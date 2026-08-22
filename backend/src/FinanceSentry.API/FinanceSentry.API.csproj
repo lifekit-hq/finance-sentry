@@ -45,6 +45,7 @@
     <ProjectReference Include="..\FinanceSentry.Modules.Analytics\FinanceSentry.Modules.Analytics.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Retention\FinanceSentry.Modules.Retention.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Agent\FinanceSentry.Modules.Agent.csproj" />
+    <ProjectReference Include="..\FinanceSentry.Modules.Liquidity\FinanceSentry.Modules.Liquidity.csproj" />
     <ProjectReference Include="..\FinanceSentry.Integration\FinanceSentry.Integration.csproj" />
   </ItemGroup>
 

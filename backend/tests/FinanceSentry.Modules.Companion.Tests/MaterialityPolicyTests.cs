@@ -18,6 +18,7 @@ public sealed class MaterialityPolicyTests
     [InlineData("ThesisBroken", CompanionEventKind.ThesisBreak)]
     [InlineData("MarketStructure", CompanionEventKind.MarketStructure)]
     [InlineData("LowBalance", CompanionEventKind.LowBalance)]
+    [InlineData("CashShortfall", CompanionEventKind.CashShortfall)]
     public void Known_alert_types_map_to_kinds(string alertType, CompanionEventKind expected)
         => _policy.ClassifyAlert(alertType).Should().Be(expected);
 

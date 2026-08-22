@@ -24,6 +24,8 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     private static readonly TimeSpan JobFailureSilenceWindow = TimeSpan.FromMinutes(15);
     // 6 days: weekly cron fires each Monday; prevents a re-run or drift from double-alerting.
     private static readonly TimeSpan PerformanceBriefSilenceWindow = TimeSpan.FromDays(6);
+    // Active-alert dedup is the primary guard; 24h HasRecent prevents re-alert on the same day after manual resolve.
+    private static readonly TimeSpan CashShortfallSilenceWindow = TimeSpan.FromHours(24);
 
     private readonly IAlertRepository _alerts = alerts;
 
@@ -322,6 +324,38 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ReferenceId = null,
             ReferenceLabel = "weekly",
         }, ct);
+    }
+
+    public async Task GenerateCashShortfallAlertAsync(
+        Guid userId, Guid accountId, string accountName,
+        DateOnly shortfallDate, decimal shortfallAmount, string currency,
+        CancellationToken ct = default)
+    {
+        var existing = await _alerts.FindActiveAsync(userId, AlertType.CashShortfall, accountId, ct);
+        if (existing is not null) return;
+
+        var quietSince = DateTimeOffset.UtcNow - CashShortfallSilenceWindow;
+        if (await _alerts.HasRecentAsync(userId, AlertType.CashShortfall, accountId, accountName, quietSince, ct))
+            return;
+
+        await _alerts.AddAsync(new Alert
+        {
+            UserId = userId,
+            Type = AlertType.CashShortfall,
+            Severity = AlertSeverity.Warning,
+            Title = $"Cash shortfall projected: {accountName}",
+            Message = $"{accountName} is projected to run short by {shortfallAmount:F2} {currency} on {shortfallDate:yyyy-MM-dd} based on your upcoming recurring payments.",
+            ReferenceId = accountId,
+            ReferenceLabel = accountName,
+        }, ct);
+    }
+
+    public async Task ResolveCashShortfallAlertAsync(
+        Guid userId, Guid accountId, CancellationToken ct = default)
+    {
+        var existing = await _alerts.FindActiveAsync(userId, AlertType.CashShortfall, accountId, ct);
+        if (existing is null) return;
+        await _alerts.ResolveAsync(existing.Id, ct);
     }
 
     /// <summary>Deterministic pseudo-GUID from (ruleKey, subject) so find/resolve are stable across runs.</summary>

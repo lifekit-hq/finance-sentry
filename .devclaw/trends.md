@@ -28,3 +28,15 @@ A new top-level `backend` directory appeared in finance-sentry since the last bo
 
 ---
 
+## [2026-08-22T10:57:20+00:00] D3 — drift
+
+A new top-level `backend` directory appeared in finance-sentry, echoing the prior `backend`-arrival note from 2026-08-19 (then flagged for confirmation but apparently still unresolved or recurring). finance-sentry's documented layout has no `backend/` root — ASP.NET Core API and Angular frontend are the two known surfaces — so a second unexplained appearance of this directory raises the same open question as before without a recorded answer.
+
+**Evidence:**
+- `git diff --diff-filter=A --name-only 891ccec51e1534302e124b6fa05ccf293f156769..HEAD`
+- `backend/`
+
+**Proposed action:** Resolve the open question from the 2026-08-19 D3 entry: confirm whether `backend/` is a deliberate restructuring (e.g. renaming/relocating the ASP.NET Core API) and if so document it in the module map; if it's still unexplained after two occurrences, treat it as a recurring drift rather than a one-off.
+
+---
+

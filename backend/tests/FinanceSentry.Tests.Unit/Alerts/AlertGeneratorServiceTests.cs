@@ -161,4 +161,64 @@ public class AlertGeneratorServiceTests
 
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
     }
+
+    [Fact]
+    public async Task GenerateCashShortfall_NoExisting_AddsWarningAlert()
+    {
+        var shortfallDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
+
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.CashShortfall, _accountId, default))
+            .ReturnsAsync((Alert?)null);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.CashShortfall, _accountId, "Chase ···1234", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateCashShortfallAlertAsync(
+            _userId, _accountId, "Chase ···1234", shortfallDate, 50m, "EUR");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.CashShortfall &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceId == _accountId &&
+            a.Message.Contains(shortfallDate.ToString("yyyy-MM-dd")) &&
+            a.Message.Contains("50.00") &&
+            a.Message.Contains("EUR")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateCashShortfall_ExistingActive_SkipsCreation()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.CashShortfall, _accountId, default))
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid() });
+
+        await _service.GenerateCashShortfallAlertAsync(
+            _userId, _accountId, "Chase ···1234",
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5), 25m, "EUR");
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResolveCashShortfall_ExistingActive_CallsResolve()
+    {
+        var existing = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.CashShortfall, _accountId, default))
+            .ReturnsAsync(existing);
+
+        await _service.ResolveCashShortfallAlertAsync(_userId, _accountId);
+
+        _repo.Verify(r => r.ResolveAsync(existing.Id, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResolveCashShortfall_NoExisting_DoesNothing()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.CashShortfall, _accountId, default))
+            .ReturnsAsync((Alert?)null);
+
+        await _service.ResolveCashShortfallAlertAsync(_userId, _accountId);
+
+        _repo.Verify(r => r.ResolveAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
 }

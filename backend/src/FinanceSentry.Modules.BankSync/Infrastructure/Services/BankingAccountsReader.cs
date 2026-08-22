@@ -34,4 +34,19 @@ public class BankingAccountsReader(
             a.ProductType))
         .ToList();
     }
+
+    public async Task<IReadOnlyList<Guid>> GetAllActiveUserIdsAsync(CancellationToken ct = default)
+    {
+        var all = await _accounts.GetAllActiveAsync(ct);
+        return all.Select(a => a.UserId).Distinct().ToList();
+    }
+
+    public async Task<IReadOnlyList<AccountBalanceSnapshot>> GetActiveAccountSnapshotsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var list = await _accounts.GetByUserIdAsync(userId, ct);
+        return list
+            .Where(a => a.IsActive)
+            .Select(a => new AccountBalanceSnapshot(a.Id, a.BankName, a.AccountNumberLast4, a.Currency, a.CurrentBalance))
+            .ToList();
+    }
 }

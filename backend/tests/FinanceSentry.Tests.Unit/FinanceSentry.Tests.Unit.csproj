@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Wealth\FinanceSentry.Modules.Wealth.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Subscriptions\FinanceSentry.Modules.Subscriptions.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Radar\FinanceSentry.Modules.Radar.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Modules.Liquidity\FinanceSentry.Modules.Liquidity.csproj" />
   </ItemGroup>
 
 </Project>

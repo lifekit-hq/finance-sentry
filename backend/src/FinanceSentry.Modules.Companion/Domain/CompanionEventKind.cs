@@ -14,6 +14,7 @@ public enum CompanionEventKind
     ThesisBreak,
     MarketStructure,
     LowBalance,
+    CashShortfall,
     AnalystAction,
     ConsentExpiring,
     OperationalFailure,

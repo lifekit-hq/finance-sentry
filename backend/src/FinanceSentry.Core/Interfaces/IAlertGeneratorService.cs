@@ -139,4 +139,23 @@ public interface IAlertGeneratorService
         string headline,
         string body,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert when the 30-day cash-flow projection shows the account going negative
+    /// (041). <paramref name="accountId"/> is the dedup key so the daily sentinel never duplicates
+    /// while the shortfall persists.
+    /// </summary>
+    Task GenerateCashShortfallAlertAsync(
+        Guid userId,
+        Guid accountId,
+        string accountName,
+        DateOnly shortfallDate,
+        decimal shortfallAmount,
+        string currency,
+        CancellationToken ct = default);
+
+    Task ResolveCashShortfallAlertAsync(
+        Guid userId,
+        Guid accountId,
+        CancellationToken ct = default);
 }

@@ -25,6 +25,7 @@ public static class SubscriptionsModule
 
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<ISubscriptionDetectionResultService, SubscriptionDetectionResultService>();
+        services.AddScoped<IActiveSubscriptionsReader, ActiveSubscriptionsReader>();
 
         return services;
     }

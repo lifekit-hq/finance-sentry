@@ -19,6 +19,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "ThesisBroken" => CompanionEventKind.ThesisBreak,
         "MarketStructure" => CompanionEventKind.MarketStructure,
         "LowBalance" => CompanionEventKind.LowBalance,
+        "CashShortfall" => CompanionEventKind.CashShortfall,
         "ConsentExpiring" => CompanionEventKind.ConsentExpiring,
         "JobFailure" => CompanionEventKind.OperationalFailure,
         _ => null,

@@ -319,5 +319,13 @@ public class RunThesisMonitorHandlerTests
 
         public Task GeneratePerformanceBriefAlertAsync(Guid userId, string headline, string body, CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task GenerateCashShortfallAlertAsync(
+            Guid userId, Guid accountId, string accountName,
+            DateOnly shortfallDate, decimal shortfallAmount, string currency, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveCashShortfallAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }
