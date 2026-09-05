@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <Version>1.7.0</Version> <!-- x-release-please-version -->
-    <AssemblyVersion>1.7.0</AssemblyVersion> <!-- x-release-please-version -->
-    <FileVersion>1.7.0</FileVersion> <!-- x-release-please-version -->
+    <Version>1.8.0</Version> <!-- x-release-please-version -->
+    <AssemblyVersion>1.8.0</AssemblyVersion> <!-- x-release-please-version -->
+    <FileVersion>1.8.0</FileVersion> <!-- x-release-please-version -->
   </PropertyGroup>
 
   <ItemGroup>
