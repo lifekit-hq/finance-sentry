@@ -5,6 +5,39 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.8.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.7.0...v1.8.0) (2026-09-05)
+
+
+### Features
+
+* **044:** classify counterparty flows per direction, drop netting ([#547](https://github.com/lifekit-hq/finance-sentry/issues/547)) ([69b811d](https://github.com/lifekit-hq/finance-sentry/commit/69b811dc785a47732bd28c9ff360108d35b153af))
+* **432:** US2 cash-sweep proposal + US3 one-tap acknowledgement ([#549](https://github.com/lifekit-hq/finance-sentry/issues/549)) ([0cefaf2](https://github.com/lifekit-hq/finance-sentry/commit/0cefaf2b48f9c611fc4537ae67e54dd7815175b3))
+* **576:** flow-breakdown drill-down — click a tile to audit its transactions ([#577](https://github.com/lifekit-hq/finance-sentry/issues/577)) ([5ceacae](https://github.com/lifekit-hq/finance-sentry/commit/5ceacae026af7e9b53a2418d86e75072f59d591a))
+* Merge origin/main into goal/issue-414 weekly performance brief ([#545](https://github.com/lifekit-hq/finance-sentry/issues/545)) ([28211c3](https://github.com/lifekit-hq/finance-sentry/commit/28211c3e5f4a0092691a02cf9db2bf4808471c73)), closes [#414](https://github.com/lifekit-hq/finance-sentry/issues/414)
+
+
+### Bug Fixes
+
+* **044:** align sentinel queries and thresholds to spec ([#548](https://github.com/lifekit-hq/finance-sentry/issues/548)) ([4de1810](https://github.com/lifekit-hq/finance-sentry/commit/4de1810594de147f33a99c60b00d90f5b79a6cac))
+* **044:** count the mortgage as household spending and cover Liza's transliteration variants ([#575](https://github.com/lifekit-hq/finance-sentry/issues/575)) ([b9623ad](https://github.com/lifekit-hq/finance-sentry/commit/b9623adfc60cabbffca5bb7763d803a198df6ffb)), closes [#573](https://github.com/lifekit-hq/finance-sentry/issues/573)
+* **044:** cover Latin-script family transfers and Revolut X in counterparty rules ([#572](https://github.com/lifekit-hq/finance-sentry/issues/572)) ([4d9aebd](https://github.com/lifekit-hq/finance-sentry/commit/4d9aebd12d1814556817a1640ffdb346db9d3542)), closes [#571](https://github.com/lifekit-hq/finance-sentry/issues/571)
+* **044:** give M011/M012 data ops explicit column types so their SQL generates ([#566](https://github.com/lifekit-hq/finance-sentry/issues/566)) ([e9dd5ac](https://github.com/lifekit-hq/finance-sentry/commit/e9dd5ac6b78889ee7a260cc1428ee49813f4b57e)), closes [#565](https://github.com/lifekit-hq/finance-sentry/issues/565)
+* **044:** make M011's FAMILY_SUPPORT category seed idempotent ([#568](https://github.com/lifekit-hq/finance-sentry/issues/568)) ([97320fc](https://github.com/lifekit-hq/finance-sentry/commit/97320fcf1f1e3c391bf91fc94e41e90b45ee1b6a)), closes [#567](https://github.com/lifekit-hq/finance-sentry/issues/567)
+* **044:** reconcile BankSync snapshot with the model so M011/M012 apply ([#564](https://github.com/lifekit-hq/finance-sentry/issues/564)) ([63d8ddd](https://github.com/lifekit-hq/finance-sentry/commit/63d8dddbd2041ff6cb20cca4e4d1555e8748d405)), closes [#563](https://github.com/lifekit-hq/finance-sentry/issues/563)
+* **406:** add postinstall shim to patch @lifekit-hq/ui@0.2.0 stacked… ([#542](https://github.com/lifekit-hq/finance-sentry/issues/542)) ([996057b](https://github.com/lifekit-hq/finance-sentry/commit/996057b535ae5a793a4148478a3b35209921f938))
+* **421:** dossier no-data state and a stale tag that fired before first… ([#546](https://github.com/lifekit-hq/finance-sentry/issues/546)) ([6d3172d](https://github.com/lifekit-hq/finance-sentry/commit/6d3172d8f92ab4f471921d652ea951d513ed18d7))
+* **alerts:** make the M003 acknowledgement migration discoverable by EF ([#555](https://github.com/lifekit-hq/finance-sentry/issues/555)) ([7f2c519](https://github.com/lifekit-hq/finance-sentry/commit/7f2c519dc90ec846912d3083338ab8cd8a629044))
+* **ci:** close the gate holes that let unvalidated PRs merge ([#562](https://github.com/lifekit-hq/finance-sentry/issues/562)) ([57a691b](https://github.com/lifekit-hq/finance-sentry/commit/57a691b30222a1128d480dc284e9529044554072)), closes [#561](https://github.com/lifekit-hq/finance-sentry/issues/561)
+* **research:** self-heal the TrendForce source off its stale seeded URL ([#552](https://github.com/lifekit-hq/finance-sentry/issues/552)) ([8beec79](https://github.com/lifekit-hq/finance-sentry/commit/8beec790d440f4a403f0e96e45d510c6ff8c0c20)), closes [#318](https://github.com/lifekit-hq/finance-sentry/issues/318)
+* **specify:** untrack the per-checkout feature.json pointer ([#556](https://github.com/lifekit-hq/finance-sentry/issues/556)) ([59676a6](https://github.com/lifekit-hq/finance-sentry/commit/59676a601a0daeab2fda271952f376b3550ac444))
+
+
+### Documentation
+
+* **538:** repoint M004's rounding reference after the recognizer move ([#550](https://github.com/lifekit-hq/finance-sentry/issues/550)) ([718a399](https://github.com/lifekit-hq/finance-sentry/commit/718a399d49ae95c051011dd2a45723f3031a022b))
+* **agents:** correct two stale sandbox frontend setup steps ([#551](https://github.com/lifekit-hq/finance-sentry/issues/551)) ([e9de3ed](https://github.com/lifekit-hq/finance-sentry/commit/e9de3ed82e601a99f2462772b8cb2ed52ba8f03d))
+* squash PR titles must carry the branch's highest-ranked commit type ([#570](https://github.com/lifekit-hq/finance-sentry/issues/570)) ([f6e705d](https://github.com/lifekit-hq/finance-sentry/commit/f6e705da7eca0a0766485029ef14cd4f16615823))
+
 ## [1.7.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.6.0...v1.7.0) (2026-08-31)
 
 
