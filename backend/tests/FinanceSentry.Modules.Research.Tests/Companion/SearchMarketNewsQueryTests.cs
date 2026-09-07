@@ -2,7 +2,6 @@ namespace FinanceSentry.Modules.Research.Tests.Companion;
 
 using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Domain;
-using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
 using Xunit;
 
@@ -32,24 +31,5 @@ public sealed class SearchMarketNewsQueryTests
         result.SourceHealth.Should().ContainSingle();
         result.SourceHealth[0].Status.Should().Be("down");
         result.SourceHealth[0].ConsecutiveFailures.Should().Be(18);
-    }
-
-    private sealed class FakeNewsRepository : INewsRepository
-    {
-        public Task<IReadOnlyList<NewsArticle>> SearchAsync(
-            string? query,
-            IReadOnlyCollection<string>? tickers,
-            Guid? thesisId,
-            DateTimeOffset? since,
-            int limit,
-            CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
-
-        public Task<IReadOnlyList<NewsArticle>> GetForTickerAsync(
-            string ticker, DateTimeOffset? since, int limit, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
-
-        public Task<int> InsertNewAsync(IReadOnlyCollection<NewsArticle> articles, CancellationToken ct = default)
-            => Task.FromResult(articles.Count);
     }
 }

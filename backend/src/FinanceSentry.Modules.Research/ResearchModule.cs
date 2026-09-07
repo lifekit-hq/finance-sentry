@@ -38,6 +38,14 @@ public static class ResearchModule
                 job => job.IngestFedAsync(CancellationToken.None),
                 "0 */6 * * *");
 
+            // Re-probe auto-retired sources 4×/day (spec 047) — retirement is otherwise permanent,
+            // since the ingestion sweep only walks enabled sources. Offset off the hour so it does not
+            // start in the same minute as the */30 sweep.
+            mgr.AddOrUpdate<NewsSourceRecoveryJob>(
+                "research-news-source-recovery",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "20 */6 * * *");
+
             mgr.AddOrUpdate<MacroCalendarSeedJob>(
                 "research-macro-seed",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -282,7 +290,9 @@ public static class ResearchModule
         services.AddScoped<IResearchIndexer, ResearchIndexer>();
         services.AddScoped<IResearchRetriever, ResearchRetriever>();
 
+        services.AddScoped<NewsSourceFetcher>();
         services.AddScoped<NewsIngestionJob>();
+        services.AddScoped<NewsSourceRecoveryJob>();
         services.AddScoped<NewsSourceSeedJob>();
         services.AddScoped<AnalystActionsIngestionJob>();
         services.AddScoped<MacroCalendarSeedJob>();

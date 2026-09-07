@@ -212,6 +212,9 @@ internal sealed class FakeNewsSourceRepository : INewsSourceRepository
     public Task<IReadOnlyList<NewsSource>> ListEnabledAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Where(s => s.Enabled).Select(Copy).ToList());
 
+    public Task<IReadOnlyList<NewsSource>> ListDisabledAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Where(s => !s.Enabled).Select(Copy).ToList());
+
     public Task<IReadOnlyList<NewsSource>> ListAllAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Select(Copy).ToList());
 
@@ -258,4 +261,70 @@ internal sealed class FakeNewsSourceRepository : INewsSourceRepository
         LastFailureReason = s.LastFailureReason,
         CreatedAt = s.CreatedAt,
     };
+}
+
+/// <summary>
+/// In-memory <see cref="INewsRepository"/> that keeps what was inserted, so a test can assert on the
+/// articles an ingestion path actually persisted rather than only on its return count.
+/// </summary>
+internal sealed class FakeNewsRepository : INewsRepository
+{
+    public List<NewsArticle> Inserted { get; } = [];
+
+    public Task<IReadOnlyList<NewsArticle>> SearchAsync(
+        string? query,
+        IReadOnlyCollection<string>? tickers,
+        Guid? thesisId,
+        DateTimeOffset? since,
+        int limit,
+        CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
+
+    public Task<IReadOnlyList<NewsArticle>> GetForTickerAsync(
+        string ticker, DateTimeOffset? since, int limit, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<NewsArticle>>([]);
+
+    public Task<int> InsertNewAsync(IReadOnlyCollection<NewsArticle> articles, CancellationToken ct = default)
+    {
+        Inserted.AddRange(articles);
+        return Task.FromResult(articles.Count);
+    }
+}
+
+/// <summary><see cref="IMarketNewsService"/> double; only the registered-source feed path is exercised.</summary>
+internal sealed class FakeMarketNewsService(IReadOnlyList<NewsArticle>? feedArticles = null) : IMarketNewsService
+{
+    public string? RequestedLabel { get; private set; }
+
+    public Task<int> IngestForTickersAsync(IReadOnlyCollection<string> tickers, CancellationToken ct = default)
+        => Task.FromResult(0);
+
+    public Task<int> IngestFedPressAsync(CancellationToken ct = default) => Task.FromResult(0);
+
+    public Task<IReadOnlyList<NewsArticle>> FetchFeedArticlesAsync(
+        string url, string sourceLabel, CancellationToken ct = default)
+    {
+        RequestedLabel = sourceLabel;
+        return Task.FromResult(feedArticles ?? []);
+    }
+}
+
+/// <summary>
+/// <see cref="INewsPageSource"/> double that claims one URL and either yields the given candidates or
+/// throws — the two outcomes the health/recovery paths branch on.
+/// </summary>
+internal sealed class FakeNewsPageSource(
+    string url, IReadOnlyList<NewsPageArticle>? articles = null, Exception? failure = null) : INewsPageSource
+{
+    public int FetchCount { get; private set; }
+
+    public bool CanHandle(string candidateUrl) => candidateUrl == url;
+
+    public Task<IReadOnlyList<NewsPageArticle>> FetchAsync(string candidateUrl, CancellationToken ct = default)
+    {
+        FetchCount++;
+        return failure is not null
+            ? Task.FromException<IReadOnlyList<NewsPageArticle>>(failure)
+            : Task.FromResult(articles ?? []);
+    }
 }
