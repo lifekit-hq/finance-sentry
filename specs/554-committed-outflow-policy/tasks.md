@@ -1,0 +1,27 @@
+# Tasks: One Committed-Outflow Policy (554)
+
+## [US1] One policy decides committed vs discretionary — rules (a), (b), (c)
+
+- [x] Add `ICommittedOutflowPolicy` + `CommittedOutflowPolicy` + `CommittedOutflowRules` (BankSync `Application/Services`), documenting all four rules and naming rule (d) as US2's
+- [x] `CommittedOutflowRules.IsCommitted(Transaction)` — rule (a) via `CommitmentKeyResolver`, rule (b) via the committed-category set
+- [x] `CommittedOutflowRules.IsCommittedFlowRole(string)` — rule (c) over `FlowRoles.FamilySupport` / `FlowRoles.Household`
+- [x] `MoneyFlowStatisticsService` takes `ICommittedOutflowPolicy` instead of `IActiveSubscriptionsReader`; per-debit sum and the synthetic counterparty row both ask the rule set
+- [x] Rewrite the match-rule XML doc on `IMoneyFlowStatisticsService` around the four rules
+- [x] Register the policy in `BankSyncModule`
+- [x] `CommittedOutflowPolicyTests` — each rule in isolation: active subscription key, installment plan key, rent category, loan category, an ordinary shop, the two committed roles, investment/self-routing/unset role
+- [x] `MoneyFlowStatisticsTests` — construction sites moved to a policy stub; fixture tests for monthly rent, a family-support counterparty flow, an unroled counterparty flow, the partition invariant on the synthetic row, and a cross-currency rent case that would fail under a native sum
+- [x] Update `docs/money-semantics.md` §5a — the definition is four rules
+- [x] `dotnet build backend/FinanceSentry.sln -c Release -m:1` — no new warnings
+- [x] `dotnet test backend/FinanceSentry.sln --no-build -c Release -m:1` — green
+- [x] Commit spec artifacts + code
+
+## [US2] Rule (d) — user-pinned committed merchants
+
+- [ ] `CommittedMerchantPin` entity + repository port + EF configuration + migration
+- [ ] Pin / unpin commands and a list query, keyed by `MerchantNameNormalizer.NormalizeDetectionKey`
+- [ ] `CommittedOutflowPolicy` loads the pin set; `IsCommitted` gains the rule (d) clause
+- [ ] REST endpoint (list / add / remove) on the BankSync controller surface
+- [ ] MCP tool over the same commands, added to the canonical tool list
+- [ ] Tests: repository round-trip, the policy clause, endpoint contract test, MCP tool contract test
+- [ ] `docs/money-semantics.md` §5a — rule (d)
+- [ ] `dotnet build` + `dotnet test` green; commit spec artifacts + code
