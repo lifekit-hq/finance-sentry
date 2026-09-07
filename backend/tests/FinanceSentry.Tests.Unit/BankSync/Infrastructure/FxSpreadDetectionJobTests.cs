@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -19,12 +20,27 @@ using Xunit;
 /// threshold. Crucially, unrelated same-day flows (salary in, rent out) must never pair — the
 /// old day-bucket aggregate design alerted on exactly that coincidence.
 /// </summary>
-public class FxSpreadDetectionJobTests
+public sealed class FxSpreadDetectionJobTests : IDisposable
 {
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
-    // EUR→UAH market rate from CurrencyConverter fallback rates: 1.08 / 0.024 = 45
-    private const decimal EurUahMarketRate = 45m;
+    // Live rates deliberately different from CurrencyConverter's offline seed (EUR 1.08 /
+    // UAH 0.024, which would imply 45): the sentinel must measure against the refreshed table,
+    // so every figure below is pinned to 1.20 / 0.030 = 40 and would not match under the seed.
+    private const decimal LiveEurUsd = 1.20m;
+    private const decimal LiveUahUsd = 0.030m;
+    private const decimal EurUahMarketRate = 40m;
+
+    public FxSpreadDetectionJobTests() => InstallLiveRates();
+
+    public void Dispose() => CurrencyConverter.UpdateRates(CurrencyConverter.FallbackRates);
+
+    private static void InstallLiveRates() =>
+        CurrencyConverter.UpdateRates(new Dictionary<string, decimal>
+        {
+            ["EUR"] = LiveEurUsd,
+            ["UAH"] = LiveUahUsd,
+        });
 
     private static BankSyncDbContext NewDb() => new(
         new DbContextOptionsBuilder<BankSyncDbContext>()
@@ -33,14 +49,19 @@ public class FxSpreadDetectionJobTests
     private static IConfiguration DefaultConfig() =>
         new ConfigurationBuilder().Build();
 
-    private static IConfiguration ConfigWith(int lookbackDays, decimal threshold) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["HygieneSentinels:FxSpreadLookbackDays"] = lookbackDays.ToString(),
-                ["HygieneSentinels:FxSpreadThreshold"] = threshold.ToString("F4"),
-            })
-            .Build();
+    private static IConfiguration ConfigWith(
+        int lookbackDays, decimal threshold, int? maxRateAgeHours = null)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["HygieneSentinels:FxSpreadLookbackDays"] = lookbackDays.ToString(),
+            ["HygieneSentinels:FxSpreadThreshold"] = threshold.ToString("F4"),
+        };
+        if (maxRateAgeHours is not null)
+            settings["HygieneSentinels:FxSpreadMaxRateAgeHours"] = maxRateAgeHours.Value.ToString();
+
+        return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+    }
 
     private FxSpreadDetectionJob MakeJob(BankSyncDbContext db, IConfiguration? config = null) =>
         new(db, new TransferDetectionService(), _alerts.Object, config ?? DefaultConfig(),
@@ -90,18 +111,48 @@ public class FxSpreadDetectionJobTests
         var uahAccount = MakeAccount(userId, "UAH");
         db.BankAccounts.AddRange(eurAccount, uahAccount);
 
-        // 100 EUR debit → 4050 UAH credit (implied rate 40.5, market 45)
-        // Spread = (45 - 40.5) / 45 = 10% > default 3% threshold
-        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 4050m, DateTime.UtcNow);
+        // 100 EUR debit → 3600 UAH credit (implied rate 36, market 40)
+        // Spread = (40 - 36) / 40 = 10% > default 3% threshold
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow);
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
-            userId, debit.Id, "EUR", "UAH", 40.5m, EurUahMarketRate,
+            userId, debit.Id, "EUR", "UAH", 36m, EurUahMarketRate,
             It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    /// <summary>
+    /// The reference rate has to be one somebody published. CurrencyConverter seeds itself with
+    /// hardcoded constants that hold until the refresh job first ticks and survive any feed
+    /// outage afterwards; against a drifted seed a fair conversion reads as a multi-percent loss.
+    /// The sentinel stands down instead of accusing the bank.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_NoAlert_WhenFxRatesAreOlderThanTheConfiguredMaxAge()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        // The same conversion the firing case alerts on.
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow);
+        db.Transactions.AddRange(debit, credit);
+        await db.SaveChangesAsync();
+
+        // Zero tolerance is stale by definition (freshness is strict), so the table installed in
+        // the constructor cannot satisfy it — no dependence on how much time has elapsed.
+        await MakeJob(db, ConfigWith(30, 0.03m, maxRateAgeHours: 0)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     /// <summary>
@@ -158,8 +209,8 @@ public class FxSpreadDetectionJobTests
         db.BankAccounts.AddRange(eurAccount, uahAccount);
 
         var today = DateTime.UtcNow;
-        // 100 EUR grocery debit and 4050 UAH bonus credit — USD values within 10%, but no
-        // transfer signal on either leg.
+        // 100 EUR grocery debit and 4050 UAH bonus credit — USD values within the pairing
+        // tolerance, but no transfer signal on either leg.
         db.Transactions.AddRange(
             MakeTx(eurAccount, 100m, "debit", today,
                 description: "Grocery store purchase", category: "FOOD_AND_DRINK"),
@@ -184,8 +235,8 @@ public class FxSpreadDetectionJobTests
         var uahAccount = MakeAccount(userId, "UAH");
         db.BankAccounts.AddRange(eurAccount, uahAccount);
 
-        // Implied 44.5 vs market 45 — spread ≈ 1.1% < 3% threshold
-        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 4450m, DateTime.UtcNow);
+        // Implied 39.5 vs market 40 — spread = 1.25% < 3% threshold
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3950m, DateTime.UtcNow);
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
@@ -255,15 +306,15 @@ public class FxSpreadDetectionJobTests
         var uahAccount = MakeAccount(userId, "UAH");
         db.BankAccounts.AddRange(eurAccount, uahAccount);
 
-        // Implied 44.0 (spread ≈ 2.2%): below 3% default but above 2% custom threshold
-        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 4400m, DateTime.UtcNow);
+        // Implied 39.0 (spread = 2.5%): below the 3% default but above the 2% custom threshold
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3900m, DateTime.UtcNow);
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
         await MakeJob(db, ConfigWith(30, 0.02m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
-            userId, debit.Id, "EUR", "UAH", 44m, EurUahMarketRate,
+            userId, debit.Id, "EUR", "UAH", 39m, EurUahMarketRate,
             It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -302,7 +353,7 @@ public class FxSpreadDetectionJobTests
         db.BankAccounts.AddRange(eurAccount, uahAccount);
 
         // Same figures as the firing case, but the debit side's account is disconnected.
-        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 4050m, DateTime.UtcNow);
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow);
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
@@ -326,19 +377,19 @@ public class FxSpreadDetectionJobTests
         // Two distinct costly conversions on adjacent days — each must alert with its own
         // debit transaction id (the dedup key), not collapse into one currency-pair alert.
         var (debit1, credit1) = MakeConversion(
-            eurAccount, 100m, uahAccount, 4050m, DateTime.UtcNow.AddDays(-1));
+            eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow.AddDays(-1));
         var (debit2, credit2) = MakeConversion(
-            eurAccount, 200m, uahAccount, 8100m, DateTime.UtcNow);
+            eurAccount, 200m, uahAccount, 7200m, DateTime.UtcNow);
         db.Transactions.AddRange(debit1, credit1, debit2, credit2);
         await db.SaveChangesAsync();
 
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
-            userId, debit1.Id, "EUR", "UAH", 40.5m, EurUahMarketRate, It.IsAny<CancellationToken>()),
+            userId, debit1.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
             Times.Once);
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
-            userId, debit2.Id, "EUR", "UAH", 40.5m, EurUahMarketRate, It.IsAny<CancellationToken>()),
+            userId, debit2.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

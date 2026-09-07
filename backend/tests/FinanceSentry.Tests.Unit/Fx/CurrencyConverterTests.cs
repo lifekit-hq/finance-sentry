@@ -77,6 +77,42 @@ public sealed class CurrencyConverterTests : IDisposable
     }
 
     [Fact]
+    public void AreRatesFresh_IsTrue_ImmediatelyAfterARefresh()
+    {
+        CurrencyConverter.UpdateRates(new Dictionary<string, decimal> {["EUR"] = 1.05m});
+
+        CurrencyConverter.RatesUpdatedAtUtc.Should().NotBeNull();
+        CurrencyConverter.AreRatesFresh(TimeSpan.FromHours(1)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AreRatesFresh_IsFalse_OnceTheTableHasAgedPastMaxAge()
+    {
+        CurrencyConverter.UpdateRates(new Dictionary<string, decimal> {["EUR"] = 1.05m});
+
+        // Freshness is strict, so a zero tolerance is stale however coarse the host clock is —
+        // no elapsed-time race here, and it doubles as the caller's off switch.
+        CurrencyConverter.AreRatesFresh(TimeSpan.Zero).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The refresh job leaves the current table in place when the feed yields nothing. If that
+    /// non-event moved the freshness stamp, an outage would look like a healthy refresh forever
+    /// and rate-comparing callers (the FX-spread sentinel) would trust drifting numbers.
+    /// </summary>
+    [Fact]
+    public void UpdateRates_LeavesTheFreshnessStampAlone_WhenTheFeedYieldsNothing()
+    {
+        CurrencyConverter.UpdateRates(new Dictionary<string, decimal> {["EUR"] = 1.05m});
+        var stampedAt = CurrencyConverter.RatesUpdatedAtUtc;
+
+        CurrencyConverter.UpdateRates(null);
+        CurrencyConverter.UpdateRates(new Dictionary<string, decimal>());
+
+        CurrencyConverter.RatesUpdatedAtUtc.Should().Be(stampedAt);
+    }
+
+    [Fact]
     public void UpdateRates_SkipsNonPositiveRates()
     {
         CurrencyConverter.UpdateRates(new Dictionary<string, decimal>

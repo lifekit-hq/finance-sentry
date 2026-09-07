@@ -65,6 +65,15 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   (`Program.cs`), seeded with hardcoded fallbacks until the first refresh.
 - **Unknown currency falls back 1:1.** Use `CurrencyConverter.IsKnown` to flag a total as
   approximate rather than trusting the silent fallback.
+- **A rate may never be compared to another rate without a freshness check.** The seed table
+  is live until the first refresh and survives any feed outage after it (the refresh job
+  keeps the current table when the feed yields nothing), so `IsKnown` says nothing about
+  whether a rate is current. Normalising magnitudes tolerates that — the total is approximate
+  either way. Judging a bank's implied rate *against* the table does not: the measurement is
+  the gap between them, so a drifted reference invents one. Gate such reads on
+  `CurrencyConverter.AreRatesFresh(maxAge)` (`RatesUpdatedAtUtc` is null until the first
+  refresh, and an ignored empty feed never moves it) and stand down rather than publish a
+  figure. `FxSpreadDetectionJob` is the one such consumer today.
 
 ## 4. Transaction lifecycle (pending / posted / dedup)
 

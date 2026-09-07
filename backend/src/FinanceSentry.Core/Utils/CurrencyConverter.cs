@@ -23,12 +23,37 @@ public static class CurrencyConverter
             ["UAH"] = 0.024m,
         };
 
-    // Immutable dictionary swapped by reference so reads never see a partial table.
-    private static volatile IReadOnlyDictionary<string, decimal> _rates = FallbackRates;
+    /// <summary>Table plus the moment it was installed, swapped as one so a reader that checks
+    /// freshness before reading rates can never pair a live stamp with the seed table.</summary>
+    private sealed record RateTable(IReadOnlyDictionary<string, decimal> Rates, DateTimeOffset? UpdatedAtUtc);
+
+    // Immutable snapshot swapped by reference so reads never see a partial table.
+    private static volatile RateTable _table = new(FallbackRates, null);
+
+    /// <summary>
+    /// When the live table was last installed by <see cref="UpdateRates"/>, or null while the
+    /// hardcoded seed is still in force. Callers that compare a rate to another rate — rather
+    /// than merely normalising magnitudes — must consult <see cref="AreRatesFresh"/> first.
+    /// </summary>
+    public static DateTimeOffset? RatesUpdatedAtUtc => _table.UpdatedAtUtc;
+
+    /// <summary>
+    /// True when a live refresh landed less than <paramref name="maxAge"/> ago. False while the
+    /// seed is still in force, and false once the feed has been down long enough for the table to
+    /// drift. A non-positive <paramref name="maxAge"/> is never fresh, so it switches a
+    /// freshness-gated caller off outright.
+    /// <para>
+    /// Normalising a mixed-currency total tolerates a stale rate — the total is approximate either
+    /// way. Judging one rate <em>against</em> another does not: the whole measurement is the gap
+    /// between them, so a stale reference manufactures a gap that no bank charged.
+    /// </para>
+    /// </summary>
+    public static bool AreRatesFresh(TimeSpan maxAge) =>
+        _table.UpdatedAtUtc is { } updatedAt && DateTimeOffset.UtcNow - updatedAt < maxAge;
 
     public static decimal ToUsd(decimal amount, string currency)
     {
-        if (!string.IsNullOrWhiteSpace(currency) && _rates.TryGetValue(currency, out var rate))
+        if (!string.IsNullOrWhiteSpace(currency) && _table.Rates.TryGetValue(currency, out var rate))
             return amount * rate;
 
         return amount;
@@ -40,12 +65,13 @@ public static class CurrencyConverter
     /// fallback for an unlisted currency.
     /// </summary>
     public static bool IsKnown(string? currency) =>
-        !string.IsNullOrWhiteSpace(currency) && _rates.ContainsKey(currency);
+        !string.IsNullOrWhiteSpace(currency) && _table.Rates.ContainsKey(currency);
 
     /// <summary>
     /// Replaces the live rate table (USD-per-unit multipliers). The hardcoded
     /// fallback is merged underneath so a currency briefly missing from the feed
-    /// still resolves. Ignored when <paramref name="rates"/> is null/empty.
+    /// still resolves. Ignored when <paramref name="rates"/> is null/empty — a feed
+    /// outage must not pass for a refresh, so the freshness stamp stays put too.
     /// </summary>
     public static void UpdateRates(IReadOnlyDictionary<string, decimal>? rates)
     {
@@ -60,6 +86,6 @@ public static class CurrencyConverter
         }
 
         merged["USD"] = 1.00m;
-        _rates = merged;
+        _table = new RateTable(merged, DateTimeOffset.UtcNow);
     }
 }

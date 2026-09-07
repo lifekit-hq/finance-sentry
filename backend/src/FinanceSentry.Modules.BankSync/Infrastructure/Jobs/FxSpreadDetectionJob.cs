@@ -32,6 +32,10 @@ public sealed class FxSpreadDetectionJob(
     private const int DefaultLookbackDays = 3;
     private const decimal DefaultSpreadThreshold = 0.03m;
 
+    // The FX refresh job runs daily, so 48h tolerates one missed run before the sentinel
+    // stands down rather than measuring against a rate nobody can vouch for.
+    private const int DefaultMaxRateAgeHours = 48;
+
     // The transfer matcher's default cross-currency tolerance (5%) exists to REJECT pairs that
     // deviate from the market rate — but a costly conversion deviates by exactly the spread we
     // are hunting. Widen the amount tolerance for this sentinel so a pair losing up to ~30% to
@@ -44,6 +48,26 @@ public sealed class FxSpreadDetectionJob(
         var lookbackDays = config.GetValue("HygieneSentinels:FxSpreadLookbackDays", DefaultLookbackDays);
         var threshold = config.GetValue("HygieneSentinels:FxSpreadThreshold", DefaultSpreadThreshold);
         var since = DateTime.UtcNow.AddDays(-lookbackDays);
+
+        // This is the one sentinel that judges a rate against a rate, so the reference has to be
+        // a real one. CurrencyConverter seeds itself with hardcoded constants (EUR 1.08, UAH
+        // 0.024) that are live until the refresh job first ticks and stay put through any feed
+        // outage after that — measured against them, a perfectly fair conversion reads as a
+        // multi-percent loss and the user gets told their bank gouged them. Standing down defers
+        // rather than drops while the outage stays shorter than the lookback window — the next
+        // tick re-examines it. An outage past MaxRateAge + FxSpreadLookbackDays does lose the
+        // conversions that age out meanwhile: a fair trade against alerting on fiction, and the
+        // skip is logged so the outage is visible.
+        var maxRateAge = TimeSpan.FromHours(
+            config.GetValue("HygieneSentinels:FxSpreadMaxRateAgeHours", DefaultMaxRateAgeHours));
+        if (!CurrencyConverter.AreRatesFresh(maxRateAge))
+        {
+            logger.LogWarning(
+                "FxSpreadDetectionJob: skipped — FX rates last refreshed {UpdatedAt} (max age {MaxAge}); "
+                + "a spread measured against the offline seed table would be fiction",
+                CurrencyConverter.RatesUpdatedAtUtc?.ToString("O") ?? "never", maxRateAge);
+            return;
+        }
 
         // Liveness policy (aligned across all 044 sentinels): only transactions on active
         // accounts participate — a disconnected account's history must not raise new alerts.

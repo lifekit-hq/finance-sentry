@@ -35,3 +35,7 @@
 - [x] Add `FxSpread` to `CompanionEventKind` + `MaterialityPolicy`
 - [x] Implement `FxSpreadDetectionJob` + register + schedule in BankSyncModule
 - [x] Write unit tests for `FxSpreadDetectionJob`
+- [x] Give `CurrencyConverter` a freshness stamp an outage cannot forge (`RatesUpdatedAtUtc` / `AreRatesFresh`)
+- [x] Stand the sentinel down on stale rates — a spread measured against the offline seed accuses honest conversions
+- [x] Pin the sentinel's tests to a refreshed table, not the seed, so reading the seed fails them
+- [x] Declare the `HygieneSentinels` block in appsettings so every threshold is discoverable
