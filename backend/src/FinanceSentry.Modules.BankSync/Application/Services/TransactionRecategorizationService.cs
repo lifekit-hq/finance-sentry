@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -35,7 +36,9 @@ public class TransactionRecategorizationService(
     IMonobankAdapter monobankAdapter,
     ITrueLayerConnectionRepository truelayerConnections,
     ITrueLayerClient truelayerClient,
-    ICategoryResolver categoryResolver,
+    ITransactionCategorizer categorizer,
+    TrueLayerCategoryMapper categoryMapper,
+    IActiveSubscriptionsReader activeSubscriptions,
     ILogger<TransactionRecategorizationService> logger) : ITransactionRecategorizationService
 {
     // Monobank statement API caps each request at 31 days and ~1 request per 60s per token.
@@ -51,7 +54,9 @@ public class TransactionRecategorizationService(
     private readonly IMonobankAdapter _monobankAdapter = monobankAdapter;
     private readonly ITrueLayerConnectionRepository _truelayerConnections = truelayerConnections;
     private readonly ITrueLayerClient _truelayerClient = truelayerClient;
-    private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly ITransactionCategorizer _categorizer = categorizer;
+    private readonly TrueLayerCategoryMapper _categoryMapper = categoryMapper;
+    private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
     private readonly ILogger<TransactionRecategorizationService> _logger = logger;
 
     // Guarantees ≥ MonobankThrottle spacing between statement calls across the whole run.
@@ -62,7 +67,11 @@ public class TransactionRecategorizationService(
         var userAccounts = (await _accounts.GetByUserIdAsync(userId, ct)).ToList();
         var userTransactions = (await _transactions.GetByUserIdAsync(userId, ct)).ToList();
 
-        var reResolved = ReResolveFromStoredSignal(userTransactions);
+        // Read once for the whole pass: the loan rule matches each row against the user's
+        // active repayment plans, so a per-row lookup would be one query per transaction.
+        var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
+
+        var reResolved = ReResolveFromStoredSignal(userTransactions, installmentPlans);
         var reFetched = await ReFetchMissingSignalAsync(userAccounts, userTransactions, ct);
 
         await _transactions.SaveChangesAsync(ct);
@@ -78,12 +87,13 @@ public class TransactionRecategorizationService(
     }
 
     /// <summary>Pass 1 — cheap in-process re-resolve for rows that already carry a raw signal.</summary>
-    private int ReResolveFromStoredSignal(IReadOnlyList<Transaction> txns)
+    private int ReResolveFromStoredSignal(
+        IReadOnlyList<Transaction> txns, IReadOnlyList<ActiveInstallmentPlan> installmentPlans)
     {
         var updated = 0;
         foreach (var t in txns)
         {
-            var resolved = ResolveFromRaw(t);
+            var resolved = ResolveFromRaw(t, installmentPlans);
             if (resolved is not null && resolved != t.MerchantCategory)
             {
                 t.MerchantCategory = resolved;
@@ -146,18 +156,23 @@ public class TransactionRecategorizationService(
         return updated;
     }
 
-    private string? ResolveFromRaw(Transaction t)
-    {
-        if (t.Mcc.HasValue)
-            return _categoryResolver.ResolveMcc(t.Mcc);
-        if (!string.IsNullOrWhiteSpace(t.SourceCategory))
-            return _categoryResolver.ResolveCanonicalKey(t.SourceCategory);
-
-        // No structured signal (e.g. TrueLayer): recover from the free-text description.
-        // A miss returns null so the row stays eligible for a provider re-fetch (pass 2).
-        var byDescription = _categoryResolver.ResolveDescription(t.Description);
-        return byDescription == CategoryKeys.Uncategorized ? null : byDescription;
-    }
+    // The same ladder the ingest adapters run, so a backfill can only ever confirm or correct an
+    // ingest decision — never reverse one (#553). A null means no rule claimed the row, which
+    // leaves it eligible for a provider re-fetch in pass 2.
+    //
+    // SourceCategory is written by the TrueLayer adapter alone and holds the provider's raw
+    // wording, so it goes through the same mapper ingest used; handing the ladder the raw string
+    // would fail canonical-key validation and silently drop the provider rung on this path only.
+    private string? ResolveFromRaw(Transaction t, IReadOnlyList<ActiveInstallmentPlan> installmentPlans) =>
+        _categorizer.Categorize(
+            new CategorizationSignals(
+                Description: t.Description,
+                MerchantName: t.MerchantName,
+                TransactionType: t.TransactionType,
+                Amount: t.Amount,
+                Mcc: t.Mcc,
+                ProviderCategory: _categoryMapper.MapStored(t.SourceCategory)),
+            installmentPlans);
 
     private async Task<IReadOnlyList<TransactionCandidate>> FetchCandidatesAsync(
         BankAccount account, IReadOnlyList<Transaction> rows, CancellationToken ct)

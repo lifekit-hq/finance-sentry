@@ -42,17 +42,6 @@ public sealed class CategoryResolver(IServiceScopeFactory scopeFactory) : ICateg
         return _validKeys!.Contains(normalized) ? normalized : CategoryKeys.Uncategorized;
     }
 
-    public string ResolveDescription(string? description)
-    {
-        // Prefer a specific merchant match ("To Go Sushi" -> food), then fall back to the
-        // directional-transfer prefix ("To Mario Scalas" -> transfer out).
-        var byKeyword = TryResolveKeyword(description);
-        if (byKeyword is not null)
-            return byKeyword;
-
-        return TransferDescriptionClassifier.Resolve(description) ?? CategoryKeys.Uncategorized;
-    }
-
     public string? TryResolveKeyword(string? description)
     {
         EnsureLoaded();

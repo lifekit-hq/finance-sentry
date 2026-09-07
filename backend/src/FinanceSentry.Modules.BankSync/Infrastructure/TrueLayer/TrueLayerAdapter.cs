@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
@@ -14,7 +15,8 @@ using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 public class TrueLayerAdapter(
     ITrueLayerClient client,
     TrueLayerCategoryMapper categoryMapper,
-    ICategoryResolver categoryResolver) : IBankProvider
+    ITransactionCategorizer categorizer,
+    IActiveSubscriptionsReader activeSubscriptions) : IBankProvider
 {
     /// <summary>
     /// ProductType marker distinguishing a /data/v1/cards credit card from a regular
@@ -35,7 +37,8 @@ public class TrueLayerAdapter(
     private const int ResyncLookbackDays = 7;
 
     private readonly TrueLayerCategoryMapper _categoryMapper = categoryMapper;
-    private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly ITransactionCategorizer _categorizer = categorizer;
+    private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
 
     public string ProviderName => "truelayer";
 
@@ -129,6 +132,10 @@ public class TrueLayerAdapter(
         string credential, string externalAccountId, Guid accountId, Guid userId,
         DateTime? since, bool isCard, CancellationToken ct)
     {
+        // Read once for the whole sync: the loan rule matches each row against the user's active
+        // repayment plans, so a per-row lookup would be one query per transaction.
+        var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var overlapFrom = today.AddDays(-ResyncLookbackDays);
         var watermarkFrom = since.HasValue
@@ -155,16 +162,20 @@ public class TrueLayerAdapter(
             var amount = Math.Abs(t.Amount);
             var txType = t.Amount < 0 || t.TransactionType == "debit" ? "debit" : "credit";
 
-            // Prefer TrueLayer's own classification; many EU banks return it empty, so fall
-            // back to matching the free-text description against the merchant-keyword table.
-            var category = _categoryMapper.Map(t.Classification);
-            if (category == CategoryKeys.Uncategorized)
-                category = _categoryResolver.ResolveDescription(t.Description);
+            // TrueLayer's own classification enters the shared ladder as the provider category —
+            // many EU banks return it empty, and the ladder's description rules then decide.
+            var category = _categorizer.Categorize(
+                new CategorizationSignals(
+                    Description: t.Description,
+                    MerchantName: t.MerchantName,
+                    TransactionType: txType,
+                    Amount: amount,
+                    ProviderCategory: _categoryMapper.Map(t.Classification)),
+                installmentPlans)
+                ?? CategoryKeys.Uncategorized;
 
             // Persist the raw classification (when present) so a later re-map is traceable.
-            var sourceCategory = t.Classification is { Count: > 0 }
-                ? string.Join(" > ", t.Classification)
-                : null;
+            var sourceCategory = TrueLayerCategoryMapper.ToSourceCategory(t.Classification);
 
             return new TransactionCandidate(
                 AccountId: accountId,

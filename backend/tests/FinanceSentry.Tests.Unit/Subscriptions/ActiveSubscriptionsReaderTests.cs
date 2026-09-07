@@ -78,6 +78,47 @@ public class ActiveSubscriptionsReaderTests
     }
 
     [Fact]
+    public async Task GetActiveInstallmentPlans_ExcludesSubscriptionKindCommitments()
+    {
+        // The kind filter is what keeps categorization (#553) from calling every recurring
+        // debit — Netflix, a monthly transfer to a person — a loan repayment.
+        var (reader, _) = MakeSut(
+            Make("netflix", "Netflix"),
+            Make("ліза", "Ліза"),
+            Make("516936", "Іпотека", SubscriptionKinds.Installment),
+            Make("installment:allo:2340", "Алло", SubscriptionKinds.Installment));
+
+        var plans = await reader.GetActiveInstallmentPlansAsync(UserId);
+
+        plans.Select(p => p.Key).Should().BeEquivalentTo(["516936", "installment:allo:2340"]);
+    }
+
+    [Fact]
+    public async Task GetActiveInstallmentPlans_CarryTheAmountTheChargesClusterAround()
+    {
+        // Masked-card keys collide across every card on one BIN, so the amount is the only
+        // thing that tells the mortgage apart from a small transfer.
+        var (reader, _) = MakeSut(Make("516936", "Іпотека", SubscriptionKinds.Installment));
+
+        var plans = await reader.GetActiveInstallmentPlansAsync(UserId);
+
+        plans.Should().ContainSingle().Which.ExpectedAmount.Should().Be(15m);
+    }
+
+    [Fact]
+    public async Task GetActiveInstallmentPlans_ReadsOnlyActiveRows()
+    {
+        var (reader, repo) = MakeSut(Make("installment:allo:2340", "Алло", SubscriptionKinds.Installment));
+
+        await reader.GetActiveInstallmentPlansAsync(UserId);
+
+        repo.Verify(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(
+            r => r.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task GetActiveCommitmentMerchantKeys_NoActiveCommitments_ReturnsEmptySet()
     {
         var (reader, _) = MakeSut();

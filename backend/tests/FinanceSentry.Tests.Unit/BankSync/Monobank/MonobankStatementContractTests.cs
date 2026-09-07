@@ -1,6 +1,9 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Monobank;
 
 using System.Net;
+using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 using FluentAssertions;
@@ -59,6 +62,69 @@ public class MonobankStatementContractTests
           }
         ]
         """;
+
+    // Three debits Monobank all books under the wire-transfer MCC 4829: a mortgage repayment
+    // (a bare masked card number), an installment repayment, and a genuine card-to-card
+    // transfer. Only the first two are spending (#553).
+    private const string Mcc4829Body = """
+        [
+          {
+            "id": "mortgage0001=",
+            "time": 1554466347,
+            "description": "516936******4992",
+            "mcc": 4829,
+            "hold": false,
+            "amount": -1406096,
+            "operationAmount": -1406096,
+            "currencyCode": 980,
+            "operationCurrencyCode": 980,
+            "balance": 10050000
+          },
+          {
+            "id": "installment001=",
+            "time": 1554466348,
+            "description": "Платіж ТОВ Алло - monomarket",
+            "mcc": 4829,
+            "hold": false,
+            "amount": -299995,
+            "operationAmount": -299995,
+            "currencyCode": 980,
+            "operationCurrencyCode": 980,
+            "balance": 9750005
+          },
+          {
+            "id": "cardtocard001=",
+            "time": 1554466349,
+            "description": "Переказ на картку",
+            "mcc": 4829,
+            "hold": false,
+            "amount": -500000,
+            "operationAmount": -500000,
+            "currencyCode": 980,
+            "operationCurrencyCode": 980,
+            "balance": 9250005
+          }
+        ]
+        """;
+
+    [Fact]
+    public async Task GetCandidates_SplitsMcc4829_RepaymentsAreLoanPayments_TransfersStayTransfers()
+    {
+        var handler = new MonobankStubHttpHandler().Enqueue(HttpStatusCode.OK, Mcc4829Body);
+        // The mortgage is only reachable through its detected plan — its description carries
+        // no wording, so the keyword bridge cannot see it.
+        var mortgagePlan = new ActiveInstallmentPlan(
+            CommitmentKeyResolver.Resolve(null, "516936******4992", 14060.96m, 4829), 14060.96m);
+        var adapter = new MonobankAdapter(
+            handler.BuildClient(), StubCategoryResolver.Categorizer,
+            new StubActiveSubscriptionsReader(mortgagePlan));
+
+        var candidates = await adapter.GetCandidatesAsync(
+            Token, AccountId, Guid.NewGuid(), Guid.NewGuid(), From, To);
+
+        candidates.Select(c => c.MerchantCategory).Should().Equal(
+            CategoryKeys.LoanPayments, CategoryKeys.LoanPayments, CategoryKeys.TransferOut);
+    }
 
     [Fact]
     public async Task GetStatements_RequestsStatementPathWithUnixRange()
@@ -124,7 +190,8 @@ public class MonobankStatementContractTests
     public async Task GetCandidates_ConvertsKopecksToDecimalAndUnixTimeToUtc()
     {
         var handler = new MonobankStubHttpHandler().Enqueue(HttpStatusCode.OK, StatementBody);
-        var adapter = new MonobankAdapter(handler.BuildClient(), StubCategoryResolver.Instance);
+        var adapter = new MonobankAdapter(
+            handler.BuildClient(), StubCategoryResolver.Categorizer, StubActiveSubscriptionsReader.Empty);
 
         var candidates = await adapter.GetCandidatesAsync(
             Token, AccountId, Guid.NewGuid(), Guid.NewGuid(), From, To);

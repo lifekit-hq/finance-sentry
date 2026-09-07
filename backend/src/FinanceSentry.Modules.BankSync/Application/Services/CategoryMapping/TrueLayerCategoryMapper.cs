@@ -128,6 +128,9 @@ public sealed class TrueLayerCategoryMapper
             ["Health insurance"] = "UNCATEGORIZED",
         };
 
+    /// <summary>Separator joining a classification path into the stored <c>SourceCategory</c>.</summary>
+    private const string StoredSeparator = " > ";
+
     public string Map(IReadOnlyList<string>? classification)
     {
         if (classification is null || classification.Count == 0)
@@ -141,4 +144,24 @@ public sealed class TrueLayerCategoryMapper
         }
         return "UNCATEGORIZED";
     }
+
+    /// <summary>
+    /// The stored <c>SourceCategory</c> form of a classification path — kept next to
+    /// <see cref="MapStored"/>, its exact inverse, so ingest and the recategorization backfill
+    /// cannot disagree about the format (#553).
+    /// </summary>
+    public static string? ToSourceCategory(IReadOnlyList<string>? classification)
+        => classification is { Count: > 0 } ? string.Join(StoredSeparator, classification) : null;
+
+    /// <summary>
+    /// Maps an already-stored <c>SourceCategory</c> the way ingest mapped the live classification.
+    /// The backfill must map before consulting the categorization ladder: the stored value is the
+    /// provider's raw wording ("Restaurants"), never a canonical key, so feeding it to the ladder
+    /// unmapped silently skips the provider rung and lets a lower rung re-decide a row that ingest
+    /// had already classified correctly.
+    /// </summary>
+    public string MapStored(string? sourceCategory)
+        => string.IsNullOrWhiteSpace(sourceCategory)
+            ? "UNCATEGORIZED"
+            : Map(sourceCategory.Split(StoredSeparator, StringSplitOptions.RemoveEmptyEntries));
 }

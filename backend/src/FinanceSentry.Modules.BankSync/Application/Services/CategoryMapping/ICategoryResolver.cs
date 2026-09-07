@@ -21,16 +21,9 @@ public interface ICategoryResolver
 
     /// <summary>
     /// Resolves a category from a free-text transaction description via the runtime-editable
-    /// <c>merchant_keywords</c> table (longest keyword wins). Used as a fallback for providers
-    /// that return no MCC or category name. Returns UNCATEGORIZED when nothing matches.
-    /// </summary>
-    string ResolveDescription(string? description);
-
-    /// <summary>
-    /// The keyword half of <see cref="ResolveDescription"/> alone: resolves via the
-    /// runtime-editable <c>merchant_keywords</c> table (longest keyword wins) and returns
-    /// null when nothing matches — so callers with their own fallback chain (e.g. the
-    /// Monobank transfer-prefix → MCC ladder) can splice the keyword bridge in at the front.
+    /// <c>merchant_keywords</c> table (longest keyword wins), returning null when nothing
+    /// matches. This is one rung of
+    /// <see cref="ITransactionCategorizer"/>'s ladder, not a categorization decision on its own.
     /// </summary>
     string? TryResolveKeyword(string? description);
 

@@ -31,7 +31,8 @@ public class MoneyFlowStatisticsTests
 
     private static Transaction MakeTx(
         Guid accountId, decimal amount, string type, DateTime date, bool isPending = false,
-        string? merchantName = null, string description = "desc", int? mcc = null)
+        string? merchantName = null, string description = "desc", int? mcc = null,
+        string? category = null)
     {
         var hash = Guid.NewGuid().ToString("N");
         var tx = new Transaction(accountId, UserId, amount, date, description, hash, isPending)
@@ -40,7 +41,8 @@ public class MoneyFlowStatisticsTests
             PostedDate = isPending ? null : date,
             IsActive = true,
             MerchantName = merchantName,
-            Mcc = mcc
+            Mcc = mcc,
+            MerchantCategory = category
         };
         return tx;
     }
@@ -864,5 +866,42 @@ public class MoneyFlowStatisticsTests
 
         result[0].CommittedOutflowUsd.Should().Be(0m);
         result[0].DiscretionaryOutflowUsd.Should().Be(result[0].OutflowUsd);
+    }
+
+    [Fact]
+    public async Task GetMonthlyFlow_RepaymentsOnTheWireTransferMcc_AreOutflowAndCommitted()
+    {
+        // #553: the mortgage and the monomarket repayments all carry MCC 4829, and while they
+        // were categorized TRANSFER_OUT the transfer exclusion dropped them from outflow
+        // entirely — hiding the largest fixed commitment in the book. Categorized
+        // LOAN_PAYMENTS they are spending, and their commitment keys make them committed.
+        // The genuine card-to-card transfer on the same MCC must still be excluded.
+        const string mortgageDescription = "516936******4992";
+        const decimal mortgageAmount = 14060.96m;
+        var (account, accountId) = MakeAccount("UAH");
+        var date = new DateTime(2026, 4, 12, 0, 0, 0, DateTimeKind.Utc);
+
+        var transactions = new List<Transaction>
+        {
+            MakeTx(accountId, mortgageAmount, "debit", date, description: mortgageDescription,
+                mcc: 4829, category: CategoryKeys.LoanPayments),
+            MakeTx(accountId, 2999.95m, "debit", date, description: "Платіж ТОВ Алло - monomarket",
+                mcc: 4829, category: CategoryKeys.LoanPayments),
+            MakeTx(accountId, 5000m, "debit", date, description: "Переказ на картку",
+                mcc: 4829, category: CategoryKeys.TransferOut),
+        };
+
+        var sut = new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
+            CommitmentsReader(
+                CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
+                "installment:тов алло:3000"));
+
+        var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
+
+        result[0].Outflow.Should().Be(mortgageAmount + 2999.95m);
+        result[0].OutflowUsd.Should().Be(CurrencyConverter.ToUsd(mortgageAmount + 2999.95m, "UAH"));
+        result[0].CommittedOutflowUsd.Should().Be(result[0].OutflowUsd);
+        result[0].DiscretionaryOutflowUsd.Should().Be(0m);
     }
 }

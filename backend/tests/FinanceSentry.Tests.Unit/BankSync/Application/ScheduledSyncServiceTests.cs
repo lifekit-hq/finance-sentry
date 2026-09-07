@@ -468,7 +468,8 @@ public class ScheduledSyncServiceTests
         var adapter = new TrueLayerAdapter(
             h.TrueLayerClient.Object,
             new FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping.TrueLayerCategoryMapper(),
-            Infrastructure.StubCategoryResolver.Instance);
+            Infrastructure.StubCategoryResolver.Categorizer,
+            Infrastructure.StubActiveSubscriptionsReader.Empty);
         h.ProviderFactory.Setup(f => f.Resolve("truelayer")).Returns(adapter);
 
         h.TrueLayerClient.Setup(c => c.GetTransactionsAsync(

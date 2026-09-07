@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FluentAssertions;
@@ -15,7 +16,8 @@ public class TrueLayerAdapterTests
 
     private readonly Mock<ITrueLayerClient> _clientMock = new(MockBehavior.Strict);
     private TrueLayerAdapter CreateSut() =>
-        new(_clientMock.Object, new TrueLayerCategoryMapper(), StubCategoryResolver.Instance);
+        new(_clientMock.Object, new TrueLayerCategoryMapper(), StubCategoryResolver.Categorizer,
+            StubActiveSubscriptionsReader.Empty);
 
     [Fact]
     public void ProviderName_IsTrueLayer()
@@ -228,6 +230,38 @@ public class TrueLayerAdapterTests
 
         candidates.Should().ContainSingle();
         candidates[0].MerchantCategory.Should().Be("FOOD_AND_DRINK");
+    }
+
+    [Fact]
+    public async Task SyncTransactionsAsync_InstallmentDescription_CategorizesAsLoanPayments()
+    {
+        // #553: TrueLayer ingest never consulted the loan rule, so a row the recategorization
+        // backfill calls LOAN_PAYMENTS was ingested as something else and flipped on the next
+        // backfill. Both paths now run the one shared ladder — see the backfill's twin,
+        // TransactionRecategorizationServiceTests.BackfillsATrueLayerInstallmentRow_ToLoanPayments.
+        var booked = new TrueLayerTransaction(
+            TransactionId: "tx-loan",
+            Timestamp: new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc),
+            Amount: -310.00m,
+            Currency: "EUR",
+            Description: "Car loan installment 3 of 24",
+            MerchantName: "BankOfIreland Finance",
+            TransactionType: "debit",
+            IsPending: false,
+            Classification: ["Transfers"]);
+
+        _clientMock
+            .Setup(c => c.GetTransactionsAsync(AccessToken, ExternalAccountId, It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), default))
+            .ReturnsAsync([booked]);
+        _clientMock
+            .Setup(c => c.GetPendingTransactionsAsync(AccessToken, ExternalAccountId, default))
+            .ReturnsAsync([]);
+
+        var (candidates, _) = await CreateSut().SyncTransactionsAsync(
+            AccessToken, ExternalAccountId, AccountId, UserId, since: null);
+
+        candidates.Should().ContainSingle();
+        candidates[0].MerchantCategory.Should().Be(CategoryKeys.LoanPayments);
     }
 
     [Fact]

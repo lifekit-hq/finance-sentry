@@ -1,14 +1,19 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 
+using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
-using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 
-public class MonobankAdapter(MonobankHttpClient client, ICategoryResolver categoryResolver) : IMonobankAdapter, IBankProvider
+public class MonobankAdapter(
+    MonobankHttpClient client,
+    ITransactionCategorizer categorizer,
+    IActiveSubscriptionsReader activeSubscriptions) : IMonobankAdapter, IBankProvider
 {
     private readonly MonobankHttpClient _client = client;
-    private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly ITransactionCategorizer _categorizer = categorizer;
+    private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
 
     /// <summary>Monobank rejects statement ranges longer than 31 days (+1h) with a 400.</summary>
     private const int MaxStatementWindowDays = 31;
@@ -75,6 +80,7 @@ public class MonobankAdapter(MonobankHttpClient client, ICategoryResolver catego
     {
         var now = DateTimeOffset.UtcNow;
         var candidates = new List<TransactionCandidate>();
+        var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
 
         var overlapStart = now.AddDays(-ResyncLookbackDays);
         var watermarkStart = since.HasValue
@@ -89,7 +95,7 @@ public class MonobankAdapter(MonobankHttpClient client, ICategoryResolver catego
         {
             var to = from.AddDays(MaxStatementWindowDays) < now ? from.AddDays(MaxStatementWindowDays) : now;
             var txns = await _client.GetStatementsAsync(credential, externalAccountId, from, to, ct);
-            candidates.AddRange(MapTransactions(txns, accountId, userId));
+            candidates.AddRange(MapTransactions(txns, accountId, userId, installmentPlans));
         }
 
         return (candidates, DateTime.UtcNow);
@@ -102,12 +108,14 @@ public class MonobankAdapter(MonobankHttpClient client, ICategoryResolver catego
         string token, string externalAccountId, Guid accountId, Guid userId,
         DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
     {
+        var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
         var txns = await _client.GetStatementsAsync(token, externalAccountId, from, to, ct);
-        return MapTransactions(txns, accountId, userId).ToList();
+        return MapTransactions(txns, accountId, userId, installmentPlans).ToList();
     }
 
     private IEnumerable<TransactionCandidate> MapTransactions(
-        IReadOnlyList<MonobankTransaction> txns, Guid accountId, Guid userId)
+        IReadOnlyList<MonobankTransaction> txns, Guid accountId, Guid userId,
+        IReadOnlyList<ActiveInstallmentPlan> installmentPlans)
     {
         return txns.Select(t =>
         {
@@ -124,18 +132,24 @@ public class MonobankAdapter(MonobankHttpClient client, ICategoryResolver catego
                 IsPending: t.Hold,
                 TransactionType: txType,
                 MerchantName: t.CounterName,
-                MerchantCategory: ResolveCategory(t),
+                MerchantCategory: ResolveCategory(t, txType, amount, installmentPlans),
                 Mcc: t.MCC);
         });
     }
 
-    // Precedence mirrors the TrueLayer description path: the runtime-editable keyword bridge
-    // first («Погашення …» installment charges carry the wire-transfer MCC 4829 and would
-    // otherwise vanish into TRANSFER_OUT), then the directional-transfer description
-    // (savings-jar "Поповнення «…»" / "З банки «…»" — Monobank tags jars with the charity
-    // MCC 8398), then the MCC map for everything else.
-    private string ResolveCategory(MonobankTransaction t) =>
-        _categoryResolver.TryResolveKeyword(t.Description)
-        ?? TransferDescriptionClassifier.Resolve(t.Description)
-        ?? _categoryResolver.ResolveMcc(t.MCC);
+    // The ladder itself lives in ITransactionCategorizer so ingest and the recategorization
+    // backfill cannot drift apart (#553). Monobank supplies no provider category of its own —
+    // its MCC is the structured signal.
+    private string ResolveCategory(
+        MonobankTransaction t, string transactionType, decimal amount,
+        IReadOnlyList<ActiveInstallmentPlan> installmentPlans) =>
+        _categorizer.Categorize(
+            new CategorizationSignals(
+                Description: t.Description,
+                MerchantName: t.CounterName,
+                TransactionType: transactionType,
+                Amount: amount,
+                Mcc: t.MCC),
+            installmentPlans)
+        ?? CategoryKeys.Uncategorized;
 }
