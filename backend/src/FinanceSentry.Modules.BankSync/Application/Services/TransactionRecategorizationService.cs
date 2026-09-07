@@ -36,7 +36,8 @@ public class TransactionRecategorizationService(
     IMonobankAdapter monobankAdapter,
     ITrueLayerConnectionRepository truelayerConnections,
     ITrueLayerClient truelayerClient,
-    ICategoryResolver categoryResolver,
+    ITransactionCategorizer categorizer,
+    TrueLayerCategoryMapper categoryMapper,
     IActiveSubscriptionsReader activeSubscriptions,
     ILogger<TransactionRecategorizationService> logger) : ITransactionRecategorizationService
 {
@@ -53,7 +54,8 @@ public class TransactionRecategorizationService(
     private readonly IMonobankAdapter _monobankAdapter = monobankAdapter;
     private readonly ITrueLayerConnectionRepository _truelayerConnections = truelayerConnections;
     private readonly ITrueLayerClient _truelayerClient = truelayerClient;
-    private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly ITransactionCategorizer _categorizer = categorizer;
+    private readonly TrueLayerCategoryMapper _categoryMapper = categoryMapper;
     private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
     private readonly ILogger<TransactionRecategorizationService> _logger = logger;
 
@@ -154,25 +156,23 @@ public class TransactionRecategorizationService(
         return updated;
     }
 
-    private string? ResolveFromRaw(Transaction t, IReadOnlyList<ActiveInstallmentPlan> installmentPlans)
-    {
-        // Ahead of the MCC map: loan and installment repayments carry the wire-transfer MCC
-        // 4829, so re-resolving them by MCC alone re-buries them in TRANSFER_OUT (#553).
-        var repayment = LoanRepaymentClassifier.Resolve(
-            t.TransactionType, t.MerchantName, t.Description, t.Amount, t.Mcc, installmentPlans);
-        if (repayment is not null)
-            return repayment;
-
-        if (t.Mcc.HasValue)
-            return _categoryResolver.ResolveMcc(t.Mcc);
-        if (!string.IsNullOrWhiteSpace(t.SourceCategory))
-            return _categoryResolver.ResolveCanonicalKey(t.SourceCategory);
-
-        // No structured signal (e.g. TrueLayer): recover from the free-text description.
-        // A miss returns null so the row stays eligible for a provider re-fetch (pass 2).
-        var byDescription = _categoryResolver.ResolveDescription(t.Description);
-        return byDescription == CategoryKeys.Uncategorized ? null : byDescription;
-    }
+    // The same ladder the ingest adapters run, so a backfill can only ever confirm or correct an
+    // ingest decision — never reverse one (#553). A null means no rule claimed the row, which
+    // leaves it eligible for a provider re-fetch in pass 2.
+    //
+    // SourceCategory is written by the TrueLayer adapter alone and holds the provider's raw
+    // wording, so it goes through the same mapper ingest used; handing the ladder the raw string
+    // would fail canonical-key validation and silently drop the provider rung on this path only.
+    private string? ResolveFromRaw(Transaction t, IReadOnlyList<ActiveInstallmentPlan> installmentPlans) =>
+        _categorizer.Categorize(
+            new CategorizationSignals(
+                Description: t.Description,
+                MerchantName: t.MerchantName,
+                TransactionType: t.TransactionType,
+                Amount: t.Amount,
+                Mcc: t.Mcc,
+                ProviderCategory: _categoryMapper.MapStored(t.SourceCategory)),
+            installmentPlans);
 
     private async Task<IReadOnlyList<TransactionCandidate>> FetchCandidatesAsync(
         BankAccount account, IReadOnlyList<Transaction> rows, CancellationToken ct)

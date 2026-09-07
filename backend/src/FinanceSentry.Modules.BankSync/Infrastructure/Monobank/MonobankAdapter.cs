@@ -1,18 +1,18 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
-using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 
 public class MonobankAdapter(
     MonobankHttpClient client,
-    ICategoryResolver categoryResolver,
+    ITransactionCategorizer categorizer,
     IActiveSubscriptionsReader activeSubscriptions) : IMonobankAdapter, IBankProvider
 {
     private readonly MonobankHttpClient _client = client;
-    private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly ITransactionCategorizer _categorizer = categorizer;
     private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
 
     /// <summary>Monobank rejects statement ranges longer than 31 days (+1h) with a 400.</summary>
@@ -137,18 +137,19 @@ public class MonobankAdapter(
         });
     }
 
-    // The runtime-editable keyword bridge stays in front so an admin keeps the last word on a
-    // wording. Then loan/installment repayments: they carry the wire-transfer MCC 4829 and
-    // would otherwise vanish into TRANSFER_OUT, and unlike a keyword the rule also reaches the
-    // mortgage, whose description is a bare masked card number (#553). Then the
-    // directional-transfer description (savings-jar "Поповнення «…»" / "З банки «…»" —
-    // Monobank tags jars with the charity MCC 8398), then the MCC map for everything else.
+    // The ladder itself lives in ITransactionCategorizer so ingest and the recategorization
+    // backfill cannot drift apart (#553). Monobank supplies no provider category of its own —
+    // its MCC is the structured signal.
     private string ResolveCategory(
         MonobankTransaction t, string transactionType, decimal amount,
         IReadOnlyList<ActiveInstallmentPlan> installmentPlans) =>
-        _categoryResolver.TryResolveKeyword(t.Description)
-        ?? LoanRepaymentClassifier.Resolve(
-            transactionType, t.CounterName, t.Description, amount, t.MCC, installmentPlans)
-        ?? TransferDescriptionClassifier.Resolve(t.Description)
-        ?? _categoryResolver.ResolveMcc(t.MCC);
+        _categorizer.Categorize(
+            new CategorizationSignals(
+                Description: t.Description,
+                MerchantName: t.CounterName,
+                TransactionType: transactionType,
+                Amount: amount,
+                Mcc: t.MCC),
+            installmentPlans)
+        ?? CategoryKeys.Uncategorized;
 }

@@ -71,7 +71,7 @@ public class MonobankAdapterTests
         """;
 
     private static MonobankAdapter CreateSut(MonobankStubHttpHandler handler)
-        => new(handler.BuildClient(), StubCategoryResolver.Instance, StubActiveSubscriptionsReader.Empty);
+        => new(handler.BuildClient(), StubCategoryResolver.Categorizer, StubActiveSubscriptionsReader.Empty);
 
     [Fact]
     public void ProviderName_IsMonobank()

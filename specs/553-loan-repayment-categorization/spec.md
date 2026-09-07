@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: US1 implemented
+**Status**: US1 + US2 implemented
 
 **GitHub Issue**: #553
 
@@ -85,6 +85,34 @@ in one place in the categorization chain, never in a consumer.
    is computed, **Then** both are in `Outflow`/`OutflowUsd` (no longer excluded as transfers)
    and, when their commitment key is an active commitment, in `CommittedOutflowUsd`.
 
+### [US2] One ordered ladder decides every category, on every path (P1)
+
+US1 put the loan rule in a single classifier, but each path still *called* it ad hoc and in its
+own order: `MonobankAdapter` ran keyword → loan → transfer → MCC, `TransactionRecategorizationService`
+ran loan → MCC → canonical key → description, and `TrueLayerAdapter` never called it at all. The
+rule was in one place; the **precedence** was in three. A row could therefore be categorized one
+way at ingest and re-categorized another way by the next backfill.
+
+The ladder itself becomes the shared thing — `ITransactionCategorizer` — and every path that
+decides a category runs it and nothing else.
+
+**Acceptance Scenarios**:
+
+1. **Given** a debit whose description matches the installment recognizer, **When** it arrives
+   through **TrueLayer** ingest, **Then** it is categorized `LOAN_PAYMENTS` — the same answer the
+   recategorization backfill gives for the identical stored row.
+2. **Given** a row carrying an MCC and a description an admin has covered with a
+   `merchant_keywords` row, **When** the recategorization backfill runs, **Then** the keyword wins
+   — the backfill no longer short-circuits to the MCC map and undoes the ingest decision.
+3. **Given** a Monobank savings-jar top-up (`Поповнення «…»`, charity MCC 8398), **When** the
+   backfill runs, **Then** it stays `TRANSFER_OUT` rather than being re-buried as
+   government/non-profit spend.
+4. **Given** a transaction the bank itself classified (`Restaurants`) whose description starts
+   with the outgoing-transfer prefix (`To Go Sushi`), **When** it is categorized, **Then** the
+   provider's classification wins over the directional-prefix heuristic.
+5. **Given** a transaction no rung claims, **When** it is categorized, **Then** the result is
+   null rather than `UNCATEGORIZED`, so a backfilled row stays eligible for a provider re-fetch.
+
 **Out of scope for this feature**: no special-casing in `MoneyFlowStatisticsService`, the
 dashboard, or the top-categories reader — the category is wrong at the source and every
 consumer reads `MerchantCategory`. No data migration: the recategorization path is the backfill
@@ -100,6 +128,9 @@ mechanism the issue names, and `M015` already exists for the wording-matched hal
   mortgage-shaped masked card, a monomarket-shaped repayment, and plain transfers.
 - `MoneyFlowStatisticsTests` covers a mortgage-shaped and a monomarket-shaped debit landing in
   outflow and in committed.
+- `TransactionCategorizerTests` pins the ladder ORDER — every rung proved to beat the rung below
+  it with a fixture where the two disagree, so an ordering that holds only by accident fails.
+- A TrueLayer ingest test and its recategorization twin assert the same answer for the same row.
 
 **Post-merge check (manual, not part of the completion contract)**: re-run the #538 AC1 query on
 production — the mortgage appears in monthly outflow and the committed share moves from ~8% to

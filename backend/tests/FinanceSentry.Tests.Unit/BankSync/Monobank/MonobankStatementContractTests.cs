@@ -116,7 +116,7 @@ public class MonobankStatementContractTests
         var mortgagePlan = new ActiveInstallmentPlan(
             CommitmentKeyResolver.Resolve(null, "516936******4992", 14060.96m, 4829), 14060.96m);
         var adapter = new MonobankAdapter(
-            handler.BuildClient(), StubCategoryResolver.Instance,
+            handler.BuildClient(), StubCategoryResolver.Categorizer,
             new StubActiveSubscriptionsReader(mortgagePlan));
 
         var candidates = await adapter.GetCandidatesAsync(
@@ -191,7 +191,7 @@ public class MonobankStatementContractTests
     {
         var handler = new MonobankStubHttpHandler().Enqueue(HttpStatusCode.OK, StatementBody);
         var adapter = new MonobankAdapter(
-            handler.BuildClient(), StubCategoryResolver.Instance, StubActiveSubscriptionsReader.Empty);
+            handler.BuildClient(), StubCategoryResolver.Categorizer, StubActiveSubscriptionsReader.Empty);
 
         var candidates = await adapter.GetCandidatesAsync(
             Token, AccountId, Guid.NewGuid(), Guid.NewGuid(), From, To);

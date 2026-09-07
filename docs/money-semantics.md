@@ -114,7 +114,7 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   wire-transfer MCC 4829, the same MCC a genuine card-to-card transfer carries, so the MCC
   map alone buried the mortgage and every розстрочка repayment in `TRANSFER_OUT` and dropped
   them out of outflow (≈15% understated; issue #553). `LoanRepaymentClassifier` runs ahead of
-  the MCC map on both the Monobank ingest path and the recategorization path and books them
+  the MCC map on every path that categorizes a transaction and books them
   `LOAN_PAYMENTS` — real spending, and a repayment of principal is money that has left. It
   claims a debit on two signals: an installment wording
   (`InstallmentPlanRecognizer.IsInstallmentTransaction`), or a commitment key that belongs to
@@ -126,11 +126,28 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   payment. Credits are never claimed, and a `subscription`-kind commitment (Netflix, a
   recurring transfer to a person) is never claimed, so genuine transfers on MCC 4829 stay
   excluded. A brand-new plan's first repayment is not yet detected, so it reads as a transfer
-  until the next detection pass plus a re-categorization. On the ingest path the
-  runtime-editable `merchant_keywords` bridge still runs ahead of the classifier, so an admin
-  keeps the last word on any given wording; the backfill path has never consulted that bridge
-  for rows that carry an MCC, so an admin override of an installment wording holds at ingest
-  but is re-claimed by the next `recategorize` run.
+  until the next detection pass plus a re-categorization.
+- **One ladder decides every category.** `ITransactionCategorizer` is the single ordered rule
+  chain, and Monobank ingest, TrueLayer ingest and the `recategorize` backfill all run it and
+  nothing else — a backfill can therefore only confirm or correct an ingest decision, never
+  reverse one. The order, highest first: the runtime-editable `merchant_keywords` bridge (an
+  admin keeps the last word on a wording); the loan/installment rule above; the provider's own
+  category (a bank calling "To Go Sushi" *Restaurants* beats the directional prefix below);
+  the directional-transfer / savings-jar description (which outranks the MCC map because
+  Monobank tags jar operations with the charity MCC 8398); then the MCC map. A rung resolving
+  to `UNCATEGORIZED` has not claimed the row, so the ladder continues past it; when no rung
+  claims it the result is null, which keeps a backfilled row eligible for a provider re-fetch.
+  Before the ladder was shared, the three paths disagreed: the backfill re-buried savings jars
+  as charity spend and re-claimed admin keyword overrides on any MCC-bearing row, and TrueLayer
+  ingest never consulted the loan rule at all.
+  Sharing the ladder is only half the contract — **every path must also feed a rung the same
+  shape**. The provider rung takes a canonical key, never a bank's raw wording: ingest maps the
+  live classification, and the backfill maps the stored `SourceCategory` back through the same
+  `TrueLayerCategoryMapper` (`ToSourceCategory` / `MapStored` are inverses kept side by side).
+  Hand that rung a raw string and canonical-key validation rejects it, the rung is skipped on
+  that path alone, and the directional-prefix rung below re-labels a restaurant `TRANSFER_OUT` —
+  out of outflow entirely, and unrecoverable, since the re-fetch pass skips rows that already
+  carry a `SourceCategory`.
 - Outflow = sum of `debit` amounts, inflow = sum of `credit` amounts, per currency, plus
   USD-converted fields. Transactions on deactivated accounts resolve to currency
   `"UNKNOWN"` (converted 1:1).

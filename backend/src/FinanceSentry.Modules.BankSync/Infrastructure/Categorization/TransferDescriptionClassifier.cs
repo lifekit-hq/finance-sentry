@@ -16,9 +16,10 @@ using FinanceSentry.Core.Domain;
 /// they are internal transfers and not government/charity spend.
 ///
 /// Deliberately conservative: only the directional prefixes match, and the trailing space is
-/// required so "Tobacco"/"Tommy" don't trip the "To" branch. Merchant-keyword matching runs
-/// first (see <see cref="CategoryResolver.ResolveDescription"/>), so "To Go Sushi" still lands
-/// as food rather than a transfer.
+/// required so "Tobacco"/"Tommy" don't trip the "To" branch. This is one rung of
+/// <see cref="Application.Services.CategoryMapping.ITransactionCategorizer"/>'s ladder, which
+/// runs merchant-keyword matching above it, so "To Go Sushi" still lands as food rather than a
+/// transfer.
 /// </summary>
 public static class TransferDescriptionClassifier
 {

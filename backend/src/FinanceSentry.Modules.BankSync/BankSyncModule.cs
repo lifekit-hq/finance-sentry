@@ -122,6 +122,9 @@ public static class BankSyncModule
             _ => new TransactionDeduplicationService(deduplicationKey));
 
         services.AddSingleton<ICategoryResolver, CategoryResolver>();
+        // Stateless over the singleton resolver — the per-user installment plans are a call
+        // argument, never cached here.
+        services.AddSingleton<ITransactionCategorizer, TransactionCategorizer>();
         services.AddScoped<ICategoryReadService, CategoryReadService>();
 
         services.AddHttpClient<MonobankHttpClient>(client =>
