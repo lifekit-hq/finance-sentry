@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/lifekit-hq/devclaw/main/docs/reference/devclaw-manifest.schema.json",
   "schemaVersion": 1,
-  "boilerplateRevision": 1,
+  "boilerplateRevision": 2,
   "strictnessDefault": "strict",
   "surface": "app",
   "stack": ["dotnet", "angular"],
