@@ -59,8 +59,9 @@ public interface IMoneyFlowStatisticsService
     /// and installment (розстрочка) plans, keyed as
     /// <c>installment:{merchant}:{roundedAmount}</c>. Every other non-transfer outflow is
     /// DISCRETIONARY. Transfers are excluded from both, exactly as they are from
-    /// <c>Outflow</c> — so a mortgage repayment made as a transfer to a masked card is in no
-    /// bucket and in no denominator.
+    /// <c>Outflow</c> — but a repayment to a masked card is no longer one of them: since #553
+    /// <see cref="LoanRepaymentClassifier"/> categorizes it <c>LOAN_PAYMENTS</c> at the source,
+    /// so the mortgage now lands in outflow and, via its plan key, in committed.
     /// </para>
     /// <para>
     /// <b>Counterparty flows.</b> Counterparty transactions (e.g. family rent / support) are

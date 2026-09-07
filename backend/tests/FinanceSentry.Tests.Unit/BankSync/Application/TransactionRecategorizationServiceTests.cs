@@ -1,12 +1,14 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -26,6 +28,7 @@ public class TransactionRecategorizationServiceTests
     private readonly Mock<ITrueLayerConnectionRepository> _truelayerConnections = new();
     private readonly Mock<FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer.ITrueLayerClient> _truelayerClient = new();
     private readonly Mock<ICategoryResolver> _resolver = new();
+    private IActiveSubscriptionsReader _activeSubscriptions = StubActiveSubscriptionsReader.Empty;
 
     private TransactionRecategorizationService BuildSut()
     {
@@ -33,7 +36,8 @@ public class TransactionRecategorizationServiceTests
             _accounts.Object, _transactions.Object, _encryption.Object,
             _dedup.Object, _providerFactory.Object, _monobankCredentials.Object,
             _monobankAdapter.Object, _truelayerConnections.Object, _truelayerClient.Object,
-            _resolver.Object, new Mock<ILogger<TransactionRecategorizationService>>().Object);
+            _resolver.Object, _activeSubscriptions,
+            new Mock<ILogger<TransactionRecategorizationService>>().Object);
     }
 
     [Fact]
@@ -109,5 +113,57 @@ public class TransactionRecategorizationServiceTests
         tx.Mcc.Should().Be(5411);
         result.ReFetchedUpdated.Should().Be(1);
         result.StillUncategorized.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task BackfillsStoredMortgageRow_FromTransferOutToLoanPayments_WithoutAnyProviderCall()
+    {
+        // #553: the mortgage carries the wire-transfer MCC 4829, so re-resolving by MCC alone
+        // re-buries it in TRANSFER_OUT. The active installment plan is what rescues it, and the
+        // recategorization path is the backfill for history ingested before the rule existed.
+        const string mortgageDescription = "516936******4992";
+        const decimal mortgageAmount = 14060.96m;
+        var accountId = Guid.NewGuid();
+        var tx = new Transaction(accountId, UserId, mortgageAmount, DateTime.UtcNow, mortgageDescription, "h-mortgage")
+        {
+            TransactionType = "debit",
+            Mcc = 4829,
+            MerchantCategory = CategoryKeys.TransferOut,
+        };
+        _activeSubscriptions = new StubActiveSubscriptionsReader(new ActiveInstallmentPlan(
+            CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
+            mortgageAmount));
+        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([tx]);
+
+        var result = await BuildSut().RecategorizeUserAsync(UserId);
+
+        tx.MerchantCategory.Should().Be(CategoryKeys.LoanPayments);
+        result.ReResolved.Should().Be(1);
+        _resolver.Verify(r => r.ResolveMcc(It.IsAny<int?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LeavesAGenuineTransferOnTheSameMcc_AsTransferOut()
+    {
+        var accountId = Guid.NewGuid();
+        var tx = new Transaction(accountId, UserId, 5000m, DateTime.UtcNow, "Переказ на картку", "h-transfer")
+        {
+            TransactionType = "debit",
+            Mcc = 4829,
+            MerchantCategory = CategoryKeys.TransferOut,
+        };
+        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([tx]);
+        _resolver.Setup(r => r.ResolveMcc(4829)).Returns(CategoryKeys.TransferOut);
+
+        var result = await BuildSut().RecategorizeUserAsync(UserId);
+
+        tx.MerchantCategory.Should().Be(CategoryKeys.TransferOut);
+        result.ReResolved.Should().Be(0);
     }
 }

@@ -110,6 +110,27 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   are rightly excluded — the *spending* is counted on the card itself when the provider
   exposes it (Revolut's TrueLayer integration does not: its card is invisible, so only
   the repayments are observable at all).
+- **Loan and installment repayments are NOT transfers.** Monobank books them under the
+  wire-transfer MCC 4829, the same MCC a genuine card-to-card transfer carries, so the MCC
+  map alone buried the mortgage and every розстрочка repayment in `TRANSFER_OUT` and dropped
+  them out of outflow (≈15% understated; issue #553). `LoanRepaymentClassifier` runs ahead of
+  the MCC map on both the Monobank ingest path and the recategorization path and books them
+  `LOAN_PAYMENTS` — real spending, and a repayment of principal is money that has left. It
+  claims a debit on two signals: an installment wording
+  (`InstallmentPlanRecognizer.IsInstallmentTransaction`), or a commitment key that belongs to
+  an ACTIVE `installment`-kind `DetectedSubscription` **whose expected amount the debit is
+  within 15% of** — the only way to reach a mortgage, whose description is a bare masked card
+  number. The amount test is load-bearing, not a nicety: `MerchantNameNormalizer` strips the
+  trailing group, so `516936******4992` keys as `516936` and every card issued on that BIN
+  shares the key; without it a ₴200 transfer to a friend's card would book as a mortgage
+  payment. Credits are never claimed, and a `subscription`-kind commitment (Netflix, a
+  recurring transfer to a person) is never claimed, so genuine transfers on MCC 4829 stay
+  excluded. A brand-new plan's first repayment is not yet detected, so it reads as a transfer
+  until the next detection pass plus a re-categorization. On the ingest path the
+  runtime-editable `merchant_keywords` bridge still runs ahead of the classifier, so an admin
+  keeps the last word on any given wording; the backfill path has never consulted that bridge
+  for rows that carry an MCC, so an admin override of an installment wording holds at ingest
+  but is re-claimed by the next `recategorize` run.
 - Outflow = sum of `debit` amounts, inflow = sum of `credit` amounts, per currency, plus
   USD-converted fields. Transactions on deactivated accounts resolve to currency
   `"UNKNOWN"` (converted 1:1).
@@ -181,14 +202,15 @@ transfers are in none of the three).
   as discretionary. The split describes today's commitments, not history.
 - **Known under-count**: a full early payoff ("Повне погашення") is not keyed as a plan — the
   detector uses payoffs only to mark a plan completed, and a completed plan is no longer
-  `active` — so a payoff reads as discretionary. Recurring repayments to a masked card number
-  (mortgage, loan) are classified as transfers and are outside `Outflow` entirely, so they are
-  in neither bucket and in no denominator. Ordinary spend — groceries, fuel, restaurants —
+  `active` — so a payoff reads as discretionary. Ordinary spend — groceries, fuel, restaurants —
   has no recurring signature and never becomes a `DetectedSubscription` by construction.
   Committed coverage was measured at ~22% of outflow on production data before installment
   plans were matchable (issue #538, 2026-08-31) — below the 40% bar that ticket set for
   rendering the split on the dashboard, so the figures are exposed on the API but not charted
-  pending a re-measurement. See `specs/045-committed-vs-discretionary/`.
+  pending a re-measurement. That measurement also predates #553: repayments to a masked card
+  number were classified as transfers and sat outside `Outflow` entirely, so the mortgage was
+  in neither bucket and in no denominator. It now lands in both outflow and committed.
+  See `specs/045-committed-vs-discretionary/` and `specs/553-loan-repayment-categorization/`.
 
 ## 6. Top spending categories
 

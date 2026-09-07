@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -36,6 +37,7 @@ public class TransactionRecategorizationService(
     ITrueLayerConnectionRepository truelayerConnections,
     ITrueLayerClient truelayerClient,
     ICategoryResolver categoryResolver,
+    IActiveSubscriptionsReader activeSubscriptions,
     ILogger<TransactionRecategorizationService> logger) : ITransactionRecategorizationService
 {
     // Monobank statement API caps each request at 31 days and ~1 request per 60s per token.
@@ -52,6 +54,7 @@ public class TransactionRecategorizationService(
     private readonly ITrueLayerConnectionRepository _truelayerConnections = truelayerConnections;
     private readonly ITrueLayerClient _truelayerClient = truelayerClient;
     private readonly ICategoryResolver _categoryResolver = categoryResolver;
+    private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions;
     private readonly ILogger<TransactionRecategorizationService> _logger = logger;
 
     // Guarantees ≥ MonobankThrottle spacing between statement calls across the whole run.
@@ -62,7 +65,11 @@ public class TransactionRecategorizationService(
         var userAccounts = (await _accounts.GetByUserIdAsync(userId, ct)).ToList();
         var userTransactions = (await _transactions.GetByUserIdAsync(userId, ct)).ToList();
 
-        var reResolved = ReResolveFromStoredSignal(userTransactions);
+        // Read once for the whole pass: the loan rule matches each row against the user's
+        // active repayment plans, so a per-row lookup would be one query per transaction.
+        var installmentPlans = await _activeSubscriptions.GetActiveInstallmentPlansAsync(userId, ct);
+
+        var reResolved = ReResolveFromStoredSignal(userTransactions, installmentPlans);
         var reFetched = await ReFetchMissingSignalAsync(userAccounts, userTransactions, ct);
 
         await _transactions.SaveChangesAsync(ct);
@@ -78,12 +85,13 @@ public class TransactionRecategorizationService(
     }
 
     /// <summary>Pass 1 — cheap in-process re-resolve for rows that already carry a raw signal.</summary>
-    private int ReResolveFromStoredSignal(IReadOnlyList<Transaction> txns)
+    private int ReResolveFromStoredSignal(
+        IReadOnlyList<Transaction> txns, IReadOnlyList<ActiveInstallmentPlan> installmentPlans)
     {
         var updated = 0;
         foreach (var t in txns)
         {
-            var resolved = ResolveFromRaw(t);
+            var resolved = ResolveFromRaw(t, installmentPlans);
             if (resolved is not null && resolved != t.MerchantCategory)
             {
                 t.MerchantCategory = resolved;
@@ -146,8 +154,15 @@ public class TransactionRecategorizationService(
         return updated;
     }
 
-    private string? ResolveFromRaw(Transaction t)
+    private string? ResolveFromRaw(Transaction t, IReadOnlyList<ActiveInstallmentPlan> installmentPlans)
     {
+        // Ahead of the MCC map: loan and installment repayments carry the wire-transfer MCC
+        // 4829, so re-resolving them by MCC alone re-buries them in TRANSFER_OUT (#553).
+        var repayment = LoanRepaymentClassifier.Resolve(
+            t.TransactionType, t.MerchantName, t.Description, t.Amount, t.Mcc, installmentPlans);
+        if (repayment is not null)
+            return repayment;
+
         if (t.Mcc.HasValue)
             return _categoryResolver.ResolveMcc(t.Mcc);
         if (!string.IsNullOrWhiteSpace(t.SourceCategory))
