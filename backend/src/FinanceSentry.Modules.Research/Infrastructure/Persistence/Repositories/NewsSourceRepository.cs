@@ -9,6 +9,9 @@ public class NewsSourceRepository(ResearchDbContext db) : INewsSourceRepository
     public async Task<IReadOnlyList<NewsSource>> ListEnabledAsync(CancellationToken ct = default)
         => await db.NewsSources.AsNoTracking().Where(s => s.Enabled).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<NewsSource>> ListDisabledAsync(CancellationToken ct = default)
+        => await db.NewsSources.AsNoTracking().Where(s => !s.Enabled).ToListAsync(ct);
+
     public async Task<IReadOnlyList<NewsSource>> ListAllAsync(CancellationToken ct = default)
         => await db.NewsSources.AsNoTracking().OrderBy(s => s.Name).ToListAsync(ct);
 

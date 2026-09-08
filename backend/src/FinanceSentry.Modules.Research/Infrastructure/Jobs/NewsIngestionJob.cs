@@ -1,7 +1,5 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
-using System.Security.Cryptography;
-using System.Text;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
@@ -18,7 +16,7 @@ public sealed class NewsIngestionJob(
     IMarketNewsService news,
     INewsSourceRepository sourceRepo,
     INewsRepository newsRepo,
-    IEnumerable<INewsPageSource> pageSources,
+    NewsSourceFetcher fetcher,
     IAlertGeneratorService alerts,
     IBankingTotalsReader banking,
     ILogger<NewsIngestionJob> logger)
@@ -97,15 +95,7 @@ public sealed class NewsIngestionJob(
     {
         try
         {
-            var articles = source.Kind == NewsSourceKind.Rss
-                ? await FetchRssAsync(source, ct)
-                : await FetchPageAsync(source, ct);
-
-            foreach (var article in articles)
-            {
-                article.ThesisIds = NewsSourceTagging.ResolveThesisIds(source, article.Title, article.Summary).ToList();
-            }
-
+            var articles = await fetcher.FetchAsync(source, ct);
             var inserted = await newsRepo.InsertNewAsync(articles, ct);
             NewsSourceHealthTracker.RecordSuccess(source);
             await sourceRepo.UpdateAsync(source, ct);
@@ -142,29 +132,6 @@ public sealed class NewsIngestionJob(
         }
     }
 
-    private async Task<IReadOnlyList<NewsArticle>> FetchRssAsync(NewsSource source, CancellationToken ct)
-        => await news.FetchFeedArticlesAsync(source.Url, $"src:{source.Name}", ct);
-
-    private async Task<IReadOnlyList<NewsArticle>> FetchPageAsync(NewsSource source, CancellationToken ct)
-    {
-        var pageSource = pageSources.FirstOrDefault(p => p.CanHandle(source.Url))
-            ?? throw new NewsSourceParseException(
-                $"No page source registered to handle '{source.Url}'.");
-
-        var candidates = await pageSource.FetchAsync(source.Url, ct);
-        return candidates
-            .Select(c => new NewsArticle
-            {
-                Source = $"src:{source.Name}",
-                Title = Trim(c.Title, 500),
-                Url = Trim(c.Url, 2000),
-                Summary = c.Summary is null ? null : Trim(c.Summary, 4000),
-                PublishedAt = c.PublishedAt,
-                ContentHash = HashContent(c.Url, c.Title),
-            })
-            .ToList();
-    }
-
     private async Task RaiseFailureAlertAsync(string sourceName, string reason, CancellationToken ct)
     {
         var provider = $"news-source:{sourceName}";
@@ -174,10 +141,4 @@ public sealed class NewsIngestionJob(
             await alerts.GenerateSyncFailureAlertAsync(userId, provider, null, null, reason, ct);
         }
     }
-
-    private static string HashContent(string url, string title)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{url}\n{title}")));
-
-    private static string Trim(string value, int max)
-        => value.Length <= max ? value : value[..max];
 }

@@ -6,6 +6,12 @@ public interface INewsSourceRepository
 {
     Task<IReadOnlyList<NewsSource>> ListEnabledAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Sources the health tracker has auto-retired. Nothing else writes <c>Enabled = false</c>, so
+    /// these are exactly the sources that fell out of ingestion and need re-probing (spec 047).
+    /// </summary>
+    Task<IReadOnlyList<NewsSource>> ListDisabledAsync(CancellationToken ct = default);
+
     Task<IReadOnlyList<NewsSource>> ListAllAsync(CancellationToken ct = default);
 
     Task<NewsSource?> GetByUrlAsync(string url, CancellationToken ct = default);
