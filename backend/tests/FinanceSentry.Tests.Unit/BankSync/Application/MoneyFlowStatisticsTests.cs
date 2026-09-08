@@ -1,7 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
 using FinanceSentry.Core.Domain;
-using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -63,11 +62,16 @@ public class MoneyFlowStatisticsTests
         return mock;
     }
 
-    private static IActiveSubscriptionsReader CommitmentsReader(params string[] merchantKeys)
+    /// <summary>
+    /// The real <see cref="CommittedOutflowRules"/> behind a stubbed loader: these tests are
+    /// about what the reader does with a verdict, so stubbing the verdict itself would let the
+    /// two drift. Only the per-user data the rules read is faked.
+    /// </summary>
+    private static ICommittedOutflowPolicy CommittedPolicy(params string[] activeCommitmentKeys)
     {
-        var mock = new Mock<IActiveSubscriptionsReader>();
-        mock.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(merchantKeys.ToHashSet(StringComparer.Ordinal));
+        var mock = new Mock<ICommittedOutflowPolicy>();
+        mock.Setup(p => p.LoadForUserAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CommittedOutflowRules(activeCommitmentKeys.ToHashSet(StringComparer.Ordinal)));
         return mock.Object;
     }
 
@@ -98,7 +102,7 @@ public class MoneyFlowStatisticsTests
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
@@ -144,7 +148,7 @@ public class MoneyFlowStatisticsTests
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
@@ -183,7 +187,7 @@ public class MoneyFlowStatisticsTests
                        .ReturnsAsync([eurAccount, usdAccount]);
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
@@ -233,7 +237,7 @@ public class MoneyFlowStatisticsTests
                        .ReturnsAsync([accountA, accountB]);
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -273,7 +277,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Mom", FlowRoles.FamilySupport, 0m, 50m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
@@ -320,7 +324,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Mom", FlowRoles.FamilySupport, 720m, 500m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
 
@@ -366,7 +370,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Mom", FlowRoles.FamilySupport, 0m, 50m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
@@ -409,7 +413,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Mortgage", FlowRoles.Household, 0m, 315m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
@@ -450,7 +454,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Routing via mom (EUR)", FlowRoles.SelfRouting, 1200m, 1200m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
@@ -482,7 +486,7 @@ public class MoneyFlowStatisticsTests
             new CounterpartyMonthlyFlow("2026-05", "Investment routing", FlowRoles.Investment, 700m, 0m));
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
@@ -520,7 +524,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(uahAccount, eurAccount).Object,
-            new TransferDetectionService(), CommitmentsReader());
+            new TransferDetectionService(), CommittedPolicy());
 
         var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
 
@@ -584,7 +588,7 @@ public class MoneyFlowStatisticsTests
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(
-            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommitmentsReader());
+            txRepoMock.Object, accountRepoMock.Object, new TransferDetectionService(), CommittedPolicy());
 
         // Act
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
@@ -613,7 +617,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("netflix"));
+            CommittedPolicy("netflix"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -639,7 +643,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("netflix"));
+            CommittedPolicy("netflix"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -668,7 +672,7 @@ public class MoneyFlowStatisticsTests
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(uahAccount, eurAccount).Object,
             new TransferDetectionService(),
-            CommitmentsReader("kredobank", "netflix"));
+            CommittedPolicy("kredobank", "netflix"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -702,7 +706,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("claude", "mobile top-up 0057"));
+            CommittedPolicy("claude", "mobile top-up 0057"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -729,7 +733,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("netflix"));
+            CommittedPolicy("netflix"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -753,7 +757,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader());
+            CommittedPolicy());
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -778,7 +782,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("installment:telemart:6500"));
+            CommittedPolicy("installment:telemart:6500"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -804,7 +808,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("installment:тов алло:2340"));
+            CommittedPolicy("installment:тов алло:2340"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -830,7 +834,7 @@ public class MoneyFlowStatisticsTests
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(uahAccount, eurAccount).Object,
             new TransferDetectionService(),
-            CommitmentsReader("installment:telemart:6500", "installment:pandora:120"));
+            CommittedPolicy("installment:telemart:6500", "installment:pandora:120"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -860,7 +864,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader("installment:rozetkapay:2340"));
+            CommittedPolicy("installment:rozetkapay:2340"));
 
         var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
 
@@ -893,7 +897,7 @@ public class MoneyFlowStatisticsTests
 
         var sut = new MoneyFlowStatisticsService(
             TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
-            CommitmentsReader(
+            CommittedPolicy(
                 CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
                 "installment:тов алло:3000"));
 
@@ -903,5 +907,123 @@ public class MoneyFlowStatisticsTests
         result[0].OutflowUsd.Should().Be(CurrencyConverter.ToUsd(mortgageAmount + 2999.95m, "UAH"));
         result[0].CommittedOutflowUsd.Should().Be(result[0].OutflowUsd);
         result[0].DiscretionaryOutflowUsd.Should().Be(0m);
+    }
+
+    // ── #554 The widened definition: rent, loans, counterparty obligations ────
+
+    [Fact]
+    public async Task GetMonthlyFlow_Rent_IsCommittedWithoutADetectedSubscription()
+    {
+        // The 1,275 EUR/mo rent to the same payee is the largest fixed outflow in the book and
+        // has no recurrence signature the detector can see. Under the subscription-only
+        // definition it read as discretionary, which is what stopped #538 on its own gate.
+        var (account, accountId) = MakeAccount("EUR");
+        var date = new DateTime(2026, 6, 3, 0, 0, 0, DateTimeKind.Utc);
+
+        var transactions = new List<Transaction>
+        {
+            MakeTx(accountId, 1275m, "debit", date, merchantName: "To Mario Scalas",
+                description: "Rent June", category: CategoryKeys.RentAndUtilities),
+            MakeTx(accountId, 62.40m, "debit", date, merchantName: "Zara",
+                description: "ZARA MILANO", category: CategoryKeys.GeneralMerchandise),
+        };
+
+        var sut = new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
+            CommittedPolicy());
+
+        var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
+
+        result[0].CommittedOutflowUsd.Should().Be(CurrencyConverter.ToUsd(1275m, "EUR"));
+        result[0].DiscretionaryOutflowUsd.Should().Be(CurrencyConverter.ToUsd(62.40m, "EUR"));
+        (result[0].CommittedOutflowUsd + result[0].DiscretionaryOutflowUsd)
+            .Should().Be(result[0].OutflowUsd);
+    }
+
+    [Fact]
+    public async Task GetMonthlyFlow_TheRealBookShapes_LandOnTheRightSideAcrossCurrencies()
+    {
+        // Every shape the widened definition has to get right, in one month, across two
+        // currencies: rent (category), the mortgage behind a masked card and a monomarket
+        // installment (category + plan key), a Netflix-style subscription (merchant key), and
+        // two ordinary shops.
+        const decimal rent = 1275m;
+        const decimal shopEur = 62.40m;
+        const decimal mortgage = 14060.96m;
+        const decimal installment = 2999.95m;
+        const decimal netflix = 439m;
+        const decimal shopUah = 900m;
+
+        var (eurAccount, eurAccountId) = MakeAccount("EUR");
+        var (uahAccount, uahAccountId) = MakeAccount("UAH");
+        var date = new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc);
+
+        var transactions = new List<Transaction>
+        {
+            MakeTx(eurAccountId, rent, "debit", date, merchantName: "To Mario Scalas",
+                description: "Rent June", category: CategoryKeys.RentAndUtilities),
+            MakeTx(eurAccountId, shopEur, "debit", date, merchantName: "Zara",
+                description: "ZARA MILANO", category: CategoryKeys.GeneralMerchandise),
+            MakeTx(uahAccountId, mortgage, "debit", date, description: "516936******4992",
+                mcc: 4829, category: CategoryKeys.LoanPayments),
+            MakeTx(uahAccountId, installment, "debit", date,
+                description: "Платіж ТОВ Алло - monomarket", mcc: 4829,
+                category: CategoryKeys.LoanPayments),
+            MakeTx(uahAccountId, netflix, "debit", date, merchantName: "Netflix.com",
+                description: "CARD PAYMENT 4471", mcc: 5815),
+            MakeTx(uahAccountId, shopUah, "debit", date, merchantName: "Сільпо",
+                description: "СІЛЬПО 148", category: CategoryKeys.FoodAndDrink),
+        };
+
+        var sut = new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(eurAccount, uahAccount).Object,
+            new TransferDetectionService(), CommittedPolicy("netflix"));
+
+        var result = await sut.GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
+
+        var eur = result.Single(r => r.Currency == "EUR");
+        eur.CommittedOutflowUsd.Should().Be(CurrencyConverter.ToUsd(rent, "EUR"));
+        eur.DiscretionaryOutflowUsd.Should().Be(CurrencyConverter.ToUsd(shopEur, "EUR"));
+
+        var uah = result.Single(r => r.Currency == "UAH");
+        var committedUah = CurrencyConverter.ToUsd(mortgage + installment + netflix, "UAH");
+        uah.CommittedOutflowUsd.Should().Be(committedUah);
+        uah.DiscretionaryOutflowUsd.Should().Be(CurrencyConverter.ToUsd(shopUah, "UAH"));
+
+        // The cross-currency total is only meaningful in USD: the committed NATIVE sum adds
+        // hryvnia to euros and is wrong by roughly the whole rent.
+        result.Sum(r => r.CommittedOutflowUsd)
+            .Should().Be(CurrencyConverter.ToUsd(rent, "EUR") + committedUah);
+        result.Sum(r => r.CommittedOutflowUsd)
+            .Should().NotBe(rent + mortgage + installment + netflix);
+    }
+
+    [Fact]
+    public async Task GetMonthlyFlow_CounterpartyObligations_AreCommitted_UnroledSpendIsNot()
+    {
+        // Rule (c) reads spec 044's roles directly rather than re-deciding who counts as
+        // family. Support and the household bill are obligations; a counterparty saved with no
+        // role is spending that names none, and investment routing is not spending at all.
+        var (account, accountId) = MakeAccount("EUR");
+        var date = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        var classification = CounterpartyResults.WithFlows(
+            new CounterpartyMonthlyFlow("2026-05", "мама", FlowRoles.FamilySupport, 0m, 50m),
+            new CounterpartyMonthlyFlow("2026-05", "Mortgage", FlowRoles.Household, 0m, 315m),
+            new CounterpartyMonthlyFlow("2026-05", "Unnamed payee", string.Empty, 0m, 40m),
+            new CounterpartyMonthlyFlow("2026-05", "Binance top-up", FlowRoles.Investment, 0m, 300m));
+
+        var sut = new MoneyFlowStatisticsService(
+            TxRepo([MakeTx(accountId, 100m, "debit", date)]).Object, AccountRepo(account).Object,
+            new TransferDetectionService(), CommittedPolicy());
+
+        var result = await sut.GetMonthlyFlowAsync(UserId, classification, 6);
+
+        var synthetic = result.Single(r => r.InvestedOutflowUsd == 300m);
+        synthetic.OutflowUsd.Should().Be(405m);              // 50 + 315 + 40; investment is not spending
+        synthetic.CommittedOutflowUsd.Should().Be(365m);     // support + household
+        synthetic.DiscretionaryOutflowUsd.Should().Be(40m);  // the unroled counterparty
+        (synthetic.CommittedOutflowUsd + synthetic.DiscretionaryOutflowUsd)
+            .Should().Be(synthetic.OutflowUsd);
     }
 }

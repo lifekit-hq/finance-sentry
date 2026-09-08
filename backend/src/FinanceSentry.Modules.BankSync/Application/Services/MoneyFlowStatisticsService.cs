@@ -1,7 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Domain;
-using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -51,17 +50,13 @@ public interface IMoneyFlowStatisticsService
     /// current month's outflow a fraction of reality. Settlement retires or flips the pending
     /// row in place, so it is never double-counted for long.
     /// <para>
-    /// <b>Committed vs discretionary match rule.</b> An outflow is COMMITTED when the key
-    /// derived from it by <see cref="CommitmentKeyResolver.Resolve"/> is the key of one of the
-    /// user's detected commitments whose status is <c>active</c> — the same key the detector
-    /// grouped the charge under, so the two sides cannot drift apart. That covers both kinds of
-    /// commitment the detector stores: recurring services, keyed by normalized merchant name,
-    /// and installment (розстрочка) plans, keyed as
-    /// <c>installment:{merchant}:{roundedAmount}</c>. Every other non-transfer outflow is
-    /// DISCRETIONARY. Transfers are excluded from both, exactly as they are from
-    /// <c>Outflow</c> — but a repayment to a masked card is no longer one of them: since #553
-    /// <see cref="LoanRepaymentClassifier"/> categorizes it <c>LOAN_PAYMENTS</c> at the source,
-    /// so the mortgage now lands in outflow and, via its plan key, in committed.
+    /// <b>Committed vs discretionary.</b> <see cref="CommittedOutflowRules"/> owns the whole
+    /// definition — an active detected commitment, a committed category, or a counterparty
+    /// obligation — and this reader does not re-derive any part of it. Every non-transfer
+    /// outflow the rules do not claim is DISCRETIONARY. Transfers are in neither bucket,
+    /// exactly as they are outside <c>Outflow</c> — but a repayment to a masked card is no
+    /// longer one of them: since #553 <see cref="LoanRepaymentClassifier"/> categorizes it
+    /// <c>LOAN_PAYMENTS</c> at the source, so the mortgage lands in outflow and in committed.
     /// </para>
     /// <para>
     /// <b>Counterparty flows.</b> Counterparty transactions (e.g. family rent / support) are
@@ -85,12 +80,12 @@ public class MoneyFlowStatisticsService(
     ITransactionRepository transactions,
     IBankAccountRepository accounts,
     ITransferDetectionService transferDetection,
-    IActiveSubscriptionsReader activeSubscriptions) : IMoneyFlowStatisticsService
+    ICommittedOutflowPolicy committedOutflow) : IMoneyFlowStatisticsService
 {
     private readonly ITransactionRepository _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
     private readonly IBankAccountRepository _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly ITransferDetectionService _transferDetection = transferDetection ?? throw new ArgumentNullException(nameof(transferDetection));
-    private readonly IActiveSubscriptionsReader _activeSubscriptions = activeSubscriptions ?? throw new ArgumentNullException(nameof(activeSubscriptions));
+    private readonly ICommittedOutflowPolicy _committedOutflow = committedOutflow ?? throw new ArgumentNullException(nameof(committedOutflow));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<MonthlyFlow>> GetMonthlyFlowAsync(
@@ -123,10 +118,8 @@ public class MoneyFlowStatisticsService(
         var nonCounterpartyTx = txList.Where(t => !matchedIds.Contains(t.Id)).ToList();
         var transferIds = _transferDetection.DetectTransferTransactionIds(nonCounterpartyTx, accountCurrencies);
 
-        // 5. Merchant keys of the user's active commitments — the committed/discretionary
-        // classifier. Read once for the whole window; the detector's status is point-in-time,
-        // so a subscription cancelled today reclassifies its past charges too.
-        var committedMerchantKeys = await _activeSubscriptions.GetActiveCommitmentMerchantKeysAsync(userId, ct);
+        // 5. The committed/discretionary rule set, loaded once for the whole window.
+        var committedRules = await _committedOutflow.LoadForUserAsync(userId, ct);
 
         // 6. Normal flow: exclude counterparty-matched, transfer pairs, and TRANSFER category,
         // then group by (currency, year-month) and sum inflow/outflow (pending included —
@@ -149,10 +142,7 @@ public class MoneyFlowStatisticsService(
                 var inflow = g.Where(x => x.Transaction.TransactionType == "credit").Sum(x => x.Transaction.Amount);
                 var outflow = debits.Sum(x => x.Transaction.Amount);
                 var committed = debits
-                    .Where(x => committedMerchantKeys.Contains(
-                        CommitmentKeyResolver.Resolve(
-                            x.Transaction.MerchantName, x.Transaction.Description,
-                            x.Transaction.Amount, x.Transaction.Mcc)))
+                    .Where(x => committedRules.IsCommitted(x.Transaction))
                     .Sum(x => x.Transaction.Amount);
 
                 var inflowUsd = CurrencyConverter.ToUsd(inflow, g.Key.Currency);
@@ -195,9 +185,11 @@ public class MoneyFlowStatisticsService(
         //                       Folding either into spend/income would misstate the savings rate
         //                       by exactly the amount that was saved.
         //
-        //    Counterparty spend has no commitment merchant key, so within the synthetic row the
-        //    whole outflow lands as discretionary — keeping the committed + discretionary
-        //    partition of OutflowUsd exact across every row.
+        //    The committed/discretionary split of this row is decided by ROLE, not by merchant
+        //    key: these transactions were filtered out of the per-debit pass above, so the only
+        //    thing left to ask them is what obligation they represent. Family support and the
+        //    household bill are committed; a counterparty carrying no role is spending with no
+        //    obligation named, so it falls to discretionary and keeps the partition exact.
         var counterpartyRows = classification.MonthlyFlows
             .GroupBy(f => f.Month)
             .Select(g =>
@@ -210,13 +202,16 @@ public class MoneyFlowStatisticsService(
                 var expenseUsd = realFlows.Sum(f => f.OutflowUsd);
                 var familySupportUsd = g.Where(f => f.FlowRole == FlowRoles.FamilySupport).Sum(f => f.OutflowUsd);
                 var investedUsd = g.Where(f => f.FlowRole == FlowRoles.Investment).Sum(f => f.OutflowUsd);
+                var committedUsd = realFlows
+                    .Where(f => committedRules.IsCommittedFlowRole(f.FlowRole))
+                    .Sum(f => f.OutflowUsd);
 
                 return new MonthlyFlow(
                     g.Key, "USD",
                     0m, 0m, 0m,
                     incomeUsd, expenseUsd, incomeUsd - expenseUsd,
-                    CommittedOutflowUsd: 0m,
-                    DiscretionaryOutflowUsd: expenseUsd,
+                    CommittedOutflowUsd: committedUsd,
+                    DiscretionaryOutflowUsd: expenseUsd - committedUsd,
                     familySupportUsd, investedUsd);
             });
 

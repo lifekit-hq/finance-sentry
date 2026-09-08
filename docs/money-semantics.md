@@ -198,7 +198,11 @@ one and a transfer in the other.
 always sum back to it, and no figure is committed unless it is already in `Outflow` (so
 transfers are in none of the three).
 
-- **Committed** = the key derived from the transaction by
+**`CommittedOutflowRules` (`BankSync/Application/Services/CommittedOutflowPolicy.cs`) is the
+only place the definition lives.** Consumers load it once per user via `ICommittedOutflowPolicy`
+and ask it; none of them re-derives a rule. An outflow is **committed** when ANY rule fires:
+
+- **(a) an active detected commitment** — the key derived by
   `CommitmentKeyResolver.Resolve(MerchantName, Description, Amount, Mcc)` is the key of one of
   the user's `DetectedSubscription` rows whose status is `active`, read through
   `IActiveSubscriptionsReader.GetActiveCommitmentMerchantKeysAsync`. Both kinds count, and each
@@ -209,9 +213,25 @@ transfers are in none of the three).
   keeps the stored key and the matched key from drifting apart. A plan's identity includes its
   rounded monthly amount, so concurrent plans at one shop stay distinct and only the plan the
   user actually holds is claimed.
-- **Discretionary** = every other non-transfer outflow. Derived as
-  `OutflowUsd − CommittedOutflowUsd` so the partition is exact; converting the two subsets
-  independently would let rounding pull them off the total.
+- **(b) a committed category** — `RENT_AND_UTILITIES` or `LOAN_PAYMENTS`. Rent is the largest
+  fixed outflow in the book and the detector can never see it: the same payee for the same
+  amount every month is not a merchant recurrence signature. A loan payment is a debt
+  obligation whether or not a plan was detected behind it. The set is deliberately just these
+  two; `GENERAL_SERVICES` and `TRANSPORTATION` mix subscriptions with impulse spend.
+- **(c) a counterparty obligation** — the flow role assigned by the counterparty classification
+  (§5.1, spec 044) is `family_support` or `household`. Applied per ROLE, not per debit, because
+  counterparty transactions are filtered out of the per-debit pass and re-enter as one
+  synthetic USD row per month. `investment` and `self_routing` are absent because they are not
+  spending at all; a counterparty saved with no role is spending that names no obligation and
+  falls to discretionary.
+- **(d) a user pin** — the user marked the merchant key as committed. NOT IMPLEMENTED yet
+  (spec 554, US2).
+
+**Discretionary** = every other non-transfer outflow. Derived as
+`OutflowUsd − CommittedOutflowUsd` (and, on the synthetic row, `expense − committed`) so the
+partition is exact; converting the two subsets independently would let rounding pull them off
+the total.
+
 - **Currency**: the committed native sum is per (month, currency) bucket and is converted
   with `CurrencyConverter.ToUsd` at the same reader boundary as `OutflowUsd`. Commitments
   are billed in UAH, EUR and USD, so only the `…Usd` fields may be added across rows.
@@ -219,15 +239,22 @@ transfers are in none of the three).
   as discretionary. The split describes today's commitments, not history.
 - **Known under-count**: a full early payoff ("Повне погашення") is not keyed as a plan — the
   detector uses payoffs only to mark a plan completed, and a completed plan is no longer
-  `active` — so a payoff reads as discretionary. Ordinary spend — groceries, fuel, restaurants —
-  has no recurring signature and never becomes a `DetectedSubscription` by construction.
-  Committed coverage was measured at ~22% of outflow on production data before installment
-  plans were matchable (issue #538, 2026-08-31) — below the 40% bar that ticket set for
-  rendering the split on the dashboard, so the figures are exposed on the API but not charted
-  pending a re-measurement. That measurement also predates #553: repayments to a masked card
-  number were classified as transfers and sat outside `Outflow` entirely, so the mortgage was
-  in neither bucket and in no denominator. It now lands in both outflow and committed.
-  See `specs/045-committed-vs-discretionary/` and `specs/553-loan-repayment-categorization/`.
+  `active` — so a payoff reads as discretionary unless its category carries it. Ordinary spend
+  — groceries, restaurants, clothes — is discretionary by construction, which is the point.
+- **Known over-claim**: rule (b) inherits whatever the ingest ladder (#553) put in its two
+  keys, and `RENT_AND_UTILITIES` is wider than rent — the telecom MCC range 4812–4900 and the
+  `top-up` keyword land there, so an ad-hoc mobile top-up reads as committed alongside the
+  monthly phone plan. Accepted rather than carved out: a statement line carries nothing that
+  tells a plan payment from a discretionary top-up, and narrowing by MCC inside the policy
+  would put a second categorization opinion next to the ladder that owns it. The amounts are
+  small; rent, utilities and loans are not.
+- **Coverage**: measured at 7.9% of outflow under rule (a) alone (comment on issue #538,
+  2026-09-03), and ~18% once #553 restored the mortgage and the monomarket repayments to
+  outflow — both below the 40% bar #538 set for charting the split, which is why the figures
+  are on the API and not on the dashboard. Rules (b) and (c) are the widening; the share has
+  NOT been re-measured on production since, and #554 is not done until it has been. See
+  `specs/045-committed-vs-discretionary/`, `specs/553-loan-repayment-categorization/` and
+  `specs/554-committed-outflow-policy/`.
 
 ## 6. Top spending categories
 
