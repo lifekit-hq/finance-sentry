@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 /// <summary>
 /// The single definition of COMMITTED outflow. An outflow already counted in <c>Outflow</c> is
@@ -27,9 +28,14 @@ using FinanceSentry.Modules.BankSync.Domain;
 ///     per-debit pass upstream and re-enter the statistics as one synthetic row per month.
 ///   </item>
 ///   <item>
-///     <b>(d) user pin</b> — the user marked the merchant key as committed. NOT IMPLEMENTED
-///     yet; it arrives with the persisted pin list (spec 554, US2) rather than as an
-///     always-false clause here.
+///     <b>(d) user pin</b> — the debit's
+///     <see cref="MerchantNameNormalizer.NormalizeDetectionKey"/> is one of the merchant keys
+///     the user pinned as committed (<c>CommittedMerchantPin</c>). This is the escape hatch for
+///     obligations no rule above can see, because only the user knows they exist: a standing
+///     payment to a person, a gym with a lock-in, a service billed too irregularly to detect.
+///     Keyed on the detection key rather than <see cref="CommitmentKeyResolver.Resolve"/>: a pin
+///     names a MERCHANT, so it must claim that merchant's charges whether or not an individual
+///     row happens to look like an installment repayment.
 ///   </item>
 /// </list>
 /// <para>
@@ -38,7 +44,9 @@ using FinanceSentry.Modules.BankSync.Domain;
 /// the same story.
 /// </para>
 /// </summary>
-public sealed class CommittedOutflowRules(IReadOnlySet<string> activeCommitmentKeys)
+public sealed class CommittedOutflowRules(
+    IReadOnlySet<string> activeCommitmentKeys,
+    IReadOnlySet<string> pinnedMerchantKeys)
 {
     /// <summary>
     /// Categories whose spending is a standing obligation rather than a choice made this month.
@@ -75,8 +83,11 @@ public sealed class CommittedOutflowRules(IReadOnlySet<string> activeCommitmentK
     private readonly IReadOnlySet<string> _activeCommitmentKeys =
         activeCommitmentKeys ?? throw new ArgumentNullException(nameof(activeCommitmentKeys));
 
+    private readonly IReadOnlySet<string> _pinnedMerchantKeys =
+        pinnedMerchantKeys ?? throw new ArgumentNullException(nameof(pinnedMerchantKeys));
+
     /// <summary>
-    /// Rules (a) and (b) for a single debit. The caller has already established that the
+    /// Rules (a), (b) and (d) for a single debit. The caller has already established that the
     /// transaction is in <c>Outflow</c> — this decides only which side of the partition it
     /// lands on, never whether it is spending.
     /// </summary>
@@ -84,14 +95,26 @@ public sealed class CommittedOutflowRules(IReadOnlySet<string> activeCommitmentK
     {
         ArgumentNullException.ThrowIfNull(debit);
 
-        // (b) first: it is a dictionary probe, while (a) has to derive a key.
+        // (b) first: it is a dictionary probe, while (a) and (d) have to derive a key.
         if (debit.MerchantCategory is not null && CommittedCategories.Contains(debit.MerchantCategory))
             return true;
 
         var commitmentKey = CommitmentKeyResolver.Resolve(
             debit.MerchantName, debit.Description, debit.Amount, debit.Mcc);
 
-        return _activeCommitmentKeys.Contains(commitmentKey);
+        if (_activeCommitmentKeys.Contains(commitmentKey))
+            return true;
+
+        if (_pinnedMerchantKeys.Count == 0)
+            return false;
+
+        // (d) re-derives rather than reusing commitmentKey: the resolver returns
+        // installment:{merchant}:{amount} for repayment-shaped rows, which no merchant pin can
+        // ever equal, so a pinned shop's repayments would slip through.
+        var merchantKey = MerchantNameNormalizer.NormalizeDetectionKey(
+            debit.MerchantName, debit.Description);
+
+        return _pinnedMerchantKeys.Contains(merchantKey);
     }
 
     /// <summary>
@@ -121,12 +144,24 @@ public interface ICommittedOutflowPolicy
 }
 
 /// <inheritdoc />
-public class CommittedOutflowPolicy(IActiveSubscriptionsReader activeSubscriptions) : ICommittedOutflowPolicy
+public class CommittedOutflowPolicy(
+    IActiveSubscriptionsReader activeSubscriptions,
+    ICommittedMerchantPinRepository pins) : ICommittedOutflowPolicy
 {
     private readonly IActiveSubscriptionsReader _activeSubscriptions =
         activeSubscriptions ?? throw new ArgumentNullException(nameof(activeSubscriptions));
 
+    private readonly ICommittedMerchantPinRepository _pins =
+        pins ?? throw new ArgumentNullException(nameof(pins));
+
     /// <inheritdoc />
-    public async Task<CommittedOutflowRules> LoadForUserAsync(Guid userId, CancellationToken ct = default) =>
-        new(await _activeSubscriptions.GetActiveCommitmentMerchantKeysAsync(userId, ct));
+    public async Task<CommittedOutflowRules> LoadForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        // Sequential, not Task.WhenAll: both reads sit behind scoped DbContexts, which forbid
+        // concurrent operations on one instance.
+        var commitmentKeys = await _activeSubscriptions.GetActiveCommitmentMerchantKeysAsync(userId, ct);
+        var pinnedKeys = await _pins.GetPinnedKeysAsync(userId, ct);
+
+        return new CommittedOutflowRules(commitmentKeys, pinnedKeys);
+    }
 }

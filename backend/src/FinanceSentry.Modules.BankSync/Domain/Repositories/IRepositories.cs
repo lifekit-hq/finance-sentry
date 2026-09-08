@@ -225,6 +225,35 @@ public interface ICounterpartyRepository
         Guid userId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Repository for the merchants a user pinned as committed — rule (d) of
+/// <c>CommittedOutflowRules</c>.
+/// </summary>
+public interface ICommittedMerchantPinRepository
+{
+    /// <summary>Every pin the user holds, ordered by merchant key so listings are stable.</summary>
+    Task<IReadOnlyList<CommittedMerchantPin>> ListAsync(
+        Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Just the keys, as the set the policy tests membership against. Separate from
+    /// <see cref="ListAsync"/> because the policy runs it per statistics request and needs no
+    /// display names.
+    /// </summary>
+    Task<IReadOnlySet<string>> GetPinnedKeysAsync(
+        Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>The user's pin for <paramref name="merchantKey"/>, if they hold one.</summary>
+    Task<CommittedMerchantPin?> FindAsync(
+        Guid userId, string merchantKey, CancellationToken cancellationToken = default);
+
+    Task AddAsync(CommittedMerchantPin pin, CancellationToken cancellationToken = default);
+
+    /// <summary>False when the user held no pin for that key — the caller reports "not pinned".</summary>
+    Task<bool> RemoveAsync(
+        Guid userId, string merchantKey, CancellationToken cancellationToken = default);
+}
+
 public interface ITrueLayerConnectionRepository
 {
     Task<TrueLayerConnection> AddAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default);

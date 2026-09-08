@@ -4,6 +4,13 @@ using System.Text.RegularExpressions;
 
 public static class MerchantNameNormalizer
 {
+    /// <summary>
+    /// The key every unnameable merchant collapses to. Public because callers that turn user
+    /// input into a key have to reject it — a rule keyed on <c>unknown</c> would claim the whole
+    /// unnamed tail of the book.
+    /// </summary>
+    public const string UnknownKey = "unknown";
+
     private static readonly string[] DomainSuffixes = [".com", ".net", ".io", ".co", ".org"];
     private static readonly Regex TrailingNumericPattern = new(@"[\s\-_*#]+\d[\d\s\-_]*$", RegexOptions.Compiled);
     private static readonly Regex CollapseSpacesPattern = new(@"\s+", RegexOptions.Compiled);
@@ -54,7 +61,7 @@ public static class MerchantNameNormalizer
     public static string Normalize(string? input)
     {
         if (string.IsNullOrWhiteSpace(input))
-            return "unknown";
+            return UnknownKey;
 
         var result = input.Trim().ToLowerInvariant();
 
@@ -77,7 +84,7 @@ public static class MerchantNameNormalizer
         result = CollapseSpacesPattern.Replace(result, " ").Trim();
 
         if (string.IsNullOrWhiteSpace(result))
-            return "unknown";
+            return UnknownKey;
 
         foreach (var (keyword, canonical) in BrandAliases)
         {
@@ -96,6 +103,6 @@ public static class MerchantNameNormalizer
             .OrderByDescending(g => g.Count())
             .FirstOrDefault();
 
-        return grouped?.Key ?? "unknown";
+        return grouped?.Key ?? UnknownKey;
     }
 }
