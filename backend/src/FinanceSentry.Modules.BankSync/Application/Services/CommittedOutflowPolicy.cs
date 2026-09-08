@@ -108,11 +108,18 @@ public sealed class CommittedOutflowRules(
         if (_pinnedMerchantKeys.Count == 0)
             return false;
 
-        // (d) re-derives rather than reusing commitmentKey: the resolver returns
-        // installment:{merchant}:{amount} for repayment-shaped rows, which no merchant pin can
-        // ever equal, so a pinned shop's repayments would slip through.
+        // (d) re-derives rather than reusing commitmentKey: the resolver keys a repayment-shaped
+        // row as installment:{merchant}:{amount}, which no merchant pin can ever equal, so the
+        // repayments of a pinned merchant would slip through.
         var merchantKey = MerchantNameNormalizer.NormalizeDetectionKey(
             debit.MerchantName, debit.Description);
+
+        // A debit that names no merchant matches no merchant pin. Without this, a single pin
+        // stored under the collapsed `unknown` key would claim every unnamed debit in the book.
+        // CommittedMerchantKey.Derive refuses to mint that key and the rule refuses to honour
+        // it: a whole-book claim should not be one bad row away.
+        if (merchantKey == MerchantNameNormalizer.UnknownKey)
+            return false;
 
         return _pinnedMerchantKeys.Contains(merchantKey);
     }

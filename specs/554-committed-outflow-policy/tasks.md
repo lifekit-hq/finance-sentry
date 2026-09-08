@@ -17,11 +17,13 @@
 
 ## [US2] Rule (d) — user-pinned committed merchants
 
-- [ ] `CommittedMerchantPin` entity + repository port + EF configuration + migration
-- [ ] Pin / unpin commands and a list query, keyed by `MerchantNameNormalizer.NormalizeDetectionKey`
-- [ ] `CommittedOutflowPolicy` loads the pin set; `IsCommitted` gains the rule (d) clause
-- [ ] REST endpoint (list / add / remove) on the BankSync controller surface
-- [ ] MCP tool over the same commands, added to the canonical tool list
-- [ ] Tests: repository round-trip, the policy clause, endpoint contract test, MCP tool contract test
-- [ ] `docs/money-semantics.md` §5a — rule (d)
-- [ ] `dotnet build` + `dotnet test` green; commit spec artifacts + code
+- [x] `CommittedMerchantPin` entity + repository port + EF configuration + migration (`M017`)
+- [x] Pin / unpin commands and a list query, keyed by `MerchantNameNormalizer.NormalizeDetectionKey`
+      through the one `CommittedMerchantKey.Derive` seam
+- [x] `CommittedOutflowPolicy` loads the pin set; `IsCommitted` gains the rule (d) clause
+- [x] REST endpoint (list / add / remove) on `CommittedMerchantsController`
+- [x] `committed_merchants` MCP tool over the same commands, added to the canonical tool list
+- [x] Tests: repository round-trip, the policy clause, the split end to end through
+      `MoneyFlowStatisticsService`, endpoint contract test, MCP tool contract test
+- [x] `docs/money-semantics.md` §5a — rule (d); `docs/mcp.md` — the tool row
+- [x] `dotnet build` + `dotnet test` green; commit spec artifacts + code

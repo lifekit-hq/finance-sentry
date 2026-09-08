@@ -44,12 +44,35 @@ saved without a role is real spending with no recognised role. It is in `realFlo
 `investment` and `self_routing` are carved out) and must fall to discretionary — that is the
 live path that keeps the role predicate from being a tautology over today's role set.
 
-### [US2] Rule (d) — user pins (NOT built; recorded for the next session)
+### [US2] Rule (d) — user pins (BUILT)
 
-- `FinanceSentry.Modules.BankSync/Domain/CommittedMerchantPin.cs` + repository port, EF config
-  and a migration (precedent for a small per-user BankSync table: `Counterparty`)
-- `Application/Commands/PinCommittedMerchant*` / `UnpinCommittedMerchant*`, a list query
+- `Domain/CommittedMerchantPin.cs` + `ICommittedMerchantPinRepository` (in `IRepositories.cs`),
+  `CommittedMerchantPinRepository`, EF config in `BankSyncDbContext`, migration `M017`
+- `Application/Commands/PinCommittedMerchantCommand.cs` / `UnpinCommittedMerchantCommand.cs`,
+  `Application/Queries/ListCommittedMerchantPinsQuery.cs`,
+  `Application/Services/CommittedMerchantKey.cs`
 - `CommittedOutflowPolicy` loads the pin set alongside the commitment keys; `IsCommitted` gains
   the `NormalizeDetectionKey` clause
-- `API/Controllers` endpoint + an MCP tool (register in `ToolNameContractTests`' canonical list)
-- Tests: repository round-trip, policy clause, contract test on the endpoint and the tool
+- `API/Controllers/CommittedMerchantsController.cs`, `API/Responses/CommittedMerchantPinDto.cs`
+- `FinanceSentry.Mcp/Tools/CommittedMerchantsTool.cs` + `Responses/CommittedMerchantsToolResult.cs`,
+  registered in `ToolNameContractTests`' canonical list (60 tools) and `docs/mcp.md`
+- Tests: `CommittedMerchantPinsTests` (handlers over the real repository on an in-memory
+  context), rule (d) cases in `CommittedOutflowPolicyTests`, a pinned-merchant split fixture in
+  `MoneyFlowStatisticsTests`, `CommittedMerchantsAPIContractTests`, `CommittedMerchantsToolTests`
+
+| US2 decision | Choice | Why |
+|---|---|---|
+| Pin identity | The normalized detection key, unique per `(UserId, MerchantKey)` | One pin has to claim every spelling the statement uses for the merchant; the typed name is kept as `DisplayName` for display only, since the key is lowercased and stripped |
+| Where the key is derived | One `CommittedMerchantKey.Derive` seam, called by both handlers | The REST endpoint, the MCP tool and the policy cannot drift into three normalizations of one name |
+| Rule (d)'s key vs rule (a)'s | Rule (d) re-derives with `NormalizeDetectionKey` instead of reusing `CommitmentKeyResolver.Resolve` | The resolver keys a repayment-shaped row `installment:{merchant}:{amount}`, which no merchant pin can equal — a pinned merchant's repayments would slip through. Pinned by a test that fails under the shared key |
+| The `unknown` key | Refused on write (`UnpinnableMerchantException`, 400) **and** never matched on read | Every unnameable debit carries it, so one such pin would silently claim the whole unnamed tail of the book. Two guards because neither side should be able to cause a whole-book claim alone |
+| Re-pinning | Idempotent — 200 + `AlreadyPinned`, not 409 | Two spellings normalize to one key, so a caller re-pinning has asked for a state that already holds |
+| Unpin addressing | By merchant text on the query string, not by pin id in the path | The key is the pin's identity, so unpinning mirrors pinning and needs no listing round trip; a free-text key ("mobile top-up 0057") makes a brittle path segment |
+| MCP surface | One `committed_merchants` tool with an `action` parameter, not three tools | Keeps the 60-tool surface from growing by three for one concept; malformed calls come back as an `Error` member rather than a transport exception the agent cannot read |
+| No frontend in this slice | REST + MCP only | The app renders no pin management yet; a UI slice is its own increment (see FOLLOW-UPS in the PR) |
+
+Constraint discovered while building: `MerchantNameNormalizer.NormalizeDetectionKey` collapses
+blank/punctuation-only input to `unknown`, the same key every unnamed debit carries — the pin
+path had to reject it explicitly on both sides. Second: an installment-shaped row only reaches
+rule (d) as its merchant when the statement line carries a `MerchantName`; keyed off the
+description alone it normalizes to the whole description, which no pin equals.

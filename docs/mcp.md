@@ -20,7 +20,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 58 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 60 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -30,6 +30,7 @@ The current runtime surface contains 58 tools. The canonical list is the `Agreed
 | `list_active_alerts` | Read | Alerts | `userId?` | Only unread unresolved alerts |
 | `get_portfolio_snapshot` | Read | Portfolio | `userId?` | Unified brokerage + crypto holdings |
 | `list_subscriptions` | Read | Subscriptions | `userId?` | Detected recurring charges |
+| `committed_merchants` | Read + Write | Cashflow | `action` (`list`\|`pin`\|`unpin`), `merchant?`, `userId?` | The merchants the user declared committed — rule (d) of the committed-outflow policy |
 | `get_sync_health` | Read | Sync | `userId?` | Status across Monobank, TrueLayer, Binance, IBKR |
 | `get_crypto_pnl_detail` | Read | Crypto | `userId?` | Per-asset crypto P&L from trade history |
 | `get_tax_lots` | Read | Brokerage | `userId?` | Current tax lots / average cost data |

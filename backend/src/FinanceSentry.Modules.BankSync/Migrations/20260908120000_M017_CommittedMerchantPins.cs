@@ -1,4 +1,3 @@
-using System;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
