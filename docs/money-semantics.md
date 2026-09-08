@@ -236,7 +236,11 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   tail of the book; the write path (`CommittedMerchantKey.Derive`) refuses to mint that key and
   the rule refuses to honour it. Managed via `GET`/`POST`/`DELETE /api/v1/committed-merchants`
   and the `committed_merchants` MCP tool; pinning is idempotent, since two spellings of one
-  merchant normalize to one key.
+  merchant normalize to one key, and unpinning accepts either the merchant text or the listed
+  `merchantKey`. **A pin is an exact key match, not a substring search**: a row that carries no
+  `MerchantName` keys off its whole description, so a pin on `Telemart` does not claim
+  `Щомісячний платіж telemart - monomarket`. Looser matching would let a pin on a common word
+  swallow unrelated spend; the cost is that pins are ineffective on description-only rows.
 
 **Discretionary** = every other non-transfer outflow. Derived as
 `OutflowUsd − CommittedOutflowUsd` (and, on the synthetic row, `expense − committed`) so the

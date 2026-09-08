@@ -3,7 +3,6 @@ namespace FinanceSentry.Modules.BankSync.API.Controllers;
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using Microsoft.AspNetCore.Mvc;
@@ -38,9 +37,11 @@ public class CommittedMerchantsController(
         var result = await pinMerchant.Handle(
             new PinCommittedMerchantCommand(User.RequireUserId(), body.Merchant), ct);
 
+        // Location is the collection: a pin has no per-id route, since its identity is the
+        // merchant key and callers address it by that everywhere else.
         return result.AlreadyPinned
             ? Ok(result.Pin)
-            : CreatedAtAction(nameof(List), new { id = result.Pin.Id }, result.Pin);
+            : CreatedAtAction(nameof(List), result.Pin);
     }
 
     // ── DELETE /api/v1/committed-merchants?merchant=… ────────────────────────

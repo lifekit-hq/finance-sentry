@@ -1,6 +1,5 @@
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Tools;
-using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Domain.Exceptions;

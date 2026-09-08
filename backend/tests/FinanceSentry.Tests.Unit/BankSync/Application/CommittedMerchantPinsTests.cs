@@ -1,6 +1,5 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
-using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -130,6 +129,21 @@ public class CommittedMerchantPinsTests
     {
         // The caller turns this into a 404 rather than pretending the removal happened.
         (await Unpin(NewRepository(), UserId, "Anytime Fitness")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Unpin_ByTheKeyTheListingAdvertised_RemovesThePin()
+    {
+        // List-then-unpin is the only flow an MCP caller has, and normalization is not a fixed
+        // point over every key it emits: "*MOBI TOP-UP 0857860057" stores `mobile top-up 0057`,
+        // which re-derives to `mobile top-up`. Unpinning by the advertised key must still work.
+        var repository = NewRepository();
+        await Pin(repository, UserId, "*MOBI TOP-UP 0857860057");
+        var advertisedKey = (await List(repository, UserId)).Single().MerchantKey;
+
+        advertisedKey.Should().Be("mobile top-up 0057");
+        (await Unpin(repository, UserId, advertisedKey)).Should().BeTrue();
+        (await repository.GetPinnedKeysAsync(UserId)).Should().BeEmpty();
     }
 
     // ── Listing ──────────────────────────────────────────────────────────────

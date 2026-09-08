@@ -2,7 +2,6 @@ using System.ComponentModel;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Mcp.Responses;
-using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Domain.Exceptions;
@@ -23,8 +22,10 @@ public sealed class CommittedMerchantsTool(
         + "user knows about (a standing payment to a person, a gym lock-in), which no recurrence "
         + "detector or category rule can see. Pinned merchants count as committed rather than "
         + "discretionary in every cash-flow split. action=list returns all pins; action=pin "
-        + "requires merchant; action=unpin requires the same merchant text. Scoped to the "
-        + "authenticated MCP identity.")]
+        + "requires merchant; action=unpin takes either the same merchant text or the "
+        + "merchantKey a listing returned. A pin matches a statement line by normalized merchant "
+        + "name, exactly rather than as a substring, so it does not claim rows that name the "
+        + "merchant only inside a longer description. Scoped to the authenticated MCP identity.")]
     public async Task<CommittedMerchantsToolResult?> ExecuteAsync(
         [Description("What to do: list | pin | unpin.")] string action,
         [Description("Merchant as it appears on the statement, e.g. 'Mario Scalas', 'Anytime Fitness'. Required for pin and unpin.")] string? merchant = null,

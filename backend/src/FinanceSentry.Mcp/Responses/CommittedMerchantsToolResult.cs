@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using FinanceSentry.Modules.BankSync.API.Responses;
+using FinanceSentry.Modules.BankSync.Application.Queries;
 
 namespace FinanceSentry.Mcp.Responses;
 

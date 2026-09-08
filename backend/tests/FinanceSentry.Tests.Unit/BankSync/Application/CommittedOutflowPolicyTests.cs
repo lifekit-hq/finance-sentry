@@ -189,6 +189,19 @@ public class CommittedOutflowPolicyTests
     }
 
     [Fact]
+    public void IsCommitted_PinDoesNotMatchARowThatNamesTheMerchantOnlyInsideItsDescription()
+    {
+        // A known limit of rule (d), pinned so it cannot regress silently into a fuzzy match.
+        // Rows with no MerchantName key off the WHOLE description, so a pin on "Telemart" does
+        // not claim "Щомісячний платіж telemart - monomarket" — the pin is an exact key match,
+        // not a substring search. Anything looser would let a pin on a common word ("bank",
+        // "card") swallow unrelated spend.
+        var descriptionOnly = Debit(6499.84m, "Щомісячний платіж telemart - monomarket");
+
+        RulesWithPins("telemart").IsCommitted(descriptionOnly).Should().BeFalse();
+    }
+
+    [Fact]
     public void IsCommitted_MerchantTheUserDidNotPin_IsDiscretionary()
     {
         // A pin is a claim about ONE merchant, never a mood about the month.
