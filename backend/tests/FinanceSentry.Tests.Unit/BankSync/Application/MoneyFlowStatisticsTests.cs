@@ -67,11 +67,22 @@ public class MoneyFlowStatisticsTests
     /// about what the reader does with a verdict, so stubbing the verdict itself would let the
     /// two drift. Only the per-user data the rules read is faked.
     /// </summary>
-    private static ICommittedOutflowPolicy CommittedPolicy(params string[] activeCommitmentKeys)
+    private static ICommittedOutflowPolicy CommittedPolicy(params string[] activeCommitmentKeys) =>
+        Policy(activeCommitmentKeys, []);
+
+    /// <summary>A user who has pinned merchants (rule (d)) but has no detected commitments.</summary>
+    private static ICommittedOutflowPolicy CommittedPolicyWithPins(params string[] pinnedMerchantKeys) =>
+        Policy([], pinnedMerchantKeys);
+
+    private static ICommittedOutflowPolicy Policy(string[] activeCommitmentKeys, string[] pinnedMerchantKeys)
     {
         var mock = new Mock<ICommittedOutflowPolicy>();
         mock.Setup(p => p.LoadForUserAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CommittedOutflowRules(activeCommitmentKeys.ToHashSet(StringComparer.Ordinal)));
+            .ReturnsAsync(new CommittedOutflowRules
+            {
+                ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
+                PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+            });
         return mock.Object;
     }
 
@@ -625,6 +636,38 @@ public class MoneyFlowStatisticsTests
         result[0].OutflowUsd.Should().Be(100m);
         result[0].CommittedOutflowUsd.Should().Be(15m);
         result[0].DiscretionaryOutflowUsd.Should().Be(85m);
+    }
+
+    [Fact]
+    public async Task GetMonthlyFlow_PinnedMerchant_MovesSpendFromDiscretionaryToCommitted()
+    {
+        // Rule (d) end to end: the gym is uncategorized and was never detected as recurring, so
+        // without the pin it is discretionary. The user pinning it is the only thing that moves
+        // the money — which is the whole point of the escape hatch.
+        var (account, accountId) = MakeAccount("USD");
+        var date = new DateTime(2026, 4, 12, 0, 0, 0, DateTimeKind.Utc);
+
+        var transactions = new List<Transaction>
+        {
+            MakeTx(accountId, 60m, "debit", date, merchantName: "Anytime Fitness"),
+            MakeTx(accountId, 40m, "debit", date, merchantName: "Silpo"),
+        };
+
+        var unpinned = await new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
+            CommittedPolicy()).GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
+
+        var pinned = await new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(account).Object, new TransferDetectionService(),
+            CommittedPolicyWithPins("anytime fitness")).GetMonthlyFlowAsync(UserId, CounterpartyResults.None, 6);
+
+        unpinned[0].CommittedOutflowUsd.Should().Be(0m);
+        unpinned[0].DiscretionaryOutflowUsd.Should().Be(100m);
+
+        pinned[0].CommittedOutflowUsd.Should().Be(60m);
+        pinned[0].DiscretionaryOutflowUsd.Should().Be(40m);
+        (pinned[0].CommittedOutflowUsd + pinned[0].DiscretionaryOutflowUsd)
+            .Should().Be(pinned[0].OutflowUsd);
     }
 
     [Fact]

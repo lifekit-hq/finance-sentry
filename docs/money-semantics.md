@@ -224,8 +224,25 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   synthetic USD row per month. `investment` and `self_routing` are absent because they are not
   spending at all; a counterparty saved with no role is spending that names no obligation and
   falls to discretionary.
-- **(d) a user pin** — the user marked the merchant key as committed. NOT IMPLEMENTED yet
-  (spec 554, US2).
+- **(d) a user pin** — the debit's `MerchantNameNormalizer.NormalizeDetectionKey` is one of the
+  merchant keys the user pinned (`committed_merchant_pins`, unique per `(UserId, MerchantKey)`).
+  This is the escape hatch for the obligations only the user knows about: a standing payment to
+  a person, a gym with a lock-in, a service billed too irregularly for the detector to promote
+  it. Keyed on the **detection key**, not on `CommitmentKeyResolver.Resolve`, because a pin
+  names a MERCHANT and must claim that merchant's charges even when an individual row is shaped
+  like an installment repayment (which the resolver keys `installment:{merchant}:{amount}`, a
+  form no merchant pin can equal). A debit whose merchant cannot be named collapses to the
+  `unknown` key and is never claimed by a pin — otherwise one pin would take the whole unnamed
+  tail of the book; the write path (`CommittedMerchantKey.Derive`) refuses to mint that key and
+  the rule refuses to honour it. Managed via `GET`/`POST`/`DELETE /api/v1/committed-merchants`
+  and the `committed_merchants` MCP tool. Pinning is idempotent: two spellings of one merchant
+  normalize to one key, and two concurrent pins of it both report the row that exists.
+  Unpinning accepts either the merchant text or the listed `merchantKey` — both derive to the
+  same key, because `NormalizeDetectionKey` is a fixed point over its own output.
+  **A pin is an exact key match, not a substring search**: a row that carries no
+  `MerchantName` keys off its whole description, so a pin on `Telemart` does not claim
+  `Щомісячний платіж telemart - monomarket`. Looser matching would let a pin on a common word
+  swallow unrelated spend; the cost is that pins are ineffective on description-only rows.
 
 **Discretionary** = every other non-transfer outflow. Derived as
 `OutflowUsd − CommittedOutflowUsd` (and, on the synthetic row, `expense − committed`) so the

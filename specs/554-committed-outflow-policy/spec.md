@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: US1 implemented; US2 (user pins) not started
+**Status**: US1 + US2 + US3 implemented
 
 **GitHub Issue**: #554
 
@@ -74,7 +74,7 @@ detector happened to spot.
    shop — each land on the right side of the split, including a cross-currency case that would
    fail under a native sum.
 
-### [US2] Rule (d) — user-pinned committed merchants (NOT built)
+### [US2] Rule (d) — user-pinned committed merchants (BUILT)
 
 **As** the user, **I want** to mark a merchant as committed, **so that** an obligation only I
 know about (a standing payment to a person, a gym I am locked into) counts as committed.
@@ -86,6 +86,34 @@ know about (a standing payment to a person, a gym I am locked into) counts as co
 2. An endpoint to list/add/remove entries, and an MCP tool over the same commands.
 3. Rule (d) reads the list in `CommittedOutflowPolicy` — the same rule set, one more clause.
 4. Backend unit + contract tests; `docs/money-semantics.md` §5a updated.
+
+### [US3] One key seam, one race-safe write — hardening rule (d)
+
+**As** the next person to touch the pin surface, **I want** rule (d) to rest on a single key
+derivation and a write that cannot 500, **so that** the escape hatch the split now leans on
+does not quietly grow a second key path or lose a pin to a double-click.
+
+Review of the US2 increment (PR #605) surfaced four seams that US2 accepted as costs. Each is
+paid off here rather than carried.
+
+**Acceptance**
+
+1. `MerchantNameNormalizer.NormalizeDetectionKey` is a **fixed point over its own output**:
+   `f(f(x)) == f(x)` for every input, proven by a property test over the shapes the book
+   actually carries. The mobile-top-up key is the case that broke it.
+2. `UnpinCommittedMerchantCommand` looks the pin up through `CommittedMerchantKey.Derive`
+   only — the raw `.Trim().ToLowerInvariant()` second path is deleted, and the
+   pin-then-unpin-by-the-advertised-key round trip still holds (US2's test is the proof, kept
+   unchanged).
+3. `CommittedOutflowRules` cannot be constructed with its two same-typed key sets swapped:
+   both are named at every call site.
+4. Two concurrent pins of the same merchant both return the documented idempotent result
+   rather than a `DbUpdateException`; the losing write finds the winner's row. A
+   `DbUpdateException` that is *not* a lost race still surfaces.
+5. `ICommittedMerchantPinRepository` lives in its own file, not appended to the module's
+   catch-all repository-port file.
+6. The keys the idempotence fix moves are rekeyed in the database, so no commitment or pin
+   minted under the old derivation silently stops matching.
 
 ---
 

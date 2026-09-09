@@ -16,6 +16,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options) : Db
     public DbSet<MerchantKeyword> MerchantKeywords { get; set; } = null!;
     public DbSet<Counterparty> Counterparties { get; set; } = null!;
     public DbSet<CounterpartyRule> CounterpartyRules { get; set; } = null!;
+    public DbSet<CommittedMerchantPin> CommittedMerchantPins { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -132,6 +133,17 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options) : Db
         crb.Property(r => r.Pattern).IsRequired().HasMaxLength(255);
         crb.Property(r => r.Currency).HasMaxLength(3);
         crb.HasIndex(r => r.CounterpartyId).HasDatabaseName("idx_counterparty_rule_counterparty_id");
+
+        var cmp = modelBuilder.Entity<CommittedMerchantPin>();
+        cmp.ToTable("committed_merchant_pins");
+        cmp.HasKey(p => p.Id);
+        cmp.Property(p => p.UserId).IsRequired();
+        cmp.Property(p => p.MerchantKey).IsRequired().HasMaxLength(255);
+        cmp.Property(p => p.DisplayName).IsRequired().HasMaxLength(255);
+        // Unique per user: a pin is set membership, so a second row for the same key would be a
+        // duplicate the policy could never tell apart.
+        cmp.HasIndex(p => new { p.UserId, p.MerchantKey }).IsUnique()
+           .HasDatabaseName("idx_committed_merchant_pin_user_merchant_unique");
 
         var sjb = modelBuilder.Entity<SyncJob>();
         sjb.HasKey(sj => sj.Id);

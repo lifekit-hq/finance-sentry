@@ -28,3 +28,13 @@ public class SyncAlreadyRunningException()
 
 public class CredentialExpiredException()
     : BankSyncException("CREDENTIAL_EXPIRED", "Bank credentials expired. Please reconnect your account.", 401);
+
+/// <summary>
+/// The merchant offered for a committed pin normalizes to nothing nameable. Rejected rather
+/// than stored: <c>MerchantNameNormalizer</c> collapses blank and punctuation-only input to the
+/// key <c>unknown</c>, which every unnamed debit also carries — a pin on it would silently claim
+/// the whole tail of the book as committed. Reuses <c>VALIDATION_ERROR</c> so no new error code
+/// has to be threaded into the frontend registry for a surface the app does not render yet.
+/// </summary>
+public class UnpinnableMerchantException()
+    : BankSyncException("VALIDATION_ERROR", "A committed pin needs a recognisable merchant name.", 400);

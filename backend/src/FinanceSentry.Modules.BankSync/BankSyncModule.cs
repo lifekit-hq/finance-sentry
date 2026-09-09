@@ -161,6 +161,7 @@ public static class BankSyncModule
 
         services.AddScoped<ICounterpartyRepository, CounterpartyRepository>();
         services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();
+        services.AddScoped<ICommittedMerchantPinRepository, CommittedMerchantPinRepository>();
 
         services.AddScoped<IBankingAccountsReader, BankingAccountsReader>();
         services.AddScoped<IBankingTransactionReader, BankingTransactionReader>();

@@ -4,6 +4,7 @@ using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -31,7 +32,20 @@ public class CommittedOutflowPolicyTests
         };
 
     private static CommittedOutflowRules Rules(params string[] activeCommitmentKeys) =>
-        new(activeCommitmentKeys.ToHashSet(StringComparer.Ordinal));
+        new()
+        {
+            ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
+            PinnedMerchantKeys = NoPins,
+        };
+
+    private static CommittedOutflowRules RulesWithPins(params string[] pinnedMerchantKeys) =>
+        new()
+        {
+            ActiveCommitmentKeys = NoPins,
+            PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+        };
+
+    private static IReadOnlySet<string> NoPins => new HashSet<string>(StringComparer.Ordinal);
 
     // ── Rule (a): an active detected commitment ──────────────────────────────
 
@@ -141,21 +155,132 @@ public class CommittedOutflowPolicyTests
         Rules().IsCommittedFlowRole(flowRole).Should().BeFalse();
     }
 
+    // ── Rule (d): a user pin ─────────────────────────────────────────────────
+
+    [Fact]
+    public void IsCommitted_PinnedMerchant_IsCommittedWithoutCategoryOrDetection()
+    {
+        // The obligation only the user can see: a standing payment to a person, uncategorized,
+        // never promoted to a subscription. It is committed because — and only because — the
+        // user said so.
+        var standingPayment = Debit(400m, "To Mario Scalas", merchantName: "Mario Scalas");
+
+        RulesWithPins("mario scalas").IsCommitted(standingPayment).Should().BeTrue();
+        Rules().IsCommitted(standingPayment).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsCommitted_PinIsMatchedOnTheDetectionKey_SoEverySpellingCounts()
+    {
+        // One pin has to claim every spelling the statement uses. "NETFLIX.COM" and "Netflix"
+        // normalize to the same detection key, which is why the pin stores the key rather than
+        // the typed name.
+        var pinned = RulesWithPins("netflix");
+
+        pinned.IsCommitted(Debit(15.99m, "CARD PAYMENT", merchantName: "NETFLIX.COM")).Should().BeTrue();
+        pinned.IsCommitted(Debit(15.99m, "CARD PAYMENT", merchantName: "Netflix")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsCommitted_PinnedMerchantsInstallmentShapedRow_IsStillCommitted()
+    {
+        // The reason rule (d) re-derives instead of reusing the rule (a) key: the resolver keys
+        // this row installment:telemart:6500, which no merchant pin can ever equal — so a pinned
+        // merchant's repayments would slip through to discretionary. Rule (d) keys on the
+        // merchant, so it claims them.
+        var repayment = Debit(6499.84m, "Щомісячний платіж telemart - monomarket",
+            merchantName: "Telemart");
+
+        RulesWithPins("telemart").IsCommitted(repayment).Should().BeTrue();
+        Rules("telemart").IsCommitted(repayment).Should().BeFalse(
+            because: "rule (a) sees only the installment plan key for this row");
+    }
+
+    [Fact]
+    public void IsCommitted_PinDoesNotMatchARowThatNamesTheMerchantOnlyInsideItsDescription()
+    {
+        // A known limit of rule (d), pinned so it cannot regress silently into a fuzzy match.
+        // Rows with no MerchantName key off the WHOLE description, so a pin on "Telemart" does
+        // not claim "Щомісячний платіж telemart - monomarket" — the pin is an exact key match,
+        // not a substring search. Anything looser would let a pin on a common word ("bank",
+        // "card") swallow unrelated spend.
+        var descriptionOnly = Debit(6499.84m, "Щомісячний платіж telemart - monomarket");
+
+        RulesWithPins("telemart").IsCommitted(descriptionOnly).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsCommitted_MerchantTheUserDidNotPin_IsDiscretionary()
+    {
+        // A pin is a claim about ONE merchant, never a mood about the month.
+        RulesWithPins("mario scalas")
+            .IsCommitted(Debit(62.40m, "ZARA MILANO", merchantName: "Zara"))
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsCommitted_UnnamedDebit_IsNotClaimedByAPinOnTheUnknownKey()
+    {
+        // Defence for the hole CommittedMerchantKey.Derive closes at the write side: every
+        // unnameable debit normalizes to "unknown", so a rule set that somehow held that key
+        // would silently claim the whole unnamed tail of the book. Even then, it must not.
+        var unnamed = Debit(31.20m, "   ");
+
+        RulesWithPins(MerchantNameNormalizer.UnknownKey).IsCommitted(unnamed).Should().BeFalse();
+    }
+
     // ── Loading the per-user rule set ────────────────────────────────────────
 
     [Fact]
     public async Task LoadForUserAsync_CarriesTheUsersActiveCommitmentKeysIntoTheRules()
     {
-        var reader = new Mock<IActiveSubscriptionsReader>();
-        reader.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal) { "installment:telemart:6500" });
-
-        var rules = await new CommittedOutflowPolicy(reader.Object).LoadForUserAsync(UserId);
+        var rules = await Policy(
+            commitmentKeys: ["installment:telemart:6500"], pinnedKeys: []).LoadForUserAsync(UserId);
 
         rules.IsCommitted(Debit(6499.84m, "Щомісячний платіж telemart - monomarket"))
              .Should().BeTrue();
-        reader.Verify(
-            r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()),
-            Times.Once);
+    }
+
+    [Fact]
+    public async Task LoadForUserAsync_CarriesTheUsersPinsIntoTheRules()
+    {
+        var rules = await Policy(
+            commitmentKeys: [], pinnedKeys: ["mario scalas"]).LoadForUserAsync(UserId);
+
+        rules.IsCommitted(Debit(400m, "To Mario Scalas", merchantName: "Mario Scalas"))
+             .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LoadForUserAsync_ReadsEachSourceOncePerUser_NotOncePerTransaction()
+    {
+        var subscriptions = new Mock<IActiveSubscriptionsReader>();
+        subscriptions.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
+        var pins = new Mock<ICommittedMerchantPinRepository>();
+        pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
+
+        var rules = await new CommittedOutflowPolicy(subscriptions.Object, pins.Object)
+            .LoadForUserAsync(UserId);
+        for (var i = 0; i < 3; i++)
+            rules.IsCommitted(Debit(10m + i, "СІЛЬПО"));
+
+        subscriptions.Verify(
+            r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
+        pins.Verify(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static CommittedOutflowPolicy Policy(string[] commitmentKeys, string[] pinnedKeys)
+    {
+        var subscriptions = new Mock<IActiveSubscriptionsReader>();
+        subscriptions.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(commitmentKeys.ToHashSet(StringComparer.Ordinal));
+
+        var pins = new Mock<ICommittedMerchantPinRepository>();
+        pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pinnedKeys.ToHashSet(StringComparer.Ordinal));
+
+        return new CommittedOutflowPolicy(subscriptions.Object, pins.Object);
     }
 }
