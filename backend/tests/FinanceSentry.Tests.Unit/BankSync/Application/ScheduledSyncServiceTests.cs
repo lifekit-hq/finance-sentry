@@ -72,7 +72,7 @@ public class ScheduledSyncServiceTests
         // Default TrueLayer wiring: a linked connection with a decryptable refresh token that
         // exchanges for an access token without rotating, and a provider resolvable by name.
         var connection = new TrueLayerConnection(UserId, "ob-testbank", "Test Bank", $"ref-{Guid.NewGuid():N}");
-        connection.SetRefreshToken([1], [2], [3]);
+        connection.SetRefreshToken([1], [2], [3], 1);
 
         var account = new BankAccount
         {

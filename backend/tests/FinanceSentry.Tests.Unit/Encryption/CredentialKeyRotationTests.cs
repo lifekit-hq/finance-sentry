@@ -53,7 +53,8 @@ public class CredentialKeyRotationTests
         var underV1 = ServiceAtVersion(1).Encrypt(token);
         underV1.KeyVersion.Should().Be(1);
         db.MonobankCredentials.Add(
-            new MonobankCredential(Guid.NewGuid(), underV1.Ciphertext, underV1.Iv, underV1.AuthTag));
+            new MonobankCredential(
+                Guid.NewGuid(), underV1.Ciphertext, underV1.Iv, underV1.AuthTag, underV1.KeyVersion));
         await db.SaveChangesAsync();
 
         var atV2 = ServiceAtVersion(2);
@@ -76,7 +77,8 @@ public class CredentialKeyRotationTests
 
         var underV1 = ServiceAtVersion(1).Encrypt("token");
         db.MonobankCredentials.Add(
-            new MonobankCredential(Guid.NewGuid(), underV1.Ciphertext, underV1.Iv, underV1.AuthTag));
+            new MonobankCredential(
+                Guid.NewGuid(), underV1.Ciphertext, underV1.Iv, underV1.AuthTag, underV1.KeyVersion));
         await db.SaveChangesAsync();
 
         var atV2 = ServiceAtVersion(2);
@@ -84,6 +86,44 @@ public class CredentialKeyRotationTests
 
         (await target.RotateAsync(2, default)).Should().Be(1);
         (await target.RotateAsync(2, default)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AWriteRecordsTheVersionItEncryptedUnder_SoItCanBeReadBack()
+    {
+        // The bug this pins: SetRefreshToken and the MonobankCredential ctor did not persist the
+        // key version, so a row written after rotation carried v2 ciphertext labelled v1 and was
+        // then decrypted with the WRONG key. It was invisible while one key was configured — every
+        // version was 1 — and became live the moment rotation made versions differ. The scheduled
+        // TrueLayer token refresh writes through this path, so it would have re-broken the very
+        // rows rotation had just fixed.
+        const string token = "written-after-rotation";
+        await using var db = NewContext();
+        var atV2 = ServiceAtVersion(2);
+
+        var encrypted = atV2.Encrypt(token);
+        encrypted.KeyVersion.Should().Be(2);
+
+        var connection = new TrueLayerConnection(Guid.NewGuid(), "mock-bank", "Mock Bank", "ref-1");
+        connection.SetRefreshToken(
+            encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
+        var mono = new MonobankCredential(
+            Guid.NewGuid(), encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
+        db.TrueLayerConnections.Add(connection);
+        db.MonobankCredentials.Add(mono);
+        await db.SaveChangesAsync();
+
+        var storedConnection = await db.TrueLayerConnections.SingleAsync();
+        var storedMono = await db.MonobankCredentials.SingleAsync();
+
+        storedConnection.KeyVersion.Should().Be(2);
+        storedMono.KeyVersion.Should().Be(2);
+        atV2.Decrypt(
+            storedConnection.EncryptedRefreshToken, storedConnection.Iv,
+            storedConnection.AuthTag, storedConnection.KeyVersion).Should().Be(token);
+        atV2.Decrypt(
+            storedMono.EncryptedToken, storedMono.Iv,
+            storedMono.AuthTag, storedMono.KeyVersion).Should().Be(token);
     }
 
     [Fact]

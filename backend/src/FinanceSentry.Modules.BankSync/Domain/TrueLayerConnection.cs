@@ -39,11 +39,19 @@ public class TrueLayerConnection : Entity
         Reference = reference;
     }
 
-    public void SetRefreshToken(byte[] ciphertext, byte[] iv, byte[] authTag)
+    /// <summary>
+    /// Stores a freshly encrypted refresh token. <paramref name="keyVersion"/> is REQUIRED and is
+    /// the version the ciphertext was produced under — a row whose stored version does not match
+    /// its ciphertext is decrypted with the wrong key and throws (issue #493). It was optional in
+    /// effect until 2026-09-09: with a single configured key every version was 1, so dropping it
+    /// was invisible. It is not optional now.
+    /// </summary>
+    public void SetRefreshToken(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
     {
         EncryptedRefreshToken = ciphertext;
         Iv = iv;
         AuthTag = authTag;
+        KeyVersion = keyVersion;
         UpdatedAt = DateTime.UtcNow;
     }
 
