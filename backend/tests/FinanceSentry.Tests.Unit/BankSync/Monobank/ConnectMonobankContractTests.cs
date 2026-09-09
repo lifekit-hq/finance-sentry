@@ -120,7 +120,7 @@ public class ConnectMonobankContractTests
             .ReturnsAsync([BlackAccount]);
         _credentials
             .Setup(c => c.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MonobankCredential(UserId, [1], [2], [3]));
+            .ReturnsAsync(new MonobankCredential(UserId, [1], [2], [3], 1));
 
         var (status, errorCode) = await RunThroughErrorMiddlewareAsync(
             () => CreateHandler().Handle(new ConnectMonobankAccountCommand(UserId, Token), default));

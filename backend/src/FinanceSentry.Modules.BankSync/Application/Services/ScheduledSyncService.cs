@@ -509,7 +509,7 @@ public class ScheduledSyncService(
             if (!string.IsNullOrEmpty(tokenSet.RefreshToken) && tokenSet.RefreshToken != refreshToken)
             {
                 var encrypted = _encryption.Encrypt(tokenSet.RefreshToken);
-                connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag);
+                connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
                 await _truelayerConnections.UpdateAsync(connection, ct);
             }
 
