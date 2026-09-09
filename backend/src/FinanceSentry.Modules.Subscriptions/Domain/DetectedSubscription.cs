@@ -136,6 +136,7 @@ public class DetectedSubscription
         string merchantNameDisplay,
         decimal averageAmount,
         decimal lastKnownAmount,
+        string currency,
         DateOnly lastChargeDate,
         DateOnly nextExpectedDate,
         int occurrenceCount,
@@ -151,6 +152,11 @@ public class DetectedSubscription
             MerchantNameDisplay = merchantNameDisplay;
         AverageAmount = averageAmount;
         LastKnownAmount = lastKnownAmount;
+        // The unit the amounts above are in. A merchant whose billing moves to another account
+        // restates every one of them, and a row left labelled with the old currency is not
+        // merely mislabelled: the spend summaries run ToUsd over Currency, so a EUR amount
+        // converted at the GBP rate silently misstates the user's monthly total.
+        Currency = currency;
         // Always assigned, never merged: once the new price has settled, detection stops
         // reporting a step and the stale baseline must clear or the sentinel re-fires forever.
         PreviousAmount = previousAmount;

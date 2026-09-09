@@ -74,6 +74,22 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   `CurrencyConverter.AreRatesFresh(maxAge)` (`RatesUpdatedAtUtc` is null until the first
   refresh, and an ignored empty feed never moves it) and stand down rather than publish a
   figure. `FxSpreadDetectionJob` is the one such consumer today.
+- **Two amounts judged at a tolerance finer than the table's drift are partitioned, not
+  converted.** Converting is the right move when the result is a *total* — a few percent of
+  rate error degrades it and nothing else breaks. It is the wrong move when the converted
+  number is then compared against a threshold tighter than the error itself: the seed table
+  can sit ~7% from the real rate indefinitely, so at a 15% tolerance a stale rate manufactures
+  the very signal the check exists to find. Subscription price detection therefore prices a
+  merchant off the charges in the currency it bills *today*
+  (`SubscriptionDetectionJob.InCurrentBillingCurrency`) — a merchant's charges are grouped by
+  name alone, and a user's accounts span currencies, so without that partition moving a
+  subscription from a GBP card to a EUR one reads as a clean 18–27% "price hike" (inside every
+  repricing guard) that no merchant charged.
+- **An amount and its currency are restated together.** Any entity holding both must assign
+  both on every update path — `DetectedSubscription.UpdateFromDetection` takes `currency`
+  alongside the amounts for this reason. A row left labelled with the old currency while its
+  numbers changed unit is not a cosmetic mislabel: the spend summaries run
+  `ToUsd(amount, row.Currency)` over it, so the whole rate becomes the error.
 
 ## 4. Transaction lifecycle (pending / posted / dedup)
 

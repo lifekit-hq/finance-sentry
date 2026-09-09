@@ -46,6 +46,7 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
                     result.MerchantNameDisplay,
                     result.AverageAmount,
                     result.LastKnownAmount,
+                    result.Currency,
                     result.LastChargeDate,
                     result.NextExpectedDate,
                     result.OccurrenceCount,

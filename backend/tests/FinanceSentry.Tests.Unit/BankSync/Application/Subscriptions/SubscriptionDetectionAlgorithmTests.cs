@@ -264,6 +264,115 @@ public class SubscriptionDetectionAlgorithmTests
     }
 
     [Fact]
+    public void DetectSubscriptions_CurrencyChange_IsNotAdoptedAsABaseline()
+    {
+        // The user moves the same subscription from a GBP card to a EUR one. £9.99 restated
+        // as €11.99 is a clean chronological step inside every repricing guard, so without a
+        // currency partition it becomes a 20% "hike" the merchant never charged.
+        var txs = new[]
+        {
+            Tx("Spotify", 9.99m, 2026, 4, 5, currency: "GBP"),
+            Tx("Spotify", 9.99m, 2026, 5, 5, currency: "GBP"),
+            Tx("Spotify", 9.99m, 2026, 6, 5, currency: "GBP"),
+            Tx("Spotify", 11.99m, 2026, 7, 5, currency: "EUR"),
+            Tx("Spotify", 11.99m, 2026, 8, 5, currency: "EUR"),
+        };
+
+        // Two EUR charges are all the evidence left, which is under the occurrence gate.
+        SubscriptionDetectionJob.DetectSubscriptions(txs).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DetectSubscriptions_HikeAfterACurrencyChange_PricesTheMerchantInOneUnit()
+    {
+        // £9.29 and €10.99 are the same real price, so the merchant's charges hold three
+        // amount clusters, not two — which is the one shape SplitAtPriceStep refuses outright.
+        // Unpartitioned, the €13.49 hike is left standing alone below the occurrence gate and
+        // the subscription vanishes in the very month it went up.
+        var txs = new[]
+        {
+            Tx("Spotify", 9.29m, 2026, 3, 5, currency: "GBP"),
+            Tx("Spotify", 9.29m, 2026, 4, 5, currency: "GBP"),
+            Tx("Spotify", 10.99m, 2026, 5, 5),
+            Tx("Spotify", 10.99m, 2026, 6, 5),
+            Tx("Spotify", 13.49m, 2026, 7, 5),
+        };
+
+        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.Currency.Should().Be("EUR");
+        result.OccurrenceCount.Should().Be(3);
+        result.AverageAmount.Should().Be(13.49m);
+        result.LastKnownAmount.Should().Be(13.49m);
+        result.PreviousAmount.Should().Be(10.99m);
+    }
+
+    [Fact]
+    public void InCurrentBillingCurrency_SameDayInBothCurrencies_PicksOneDeterministically()
+    {
+        // Both currencies are established and both carry a charge on the latest date, so the
+        // tie holds no signal — but the source is an unordered query result, and the answer
+        // must not depend on which row it happens to yield first.
+        SubscriptionDetectionJob.TxRow[] txs =
+        [
+            Tx("Spotify", 9.29m, 2026, 6, 5, currency: "GBP"),
+            Tx("Spotify", 10.99m, 2026, 6, 5),
+            Tx("Spotify", 10.99m, 2026, 7, 5),
+            Tx("Spotify", 9.29m, 2026, 7, 5, currency: "GBP"),
+        ];
+
+        var forwards = SubscriptionDetectionJob.InCurrentBillingCurrency(txs);
+        var backwards = SubscriptionDetectionJob.InCurrentBillingCurrency(txs.Reverse());
+
+        forwards.Select(t => t.Currency).Should().AllBe("EUR");
+        backwards.Should().BeEquivalentTo(forwards);
+    }
+
+    [Fact]
+    public void DetectSubscriptions_OneStrayForeignCharge_DoesNotRetireTheSubscription()
+    {
+        // A single purchase abroad at a merchant the user also subscribes to is not the
+        // merchant moving accounts. Without a minimum-evidence gate on the currency it would
+        // retire every established charge and delete the subscription outright.
+        var txs = new[]
+        {
+            Tx("Netflix.com", 10.99m, 2026, 4, 15),
+            Tx("Netflix.com", 10.99m, 2026, 5, 15),
+            Tx("Netflix.com", 10.99m, 2026, 6, 15),
+            Tx("Netflix.com", 10.99m, 2026, 7, 15),
+            Tx("Netflix.com", 12.99m, 2026, 7, 20, currency: "USD"),
+        };
+
+        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.Currency.Should().Be("EUR");
+        result.OccurrenceCount.Should().Be(4);
+        result.LastKnownAmount.Should().Be(10.99m);
+    }
+
+    [Fact]
+    public void DetectSubscriptions_RealHikeAfterACurrencyChange_StillReportsItsBaseline()
+    {
+        // The currency partition must not swallow a genuine step taken inside the current
+        // currency — only the charges from before the move leave the series.
+        var txs = new[]
+        {
+            Tx("Netflix.com", 8.99m, 2026, 3, 15, currency: "GBP"),
+            Tx("Netflix.com", 10.99m, 2026, 4, 15),
+            Tx("Netflix.com", 10.99m, 2026, 5, 15),
+            Tx("Netflix.com", 10.99m, 2026, 6, 15),
+            Tx("Netflix.com", 13.49m, 2026, 7, 15),
+        };
+
+        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.Currency.Should().Be("EUR");
+        result.OccurrenceCount.Should().Be(4);
+        result.PreviousAmount.Should().Be(10.99m);
+        result.LastKnownAmount.Should().Be(13.49m);
+    }
+
+    [Fact]
     public void DetectSubscriptions_PlanSwitch_IsNotAdoptedAsABaseline()
     {
         // Claude Pro €22 → Max €98/€110 is a different plan, not a repricing. Adopting the

@@ -66,7 +66,7 @@ public class DetectedSubscriptionTests
         mortgage.Status.Should().Be(SubscriptionStatus.Active);
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m,
+            "516936******4992", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2036, 5, 11), new DateOnly(2036, 6, 11),
             13, 100, null, SubscriptionKinds.Installment);
 
@@ -79,7 +79,7 @@ public class DetectedSubscriptionTests
         var mortgage = CreateInstallment(display: "Іпотека");
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m,
+            "516936******4992", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2026, 9, 11), new DateOnly(2026, 10, 11),
             4, 100, null, SubscriptionKinds.Installment);
 
@@ -92,7 +92,7 @@ public class DetectedSubscriptionTests
         var plan = CreateInstallment(display: "ТОВ Алло");
 
         plan.UpdateFromDetection(
-            "ТОВ Алло - monomarket", 2339.95m, 2339.95m,
+            "ТОВ Алло - monomarket", 2339.95m, 2339.95m, "UAH",
             new DateOnly(2026, 9, 5), new DateOnly(2026, 10, 5),
             5, 100, null, SubscriptionKinds.Installment);
 

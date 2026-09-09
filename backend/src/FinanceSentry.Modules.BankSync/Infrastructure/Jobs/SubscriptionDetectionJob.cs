@@ -97,11 +97,12 @@ public sealed class SubscriptionDetectionJob(
         }
     }
 
-    // Recurring-service detection: group by merchant, price the merchant off the amount
-    // cluster holding its most recent charge (so a discontinued plan's old price — e.g.
-    // Claude Pro €22 next to Max €110 — can't poison the stability gates) plus, if that
-    // price has just replaced another, the one it displaced. Then require a consistent
-    // monthly/annual cadence over the charges, a stable current amount, and at least
+    // Recurring-service detection: group by merchant, keep only the charges in the currency
+    // that merchant bills today (two units cannot be compared to each other), then price the
+    // merchant off the amount cluster holding its most recent charge (so a discontinued
+    // plan's old price — e.g. Claude Pro €22 next to Max €110 — can't poison the stability
+    // gates) plus, if that price has just replaced another, the one it displaced. Then require
+    // a consistent monthly/annual cadence over the charges, a stable current amount, and at least
     // MinOccurrences charges. A recurring transfer to a masked card number is a
     // loan/mortgage repayment, not a service — it's emitted as an installment so it stays
     // out of the spend summary.
@@ -113,7 +114,7 @@ public sealed class SubscriptionDetectionJob(
         foreach (var merchantGroup in byMerchant)
         {
             var normalized = merchantGroup.Key;
-            var series = SplitAtPriceStep(merchantGroup);
+            var series = SplitAtPriceStep(InCurrentBillingCurrency(merchantGroup));
             var sorted = series.Current.Concat(series.Displaced).OrderBy(t => t.TransactionDate).ToList();
 
             if (sorted.Count < MinOccurrences) continue;
@@ -189,6 +190,64 @@ public sealed class SubscriptionDetectionJob(
     /// other amounts belong to a different plan rather than an earlier price of this one.
     /// </summary>
     public sealed record PriceSeries(IReadOnlyList<TxRow> Current, IReadOnlyList<TxRow> Displaced);
+
+    /// <summary>
+    /// A merchant's charges in the currency it bills today, dropping the ones it billed in
+    /// another. Charges are grouped by merchant alone, but a user's accounts span currencies
+    /// (Monobank UAH, Revolut EUR, a UK card GBP), so one merchant's group can hold amounts in
+    /// several units — and every judgment downstream of here compares two amounts to each
+    /// other: the cluster tolerance, the stability gate, the price step, and the hike baseline
+    /// the sentinel divides by. Moving a subscription from a GBP card to a EUR one restates
+    /// £9.99 as €11.99, which reads as a clean, in-guard 20% chronological step and fires a
+    /// price-hike alert for a rise no merchant charged.
+    ///
+    /// The other currencies are dropped rather than converted to a common unit deliberately.
+    /// <c>CurrencyConverter</c>'s table is approximate by contract — unknown currencies fall
+    /// back 1:1, known ones to a hardcoded seed that a feed outage leaves standing — and its
+    /// drift is the same order as <see cref="AmountClusterTolerance"/>, so converting would let
+    /// a stale rate manufacture the very step this guard exists to refuse.
+    ///
+    /// A retired currency leaves the price series exactly as a retired plan does in
+    /// <see cref="SplitAtPriceStep"/>: it is no longer what the merchant bills.
+    ///
+    /// Which currency is "today's" takes the same minimum evidence a price does
+    /// (<see cref="MinBaselineCharges"/>): a merchant does not move accounts on the strength of
+    /// one charge, and without the gate a single foreign purchase at a merchant the user also
+    /// subscribes to would retire nine months of established charges and delete the
+    /// subscription outright. Until the newcomer has charges of its own, the established
+    /// currency is still the one being billed, so the row keeps updating there rather than
+    /// going stale.
+    /// </summary>
+    public static IReadOnlyList<TxRow> InCurrentBillingCurrency(IEnumerable<TxRow> transactions)
+    {
+        var all = transactions.ToList();
+        if (all.Count == 0) return all;
+
+        var chargesPerCurrency = all
+            .GroupBy(t => t.Currency ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        // Migration day is exactly when both currencies carry a charge on the same date, and
+        // a tie holds no signal about which one the merchant kept — but the source is an
+        // unordered query result, so picking whichever arrives first would make the row differ
+        // between runs over identical data. Break the tie on the currency name: arbitrary, and
+        // stable until the next charge settles the question for real.
+        var byRecency = all
+            .OrderByDescending(t => t.TransactionDate)
+            .ThenBy(t => t.Currency, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // The newest currency that is a billing arrangement rather than a one-off. If none has
+        // that much evidence yet the merchant has no established price in any unit, so the
+        // newest charge decides and MinOccurrences drops the row anyway.
+        var current = byRecency
+            .FirstOrDefault(t => chargesPerCurrency[t.Currency ?? string.Empty] >= MinBaselineCharges)
+            ?? byRecency[0];
+
+        return all
+            .Where(t => string.Equals(t.Currency, current.Currency, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
 
     /// <summary>
     /// Splits a merchant's charges into amount clusters (adjacent sorted amounts within

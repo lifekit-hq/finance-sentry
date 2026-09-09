@@ -57,6 +57,62 @@ Tying the baseline's lifetime to `MinOccurrences` rather than to a time window b
 re-alerting to one further monthly cycle past the 30-day alert silence — the baseline clears on
 the third charge at the new price.
 
+## One merchant, one unit (US1)
+
+Detection groups a merchant's charges by normalized name alone, but a user's accounts span
+currencies — Monobank UAH, Revolut/AIB EUR, a UK card GBP — so one group can hold amounts in
+several units. Everything downstream of that group is a comparison between two amounts: the
+15% cluster tolerance, the CV stability gate, the `MaxPriceStepRatio` guard, and the
+`HikeBaseline` the sentinel divides by. Comparing across units silently compares two things.
+
+The damage is not theoretical and it is not the large gaps — ₴449 next to €10.99 is a 40×
+ratio that `MaxPriceStepRatio` already refuses. It is the pairs that sit *inside* the guards:
+GBP→EUR (≈1.18) and GBP→USD (≈1.27) both clear the 15% cluster tolerance, stay under the 2×
+step ratio, and form a clean chronological step, so moving a subscription from a GBP card to a
+EUR one manufactures a textbook repricing. The sentinel then fires a confident, correctly
+dedup'd 20% price-hike alert for a rise no merchant charged — and symmetrically, a move in the
+other direction masks a real hike behind a fabricated cut.
+
+Decision: a merchant's price series is the charges in the currency it bills **today**
+(`InCurrentBillingCurrency`, applied before `SplitAtPriceStep`). A retired currency leaves the
+series exactly as a retired plan does — it is no longer what the merchant bills.
+
+Which currency counts as today's takes the same minimum evidence a price does
+(`MinBaselineCharges`, the file's existing "one charge is not a price" constant). Without that
+gate the partition is a far worse bug than the one it fixes: a single purchase abroad at a
+merchant the user also subscribes to would retire nine months of established charges and
+delete the subscription outright. With it, the newcomer has to bill twice before it displaces
+anything, and until then the row keeps updating in the currency it is still billed in rather
+than going stale. A same-day tie between two established currencies carries no signal, so it
+is broken on the currency name — arbitrary, but the source is an unordered query result and
+the row must not differ between runs over identical data.
+
+Why not convert to a common unit through `CurrencyConverter.ToUsd`, which the backend rules
+otherwise mandate for cross-currency comparison: that rule governs *normalising magnitudes*,
+where an approximate rate degrades a total. Here the converted number is fed to a 15% cluster
+tolerance and a 15% hike threshold, and the converter's table is approximate by contract — it
+falls back to a hardcoded seed that a feed outage leaves standing, drifting the same order as
+the tolerance itself. Converting would hand a stale rate the power to manufacture the very
+step this guard exists to refuse, which is the mistake US4 already had to undo.
+
+Cost, accepted and bounded: a subscription mid-move carries only the charges in whichever
+currency is established, so between the newcomer's second charge and its third it can sit
+under `MinOccurrences` — one monthly cycle. Detection stops *reporting* the merchant for that
+cycle; it does not delete it, so the row stays on the list at its last known price, and if the
+charges really have stopped `MarkStaleAsPotentiallyCancelledAsync` flips it to *potentially
+cancelled* after ~45 days. The row it produced before this change was an average across two
+units, so nothing true is lost either way.
+
+The restated amounts have to carry their unit with them: `UpdateFromDetection` assigns
+`Currency` alongside them, because `GetSubscriptionSummaryQuery` and
+`GetInstallmentFxImpactQuery` run `ToUsd(amount, Currency)` over the row. A row left labelled
+GBP while its amounts turned into euros is not a cosmetic mislabel — it misstates the user's
+monthly spend total by the whole GBP/EUR rate.
+
+Not affected: `DetectInstallments` groups by `(merchant, rounded plan amount)`, so two
+currencies only share a plan when the same *number* is billed in both — and then the ratio is
+1:1 and no step can be fabricated. It is bounded by its own grouping key, not by luck.
+
 Known limits, both consequences of reading detection's output rather than the raw series:
 - `AmountClusterTolerance` sets the floor on what a hike can be. A step under 15% never leaves
   its cluster, so it has no baseline and is still measured against a diluted average; lowering
@@ -86,6 +142,13 @@ Known limits, both consequences of reading detection's output rather than the ra
 - NEW `backend/src/FinanceSentry.Modules.Subscriptions/Migrations/20260906000000_M006_AddPreviousAmount.cs` (+ Designer, snapshot)
 - EDIT `ISubscriptionHygieneSummaryReader.cs` — `PreviousAmount` + `HikeBaseline`; reader projects it
 - NEW `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/PriceHikeSentinelPipelineTests.cs` — detect → persist → read → alert
+
+### Single-currency follow-up (a change of unit is not a change of price)
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/SubscriptionDetectionJob.cs` — `InCurrentBillingCurrency`
+- EDIT `backend/src/FinanceSentry.Modules.Subscriptions/Domain/DetectedSubscription.cs` — `UpdateFromDetection` restates `Currency`
+- EDIT `backend/src/FinanceSentry.Modules.Subscriptions/Application/Services/SubscriptionDetectionResultService.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Application/Subscriptions/SubscriptionDetectionAlgorithmTests.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/PriceHikeSentinelPipelineTests.cs`
 
 ## [US2] Duplicate charge — files touched
 - EDIT `backend/src/FinanceSentry.Modules.Alerts/Domain/AlertType.cs` — add `DuplicateCharge`
@@ -151,7 +214,7 @@ on — its own change.
 
 ## Constraints
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`
-- All amounts compared cross-currency must go through `CurrencyConverter.ToUsd` before comparison
+- Amounts summed or ranked across currencies go through `CurrencyConverter.ToUsd` first. Amounts compared to each other at a tolerance finer than the rate table's drift (the price-hike clustering and threshold) are not converted — they are partitioned by currency instead, so nothing is compared across units at all
 - Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. Pre-existing `UnusualSpendDetectionJob` still filters on `t.Amount < 0` alone and is therefore inert — out of scope here, tracked as follow-up
 - BankSync job can inject `ISubscriptionHygieneSummaryReader` without a project reference to Subscriptions — DI resolves at runtime via the composition root
 - `CurrencyConverter`'s table is only guaranteed *approximate*: unknown currencies fall back 1:1 and known ones fall back to a hardcoded seed. Normalising a total may rely on it; comparing one rate to another may not — gate on `AreRatesFresh` first

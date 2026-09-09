@@ -12,6 +12,7 @@
 - [x] Persist `PreviousAmount` on `detected_subscriptions` (M006) and surface it on `SubscriptionHygieneSummary`
 - [x] Measure the hike against `HikeBaseline`, not the average that already contains the raised charge
 - [x] Write an end-to-end test running a charge series through the real detect → persist → read → alert chain
+- [x] Price the merchant in one currency — a card moved between accounts restated the same charge as a 20% hike
 
 ## [US2] Duplicate charge detection
 
