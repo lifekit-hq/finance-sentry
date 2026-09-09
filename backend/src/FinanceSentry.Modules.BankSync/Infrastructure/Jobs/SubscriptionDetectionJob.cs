@@ -205,10 +205,13 @@ public sealed class SubscriptionDetectionJob(
     /// price-hike alert for a rise no merchant charged.
     ///
     /// The other currencies are dropped rather than converted to a common unit deliberately.
-    /// <c>CurrencyConverter</c>'s table is approximate by contract — unknown currencies fall
-    /// back 1:1, known ones to a hardcoded seed that a feed outage leaves standing — and its
-    /// drift is the same order as <see cref="AmountClusterTolerance"/>, so converting would let
-    /// a stale rate manufacture the very step this guard exists to refuse.
+    /// <c>CurrencyConverter.ToUsd</c>'s error is not bounded by anything this guard could budget
+    /// for: it returns a currency missing from the table *unchanged*, and the seed standing in
+    /// before the first refresh (or through a feed outage) covers four, so a PLN charge would be
+    /// compared at roughly 4× its dollar value against <see cref="AmountClusterTolerance"/>.
+    /// Converting would let the rate table manufacture the very step this guard exists to refuse.
+    /// Gating on <c>CurrencyConverter.AreRatesFresh</c> instead — as <c>FxSpreadDetectionJob</c>
+    /// does — trades a false hike for blindness to real ones whenever the feed is down.
     ///
     /// A retired currency leaves the price series exactly as a retired plan does in
     /// <see cref="SplitAtPriceStep"/>: it is no longer what the merchant bills.
