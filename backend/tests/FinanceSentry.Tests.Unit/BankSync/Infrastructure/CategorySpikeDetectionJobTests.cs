@@ -5,7 +5,8 @@ using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Modules.BankSync.Application.Services;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -23,19 +24,11 @@ public class CategorySpikeDetectionJobTests
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"catspike-{Guid.NewGuid():N}").Options);
 
-    private static IConfiguration DefaultConfig() =>
-        new ConfigurationBuilder().Build();
-
-    private static IConfiguration ConfigWithMultiplier(decimal multiplier) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["HygieneSentinels:CategorySpikeMultiplier"] = multiplier.ToString("F4"),
-            })
-            .Build();
-
-    private CategorySpikeDetectionJob MakeJob(BankSyncDbContext db, IConfiguration? config = null) =>
-        new(db, _alerts.Object, config ?? DefaultConfig(),
+    private CategorySpikeDetectionJob MakeJob(BankSyncDbContext db, decimal? multiplier = null) =>
+        new(db, _alerts.Object,
+            Options.Create(multiplier is null
+                ? new HygieneSentinelsOptions()
+                : new HygieneSentinelsOptions { CategorySpikeMultiplier = multiplier.Value }),
             Mock.Of<ILogger<CategorySpikeDetectionJob>>());
 
     private static BankAccount MakeAccount(Guid userId, string currency = "EUR")
@@ -209,6 +202,41 @@ public class CategorySpikeDetectionJobTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Pins the baseline denominator: the 6-month window, not the months that happen to hold rows.
+    /// A USD account keeps the arithmetic exact (ToUsd is the identity), and the fixture is chosen so
+    /// the two candidate denominators disagree on the outcome as well as on the number — 1200 over 6
+    /// is a 200 baseline the 500 current month clears at 2.0×, while 1200 over the 4 months holding
+    /// spend would be a 300 baseline it does not.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_DividesBaselineByWindow_NotByMonthsHoldingSpend()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var account = MakeAccount(userId, "USD");
+        db.BankAccounts.Add(account);
+
+        var now = DateTime.UtcNow;
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // Spend in 4 of the 6 complete months preceding this one — months -3 and -5 are real zeros.
+        foreach (var monthsBack in new[] { 1, 2, 4, 6 })
+        {
+            db.Transactions.Add(MakeTx(account, 300m, "TRAVEL",
+                currentMonthStart.AddMonths(-monthsBack).AddDays(5)));
+        }
+        db.Transactions.Add(MakeTx(account, 500m, "TRAVEL", currentMonthStart.AddDays(5)));
+
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
+            userId, "TRAVEL", 500m, 200m, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     [Fact]
     public async Task ExecuteAsync_UsesConfigurableMultiplier()
     {
@@ -230,7 +258,7 @@ public class CategorySpikeDetectionJobTests
 
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWithMultiplier(1.1m)).ExecuteAsync();
+        await MakeJob(db, multiplier: 1.1m).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
             userId, "ENTERTAINMENT", It.IsAny<decimal>(), It.IsAny<decimal>(),

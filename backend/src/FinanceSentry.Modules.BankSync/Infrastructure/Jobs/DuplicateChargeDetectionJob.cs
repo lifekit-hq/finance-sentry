@@ -4,8 +4,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Daily sentinel (044/US2): fires a DuplicateCharge alert when the same merchant charges the same
@@ -19,29 +19,19 @@ using Microsoft.Extensions.Logging;
 public sealed class DuplicateChargeDetectionJob(
     BankSyncDbContext db,
     IAlertGeneratorService alerts,
-    IConfiguration config,
+    IOptions<HygieneSentinelsOptions> options,
     ILogger<DuplicateChargeDetectionJob> logger)
 {
-    private const int DefaultDuplicateWindowDays = 5;
-
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var windowDays = config.GetValue("HygieneSentinels:DuplicateWindowDays", DefaultDuplicateWindowDays);
-        var since = DateTime.UtcNow.AddDays(-windowDays);
+        var since = DateTime.UtcNow.AddDays(-options.Value.DuplicateWindowDays);
 
         IReadOnlyList<TransactionRow> rows;
-        Dictionary<Guid, string> currencyByAccount;
+        ActiveAccountSnapshot accounts;
         try
         {
-            // Liveness policy (aligned across all 044 sentinels): only transactions on active
-            // accounts participate — a disconnected account's history must not raise new alerts.
-            currencyByAccount = await db.BankAccounts
-                .AsNoTracking()
-                .Where(a => a.IsActive)
-                .Select(a => new { a.Id, a.Currency })
-                .ToDictionaryAsync(a => a.Id, a => a.Currency, ct);
-
-            var activeAccountIds = currencyByAccount.Keys.ToList();
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            var activeAccountIds = accounts.AccountIds;
 
             // Debit-only: adapters store amounts positive with TransactionType carrying the
             // direction ("debit"/"credit"); a signed negative amount is also a debit. A refund
@@ -82,7 +72,7 @@ public sealed class DuplicateChargeDetectionJob(
             if (merchantKey == MerchantNameNormalizer.UnknownKey) continue;
 
             var userId = group.First().UserId;
-            var currency = currencyByAccount.TryGetValue(accountId, out var c) ? c : "USD";
+            var currency = accounts.CurrencyOf(accountId);
             // The alert names the merchant the way the statement does; the key is for dedup only.
             var merchantName = MerchantNameNormalizer.GetDisplayName(group.Select(r => r.MerchantName));
 

@@ -1,11 +1,12 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -23,19 +24,11 @@ public class DuplicateChargeDetectionJobTests
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"dup-{Guid.NewGuid():N}").Options);
 
-    private static IConfiguration DefaultConfig() =>
-        new ConfigurationBuilder().Build();
-
-    private static IConfiguration ConfigWithWindow(int days) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["HygieneSentinels:DuplicateWindowDays"] = days.ToString(),
-            })
-            .Build();
-
-    private DuplicateChargeDetectionJob MakeJob(BankSyncDbContext db, IConfiguration? config = null) =>
-        new(db, _alerts.Object, config ?? DefaultConfig(),
+    private DuplicateChargeDetectionJob MakeJob(BankSyncDbContext db, int? windowDays = null) =>
+        new(db, _alerts.Object,
+            Options.Create(windowDays is null
+                ? new HygieneSentinelsOptions()
+                : new HygieneSentinelsOptions { DuplicateWindowDays = windowDays.Value }),
             Mock.Of<ILogger<DuplicateChargeDetectionJob>>());
 
     private static BankAccount MakeAccount(Guid userId, string currency = "EUR")
@@ -123,7 +116,7 @@ public class DuplicateChargeDetectionJobTests
             MakeTx(account, -9.99m, "Netflix", DateTime.UtcNow.AddDays(-10)));
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWithWindow(5)).ExecuteAsync();
+        await MakeJob(db, windowDays: 5).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),

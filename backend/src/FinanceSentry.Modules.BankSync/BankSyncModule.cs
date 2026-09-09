@@ -109,6 +109,7 @@ public static class BankSyncModule
         services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
         services.Configure<EncryptionOptions>(config.GetSection(EncryptionOptions.SectionName));
+        services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
         services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
 
         services.AddScoped<IBankAccountRepository, BankAccountRepository>();

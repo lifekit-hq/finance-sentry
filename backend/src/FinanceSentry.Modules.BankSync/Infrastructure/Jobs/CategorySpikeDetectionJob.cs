@@ -2,10 +2,11 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Daily sentinel (044/US3): fires a CategorySpike alert when month-to-date spend in a category
@@ -16,34 +17,28 @@ using Microsoft.Extensions.Logging;
 public sealed class CategorySpikeDetectionJob(
     BankSyncDbContext db,
     IAlertGeneratorService alerts,
-    IConfiguration config,
+    IOptions<HygieneSentinelsOptions> options,
     ILogger<CategorySpikeDetectionJob> logger)
 {
     private const int BaselineMonths = 6;
-    // Spec requires ≥4 months before firing; still average over all BaselineMonths when available.
+
+    // A category has to be established before a spike means anything, but the baseline is still
+    // divided by BaselineMonths (below) — see the comment there.
     private const int MinHistoryMonths = 4;
-    private const decimal DefaultSpikeMultiplier = 2.0m;
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var multiplier = config.GetValue("HygieneSentinels:CategorySpikeMultiplier", DefaultSpikeMultiplier);
+        var multiplier = options.Value.CategorySpikeMultiplier;
         var now = DateTime.UtcNow;
         var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var historyStart = currentMonthStart.AddMonths(-BaselineMonths);
 
         IReadOnlyList<SpendRow> rows;
-        Dictionary<Guid, string> currencyByAccount;
+        ActiveAccountSnapshot accounts;
         try
         {
-            // Liveness policy (aligned across all 044 sentinels): only transactions on active
-            // accounts participate — a disconnected account's history must not raise new alerts.
-            currencyByAccount = await db.BankAccounts
-                .AsNoTracking()
-                .Where(a => a.IsActive)
-                .Select(a => new { a.Id, a.Currency })
-                .ToDictionaryAsync(a => a.Id, a => a.Currency, ct);
-
-            var activeAccountIds = currencyByAccount.Keys.ToList();
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            var activeAccountIds = accounts.AccountIds;
 
             // Debit-only and posted-only — the same predicate DuplicateChargeDetectionJob uses.
             // Direction lives in TransactionType, not the sign: every persist path runs
@@ -69,8 +64,7 @@ public sealed class CategorySpikeDetectionJob(
         }
 
         decimal ToUsd(Guid accountId, decimal amount) =>
-            CurrencyConverter.ToUsd(Math.Abs(amount),
-                currencyByAccount.TryGetValue(accountId, out var c) ? c : "USD");
+            CurrencyConverter.ToUsd(Math.Abs(amount), accounts.CurrencyOf(accountId));
 
         var grouped = rows.GroupBy(r => new { r.UserId, r.Category });
 
@@ -89,7 +83,14 @@ public sealed class CategorySpikeDetectionJob(
             var currentKey = new { currentMonthStart.Year, currentMonthStart.Month };
             if (!byMonth.TryGetValue(currentKey, out var currentMonth) || currentMonth <= 0) continue;
 
-            var baseline = historicMonths.Sum(kv => kv.Value) / historicMonths.Count;
+            // Average monthly spend over the past BaselineMonths complete months — divided by the
+            // window, not by the months that happen to hold rows. A month with no spend in this
+            // category is a real zero, and averaging it away made the sentinel quietly weakest
+            // exactly where a spike is most visible: a category billed in 3 of 6 months carried a
+            // baseline twice its true monthly average, so the multiplier had to be cleared against
+            // a number no month ever spent. MinHistoryMonths above is what keeps a category that is
+            // merely *new* from firing off one month of history.
+            var baseline = historicMonths.Sum(kv => kv.Value) / BaselineMonths;
             if (baseline <= 0) continue;
 
             if (currentMonth <= baseline * multiplier) continue;

@@ -8,7 +8,7 @@ using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -46,25 +46,23 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"fxspread-{Guid.NewGuid():N}").Options);
 
-    private static IConfiguration DefaultConfig() =>
-        new ConfigurationBuilder().Build();
-
-    private static IConfiguration ConfigWith(
+    private static IOptions<HygieneSentinelsOptions> OptionsWith(
         int lookbackDays, decimal threshold, int? maxRateAgeHours = null)
     {
-        var settings = new Dictionary<string, string?>
+        var options = new HygieneSentinelsOptions
         {
-            ["HygieneSentinels:FxSpreadLookbackDays"] = lookbackDays.ToString(),
-            ["HygieneSentinels:FxSpreadThreshold"] = threshold.ToString("F4"),
+            FxSpreadLookbackDays = lookbackDays,
+            FxSpreadThreshold = threshold,
         };
-        if (maxRateAgeHours is not null)
-            settings["HygieneSentinels:FxSpreadMaxRateAgeHours"] = maxRateAgeHours.Value.ToString();
+        if (maxRateAgeHours is not null) options.FxSpreadMaxRateAgeHours = maxRateAgeHours.Value;
 
-        return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        return Options.Create(options);
     }
 
-    private FxSpreadDetectionJob MakeJob(BankSyncDbContext db, IConfiguration? config = null) =>
-        new(db, new TransferDetectionService(), _alerts.Object, config ?? DefaultConfig(),
+    private FxSpreadDetectionJob MakeJob(
+        BankSyncDbContext db, IOptions<HygieneSentinelsOptions>? options = null) =>
+        new(db, new TransferDetectionService(), _alerts.Object,
+            options ?? Options.Create(new HygieneSentinelsOptions()),
             Mock.Of<ILogger<FxSpreadDetectionJob>>());
 
     private static BankAccount MakeAccount(Guid userId, string currency)
@@ -147,7 +145,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
 
         // Zero tolerance is stale by definition (freshness is strict), so the table installed in
         // the constructor cannot satisfy it — no dependence on how much time has elapsed.
-        await MakeJob(db, ConfigWith(30, 0.03m, maxRateAgeHours: 0)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m, maxRateAgeHours: 0)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -266,7 +264,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
                 description: "Currency exchange", category: CategoryKeys.TransferIn));
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.03m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -311,7 +309,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.02m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.02m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             userId, debit.Id, "EUR", "UAH", 39m, EurUahMarketRate,
@@ -334,7 +332,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.03m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),

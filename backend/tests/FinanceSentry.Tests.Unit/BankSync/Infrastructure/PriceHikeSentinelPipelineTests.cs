@@ -8,7 +8,7 @@ using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -55,7 +55,7 @@ public class PriceHikeSentinelPipelineTests
         var job = new PriceHikeDetectionJob(
             reader,
             _alerts.Object,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new HygieneSentinelsOptions()),
             Mock.Of<ILogger<PriceHikeDetectionJob>>());
 
         await job.ExecuteAsync();

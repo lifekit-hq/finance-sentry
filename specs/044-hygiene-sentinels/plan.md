@@ -269,6 +269,48 @@ produce a hike baseline) is a consequence of that window, which is why the const
 Behaviour is unchanged — no test was added, weakened, or retuned; the 914 unit tests pass as
 written apart from the type name they call through.
 
+### Sentinel hardening II — the shared reads, the bound thresholds, the pinned denominator
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Application/Services/HygieneSentinelsOptions.cs`
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/ActiveAccountSnapshot.cs`
+- NEW `backend/tests/FinanceSentry.Tests.Unit/BankSync/Application/HygieneSentinelsOptionsTests.cs`
+- EDIT the four sentinel jobs (`IConfiguration` → `IOptions<HygieneSentinelsOptions>`; three of them
+  drop their copy of the active-accounts read), `BankSyncModule.cs` (`Configure<>`),
+  `ISubscriptionHygieneSummaryReader.cs` + `SubscriptionHygieneSummaryReader.cs` (drop `Kind`), and
+  the five sentinel test files
+
+Three things the review pass over US1–US4 left, each a way for a later change to go wrong quietly:
+
+**The thresholds were six string literals** repeated across four jobs and four test files, each with
+its own in-code default. A typo in a key name is not an error — `GetValue` returns the default, and
+that sentinel silently runs on a setting nobody chose. `HygieneSentinelsOptions` gives every
+threshold one name the compiler checks; `HygieneSentinelsOptionsTests` holds the deployed appsettings
+key spellings and the documented defaults, so renaming a property fails a test instead of orphaning a
+deployed key. The shape follows `AnalyticsOptions`/`RadarOptions` — `SectionName` const, settable
+properties carrying the defaults, `services.Configure<>` in the module.
+
+**The liveness policy was copy-pasted three times.** "Only transactions on active accounts
+participate" is one decision, and it was restated (comment included) in each of the duplicate-charge,
+category-spike and FX-spread jobs, twice as a currency map plus id list and once as a triple list.
+`ActiveAccountSnapshot` reads it once and answers all three shapes. Its `CurrencyOf` throws on a miss
+rather than falling back to `"USD"`: callers only ask about accounts whose rows they selected through
+`AccountIds`, so a miss is a broken caller, not a data case — the old fallback was unreachable
+defensiveness that would have converted hryvnia as dollars if it ever *had* been reachable.
+
+**The category-spike baseline divided by the months that held rows,** not by the 6-month window the
+spec names. That made the sentinel weakest exactly where a spike is most visible: a category billed
+in 3 of 6 months carried a baseline twice its true monthly average, so the multiplier had to be
+cleared against a number no month ever spent. It now divides by `BaselineMonths` — a month with no
+spend in the category is a real zero. `MinHistoryMonths` (4) is what still keeps a merely *new*
+category from firing off one month of history; the two gates were conflated because one variable
+served both. `ExecuteAsync_DividesBaselineByWindow_NotByMonthsHoldingSpend` pins it on a USD account
+(so `ToUsd` is the identity) with spend in 4 of 6 months, chosen so the two candidate denominators
+disagree on the alert as well as on the number — nine of the eleven existing tests asserted the
+emitted baseline with `It.IsAny<decimal>()` and would have passed either way.
+
+`SubscriptionHygieneSummary.Kind` was projected, persisted and built in every fixture, and read by
+nobody — the price-hike sentinel treats a rising recurring charge the same whether it is a
+subscription or an installment. Dropped.
+
 ## Constraints
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`
 - Amounts summed or ranked across currencies go through `CurrencyConverter.ToUsd` first. Amounts compared to each other at a tolerance finer than the rate table's drift (the price-hike clustering and threshold) are not converted — they are partitioned by currency instead, so nothing is compared across units at all

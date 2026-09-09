@@ -2,7 +2,8 @@ namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Modules.BankSync.Application.Services;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -17,19 +18,13 @@ public class PriceHikeDetectionJobTests
     private readonly Mock<ISubscriptionHygieneSummaryReader> _reader = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
-    private static IConfiguration DefaultConfig() =>
-        new ConfigurationBuilder().Build();
+    private static IOptions<HygieneSentinelsOptions> OptionsWithThreshold(decimal? threshold = null) =>
+        Options.Create(threshold is null
+            ? new HygieneSentinelsOptions()
+            : new HygieneSentinelsOptions { PriceHikeThreshold = threshold.Value });
 
-    private static IConfiguration ConfigWithThreshold(decimal threshold) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["HygieneSentinels:PriceHikeThreshold"] = threshold.ToString("F4"),
-            })
-            .Build();
-
-    private PriceHikeDetectionJob MakeJob(IConfiguration? config = null) =>
-        new(_reader.Object, _alerts.Object, config ?? DefaultConfig(),
+    private PriceHikeDetectionJob MakeJob(decimal? threshold = null) =>
+        new(_reader.Object, _alerts.Object, OptionsWithThreshold(threshold),
             Mock.Of<ILogger<PriceHikeDetectionJob>>());
 
     [Fact]
@@ -39,7 +34,7 @@ public class PriceHikeDetectionJobTests
         var subId = Guid.NewGuid();
         var sub = new SubscriptionHygieneSummary(
             subId, userId, "Netflix", AverageAmount: 10m, LastKnownAmount: 12m,
-            Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            Currency: "EUR", OccurrenceCount: 5);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
@@ -57,7 +52,7 @@ public class PriceHikeDetectionJobTests
         var sub = new SubscriptionHygieneSummary(
             Guid.NewGuid(), Guid.NewGuid(), "Spotify",
             AverageAmount: 10m, LastKnownAmount: 10.5m,
-            Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            Currency: "EUR", OccurrenceCount: 5);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
@@ -78,7 +73,7 @@ public class PriceHikeDetectionJobTests
         var sub = new SubscriptionHygieneSummary(
             Guid.NewGuid(), Guid.NewGuid(), "NewApp",
             AverageAmount: 10m, LastKnownAmount: 12m,
-            Currency: "EUR", OccurrenceCount: 2, Kind: "subscription");
+            Currency: "EUR", OccurrenceCount: 2);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
@@ -101,7 +96,7 @@ public class PriceHikeDetectionJobTests
         var subId = Guid.NewGuid();
         var sub = new SubscriptionHygieneSummary(
             subId, userId, "Netflix", AverageAmount: 13.49m, LastKnownAmount: 13.49m,
-            Currency: "EUR", OccurrenceCount: 6, Kind: "subscription", PreviousAmount: 10.99m);
+            Currency: "EUR", OccurrenceCount: 6, PreviousAmount: 10.99m);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
@@ -119,7 +114,7 @@ public class PriceHikeDetectionJobTests
         var sub = new SubscriptionHygieneSummary(
             Guid.NewGuid(), Guid.NewGuid(), "Free",
             AverageAmount: 0m, LastKnownAmount: 5m,
-            Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            Currency: "EUR", OccurrenceCount: 5);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
@@ -140,12 +135,12 @@ public class PriceHikeDetectionJobTests
         var sub = new SubscriptionHygieneSummary(
             Guid.NewGuid(), Guid.NewGuid(), "Service",
             AverageAmount: 100m, LastKnownAmount: 105m,
-            Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            Currency: "EUR", OccurrenceCount: 5);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([sub]);
 
-        await MakeJob(ConfigWithThreshold(0.03m)).ExecuteAsync();
+        await MakeJob(threshold: 0.03m).ExecuteAsync();
 
         _alerts.Verify(a => a.GeneratePriceHikeAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
@@ -160,9 +155,9 @@ public class PriceHikeDetectionJobTests
         var subs = new[]
         {
             new SubscriptionHygieneSummary(Guid.NewGuid(), Guid.NewGuid(), "A",
-                AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5, Kind: "subscription"),
+                AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5),
             new SubscriptionHygieneSummary(Guid.NewGuid(), Guid.NewGuid(), "B",
-                AverageAmount: 20m, LastKnownAmount: 25m, Currency: "USD", OccurrenceCount: 4, Kind: "subscription"),
+                AverageAmount: 20m, LastKnownAmount: 25m, Currency: "USD", OccurrenceCount: 4),
         };
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
@@ -181,9 +176,9 @@ public class PriceHikeDetectionJobTests
     public async Task ExecuteAsync_ContinuesOtherSubscriptions_WhenOneAlertThrows()
     {
         var subA = new SubscriptionHygieneSummary(Guid.NewGuid(), Guid.NewGuid(), "A",
-            AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5);
         var subB = new SubscriptionHygieneSummary(Guid.NewGuid(), Guid.NewGuid(), "B",
-            AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5, Kind: "subscription");
+            AverageAmount: 10m, LastKnownAmount: 12m, Currency: "EUR", OccurrenceCount: 5);
 
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([subA, subB]);

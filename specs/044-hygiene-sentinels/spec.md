@@ -12,7 +12,7 @@ Four deterministic detectors — one Hangfire job per detector, all emitting thr
 Recurring merchant amount drifts up — subscription or installment creep.
 
 **Acceptance**:
-- Fires when `LastKnownAmount > AverageAmount × (1 + threshold)` and `OccurrenceCount ≥ 3`
+- Fires when `LastKnownAmount > HikeBaseline × (1 + threshold)` and `OccurrenceCount ≥ 3`, where `HikeBaseline` is `PreviousAmount ?? AverageAmount` — the price billed before the most recent step when detection recorded one, otherwise the running average. Measuring against the average alone can never fire: the charge that raised the price is itself in the average diluting it (see plan.md, "The hike baseline")
 - Reads `detected_subscriptions` (014) — recurrence not re-derived
 - Threshold: `HygieneSentinels:PriceHikeThreshold` (default 15 %)
 - Alert type: `PriceHike`; active-alert gate + 30-day silence per subscription id
@@ -30,7 +30,7 @@ Same merchant charges same amount twice within N days on one account.
 Month-to-date spend in a category meaningfully exceeds 6-month baseline.
 
 **Acceptance**:
-- Baseline: average monthly spend over past 6 complete months (all amounts in USD via `CurrencyConverter.ToUsd`)
+- Baseline: average monthly spend over past 6 complete months — total spend divided by the 6-month window, not by the months that happen to hold rows, so a month with no spend in the category counts as the zero it is (all amounts in USD via `CurrencyConverter.ToUsd`)
 - Requires ≥ 4 months of history; fires when current-month > baseline × `HygieneSentinels:CategorySpikeMultiplier` (default 2.0)
 - Alert type: `CategorySpike`; 7-day silence per `(UserId, category)`
 - Companion delivery via `CompanionEventKind.CategorySpike`

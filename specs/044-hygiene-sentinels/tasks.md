@@ -54,8 +54,10 @@
 ## [US6] Sentinel hardening II (second review pass)
 
 - [x] Move the recurrence/clustering algorithm out of `SubscriptionDetectionJob` into `Application/Services/SubscriptionDetectionAlgorithm.cs`, so the job schedules and persists while the algorithm decides
-- [ ] Divide the category-spike baseline by the months the spec names, not the months that happen to hold data — and pin whichever it is with a test instead of `It.IsAny<decimal>()`
-- [ ] Bind one `HygieneSentinelsOptions` so the six threshold keys stop being magic strings repeated across four jobs and four test files
-- [ ] Read "active accounts → currency map + id list" once instead of three copy-pasted blocks across the sentinels
-- [ ] Drop `SubscriptionHygieneSummary.Kind` — projected, persisted and built in every fixture, read by nobody
-- [ ] Restate the US1 firing condition in spec.md as the `PreviousAmount ?? AverageAmount` baseline that actually shipped
+- [x] Divide the category-spike baseline by the months the spec names, not the months that happen to hold data — and pin whichever it is with a test instead of `It.IsAny<decimal>()`
+- [x] Bind one `HygieneSentinelsOptions` so the six threshold keys stop being magic strings repeated across four jobs and four test files
+- [x] Read "active accounts → currency map + id list" once instead of three copy-pasted blocks across the sentinels
+- [x] Drop `SubscriptionHygieneSummary.Kind` — projected, persisted and built in every fixture, read by nobody
+- [x] Restate the US1 firing condition in spec.md as the `PreviousAmount ?? AverageAmount` baseline that actually shipped
+- [x] Repoint `docs/money-semantics.md` at `SubscriptionDetectionAlgorithm.InCurrentBillingCurrency` — the method moved and the sweep missed this one
+- [x] Give 044 its block in `docs/claude/app-state.md`, as CLAUDE.md requires on feature landing

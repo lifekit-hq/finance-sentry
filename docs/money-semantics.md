@@ -87,7 +87,7 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   where partitioning costs only the charges from before the move. Subscription price detection
   therefore prices a
   merchant off the charges in the currency it bills *today*
-  (`SubscriptionDetectionJob.InCurrentBillingCurrency`) — a merchant's charges are grouped by
+  (`SubscriptionDetectionAlgorithm.InCurrentBillingCurrency`) — a merchant's charges are grouped by
   name alone, and a user's accounts span currencies, so without that partition moving a
   subscription from a GBP card to a EUR one reads as a clean 18–27% "price hike" (inside every
   repricing guard) that no merchant charged.
