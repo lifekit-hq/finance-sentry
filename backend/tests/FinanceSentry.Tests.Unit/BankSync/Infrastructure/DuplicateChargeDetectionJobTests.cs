@@ -267,8 +267,11 @@ public class DuplicateChargeDetectionJobTests
 
         await MakeJob(db).ExecuteAsync();
 
+        // The display name is deliberately unpinned: the two spellings tie, so which one the alert
+        // shows is not a property this test owns (ExecuteAsync_AlertCarriesRawStatementName does).
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            userId, account.Id, "netflix", "Netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            userId, account.Id, "netflix", It.IsAny<string>(), 9.99m, "EUR", 2,
+            It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
