@@ -33,6 +33,9 @@ public sealed class SubscriptionDetectionJob(
     // One charge is not a price. A prorated or promotional first month sits within the step
     // ratio and has a coefficient of variation of zero by construction, so accepting a
     // single displaced charge as the baseline would alert on the merchant's own onboarding.
+    // The same minimum decides when a currency has displaced another in InCurrentBillingCurrency
+    // — raise this and both gates move, so weigh the onboarding case and the account-move case
+    // together rather than tuning one of them.
     private const int MinBaselineCharges = 2;
 
     private static readonly string[] UnidentifiableNormalizedNames =
@@ -223,8 +226,14 @@ public sealed class SubscriptionDetectionJob(
         var all = transactions.ToList();
         if (all.Count == 0) return all;
 
+        // An unlabelled charge is its own unit, not a wildcard matching every other one. The
+        // count, the ordering and the filter below must all agree on that or they disagree
+        // about what a currency is: one null-currency row beside one empty-string row would
+        // clear the quorum on a shared count of two and then filter down to one of them.
+        static string Unit(TxRow t) => t.Currency ?? string.Empty;
+
         var chargesPerCurrency = all
-            .GroupBy(t => t.Currency ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(Unit, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
         // Migration day is exactly when both currencies carry a charge on the same date, and
@@ -234,18 +243,20 @@ public sealed class SubscriptionDetectionJob(
         // stable until the next charge settles the question for real.
         var byRecency = all
             .OrderByDescending(t => t.TransactionDate)
-            .ThenBy(t => t.Currency, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(Unit, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         // The newest currency that is a billing arrangement rather than a one-off. If none has
         // that much evidence yet the merchant has no established price in any unit, so the
-        // newest charge decides and MinOccurrences drops the row anyway.
-        var current = byRecency
-            .FirstOrDefault(t => chargesPerCurrency[t.Currency ?? string.Empty] >= MinBaselineCharges)
+        // newest charge decides and MinOccurrences drops the row anyway. The fallback is not
+        // decoration: without it a merchant holding one charge in each of two currencies
+        // returns null here, and the throw would abandon detection for the user's whole
+        // portfolio, since ProcessAccountsAsync catches per user rather than per merchant.
+        var current = byRecency.FirstOrDefault(t => chargesPerCurrency[Unit(t)] >= MinBaselineCharges)
             ?? byRecency[0];
 
         return all
-            .Where(t => string.Equals(t.Currency, current.Currency, StringComparison.OrdinalIgnoreCase))
+            .Where(t => string.Equals(Unit(t), Unit(current), StringComparison.OrdinalIgnoreCase))
             .ToList();
     }
 

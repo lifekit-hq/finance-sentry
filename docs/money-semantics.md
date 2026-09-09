@@ -77,9 +77,15 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
 - **Two amounts judged at a tolerance finer than the table's drift are partitioned, not
   converted.** Converting is the right move when the result is a *total* — a few percent of
   rate error degrades it and nothing else breaks. It is the wrong move when the converted
-  number is then compared against a threshold tighter than the error itself: the seed table
-  can sit ~7% from the real rate indefinitely, so at a 15% tolerance a stale rate manufactures
-  the very signal the check exists to find. Subscription price detection therefore prices a
+  number is then compared against a threshold tighter than the error itself. `ToUsd`'s error is
+  not bounded by the seed's drift: `FallbackRates` seeds four currencies (USD/EUR/GBP/UAH) and
+  `ToUsd` returns anything else *unchanged*, so a PLN charge converts 1:1 and lands ~4× from its
+  dollar value — enough to fabricate a step, a plan switch or a third cluster out of nothing. Even
+  among the seeded four, a drift of a few percent against a 15% tolerance leaves no margin. The
+  freshness gate that `FxSpreadDetectionJob` uses is the obvious alternative and was declined
+  here: standing detection down on a stale table makes it intermittently blind to real hikes,
+  where partitioning costs only the charges from before the move. Subscription price detection
+  therefore prices a
   merchant off the charges in the currency it bills *today*
   (`SubscriptionDetectionJob.InCurrentBillingCurrency`) — a merchant's charges are grouped by
   name alone, and a user's accounts span currencies, so without that partition moving a

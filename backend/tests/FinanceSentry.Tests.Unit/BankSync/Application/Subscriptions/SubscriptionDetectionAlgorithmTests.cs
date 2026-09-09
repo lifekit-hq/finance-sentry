@@ -329,6 +329,24 @@ public class SubscriptionDetectionAlgorithmTests
     }
 
     [Fact]
+    public void InCurrentBillingCurrency_NoCurrencyHasReachedQuorum_KeepsTheNewestChargesUnit()
+    {
+        // Two one-off charges at one merchant in different units: neither is a billing
+        // arrangement, so the quorum matches nothing at all. The fallback has to hold —
+        // selecting nothing would throw, and ProcessAccountsAsync catches per user rather than
+        // per merchant, so one such merchant would abandon detection for the whole portfolio.
+        SubscriptionDetectionJob.TxRow[] txs =
+        [
+            Tx("Ryanair", 40.00m, 2026, 5, 2, currency: "GBP"),
+            Tx("Ryanair", 55.00m, 2026, 6, 9),
+        ];
+
+        var kept = SubscriptionDetectionJob.InCurrentBillingCurrency(txs);
+
+        kept.Should().ContainSingle().Which.Currency.Should().Be("EUR");
+    }
+
+    [Fact]
     public void DetectSubscriptions_OneStrayForeignCharge_DoesNotRetireTheSubscription()
     {
         // A single purchase abroad at a merchant the user also subscribes to is not the
