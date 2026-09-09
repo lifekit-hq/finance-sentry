@@ -77,7 +77,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// </summary>
     private static Transaction MakeTx(BankAccount account, decimal amount, string type,
         DateTime? date = null, string description = "tx", string? category = null,
-        bool isPending = false, DateTime? postedDate = null)
+        bool isPending = false)
     {
         var tx = new Transaction(account.Id, account.UserId, amount,
             date ?? DateTime.UtcNow, description, Guid.NewGuid().ToString(), isPending)
@@ -85,7 +85,6 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
             TransactionType = type,
             MerchantCategory = category,
             IsActive = true,
-            PostedDate = postedDate,
         };
         return tx;
     }
@@ -93,14 +92,14 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// <summary>A debit+credit conversion pair carrying a transfer category on both legs.</summary>
     private static (Transaction Debit, Transaction Credit) MakeConversion(
         BankAccount fromAccount, decimal fromAmount, BankAccount toAccount, decimal toAmount,
-        DateTime date, bool isPending = false, DateTime? postedDate = null)
+        DateTime date, bool isPending = false)
     {
         var debit = MakeTx(fromAccount, fromAmount, "debit", date,
             description: "Currency exchange", category: CategoryKeys.TransferOut,
-            isPending: isPending, postedDate: postedDate);
+            isPending: isPending);
         var credit = MakeTx(toAccount, toAmount, "credit", date,
             description: "Currency exchange", category: CategoryKeys.TransferIn,
-            isPending: isPending, postedDate: postedDate);
+            isPending: isPending);
         return (debit, credit);
     }
 
@@ -444,7 +443,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         var (heldDebit, heldCredit) = MakeConversion(
             eurAccount, 100m, uahAccount, 3600m, date, isPending: true);
         var (settledDebit, settledCredit) = MakeConversion(
-            eurAccount, 102m, uahAccount, 3672m, date, postedDate: date);
+            eurAccount, 102m, uahAccount, 3672m, date);
         db.Transactions.AddRange(heldDebit, heldCredit, settledDebit, settledCredit);
         await db.SaveChangesAsync();
 
@@ -458,36 +457,6 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    /// <summary>
-    /// Waiting for settlement must not silently drop a slow one. The lookback window follows the
-    /// same date the transfer matcher pairs on — <c>PostedDate ?? TransactionDate</c> — so a
-    /// conversion that settles days after it was made is measured when it settles rather than
-    /// having aged out of the window while it was still ineligible.
-    /// </summary>
-    [Fact]
-    public async Task ExecuteAsync_AlertFired_WhenAConversionSettledLongAfterItWasMade()
-    {
-        await using var db = NewDb();
-        var userId = Guid.NewGuid();
-        var eurAccount = MakeAccount(userId, "EUR");
-        var uahAccount = MakeAccount(userId, "UAH");
-        db.BankAccounts.AddRange(eurAccount, uahAccount);
-
-        // Made 10 days ago, settled today — outside a 3-day window on the transaction date,
-        // inside it on the settled date.
-        var (debit, credit) = MakeConversion(
-            eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow.AddDays(-10),
-            postedDate: DateTime.UtcNow);
-        db.Transactions.AddRange(debit, credit);
-        await db.SaveChangesAsync();
-
-        await MakeJob(db, OptionsWith(3, 0.03m)).ExecuteAsync();
-
-        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
-            userId, debit.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

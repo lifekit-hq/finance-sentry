@@ -65,5 +65,6 @@
 ## [US7] The FX sentinel measures settled conversions (the deferred pending-leg gap)
 
 - [x] Exclude pending legs from `FxSpreadDetectionJob`'s read — a hold's amount is provisional, and a hold that settles at a different amount is never retired by `PendingReconciler`, so it alerted a second time under its own debit id
-- [x] Select the lookback window on the leg's settled date (`PostedDate ?? TransactionDate`), the same date the transfer matcher pairs on, so waiting for settlement does not drop a slow one
-- [x] Pin all three: a pending conversion is silent, a hold coexisting with its settled twin alerts exactly once (keyed to the settled leg), a late settlement is still measured
+- [x] Pin both: a pending conversion is silent, and a hold coexisting with its settled twin alerts exactly once, keyed to the settled leg
+- [x] Record why the slow-settlement gap is left open — `PostedDate ?? TransactionDate` reads as the fix but selects the same rows, since no adapter writes a settled-at time there
+- [ ] Give ingest a real settled-at stamp so a Monobank hold clearing past the lookback window is still measured (adapter-contract change — own slice)

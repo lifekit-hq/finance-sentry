@@ -209,7 +209,7 @@ skip is logged each tick so the outage is visible. `UpdateRates` ignores a null/
 `MaxRateAgeHours` is never fresh, which is also the sentinel's off switch.
 
 ### Settled-conversion follow-up (a hold is not a conversion)
-- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/FxSpreadDetectionJob.cs` — the transaction read
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/FxSpreadDetectionJob.cs` — `!t.IsPending` on the transaction read
 - EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/FxSpreadDetectionJobTests.cs`
 
 The sentinel filtered `t.IsActive` but not `t.IsPending`, and it divides one leg amount by the
@@ -229,16 +229,19 @@ inclusion of pending rows is cash-flow's requirement (a pending transfer leg mus
 from income/spending), and this sentinel narrows its own read rather than changing a policy another
 consumer depends on.
 
-Waiting for settlement must not silently drop a slow one, so the lookback window now follows the
-same date the matcher pairs legs on — `PostedDate ?? TransactionDate` — instead of the transaction
-date alone. A conversion that settles days after it was made is measured when it settles, rather
-than having aged out of the window during the period it was ineligible. The read is `COALESCE`-ed
-rather than index-ranged on `TransactionDate`; the window is 3 days over one user's accounts, so
-the scan is bounded by the account filter either way.
+Accepted gap, stated because the obvious fix does not work. Waiting for settlement can drop a slow
+one: `ScheduledSyncService` settles a Monobank hold **in place**, keeping the row's original date,
+so a hold clearing more than `FxSpreadLookbackDays` after it was made becomes eligible only once it
+has aged out of the window. Widening the select to `PostedDate ?? TransactionDate` — the date
+money-flow buckets on and the transfer matcher pairs on — looks like the fix and is not: no adapter
+ever writes a later settlement time there. `MonobankAdapter` sets `PostedDate` to the transaction
+date even for a hold, and `TrueLayerAdapter` writes null while pending and the replacement posted
+row's own date after, which `TransactionDate` already carries. The COALESCE would select exactly
+the same rows, so it was reverted rather than shipped as an inert guard. Closing the gap means
+giving ingest a real settled-at stamp — a change to the adapter contract, and its own slice.
 
-The other settlement path needs nothing: `ScheduledSyncService` settles a Monobank hold in place,
-keeping the row id and setting `PostedDate`, so that conversion simply becomes eligible on the
-first tick after it settles.
+The TrueLayer path needs nothing: settlement inserts a new posted row carrying the settled date,
+which the plain `TransactionDate` window catches on the next daily tick.
 
 ### Sentinel hardening (the review pass, US1–US4 shipped)
 - DELETE `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/UnusualSpendDetectionJob.cs` — the sign predicate no ingest path can satisfy made it inert; `CategorySpikeDetectionJob` supersedes it

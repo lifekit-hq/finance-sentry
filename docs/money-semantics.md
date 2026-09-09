@@ -102,6 +102,12 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
 - Dedup hash: `HMAC-SHA256(accountId|amount|date|description)`
   (`TransactionDeduplicationService`). Pending rows hash on `TransactionDate`; posted rows
   on `PostedDate`.
+- **`PostedDate` is not a settled-at stamp.** No adapter writes the time a row actually
+  cleared: `MonobankAdapter` sets it to the transaction date even for a hold,
+  `TrueLayerAdapter` writes null while pending and the row's own timestamp once posted. It is
+  therefore either equal to `TransactionDate` or null, never later. Reads that want "when did
+  this settle" cannot get it from here — `PostedDate ?? TransactionDate` (which §5 buckets on)
+  is a null-guard, not a different date.
 - **Settle-in-place**: if a posted candidate hashes identically to a stored *pending* row
   (Monobank holds keep their date when they clear), the stored row is flipped to posted
   (`ScheduledSyncService.PersistAndReconcileAsync`).
@@ -125,10 +131,11 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   reader that divides one leg by another measures a rate nobody was charged. **A reader that
   judges a figure per row therefore filters `!IsPending`** — `DuplicateChargeDetectionJob`,
   `CategorySpikeDetectionJob`, `SubscriptionDetectionJob` and `FxSpreadDetectionJob` all do.
-  Monthly flow (§5) deliberately counts pending money and so does *not* filter it — which
-  means it double-counts this one case. Not yet addressed: the fix is a policy decision about
-  what flow should do with a hold whose posted twin it can already see, not a reader-local
-  filter.
+  Monthly flow (§5) deliberately counts pending money and so does *not* filter it, and
+  therefore double-counts such a purchase. (Not the FX conversion above: both its legs carry
+  transfer categories and §5 excludes them either way.) Not yet addressed — what flow should
+  do with a hold whose posted twin it can already see is a policy decision, not a
+  reader-local filter.
 
 ## 5. Monthly inflow / outflow ("Spending (MTD)", "Monthly Outflow")
 

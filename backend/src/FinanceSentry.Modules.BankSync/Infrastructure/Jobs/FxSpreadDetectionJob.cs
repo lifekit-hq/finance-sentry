@@ -92,13 +92,19 @@ public sealed class FxSpreadDetectionJob(
             // here: PendingReconciler retires a hold by matching it to a posted row on amount, and
             // an FX hold settles at a different amount, so both rows stay active and pair
             // independently — two alerts for one conversion, under two debit ids the dedup key
-            // cannot join. The window follows the same date the matcher pairs on
-            // (PostedDate ?? TransactionDate), so a slow settlement is measured when it settles
-            // instead of ageing out while it was ineligible.
+            // cannot join.
+            //
+            // Accepted gap: a Monobank hold settles in place and keeps its original date, so one
+            // clearing more than FxSpreadLookbackDays after it was made becomes eligible only once
+            // it has already aged out of the window. Widening the select to
+            // (PostedDate ?? TransactionDate) does NOT close it — no adapter ever sets PostedDate
+            // to a later settlement time (Monobank writes the transaction date even for a hold,
+            // TrueLayer writes null and then the replacement posted row's own date), so that read
+            // selects the same rows. Closing it needs a real settled-at stamp from ingest.
             transactions = await db.Transactions
                 .AsNoTracking()
                 .Where(t => accountIds.Contains(t.AccountId)
-                         && (t.PostedDate ?? t.TransactionDate) >= since
+                         && t.TransactionDate >= since
                          && t.IsActive
                          && !t.IsPending)
                 .ToListAsync(ct);

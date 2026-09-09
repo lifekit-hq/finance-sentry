@@ -39,7 +39,7 @@ Month-to-date spend in a category meaningfully exceeds 6-month baseline.
 A cross-currency round-trip between own accounts loses more than X% to conversion.
 
 **Acceptance**:
-- Matches cross-currency transfer pairs within `HygieneSentinels:FxSpreadLookbackDays` (default 3) using BankSync's existing cross-currency matching logic. Only settled legs participate — a hold's amount is provisional, and the window is measured on the leg's settled date (`PostedDate ?? TransactionDate`) so a slow settlement is measured rather than aged out
+- Matches cross-currency transfer pairs within `HygieneSentinels:FxSpreadLookbackDays` (default 3) using BankSync's existing cross-currency matching logic. Only settled legs participate — a hold's amount is provisional, and a hold that settles at a different amount is never retired, so it would alert a second time on its own
 - Computes implicit rate from pair amounts; compares to `CurrencyConverter` market rate
 - Fires when spread > `HygieneSentinels:FxSpreadThreshold` (default 3 %)
 - Alert type: `FxSpread`; 7-day silence per `(UserId, debit transaction id)`
