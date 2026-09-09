@@ -12,6 +12,8 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.CryptoSync.Infrastructure.Encryption;
 
 public static class CryptoSyncModule
 {
@@ -41,6 +43,8 @@ public static class CryptoSyncModule
         services.AddSingleton<CostBasisCalculator>();
         services.AddScoped<ICryptoExchangeAdapter, BinanceAdapter>();
         services.AddScoped<IBinanceCredentialRepository, BinanceCredentialRepository>();
+        // #493: this module's credential store joins key rotation.
+        services.AddScoped<ICredentialRotationTarget, BinanceCredentialRotationTarget>();
         services.AddScoped<ICryptoHoldingRepository, CryptoHoldingRepository>();
         services.AddScoped<ICryptoHoldingsReader, CryptoHoldingsReader>();
         services.AddScoped<BinanceSyncJob>();

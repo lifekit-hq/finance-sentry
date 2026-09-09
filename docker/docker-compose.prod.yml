@@ -26,6 +26,15 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-https://finance-sentry.tail1cb676.ts.net}
       Jwt__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-60}
       Deduplication__MasterKeyBase64: ${DEDUPLICATION_MASTER_KEY_BASE64}
+      # AES-256-GCM key for stored bank credentials (issue #493). REQUIRED: outside
+      # Development the API refuses to start without it, rather than silently encrypting
+      # under a key committed to this repository — which is what it did until 2026-09-09.
+      # Provision ENCRYPTION_KEY_V1 in .env or the deploy secret store; never commit a value.
+      # To rotate: add `Encryption__Keys__2: ${ENCRYPTION_KEY_V2}` here, set
+      # Encryption__CurrentKeyVersion to 2, redeploy. Startup rotation re-encrypts every
+      # credential row; only once a boot logs 0 rows migrated may version 1 be removed.
+      Encryption__Keys__1: ${ENCRYPTION_KEY_V1}
+      Encryption__CurrentKeyVersion: ${ENCRYPTION_CURRENT_KEY_VERSION:-1}
       GOOGLEOAUTH__CLIENTID: ${GOOGLE_CLIENT_ID:-}
       # TrueLayer (Open Banking EU/UK). Production URLs — creds in .env are the
       # live console.truelayer.com set, not sandbox. Override with

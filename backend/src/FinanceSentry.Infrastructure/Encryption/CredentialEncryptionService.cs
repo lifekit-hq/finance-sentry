@@ -25,16 +25,22 @@ public class CredentialEncryptionService : ICredentialEncryptionService
     private const int IvSizeBytes = 12;      // 96-bit IV (recommended for GCM)
     private const int TagSizeBytes = 16;     // 128-bit authentication tag
 
+    /// <summary>
+    /// The key this service silently fell back to when <c>Encryption:Keys</c> was unconfigured
+    /// (issue #493). It is committed to a public repository, so every credential encrypted under
+    /// it must be treated as disclosed. It is named here so exactly one place spells it: the
+    /// startup validator refuses it outside Development, and the Development fallback below is
+    /// the ONE remaining caller.
+    /// </summary>
+    public const string DisclosedFallbackKeyBase64 = "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=";
+
     public CredentialEncryptionService(IOptions<EncryptionOptions> options)
     {
         _options = options.Value;
-        if (_options.Keys == null || _options.Keys.Count == 0)
-        {
-            _options.Keys = new Dictionary<int, string>
-            {
-                [1] = "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA="
-            };
-        }
+        // No fallback here any more (#493). An unconfigured instance used to quietly encrypt
+        // production credentials under DisclosedFallbackKeyBase64; it now throws, and
+        // EncryptionOptionsValidator turns that into a startup failure outside Development
+        // rather than a first-request one.
         ValidateOptions(_options);
     }
 

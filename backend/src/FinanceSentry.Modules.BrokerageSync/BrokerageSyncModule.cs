@@ -13,6 +13,8 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
 
 public static class BrokerageSyncModule
 {
@@ -55,6 +57,8 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerAdapter, IbkrOAuthAdapter>();
 
         services.AddScoped<IIBKRCredentialRepository, IBKRCredentialRepository>();
+        // #493: this module's credential store joins key rotation.
+        services.AddScoped<ICredentialRotationTarget, IBKRCredentialRotationTarget>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         services.AddScoped<IBKRSyncJob>();

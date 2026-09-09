@@ -143,7 +143,7 @@ public class AlertsApiFactory : WebApplicationFactory<Program>
                 opts.CurrentKeyVersion = 1;
                 opts.Keys = new Dictionary<int, string>
                 {
-                    [1] = "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=",
+                    [1] = "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=",
                 };
             });
         });
@@ -152,10 +152,10 @@ public class AlertsApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Default",
             "Host=localhost;Database=test;Username=test;Password=test");
         builder.UseSetting("Deduplication:MasterKeyBase64",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Encryption:CurrentKeyVersion", "1");
         builder.UseSetting("Encryption:Keys:1",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
     }
