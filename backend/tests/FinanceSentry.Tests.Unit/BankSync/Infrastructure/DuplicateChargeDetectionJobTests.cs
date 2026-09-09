@@ -70,7 +70,7 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            userId, account.Id, "netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            userId, account.Id, "netflix", "Netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -87,8 +87,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -106,8 +106,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -126,8 +126,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db, ConfigWithWindow(5)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -148,8 +148,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -169,7 +169,7 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            userId, account.Id, "gym", 5.00m, "EUR", 3, It.IsAny<CancellationToken>()),
+            userId, account.Id, "gym", "Gym", 5.00m, "EUR", 3, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -192,8 +192,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -218,8 +218,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -245,7 +245,7 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            userId, account.Id, "netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            userId, account.Id, "netflix", "Netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -268,7 +268,57 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            userId, account.Id, "netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            userId, account.Id, "netflix", "Netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Every unnameable merchant normalizes to one sentinel key, so two unrelated charges that merely
+    /// share an amount would land in the same group. That is not a duplicate — nothing is claimed.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_NoAlert_WhenMerchantNamesAreBlank()
+    {
+        await using var db = NewDb();
+        var account = MakeAccount(Guid.NewGuid());
+        db.BankAccounts.Add(account);
+
+        var first = MakeTx(account, -9.99m, "Corner shop");
+        first.MerchantName = "   ";
+        var second = MakeTx(account, -9.99m, "Taxi ride");
+        second.MerchantName = string.Empty;
+        db.Transactions.AddRange(first, second);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The normalized key is a grouping device, not something a user recognises: the alert has to
+    /// name the merchant the way the statement spelled it.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_AlertCarriesRawStatementName_NotTheNormalizedKey()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var account = MakeAccount(userId);
+        db.BankAccounts.Add(account);
+        db.Transactions.AddRange(
+            MakeTx(account, -9.99m, "PAYPAL*Netflix.com 1234"),
+            MakeTx(account, -9.99m, "PAYPAL*Netflix.com 1234"));
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
+            userId, account.Id, "netflix", "PAYPAL*Netflix.com 1234", 9.99m, "EUR", 2,
+            It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -287,8 +337,8 @@ public class DuplicateChargeDetectionJobTests
         await MakeJob(db).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -308,8 +358,8 @@ public class DuplicateChargeDetectionJobTests
 
         var callCount = 0;
         _alerts.Setup(a => a.GenerateDuplicateChargeAlertAsync(
-                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(),
-                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 if (++callCount == 1) throw new InvalidOperationException("db failure");

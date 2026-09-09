@@ -214,9 +214,40 @@ alert twice for one conversion, since the dedup key is the debit transaction id.
 deciding what `TransferDetectionService` should do with pending legs, which cash-flow also depends
 on — its own change.
 
+### Sentinel hardening (the review pass, US1–US4 shipped)
+- DELETE `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/UnusualSpendDetectionJob.cs` — the sign predicate no ingest path can satisfy made it inert; `CategorySpikeDetectionJob` supersedes it
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/BankSyncModule.cs` — drop the registration, `RemoveIfExists` the deployed schedule
+- EDIT `backend/src/FinanceSentry.Modules.Alerts/Application/Services/AlertGeneratorService.cs` — one `EmitAsync` + a silence-window table replace 17 hand-rolled find-active/HasRecent/Add blocks
+- EDIT `backend/src/FinanceSentry.Core/Interfaces/IAlertGeneratorService.cs` — drop the retired `GenerateUnusualSpendAlertAsync`; duplicate-charge takes key **and** display name
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/DuplicateChargeDetectionJob.cs` — skip the unnameable-merchant group, name the merchant the way the statement did
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Alerts/AlertGeneratorServiceTests.cs`, `.../BankSync/Infrastructure/DuplicateChargeDetectionJobTests.cs`
+
+The dedup discipline (an open alert on the same reference wins, then the type's silence window) was
+restated in every generator, so each new alert type re-derived it and the four this feature added
+went untested. It is now one method and one table. Two generators legitimately opt out — `JobFailure`
+and `PerformanceBrief` want a row per occurrence, and a risk-rule *override* is recorded
+unconditionally — so the opt-out is named (`Dedup`) rather than implied by an absent gate.
+
+Looking a window up by alert type turns a missing entry into a `KeyNotFoundException` inside a
+background job. A reflection test asserts every live `AlertType` constant has one; `UnusualSpend` is
+listed there as retired, which is the only place the retirement has to be remembered.
+
+The duplicate-charge alert named the merchant by its normalized key ("claude" for a charge the
+statement calls "Anthropic* Claude Sub"). The raw name now rides alongside and fills the title and
+message. It stops there: `ReferenceLabel` is what `HasRecentAsync` matches on, so it stays the
+normalized key — the raw name has no stable value for a group spelled two ways (there is no majority
+spelling), and rows written before this change carry the key, so a label switch would quietly retire
+the backstop that guards a dismissed alert. Charges whose merchant
+the normalizer cannot name all collapse to `MerchantNameNormalizer.UnknownKey`, so two unrelated
+unnamed charges sharing an amount looked like a duplicate: that group is now skipped.
+
+Not in this slice: `SubscriptionDetectionJob` still carries ~130 lines of recurrence/clustering
+algorithm inside a Hangfire job, which forces pipeline tests to reach through infrastructure to
+construct `TxRow`. Extracting it into an Application service is its own change.
+
 ## Constraints
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`
 - Amounts summed or ranked across currencies go through `CurrencyConverter.ToUsd` first. Amounts compared to each other at a tolerance finer than the rate table's drift (the price-hike clustering and threshold) are not converted — they are partitioned by currency instead, so nothing is compared across units at all
-- Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. Pre-existing `UnusualSpendDetectionJob` still filters on `t.Amount < 0` alone and is therefore inert — out of scope here, tracked as follow-up
+- Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. `UnusualSpendDetectionJob` filtered on `t.Amount < 0` alone and was therefore inert — it is deleted, superseded by `CategorySpikeDetectionJob`, and its Hangfire schedule withdrawn by name
 - BankSync job can inject `ISubscriptionHygieneSummaryReader` without a project reference to Subscriptions — DI resolves at runtime via the composition root
 - `CurrencyConverter`'s table is only guaranteed *approximate*: unknown currencies fall back 1:1 and known ones fall back to a hardcoded seed. Normalising a total may rely on it; comparing one rate to another may not — gate on `AreRatesFresh` first

@@ -41,3 +41,12 @@
 - [x] Stand the sentinel down on stale rates — a spread measured against the offline seed accuses honest conversions
 - [x] Pin the sentinel's tests to a refreshed table, not the seed, so reading the seed fails them
 - [x] Declare the `HygieneSentinels` block in appsettings so every threshold is discoverable
+
+## [US5] Sentinel hardening (review pass over US1–US4)
+
+- [x] Delete the inert `UnusualSpendDetectionJob` and withdraw its deployed Hangfire schedule — `CategorySpikeDetectionJob` supersedes it
+- [x] Collapse the 17 hand-rolled dedup blocks in `AlertGeneratorService` into one `EmitAsync` plus a silence-window table
+- [x] Pin the dedup discipline for `PriceHike`/`DuplicateCharge`/`CategorySpike`/`FxSpread` — active-alert gate and silence window, one pair each
+- [x] Assert every live `AlertType` declares a silence window, so a new type cannot fail first inside a background job
+- [x] Name the merchant in a duplicate-charge alert the way the statement did, keeping the normalized key as the dedup anchor
+- [x] Skip the unnameable-merchant group — every blank merchant normalizes to one key, so unrelated charges sharing an amount read as a duplicate

@@ -9,9 +9,9 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Daily sentinel (044/US3): fires a CategorySpike alert when month-to-date spend in a category
-/// exceeds the 6-month baseline by more than the configured multiplier. Uses the same currency-aware
-/// USD conversion as UnusualSpendDetectionJob; differs in lookback (6 vs 3 months) and configurable
-/// threshold.
+/// exceeds the 6-month baseline by more than the configured multiplier. Supersedes the retired
+/// UnusualSpend sentinel: same currency-aware USD conversion, but a 6-month lookback, a configurable
+/// threshold, and a debit predicate that matches how adapters actually store direction.
 /// </summary>
 public sealed class CategorySpikeDetectionJob(
     BankSyncDbContext db,

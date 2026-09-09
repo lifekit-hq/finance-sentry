@@ -53,10 +53,10 @@ public static class BankSyncModule
                 job => job.RunAsync(CancellationToken.None),
                 Cron.Weekly());
 
-            mgr.AddOrUpdate<UnusualSpendDetectionJob>(
-                "unusual-spend-detection",
-                job => job.ExecuteAsync(CancellationToken.None),
-                Cron.Daily());
+            // Retired by 044: CategorySpikeDetectionJob supersedes it. Hangfire keeps recurring
+            // definitions in storage, so an already-deployed schedule has to be withdrawn by name.
+            mgr.RemoveIfExists("unusual-spend-detection");
+
             mgr.AddOrUpdate<SubscriptionDetectionJob>(
                 "subscription-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -173,7 +173,6 @@ public static class BankSyncModule
         services.AddScoped<SyncScheduler>();
         services.AddScoped<DataRetentionJob>();
         services.AddScoped<CredentialBackupJob>();
-        services.AddScoped<UnusualSpendDetectionJob>();
         services.AddScoped<SubscriptionDetectionJob>();
         services.AddScoped<StaleSyncReaperJob>();
         services.AddScoped<ConsentExpiryReminderJob>();
