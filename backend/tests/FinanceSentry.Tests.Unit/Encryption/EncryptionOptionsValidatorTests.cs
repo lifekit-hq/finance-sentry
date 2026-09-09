@@ -125,7 +125,7 @@ public class EncryptionOptionsValidatorTests
     [InlineData("   ")]
     [InlineData("bm90LTMyLWJ5dGVz")] // valid Base64, wrong length
     [InlineData("not-base64-at-all!!")]
-    public void UnusableKey_FailsStartup(string key)
+    public void UnusableCurrentKey_FailsStartup(string key)
     {
         // `Encryption__Keys__1: ${ENCRYPTION_KEY_V1}` expands to an EMPTY value when the variable
         // is unset. That looks configured to a presence check and blows up at the first credential
@@ -137,6 +137,44 @@ public class EncryptionOptionsValidatorTests
         };
 
         ValidatorFor("Production").Validate(name: null, options).Failed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void BlankNonCurrentSlot_IsUnprovisioned_NotInvalid()
+    {
+        // compose declares the slot the rotation procedure tells the operator to fill, so it is
+        // present-and-empty until they do. That is "not configured yet", not "configured badly" —
+        // failing the boot on it would mean the compose file could not declare it at all.
+        var options = new EncryptionOptions
+        {
+            CurrentKeyVersion = 1,
+            Keys = new Dictionary<int, string> { [1] = ValidKeyBase64, [2] = "" },
+        };
+
+        ValidatorFor("Production").Validate(name: null, options).Succeeded.Should().BeTrue();
+        options.Keys.Should().NotContainKey(2, "an empty slot is dropped, never carried as a key");
+    }
+
+    [Fact]
+    public void BlankSlotAtTheCurrentVersion_StillFailsStartup_WithTheMigrationHint()
+    {
+        // The default prod shape is CurrentKeyVersion=2; if ENCRYPTION_KEY_V2 was never set this
+        // must refuse to boot AND say what to set, rather than fall back to writing under V1 —
+        // which is the disclosed key on the very deployment this exists to fix.
+        var options = new EncryptionOptions
+        {
+            CurrentKeyVersion = 2,
+            Keys = new Dictionary<int, string>
+            {
+                [1] = CredentialEncryptionService.DisclosedFallbackKeyBase64,
+                [2] = "",
+            },
+        };
+
+        var result = ValidatorFor("Production").Validate(name: null, options);
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("ENCRYPTION_KEY_V2");
     }
 
     [Fact]

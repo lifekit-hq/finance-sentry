@@ -1,5 +1,6 @@
 namespace FinanceSentry.Infrastructure.Encryption;
 
+using System.Linq;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -44,6 +45,23 @@ public sealed class EncryptionOptionsValidator(
     public ValidateOptionsResult Validate(string? name, EncryptionOptions options)
     {
         var isDevelopment = environment.IsDevelopment();
+
+        // A key slot the deployment declares but has not provisioned arrives as an EMPTY string:
+        // `Encryption__Keys__2: ${ENCRYPTION_KEY_V2:-}` in compose expands to "" until the operator
+        // sets it. That is "not configured", not "configured badly", so it is dropped here rather
+        // than failing the boot — otherwise the compose file could not declare the slot that the
+        // rotation procedure tells the operator to fill. A blank slot that IS the current version
+        // still fails, via the CurrentKeyVersion check below.
+        if (options.Keys is not null && options.Keys.Count > 0)
+        {
+            foreach (var version in options.Keys
+                         .Where(kv => string.IsNullOrWhiteSpace(kv.Value))
+                         .Select(kv => kv.Key)
+                         .ToList())
+            {
+                options.Keys.Remove(version);
+            }
+        }
 
         if (options.Keys is null || options.Keys.Count == 0)
         {
@@ -101,9 +119,7 @@ public sealed class EncryptionOptionsValidator(
             if (!IsUsableAesKey(value))
             {
                 return ValidateOptionsResult.Fail(
-                    $"Encryption:Keys[{version}] is not a Base64-encoded 32-byte AES-256 key. "
-                    + "An unset environment variable expands to an empty value, which looks "
-                    + "configured and is not.");
+                    $"Encryption:Keys[{version}] is not a Base64-encoded 32-byte AES-256 key.");
             }
         }
 
@@ -111,7 +127,10 @@ public sealed class EncryptionOptionsValidator(
         {
             return ValidateOptionsResult.Fail(
                 $"Encryption:CurrentKeyVersion ({options.CurrentKeyVersion}) has no matching entry "
-                + "in Encryption:Keys, so new credentials could not be encrypted.");
+                + "in Encryption:Keys, so new credentials could not be encrypted. If this is the "
+                + "first deployment after issue #493: set ENCRYPTION_KEY_V2 to a fresh key "
+                + "(`openssl rand -base64 32`) and leave ENCRYPTION_KEY_V1 as the OLD key the "
+                + "existing rows were written under — startup rotation needs it to read them.");
         }
 
         return ValidateOptionsResult.Success;

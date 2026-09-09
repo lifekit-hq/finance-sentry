@@ -26,15 +26,23 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-https://finance-sentry.tail1cb676.ts.net}
       Jwt__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-60}
       Deduplication__MasterKeyBase64: ${DEDUPLICATION_MASTER_KEY_BASE64}
-      # AES-256-GCM key for stored bank credentials (issue #493). REQUIRED: outside
-      # Development the API refuses to start without it, rather than silently encrypting
-      # under a key committed to this repository — which is what it did until 2026-09-09.
-      # Provision ENCRYPTION_KEY_V1 in .env or the deploy secret store; never commit a value.
-      # To rotate: add `Encryption__Keys__2: ${ENCRYPTION_KEY_V2}` here, set
-      # Encryption__CurrentKeyVersion to 2, redeploy. Startup rotation re-encrypts every
-      # credential row; only once a boot logs 0 rows migrated may version 1 be removed.
-      Encryption__Keys__1: ${ENCRYPTION_KEY_V1}
-      Encryption__CurrentKeyVersion: ${ENCRYPTION_CURRENT_KEY_VERSION:-1}
+      # AES-256-GCM keys for stored bank credentials (issue #493). REQUIRED: outside
+      # Development the API refuses to start without a usable current key, rather than
+      # silently encrypting under a key committed to this repository — which is what it
+      # did until 2026-09-09.
+      #
+      # V1 is the OLD key the existing rows were written under. It stays configured,
+      # read-only, so startup rotation can DECRYPT them; it is never written with, because
+      # CurrentKeyVersion points at 2. Do NOT put a fresh key at V1: version 1 would then
+      # name a different key, every existing credential would fail to decrypt, and rotation
+      # would migrate nothing because every row already reads version 1.
+      #
+      # V2 is the new key: `openssl rand -base64 32`. Provision it in docker/.env.sops.
+      # Startup rotation re-encrypts every row v1 -> v2 and logs how many it moved. Once a
+      # boot logs 0 rows migrated, drop ENCRYPTION_KEY_V1 and the disclosure is closed.
+      Encryption__Keys__1: ${ENCRYPTION_KEY_V1:-}
+      Encryption__Keys__2: ${ENCRYPTION_KEY_V2:-}
+      Encryption__CurrentKeyVersion: ${ENCRYPTION_CURRENT_KEY_VERSION:-2}
       GOOGLEOAUTH__CLIENTID: ${GOOGLE_CLIENT_ID:-}
       # TrueLayer (Open Banking EU/UK). Production URLs — creds in .env are the
       # live console.truelayer.com set, not sandbox. Override with
