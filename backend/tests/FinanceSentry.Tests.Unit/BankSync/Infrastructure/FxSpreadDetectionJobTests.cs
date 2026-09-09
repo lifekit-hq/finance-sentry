@@ -76,14 +76,16 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// Adapter convention: positive amount, direction in <c>TransactionType</c> ("debit"/"credit").
     /// </summary>
     private static Transaction MakeTx(BankAccount account, decimal amount, string type,
-        DateTime? date = null, string description = "tx", string? category = null)
+        DateTime? date = null, string description = "tx", string? category = null,
+        bool isPending = false, DateTime? postedDate = null)
     {
         var tx = new Transaction(account.Id, account.UserId, amount,
-            date ?? DateTime.UtcNow, description, Guid.NewGuid().ToString())
+            date ?? DateTime.UtcNow, description, Guid.NewGuid().ToString(), isPending)
         {
             TransactionType = type,
             MerchantCategory = category,
             IsActive = true,
+            PostedDate = postedDate,
         };
         return tx;
     }
@@ -91,12 +93,14 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// <summary>A debit+credit conversion pair carrying a transfer category on both legs.</summary>
     private static (Transaction Debit, Transaction Credit) MakeConversion(
         BankAccount fromAccount, decimal fromAmount, BankAccount toAccount, decimal toAmount,
-        DateTime date)
+        DateTime date, bool isPending = false, DateTime? postedDate = null)
     {
         var debit = MakeTx(fromAccount, fromAmount, "debit", date,
-            description: "Currency exchange", category: CategoryKeys.TransferOut);
+            description: "Currency exchange", category: CategoryKeys.TransferOut,
+            isPending: isPending, postedDate: postedDate);
         var credit = MakeTx(toAccount, toAmount, "credit", date,
-            description: "Currency exchange", category: CategoryKeys.TransferIn);
+            description: "Currency exchange", category: CategoryKeys.TransferIn,
+            isPending: isPending, postedDate: postedDate);
         return (debit, credit);
     }
 
@@ -388,6 +392,102 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
             Times.Once);
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             userId, debit2.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// A hold's amount is provisional, and a cross-currency conversion is where the bank revises
+    /// it on settlement — so the implied rate divided out of a hold is a rate nobody was charged.
+    /// The sentinel waits for the settled figures rather than accusing on the provisional ones.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_NoAlert_WhenTheConversionIsStillOnHold()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        // The same figures the firing case alerts on, still pending on both legs.
+        var (debit, credit) = MakeConversion(
+            eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow, isPending: true);
+        db.Transactions.AddRange(debit, credit);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The hold outlives the settled conversion it became: <c>PendingReconciler</c> retires a hold
+    /// by matching it to a posted row on (account, amount, description), and an FX hold settles at
+    /// a different amount — so both rows stay active. Both pair, and the dedup key is the debit
+    /// transaction id, so one conversion produced two alerts under two ids nothing could join.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_AlertsOnce_WhenAHoldCoexistsWithTheSettledConversionItBecame()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        var date = DateTime.UtcNow;
+        // The hold quotes 100 EUR → 3600 UAH; it settles at 102 → 3672 (the same implied 36).
+        // Both legs moved, so neither matches its twin on amount and the hold is never retired.
+        var (heldDebit, heldCredit) = MakeConversion(
+            eurAccount, 100m, uahAccount, 3600m, date, isPending: true);
+        var (settledDebit, settledCredit) = MakeConversion(
+            eurAccount, 102m, uahAccount, 3672m, date, postedDate: date);
+        db.Transactions.AddRange(heldDebit, heldCredit, settledDebit, settledCredit);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            userId, settledDebit.Id, "EUR", "UAH", 36m, EurUahMarketRate,
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+        // …and that is the only alert: the hold contributed no second one.
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Waiting for settlement must not silently drop a slow one. The lookback window follows the
+    /// same date the transfer matcher pairs on — <c>PostedDate ?? TransactionDate</c> — so a
+    /// conversion that settles days after it was made is measured when it settles rather than
+    /// having aged out of the window while it was still ineligible.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_AlertFired_WhenAConversionSettledLongAfterItWasMade()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        // Made 10 days ago, settled today — outside a 3-day window on the transaction date,
+        // inside it on the settled date.
+        var (debit, credit) = MakeConversion(
+            eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow.AddDays(-10),
+            postedDate: DateTime.UtcNow);
+        db.Transactions.AddRange(debit, credit);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db, OptionsWith(3, 0.03m)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            userId, debit.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

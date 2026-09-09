@@ -208,11 +208,37 @@ skip is logged each tick so the outage is visible. `UpdateRates` ignores a null/
 *including* the freshness stamp, so an outage cannot masquerade as a refresh. A non-positive
 `MaxRateAgeHours` is never fresh, which is also the sentinel's off switch.
 
-Not in this slice: the sentinel filters `t.IsActive` but not `t.IsPending`, and a pending leg
-coexists with its posted twin as a separate active row. The two can pair with different credits and
-alert twice for one conversion, since the dedup key is the debit transaction id. Fixing it means
-deciding what `TransferDetectionService` should do with pending legs, which cash-flow also depends
-on — its own change.
+### Settled-conversion follow-up (a hold is not a conversion)
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/FxSpreadDetectionJob.cs` — the transaction read
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/FxSpreadDetectionJobTests.cs`
+
+The sentinel filtered `t.IsActive` but not `t.IsPending`, and it divides one leg amount by the
+other to get the rate it accuses the bank over. A hold's amount is provisional, and a
+cross-currency conversion is exactly the case a bank revises on settlement — so the implied rate
+taken from a hold is a rate nobody was charged, the same class of fiction the stale-rate stand-down
+above already refused.
+
+The double-alert is worse than "the two rows overlap for a tick". `PendingReconciler` retires a
+hold by matching it to a posted row on `(account, amount, description)`, and an FX hold that
+settles at a different amount never matches — so it lingers active indefinitely, pairs on its own,
+and alerts under a debit id the settled row's dedup key cannot join. One conversion, two permanent
+alerts.
+
+Decision: measure settled legs only. `TransferDetectionService` is untouched — its documented
+inclusion of pending rows is cash-flow's requirement (a pending transfer leg must still be excluded
+from income/spending), and this sentinel narrows its own read rather than changing a policy another
+consumer depends on.
+
+Waiting for settlement must not silently drop a slow one, so the lookback window now follows the
+same date the matcher pairs legs on — `PostedDate ?? TransactionDate` — instead of the transaction
+date alone. A conversion that settles days after it was made is measured when it settles, rather
+than having aged out of the window during the period it was ineligible. The read is `COALESCE`-ed
+rather than index-ranged on `TransactionDate`; the window is 3 days over one user's accounts, so
+the scan is bounded by the account filter either way.
+
+The other settlement path needs nothing: `ScheduledSyncService` settles a Monobank hold in place,
+keeping the row id and setting `PostedDate`, so that conversion simply becomes eligible on the
+first tick after it settles.
 
 ### Sentinel hardening (the review pass, US1–US4 shipped)
 - DELETE `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/UnusualSpendDetectionJob.cs` — the sign predicate no ingest path can satisfy made it inert; `CategorySpikeDetectionJob` supersedes it
@@ -329,5 +355,6 @@ subscription or an installment. Dropped.
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`
 - Amounts summed or ranked across currencies go through `CurrencyConverter.ToUsd` first. Amounts compared to each other at a tolerance finer than the rate table's drift (the price-hike clustering and threshold) are not converted — they are partitioned by currency instead, so nothing is compared across units at all
 - Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. `UnusualSpendDetectionJob` filtered on `t.Amount < 0` alone and was therefore inert — it is deleted, superseded by `CategorySpikeDetectionJob`, and its Hangfire schedule withdrawn by name
+- No sentinel measures a pending row. `DuplicateChargeDetectionJob` and `CategorySpikeDetectionJob` exclude it because a hold counted alongside its posted twin doubles a month's spend; `FxSpreadDetectionJob` excludes it because a hold's amount is provisional and it divides one amount by another. `TransferDetectionService` keeps including pending rows — that is cash-flow's requirement, not a sentinel's
 - BankSync job can inject `ISubscriptionHygieneSummaryReader` without a project reference to Subscriptions — DI resolves at runtime via the composition root
 - `CurrencyConverter`'s table is only guaranteed *approximate*: unknown currencies fall back 1:1 and known ones fall back to a hardcoded seed. Normalising a total may rely on it; comparing one rate to another may not — gate on `AreRatesFresh` first

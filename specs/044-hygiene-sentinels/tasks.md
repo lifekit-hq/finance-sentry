@@ -61,3 +61,9 @@
 - [x] Restate the US1 firing condition in spec.md as the `PreviousAmount ?? AverageAmount` baseline that actually shipped
 - [x] Repoint `docs/money-semantics.md` at `SubscriptionDetectionAlgorithm.InCurrentBillingCurrency` — the method moved and the sweep missed this one
 - [x] Give 044 its block in `docs/claude/app-state.md`, as CLAUDE.md requires on feature landing
+
+## [US7] The FX sentinel measures settled conversions (the deferred pending-leg gap)
+
+- [x] Exclude pending legs from `FxSpreadDetectionJob`'s read — a hold's amount is provisional, and a hold that settles at a different amount is never retired by `PendingReconciler`, so it alerted a second time under its own debit id
+- [x] Select the lookback window on the leg's settled date (`PostedDate ?? TransactionDate`), the same date the transfer matcher pairs on, so waiting for settlement does not drop a slow one
+- [x] Pin all three: a pending conversion is silent, a hold coexisting with its settled twin alerts exactly once (keyed to the settled leg), a late settlement is still measured

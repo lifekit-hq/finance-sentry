@@ -86,11 +86,21 @@ public sealed class FxSpreadDetectionJob(
                 .Select(a => a.AccountId)
                 .ToList();
 
+            // Settled legs only. A hold's amount is provisional, and a cross-currency conversion
+            // is precisely where the bank revises it on settlement — so an implied rate divided
+            // out of a hold is a rate nobody was charged. The hold also outlives its settled twin
+            // here: PendingReconciler retires a hold by matching it to a posted row on amount, and
+            // an FX hold settles at a different amount, so both rows stay active and pair
+            // independently — two alerts for one conversion, under two debit ids the dedup key
+            // cannot join. The window follows the same date the matcher pairs on
+            // (PostedDate ?? TransactionDate), so a slow settlement is measured when it settles
+            // instead of ageing out while it was ineligible.
             transactions = await db.Transactions
                 .AsNoTracking()
                 .Where(t => accountIds.Contains(t.AccountId)
-                         && t.TransactionDate >= since
-                         && t.IsActive)
+                         && (t.PostedDate ?? t.TransactionDate) >= since
+                         && t.IsActive
+                         && !t.IsPending)
                 .ToListAsync(ct);
         }
         catch (Exception ex)

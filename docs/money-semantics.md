@@ -106,16 +106,29 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   (Monobank holds keep their date when they clear), the stored row is flipped to posted
   (`ScheduledSyncService.PersistAndReconcileAsync`).
 - **PendingReconciler**: a pending row whose posted twin exists under a *different* hash
-  (date moved — the TrueLayer case) is retired (soft-deleted, `IsActive = false`).
+  (date moved — the TrueLayer case) is retired (soft-deleted, `IsActive = false`). It matches
+  the twin on `(account, amount, description)`, so **a hold that settles at a different amount
+  is never retired** — it stays active alongside its posted row. That is routine for a
+  cross-currency charge, where the settled amount is the bank's, not the hold's.
 - **Sync lookback overlap**: settled transactions keep their original timestamp, so a pure
   watermark fetch would never re-observe them once the watermark passes — every
   incremental sync therefore re-reads a trailing 7-day window (`ResyncLookbackDays` in
   both adapters). Dedup makes the overlap idempotent; it is what feeds settle-in-place
   and the reconciler.
-- Net effect: a real purchase exists as exactly one active row; it may be `IsPending` for a
-  few days, then becomes posted either in place or via retire-and-replace. A hold that
-  takes longer than the lookback window to settle stays pending until a manual resync
-  (reset the account's `LastTransactionSyncAt`).
+- Net effect: a real purchase *usually* exists as exactly one active row; it may be
+  `IsPending` for a few days, then becomes posted either in place or via retire-and-replace.
+  A hold that takes longer than the lookback window to settle stays pending until a manual
+  resync (reset the account's `LastTransactionSyncAt`).
+- **The exception a reader must count on**: where the settled amount differs from the hold's,
+  neither settle-in-place (hashes differ) nor `PendingReconciler` (amounts differ) fires, and
+  the two rows coexist indefinitely. A reader that sums both double-counts the purchase; a
+  reader that divides one leg by another measures a rate nobody was charged. **A reader that
+  judges a figure per row therefore filters `!IsPending`** — `DuplicateChargeDetectionJob`,
+  `CategorySpikeDetectionJob`, `SubscriptionDetectionJob` and `FxSpreadDetectionJob` all do.
+  Monthly flow (§5) deliberately counts pending money and so does *not* filter it — which
+  means it double-counts this one case. Not yet addressed: the fix is a policy decision about
+  what flow should do with a hold whose posted twin it can already see, not a reader-local
+  filter.
 
 ## 5. Monthly inflow / outflow ("Spending (MTD)", "Monthly Outflow")
 
