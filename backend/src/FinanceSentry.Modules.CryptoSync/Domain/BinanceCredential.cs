@@ -59,4 +59,24 @@ public sealed class BinanceCredential
     {
         IsActive = false;
     }
+
+    /// <summary>
+    /// Replaces this row's ciphertext with the same plaintext re-encrypted under a newer key
+    /// (issue #493). The payload and the key version move together — a row is never left with new
+    /// ciphertext and an old version, or the reverse. Not a business update: the credential is
+    /// unchanged, so no domain timestamp moves.
+    /// </summary>
+    public void RotateEncryption(
+        byte[] encryptedApiKey, byte[] apiKeyIv, byte[] apiKeyAuthTag,
+        byte[] encryptedApiSecret, byte[] apiSecretIv, byte[] apiSecretAuthTag,
+        int keyVersion)
+    {
+        EncryptedApiKey = encryptedApiKey;
+        ApiKeyIv = apiKeyIv;
+        ApiKeyAuthTag = apiKeyAuthTag;
+        EncryptedApiSecret = encryptedApiSecret;
+        ApiSecretIv = apiSecretIv;
+        ApiSecretAuthTag = apiSecretAuthTag;
+        KeyVersion = keyVersion;
+    }
 }

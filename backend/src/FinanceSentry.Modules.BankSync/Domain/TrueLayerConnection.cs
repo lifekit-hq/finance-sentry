@@ -76,4 +76,18 @@ public class TrueLayerConnection : Entity
         Status = "CREATED";
         UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Replaces this row's ciphertext with the same plaintext re-encrypted under a newer key
+    /// (issue #493). The payload and the key version move together — a row is never left with new
+    /// ciphertext and an old version, or the reverse. Not a business update: the credential is
+    /// unchanged, so no domain timestamp moves.
+    /// </summary>
+    public void RotateEncryption(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
+    {
+        EncryptedRefreshToken = ciphertext;
+        Iv = iv;
+        AuthTag = authTag;
+        KeyVersion = keyVersion;
+    }
 }

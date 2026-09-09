@@ -355,10 +355,10 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Default",
             "Host=127.0.0.1;Port=1;Database=test;Username=test;Password=test;Timeout=1");
         builder.UseSetting("Deduplication:MasterKeyBase64",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Encryption:CurrentKeyVersion", "1");
         builder.UseSetting("Encryption:Keys:1",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
         builder.UseSetting("Binance:BaseUrl", "https://testnet.binance.vision");

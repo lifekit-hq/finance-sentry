@@ -128,4 +128,28 @@ public sealed class IBKRCredential
         EncryptionKeyAuthTag = encryptionKeyAuthTag;
         KeyVersion = keyVersion;
     }
+
+    /// <summary>
+    /// Replaces this row's ciphertext with the same plaintext re-encrypted under a newer key
+    /// (issue #493). The payload and the key version move together — a row is never left with new
+    /// ciphertext and an old version, or the reverse. Not a business update: the credential is
+    /// unchanged, so no domain timestamp moves.
+    /// </summary>
+    public void RotateEncryption(
+        byte[] encryptedAccessTokenSecret, byte[] accessTokenSecretIv, byte[] accessTokenSecretAuthTag,
+        byte[] encryptedSignatureKey, byte[] signatureKeyIv, byte[] signatureKeyAuthTag,
+        byte[] encryptedEncryptionKey, byte[] encryptionKeyIv, byte[] encryptionKeyAuthTag,
+        int keyVersion)
+    {
+        EncryptedAccessTokenSecret = encryptedAccessTokenSecret;
+        AccessTokenSecretIv = accessTokenSecretIv;
+        AccessTokenSecretAuthTag = accessTokenSecretAuthTag;
+        EncryptedSignatureKey = encryptedSignatureKey;
+        SignatureKeyIv = signatureKeyIv;
+        SignatureKeyAuthTag = signatureKeyAuthTag;
+        EncryptedEncryptionKey = encryptedEncryptionKey;
+        EncryptionKeyIv = encryptionKeyIv;
+        EncryptionKeyAuthTag = encryptionKeyAuthTag;
+        KeyVersion = keyVersion;
+    }
 }

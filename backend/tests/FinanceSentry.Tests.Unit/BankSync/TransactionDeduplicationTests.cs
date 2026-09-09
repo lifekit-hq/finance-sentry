@@ -12,7 +12,7 @@ using Xunit;
 public class TransactionDeduplicationTests
 {
     // 32-byte key base64-encoded — for tests only
-    private const string TestKey = "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=";
+    private const string TestKey = "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=";
 
     private readonly TransactionDeduplicationService _sut = new(TestKey);
 

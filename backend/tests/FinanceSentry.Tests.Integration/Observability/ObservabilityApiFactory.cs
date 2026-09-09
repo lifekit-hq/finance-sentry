@@ -29,10 +29,10 @@ public class ObservabilityApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Default",
             "Host=localhost;Port=5432;Database=unreachable;Username=test;Password=test;Timeout=1;Command Timeout=1");
         builder.UseSetting("Deduplication:MasterKeyBase64",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Encryption:CurrentKeyVersion", "1");
         builder.UseSetting("Encryption:Keys:1",
-            "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA=");
+            "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
         builder.UseSetting("GoogleOAuth:ClientId", "test-client-id");
