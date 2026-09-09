@@ -22,10 +22,12 @@ public class CommittedMerchantPinsTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid OtherUserId = Guid.NewGuid();
 
-    private static ICommittedMerchantPinRepository NewRepository() =>
-        new CommittedMerchantPinRepository(new BankSyncDbContext(
-            new DbContextOptionsBuilder<BankSyncDbContext>()
-                .UseInMemoryDatabase($"pins-{Guid.NewGuid():N}").Options));
+    private static DbContextOptions<BankSyncDbContext> Options(string database) =>
+        new DbContextOptionsBuilder<BankSyncDbContext>().UseInMemoryDatabase(database).Options;
+
+    private static ICommittedMerchantPinRepository NewRepository(string? database = null) =>
+        new CommittedMerchantPinRepository(
+            new BankSyncDbContext(Options(database ?? $"pins-{Guid.NewGuid():N}")));
 
     private static Task<PinCommittedMerchantResult> Pin(
         ICommittedMerchantPinRepository repository, Guid userId, string merchant) =>
@@ -112,6 +114,61 @@ public class CommittedMerchantPinsTests
         (await List(repository, UserId)).Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Pin_LosingTheRaceToAConcurrentPin_ReportsTheWinnersRow()
+    {
+        // Two tabs, or one double-clicked button: the second write loses the unique
+        // (UserId, MerchantKey) index. The caller asked for a state that now holds, so this is
+        // the documented idempotent result — not a 5xx.
+        var database = $"pins-{Guid.NewGuid():N}";
+        var winner = NewRepository(database);
+        var loser = new CommittedMerchantPinRepository(
+            new LosesItsFirstSave(Options(database), async () => await Pin(winner, UserId, "Anytime Fitness")));
+
+        var result = await Pin(loser, UserId, "ANYTIME FITNESS");
+
+        result.AlreadyPinned.Should().BeTrue();
+        result.Pin.DisplayName.Should().Be("Anytime Fitness", because: "the winning row is the one that exists");
+        (await List(winner, UserId)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Pin_WriteFailureThatIsNotALostRace_Surfaces()
+    {
+        // Nothing else wrote the row, so the failure is a real one and swallowing it would
+        // report a pin the user does not hold.
+        var repository = new CommittedMerchantPinRepository(
+            new LosesItsFirstSave(Options($"pins-{Guid.NewGuid():N}"), competingWriter: null));
+
+        var pin = async () => await Pin(repository, UserId, "Anytime Fitness");
+
+        await pin.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    /// <summary>
+    /// A context whose first save loses a race: the competing writer commits its row, then this
+    /// save fails the way the unique index fails it. Staged rather than run concurrently because
+    /// the in-memory provider does not enforce unique indexes at all.
+    /// </summary>
+    private sealed class LosesItsFirstSave(
+        DbContextOptions<BankSyncDbContext> options, Func<Task>? competingWriter)
+        : BankSyncDbContext(options)
+    {
+        private bool _lost;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (_lost)
+                return await base.SaveChangesAsync(cancellationToken);
+
+            _lost = true;
+            if (competingWriter is not null)
+                await competingWriter();
+
+            throw new DbUpdateException("duplicate key value violates unique constraint");
+        }
+    }
+
     // ── Unpinning ────────────────────────────────────────────────────────────
 
     [Fact]
@@ -134,9 +191,9 @@ public class CommittedMerchantPinsTests
     [Fact]
     public async Task Unpin_ByTheKeyTheListingAdvertised_RemovesThePin()
     {
-        // List-then-unpin is the only flow an MCP caller has, and normalization is not a fixed
-        // point over every key it emits: "*MOBI TOP-UP 0857860057" stores `mobile top-up 0057`,
-        // which re-derives to `mobile top-up`. Unpinning by the advertised key must still work.
+        // List-then-unpin is the only flow an MCP caller has, so the advertised key has to
+        // re-derive to itself. "*MOBI TOP-UP 0857860057" stores `mobile top-up 0057`, which used
+        // to re-derive to `mobile top-up` and 404 on the pin the listing had just shown.
         var repository = NewRepository();
         await Pin(repository, UserId, "*MOBI TOP-UP 0857860057");
         var advertisedKey = (await List(repository, UserId)).Single().MerchantKey;

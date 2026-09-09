@@ -78,9 +78,11 @@ public class MoneyFlowStatisticsTests
     {
         var mock = new Mock<ICommittedOutflowPolicy>();
         mock.Setup(p => p.LoadForUserAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CommittedOutflowRules(
-                activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
-                pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal)));
+            .ReturnsAsync(new CommittedOutflowRules
+            {
+                ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
+                PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+            });
         return mock.Object;
     }
 

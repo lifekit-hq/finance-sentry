@@ -32,17 +32,41 @@ public class CommittedMerchantPinRepository(BankSyncDbContext context) : ICommit
     }
 
     /// <inheritdoc />
-    public Task<CommittedMerchantPin?> FindAsync(
-        Guid userId, string merchantKey, CancellationToken cancellationToken = default)
+    public async Task<AddCommittedMerchantPinResult> AddIfAbsentAsync(
+        CommittedMerchantPin pin, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pin);
+
+        var existing = await FindAsync(pin.UserId, pin.MerchantKey, cancellationToken);
+        if (existing is not null)
+            return new AddCommittedMerchantPinResult(existing, AlreadyPinned: true);
+
+        _context.CommittedMerchantPins.Add(pin);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            return new AddCommittedMerchantPinResult(pin, AlreadyPinned: false);
+        }
+        catch (DbUpdateException)
+        {
+            // Same shape as CompanionEventRepository.InsertIfNewAsync: the read above cannot be
+            // atomic with the write, so a concurrent pin of the same merchant (two tabs, a
+            // double-clicked button) loses the unique (UserId, MerchantKey) index here. That is
+            // the state the caller asked for, so report it as already pinned rather than a 5xx.
+            _context.Entry(pin).State = EntityState.Detached;
+
+            var winner = await FindAsync(pin.UserId, pin.MerchantKey, cancellationToken);
+            if (winner is null)
+                throw; // Not a lost race — a real write failure the caller must hear about.
+
+            return new AddCommittedMerchantPinResult(winner, AlreadyPinned: true);
+        }
+    }
+
+    private Task<CommittedMerchantPin?> FindAsync(
+        Guid userId, string merchantKey, CancellationToken cancellationToken)
         => _context.CommittedMerchantPins.AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == userId && p.MerchantKey == merchantKey, cancellationToken);
-
-    /// <inheritdoc />
-    public async Task AddAsync(CommittedMerchantPin pin, CancellationToken cancellationToken = default)
-    {
-        _context.CommittedMerchantPins.Add(pin);
-        await _context.SaveChangesAsync(cancellationToken);
-    }
 
     /// <inheritdoc />
     public async Task<bool> RemoveAsync(

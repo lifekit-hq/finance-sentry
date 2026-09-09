@@ -32,10 +32,18 @@ public class CommittedOutflowPolicyTests
         };
 
     private static CommittedOutflowRules Rules(params string[] activeCommitmentKeys) =>
-        new(activeCommitmentKeys.ToHashSet(StringComparer.Ordinal), NoPins);
+        new()
+        {
+            ActiveCommitmentKeys = activeCommitmentKeys.ToHashSet(StringComparer.Ordinal),
+            PinnedMerchantKeys = NoPins,
+        };
 
     private static CommittedOutflowRules RulesWithPins(params string[] pinnedMerchantKeys) =>
-        new(NoPins, pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal));
+        new()
+        {
+            ActiveCommitmentKeys = NoPins,
+            PinnedMerchantKeys = pinnedMerchantKeys.ToHashSet(StringComparer.Ordinal),
+        };
 
     private static IReadOnlySet<string> NoPins => new HashSet<string>(StringComparer.Ordinal);
 

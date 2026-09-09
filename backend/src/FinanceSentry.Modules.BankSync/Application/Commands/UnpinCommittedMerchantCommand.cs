@@ -19,21 +19,10 @@ public sealed class UnpinCommittedMerchantCommandHandler(ICommittedMerchantPinRe
 
     /// <summary>
     /// Accepts either the merchant text the pin was created with or the <c>MerchantKey</c> a
-    /// listing returned, and reports false when the user held neither.
-    /// <para>
-    /// Both are accepted because normalization is not a fixed point over every key it emits:
-    /// pinning <c>"*MOBI TOP-UP 0857860057"</c> stores <c>mobile top-up 0057</c>, and re-deriving
-    /// THAT strips the trailing digits to <c>mobile top-up</c>. Since the listing advertises the
-    /// key and list-then-unpin is the obvious client flow (it is the only one an MCP caller
-    /// has), a derived-key-only lookup would 404 on the pin it just showed.
-    /// </para>
+    /// listing returned — <see cref="MerchantNameNormalizer.NormalizeDetectionKey"/> is a fixed
+    /// point over its own output, so both derive to the one key the pin is stored under.
+    /// Reports false when the user holds no pin for that key.
     /// </summary>
-    public async Task<bool> Handle(UnpinCommittedMerchantCommand command, CancellationToken ct)
-    {
-        // Derive first: it is the mirror of pinning, and it also rejects unnameable input.
-        if (await _pins.RemoveAsync(command.UserId, CommittedMerchantKey.Derive(command.Merchant), ct))
-            return true;
-
-        return await _pins.RemoveAsync(command.UserId, command.Merchant.Trim().ToLowerInvariant(), ct);
-    }
+    public Task<bool> Handle(UnpinCommittedMerchantCommand command, CancellationToken ct)
+        => _pins.RemoveAsync(command.UserId, CommittedMerchantKey.Derive(command.Merchant), ct);
 }

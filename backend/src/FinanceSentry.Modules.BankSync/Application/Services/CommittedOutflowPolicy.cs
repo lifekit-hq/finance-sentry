@@ -44,9 +44,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 /// the same story.
 /// </para>
 /// </summary>
-public sealed class CommittedOutflowRules(
-    IReadOnlySet<string> activeCommitmentKeys,
-    IReadOnlySet<string> pinnedMerchantKeys)
+public sealed class CommittedOutflowRules
 {
     /// <summary>
     /// Categories whose spending is a standing obligation rather than a choice made this month.
@@ -80,11 +78,15 @@ public sealed class CommittedOutflowRules(
     private static readonly HashSet<string> CommittedFlowRoles =
         new(StringComparer.Ordinal) { FlowRoles.FamilySupport, FlowRoles.Household };
 
-    private readonly IReadOnlySet<string> _activeCommitmentKeys =
-        activeCommitmentKeys ?? throw new ArgumentNullException(nameof(activeCommitmentKeys));
+    /// <summary>
+    /// Rule (a)'s set: the keys of the user's active <c>DetectedSubscription</c> rows. Named
+    /// rather than positional — the two sets have the same type, so a swapped pair of
+    /// constructor arguments compiled and silently traded rule (a) for rule (d).
+    /// </summary>
+    public required IReadOnlySet<string> ActiveCommitmentKeys { get; init; }
 
-    private readonly IReadOnlySet<string> _pinnedMerchantKeys =
-        pinnedMerchantKeys ?? throw new ArgumentNullException(nameof(pinnedMerchantKeys));
+    /// <summary>Rule (d)'s set: the merchant keys the user pinned as committed.</summary>
+    public required IReadOnlySet<string> PinnedMerchantKeys { get; init; }
 
     /// <summary>
     /// Rules (a), (b) and (d) for a single debit. The caller has already established that the
@@ -102,10 +104,10 @@ public sealed class CommittedOutflowRules(
         var commitmentKey = CommitmentKeyResolver.Resolve(
             debit.MerchantName, debit.Description, debit.Amount, debit.Mcc);
 
-        if (_activeCommitmentKeys.Contains(commitmentKey))
+        if (ActiveCommitmentKeys.Contains(commitmentKey))
             return true;
 
-        if (_pinnedMerchantKeys.Count == 0)
+        if (PinnedMerchantKeys.Count == 0)
             return false;
 
         // (d) re-derives rather than reusing commitmentKey: the resolver keys a repayment-shaped
@@ -121,7 +123,7 @@ public sealed class CommittedOutflowRules(
         if (merchantKey == MerchantNameNormalizer.UnknownKey)
             return false;
 
-        return _pinnedMerchantKeys.Contains(merchantKey);
+        return PinnedMerchantKeys.Contains(merchantKey);
     }
 
     /// <summary>
@@ -169,6 +171,10 @@ public class CommittedOutflowPolicy(
         var commitmentKeys = await _activeSubscriptions.GetActiveCommitmentMerchantKeysAsync(userId, ct);
         var pinnedKeys = await _pins.GetPinnedKeysAsync(userId, ct);
 
-        return new CommittedOutflowRules(commitmentKeys, pinnedKeys);
+        return new CommittedOutflowRules
+        {
+            ActiveCommitmentKeys = commitmentKeys,
+            PinnedMerchantKeys = pinnedKeys,
+        };
     }
 }

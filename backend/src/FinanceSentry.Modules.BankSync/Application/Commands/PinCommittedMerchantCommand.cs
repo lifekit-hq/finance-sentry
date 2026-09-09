@@ -31,28 +31,22 @@ public sealed class PinCommittedMerchantCommandHandler(ICommittedMerchantPinRepo
         PinCommittedMerchantCommand command, CancellationToken ct)
     {
         var displayName = command.Merchant?.Trim() ?? string.Empty;
-        var merchantKey = CommittedMerchantKey.Derive(displayName);
-
-        var existing = await _pins.FindAsync(command.UserId, merchantKey, ct);
-        if (existing is not null)
-        {
-            return new PinCommittedMerchantResult(
-                new CommittedMerchantPinDto(
-                    existing.Id, existing.MerchantKey, existing.DisplayName, existing.CreatedAt),
-                AlreadyPinned: true);
-        }
 
         var pin = new CommittedMerchantPin
         {
             UserId = command.UserId,
-            MerchantKey = merchantKey,
+            MerchantKey = CommittedMerchantKey.Derive(displayName),
             DisplayName = displayName,
         };
 
-        await _pins.AddAsync(pin, ct);
+        // One operation, not find-then-add: the two are racy against the unique index, so two
+        // concurrent pins of one merchant would fail the second write instead of both landing on
+        // the idempotent result this command documents.
+        var stored = await _pins.AddIfAbsentAsync(pin, ct);
 
         return new PinCommittedMerchantResult(
-            new CommittedMerchantPinDto(pin.Id, pin.MerchantKey, pin.DisplayName, pin.CreatedAt),
-            AlreadyPinned: false);
+            new CommittedMerchantPinDto(
+                stored.Pin.Id, stored.Pin.MerchantKey, stored.Pin.DisplayName, stored.Pin.CreatedAt),
+            stored.AlreadyPinned);
     }
 }
