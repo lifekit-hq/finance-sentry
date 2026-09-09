@@ -51,10 +51,11 @@ public class EncryptionOptionsValidatorTests
     }
 
     [Fact]
-    public void DisclosedKeyConfigured_OutsideDevelopment_FailsStartup()
+    public void DisclosedKeyAsTheCurrentKey_OutsideDevelopment_FailsStartup()
     {
         // The disclosed key pasted into a production config is the same disclosure as the removed
-        // fallback, so it is refused on its VALUE rather than on where it came from.
+        // fallback, so it is refused on its VALUE rather than on where it came from — when it is
+        // the key new credentials would be WRITTEN under.
         var options = new EncryptionOptions
         {
             CurrentKeyVersion = 1,
@@ -68,6 +69,26 @@ public class EncryptionOptionsValidatorTests
 
         result.Failed.Should().BeTrue();
         result.FailureMessage.Should().Contain("compromised");
+    }
+
+    [Fact]
+    public void DisclosedKeyAsALegacyVersion_OutsideDevelopment_IsAllowedSoRotationCanRun()
+    {
+        // THE migration this change exists to enable: every production row is at version 1 under
+        // the disclosed key, so it must stay configured — read-only, non-current — until startup
+        // rotation has moved every row to version 2. Refusing it here would make the disclosure
+        // permanent, which is the opposite of the goal.
+        var options = new EncryptionOptions
+        {
+            CurrentKeyVersion = 2,
+            Keys = new Dictionary<int, string>
+            {
+                [1] = CredentialEncryptionService.DisclosedFallbackKeyBase64,
+                [2] = ValidKeyBase64,
+            },
+        };
+
+        ValidatorFor("Production").Validate(name: null, options).Succeeded.Should().BeTrue();
     }
 
     [Fact]

@@ -67,10 +67,30 @@ public sealed class EncryptionOptionsValidator(
             return ValidateOptionsResult.Success;
         }
 
+        // The disclosed key is refused as the key NEW credentials are written under — never as a
+        // key old ones are read with. Every row already in production is at version 1 under this
+        // exact value, so retiring the disclosure REQUIRES keeping it configured as a non-current
+        // version until rotation has moved every row off it. Refusing it outright (which this
+        // check did at first) makes the documented migration — add a new version, bump
+        // CurrentKeyVersion, let startup rotation run — impossible, and would have blocked the one
+        // deployment this whole change exists to enable.
+        if (!isDevelopment
+            && options.Keys.TryGetValue(options.CurrentKeyVersion, out var currentKey)
+            && currentKey == CredentialEncryptionService.DisclosedFallbackKeyBase64)
+        {
+            return ValidateOptionsResult.Fail(DisclosedKeyConfigured);
+        }
+
         if (!isDevelopment
             && options.Keys.ContainsValue(CredentialEncryptionService.DisclosedFallbackKeyBase64))
         {
-            return ValidateOptionsResult.Fail(DisclosedKeyConfigured);
+            // Allowed, and never quietly: the disclosure is only closed once rotation has emptied
+            // this version and it is removed from configuration.
+            logger.LogWarning(
+                "Encryption:Keys still carries the DISCLOSED key at a non-current version. That is "
+                + "expected DURING rotation — it is what decrypts rows written before the new key "
+                + "existed. Credentials still on that version remain readable by anyone with the "
+                + "repository. Remove it once a startup rotation reports 0 rows migrated.");
         }
 
         // A key that is present but unusable (blank because an env var did not expand, or not
