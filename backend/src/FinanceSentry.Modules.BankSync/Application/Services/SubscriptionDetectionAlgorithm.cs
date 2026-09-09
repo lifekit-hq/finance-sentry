@@ -1,0 +1,363 @@
+namespace FinanceSentry.Modules.BankSync.Application.Services;
+
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
+
+/// <summary>
+/// Turns a user's charge history into detected subscriptions and installment plans. Pure and
+/// synchronous: no database, no clock, no DI — <c>SubscriptionDetectionJob</c> reads the rows and
+/// persists the results, this decides what they mean.
+/// </summary>
+public static class SubscriptionDetectionAlgorithm
+{
+    // Three consistent monthly charges is enough signal — newer open-banking connections
+    // often only have a few months of history, so requiring 4 hid real subscriptions
+    // (Netcup, OpenAI, Claude) whose window only holds 3 charges.
+    private const int MinOccurrences = 3;
+    private const double MaxAmountCv = 0.10;
+    private const int MonthlyMinDays = 28;
+    private const int MonthlyMaxDays = 35;
+    private const int AnnualMinDays = 351;
+    private const int AnnualMaxDays = 379;
+    // A price change (plan upgrade, VAT shift) moves the charge amount in one step;
+    // adjacent amounts within this relative distance chain into the same cluster,
+    // while a different plan (e.g. Claude Pro €22 vs Max €110) breaks the chain.
+    private const double AmountClusterTolerance = 0.15;
+    // Repricing at most doubles (or halves) a charge — a promotional year ending, a VAT
+    // shift, an inflation pass-through. A larger jump is a different plan (Claude Pro €22
+    // → Max €110), not one service at a new price, so it must not become a hike baseline.
+    private const double MaxPriceStepRatio = 2.0;
+    // One charge is not a price. A prorated or promotional first month sits within the step
+    // ratio and has a coefficient of variation of zero by construction, so accepting a
+    // single displaced charge as the baseline would alert on the merchant's own onboarding.
+    // The same minimum decides when a currency has displaced another in InCurrentBillingCurrency
+    // — raise this and both gates move, so weigh the onboarding case and the account-move case
+    // together rather than tuning one of them.
+    private const int MinBaselineCharges = 2;
+
+    private static readonly string[] UnidentifiableNormalizedNames =
+    [
+        "unknown",
+        "transfer",
+        "top-up",
+        "topup",
+        "recharge",
+        "withdrawal",
+        "atm",
+        "cash",
+    ];
+
+    /// <summary>One charge as the algorithm needs it: the transaction plus its account's currency.</summary>
+    public sealed record TxRow(
+        Guid UserId, string? MerchantName, string? Description, decimal Amount,
+        DateTime TransactionDate, string? MerchantCategory, int? Mcc, string? Currency);
+
+    /// <summary>
+    /// A merchant's charges at its current price, plus the charges at the price that one
+    /// displaced — empty when the merchant has only ever billed one price, or when the
+    /// other amounts belong to a different plan rather than an earlier price of this one.
+    /// </summary>
+    public sealed record PriceSeries(IReadOnlyList<TxRow> Current, IReadOnlyList<TxRow> Displaced);
+
+    // Recurring-service detection: group by merchant, keep only the charges in the currency
+    // that merchant bills today (two units cannot be compared to each other), then price the
+    // merchant off the amount cluster holding its most recent charge (so a discontinued
+    // plan's old price — e.g. Claude Pro €22 next to Max €110 — can't poison the stability
+    // gates) plus, if that price has just replaced another, the one it displaced. Then require
+    // a consistent monthly/annual cadence over the charges, a stable current amount, and at least
+    // MinOccurrences charges. A recurring transfer to a masked card number is a
+    // loan/mortgage repayment, not a service — it's emitted as an installment so it stays
+    // out of the spend summary.
+    public static IEnumerable<DetectedSubscriptionData> DetectSubscriptions(IReadOnlyList<TxRow> transactions)
+    {
+        var results = new List<DetectedSubscriptionData>();
+        var byMerchant = transactions.GroupBy(NormalizeForDetection);
+
+        foreach (var merchantGroup in byMerchant)
+        {
+            var normalized = merchantGroup.Key;
+            var series = SplitAtPriceStep(InCurrentBillingCurrency(merchantGroup));
+            var sorted = series.Current.Concat(series.Displaced).OrderBy(t => t.TransactionDate).ToList();
+
+            if (sorted.Count < MinOccurrences) continue;
+            if (IsUnidentifiableMerchant(normalized)) continue;
+
+            var dates = sorted.Select(t => t.TransactionDate).ToList();
+            var intervals = new List<int>();
+            for (var i = 1; i < dates.Count; i++)
+                intervals.Add((int)(dates[i] - dates[i - 1]).TotalDays);
+
+            if (intervals.Count == 0) continue;
+
+            var median = Median(intervals);
+
+            string cadence;
+            if (median >= MonthlyMinDays && median <= MonthlyMaxDays)
+                cadence = "monthly";
+            else if (median >= AnnualMinDays && median <= AnnualMaxDays)
+                cadence = "annual";
+            else
+                continue;
+
+            // Stability is judged on the current price alone — a displaced pre-hike cluster
+            // is a different price by construction and would always fail the CV gate.
+            var mean = series.Current.Average(t => (double)t.Amount);
+            if (mean <= 0) continue;
+            if (CoefficientOfVariation(series.Current, mean) > MaxAmountCv) continue;
+
+            var lastTransaction = sorted.Last();
+            var lastChargeDate = DateOnly.FromDateTime(lastTransaction.TransactionDate);
+            var nextExpectedDate = lastChargeDate.AddDays((int)median);
+
+            var displayName = normalized.StartsWith("mobile top-up ", StringComparison.Ordinal)
+                ? $"Mobile top-up {normalized[^4..]}"
+                : MerchantNameNormalizer.GetDisplayName(sorted.Select(t => t.MerchantName ?? t.Description));
+            var topCategory = sorted
+                .Select(t => t.MerchantCategory)
+                .Where(c => c != null)
+                .GroupBy(c => c)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+
+            results.Add(new DetectedSubscriptionData(
+                MerchantNameNormalized: normalized,
+                MerchantNameDisplay: displayName,
+                Cadence: cadence,
+                AverageAmount: (decimal)mean,
+                LastKnownAmount: lastTransaction.Amount,
+                PreviousAmount: series.Displaced.Count == 0
+                    ? null
+                    : Math.Round(series.Displaced.Average(t => t.Amount), 2),
+                Currency: lastTransaction.Currency ?? "USD",
+                LastChargeDate: lastChargeDate,
+                NextExpectedDate: nextExpectedDate,
+                OccurrenceCount: sorted.Count,
+                ConfidenceScore: sorted.Count,
+                Category: topCategory,
+                Kind: MaskedPan.IsLikely(normalized)
+                    ? SubscriptionKinds.Installment
+                    : SubscriptionKinds.Subscription));
+        }
+
+        return results;
+    }
+
+    /// <summary>Merchant key for recurring-service grouping.</summary>
+    public static string NormalizeForDetection(TxRow transaction) =>
+        MerchantNameNormalizer.NormalizeDetectionKey(transaction.MerchantName, transaction.Description);
+
+    /// <summary>
+    /// A merchant's charges in the currency it bills today, dropping the ones it billed in
+    /// another. Charges are grouped by merchant alone, but a user's accounts span currencies
+    /// (Monobank UAH, Revolut EUR, a UK card GBP), so one merchant's group can hold amounts in
+    /// several units — and every judgment downstream of here compares two amounts to each
+    /// other: the cluster tolerance, the stability gate, the price step, and the hike baseline
+    /// the sentinel divides by. Moving a subscription from a GBP card to a EUR one restates
+    /// £9.99 as €11.99, which reads as a clean, in-guard 20% chronological step and fires a
+    /// price-hike alert for a rise no merchant charged.
+    ///
+    /// The other currencies are dropped rather than converted to a common unit deliberately.
+    /// <c>CurrencyConverter.ToUsd</c>'s error is not bounded by anything this guard could budget
+    /// for: it returns a currency missing from the table *unchanged*, and the seed standing in
+    /// before the first refresh (or through a feed outage) covers four, so a PLN charge would be
+    /// compared at roughly 4× its dollar value against <see cref="AmountClusterTolerance"/>.
+    /// Converting would let the rate table manufacture the very step this guard exists to refuse.
+    /// Gating on <c>CurrencyConverter.AreRatesFresh</c> instead — as <c>FxSpreadDetectionJob</c>
+    /// does — trades a false hike for blindness to real ones whenever the feed is down.
+    ///
+    /// A retired currency leaves the price series exactly as a retired plan does in
+    /// <see cref="SplitAtPriceStep"/>: it is no longer what the merchant bills.
+    ///
+    /// Which currency is "today's" takes the same minimum evidence a price does
+    /// (<see cref="MinBaselineCharges"/>): a merchant does not move accounts on the strength of
+    /// one charge, and without the gate a single foreign purchase at a merchant the user also
+    /// subscribes to would retire nine months of established charges and delete the
+    /// subscription outright. Until the newcomer has charges of its own, the established
+    /// currency is still the one being billed, so the row keeps updating there rather than
+    /// going stale.
+    /// </summary>
+    public static IReadOnlyList<TxRow> InCurrentBillingCurrency(IEnumerable<TxRow> transactions)
+    {
+        var all = transactions.ToList();
+        if (all.Count == 0) return all;
+
+        // An unlabelled charge is its own unit, not a wildcard matching every other one. The
+        // count, the ordering and the filter below must all agree on that or they disagree
+        // about what a currency is: one null-currency row beside one empty-string row would
+        // clear the quorum on a shared count of two and then filter down to one of them.
+        static string Unit(TxRow t) => t.Currency ?? string.Empty;
+
+        var chargesPerCurrency = all
+            .GroupBy(Unit, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        // Migration day is exactly when both currencies carry a charge on the same date, and
+        // a tie holds no signal about which one the merchant kept — but the source is an
+        // unordered query result, so picking whichever arrives first would make the row differ
+        // between runs over identical data. Break the tie on the currency name: arbitrary, and
+        // stable until the next charge settles the question for real.
+        var byRecency = all
+            .OrderByDescending(t => t.TransactionDate)
+            .ThenBy(Unit, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // The newest currency that is a billing arrangement rather than a one-off. If none has
+        // that much evidence yet the merchant has no established price in any unit, so the
+        // newest charge decides and MinOccurrences drops the row anyway. The fallback is not
+        // decoration: without it a merchant holding one charge in each of two currencies
+        // returns null here, and the throw would abandon detection for the user's whole
+        // portfolio, since the job catches per user rather than per merchant.
+        var current = byRecency.FirstOrDefault(t => chargesPerCurrency[Unit(t)] >= MinBaselineCharges)
+            ?? byRecency[0];
+
+        return all
+            .Where(t => string.Equals(Unit(t), Unit(current), StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Splits a merchant's charges into amount clusters (adjacent sorted amounts within
+    /// <see cref="AmountClusterTolerance"/> chain together), takes the cluster holding the
+    /// most recent charge — the current price of whatever is still being billed — and, while
+    /// that price is still new, hands back the price it replaced alongside it.
+    ///
+    /// Without the second half, a real single-step hike is invisible: it exceeds the cluster
+    /// tolerance, so the new price starts its own cluster of one, falls under
+    /// <see cref="MinOccurrences"/>, and the subscription drops off the list the very month
+    /// it goes up. The displaced cluster restores both the occurrence evidence and the
+    /// pre-hike baseline the price-hike sentinel compares against.
+    ///
+    /// It is only a repricing when the merchant billed exactly two prices — a third cluster
+    /// means an outlier or a third plan, and picking the nearest of several would let one
+    /// stray charge shadow the price actually being replaced — and when those two form a
+    /// clean chronological step (concurrent plans interleave in time), the step is within
+    /// <see cref="MaxPriceStepRatio"/>, and the old price was billed at least
+    /// <see cref="MinBaselineCharges"/> times and was itself stable. Once the new price has
+    /// <see cref="MinOccurrences"/> charges of its own it stands alone and the old price
+    /// stops being news.
+    /// </summary>
+    public static PriceSeries SplitAtPriceStep(IEnumerable<TxRow> transactions)
+    {
+        var byAmount = transactions.OrderBy(t => t.Amount).ToList();
+        if (byAmount.Count == 0) return new PriceSeries(byAmount, []);
+
+        var clusters = new List<List<TxRow>> { new() { byAmount[0] } };
+        for (var i = 1; i < byAmount.Count; i++)
+        {
+            var previous = (double)byAmount[i - 1].Amount;
+            var current = (double)byAmount[i].Amount;
+            if (previous > 0 && (current - previous) / previous <= AmountClusterTolerance)
+                clusters[^1].Add(byAmount[i]);
+            else
+                clusters.Add([byAmount[i]]);
+        }
+
+        var currentCluster = clusters.MaxBy(c => c.Max(t => t.TransactionDate))!;
+        var noStep = new PriceSeries(currentCluster, []);
+        if (currentCluster.Count >= MinOccurrences || clusters.Count != 2) return noStep;
+
+        var displaced = clusters.Single(c => c != currentCluster);
+        return IsRepricing(currentCluster, displaced) ? new PriceSeries(currentCluster, displaced) : noStep;
+    }
+
+    // Installment detection: one plan per (merchant, rounded monthly amount) — the same
+    // shop can carry several concurrent розстрочки (e.g. two Алло plans at ₴2,339.95 and
+    // ₴2,999.95) and merchant-only grouping merges them into one row with polluted stats.
+    // No cadence/CV/min-count gates — a single "- monomarket" repayment is a real
+    // installment. A full payoff ("Повне погашення") carries its own amount, so it's
+    // matched by merchant: it completes every plan with no payments after it, while a
+    // plan that keeps charging past the payoff date is a separate, still-active plan.
+    public static IEnumerable<DetectedSubscriptionData> DetectInstallments(IReadOnlyList<TxRow> transactions)
+    {
+        var results = new List<DetectedSubscriptionData>();
+
+        var payoffDatesByMerchant = transactions
+            .Where(t => InstallmentPlanRecognizer.IsInstallmentPayoff(t.Description))
+            .GroupBy(t => InstallmentPlanRecognizer.ExtractMerchant(t.Description ?? string.Empty))
+            .ToDictionary(g => g.Key, g => g.Max(t => t.TransactionDate));
+
+        var byPlan = transactions
+            .Where(t => !InstallmentPlanRecognizer.IsInstallmentPayoff(t.Description))
+            .GroupBy(t => (
+                Merchant: InstallmentPlanRecognizer.ExtractMerchant(t.Description ?? string.Empty),
+                Amount: InstallmentPlanRecognizer.RoundPlanAmount(t.Amount)));
+
+        foreach (var group in byPlan)
+        {
+            var (merchant, roundedAmount) = group.Key;
+            if (string.IsNullOrWhiteSpace(merchant)) continue;
+
+            var payments = group.OrderBy(t => t.TransactionDate).ToList();
+            var lastPayment = payments[^1];
+            var lastPaymentDate = lastPayment.TransactionDate;
+
+            var completed = payoffDatesByMerchant.TryGetValue(merchant, out var payoff)
+                && payoff >= lastPaymentDate;
+
+            var lastChargeDate = DateOnly.FromDateTime(lastPaymentDate);
+
+            results.Add(new DetectedSubscriptionData(
+                MerchantNameNormalized: InstallmentPlanRecognizer.PlanKey(merchant, roundedAmount),
+                MerchantNameDisplay: merchant,
+                Cadence: "monthly",
+                AverageAmount: Math.Round(payments.Average(t => t.Amount), 2),
+                LastKnownAmount: lastPayment.Amount,
+                Currency: lastPayment.Currency ?? "USD",
+                LastChargeDate: lastChargeDate,
+                NextExpectedDate: lastChargeDate.AddMonths(1),
+                OccurrenceCount: payments.Count,
+                ConfidenceScore: 100,
+                Category: null,
+                Kind: SubscriptionKinds.Installment,
+                IsCompleted: completed));
+        }
+
+        return results;
+    }
+
+    public static bool IsUnidentifiableMerchant(string normalized)
+    {
+        if (string.IsNullOrWhiteSpace(normalized)) return true;
+
+        // Keys produced by NormalizeForDetection's mobile top-up special case are
+        // deliberately identifiable despite containing "top-up".
+        if (normalized.StartsWith("mobile top-up ", StringComparison.Ordinal)) return false;
+
+        foreach (var marker in UnidentifiableNormalizedNames)
+        {
+            if (normalized.Contains(marker, StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    private static bool IsRepricing(IReadOnlyList<TxRow> current, IReadOnlyList<TxRow> displaced)
+    {
+        if (displaced.Count < MinBaselineCharges) return false;
+        if (displaced.Max(t => t.TransactionDate) >= current.Min(t => t.TransactionDate)) return false;
+
+        var before = displaced.Average(t => (double)t.Amount);
+        var after = current.Average(t => (double)t.Amount);
+        if (before <= 0 || after <= 0) return false;
+
+        var ratio = after / before;
+        if (ratio > MaxPriceStepRatio || ratio < 1 / MaxPriceStepRatio) return false;
+
+        return CoefficientOfVariation(displaced, before) <= MaxAmountCv;
+    }
+
+    /// <summary>Spread of a cluster's amounts around a mean its caller has already proven positive.</summary>
+    private static double CoefficientOfVariation(IReadOnlyList<TxRow> transactions, double mean)
+    {
+        var variance = transactions.Sum(t => Math.Pow((double)t.Amount - mean, 2)) / transactions.Count;
+        return Math.Sqrt(variance) / mean;
+    }
+
+    private static double Median(List<int> values)
+    {
+        var sorted = values.OrderBy(v => v).ToList();
+        var mid = sorted.Count / 2;
+        return sorted.Count % 2 == 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2.0
+            : sorted[mid];
+    }
+}

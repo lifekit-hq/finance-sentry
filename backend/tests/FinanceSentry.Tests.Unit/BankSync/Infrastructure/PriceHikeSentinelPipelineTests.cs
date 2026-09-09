@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
@@ -31,7 +32,7 @@ public class PriceHikeSentinelPipelineTests
 
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
-    private static SubscriptionDetectionJob.TxRow Charge(
+    private static SubscriptionDetectionAlgorithm.TxRow Charge(
         decimal amount, int year, int month, int day, string currency = "EUR") =>
         new(UserId, "Netflix", "Netflix.com", amount, new DateTime(year, month, day), null, null, currency);
 
@@ -40,13 +41,13 @@ public class PriceHikeSentinelPipelineTests
     /// sentinel saw so a test can assert on the baseline as well as on the alert.
     /// </summary>
     private async Task<IReadOnlyList<SubscriptionHygieneSummary>> RunPipelineAsync(
-        params SubscriptionDetectionJob.TxRow[] charges)
+        params SubscriptionDetectionAlgorithm.TxRow[] charges)
     {
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
 
-        var detected = SubscriptionDetectionJob.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -201,22 +202,22 @@ public class PriceHikeSentinelPipelineTests
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
 
-        SubscriptionDetectionJob.TxRow[] beforeMove =
+        SubscriptionDetectionAlgorithm.TxRow[] beforeMove =
         [
             Charge(10.99m, 2026, 3, 15, "GBP"),
             Charge(10.99m, 2026, 4, 15, "GBP"),
             Charge(10.99m, 2026, 5, 15, "GBP"),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(beforeMove).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(beforeMove).ToList());
 
-        SubscriptionDetectionJob.TxRow[] afterMove =
+        SubscriptionDetectionAlgorithm.TxRow[] afterMove =
         [
             .. beforeMove,
             Charge(13.49m, 2026, 6, 15), Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(afterMove).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(afterMove).ToList());
 
         var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
             .Should().ContainSingle().Subject;
@@ -257,7 +258,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
-        var detected = SubscriptionDetectionJob.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -281,20 +282,20 @@ public class PriceHikeSentinelPipelineTests
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
 
-        SubscriptionDetectionJob.TxRow[] midHike =
+        SubscriptionDetectionAlgorithm.TxRow[] midHike =
         [
             Charge(10.99m, 2026, 3, 15), Charge(10.99m, 2026, 4, 15),
             Charge(10.99m, 2026, 5, 15), Charge(13.49m, 2026, 6, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(midHike).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(midHike).ToList());
 
-        SubscriptionDetectionJob.TxRow[] settled =
+        SubscriptionDetectionAlgorithm.TxRow[] settled =
         [
             .. midHike, Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(settled).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(settled).ToList());
 
         var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
             .Should().ContainSingle().Subject;

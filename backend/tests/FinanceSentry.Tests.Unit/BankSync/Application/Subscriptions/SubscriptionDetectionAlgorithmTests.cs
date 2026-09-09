@@ -3,7 +3,6 @@ namespace FinanceSentry.Tests.Unit.BankSync.Application.Subscriptions;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
-using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FluentAssertions;
 using Xunit;
 
@@ -19,7 +18,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("cash advance")]
     public void UnidentifiableMerchant_IsFiltered(string normalized)
     {
-        SubscriptionDetectionJob.IsUnidentifiableMerchant(normalized).Should().BeTrue();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(normalized).Should().BeTrue();
     }
 
     [Theory]
@@ -28,7 +27,7 @@ public class SubscriptionDetectionAlgorithmTests
     [InlineData("adobe creative cloud")]
     public void IdentifiableMerchant_IsNotFiltered(string normalized)
     {
-        SubscriptionDetectionJob.IsUnidentifiableMerchant(normalized).Should().BeFalse();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant(normalized).Should().BeFalse();
     }
 
     [Theory]
@@ -191,7 +190,7 @@ public class SubscriptionDetectionAlgorithmTests
 
     // ── Amount clustering / plan identity (issue #482, live-data scenarios) ─
 
-    private static SubscriptionDetectionJob.TxRow Tx(
+    private static SubscriptionDetectionAlgorithm.TxRow Tx(
         string description, decimal amount, int year, int month, int day,
         string currency = "EUR", int? mcc = null) =>
         new(Guid.Empty, null, description, amount, new DateTime(year, month, day), null, mcc, currency);
@@ -211,7 +210,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Anthropic* Claude Sub", 110.70m, 2026, 8, 24),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("claude");
         result.Kind.Should().Be(SubscriptionKinds.Subscription);
@@ -234,7 +233,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 8, 15),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.Cadence.Should().Be("monthly");
         result.OccurrenceCount.Should().Be(5);
@@ -257,7 +256,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 8, 15),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.OccurrenceCount.Should().Be(3);
         result.PreviousAmount.Should().BeNull();
@@ -279,7 +278,7 @@ public class SubscriptionDetectionAlgorithmTests
         };
 
         // Two EUR charges are all the evidence left, which is under the occurrence gate.
-        SubscriptionDetectionJob.DetectSubscriptions(txs).Should().BeEmpty();
+        SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().BeEmpty();
     }
 
     [Fact]
@@ -298,7 +297,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Spotify", 13.49m, 2026, 7, 5),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(3);
@@ -313,7 +312,7 @@ public class SubscriptionDetectionAlgorithmTests
         // Both currencies are established and both carry a charge on the latest date, so the
         // tie holds no signal — but the source is an unordered query result, and the answer
         // must not depend on which row it happens to yield first.
-        SubscriptionDetectionJob.TxRow[] txs =
+        SubscriptionDetectionAlgorithm.TxRow[] txs =
         [
             Tx("Spotify", 9.29m, 2026, 6, 5, currency: "GBP"),
             Tx("Spotify", 10.99m, 2026, 6, 5),
@@ -321,8 +320,8 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Spotify", 9.29m, 2026, 7, 5, currency: "GBP"),
         ];
 
-        var forwards = SubscriptionDetectionJob.InCurrentBillingCurrency(txs);
-        var backwards = SubscriptionDetectionJob.InCurrentBillingCurrency(txs.Reverse());
+        var forwards = SubscriptionDetectionAlgorithm.InCurrentBillingCurrency(txs);
+        var backwards = SubscriptionDetectionAlgorithm.InCurrentBillingCurrency(txs.Reverse());
 
         forwards.Select(t => t.Currency).Should().AllBe("EUR");
         backwards.Should().BeEquivalentTo(forwards);
@@ -335,13 +334,13 @@ public class SubscriptionDetectionAlgorithmTests
         // arrangement, so the quorum matches nothing at all. The fallback has to hold —
         // selecting nothing would throw, and ProcessAccountsAsync catches per user rather than
         // per merchant, so one such merchant would abandon detection for the whole portfolio.
-        SubscriptionDetectionJob.TxRow[] txs =
+        SubscriptionDetectionAlgorithm.TxRow[] txs =
         [
             Tx("Ryanair", 40.00m, 2026, 5, 2, currency: "GBP"),
             Tx("Ryanair", 55.00m, 2026, 6, 9),
         ];
 
-        var kept = SubscriptionDetectionJob.InCurrentBillingCurrency(txs);
+        var kept = SubscriptionDetectionAlgorithm.InCurrentBillingCurrency(txs);
 
         kept.Should().ContainSingle().Which.Currency.Should().Be("EUR");
     }
@@ -361,7 +360,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 12.99m, 2026, 7, 20, currency: "USD"),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(4);
@@ -382,7 +381,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Netflix.com", 13.49m, 2026, 7, 15),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.Currency.Should().Be("EUR");
         result.OccurrenceCount.Should().Be(4);
@@ -405,7 +404,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Anthropic* Claude Sub", 110.70m, 2026, 8, 24),
         };
 
-        SubscriptionDetectionJob.DetectSubscriptions(txs).Should().BeEmpty();
+        SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().BeEmpty();
     }
 
     [Fact]
@@ -414,7 +413,7 @@ public class SubscriptionDetectionAlgorithmTests
         // Two plans billed side by side interleave in time; a price step never does — the
         // old price stops the month the new one starts. The still-running €5 plan is
         // therefore not a baseline for the €8.50 one.
-        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        var series = SubscriptionDetectionAlgorithm.SplitAtPriceStep(
         [
             Tx("Fastmail", 5.00m, 2026, 4, 3),
             Tx("Fastmail", 5.00m, 2026, 5, 3),
@@ -435,7 +434,7 @@ public class SubscriptionDetectionAlgorithmTests
         // A one-off €20 charge forms a third cluster. Taking the nearest prior cluster would
         // make that stray charge the baseline and bury the €10.99 the merchant really
         // replaced, so a third price means the series is not a clean two-price step at all.
-        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        var series = SubscriptionDetectionAlgorithm.SplitAtPriceStep(
         [
             Tx("Netflix.com", 10.99m, 2026, 4, 15),
             Tx("Netflix.com", 10.99m, 2026, 5, 15),
@@ -454,7 +453,7 @@ public class SubscriptionDetectionAlgorithmTests
         // A discounted or prorated first month is one charge, not a price. It sits inside the
         // step ratio and has zero variance by construction, so accepting it would turn every
         // promotional onboarding into a price-hike alert.
-        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        var series = SubscriptionDetectionAlgorithm.SplitAtPriceStep(
         [
             Tx("Setapp", 9.99m, 2026, 6, 12),
             Tx("Setapp", 12.99m, 2026, 7, 12),
@@ -470,7 +469,7 @@ public class SubscriptionDetectionAlgorithmTests
     {
         // The displaced charges must themselves look like one price. A chain that drifts
         // 9.00 → 12.30 has no single "price before" to measure a hike against.
-        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        var series = SubscriptionDetectionAlgorithm.SplitAtPriceStep(
         [
             Tx("Drifty", 9.00m, 2026, 4, 15),
             Tx("Drifty", 10.30m, 2026, 5, 15),
@@ -494,7 +493,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("*MOBI TOP-UP 0857860057", 20.00m, 2026, 7, 22),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("mobile top-up 0057");
         result.MerchantNameDisplay.Should().Be("Mobile top-up 0057");
@@ -511,7 +510,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("516936******4992", 14060.96m, 2026, 8, 11, "UAH"),
         };
 
-        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectSubscriptions(txs).Should().ContainSingle().Subject;
 
         result.Kind.Should().Be(SubscriptionKinds.Installment);
         result.MerchantNameNormalized.Should().Be("516936");
@@ -530,7 +529,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Платіж ТОВ Алло - monomarket", 2999.95m, 2026, 8, 22, "UAH"),
         };
 
-        var results = SubscriptionDetectionJob.DetectInstallments(txs).ToList();
+        var results = SubscriptionDetectionAlgorithm.DetectInstallments(txs).ToList();
 
         results.Should().HaveCount(2);
         var oldPlan = results.Single(r => r.MerchantNameNormalized == "installment:тов алло:2340");
@@ -549,7 +548,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Щомісячний платіж telemart - monomarket", 6499.85m, 2026, 7, 1, "UAH"),
         };
 
-        var result = SubscriptionDetectionJob.DetectInstallments(txs).Should().ContainSingle().Subject;
+        var result = SubscriptionDetectionAlgorithm.DetectInstallments(txs).Should().ContainSingle().Subject;
 
         result.MerchantNameNormalized.Should().Be("installment:telemart:6500");
         result.OccurrenceCount.Should().Be(2);
@@ -569,7 +568,7 @@ public class SubscriptionDetectionAlgorithmTests
             Tx("Погашення наступного платежу RozetkaPay", 1371.89m, 2026, 6, 1, "UAH"),
         };
 
-        var results = SubscriptionDetectionJob.DetectInstallments(txs).ToList();
+        var results = SubscriptionDetectionAlgorithm.DetectInstallments(txs).ToList();
 
         results.Should().HaveCount(2);
         results.Single(r => r.MerchantNameNormalized == "installment:rozetkapay:800")
@@ -581,7 +580,7 @@ public class SubscriptionDetectionAlgorithmTests
     [Fact]
     public void MobileTopUpKey_IsIdentifiable_DespiteTopUpBlocklist()
     {
-        SubscriptionDetectionJob.IsUnidentifiableMerchant("mobile top-up 0057").Should().BeFalse();
+        SubscriptionDetectionAlgorithm.IsUnidentifiableMerchant("mobile top-up 0057").Should().BeFalse();
     }
 
     [Theory]

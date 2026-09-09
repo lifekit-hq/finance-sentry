@@ -241,9 +241,33 @@ the backstop that guards a dismissed alert. Charges whose merchant
 the normalizer cannot name all collapse to `MerchantNameNormalizer.UnknownKey`, so two unrelated
 unnamed charges sharing an amount looked like a duplicate: that group is now skipped.
 
-Not in this slice: `SubscriptionDetectionJob` still carries ~130 lines of recurrence/clustering
-algorithm inside a Hangfire job, which forces pipeline tests to reach through infrastructure to
-construct `TxRow`. Extracting it into an Application service is its own change.
+### Sentinel hardening II — the detector's algorithm leaves the job
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Application/Services/SubscriptionDetectionAlgorithm.cs`
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/SubscriptionDetectionJob.cs` — read, hand over, persist
+- EDIT the four test files that constructed `TxRow` through the job
+
+`SubscriptionDetectionJob` had grown into a Hangfire job carrying the whole recurrence/clustering
+algorithm as public statics — `DetectSubscriptions`, `DetectInstallments`, `SplitAtPriceStep`,
+`InCurrentBillingCurrency`, plus two DTO records and eleven tuning constants. The price-hike work
+above added ~85 lines to it, all of them decisions about what a subscription *is*, none of them
+about scheduling or persistence. Four test suites — including
+`SubscriptionDetectionAlgorithmTests`, already named and filed under
+`tests/…/BankSync/Application/Subscriptions/` — had to reach into `Infrastructure.Jobs` to build a
+`TxRow`, which is the structural smell stated out loud: the tests knew where the algorithm belonged
+before the code did.
+
+The split is by dependency, not by line count. `SubscriptionDetectionAlgorithm` is a static class
+in `Application/Services/` alongside `MerchantNameNormalizer` and `InstallmentPlanRecognizer` (the
+collaborators it already called): pure, synchronous, no `DbContext`, no clock, no logger. The job
+keeps exactly what needs infrastructure — the transaction query, `LookbackMonths` that bounds it,
+the per-user loop with its per-user `catch`, and the two `resultService` calls.
+
+`LookbackMonths` stays on the job deliberately: it selects which rows are fed in, so it belongs to
+the read, not to the judgment. The algorithm's documented limit (an annual subscription cannot
+produce a hike baseline) is a consequence of that window, which is why the constant now says so.
+
+Behaviour is unchanged — no test was added, weakened, or retuned; the 914 unit tests pass as
+written apart from the type name they call through.
 
 ## Constraints
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`

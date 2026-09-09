@@ -3,7 +3,6 @@ namespace FinanceSentry.Tests.Unit.BankSync.Application.Subscriptions;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
-using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FluentAssertions;
 using Xunit;
 
@@ -97,7 +96,7 @@ public class LoanRepaymentClassifierTests
     [Fact]
     public void RowWithNoTransactionType_IsTreatedAsAnOutflow()
     {
-        // Legacy rows carry a null type; SubscriptionDetectionJob reads them as debits too.
+        // Legacy rows carry a null type; SubscriptionDetectionJob's query reads them as debits too.
         Classify("Платіж ТОВ Алло - monomarket", 2999.95m, transactionType: null)
             .Should().Be(CategoryKeys.LoanPayments);
     }
@@ -108,16 +107,16 @@ public class LoanRepaymentClassifierTests
     public void MatchesTheKeyTheDetectorActuallyStoresForAMaskedCardPlan()
     {
         // Drift guard: the classifier's masked-PAN branch is only correct relative to
-        // SubscriptionDetectionJob. Run the real detector over a year of mortgage payments and
+        // SubscriptionDetectionAlgorithm. Run the real detector over a year of mortgage payments and
         // feed its stored key back in — asserting a literal key would let both sides drift.
         var rows = Enumerable.Range(0, 12)
-            .Select(i => new SubscriptionDetectionJob.TxRow(
+            .Select(i => new SubscriptionDetectionAlgorithm.TxRow(
                 Guid.NewGuid(), null, MortgageDescription, MortgageAmount,
                 new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc).AddMonths(i),
                 CategoryKeys.TransferOut, WireTransferMcc, "UAH"))
             .ToList();
 
-        var detected = SubscriptionDetectionJob.DetectSubscriptions(rows).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(rows).ToList();
 
         detected.Should().ContainSingle()
             .Which.Kind.Should().Be(SubscriptionKinds.Installment);
