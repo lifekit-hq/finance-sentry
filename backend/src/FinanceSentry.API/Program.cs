@@ -192,7 +192,8 @@ recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
     "exchange-rate-refresh",
     job => job.RunAsync(CancellationToken.None),
     Cron.Daily());
-BackgroundJob.Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
+app.Services.GetRequiredService<IBackgroundJobClient>()
+    .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
 
 app.Run();
 

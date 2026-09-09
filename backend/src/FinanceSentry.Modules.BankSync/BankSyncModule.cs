@@ -36,6 +36,7 @@ public static class BankSyncModule
         public void RegisterJobs(IServiceProvider sp)
         {
             var mgr = sp.GetRequiredService<IRecurringJobManager>();
+            var jobs = sp.GetRequiredService<IBackgroundJobClient>();
 
             mgr.AddOrUpdate<SyncScheduler>(
                 "bank-account-sync-scheduler",
@@ -91,10 +92,10 @@ public static class BankSyncModule
             // Startup sweep: any job still "running"/account still "syncing" after a restart was
             // orphaned mid-sync and would otherwise deadlock the scheduler — reap them all first,
             // then (re)schedule the active accounts.
-            BackgroundJob.Enqueue<StaleSyncReaperJob>(
+            jobs.Enqueue<StaleSyncReaperJob>(
                 job => job.ExecuteAsync(true, CancellationToken.None));
 
-            BackgroundJob.Enqueue<SyncScheduler>(
+            jobs.Enqueue<SyncScheduler>(
                 s => s.ScheduleAllActiveAccounts(CancellationToken.None));
         }
     }
