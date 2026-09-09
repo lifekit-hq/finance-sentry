@@ -30,7 +30,7 @@ Same merchant charges same amount twice within N days on one account.
 Month-to-date spend in a category meaningfully exceeds 6-month baseline.
 
 **Acceptance**:
-- Baseline: average monthly spend over past 6 complete months — total spend divided by the 6-month window, not by the months that happen to hold rows, so a month with no spend in the category counts as the zero it is (all amounts in USD via `CurrencyConverter.ToUsd`)
+- Baseline: average monthly spend over the past 6 complete months — total category spend divided by the months the user was *observed* for (first transaction onward, capped at 6), not by the months that happen to hold rows for the category. A month inside the observed span with no spend in the category is the zero it is; a month before the user's first transaction is no data and is not averaged in. All amounts in USD via `CurrencyConverter.ToUsd`
 - Requires ≥ 4 months of history; fires when current-month > baseline × `HygieneSentinels:CategorySpikeMultiplier` (default 2.0)
 - Alert type: `CategorySpike`; 7-day silence per `(UserId, category)`
 - Companion delivery via `CompanionEventKind.CategorySpike`

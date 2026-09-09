@@ -7,7 +7,7 @@ Each detector is a Hangfire job in `FinanceSentry.Modules.BankSync/Infrastructur
 - BankSync's own `BankSyncDbContext` (transactions / accounts) for US2, US3, US4
 - A new Core port `ISubscriptionHygieneSummaryReader` (US1) — bridging to Subscriptions module
 
-Thresholds are read from `IConfiguration` under the `HygieneSentinels:*` keys. Each job is registered in `BankSyncModule.JobRegistrar` as a daily recurring job.
+Thresholds are bound from the `HygieneSentinels` config section into `HygieneSentinelsOptions` and injected as `IOptions<>`. Each job is registered in `BankSyncModule.JobRegistrar` as a daily recurring job.
 
 New alert types (`PriceHike`, `DuplicateCharge`, `CategorySpike`, `FxSpread`) are added to `AlertType`, `IAlertGeneratorService`, `AlertGeneratorService`, `CompanionEventKind`, and `MaterialityPolicy` in one PR each.
 
@@ -286,7 +286,10 @@ that sentinel silently runs on a setting nobody chose. `HygieneSentinelsOptions`
 threshold one name the compiler checks; `HygieneSentinelsOptionsTests` holds the deployed appsettings
 key spellings and the documented defaults, so renaming a property fails a test instead of orphaning a
 deployed key. The shape follows `AnalyticsOptions`/`RadarOptions` — `SectionName` const, settable
-properties carrying the defaults, `services.Configure<>` in the module.
+properties carrying the defaults, `services.Configure<>` in the module. The binding test reads the
+shipped `appsettings.json` and layers overrides on top of it, so it is not the circular
+bind-your-own-literals check it would otherwise be: a renamed property leaves its deployed key
+unbound and the assertion sees the shipped value instead.
 
 **The liveness policy was copy-pasted three times.** "Only transactions on active accounts
 participate" is one decision, and it was restated (comment included) in each of the duplicate-charge,
@@ -296,16 +299,27 @@ rather than falling back to `"USD"`: callers only ask about accounts whose rows 
 `AccountIds`, so a miss is a broken caller, not a data case — the old fallback was unreachable
 defensiveness that would have converted hryvnia as dollars if it ever *had* been reachable.
 
-**The category-spike baseline divided by the months that held rows,** not by the 6-month window the
-spec names. That made the sentinel weakest exactly where a spike is most visible: a category billed
-in 3 of 6 months carried a baseline twice its true monthly average, so the multiplier had to be
-cleared against a number no month ever spent. It now divides by `BaselineMonths` — a month with no
-spend in the category is a real zero. `MinHistoryMonths` (4) is what still keeps a merely *new*
-category from firing off one month of history; the two gates were conflated because one variable
-served both. `ExecuteAsync_DividesBaselineByWindow_NotByMonthsHoldingSpend` pins it on a USD account
-(so `ToUsd` is the identity) with spend in 4 of 6 months, chosen so the two candidate denominators
-disagree on the alert as well as on the number — nine of the eleven existing tests asserted the
-emitted baseline with `It.IsAny<decimal>()` and would have passed either way.
+**The category-spike baseline divided by the months that held rows for the category,** which made the
+sentinel weakest exactly where a spike is most visible: a category billed in 3 of 6 months carried a
+baseline twice its true monthly average, so the multiplier had to be cleared against a number no
+month ever spent.
+
+The denominator is now the months the *user* was observed for, capped at `BaselineMonths`. Both
+extremes are wrong and for different reasons. Dividing by the months holding rows for the category
+treats a month the user simply did not shop that category as if it never happened — but it is a real
+zero and belongs in the average. Dividing unconditionally by 6 makes the opposite mistake at the
+other boundary: months before the user's first transaction are *no data*, not zeros, so a freshly
+connected account would have every category deflated to two-thirds at once and be greeted with an
+alert burst. Taking the first observed month as the window's start separates the two: a gap inside
+the observed span is a zero, a gap before it is nothing.
+
+`MinHistoryMonths` (4) keeps a merely *new* category from firing off one month of history, which is a
+separate gate from the denominator — one variable had been serving both.
+`ExecuteAsync_DividesBaselineByWindow_NotByMonthsHoldingSpend` and
+`ExecuteAsync_DividesByMonthsObserved_WhenUserIsNewerThanTheWindow` pin the two sides on USD accounts
+(so `ToUsd` is the identity), each with a fixture where the candidate denominators disagree on the
+alert as well as on the number — nine of the eleven existing tests asserted the emitted baseline with
+`It.IsAny<decimal>()` and would have passed either way.
 
 `SubscriptionHygieneSummary.Kind` was projected, persisted and built in every fixture, and read by
 nobody — the price-hike sentinel treats a rising recurring charge the same whether it is a

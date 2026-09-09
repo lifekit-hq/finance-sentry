@@ -189,7 +189,8 @@ public class CategorySpikeDetectionJobTests
             db.Transactions.Add(MakeTx(account, 100m, "SHOPPING",
                 currentMonthStart.AddMonths(-i).AddDays(5)));
         }
-        // 400 EUR — 4× the 100 EUR baseline, comfortably above the 2.0× threshold
+        // 400 EUR — 4× the 100 EUR baseline (the user was only visible for these 4 months, so that
+        // is the denominator), comfortably above the 2.0× threshold
         db.Transactions.Add(MakeTx(account, 400m, "SHOPPING", currentMonthStart.AddDays(5)));
 
         await db.SaveChangesAsync();
@@ -234,6 +235,41 @@ public class CategorySpikeDetectionJobTests
 
         _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
             userId, "TRAVEL", 500m, 200m, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// The other side of the denominator: months before the user's first transaction are no data, not
+    /// zeros. A freshly connected account seeing 4 steady months must not have every category deflated
+    /// to two-thirds of its true average — that would greet the connection with an alert burst.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_DividesByMonthsObserved_WhenUserIsNewerThanTheWindow()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var account = MakeAccount(userId, "USD");
+        db.BankAccounts.Add(account);
+
+        var now = DateTime.UtcNow;
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // The user's history starts 4 months ago — steady 300 USD a month, so the true average is 300.
+        foreach (var monthsBack in new[] { 1, 2, 3, 4 })
+        {
+            db.Transactions.Add(MakeTx(account, 300m, "TRAVEL",
+                currentMonthStart.AddMonths(-monthsBack).AddDays(5)));
+        }
+        // 700 USD clears 2× against the 300 the user actually averaged, but not against the 200 that
+        // dividing by the full 6-month window would have invented.
+        db.Transactions.Add(MakeTx(account, 700m, "TRAVEL", currentMonthStart.AddDays(5)));
+
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
+            userId, "TRAVEL", 700m, 300m, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

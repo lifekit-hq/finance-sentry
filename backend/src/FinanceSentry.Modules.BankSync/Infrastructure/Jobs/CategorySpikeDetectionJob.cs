@@ -22,8 +22,7 @@ public sealed class CategorySpikeDetectionJob(
 {
     private const int BaselineMonths = 6;
 
-    // A category has to be established before a spike means anything, but the baseline is still
-    // divided by BaselineMonths (below) — see the comment there.
+    // A category has to be established before a spike over its norm means anything.
     private const int MinHistoryMonths = 4;
 
     public async Task ExecuteAsync(CancellationToken ct = default)
@@ -66,6 +65,14 @@ public sealed class CategorySpikeDetectionJob(
         decimal ToUsd(Guid accountId, decimal amount) =>
             CurrencyConverter.ToUsd(Math.Abs(amount), accounts.CurrencyOf(accountId));
 
+        // How many of the BaselineMonths this user was actually visible for. A month holding no
+        // charge in one category is a real zero and belongs in that category's denominator, but a
+        // month before the user's first transaction is *no data* — counting it as a zero would
+        // deflate every category at once and greet a newly connected account with an alert burst.
+        var observedMonthsByUser = rows
+            .GroupBy(r => r.UserId)
+            .ToDictionary(g => g.Key, g => MonthsBetween(FirstOfMonth(g.Min(r => r.Date)), currentMonthStart));
+
         var grouped = rows.GroupBy(r => new { r.UserId, r.Category });
 
         foreach (var group in grouped)
@@ -83,14 +90,12 @@ public sealed class CategorySpikeDetectionJob(
             var currentKey = new { currentMonthStart.Year, currentMonthStart.Month };
             if (!byMonth.TryGetValue(currentKey, out var currentMonth) || currentMonth <= 0) continue;
 
-            // Average monthly spend over the past BaselineMonths complete months — divided by the
-            // window, not by the months that happen to hold rows. A month with no spend in this
-            // category is a real zero, and averaging it away made the sentinel quietly weakest
+            // Average monthly spend over the months observed, not over the months that happen to
+            // hold rows for this category. Dividing by the latter made the sentinel quietly weakest
             // exactly where a spike is most visible: a category billed in 3 of 6 months carried a
             // baseline twice its true monthly average, so the multiplier had to be cleared against
-            // a number no month ever spent. MinHistoryMonths above is what keeps a category that is
-            // merely *new* from firing off one month of history.
-            var baseline = historicMonths.Sum(kv => kv.Value) / BaselineMonths;
+            // a number no month ever spent.
+            var baseline = historicMonths.Sum(kv => kv.Value) / observedMonthsByUser[group.Key.UserId];
             if (baseline <= 0) continue;
 
             if (currentMonth <= baseline * multiplier) continue;
@@ -108,6 +113,17 @@ public sealed class CategorySpikeDetectionJob(
             }
         }
     }
+
+    private static DateTime FirstOfMonth(DateTime date) =>
+        new(date.Year, date.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>
+    /// Complete months from <paramref name="from"/> up to (not including) <paramref name="to"/>,
+    /// clamped into 1..BaselineMonths. The query window already bounds this to BaselineMonths; the
+    /// floor of 1 keeps a first-month user from dividing by zero.
+    /// </summary>
+    private static int MonthsBetween(DateTime from, DateTime to) =>
+        Math.Clamp(((to.Year - from.Year) * 12) + to.Month - from.Month, 1, BaselineMonths);
 
     private sealed record SpendRow(Guid UserId, Guid AccountId, string Category, DateTime Date, decimal Amount);
 }
