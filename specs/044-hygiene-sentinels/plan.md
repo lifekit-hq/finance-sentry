@@ -248,7 +248,7 @@ unnamed charges sharing an amount looked like a duplicate: that group is now ski
 
 `SubscriptionDetectionJob` had grown into a Hangfire job carrying the whole recurrence/clustering
 algorithm as public statics — `DetectSubscriptions`, `DetectInstallments`, `SplitAtPriceStep`,
-`InCurrentBillingCurrency`, plus two DTO records and eleven tuning constants. The price-hike work
+`InCurrentBillingCurrency`, plus two DTO records and every tuning constant but one. The price-hike work
 above added ~85 lines to it, all of them decisions about what a subscription *is*, none of them
 about scheduling or persistence. Four test suites — including
 `SubscriptionDetectionAlgorithmTests`, already named and filed under

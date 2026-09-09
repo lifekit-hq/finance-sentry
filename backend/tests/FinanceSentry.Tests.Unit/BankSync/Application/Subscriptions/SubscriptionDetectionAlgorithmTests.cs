@@ -332,8 +332,8 @@ public class SubscriptionDetectionAlgorithmTests
     {
         // Two one-off charges at one merchant in different units: neither is a billing
         // arrangement, so the quorum matches nothing at all. The fallback has to hold —
-        // selecting nothing would throw, and ProcessAccountsAsync catches per user rather than
-        // per merchant, so one such merchant would abandon detection for the whole portfolio.
+        // selecting nothing would throw, and the job catches per user rather than per merchant,
+        // so one such merchant would abandon detection for the whole portfolio.
         SubscriptionDetectionAlgorithm.TxRow[] txs =
         [
             Tx("Ryanair", 40.00m, 2026, 5, 2, currency: "GBP"),
