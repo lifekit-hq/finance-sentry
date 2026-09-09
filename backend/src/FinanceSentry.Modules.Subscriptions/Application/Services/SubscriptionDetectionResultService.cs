@@ -35,7 +35,8 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
                     result.ConfidenceScore,
                     result.Category,
                     result.Kind,
-                    result.IsCompleted);
+                    result.IsCompleted,
+                    result.PreviousAmount);
 
                 await _repository.UpsertAsync(subscription, ct);
             }
@@ -51,7 +52,8 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
                     result.ConfidenceScore,
                     result.Category,
                     result.Kind,
-                    result.IsCompleted);
+                    result.IsCompleted,
+                    result.PreviousAmount);
 
                 await _repository.UpsertAsync(existing, ct);
             }

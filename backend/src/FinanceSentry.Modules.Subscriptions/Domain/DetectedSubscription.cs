@@ -12,6 +12,12 @@ public class DetectedSubscription
     public string Cadence { get; private set; } = string.Empty;
     public decimal AverageAmount { get; private set; }
     public decimal LastKnownAmount { get; private set; }
+    /// <summary>
+    /// The price billed before the most recent price step, while that step is still recent;
+    /// null when only one price was ever billed. <see cref="AverageAmount"/> averages the
+    /// current price alone, so it is this — not the average — that a hike is measured against.
+    /// </summary>
+    public decimal? PreviousAmount { get; private set; }
     public string Currency { get; private set; } = string.Empty;
     /// <summary>"subscription" (open-ended service) or "installment" (fixed-term розстрочка).</summary>
     public string Kind { get; private set; } = SubscriptionKinds.Subscription;
@@ -63,7 +69,8 @@ public class DetectedSubscription
         int confidenceScore,
         string? category,
         string kind = SubscriptionKinds.Subscription,
-        bool isCompleted = false)
+        bool isCompleted = false,
+        decimal? previousAmount = null)
     {
         var entity = new DetectedSubscription
         {
@@ -73,6 +80,7 @@ public class DetectedSubscription
             Cadence = cadence,
             AverageAmount = averageAmount,
             LastKnownAmount = lastKnownAmount,
+            PreviousAmount = previousAmount,
             Currency = currency,
             LastChargeDate = lastChargeDate,
             NextExpectedDate = nextExpectedDate,
@@ -134,7 +142,8 @@ public class DetectedSubscription
         int confidenceScore,
         string? category,
         string kind = SubscriptionKinds.Subscription,
-        bool isCompleted = false)
+        bool isCompleted = false,
+        decimal? previousAmount = null)
     {
         // A masked card number must never clobber a human-readable name the row already
         // has (e.g. a mortgage renamed by the user whose charges show only the PAN).
@@ -142,6 +151,9 @@ public class DetectedSubscription
             MerchantNameDisplay = merchantNameDisplay;
         AverageAmount = averageAmount;
         LastKnownAmount = lastKnownAmount;
+        // Always assigned, never merged: once the new price has settled, detection stops
+        // reporting a step and the stale baseline must clear or the sentinel re-fires forever.
+        PreviousAmount = previousAmount;
         LastChargeDate = lastChargeDate;
         NextExpectedDate = nextExpectedDate;
         OccurrenceCount = occurrenceCount;

@@ -45,12 +45,19 @@ public sealed class CategorySpikeDetectionJob(
 
             var activeAccountIds = currencyByAccount.Keys.ToList();
 
+            // Debit-only and posted-only — the same predicate DuplicateChargeDetectionJob uses.
+            // Direction lives in TransactionType, not the sign: every persist path runs
+            // `Transaction.ValidateInvariants`, which rejects a negative Amount, so the sign test is
+            // a defensive arm only. A refund (credit) must never inflate a category's spend, and a
+            // pending charge coexists with its posted twin (they hash differently) — counting both
+            // would double the month's spend.
             rows = await db.Transactions
                 .AsNoTracking()
                 .Where(t => t.MerchantCategory != null
-                         && t.Amount < 0
+                         && (t.Amount < 0 || t.TransactionType == "debit")
                          && t.TransactionDate >= historyStart
                          && t.IsActive
+                         && !t.IsPending
                          && activeAccountIds.Contains(t.AccountId))
                 .Select(t => new SpendRow(t.UserId, t.AccountId, t.MerchantCategory!, t.TransactionDate, t.Amount))
                 .ToListAsync(ct);

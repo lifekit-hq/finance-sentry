@@ -22,6 +22,7 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
         sb.Property(s => s.Cadence).IsRequired().HasMaxLength(10);
         sb.Property(s => s.AverageAmount).HasColumnType("numeric(15,2)").IsRequired();
         sb.Property(s => s.LastKnownAmount).HasColumnType("numeric(15,2)").IsRequired();
+        sb.Property(s => s.PreviousAmount).HasColumnType("numeric(15,2)");
         sb.Property(s => s.Currency).IsRequired().HasMaxLength(3);
         sb.Property(s => s.Kind).IsRequired().HasMaxLength(20).HasDefaultValue(SubscriptionKinds.Subscription);
         sb.Property(s => s.Status).IsRequired().HasMaxLength(25).HasDefaultValue(SubscriptionStatus.Active);

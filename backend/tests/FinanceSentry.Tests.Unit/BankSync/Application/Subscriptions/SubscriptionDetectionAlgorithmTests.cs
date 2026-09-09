@@ -220,6 +220,143 @@ public class SubscriptionDetectionAlgorithmTests
     }
 
     [Fact]
+    public void DetectSubscriptions_SingleStepPriceHike_KeepsThePreHikeClusterAsBaseline()
+    {
+        // The month a merchant raises its price, the new price is a cluster of one — below
+        // the occurrence gate. Without the displaced cluster the whole subscription drops
+        // off the list exactly when the user most needs to see it.
+        var txs = new[]
+        {
+            Tx("Netflix.com", 10.99m, 2026, 4, 15),
+            Tx("Netflix.com", 10.99m, 2026, 5, 15),
+            Tx("Netflix.com", 10.99m, 2026, 6, 15),
+            Tx("Netflix.com", 10.99m, 2026, 7, 15),
+            Tx("Netflix.com", 13.49m, 2026, 8, 15),
+        };
+
+        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.Cadence.Should().Be("monthly");
+        result.OccurrenceCount.Should().Be(5);
+        result.AverageAmount.Should().Be(13.49m);
+        result.LastKnownAmount.Should().Be(13.49m);
+        result.PreviousAmount.Should().Be(10.99m);
+    }
+
+    [Fact]
+    public void DetectSubscriptions_SettledNewPrice_ReportsNoBaseline()
+    {
+        // Once the new price has three charges of its own it stands alone, and the old one
+        // stops being news — otherwise the sentinel re-raises the same hike all year.
+        var txs = new[]
+        {
+            Tx("Netflix.com", 10.99m, 2026, 4, 15),
+            Tx("Netflix.com", 10.99m, 2026, 5, 15),
+            Tx("Netflix.com", 13.49m, 2026, 6, 15),
+            Tx("Netflix.com", 13.49m, 2026, 7, 15),
+            Tx("Netflix.com", 13.49m, 2026, 8, 15),
+        };
+
+        var result = SubscriptionDetectionJob.DetectSubscriptions(txs).Should().ContainSingle().Subject;
+
+        result.OccurrenceCount.Should().Be(3);
+        result.PreviousAmount.Should().BeNull();
+    }
+
+    [Fact]
+    public void DetectSubscriptions_PlanSwitch_IsNotAdoptedAsABaseline()
+    {
+        // Claude Pro €22 → Max €98/€110 is a different plan, not a repricing. Adopting the
+        // Pro charges as a baseline would rescue the two Max charges past the occurrence
+        // gate and report a 372% "hike" the user chose to pay.
+        var txs = new[]
+        {
+            Tx("Claude.ai Subscription", 22.14m, 2026, 4, 11),
+            Tx("Anthropic* Claude Sub", 22.14m, 2026, 5, 11),
+            Tx("Anthropic* Claude Sub", 22.14m, 2026, 6, 11),
+            Tx("Anthropic* Claude Sub", 98.38m, 2026, 7, 24),
+            Tx("Anthropic* Claude Sub", 110.70m, 2026, 8, 24),
+        };
+
+        SubscriptionDetectionJob.DetectSubscriptions(txs).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SplitAtPriceStep_ConcurrentPlansAtOneMerchant_AreNotAPriceStep()
+    {
+        // Two plans billed side by side interleave in time; a price step never does — the
+        // old price stops the month the new one starts. The still-running €5 plan is
+        // therefore not a baseline for the €8.50 one.
+        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        [
+            Tx("Fastmail", 5.00m, 2026, 4, 3),
+            Tx("Fastmail", 5.00m, 2026, 5, 3),
+            Tx("Fastmail", 5.00m, 2026, 6, 3),
+            Tx("Fastmail", 5.00m, 2026, 7, 3),
+            Tx("Fastmail", 8.50m, 2026, 7, 20),
+            Tx("Fastmail", 5.00m, 2026, 8, 3),
+            Tx("Fastmail", 8.50m, 2026, 8, 20),
+        ]);
+
+        series.Current.Should().HaveCount(2).And.OnlyContain(t => t.Amount == 8.50m);
+        series.Displaced.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SplitAtPriceStep_OutlierChargeBesideAPriceStep_YieldsNoBaseline()
+    {
+        // A one-off €20 charge forms a third cluster. Taking the nearest prior cluster would
+        // make that stray charge the baseline and bury the €10.99 the merchant really
+        // replaced, so a third price means the series is not a clean two-price step at all.
+        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        [
+            Tx("Netflix.com", 10.99m, 2026, 4, 15),
+            Tx("Netflix.com", 10.99m, 2026, 5, 15),
+            Tx("Netflix.com", 10.99m, 2026, 6, 15),
+            Tx("Netflix.com", 20.00m, 2026, 7, 2),
+            Tx("Netflix.com", 13.49m, 2026, 8, 15),
+        ]);
+
+        series.Current.Should().ContainSingle().Which.Amount.Should().Be(13.49m);
+        series.Displaced.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SplitAtPriceStep_SingleEarlierCharge_IsNotABaseline()
+    {
+        // A discounted or prorated first month is one charge, not a price. It sits inside the
+        // step ratio and has zero variance by construction, so accepting it would turn every
+        // promotional onboarding into a price-hike alert.
+        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        [
+            Tx("Setapp", 9.99m, 2026, 6, 12),
+            Tx("Setapp", 12.99m, 2026, 7, 12),
+            Tx("Setapp", 12.99m, 2026, 8, 12),
+        ]);
+
+        series.Current.Should().HaveCount(2);
+        series.Displaced.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SplitAtPriceStep_UnstableOldPrice_IsNotABaseline()
+    {
+        // The displaced charges must themselves look like one price. A chain that drifts
+        // 9.00 → 12.30 has no single "price before" to measure a hike against.
+        var series = SubscriptionDetectionJob.SplitAtPriceStep(
+        [
+            Tx("Drifty", 9.00m, 2026, 4, 15),
+            Tx("Drifty", 10.30m, 2026, 5, 15),
+            Tx("Drifty", 11.20m, 2026, 6, 15),
+            Tx("Drifty", 12.30m, 2026, 7, 15),
+            Tx("Drifty", 16.00m, 2026, 8, 15),
+        ]);
+
+        series.Current.Should().ContainSingle().Which.Amount.Should().Be(16.00m);
+        series.Displaced.Should().BeEmpty();
+    }
+
+    [Fact]
     public void DetectSubscriptions_MobileTopUp_TrackedPerNumber()
     {
         var txs = new[]

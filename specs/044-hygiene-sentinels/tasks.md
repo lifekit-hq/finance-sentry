@@ -8,6 +8,10 @@
 - [x] Add `PriceHike` to `CompanionEventKind` + `MaterialityPolicy`
 - [x] Implement `PriceHikeDetectionJob` + register + schedule in BankSyncModule
 - [x] Write unit tests for `PriceHikeDetectionJob`
+- [x] Carry the pre-step price through detection so a real hike can reach the sentinel — the 15% cluster tolerance and the 15% threshold had made every firing series undetectable
+- [x] Persist `PreviousAmount` on `detected_subscriptions` (M006) and surface it on `SubscriptionHygieneSummary`
+- [x] Measure the hike against `HikeBaseline`, not the average that already contains the raised charge
+- [x] Write an end-to-end test running a charge series through the real detect → persist → read → alert chain
 
 ## [US2] Duplicate charge detection
 
@@ -22,6 +26,8 @@
 - [x] Add `CategorySpike` to `CompanionEventKind` + `MaterialityPolicy`
 - [x] Implement `CategorySpikeDetectionJob` + register + schedule in BankSyncModule
 - [x] Write unit tests for `CategorySpikeDetectionJob`
+- [x] Select debits by direction, not sign — `t.Amount < 0` matched nothing in production
+- [x] Exclude pending rows so a charge is not counted twice alongside its posted twin
 
 ## [US4] FX spread detection
 
@@ -29,3 +35,7 @@
 - [x] Add `FxSpread` to `CompanionEventKind` + `MaterialityPolicy`
 - [x] Implement `FxSpreadDetectionJob` + register + schedule in BankSyncModule
 - [x] Write unit tests for `FxSpreadDetectionJob`
+- [x] Give `CurrencyConverter` a freshness stamp an outage cannot forge (`RatesUpdatedAtUtc` / `AreRatesFresh`)
+- [x] Stand the sentinel down on stale rates — a spread measured against the offline seed accuses honest conversions
+- [x] Pin the sentinel's tests to a refreshed table, not the seed, so reading the seed fails them
+- [x] Declare the `HygieneSentinels` block in appsettings so every threshold is discoverable

@@ -6,8 +6,9 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Daily sentinel (044/US1): fires a PriceHike alert when a recurring subscription or installment's
-/// most recent charge is significantly above its historical average. Reads detected_subscriptions
-/// (014) via ISubscriptionHygieneSummaryReader so recurrence is never re-derived.
+/// most recent charge is significantly above the price it used to be billed at. Reads
+/// detected_subscriptions (014) via ISubscriptionHygieneSummaryReader so recurrence is never
+/// re-derived — including the pre-step baseline detection records when a merchant reprices.
 /// </summary>
 public sealed class PriceHikeDetectionJob(
     ISubscriptionHygieneSummaryReader subscriptions,
@@ -36,16 +37,18 @@ public sealed class PriceHikeDetectionJob(
         foreach (var sub in all)
         {
             if (sub.OccurrenceCount < MinOccurrences) continue;
-            if (sub.AverageAmount <= 0) continue;
 
-            var hikeFraction = (sub.LastKnownAmount - sub.AverageAmount) / sub.AverageAmount;
+            var baseline = sub.HikeBaseline;
+            if (baseline <= 0) continue;
+
+            var hikeFraction = (sub.LastKnownAmount - baseline) / baseline;
             if (hikeFraction <= threshold) continue;
 
             try
             {
                 await alerts.GeneratePriceHikeAlertAsync(
                     sub.UserId, sub.Id, sub.MerchantNameDisplay,
-                    sub.AverageAmount, sub.LastKnownAmount, sub.Currency, ct);
+                    baseline, sub.LastKnownAmount, sub.Currency, ct);
             }
             catch (Exception ex)
             {

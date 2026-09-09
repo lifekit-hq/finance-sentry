@@ -26,6 +26,14 @@ public sealed class SubscriptionDetectionJob(
     // adjacent amounts within this relative distance chain into the same cluster,
     // while a different plan (e.g. Claude Pro €22 vs Max €110) breaks the chain.
     private const double AmountClusterTolerance = 0.15;
+    // Repricing at most doubles (or halves) a charge — a promotional year ending, a VAT
+    // shift, an inflation pass-through. A larger jump is a different plan (Claude Pro €22
+    // → Max €110), not one service at a new price, so it must not become a hike baseline.
+    private const double MaxPriceStepRatio = 2.0;
+    // One charge is not a price. A prorated or promotional first month sits within the step
+    // ratio and has a coefficient of variation of zero by construction, so accepting a
+    // single displaced charge as the baseline would alert on the merchant's own onboarding.
+    private const int MinBaselineCharges = 2;
 
     private static readonly string[] UnidentifiableNormalizedNames =
     [
@@ -89,12 +97,14 @@ public sealed class SubscriptionDetectionJob(
         }
     }
 
-    // Recurring-service detection: group by merchant, keep only the amount cluster that
-    // contains the most recent charge (so a discontinued plan's old price — e.g. Claude
-    // Pro €22 next to Max €110 — can't poison the stability gates), then require a
-    // consistent monthly/annual cadence, a stable amount, and at least MinOccurrences
-    // charges. A recurring transfer to a masked card number is a loan/mortgage repayment,
-    // not a service — it's emitted as an installment so it stays out of the spend summary.
+    // Recurring-service detection: group by merchant, price the merchant off the amount
+    // cluster holding its most recent charge (so a discontinued plan's old price — e.g.
+    // Claude Pro €22 next to Max €110 — can't poison the stability gates) plus, if that
+    // price has just replaced another, the one it displaced. Then require a consistent
+    // monthly/annual cadence over the charges, a stable current amount, and at least
+    // MinOccurrences charges. A recurring transfer to a masked card number is a
+    // loan/mortgage repayment, not a service — it's emitted as an installment so it stays
+    // out of the spend summary.
     public static IEnumerable<DetectedSubscriptionData> DetectSubscriptions(IReadOnlyList<TxRow> transactions)
     {
         var results = new List<DetectedSubscriptionData>();
@@ -103,7 +113,8 @@ public sealed class SubscriptionDetectionJob(
         foreach (var merchantGroup in byMerchant)
         {
             var normalized = merchantGroup.Key;
-            var sorted = LatestAmountCluster(merchantGroup).OrderBy(t => t.TransactionDate).ToList();
+            var series = SplitAtPriceStep(merchantGroup);
+            var sorted = series.Current.Concat(series.Displaced).OrderBy(t => t.TransactionDate).ToList();
 
             if (sorted.Count < MinOccurrences) continue;
             if (IsUnidentifiableMerchant(normalized)) continue;
@@ -125,13 +136,11 @@ public sealed class SubscriptionDetectionJob(
             else
                 continue;
 
-            var amounts = sorted.Select(t => (double)t.Amount).ToList();
-            var mean = amounts.Average();
+            // Stability is judged on the current price alone — a displaced pre-hike cluster
+            // is a different price by construction and would always fail the CV gate.
+            var mean = series.Current.Average(t => (double)t.Amount);
             if (mean <= 0) continue;
-
-            var stddev = Math.Sqrt(amounts.Sum(a => Math.Pow(a - mean, 2)) / amounts.Count);
-            var cv = stddev / mean;
-            if (cv > MaxAmountCv) continue;
+            if (CoefficientOfVariation(series.Current, mean) > MaxAmountCv) continue;
 
             var lastTransaction = sorted.Last();
             var lastChargeDate = DateOnly.FromDateTime(lastTransaction.TransactionDate);
@@ -153,6 +162,9 @@ public sealed class SubscriptionDetectionJob(
                 Cadence: cadence,
                 AverageAmount: (decimal)mean,
                 LastKnownAmount: lastTransaction.Amount,
+                PreviousAmount: series.Displaced.Count == 0
+                    ? null
+                    : Math.Round(series.Displaced.Average(t => t.Amount), 2),
                 Currency: lastTransaction.Currency ?? "USD",
                 LastChargeDate: lastChargeDate,
                 NextExpectedDate: nextExpectedDate,
@@ -172,14 +184,37 @@ public sealed class SubscriptionDetectionJob(
         MerchantNameNormalizer.NormalizeDetectionKey(transaction.MerchantName, transaction.Description);
 
     /// <summary>
-    /// Splits a merchant's charges into amount clusters (adjacent sorted amounts within
-    /// <see cref="AmountClusterTolerance"/> chain together) and returns the cluster holding
-    /// the most recent charge — the current price of whatever is still being billed.
+    /// A merchant's charges at its current price, plus the charges at the price that one
+    /// displaced — empty when the merchant has only ever billed one price, or when the
+    /// other amounts belong to a different plan rather than an earlier price of this one.
     /// </summary>
-    public static IReadOnlyList<TxRow> LatestAmountCluster(IEnumerable<TxRow> transactions)
+    public sealed record PriceSeries(IReadOnlyList<TxRow> Current, IReadOnlyList<TxRow> Displaced);
+
+    /// <summary>
+    /// Splits a merchant's charges into amount clusters (adjacent sorted amounts within
+    /// <see cref="AmountClusterTolerance"/> chain together), takes the cluster holding the
+    /// most recent charge — the current price of whatever is still being billed — and, while
+    /// that price is still new, hands back the price it replaced alongside it.
+    ///
+    /// Without the second half, a real single-step hike is invisible: it exceeds the cluster
+    /// tolerance, so the new price starts its own cluster of one, falls under
+    /// <see cref="MinOccurrences"/>, and the subscription drops off the list the very month
+    /// it goes up. The displaced cluster restores both the occurrence evidence and the
+    /// pre-hike baseline the price-hike sentinel compares against.
+    ///
+    /// It is only a repricing when the merchant billed exactly two prices — a third cluster
+    /// means an outlier or a third plan, and picking the nearest of several would let one
+    /// stray charge shadow the price actually being replaced — and when those two form a
+    /// clean chronological step (concurrent plans interleave in time), the step is within
+    /// <see cref="MaxPriceStepRatio"/>, and the old price was billed at least
+    /// <see cref="MinBaselineCharges"/> times and was itself stable. Once the new price has
+    /// <see cref="MinOccurrences"/> charges of its own it stands alone and the old price
+    /// stops being news.
+    /// </summary>
+    public static PriceSeries SplitAtPriceStep(IEnumerable<TxRow> transactions)
     {
         var byAmount = transactions.OrderBy(t => t.Amount).ToList();
-        if (byAmount.Count == 0) return byAmount;
+        if (byAmount.Count == 0) return new PriceSeries(byAmount, []);
 
         var clusters = new List<List<TxRow>> { new() { byAmount[0] } };
         for (var i = 1; i < byAmount.Count; i++)
@@ -189,10 +224,37 @@ public sealed class SubscriptionDetectionJob(
             if (previous > 0 && (current - previous) / previous <= AmountClusterTolerance)
                 clusters[^1].Add(byAmount[i]);
             else
-                clusters.Add(new List<TxRow> { byAmount[i] });
+                clusters.Add([byAmount[i]]);
         }
 
-        return clusters.MaxBy(c => c.Max(t => t.TransactionDate))!;
+        var currentCluster = clusters.MaxBy(c => c.Max(t => t.TransactionDate))!;
+        var noStep = new PriceSeries(currentCluster, []);
+        if (currentCluster.Count >= MinOccurrences || clusters.Count != 2) return noStep;
+
+        var displaced = clusters.Single(c => c != currentCluster);
+        return IsRepricing(currentCluster, displaced) ? new PriceSeries(currentCluster, displaced) : noStep;
+    }
+
+    private static bool IsRepricing(IReadOnlyList<TxRow> current, IReadOnlyList<TxRow> displaced)
+    {
+        if (displaced.Count < MinBaselineCharges) return false;
+        if (displaced.Max(t => t.TransactionDate) >= current.Min(t => t.TransactionDate)) return false;
+
+        var before = displaced.Average(t => (double)t.Amount);
+        var after = current.Average(t => (double)t.Amount);
+        if (before <= 0 || after <= 0) return false;
+
+        var ratio = after / before;
+        if (ratio > MaxPriceStepRatio || ratio < 1 / MaxPriceStepRatio) return false;
+
+        return CoefficientOfVariation(displaced, before) <= MaxAmountCv;
+    }
+
+    /// <summary>Spread of a cluster's amounts around a mean its caller has already proven positive.</summary>
+    private static double CoefficientOfVariation(IReadOnlyList<TxRow> transactions, double mean)
+    {
+        var variance = transactions.Sum(t => Math.Pow((double)t.Amount - mean, 2)) / transactions.Count;
+        return Math.Sqrt(variance) / mean;
     }
 
     // Installment detection: one plan per (merchant, rounded monthly amount) — the same

@@ -12,6 +12,9 @@ public interface ISubscriptionDetectionResultService
         CancellationToken ct = default);
 }
 
+// PreviousAmount is the price the merchant billed before its most recent price step, while
+// that step is still recent; null when only one price was ever billed. A hike is measured
+// against it — AverageAmount averages the current price alone and so can never show a step.
 public record DetectedSubscriptionData(
     string MerchantNameNormalized,
     string MerchantNameDisplay,
@@ -25,7 +28,8 @@ public record DetectedSubscriptionData(
     int ConfidenceScore,
     string? Category,
     string Kind = SubscriptionKinds.Subscription,
-    bool IsCompleted = false);
+    bool IsCompleted = false,
+    decimal? PreviousAmount = null);
 
 /// <summary>
 /// Distinguishes an open-ended recurring service from a fixed-term installment

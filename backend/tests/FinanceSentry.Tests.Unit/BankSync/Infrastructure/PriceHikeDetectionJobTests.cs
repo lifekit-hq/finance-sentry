@@ -93,7 +93,28 @@ public class PriceHikeDetectionJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NoAlert_WhenAverageAmountIsZero()
+    public async Task ExecuteAsync_MeasuresAgainstPreviousAmount_WhenDetectionSawAPriceStep()
+    {
+        // The average covers the current price only, so a settled hike shows no rise in it;
+        // the pre-step price is what the raise is actually against.
+        var userId = Guid.NewGuid();
+        var subId = Guid.NewGuid();
+        var sub = new SubscriptionHygieneSummary(
+            subId, userId, "Netflix", AverageAmount: 13.49m, LastKnownAmount: 13.49m,
+            Currency: "EUR", OccurrenceCount: 6, Kind: "subscription", PreviousAmount: 10.99m);
+
+        _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([sub]);
+
+        await MakeJob().ExecuteAsync();
+
+        _alerts.Verify(a => a.GeneratePriceHikeAlertAsync(
+            userId, subId, "Netflix", 10.99m, 13.49m, "EUR", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoAlert_WhenBaselineIsZero()
     {
         var sub = new SubscriptionHygieneSummary(
             Guid.NewGuid(), Guid.NewGuid(), "Free",

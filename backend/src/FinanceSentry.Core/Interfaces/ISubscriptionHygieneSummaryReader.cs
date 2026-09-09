@@ -19,4 +19,13 @@ public record SubscriptionHygieneSummary(
     decimal LastKnownAmount,
     string Currency,
     int OccurrenceCount,
-    string Kind);
+    string Kind,
+    decimal? PreviousAmount = null)
+{
+    /// <summary>
+    /// What a price hike is measured against: the price billed before the most recent step
+    /// when detection saw one, otherwise the running average. Averaging alone cannot expose a
+    /// hike — the charge that raised the price is itself in the average that dilutes it.
+    /// </summary>
+    public decimal HikeBaseline => PreviousAmount ?? AverageAmount;
+}
