@@ -13,6 +13,7 @@
 - [x] Measure the hike against `HikeBaseline`, not the average that already contains the raised charge
 - [x] Write an end-to-end test running a charge series through the real detect → persist → read → alert chain
 - [x] Price the merchant in one currency — a card moved between accounts restated the same charge as a 20% hike
+- [x] Cover the restatement's money consequence — the stored `Currency` is the unit the spend summary runs `ToUsd` over, so a restated row has to convert at the new rate
 
 ## [US2] Duplicate charge detection
 

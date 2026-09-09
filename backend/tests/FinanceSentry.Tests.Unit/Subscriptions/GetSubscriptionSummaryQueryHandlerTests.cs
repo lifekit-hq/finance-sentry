@@ -183,6 +183,25 @@ public class GetSubscriptionSummaryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_RestatedCurrency_ConvertsAtTheNewRateNotTheOldOne()
+    {
+        // The merchant's billing moved from a UAH account to a EUR one, so detection restated
+        // ₴500/mo as €10/mo on the row it already had. Both halves of that restatement have to
+        // land: a row holding the new amount under the old unit is converted at 0.024 instead
+        // of 1.08, reporting $0.24/mo for a subscription that costs $10.80.
+        var moved = ActiveSub(500m, "UAH");
+        moved.UpdateFromDetection(
+            "Svc", 10m, 10m, "EUR",
+            new DateOnly(2026, 8, 1), new DateOnly(2026, 9, 1),
+            4, 90, null);
+
+        var result = await Run(moved);
+
+        result.Subscriptions.Monthly.Should().Be(10.80m);
+        result.Subscriptions.Next12Months.Should().Be(129.60m);
+    }
+
+    [Fact]
     public async Task Handle_NoActiveItems_ReturnsZeroesInUsd()
     {
         var result = await Run();

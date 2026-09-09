@@ -149,6 +149,8 @@ Known limits, both consequences of reading detection's output rather than the ra
 - EDIT `backend/src/FinanceSentry.Modules.Subscriptions/Application/Services/SubscriptionDetectionResultService.cs`
 - EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Application/Subscriptions/SubscriptionDetectionAlgorithmTests.cs`
 - EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/PriceHikeSentinelPipelineTests.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Subscriptions/DetectedSubscriptionTests.cs` — the restatement itself
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Subscriptions/GetSubscriptionSummaryQueryHandlerTests.cs` — why the restatement matters beyond the sentinel: `GetSubscriptionSummaryQuery.MonthlyInBaseCurrency` runs `ToUsd` over the stored `Currency`, so a row holding new amounts under the old unit misstates the monthly total by the whole ratio between the two rates (₴→$ 0.024 against €→$ 1.08 is 45×)
 
 ## [US2] Duplicate charge — files touched
 - EDIT `backend/src/FinanceSentry.Modules.Alerts/Domain/AlertType.cs` — add `DuplicateCharge`
