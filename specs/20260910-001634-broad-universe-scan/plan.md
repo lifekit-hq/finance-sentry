@@ -69,9 +69,13 @@ Decisions:
 - **Combined score = `grade × w + rsPercentile × (1 − w)`**, `w = ScanQualityWeight` (0.5), both
   inputs already on a 0-100 scale. Weight is clamped, so a misconfigured value degrades to
   pure-quality/pure-momentum rather than producing nonsense.
-- **A ticker EDGAR cannot grade is never given a faked score** (house rule: sub-scores are null, not
-  defaulted). Ungraded names — crypto, ETFs, non-filers — keep their momentum-only standing and sort
-  after every graded name, so they stay nominatable without diluting the quality-first intent.
+- **A missing half is never given a faked score** (house rule: sub-scores are null, not defaulted).
+  Ungraded names — crypto, ETFs, non-filers — and the breakout nominee whose RS window never resolved
+  score no combined value; they keep their momentum-only standing and sort after every fully-scored
+  name, so they stay nominatable without diluting the quality-first intent.
+- **The shortlist bounds the EDGAR fan-out, never the nomination count**: it is taken as
+  `max(ScanQualityShortlistSize, ScanMaxNominationsPerRun)`, so a shortlist misconfigured below the
+  cap cannot silently starve a run of nominations.
 - **Nomination reasons stay stable strings.** `QualityMomentumReason` is a constant tagged on names
   at/above `ScanQualityLeaderScore`; a score-bearing reason string would defeat the candidate's
   reason dedup and accumulate a near-duplicate every run.

@@ -221,6 +221,21 @@ public sealed class ScanNominationRulesTests
     }
 
     [Fact]
+    public void RankByQualityMomentum_GradedButRsLessName_ScoresNoCombined_AndKeepsItsGrade()
+    {
+        // A breakout nominates a ticker whose RS window never resolved: half the score is missing, so
+        // it ranks with the ungraded tail instead of being blended against a faked zero percentile.
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("NORS", null), Nomination("WEAK", 5m)],
+            new Dictionary<string, int?> { ["NORS"] = 95, ["WEAK"] = 10 },
+            Options);
+
+        ranked.Select(r => r.Ticker).Should().Equal("WEAK", "NORS");
+        ranked.Single(r => r.Ticker == "NORS").CombinedScore.Should().BeNull();
+        ranked.Single(r => r.Ticker == "NORS").QualityScore.Should().Be(95);
+    }
+
+    [Fact]
     public void RankByQualityMomentum_TiesBreakOnTickerSoRunsAreReproducible()
     {
         var ranked = ScanNominationRules.RankByQualityMomentum(

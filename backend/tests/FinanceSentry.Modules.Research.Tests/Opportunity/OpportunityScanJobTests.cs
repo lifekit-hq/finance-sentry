@@ -112,6 +112,21 @@ public sealed class OpportunityScanJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShortlistBelowTheCap_StillFillsTheCap()
+    {
+        var universe = Enumerable.Range(1, 10).Select(i => Entry($"T{i:00}", 0.01m * i)).ToList();
+        var options = new OpportunityOptions { ScanQualityShortlistSize = 1, ScanMaxNominationsPerRun = 4 };
+
+        var (job, scorer, edgar) = BuildJob(
+            universe, new Dictionary<string, IReadOnlyList<FundamentalFact>>(), options);
+        await job.ExecuteAsync();
+
+        // A shortlist smaller than the cap bounds the EDGAR fan-out, never the nomination count.
+        scorer.Commands.Should().HaveCount(4);
+        edgar.FundamentalsRequests.Should().HaveCount(4);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_UngradableTicker_KeepsMomentumStandingBelowGradedNames()
     {
         // XRP-USD has no EDGAR filer and BROKE fails upstream: both stay nominatable on momentum

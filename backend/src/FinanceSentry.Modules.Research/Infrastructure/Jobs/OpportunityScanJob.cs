@@ -40,16 +40,21 @@ public sealed class OpportunityScanJob(
         }
 
         var nominations = ScanNominationRules.Evaluate(universe, _options);
-        var shortlist = nominations.Take(_options.ScanQualityShortlistSize).ToList();
+        // The shortlist bounds the EDGAR fan-out, never the nomination count: a shortlist configured
+        // below the cap would silently score fewer candidates than the cap allows.
+        var shortlistSize = Math.Max(_options.ScanQualityShortlistSize, _options.ScanMaxNominationsPerRun);
+        var shortlist = nominations.Take(shortlistSize).ToList();
         var ranked = ScanNominationRules.RankByQualityMomentum(
             shortlist, await GradeFundamentalsAsync(shortlist, ct), _options);
         var capped = ranked.Take(_options.ScanMaxNominationsPerRun).ToList();
         if (capped.Count < nominations.Count)
         {
             logger.LogWarning(
-                "Opportunity scan capped nominations at {Cap}; dropped {Dropped}: {DroppedTickers}",
-                _options.ScanMaxNominationsPerRun,
+                "Opportunity scan dropped {Dropped} nomination(s) — cap {Cap}, graded shortlist {Shortlist}: " +
+                "{DroppedTickers}",
                 nominations.Count - capped.Count,
+                _options.ScanMaxNominationsPerRun,
+                shortlistSize,
                 string.Join(", ", ranked.Skip(capped.Count).Select(n => n.Ticker)
                     .Concat(nominations.Skip(shortlist.Count).Select(n => n.Ticker))));
         }
@@ -90,9 +95,16 @@ public sealed class OpportunityScanJob(
 
         logger.LogInformation(
             "Opportunity scan run: universe {Universe}, nominated {Nominated} (graded {Graded}, capped {Capped}), " +
-            "users {Users}, scored {Scored}, new candidates {New}, errors {Errors}",
-            universe.Count, nominations.Count, shortlist.Count, capped.Count, userIds.Count, scored, newCandidates, errors);
+            "users {Users}, scored {Scored}, new candidates {New}, errors {Errors}; nominees {Nominees}",
+            universe.Count, nominations.Count, shortlist.Count, capped.Count, userIds.Count, scored, newCandidates,
+            errors,
+            string.Join(", ", capped.Select(Describe)));
     }
+
+    /// <summary>Nominee line for the run summary — which half of the score each survivor won on.</summary>
+    private static string Describe(ScanCandidateRank rank)
+        => FormattableString.Invariant(
+            $"{rank.Ticker}(quality {rank.QualityScore}, rs {rank.RsPercentile}, combined {rank.CombinedScore})");
 
     /// <summary>
     /// EDGAR fundamentals grade per shortlisted ticker. A ticker EDGAR cannot answer for — crypto,

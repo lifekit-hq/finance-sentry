@@ -75,9 +75,10 @@ public static class ScanNominationRules
 
     /// <summary>
     /// Re-ranks momentum nominations by a combined quality x momentum score (019 FR-006): the EDGAR
-    /// fundamentals grade weighted against the universe RS percentile. A ticker EDGAR cannot grade
-    /// (crypto, ETFs, non-filers) keeps its momentum-only standing and ranks below every graded name
-    /// rather than being dropped or given a faked grade.
+    /// fundamentals grade weighted against the universe RS percentile. A nomination missing either
+    /// half — EDGAR cannot grade crypto/ETFs/non-filers, and a breakout can nominate a ticker with no
+    /// RS at all — scores no combined value and ranks below every fully-scored name on its RS alone,
+    /// rather than being dropped or having the missing half defaulted to a faked number.
     /// </summary>
     public static IReadOnlyList<ScanCandidateRank> RankByQualityMomentum(
         IReadOnlyList<ScanNomination> momentumRanked,
@@ -87,22 +88,21 @@ public static class ScanNominationRules
         var qualityWeight = Math.Clamp(options.ScanQualityWeight, 0m, 1m);
 
         return momentumRanked
-            .Select(nomination => Rank(nomination, qualityWeight, options))
+            .Select(Rank)
             .OrderByDescending(r => r.CombinedScore is not null)
             .ThenByDescending(r => r.CombinedScore ?? r.RsPercentile ?? -1m)
             .ThenBy(r => r.Ticker, StringComparer.Ordinal)
             .ToList();
 
-        ScanCandidateRank Rank(ScanNomination nomination, decimal weight, OpportunityOptions opts)
+        ScanCandidateRank Rank(ScanNomination nomination)
         {
             var quality = qualityByTicker.TryGetValue(nomination.Ticker, out var grade) ? grade : null;
-            var momentum = nomination.RsPercentile ?? 0m;
-            decimal? combined = quality is { } graded
-                ? Math.Round((graded * weight) + (momentum * (1m - weight)), 2)
+            decimal? combined = (quality, nomination.RsPercentile) is ({ } graded, { } momentum)
+                ? Math.Round((graded * qualityWeight) + (momentum * (1m - qualityWeight)), 2)
                 : null;
 
             var reasons = nomination.Reasons;
-            if (quality >= opts.ScanQualityLeaderScore)
+            if (quality >= options.ScanQualityLeaderScore)
             {
                 reasons = [.. nomination.Reasons, QualityMomentumReason];
             }
