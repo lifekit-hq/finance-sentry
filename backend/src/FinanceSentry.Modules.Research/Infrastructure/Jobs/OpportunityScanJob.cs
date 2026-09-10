@@ -98,11 +98,11 @@ public sealed class OpportunityScanJob(
             "users {Users}, scored {Scored}, new candidates {New}, errors {Errors}; nominees {Nominees}",
             universe.Count, nominations.Count, shortlist.Count, capped.Count, userIds.Count, scored, newCandidates,
             errors,
-            string.Join(", ", capped.Select(Describe)));
+            string.Join(", ", capped.Select(FormatNominee)));
     }
 
     /// <summary>Nominee line for the run summary — which half of the score each survivor won on.</summary>
-    private static string Describe(ScanCandidateRank rank)
+    private static string FormatNominee(ScanCandidateRank rank)
         => FormattableString.Invariant(
             $"{rank.Ticker}(quality {rank.QualityScore}, rs {rank.RsPercentile}, combined {rank.CombinedScore})");
 
