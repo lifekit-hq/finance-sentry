@@ -196,6 +196,18 @@ internal sealed class FakeBrokerageHoldingsReader(IReadOnlyList<BrokerageHolding
         => Task.FromResult(holdings ?? []);
 }
 
+/// <summary>039: the single-position cap is read from its single home (the Risk rule set) via this port.</summary>
+internal sealed class FakePositionCapSource(decimal? cap = null) : Domain.Ports.IPositionCapSource
+{
+    public Task<decimal?> GetMaxPositionWeightAsync(Guid userId, CancellationToken ct) => Task.FromResult(cap);
+}
+
+/// <summary>021: regime is optional context. A null latest reading ⇒ no adjustment (raw == adjusted).</summary>
+internal sealed class FakeMarketRegimeSource(MarketRegimeSnapshot? snapshot = null) : IMarketRegimeSource
+{
+    public Task<MarketRegimeSnapshot?> GetLatestAsync(CancellationToken ct = default) => Task.FromResult(snapshot);
+}
+
 internal sealed class RecordingRadarSignalWriter : IRadarSignalWriter
 {
     public List<RadarSignalRequest> Signals { get; } = [];

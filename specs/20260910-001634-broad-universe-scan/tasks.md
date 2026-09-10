@@ -50,3 +50,17 @@
 - [x] T021 [US3] Guard the seed's symbol shape (no dotted tickers) so a hand-edit cannot reintroduce
       a permanently unresolvable member.
 - [x] T022 [US3] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.
+
+## US4 — prove the cycle against production behaviour (this increment)
+
+- [x] T023 [US4] Extract the Radar half of the seam test into `BroadUniverseRadarFixture` so the
+      cycle test drives the same composed, bar-backed universe instead of a second copy of it.
+- [x] T024 [US4] Share `FakePositionCapSource` / `FakeMarketRegimeSource` from `OpportunityFakes`
+      rather than keeping them private to `ScoreCandidateHandlerTests`.
+- [x] T025 [US4] Drive the real `OpportunityScanJob` over the real `ScoreCandidateCommandHandler`
+      and the real candidate repositories, asserting the persisted Scan-sourced candidate row and its
+      score (fundamentals grade + RS window) read back through a fresh context.
+- [x] T026 [US4] Cover the nightly cadence: a second cycle appends a score and dedups nomination
+      reasons instead of duplicating the candidate.
+- [x] T027 [US4] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`, plus a
+      mutation check that the new assertions bite on production behaviour.

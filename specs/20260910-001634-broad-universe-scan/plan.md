@@ -163,3 +163,45 @@ Surface: `Modules.Research/Infrastructure/Resources/sp500-constituents.json`,
   where a seam hides. `FinanceSentry.Modules.Research.Tests` takes a test-only reference on Radar
   (precedent: its existing reference on Risk) and drives real composition → real structure read →
   real rules over an in-memory Radar database.
+
+### US4 — prove the cycle against production behaviour (this increment)
+
+Surface: `tests/FinanceSentry.Modules.Research.Tests/Opportunity/` only —
+`BroadUniverseRadarFixture.cs` (new), `BroadUniverseScanCycleTests.cs` (new),
+`BroadUniverseScanSeamTests.cs` and `OpportunityFakes.cs` / `ScoreCandidateHandlerTests.cs`
+(refactor). No production code changes.
+
+US3's seam test stopped at `ScanNominationRules`, and every scan-job test above it ran against
+`RecordingScoreCandidateHandler` — a stub that returns an all-null scorecard and writes nothing. So
+the criterion the issue actually states ("a Scan-sourced candidate exists for a non-held ticker,
+carrying both a fundamentals score and a momentum rank") was never asserted against production
+behaviour: it was assumed on both sides of the scorer.
+
+- **The proof is the persisted row, not the call.** `BroadUniverseScanCycleTests` runs the real
+  `OpportunityScanJob` over the real `ScoreCandidateCommandHandler` and the real
+  `CandidateRepository` / `CandidateScoreRepository`, then reads back through a *second*
+  `ResearchDbContext` on the same in-memory database — what it asserts is what the cycle wrote, not
+  what a change tracker still held.
+- **Only collaborators outside the module stay doubled**: EDGAR (HTTP), the signal/alert/thesis
+  writers, the brokerage book, and the Risk and regime ports. Everything between the universe and the
+  candidate row is production code, including `IpsRepository`, which is what selects the users a scan
+  run scores.
+- **A rank is an ordering, not a column.** `ScanCandidateRank`'s `RsPercentile` / `CombinedScore`
+  decide who gets a slot and are never persisted, so "the row carries a momentum rank" is proven by
+  two stored facts together: the excess-return RS for the ranking window in `Evidence.RsByWindow`,
+  and `QualityMomentumReason` on the candidate — a reason `RankByQualityMomentum` tags only when a
+  name carries *both* a grade and an RS percentile. Persisting the combined score would be the
+  honest fix if 020's hit-rate analysis ever needs to reconstruct why a slot was won.
+- **A cycle owns its `ResearchDbContext`, as each Hangfire run owns its scope.** Sharing one context
+  across both cycles would have let the second one find its candidate in the first one's change
+  tracker, proving dedup against an in-memory list rather than against a reloaded row.
+- **The Radar half is one fixture, not two copies.** `BroadUniverseRadarFixture` owns the composed,
+  bar-backed universe the seam test already built; both test classes drive the same one, so the
+  cycle test cannot drift into asserting against a universe the seam test never validated.
+- **Grounded, not vacuous.** Verified by mutation: removing the quality join from the scan job
+  (`RankByQualityMomentum` over an empty grade map) fails the persisted-reason assertion while the
+  rest still passes, so the test pins the quality x momentum path specifically. Note the fundamentals
+  score survives that mutation — the scorer fetches EDGAR itself — which is why the reason tag, not
+  the grade alone, is what proves the ranking.
+- **The nightly cadence is covered too**: a second cycle appends a score row and dedups nomination
+  reasons rather than duplicating the candidate.
