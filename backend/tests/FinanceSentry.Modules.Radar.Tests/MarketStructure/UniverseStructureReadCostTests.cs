@@ -56,10 +56,35 @@ public sealed class UniverseStructureReadCostTests
         read.Entries.Single(e => e.Ticker == "AAA1").Snapshot.SectorRank.Should().Be(2);
     }
 
+    [Fact]
+    public async Task ATickerWithNoBarsCostsOneRead()
+    {
+        await using var db = TestSupport.NewContext();
+        var fixture = await SeedAsync(db, memberCount: 2);
+
+        var snapshot = await fixture.Reader.GetStructureAsync("NOBARS", CancellationToken.None);
+
+        snapshot.Should().BeNull();
+        fixture.Bars.ReadsByTicker.Should().ContainSingle(
+            "a ticker with no structure must not pay for a sector load it cannot use")
+            .Which.Key.Should().Be("NOBARS");
+    }
+
     private static async Task<UniverseRead> ReadUniverseAsync(int memberCount)
     {
         await using var db = TestSupport.NewContext();
+        var fixture = await SeedAsync(db, memberCount);
 
+        var entries = await fixture.Reader.GetUniverseStructuresAsync(CancellationToken.None);
+
+        return new UniverseRead(
+            entries,
+            fixture.Bars.ReadsByTicker.TryGetValue(LeadingSector, out var sectorReads) ? sectorReads : 0,
+            fixture.Universe.ActiveListings);
+    }
+
+    private static async Task<ReaderFixture> SeedAsync(Infrastructure.Persistence.RadarDbContext db, int memberCount)
+    {
         var barRepo = new CountingDailyBarRepository(new DailyBarRepository(db));
         var universeRepo = new CountingUniverseRepository(new RadarUniverseRepository(db));
 
@@ -96,15 +121,11 @@ public sealed class UniverseStructureReadCostTests
             barRepo, universeRepo, new RadarSignalRepository(db), options);
         var reader = new MarketStructureReader(structureQueries, barRepo, universeRepo);
 
+        // Seeding read bars of its own; only the reader's reads are the measurement.
         barRepo.ReadsByTicker.Clear();
         universeRepo.ActiveListings = 0;
 
-        var entries = await reader.GetUniverseStructuresAsync(CancellationToken.None);
-
-        return new UniverseRead(
-            entries,
-            barRepo.ReadsByTicker.TryGetValue(LeadingSector, out var sectorReads) ? sectorReads : 0,
-            universeRepo.ActiveListings);
+        return new ReaderFixture(reader, barRepo, universeRepo);
     }
 
     private static RadarUniverseMember Member(string ticker, UniverseKind kind) => new()
@@ -135,6 +156,9 @@ public sealed class UniverseStructureReadCostTests
 
         return bars;
     }
+
+    private sealed record ReaderFixture(
+        MarketStructureReader Reader, CountingDailyBarRepository Bars, CountingUniverseRepository Universe);
 
     private sealed record UniverseRead(
         IReadOnlyList<Core.Interfaces.UniverseStructureEntry> Entries, int SectorReads, int UniverseListings);
