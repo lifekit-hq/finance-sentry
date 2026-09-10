@@ -21,7 +21,7 @@ public class CredentialEncryptionServiceTests
     private readonly CredentialEncryptionService _sut;
 
     // 32-byte key (256 bits) encoded as Base64 — for tests only, never use in production
-    private const string TestKeyBase64 = "dGVzdGtleS10ZXN0a2V5LXRlc3RrZXktdGVzdGtleTA="; // 32 bytes
+    private const string TestKeyBase64 = "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU="; // 32 bytes
 
     public CredentialEncryptionServiceTests()
     {

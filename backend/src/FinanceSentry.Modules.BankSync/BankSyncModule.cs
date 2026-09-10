@@ -18,6 +18,8 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
+using Microsoft.Extensions.Options;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -108,9 +110,23 @@ public static class BankSyncModule
 
         services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
-        services.Configure<EncryptionOptions>(config.GetSection(EncryptionOptions.SectionName));
+        // #493: validated AT STARTUP, not at first credential read. Outside Development an
+        // unconfigured or disclosed key stops the process coming up; the service itself no longer
+        // falls back to the key committed in this repository.
+        services.AddOptions<EncryptionOptions>()
+            .Bind(config.GetSection(EncryptionOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<EncryptionOptions>, EncryptionOptionsValidator>();
         services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
         services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
+
+        // #493: rows written under the old key are re-encrypted on startup. Registered here
+        // because this module owns the encryption registration; every module contributes its own
+        // stores as ICredentialRotationTarget and they are discovered by that interface.
+        services.AddScoped<CredentialKeyRotationService>();
+        services.AddHostedService<CredentialKeyRotationHostedService>();
+        services.AddScoped<ICredentialRotationTarget, MonobankCredentialRotationTarget>();
+        services.AddScoped<ICredentialRotationTarget, TrueLayerConnectionRotationTarget>();
 
         services.AddScoped<IBankAccountRepository, BankAccountRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();

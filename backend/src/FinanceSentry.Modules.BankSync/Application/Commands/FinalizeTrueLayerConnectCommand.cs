@@ -52,7 +52,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 400);
 
         var encrypted = encryption.Encrypt(tokens.RefreshToken);
-        connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag);
+        connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
         connection.MarkLinked(expiresAt: DateTime.UtcNow.AddDays(90));
         await connections.UpdateAsync(connection, cancellationToken);
 

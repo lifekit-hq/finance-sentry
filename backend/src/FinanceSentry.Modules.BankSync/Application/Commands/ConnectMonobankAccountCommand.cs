@@ -57,7 +57,8 @@ public class ConnectMonobankAccountCommandHandler(
             userId: request.UserId,
             encryptedToken: encrypted.Ciphertext,
             iv: encrypted.Iv,
-            authTag: encrypted.AuthTag);
+            authTag: encrypted.AuthTag,
+            keyVersion: encrypted.KeyVersion);
         await monobankCredentials.AddAsync(credential, cancellationToken);
 
         // Create BankAccount rows

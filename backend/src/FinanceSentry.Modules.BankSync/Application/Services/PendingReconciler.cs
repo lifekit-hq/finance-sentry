@@ -11,6 +11,13 @@ using FinanceSentry.Modules.BankSync.Domain;
 /// <see cref="TransactionDeduplicationService"/>) — so deduplication keeps both. Without
 /// reconciliation the pending row lingers forever as a stale duplicate. Once a posted row
 /// exists for the same account + amount + description, the pending row is stale.
+///
+/// <para>
+/// The description is compared through <see cref="SettlementDescriptionNormalizer"/> because a
+/// provider may also rewrite the text on settlement — AIB splices a <c>TxnDate:</c> stamp into
+/// it — and a raw comparison then misses the twin, leaving both rows active and the payment
+/// counted twice.
+/// </para>
 /// </summary>
 public static class PendingReconciler
 {
@@ -40,7 +47,8 @@ public static class PendingReconciler
     }
 
     // Pending↔posted match key: same account, amount, and merchant text. Deliberately excludes
-    // the date, which is exactly what differs between the two versions.
+    // the date, which is exactly what differs between the two versions — and normalizes the
+    // text, which some providers also rewrite on settlement.
     private static string Key(Transaction t) =>
-        $"{t.AccountId}|{t.Amount:F2}|{t.Description.Trim().ToLowerInvariant()}";
+        $"{t.AccountId}|{t.Amount:F2}|{SettlementDescriptionNormalizer.Normalize(t.Description)}";
 }

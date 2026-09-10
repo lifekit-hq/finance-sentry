@@ -112,10 +112,16 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   (Monobank holds keep their date when they clear), the stored row is flipped to posted
   (`ScheduledSyncService.PersistAndReconcileAsync`).
 - **PendingReconciler**: a pending row whose posted twin exists under a *different* hash
-  (date moved — the TrueLayer case) is retired (soft-deleted, `IsActive = false`). It matches
-  the twin on `(account, amount, description)`, so **a hold that settles at a different amount
-  is never retired** — it stays active alongside its posted row. That is routine for a
-  cross-currency charge, where the settled amount is the bank's, not the hold's.
+  (date moved — the TrueLayer case) is retired (soft-deleted, `IsActive = false`). The twin is
+  matched on account + amount + description, and the description goes through
+  `SettlementDescriptionNormalizer` first, because a provider may also **rewrite the text** on
+  settlement: AIB splices a `TxnDate: 02Sep2026` stamp into the booked copy that the pending
+  copy never carried. Comparing raw text missed the twin, so neither row was retired and the
+  payment counted twice in every figure derived from it. Normalization is deliberately narrow —
+  only that stamp — since merging two genuinely distinct transactions is the worse failure.
+  The **amount** is compared as-is, so **a hold that settles at a different amount is never
+  retired** — it stays active alongside its posted row. That is routine for a cross-currency
+  charge, where the settled amount is the bank's, not the hold's.
 - **Sync lookback overlap**: settled transactions keep their original timestamp, so a pure
   watermark fetch would never re-observe them once the watermark passes — every
   incremental sync therefore re-reads a trailing 7-day window (`ResyncLookbackDays` in
@@ -232,6 +238,14 @@ one and a transfer in the other.
   Rules can carry an optional account-currency filter, and a currency-scoped match beats a
   generic one — «Від: Людмила Сичова» in UAH is rent (`family_support` income), in EUR it is
   the same wording on a routing hop (`self_routing`, excluded).
+
+  `self_routing` also covers the user's **own** EUR accounts (`Own accounts (EUR)`, M019): an
+  AIB → Revolut hop reads `*MOBI DENYS SYCHOV IE…` on one statement and `Payment from Denys
+  Sychov` on the other. The legs share nothing pair detection can key on and settle on
+  different days, so the credit read as INCOME and inflated gross income and the savings rate
+  every month it happened. Counterparty classification is per direction, so one rule retires
+  both legs; the direction-blind `denys sychov ie` → `TRANSFER_IN` keyword that used to patch
+  the inbound leg (and mislabelled the outbound one) is dropped in the same migration.
 
   Known gap: `household` outbound joins outflow but no spending *category* — top-categories
   only emits a synthetic row for `family_support` — and it always lands as discretionary,

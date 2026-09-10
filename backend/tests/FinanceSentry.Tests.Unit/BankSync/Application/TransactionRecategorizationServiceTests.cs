@@ -102,7 +102,7 @@ public class TransactionRecategorizationServiceTests
             .ReturnsAsync([tx]);
         _monobankCredentials.Setup(r => r.GetByIdAsync(credentialId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FinanceSentry.Modules.BankSync.Domain.MonobankCredential(
-                UserId, new byte[32], new byte[12], new byte[16]));
+                UserId, new byte[32], new byte[12], new byte[16], 1));
         _encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
             .Returns("mono-token");
 

@@ -39,11 +39,19 @@ public class TrueLayerConnection : Entity
         Reference = reference;
     }
 
-    public void SetRefreshToken(byte[] ciphertext, byte[] iv, byte[] authTag)
+    /// <summary>
+    /// Stores a freshly encrypted refresh token. <paramref name="keyVersion"/> is REQUIRED and is
+    /// the version the ciphertext was produced under — a row whose stored version does not match
+    /// its ciphertext is decrypted with the wrong key and throws (issue #493). It was optional in
+    /// effect until 2026-09-09: with a single configured key every version was 1, so dropping it
+    /// was invisible. It is not optional now.
+    /// </summary>
+    public void SetRefreshToken(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
     {
         EncryptedRefreshToken = ciphertext;
         Iv = iv;
         AuthTag = authTag;
+        KeyVersion = keyVersion;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -75,5 +83,19 @@ public class TrueLayerConnection : Entity
         Reference = newReference;
         Status = "CREATED";
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Replaces this row's ciphertext with the same plaintext re-encrypted under a newer key
+    /// (issue #493). The payload and the key version move together — a row is never left with new
+    /// ciphertext and an old version, or the reverse. Not a business update: the credential is
+    /// unchanged, so no domain timestamp moves.
+    /// </summary>
+    public void RotateEncryption(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
+    {
+        EncryptedRefreshToken = ciphertext;
+        Iv = iv;
+        AuthTag = authTag;
+        KeyVersion = keyVersion;
     }
 }
