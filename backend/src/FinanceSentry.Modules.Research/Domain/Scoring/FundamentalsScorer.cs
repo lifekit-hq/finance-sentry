@@ -11,6 +11,9 @@ using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 /// </summary>
 public static class FundamentalsScorer
 {
+    /// <summary>EDGAR datapoints per concept a caller must fetch for the YoY and margin-trend windows to resolve.</summary>
+    public const int FactsPerConcept = 8;
+
     private const decimal MinScore = 0m;
     private const decimal MaxScore = 100m;
     private const decimal Midpoint = 50m;

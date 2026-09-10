@@ -7,15 +7,17 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Composes the Radar universe: seed members (benchmark + sectors + industry) ∪ equity holdings
-/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers. Membership is persisted
-/// and auto-synced; departed holdings/watchlist tickers are de-activated (history retained).
+/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ — when
+/// <see cref="RadarOptions.BroadUniverseEnabled"/> is set — broad-market index constituents.
+/// Membership is persisted and auto-synced; departed tickers are de-activated (history retained).
 /// </summary>
 public sealed class RadarUniverseService(
     IRadarUniverseRepository universe,
     IBrokerageHoldingsReader brokerageReader,
     IWatchlistReader watchlistReader,
     IBankingTotalsReader bankingTotals,
-    IOptions<RadarOptions> options) : IRadarUniverseService
+    IOptions<RadarOptions> options,
+    IIndexConstituentSource? constituentSource = null) : IRadarUniverseService
 {
     private const string EquityInstrumentType = "STK";
 
@@ -46,6 +48,15 @@ public sealed class RadarUniverseService(
             foreach (var ticker in watchlist)
             {
                 Add(resolved, ticker, UniverseKind.Watchlist, UniverseSource.Auto);
+            }
+        }
+
+        // Added last so an owned or watched constituent keeps its ownership kind (first write wins).
+        if (_options.BroadUniverseEnabled && constituentSource is not null)
+        {
+            foreach (var ticker in constituentSource.GetConstituents())
+            {
+                Add(resolved, ticker, UniverseKind.IndexConstituent, UniverseSource.Auto);
             }
         }
 

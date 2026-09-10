@@ -42,7 +42,6 @@ public sealed class ScoreCandidateCommandHandler(
     private const string NominationSignalType = "candidate_scored";
     private const string TopTierSignalType = "top_tier_candidate";
     private const string SubjectTypeTicker = "Ticker";
-    private const int MaxFactsPerConcept = 8;
     private const string DefaultNominationReason = "conviction";
     private const string NoIpsNote = "no IPS on file";
 
@@ -66,7 +65,7 @@ public sealed class ScoreCandidateCommandHandler(
         }
 
         var structureSnapshot = await structureReader.GetStructureAsync(ticker, ct);
-        var fundamentalFacts = await secEdgar.GetFundamentalsAsync(ticker, MaxFactsPerConcept, ct);
+        var fundamentalFacts = await secEdgar.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct);
         var ips = await ipsRepo.GetCurrentAsync(command.UserId, ct);
         // 039: the single-position cap now lives in its single home (the Risk rule set), read via port.
         var maxPositionCap = await positionCapSource.GetMaxPositionWeightAsync(command.UserId, ct);

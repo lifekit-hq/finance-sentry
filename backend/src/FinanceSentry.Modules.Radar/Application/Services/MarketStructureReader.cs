@@ -21,44 +21,38 @@ public sealed class MarketStructureReader(
 
     public async Task<MarketStructureSnapshot?> GetStructureAsync(string ticker, CancellationToken ct = default)
     {
+        // Structure first: a ticker with no bars costs one read, never a sector load it cannot use.
         var structure = await structureQueryService.GetStructureAsync(ticker, ct);
         if (structure is null)
         {
             return null;
         }
 
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-BreakoutWindowBars * 2);
-        var series = await bars.GetSinceAsync(ticker.Trim().ToUpperInvariant(), since, ct);
+        var since = BreakoutSince();
+        var members = await universe.ListActiveAsync(ct);
+        var sectorRanks = await LoadSectorRankLookupAsync(members, since, ct);
 
-        var (sectorRank, sectorRankDelta) = await ResolveSectorRankAsync(ticker, series, since, ct);
-
-        return new MarketStructureSnapshot(
-            structure.Ticker,
-            structure.RsByWindow,
-            structure.ReturnByWindow,
-            structure.ExtensionFromMa50,
-            structure.TodayZScore,
-            structure.VolumeRatio,
-            structure.Ma50,
-            structure.Ma200,
-            structure.Stale,
-            sectorRank,
-            sectorRankDelta,
-            DistanceFrom63dHigh(series));
+        return await ProjectAsync(structure, since, sectorRanks, ct);
     }
 
     public async Task<IReadOnlyList<UniverseStructureEntry>> GetUniverseStructuresAsync(CancellationToken ct = default)
     {
+        var since = BreakoutSince();
         var members = await universe.ListActiveAsync(ct);
+        var sectorRanks = await LoadSectorRankLookupAsync(members, since, ct);
+
         var entries = new List<UniverseStructureEntry>(members.Count);
         foreach (var member in members)
         {
-            var snapshot = await GetStructureAsync(member.Ticker, ct);
-            if (snapshot is not null)
+            var structure = await structureQueryService.GetStructureAsync(member.Ticker, ct);
+            if (structure is null)
             {
-                var isEtfLens = member.Kind is UniverseKind.Benchmark or UniverseKind.Sector or UniverseKind.Industry;
-                entries.Add(new UniverseStructureEntry(snapshot.Ticker, isEtfLens, snapshot));
+                continue;
             }
+
+            var isEtfLens = member.Kind is UniverseKind.Benchmark or UniverseKind.Sector or UniverseKind.Industry;
+            entries.Add(new UniverseStructureEntry(
+                structure.Ticker, isEtfLens, await ProjectAsync(structure, since, sectorRanks, ct)));
         }
 
         return entries;
@@ -114,54 +108,57 @@ public sealed class MarketStructureReader(
         return high > 0 ? latest / high - 1m : null;
     }
 
-    private async Task<(int? Rank, int? RankDelta)> ResolveSectorRankAsync(
-        string ticker, IReadOnlyList<DailyBar> series, DateOnly since, CancellationToken ct)
+    private static DateOnly BreakoutSince()
+        => DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-BreakoutWindowBars * 2);
+
+    private async Task<MarketStructureSnapshot> ProjectAsync(
+        TickerStructure structure, DateOnly since, SectorRankLookup sectorRanks, CancellationToken ct)
     {
-        var upper = ticker.Trim().ToUpperInvariant();
-        var members = await universe.ListActiveAsync(ct);
-        var rotation = await structureQueryService.GetSectorRotationAsync(ct);
-        var rows = rotation.Where(r => r.Window == RotationWindow).ToList();
-        if (rows.Count == 0)
-        {
-            return (null, null);
-        }
+        var series = await bars.GetSinceAsync(structure.Ticker, since, ct);
+        var (sectorRank, sectorRankDelta) = sectorRanks.RankFor(structure.Ticker, series);
 
-        // A sector ETF ranks as itself; anything else maps via return-correlation affinity.
-        string? sector = members.Any(m =>
-                m.Kind == UniverseKind.Sector && string.Equals(m.Ticker, upper, StringComparison.OrdinalIgnoreCase))
-            ? upper
-            : await BestAffinitySectorAsync(series, members, since, ct);
-
-        if (sector is null)
-        {
-            return (null, null);
-        }
-
-        var row = rows.FirstOrDefault(r => string.Equals(r.Sector, sector, StringComparison.OrdinalIgnoreCase));
-        return row is null ? (null, null) : (row.Rank, row.RankDelta);
+        return new MarketStructureSnapshot(
+            structure.Ticker,
+            structure.RsByWindow,
+            structure.ReturnByWindow,
+            structure.ExtensionFromMa50,
+            structure.TodayZScore,
+            structure.VolumeRatio,
+            structure.Ma50,
+            structure.Ma200,
+            structure.Stale,
+            sectorRank,
+            sectorRankDelta,
+            DistanceFrom63dHigh(series));
     }
 
-    private async Task<string?> BestAffinitySectorAsync(
-        IReadOnlyList<DailyBar> series,
-        IReadOnlyList<RadarUniverseMember> members,
-        DateOnly since,
-        CancellationToken ct)
+    /// <summary>
+    /// Reads the rotation table and every sector ETF's closes once per call, so ranking a universe
+    /// costs the same sector I/O as ranking a single ticker.
+    /// </summary>
+    private async Task<SectorRankLookup> LoadSectorRankLookupAsync(
+        IReadOnlyList<RadarUniverseMember> members, DateOnly since, CancellationToken ct)
     {
-        if (series.Count == 0)
-        {
-            return null;
-        }
+        var rotation = await structureQueryService.GetSectorRotationAsync(ct);
+        var rows = rotation.Where(r => r.Window == RotationWindow).ToList();
+        var sectorTickers = members
+            .Where(m => m.Kind == UniverseKind.Sector)
+            .Select(m => m.Ticker.Trim().ToUpperInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var sectorCloses = new Dictionary<string, IReadOnlyDictionary<DateOnly, decimal>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sector in members.Where(m => m.Kind == UniverseKind.Sector))
+        if (rows.Count > 0)
         {
-            var sectorSeries = await bars.GetSinceAsync(sector.Ticker, since, ct);
-            if (sectorSeries.Count > 0)
+            foreach (var sector in sectorTickers)
             {
-                sectorCloses[sector.Ticker] = sectorSeries.ToDictionary(b => b.Date, b => b.AdjClose);
+                var sectorSeries = await bars.GetSinceAsync(sector, since, ct);
+                if (sectorSeries.Count > 0)
+                {
+                    sectorCloses[sector] = sectorSeries.ToDictionary(b => b.Date, b => b.AdjClose);
+                }
             }
         }
 
-        return SectorAffinity.BestSector(series.ToDictionary(b => b.Date, b => b.AdjClose), sectorCloses);
+        return new SectorRankLookup(rows, sectorTickers, sectorCloses);
     }
 }
