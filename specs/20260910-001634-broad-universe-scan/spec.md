@@ -30,6 +30,11 @@ bars), so market-wide quality ranking already exists; only breadth of price hist
   nomination path to rank every ingested ticker by combined fundamentals quality × momentum, so a
   Scan candidate can be a name I neither hold nor watch.
 
+- **US3 — Enabled, and over a universe worth trusting.** As Denys, I want the flag actually on in a
+  runnable configuration and the seed list verified against the source that ingests it, so the
+  broadened universe is real in production rather than only in tests, and a seeded ticker is a name
+  that can actually gain a bar.
+
 ## Functional requirements
 
 - **FR-001** A ticker list of index constituents is available to the Radar module without Radar
@@ -46,12 +51,20 @@ bars), so market-wide quality ranking already exists; only breadth of price hist
 - **FR-006** (US2) The scan nomination path ranks candidates across the whole ingested universe by
   a combined quality × momentum score rather than iterating the tracked set only.
 
+- **FR-007** (US3) `Radar:BroadUniverseEnabled` is set true in a configuration a deployed host
+  actually reads, and both the enable and the disable path are documented.
+- **FR-008** (US3) Every symbol in the constituent seed resolves at the ingestion source, and the
+  seed records where it came from and how to regenerate it.
+
 ## Success criteria
 
 1. A scheduled job persists daily bars for S&P 500 constituents on a regular cadence. *(US1)*
 2. The scanner's momentum-side ranking iterates the full ingested bar universe. *(US2)*
 3. After ingestion, a ledger-scan cycle yields at least one `Scan` candidate that is neither held
-   nor watchlisted and carries both a fundamentals score and a momentum rank. *(US2)*
+   nor watchlisted and carries both a fundamentals score and a momentum rank. *(US2, US3 — proven
+   through the real reader → rules chain by `BroadUniverseScanSeamTests`)*
+4. The broad universe is on in the API host's configuration, and every seeded symbol is one the
+   ingestion source can resolve. *(US3)*
 
 ## Out of scope
 

@@ -28,6 +28,21 @@ public sealed class Sp500ConstituentSourceTests
         constituents.Should().OnlyHaveUniqueItems();
     }
 
+    /// <summary>
+    /// The seed drives per-ticker Yahoo bar ingestion, and Yahoo spells share classes with a dash
+    /// (<c>BRK-B</c>, not <c>BRK.B</c>). A dotted symbol does not fail loudly — the source returns an
+    /// empty series, so the ticker never gains a bar while staying permanently least-fresh and
+    /// burning a rotation budget slot every run.
+    /// </summary>
+    [Fact]
+    public void GetConstituents_SpellsShareClassesInYahooForm()
+    {
+        var constituents = new Sp500ConstituentSource().GetConstituents();
+
+        constituents.Should().Contain("BRK-B");
+        constituents.Should().OnlyContain(t => !t.Contains('.', StringComparison.Ordinal));
+    }
+
     [Fact]
     public void GetConstituents_CachesTheParsedList()
     {

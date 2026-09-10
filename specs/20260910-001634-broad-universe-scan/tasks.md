@@ -31,3 +31,22 @@
       `MarketStructureReader.GetUniverseStructuresAsync` — at ~460 members it is ~6k queries per scan.
 - [x] T014 [US2] Tag `QualityMomentumReason` only when a combined score exists — a graded name whose
       RS never resolved has no momentum to claim.
+
+## US3 — turn it on, and make the universe trustworthy (this increment)
+
+- [x] T015 [US3] Re-verify the constituent seed independently: regenerate it from the public
+      constituents dataset and probe every symbol against the Yahoo chart endpoint.
+- [x] T016 [US3] Store symbols in Yahoo form (`BRK-B`, not `BRK.B`) and record the provenance +
+      regeneration recipe in the file's own `note`.
+- [x] T017 [US3] Raise `BroadUniverseMaxIngestPerRun` 250 → 275 so a full rotation of the now
+      503-name seed still lands inside `FreshnessMaxTradingDays`.
+- [x] T018 [US3] Add the `Radar` config section to `FinanceSentry.API/appsettings.json` with
+      `BroadUniverseEnabled: true` — the flag now has a runnable enable path, not just a default.
+- [x] T019 [US3] Document the enable/disable path, the rotation budget and the seed's provenance in
+      `docs/claude/app-state.md`.
+- [x] T020 [US3] Test the constituent seam end to end: real `RadarUniverseService` composition → real
+      `MarketStructureReader.GetUniverseStructuresAsync` → real `ScanNominationRules`, asserting a
+      non-held, non-watchlisted constituent surfaces non-ETF-lens and wins the nomination.
+- [x] T021 [US3] Guard the seed's symbol shape (no dotted tickers) so a hand-edit cannot reintroduce
+      a permanently unresolvable member.
+- [x] T022 [US3] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.

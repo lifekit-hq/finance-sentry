@@ -69,9 +69,9 @@ public sealed class RadarOptions
     /// Upstream bar fetches an ingestion run may spend on index constituents. Holdings, watchlist and
     /// seed members are always ingested first; the budget rotates over the least-fresh constituents so
     /// successive runs converge on full coverage without one run fanning out over the whole index.
-    /// Default 250 keeps a full rotation of the ~450-name seed inside
+    /// Default 275 keeps a full rotation of the 503-name seed inside
     /// <see cref="FreshnessMaxTradingDays"/> — a slower rotation would leave most constituents
     /// permanently stale, and stale structure is discarded downstream rather than ranked.
     /// </summary>
-    public int BroadUniverseMaxIngestPerRun { get; set; } = 250;
+    public int BroadUniverseMaxIngestPerRun { get; set; } = 275;
 }

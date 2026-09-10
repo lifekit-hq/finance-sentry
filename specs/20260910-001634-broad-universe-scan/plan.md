@@ -122,4 +122,35 @@ that turns it on:
   inside `FreshnessMaxTradingDays` (why the default is 250, not 100).
 - Symbols Yahoo cannot resolve (`BRK.B` — Yahoo wants `BRK-B`) return an empty series rather than
   throwing, so they never gain a bar and sort first in the rotation forever, costing a budget slot
-  per run. Harmless at budget 250; a ticker-symbol normalisation (or a negative cache) is the fix.
+  per run. **Fixed in US3** by spelling the seed in Yahoo form rather than by normalising at the
+  fetch: the seed is also the analyst universe's membership key, so one canonical spelling per name
+  beats two spellings reconciled at every boundary.
+
+### US3 — turn it on, and make the universe trustworthy (this increment)
+
+Surface: `Modules.Research/Infrastructure/Resources/sp500-constituents.json`,
+`Modules.Radar/Application/Services/RadarOptions.cs`, `FinanceSentry.API/appsettings.json`,
+`docs/claude/app-state.md`, and two test files (`Unit/Sp500ConstituentSourceTests.cs`,
+`Opportunity/BroadUniverseScanSeamTests.cs`).
+
+- **The seed is regenerated, not hand-curated.** Review flagged the list as possibly containing
+  invented tickers. Verified independently against the actual ingestion source: 14 of the 450 seeded
+  symbols did not resolve at Yahoo (`FI`, `MMC`, `BRK.B`, plus 11 names since acquired or taken
+  private — `WBA`, `HES`, `ANSS`, `DFS`, `MRO`, `K`, `IPG`, `DAY`, `BK`, `HOLX`, `CTRA`). The file is
+  now generated from the public constituents dataset with every one of its 503 symbols probed
+  individually (503/503 resolved), and the recipe is recorded in the file's own `note` so the next
+  refresh is reproducible instead of remembered.
+- **Budget follows the seed size.** 503 names at 275/run is the same ~1.8-run rotation the 450-name
+  seed had at 250 — the invariant is "a full rotation inside `FreshnessMaxTradingDays`", so the
+  number moves when the seed does.
+- **The flag is enabled in the API host's `appsettings.json`, not flipped in code.** The `RadarOptions`
+  default stays `false` so every other host and every test that does not opt in is unaffected;
+  precedent is `Retention:Downsample:Enabled`, gated the same way. Disable is the same key set to
+  `false` — the next universe sync deactivates the constituent members (existing
+  compose-and-deactivate path), so there is no separate teardown.
+- **The seam test crosses the module boundary, so its test project does too.** Radar decides which
+  members are rankable (`MarketStructureReader`'s `IsEtfLens`), Research decides which rankable
+  members get nominated; both halves were unit-tested against mocks of the other, which is exactly
+  where a seam hides. `FinanceSentry.Modules.Research.Tests` takes a test-only reference on Radar
+  (precedent: its existing reference on Risk) and drives real composition → real structure read →
+  real rules over an in-memory Radar database.
