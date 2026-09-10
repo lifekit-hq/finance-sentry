@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Radar.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Services;
+using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using Hangfire;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,11 @@ public sealed class RadarFreshnessWatchdogJob(
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var members = await universe.ListActiveAsync(ct);
+        // Broad-universe constituents are ingested on a rotating budget (#558), so an old bar there is
+        // the designed cadence rather than a data outage — watching them would bury the real signal.
+        var members = (await universe.ListActiveAsync(ct))
+            .Where(m => m.Kind != UniverseKind.IndexConstituent)
+            .ToList();
         if (members.Count == 0)
         {
             return;

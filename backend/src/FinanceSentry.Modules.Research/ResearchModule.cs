@@ -249,6 +249,7 @@ public static class ResearchModule
         // Structured monthly consensus (feature 037). Always registered — the service no-ops via
         // IsConfigured when no key is present, keeping the DI graph stable across environments.
         services.AddSingleton<IRecommendationTrendsService, FinnhubRecommendationTrendsService>();
+        services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
         services.AddScoped<Core.Interfaces.IAnalystActionFeedReader, Infrastructure.Persistence.AnalystActionFeedReader>();
 

@@ -26,9 +26,14 @@ internal sealed class FakeHistorySource(
     IReadOnlyDictionary<string, IReadOnlyList<DailyBarData>> barsByTicker,
     string? throwForTicker = null) : IMarketHistorySource
 {
+    /// <summary>Tickers an upstream fetch was attempted for, in order — the run's rate-limit cost.</summary>
+    public List<string> Requested { get; } = [];
+
     public Task<IReadOnlyList<DailyBarData>> GetDailyBarsAsync(
         string ticker, DateOnly since, CancellationToken ct = default)
     {
+        this.Requested.Add(ticker);
+
         if (throwForTicker is not null && ticker == throwForTicker)
         {
             throw new InvalidOperationException($"Source failed for {ticker}");

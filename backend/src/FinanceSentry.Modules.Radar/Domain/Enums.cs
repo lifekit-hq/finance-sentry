@@ -8,6 +8,9 @@ public enum UniverseKind
     Industry,
     Holding,
     Watchlist,
+
+    /// <summary>Broad-market index member, carried for breadth rather than because it is owned or watched.</summary>
+    IndexConstituent,
 }
 
 /// <summary>Where a universe member came from.</summary>
