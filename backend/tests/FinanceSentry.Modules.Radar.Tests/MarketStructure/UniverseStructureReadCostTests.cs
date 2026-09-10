@@ -15,7 +15,8 @@ using Xunit;
 public sealed class UniverseStructureReadCostTests
 {
     private const string Benchmark = "SPY";
-    private const string SectorEtf = "XLK";
+    private const string LeadingSector = "XLK";
+    private const string LaggingSector = "XLE";
     private const int SeriesLength = 120;
 
     /// <summary>Series run up to today: the reader's windows are anchored on the current date.</summary>
@@ -28,8 +29,9 @@ public sealed class UniverseStructureReadCostTests
         var small = await ReadUniverseAsync(memberCount: 2);
         var large = await ReadUniverseAsync(memberCount: 8);
 
-        small.Entries.Should().HaveCount(4, "benchmark + sector + members all carry structure");
-        large.Entries.Should().HaveCount(10);
+        small.Entries.Should().HaveCount(5, "benchmark + both sectors + members all carry structure");
+        large.Entries.Should().HaveCount(11);
+        small.SectorReads.Should().BeGreaterThan(0, "the sector's bars are still read — just once");
         large.SectorReads.Should().Be(
             small.SectorReads,
             "rotation and affinity are universe-wide facts, so their cost must not scale with the universe");
@@ -39,16 +41,19 @@ public sealed class UniverseStructureReadCostTests
     }
 
     [Fact]
-    public async Task AffinityStillAssignsTheSectorRank()
+    public async Task AffinityAssignsTheCorrelatedSectorsRank_NotTheLeadingSectors()
     {
         var read = await ReadUniverseAsync(memberCount: 2);
 
-        var member = read.Entries.Single(e => e.Ticker == "AAA0");
-        member.Snapshot.SectorRank.Should().Be(1, "AAA0's returns track the only ranked sector ETF");
+        var leader = read.Entries.Single(e => e.Ticker == LeadingSector);
+        var laggard = read.Entries.Single(e => e.Ticker == LaggingSector);
+        leader.IsEtfLens.Should().BeTrue();
+        leader.Snapshot.SectorRank.Should().Be(1, "a sector ETF ranks as itself");
+        laggard.Snapshot.SectorRank.Should().Be(2);
 
-        var sectorLens = read.Entries.Single(e => e.Ticker == SectorEtf);
-        sectorLens.IsEtfLens.Should().BeTrue();
-        sectorLens.Snapshot.SectorRank.Should().Be(1, "a sector ETF ranks as itself");
+        // Members share XLE's return path, so picking the wrong sector would show up as rank 1.
+        read.Entries.Single(e => e.Ticker == "AAA0").Snapshot.SectorRank.Should().Be(2);
+        read.Entries.Single(e => e.Ticker == "AAA1").Snapshot.SectorRank.Should().Be(2);
     }
 
     private static async Task<UniverseRead> ReadUniverseAsync(int memberCount)
@@ -61,24 +66,29 @@ public sealed class UniverseStructureReadCostTests
         var members = new List<RadarUniverseMember>
         {
             Member(Benchmark, UniverseKind.Benchmark),
-            Member(SectorEtf, UniverseKind.Sector),
+            Member(LeadingSector, UniverseKind.Sector),
+            Member(LaggingSector, UniverseKind.Sector),
         };
-        members.AddRange(Enumerable.Range(0, memberCount).Select(i => Member($"AAA{i}", UniverseKind.Holding)));
+        var holdings = Enumerable.Range(0, memberCount).Select(i => Member($"AAA{i}", UniverseKind.Holding)).ToList();
+        members.AddRange(holdings);
         await universeRepo.UpsertMembersAsync(members, CancellationToken.None);
 
-        // The benchmark drifts up slowly; the sector and its members share a steeper path, so
-        // return-correlation affinity has a single obvious winner.
-        await barRepo.UpsertRangeAsync(Series(Benchmark, step: 0.1m), CancellationToken.None);
-        foreach (var member in members.Where(m => m.Ticker != Benchmark))
+        // Both sectors outrun the benchmark, the leader by more — so they rank 1 and 2. Their gains
+        // arrive on different days, and the holdings step exactly with the laggard, so
+        // return-correlation affinity has one right answer and a visibly wrong one.
+        await barRepo.UpsertRangeAsync(Series(Benchmark, i => 0.1m), CancellationToken.None);
+        await barRepo.UpsertRangeAsync(
+            Series(LeadingSector, i => i % 2 == 0 ? 1.8m : 0.2m), CancellationToken.None);
+        foreach (var ticker in holdings.Select(m => m.Ticker).Prepend(LaggingSector))
         {
-            await barRepo.UpsertRangeAsync(Series(member.Ticker, step: 1m), CancellationToken.None);
+            await barRepo.UpsertRangeAsync(Series(ticker, i => i % 3 == 0 ? 1.2m : 0.15m), CancellationToken.None);
         }
 
         var options = TestSupport.Options(new RadarOptions
         {
             Benchmark = Benchmark,
             BenchmarkTickers = [Benchmark],
-            SectorTickers = [SectorEtf],
+            SectorTickers = [LeadingSector, LaggingSector],
             IndustryTickers = [],
             FreshnessMaxTradingDays = int.MaxValue,
         });
@@ -93,7 +103,7 @@ public sealed class UniverseStructureReadCostTests
 
         return new UniverseRead(
             entries,
-            barRepo.ReadsByTicker.TryGetValue(SectorEtf, out var sectorReads) ? sectorReads : 0,
+            barRepo.ReadsByTicker.TryGetValue(LeadingSector, out var sectorReads) ? sectorReads : 0,
             universeRepo.ActiveListings);
     }
 
@@ -102,12 +112,14 @@ public sealed class UniverseStructureReadCostTests
         Ticker = ticker, Kind = kind, Source = UniverseSource.Auto, Active = true,
     };
 
-    private static List<DailyBar> Series(string ticker, decimal step)
+    /// <summary>Series whose bar-to-bar gain is <paramref name="dailyGain"/> of the bar's index.</summary>
+    private static List<DailyBar> Series(string ticker, Func<int, decimal> dailyGain)
     {
         var bars = new List<DailyBar>();
+        var price = 100m;
         for (var i = 0; i < SeriesLength; i++)
         {
-            var price = 100m + (i * step);
+            price += dailyGain(i);
             bars.Add(new DailyBar
             {
                 Ticker = ticker,

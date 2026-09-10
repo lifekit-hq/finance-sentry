@@ -78,7 +78,9 @@ public static class ScanNominationRules
     /// fundamentals grade weighted against the universe RS percentile. A nomination missing either
     /// half — EDGAR cannot grade crypto/ETFs/non-filers, and a breakout can nominate a ticker with no
     /// RS at all — scores no combined value and ranks below every fully-scored name on its RS alone,
-    /// rather than being dropped or having the missing half defaulted to a faked number.
+    /// rather than being dropped or having the missing half defaulted to a faked number. The same rule
+    /// governs the reason tag: only a name that actually scored on both halves is labelled a
+    /// quality x momentum pick.
     /// </summary>
     public static IReadOnlyList<ScanCandidateRank> RankByQualityMomentum(
         IReadOnlyList<ScanNomination> momentumRanked,

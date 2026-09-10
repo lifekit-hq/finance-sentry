@@ -21,11 +21,18 @@ public sealed class MarketStructureReader(
 
     public async Task<MarketStructureSnapshot?> GetStructureAsync(string ticker, CancellationToken ct = default)
     {
+        // Structure first: a ticker with no bars costs one read, never a sector load it cannot use.
+        var structure = await structureQueryService.GetStructureAsync(ticker, ct);
+        if (structure is null)
+        {
+            return null;
+        }
+
         var since = BreakoutSince();
         var members = await universe.ListActiveAsync(ct);
         var sectorRanks = await LoadSectorRankLookupAsync(members, since, ct);
 
-        return await BuildSnapshotAsync(ticker, since, sectorRanks, ct);
+        return await ProjectAsync(structure, since, sectorRanks, ct);
     }
 
     public async Task<IReadOnlyList<UniverseStructureEntry>> GetUniverseStructuresAsync(CancellationToken ct = default)
@@ -37,12 +44,15 @@ public sealed class MarketStructureReader(
         var entries = new List<UniverseStructureEntry>(members.Count);
         foreach (var member in members)
         {
-            var snapshot = await BuildSnapshotAsync(member.Ticker, since, sectorRanks, ct);
-            if (snapshot is not null)
+            var structure = await structureQueryService.GetStructureAsync(member.Ticker, ct);
+            if (structure is null)
             {
-                var isEtfLens = member.Kind is UniverseKind.Benchmark or UniverseKind.Sector or UniverseKind.Industry;
-                entries.Add(new UniverseStructureEntry(snapshot.Ticker, isEtfLens, snapshot));
+                continue;
             }
+
+            var isEtfLens = member.Kind is UniverseKind.Benchmark or UniverseKind.Sector or UniverseKind.Industry;
+            entries.Add(new UniverseStructureEntry(
+                structure.Ticker, isEtfLens, await ProjectAsync(structure, since, sectorRanks, ct)));
         }
 
         return entries;
@@ -101,17 +111,11 @@ public sealed class MarketStructureReader(
     private static DateOnly BreakoutSince()
         => DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-BreakoutWindowBars * 2);
 
-    private async Task<MarketStructureSnapshot?> BuildSnapshotAsync(
-        string ticker, DateOnly since, SectorRankLookup sectorRanks, CancellationToken ct)
+    private async Task<MarketStructureSnapshot> ProjectAsync(
+        TickerStructure structure, DateOnly since, SectorRankLookup sectorRanks, CancellationToken ct)
     {
-        var structure = await structureQueryService.GetStructureAsync(ticker, ct);
-        if (structure is null)
-        {
-            return null;
-        }
-
-        var series = await bars.GetSinceAsync(ticker.Trim().ToUpperInvariant(), since, ct);
-        var (sectorRank, sectorRankDelta) = sectorRanks.RankFor(ticker, series);
+        var series = await bars.GetSinceAsync(structure.Ticker, since, ct);
+        var (sectorRank, sectorRankDelta) = sectorRanks.RankFor(structure.Ticker, series);
 
         return new MarketStructureSnapshot(
             structure.Ticker,

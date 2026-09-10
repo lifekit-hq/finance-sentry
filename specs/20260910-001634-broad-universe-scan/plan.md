@@ -93,13 +93,17 @@ Surface: `Modules.Radar/Domain/MarketStructure/SectorRankLookup.cs` (new, pure) 
 active universe, the rotation table and every sector ETF's bars — ~24 bar reads a member, so the
 scan's read cost grew with the broad universe. The rotation table and the sector closes it ranks are
 universe-wide facts, so they load once per read into `SectorRankLookup`, which then answers
-`RankFor(ticker, series)` with no I/O. Per member the scan now costs only its own structure +
-series reads. Single-ticker `GetStructureAsync` keeps its previous cost, except that a *sector ETF*
-now also loads the sector closes it no longer needs (bounded by the 11 SPDR sectors, and the
-universe path is the hot one — not worth a branch to skip).
+`RankFor(ticker, series)` with no I/O. Per member the scan now costs its own structure read plus its
+series read. Single-ticker `GetStructureAsync` resolves the structure *before* loading the lookup, so
+a ticker with no bars still costs one read; a *sector ETF* is the one case that loads sector closes
+it will not use (bounded by the 11 SPDRs — not worth a branch).
 
 The invariant is pinned by `UniverseStructureReadCostTests`: sector bar reads for a 2-member and an
-8-member universe must be equal, and the affinity-assigned rank must be unchanged.
+8-member universe must be equal and non-zero, and a holding whose returns track the *lagging* sector
+must still take that sector's rank (a wrong affinity pick shows up as the leader's rank).
+
+Still O(members) and untouched here: `StructureQueryService.GetStructureAsync` re-reads the
+benchmark's bars for every ticker it computes. One cached benchmark series per run is the next win.
 
 Constraints found while shipping US1 — all bite only with the flag on, and all belong to the slice
 that turns it on:
