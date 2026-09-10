@@ -180,4 +180,79 @@ public sealed class ScanNominationRulesTests
         nominations.Should().Contain(n => n.Ticker == "NORS")
             .Which.Reasons.Should().BeEquivalentTo([ScanNominationRules.BreakoutReason]);
     }
+
+    private static ScanNomination Nomination(string ticker, decimal? rsPercentile)
+        => new(ticker, [ScanNominationRules.TopDecileRsReason], rsPercentile);
+
+    [Fact]
+    public void RankByQualityMomentum_BlendsGradeAndPercentile_AtTheConfiguredWeight()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("AAA", 40m)],
+            new Dictionary<string, int?> { ["AAA"] = 90 },
+            new OpportunityOptions { ScanQualityWeight = 0.75m });
+
+        ranked.Single().CombinedScore.Should().Be(77.5m);
+        ranked.Single().QualityScore.Should().Be(90);
+    }
+
+    [Fact]
+    public void RankByQualityMomentum_QualityCanOutrankAHigherMomentumName()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("MOMO", 90m), Nomination("QUAL", 70m)],
+            new Dictionary<string, int?> { ["MOMO"] = 20, ["QUAL"] = 95 },
+            Options);
+
+        ranked.Select(r => r.Ticker).Should().Equal("QUAL", "MOMO");
+    }
+
+    [Fact]
+    public void RankByQualityMomentum_UngradedNamesFollowEveryGradedName_AndKeepMomentumOrder()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("XRP-USD", 100m), Nomination("SOL-USD", 95m), Nomination("WEAK", 5m)],
+            new Dictionary<string, int?> { ["WEAK"] = 10, ["XRP-USD"] = null },
+            Options);
+
+        ranked.Select(r => r.Ticker).Should().Equal("WEAK", "XRP-USD", "SOL-USD");
+        ranked.Where(r => r.Ticker.EndsWith("-USD", StringComparison.Ordinal))
+            .Should().OnlyContain(r => r.CombinedScore == null);
+    }
+
+    [Fact]
+    public void RankByQualityMomentum_TiesBreakOnTickerSoRunsAreReproducible()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("BBB", 50m), Nomination("AAA", 50m)],
+            new Dictionary<string, int?> { ["AAA"] = 60, ["BBB"] = 60 },
+            Options);
+
+        ranked.Select(r => r.Ticker).Should().Equal("AAA", "BBB");
+    }
+
+    [Fact]
+    public void RankByQualityMomentum_TagsOnlyLeadersWithTheQualityReason()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("LEAD", 80m), Nomination("LAG", 80m)],
+            new Dictionary<string, int?> { ["LEAD"] = 60, ["LAG"] = 59 },
+            new OpportunityOptions { ScanQualityLeaderScore = 60 });
+
+        ranked.Single(r => r.Ticker == "LEAD").Reasons
+            .Should().Contain(ScanNominationRules.QualityMomentumReason);
+        ranked.Single(r => r.Ticker == "LAG").Reasons
+            .Should().NotContain(ScanNominationRules.QualityMomentumReason);
+    }
+
+    [Fact]
+    public void RankByQualityMomentum_ClampsAnOutOfRangeWeight()
+    {
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            [Nomination("AAA", 40m)],
+            new Dictionary<string, int?> { ["AAA"] = 90 },
+            new OpportunityOptions { ScanQualityWeight = 3m });
+
+        ranked.Single().CombinedScore.Should().Be(90m);
+    }
 }

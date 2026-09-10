@@ -18,6 +18,7 @@ public static class ScanNominationRules
     public const string TopQuartileRotatingSectorReason = "scan: top-quartile RS in top rotating sector";
     public const string TopDecileRsReason = "scan: top-decile RS";
     public const string BreakoutReason = "scan: 63d-high breakout on above-average volume";
+    public const string QualityMomentumReason = "scan: quality fundamentals with universe momentum";
 
     public static IReadOnlyList<ScanNomination> Evaluate(
         IReadOnlyList<UniverseStructureEntry> universe, OpportunityOptions options)
@@ -72,6 +73,44 @@ public static class ScanNominationRules
             .ToList();
     }
 
+    /// <summary>
+    /// Re-ranks momentum nominations by a combined quality x momentum score (019 FR-006): the EDGAR
+    /// fundamentals grade weighted against the universe RS percentile. A ticker EDGAR cannot grade
+    /// (crypto, ETFs, non-filers) keeps its momentum-only standing and ranks below every graded name
+    /// rather than being dropped or given a faked grade.
+    /// </summary>
+    public static IReadOnlyList<ScanCandidateRank> RankByQualityMomentum(
+        IReadOnlyList<ScanNomination> momentumRanked,
+        IReadOnlyDictionary<string, int?> qualityByTicker,
+        OpportunityOptions options)
+    {
+        var qualityWeight = Math.Clamp(options.ScanQualityWeight, 0m, 1m);
+
+        return momentumRanked
+            .Select(nomination => Rank(nomination, qualityWeight, options))
+            .OrderByDescending(r => r.CombinedScore is not null)
+            .ThenByDescending(r => r.CombinedScore ?? r.RsPercentile ?? -1m)
+            .ThenBy(r => r.Ticker, StringComparer.Ordinal)
+            .ToList();
+
+        ScanCandidateRank Rank(ScanNomination nomination, decimal weight, OpportunityOptions opts)
+        {
+            var quality = qualityByTicker.TryGetValue(nomination.Ticker, out var grade) ? grade : null;
+            var momentum = nomination.RsPercentile ?? 0m;
+            decimal? combined = quality is { } graded
+                ? Math.Round((graded * weight) + (momentum * (1m - weight)), 2)
+                : null;
+
+            var reasons = nomination.Reasons;
+            if (quality >= opts.ScanQualityLeaderScore)
+            {
+                reasons = [.. nomination.Reasons, QualityMomentumReason];
+            }
+
+            return new ScanCandidateRank(nomination.Ticker, reasons, nomination.RsPercentile, quality, combined);
+        }
+    }
+
     private static decimal? RsAtWindow(MarketStructureSnapshot snapshot)
         => snapshot.RsByWindow.TryGetValue(RsWindowBars, out var rs) ? rs : null;
 
@@ -99,3 +138,11 @@ public static class ScanNominationRules
 }
 
 public sealed record ScanNomination(string Ticker, IReadOnlyList<string> Reasons, decimal? RsPercentile);
+
+/// <summary>A nomination carrying its EDGAR fundamentals grade and the combined quality x momentum score.</summary>
+public sealed record ScanCandidateRank(
+    string Ticker,
+    IReadOnlyList<string> Reasons,
+    decimal? RsPercentile,
+    int? QualityScore,
+    decimal? CombinedScore);

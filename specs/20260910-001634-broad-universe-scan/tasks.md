@@ -21,9 +21,11 @@
 
 ## US2 — quality × momentum nomination (next increment)
 
-- [ ] T010 [US2] Join the EDGAR fundamentals grade with the 018 structure/RS rank into a combined
-      scan score.
-- [ ] T011 [US2] Rank the whole ingested universe by that score in the nomination path, keeping the
-      per-run nomination cap.
-- [ ] T012 [US2] Tests: a non-held, non-watchlisted constituent can be nominated; ranking order and
-      cap are deterministic.
+- [x] T010 [US2] Join the EDGAR fundamentals grade with the 018 structure/RS rank into a combined
+      scan score (`ScanNominationRules.RankByQualityMomentum`).
+- [x] T011 [US2] Rank the whole ingested universe by that score in the nomination path, keeping the
+      per-run nomination cap and bounding the EDGAR fan-out with a momentum shortlist.
+- [x] T012 [US2] Tests: a non-held, non-watchlisted constituent can be nominated; ranking order,
+      shortlist bound and cap are deterministic.
+- [ ] T013 [US2] Hoist the per-ticker sector rotation/affinity work out of
+      `MarketStructureReader.GetUniverseStructuresAsync` — at ~460 members it is ~6k queries per scan.

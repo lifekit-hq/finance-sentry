@@ -12,13 +12,16 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Scheduled FR-008 machine scan (019 US2): nominates candidates from 018 market structure by the
-/// deterministic <see cref="ScanNominationRules"/> and scores each through the same pipeline as
-/// user nominations, so 020 can compare hit rates across the two sources. Runs after Radar's
-/// nightly compute. One ticker failing never aborts the run (FR-013); an empty 018 read aborts
-/// with a recorded error; zero nominations is a valid, silent outcome.
+/// deterministic <see cref="ScanNominationRules"/>, re-ranks a bounded shortlist of those by
+/// combined quality x momentum (FR-006 — EDGAR grade against universe RS, so a name outside the
+/// book can win a slot), and scores the survivors through the same pipeline as user nominations,
+/// so 020 can compare hit rates across the two sources. Runs after Radar's nightly compute. One
+/// ticker failing never aborts the run (FR-013); an empty 018 read aborts with a recorded error;
+/// zero nominations is a valid, silent outcome.
 /// </summary>
 public sealed class OpportunityScanJob(
     IMarketStructureReader structureReader,
+    ISecEdgarService secEdgar,
     Domain.Repositories.IIpsRepository ipsRepo,
     ICommandHandler<ScoreCandidateCommand, ScoreCandidateResult> scorer,
     IOptions<OpportunityOptions> options,
@@ -37,14 +40,18 @@ public sealed class OpportunityScanJob(
         }
 
         var nominations = ScanNominationRules.Evaluate(universe, _options);
-        var capped = nominations.Take(_options.ScanMaxNominationsPerRun).ToList();
+        var shortlist = nominations.Take(_options.ScanQualityShortlistSize).ToList();
+        var ranked = ScanNominationRules.RankByQualityMomentum(
+            shortlist, await GradeFundamentalsAsync(shortlist, ct), _options);
+        var capped = ranked.Take(_options.ScanMaxNominationsPerRun).ToList();
         if (capped.Count < nominations.Count)
         {
             logger.LogWarning(
                 "Opportunity scan capped nominations at {Cap}; dropped {Dropped}: {DroppedTickers}",
                 _options.ScanMaxNominationsPerRun,
                 nominations.Count - capped.Count,
-                string.Join(", ", nominations.Skip(capped.Count).Select(n => n.Ticker)));
+                string.Join(", ", ranked.Skip(capped.Count).Select(n => n.Ticker)
+                    .Concat(nominations.Skip(shortlist.Count).Select(n => n.Ticker))));
         }
 
         var userIds = await ipsRepo.GetUserIdsWithCurrentIpsAsync(ct);
@@ -82,8 +89,37 @@ public sealed class OpportunityScanJob(
         }
 
         logger.LogInformation(
-            "Opportunity scan run: universe {Universe}, nominated {Nominated} (capped {Capped}), " +
+            "Opportunity scan run: universe {Universe}, nominated {Nominated} (graded {Graded}, capped {Capped}), " +
             "users {Users}, scored {Scored}, new candidates {New}, errors {Errors}",
-            universe.Count, nominations.Count, capped.Count, userIds.Count, scored, newCandidates, errors);
+            universe.Count, nominations.Count, shortlist.Count, capped.Count, userIds.Count, scored, newCandidates, errors);
+    }
+
+    /// <summary>
+    /// EDGAR fundamentals grade per shortlisted ticker. A ticker EDGAR cannot answer for — crypto,
+    /// ETFs, a delisted filer, an upstream failure — grades null and falls back to momentum-only
+    /// standing; one bad ticker never aborts the run (FR-013).
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, int?>> GradeFundamentalsAsync(
+        IReadOnlyList<ScanNomination> shortlist, CancellationToken ct)
+    {
+        var grades = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var nomination in shortlist)
+        {
+            try
+            {
+                var facts = await secEdgar.GetFundamentalsAsync(
+                    nomination.Ticker, FundamentalsScorer.FactsPerConcept, ct);
+                grades[nomination.Ticker] = FundamentalsScorer.Score(facts).Score;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                grades[nomination.Ticker] = null;
+                logger.LogWarning(ex,
+                    "Opportunity scan could not grade fundamentals for {Ticker}; ranking it on momentum only",
+                    nomination.Ticker);
+            }
+        }
+
+        return grades;
     }
 }

@@ -50,6 +50,18 @@ public sealed class OpportunityOptions
     /// <summary>Most nominations a single scan run may score; excess is logged and dropped (alert-flood guard).</summary>
     public int ScanMaxNominationsPerRun { get; set; } = 5;
 
+    /// <summary>
+    /// Momentum-ranked nominations whose EDGAR fundamentals a scan run grades before the combined
+    /// quality x momentum re-rank. Bounds the upstream EDGAR fan-out once the broad universe is on.
+    /// </summary>
+    public int ScanQualityShortlistSize { get; set; } = 25;
+
+    /// <summary>Weight (0-1) of the fundamentals grade in the combined scan score; the rest is the RS percentile.</summary>
+    public decimal ScanQualityWeight { get; set; } = 0.5m;
+
+    /// <summary>Fundamentals grade at/above this earns the stable quality x momentum nomination reason.</summary>
+    public int ScanQualityLeaderScore { get; set; } = 60;
+
     /// <summary>Hour (UTC) the daily opportunity scan runs — after Radar's 23:00 UTC compute job has refreshed structure.</summary>
     public int ScanHourUtc { get; set; } = 0;
 

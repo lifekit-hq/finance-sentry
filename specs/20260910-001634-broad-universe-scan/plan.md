@@ -51,12 +51,36 @@ Constraints discovered:
   `FreshnessMaxTradingDays` (2). Rotation makes most constituents older than that *by design*, so the
   watchdog must skip `IndexConstituent` members or it alarms nightly and buries real book outages.
 
-### US2 — quality × momentum nomination (next increment)
+### US2 — quality × momentum nomination (this increment)
 
-Surface (not yet touched): `Modules.Research/Domain/Scoring/ScanNominationRules.cs`,
-`OpportunityScanJob`, `OpportunityOptions`. Needs a combined score that joins the EDGAR fundamentals
-grade with the 018 structure/RS rank and caps nominations per run; must keep the existing
-deterministic-rules contract and its tests green.
+Surface:
+- `Modules.Research/Domain/Scoring/ScanNominationRules.cs` — `RankByQualityMomentum` + `ScanCandidateRank`.
+- `Modules.Research/Infrastructure/Jobs/OpportunityScanJob.cs` — grades a momentum shortlist through
+  EDGAR, re-ranks, then caps.
+- `Modules.Research/Application/Services/OpportunityOptions.cs` — `ScanQualityShortlistSize`,
+  `ScanQualityWeight`, `ScanQualityLeaderScore`.
+
+Decisions:
+- **Momentum first, quality second, both bounded.** The RS percentile is free (it is already in the
+  018 snapshot the scan reads), the EDGAR grade costs an upstream fetch per ticker. So the whole
+  ingested universe is momentum-ranked, the top `ScanQualityShortlistSize` (25) are graded, and the
+  combined score re-ranks only those. Grading 460 constituents per nightly run is not affordable and
+  a name outside the momentum top-25 was never going to take one of 5 slots.
+- **Combined score = `grade × w + rsPercentile × (1 − w)`**, `w = ScanQualityWeight` (0.5), both
+  inputs already on a 0-100 scale. Weight is clamped, so a misconfigured value degrades to
+  pure-quality/pure-momentum rather than producing nonsense.
+- **A ticker EDGAR cannot grade is never given a faked score** (house rule: sub-scores are null, not
+  defaulted). Ungraded names — crypto, ETFs, non-filers — keep their momentum-only standing and sort
+  after every graded name, so they stay nominatable without diluting the quality-first intent.
+- **Nomination reasons stay stable strings.** `QualityMomentumReason` is a constant tagged on names
+  at/above `ScanQualityLeaderScore`; a score-bearing reason string would defeat the candidate's
+  reason dedup and accumulate a near-duplicate every run.
+- The EDGAR service caches fundamentals per ticker with a TTL, so the shortlist grade and the
+  subsequent `ScoreCandidateCommand` fetch for the capped survivors share one upstream call.
+
+Constraint still open (T013): `MarketStructureReader.GetUniverseStructuresAsync` re-runs sector
+rotation + affinity per member (~14 queries each), so the scan's read cost grows with the broad
+universe even though nothing else does.
 
 Constraints found while shipping US1 — all bite only with the flag on, and all belong to the slice
 that turns it on:
