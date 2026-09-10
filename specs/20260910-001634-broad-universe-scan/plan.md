@@ -136,13 +136,22 @@ Surface: `Modules.Research/Infrastructure/Resources/sp500-constituents.json`,
 - **The seed is regenerated, not hand-curated.** Review flagged the list as possibly containing
   invented tickers. Verified independently against the actual ingestion source: 14 of the 450 seeded
   symbols did not resolve at Yahoo (`FI`, `MMC`, `BRK.B`, plus 11 names since acquired or taken
-  private — `WBA`, `HES`, `ANSS`, `DFS`, `MRO`, `K`, `IPG`, `DAY`, `BK`, `HOLX`, `CTRA`). The file is
-  now generated from the public constituents dataset with every one of its 503 symbols probed
-  individually (503/503 resolved), and the recipe is recorded in the file's own `note` so the next
-  refresh is reproducible instead of remembered.
+  private — `WBA`, `HES`, `ANSS`, `DFS`, `MRO`, `K`, `IPG`, `DAY`, `BK`, `HOLX`, `CTRA`). A further
+  21 still resolve as tickers but have left the index, so the regeneration drops 35 names and adds
+  88. The file is now generated from the public constituents dataset with every one of its 503
+  symbols probed individually (503/503 resolved on 2026-09-10 — point-in-time, not a standing
+  guarantee), and the recipe is recorded in the file's own `note` so the next refresh is reproducible
+  instead of remembered.
+- **Renames orphan history.** `FI`→`FISV`, `MMC`→`MRSH`, `BK`→`BNY`, `AVB`→`VMRK` mean the bars,
+  analyst actions and valuation snapshots stored under the old symbol are no longer reachable from
+  the new member. Acceptable here — the broad universe re-ingests 300 days of bars on rotation
+  anyway — but a ticker alias map is the real fix if renames ever touch a *held* name.
 - **Budget follows the seed size.** 503 names at 275/run is the same ~1.8-run rotation the 450-name
   seed had at 250 — the invariant is "a full rotation inside `FreshnessMaxTradingDays`", so the
-  number moves when the seed does.
+  number moves when the seed does. Note the margin is thin and unmonitored: two runs against a
+  two-trading-day bound, and constituents are exempt from the freshness watchdog by design, so a
+  skipped ingestion run silently drops the tail of the rotation out of the ranking rather than
+  alarming. Widening `BroadUniverseMaxIngestPerRun` toward 503 buys margin at upstream-fetch cost.
 - **The flag is enabled in the API host's `appsettings.json`, not flipped in code.** The `RadarOptions`
   default stays `false` so every other host and every test that does not opt in is unaffected;
   precedent is `Retention:Downsample:Enabled`, gated the same way. Disable is the same key set to

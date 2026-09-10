@@ -50,6 +50,8 @@ public sealed class BroadUniverseScanSeamTests
         var entry = universe.Should().ContainSingle(e => e.Ticker == Constituent).Subject;
         entry.IsEtfLens.Should().BeFalse(
             "IndexConstituent is an ordinary ticker, not a lens the scanner reads the market through");
+        // Left at the production freshness bound: `Evaluate` drops stale entries, so a test that
+        // widened the bound would assert freshness it had itself guaranteed.
         entry.Snapshot.Stale.Should().BeFalse();
         entry.Snapshot.RsByWindow.Should().ContainKey(ScanNominationRules.RsWindowBars)
             .WhoseValue.Should().NotBeNull("without an RS value the ranking has no momentum half to score");
@@ -113,7 +115,6 @@ public sealed class BroadUniverseScanSeamTests
             SectorTickers = [Sector],
             IndustryTickers = [],
             BroadUniverseEnabled = true,
-            FreshnessMaxTradingDays = int.MaxValue,
         });
 
         var universeRepo = new RadarUniverseRepository(db);
