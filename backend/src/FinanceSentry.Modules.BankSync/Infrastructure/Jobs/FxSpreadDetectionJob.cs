@@ -6,8 +6,8 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Daily sentinel (044/US4): fires an FxSpread alert when a specific cross-currency conversion
@@ -26,16 +26,9 @@ public sealed class FxSpreadDetectionJob(
     BankSyncDbContext db,
     ITransferDetectionService transferDetection,
     IAlertGeneratorService alerts,
-    IConfiguration config,
+    IOptions<HygieneSentinelsOptions> options,
     ILogger<FxSpreadDetectionJob> logger)
 {
-    private const int DefaultLookbackDays = 3;
-    private const decimal DefaultSpreadThreshold = 0.03m;
-
-    // The FX refresh job runs daily, so 48h tolerates one missed run before the sentinel
-    // stands down rather than measuring against a rate nobody can vouch for.
-    private const int DefaultMaxRateAgeHours = 48;
-
     // The transfer matcher's default cross-currency tolerance (5%) exists to REJECT pairs that
     // deviate from the market rate — but a costly conversion deviates by exactly the spread we
     // are hunting. Widen the amount tolerance for this sentinel so a pair losing up to ~30% to
@@ -45,9 +38,8 @@ public sealed class FxSpreadDetectionJob(
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var lookbackDays = config.GetValue("HygieneSentinels:FxSpreadLookbackDays", DefaultLookbackDays);
-        var threshold = config.GetValue("HygieneSentinels:FxSpreadThreshold", DefaultSpreadThreshold);
-        var since = DateTime.UtcNow.AddDays(-lookbackDays);
+        var threshold = options.Value.FxSpreadThreshold;
+        var since = DateTime.UtcNow.AddDays(-options.Value.FxSpreadLookbackDays);
 
         // This is the one sentinel that judges a rate against a rate, so the reference has to be
         // a real one. CurrencyConverter seeds itself with hardcoded constants (EUR 1.08, UAH
@@ -58,8 +50,7 @@ public sealed class FxSpreadDetectionJob(
         // tick re-examines it. An outage past MaxRateAge + FxSpreadLookbackDays does lose the
         // conversions that age out meanwhile: a fair trade against alerting on fiction, and the
         // skip is logged so the outage is visible.
-        var maxRateAge = TimeSpan.FromHours(
-            config.GetValue("HygieneSentinels:FxSpreadMaxRateAgeHours", DefaultMaxRateAgeHours));
+        var maxRateAge = TimeSpan.FromHours(options.Value.FxSpreadMaxRateAgeHours);
         if (!CurrencyConverter.AreRatesFresh(maxRateAge))
         {
             logger.LogWarning(
@@ -69,16 +60,10 @@ public sealed class FxSpreadDetectionJob(
             return;
         }
 
-        // Liveness policy (aligned across all 044 sentinels): only transactions on active
-        // accounts participate — a disconnected account's history must not raise new alerts.
-        IReadOnlyList<AccountInfo> allAccounts;
+        ActiveAccountSnapshot accounts;
         try
         {
-            allAccounts = await db.BankAccounts
-                .AsNoTracking()
-                .Where(a => a.IsActive)
-                .Select(a => new AccountInfo(a.Id, a.UserId, a.Currency))
-                .ToListAsync(ct);
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
         }
         catch (Exception ex)
         {
@@ -86,27 +71,42 @@ public sealed class FxSpreadDetectionJob(
             return;
         }
 
-        var multiCurrencyUsers = allAccounts
+        var multiCurrencyUsers = accounts.Accounts
             .GroupBy(a => a.UserId)
             .Where(g => g.Select(a => a.Currency).Distinct().Count() >= 2)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         if (multiCurrencyUsers.Count == 0) return;
 
-        var relevantAccountIds = allAccounts
-            .Where(a => multiCurrencyUsers.ContainsKey(a.UserId))
-            .Select(a => a.AccountId)
-            .ToHashSet();
-
         IReadOnlyList<Transaction> transactions;
         try
         {
-            var accountIds = relevantAccountIds.ToList();
+            var accountIds = accounts.Accounts
+                .Where(a => multiCurrencyUsers.ContainsKey(a.UserId))
+                .Select(a => a.AccountId)
+                .ToList();
+
+            // Settled legs only. A hold's amount is provisional, and a cross-currency conversion
+            // is precisely where the bank revises it on settlement — so an implied rate divided
+            // out of a hold is a rate nobody was charged. The hold also outlives its settled twin
+            // here: PendingReconciler retires a hold by matching it to a posted row on amount, and
+            // an FX hold settles at a different amount, so both rows stay active and pair
+            // independently — two alerts for one conversion, under two debit ids the dedup key
+            // cannot join.
+            //
+            // Accepted gap: a Monobank hold settles in place and keeps its original date, so one
+            // clearing more than FxSpreadLookbackDays after it was made becomes eligible only once
+            // it has already aged out of the window. Widening the select to
+            // (PostedDate ?? TransactionDate) does NOT close it — no adapter ever sets PostedDate
+            // to a later settlement time (Monobank writes the transaction date even for a hold,
+            // TrueLayer writes null and then the replacement posted row's own date), so that read
+            // selects the same rows. Closing it needs a real settled-at stamp from ingest.
             transactions = await db.Transactions
                 .AsNoTracking()
                 .Where(t => accountIds.Contains(t.AccountId)
                          && t.TransactionDate >= since
-                         && t.IsActive)
+                         && t.IsActive
+                         && !t.IsPending)
                 .ToListAsync(ct);
         }
         catch (Exception ex)
@@ -181,6 +181,4 @@ public sealed class FxSpreadDetectionJob(
         var toUsd = CurrencyConverter.ToUsd(1m, toCurrency);
         return toUsd > 0m ? fromUsd / toUsd : 0m;
     }
-
-    private sealed record AccountInfo(Guid AccountId, Guid UserId, string Currency);
 }

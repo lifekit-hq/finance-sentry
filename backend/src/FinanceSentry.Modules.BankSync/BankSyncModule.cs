@@ -55,10 +55,10 @@ public static class BankSyncModule
                 job => job.RunAsync(CancellationToken.None),
                 Cron.Weekly());
 
-            mgr.AddOrUpdate<UnusualSpendDetectionJob>(
-                "unusual-spend-detection",
-                job => job.ExecuteAsync(CancellationToken.None),
-                Cron.Daily());
+            // Retired by 044: CategorySpikeDetectionJob supersedes it. Hangfire keeps recurring
+            // definitions in storage, so an already-deployed schedule has to be withdrawn by name.
+            mgr.RemoveIfExists("unusual-spend-detection");
+
             mgr.AddOrUpdate<SubscriptionDetectionJob>(
                 "subscription-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
@@ -117,6 +117,7 @@ public static class BankSyncModule
             .Bind(config.GetSection(EncryptionOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<EncryptionOptions>, EncryptionOptionsValidator>();
+        services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
         services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
 
         // #493: rows written under the old key are re-encrypted on startup. Registered here
@@ -189,7 +190,6 @@ public static class BankSyncModule
         services.AddScoped<SyncScheduler>();
         services.AddScoped<DataRetentionJob>();
         services.AddScoped<CredentialBackupJob>();
-        services.AddScoped<UnusualSpendDetectionJob>();
         services.AddScoped<SubscriptionDetectionJob>();
         services.AddScoped<StaleSyncReaperJob>();
         services.AddScoped<ConsentExpiryReminderJob>();

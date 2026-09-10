@@ -4,6 +4,10 @@ public static class AlertType
 {
     public const string LowBalance = "LowBalance";
     public const string SyncFailure = "SyncFailure";
+    /// <summary>
+    /// Retired by 044 in favour of <see cref="CategorySpike"/> — nothing generates it any more. The
+    /// constant stays so alerts already stored under it keep resolving to a known type.
+    /// </summary>
     public const string UnusualSpend = "UnusualSpend";
     public const string ThesisBroken = "ThesisBroken";
     public const string MarketStructure = "MarketStructure";

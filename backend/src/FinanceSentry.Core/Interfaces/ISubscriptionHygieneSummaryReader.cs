@@ -10,7 +10,11 @@ public interface ISubscriptionHygieneSummaryReader
     Task<IReadOnlyList<SubscriptionHygieneSummary>> GetAllActiveAsync(CancellationToken ct = default);
 }
 
-/// <summary>Flat summary of one active subscription or installment, scoped to a single user.</summary>
+/// <summary>
+/// Flat summary of one active subscription or installment, scoped to a single user. Subscription and
+/// installment are deliberately not distinguished here: the price-hike sentinel treats a rising
+/// recurring charge the same either way, so carrying the kind would be a field nothing reads.
+/// </summary>
 public record SubscriptionHygieneSummary(
     Guid Id,
     Guid UserId,
@@ -19,7 +23,6 @@ public record SubscriptionHygieneSummary(
     decimal LastKnownAmount,
     string Currency,
     int OccurrenceCount,
-    string Kind,
     decimal? PreviousAmount = null)
 {
     /// <summary>

@@ -74,12 +74,40 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   `CurrencyConverter.AreRatesFresh(maxAge)` (`RatesUpdatedAtUtc` is null until the first
   refresh, and an ignored empty feed never moves it) and stand down rather than publish a
   figure. `FxSpreadDetectionJob` is the one such consumer today.
+- **Two amounts judged at a tolerance finer than the table's drift are partitioned, not
+  converted.** Converting is the right move when the result is a *total* — a few percent of
+  rate error degrades it and nothing else breaks. It is the wrong move when the converted
+  number is then compared against a threshold tighter than the error itself. `ToUsd`'s error is
+  not bounded by the seed's drift: `FallbackRates` seeds four currencies (USD/EUR/GBP/UAH) and
+  `ToUsd` returns anything else *unchanged*, so a PLN charge converts 1:1 and lands ~4× from its
+  dollar value — enough to fabricate a step, a plan switch or a third cluster out of nothing. Even
+  among the seeded four, a drift of a few percent against a 15% tolerance leaves no margin. The
+  freshness gate that `FxSpreadDetectionJob` uses is the obvious alternative and was declined
+  here: standing detection down on a stale table makes it intermittently blind to real hikes,
+  where partitioning costs only the charges from before the move. Subscription price detection
+  therefore prices a
+  merchant off the charges in the currency it bills *today*
+  (`SubscriptionDetectionAlgorithm.InCurrentBillingCurrency`) — a merchant's charges are grouped by
+  name alone, and a user's accounts span currencies, so without that partition moving a
+  subscription from a GBP card to a EUR one reads as a clean 18–27% "price hike" (inside every
+  repricing guard) that no merchant charged.
+- **An amount and its currency are restated together.** Any entity holding both must assign
+  both on every update path — `DetectedSubscription.UpdateFromDetection` takes `currency`
+  alongside the amounts for this reason. A row left labelled with the old currency while its
+  numbers changed unit is not a cosmetic mislabel: the spend summaries run
+  `ToUsd(amount, row.Currency)` over it, so the whole rate becomes the error.
 
 ## 4. Transaction lifecycle (pending / posted / dedup)
 
 - Dedup hash: `HMAC-SHA256(accountId|amount|date|description)`
   (`TransactionDeduplicationService`). Pending rows hash on `TransactionDate`; posted rows
   on `PostedDate`.
+- **`PostedDate` is not a settled-at stamp.** No adapter writes the time a row actually
+  cleared: `MonobankAdapter` sets it to the transaction date even for a hold,
+  `TrueLayerAdapter` writes null while pending and the row's own timestamp once posted. It is
+  therefore either equal to `TransactionDate` or null, never later. Reads that want "when did
+  this settle" cannot get it from here — `PostedDate ?? TransactionDate` (which §5 buckets on)
+  is a null-guard, not a different date.
 - **Settle-in-place**: if a posted candidate hashes identically to a stored *pending* row
   (Monobank holds keep their date when they clear), the stored row is flipped to posted
   (`ScheduledSyncService.PersistAndReconcileAsync`).
@@ -91,15 +119,29 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   copy never carried. Comparing raw text missed the twin, so neither row was retired and the
   payment counted twice in every figure derived from it. Normalization is deliberately narrow —
   only that stamp — since merging two genuinely distinct transactions is the worse failure.
+  The **amount** is compared as-is, so **a hold that settles at a different amount is never
+  retired** — it stays active alongside its posted row. That is routine for a cross-currency
+  charge, where the settled amount is the bank's, not the hold's.
 - **Sync lookback overlap**: settled transactions keep their original timestamp, so a pure
   watermark fetch would never re-observe them once the watermark passes — every
   incremental sync therefore re-reads a trailing 7-day window (`ResyncLookbackDays` in
   both adapters). Dedup makes the overlap idempotent; it is what feeds settle-in-place
   and the reconciler.
-- Net effect: a real purchase exists as exactly one active row; it may be `IsPending` for a
-  few days, then becomes posted either in place or via retire-and-replace. A hold that
-  takes longer than the lookback window to settle stays pending until a manual resync
-  (reset the account's `LastTransactionSyncAt`).
+- Net effect: a real purchase *usually* exists as exactly one active row; it may be
+  `IsPending` for a few days, then becomes posted either in place or via retire-and-replace.
+  A hold that takes longer than the lookback window to settle stays pending until a manual
+  resync (reset the account's `LastTransactionSyncAt`).
+- **The exception a reader must count on**: where the settled amount differs from the hold's,
+  neither settle-in-place (hashes differ) nor `PendingReconciler` (amounts differ) fires, and
+  the two rows coexist indefinitely. A reader that sums both double-counts the purchase; a
+  reader that divides one leg by another measures a rate nobody was charged. **A reader that
+  judges a figure per row therefore filters `!IsPending`** — `DuplicateChargeDetectionJob`,
+  `CategorySpikeDetectionJob`, `SubscriptionDetectionJob` and `FxSpreadDetectionJob` all do.
+  Monthly flow (§5) deliberately counts pending money and so does *not* filter it, and
+  therefore double-counts such a purchase. (Not the FX conversion above: both its legs carry
+  transfer categories and §5 excludes them either way.) Not yet addressed — what flow should
+  do with a hold whose posted twin it can already see is a policy decision, not a
+  reader-local filter.
 
 ## 5. Monthly inflow / outflow ("Spending (MTD)", "Monthly Outflow")
 

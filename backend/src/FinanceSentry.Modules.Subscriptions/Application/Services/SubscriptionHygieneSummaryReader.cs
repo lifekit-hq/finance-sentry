@@ -23,7 +23,6 @@ public class SubscriptionHygieneSummaryReader(SubscriptionsDbContext db) : ISubs
                 s.LastKnownAmount,
                 s.Currency,
                 s.OccurrenceCount,
-                s.Kind,
                 s.PreviousAmount))
             .ToListAsync(ct);
     }

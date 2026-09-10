@@ -310,10 +310,6 @@ public class RunThesisMonitorHandlerTests
         public Task ResolveSyncFailureAlertAsync(Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateUnusualSpendAlertAsync(
-            Guid userId, string category, decimal currentMonthSpend, decimal averageMonthlySpend, CancellationToken ct = default)
-            => Task.CompletedTask;
-
         public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
             => Task.CompletedTask;
 
@@ -376,8 +372,8 @@ public class RunThesisMonitorHandlerTests
             => Task.CompletedTask;
 
         public Task GenerateDuplicateChargeAlertAsync(
-            Guid userId, Guid accountId, string merchantName, decimal chargeAmount, string currency,
-            int chargeCount, CancellationToken ct = default)
+            Guid userId, Guid accountId, string merchantKey, string merchantName, decimal chargeAmount,
+            string currency, int chargeCount, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GenerateCategorySpikeAlertAsync(

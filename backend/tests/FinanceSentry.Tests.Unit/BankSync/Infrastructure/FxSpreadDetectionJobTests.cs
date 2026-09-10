@@ -8,7 +8,7 @@ using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -46,25 +46,23 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"fxspread-{Guid.NewGuid():N}").Options);
 
-    private static IConfiguration DefaultConfig() =>
-        new ConfigurationBuilder().Build();
-
-    private static IConfiguration ConfigWith(
+    private static IOptions<HygieneSentinelsOptions> OptionsWith(
         int lookbackDays, decimal threshold, int? maxRateAgeHours = null)
     {
-        var settings = new Dictionary<string, string?>
+        var options = new HygieneSentinelsOptions
         {
-            ["HygieneSentinels:FxSpreadLookbackDays"] = lookbackDays.ToString(),
-            ["HygieneSentinels:FxSpreadThreshold"] = threshold.ToString("F4"),
+            FxSpreadLookbackDays = lookbackDays,
+            FxSpreadThreshold = threshold,
         };
-        if (maxRateAgeHours is not null)
-            settings["HygieneSentinels:FxSpreadMaxRateAgeHours"] = maxRateAgeHours.Value.ToString();
+        if (maxRateAgeHours is not null) options.FxSpreadMaxRateAgeHours = maxRateAgeHours.Value;
 
-        return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        return Options.Create(options);
     }
 
-    private FxSpreadDetectionJob MakeJob(BankSyncDbContext db, IConfiguration? config = null) =>
-        new(db, new TransferDetectionService(), _alerts.Object, config ?? DefaultConfig(),
+    private FxSpreadDetectionJob MakeJob(
+        BankSyncDbContext db, IOptions<HygieneSentinelsOptions>? options = null) =>
+        new(db, new TransferDetectionService(), _alerts.Object,
+            options ?? Options.Create(new HygieneSentinelsOptions()),
             Mock.Of<ILogger<FxSpreadDetectionJob>>());
 
     private static BankAccount MakeAccount(Guid userId, string currency)
@@ -78,10 +76,11 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// Adapter convention: positive amount, direction in <c>TransactionType</c> ("debit"/"credit").
     /// </summary>
     private static Transaction MakeTx(BankAccount account, decimal amount, string type,
-        DateTime? date = null, string description = "tx", string? category = null)
+        DateTime? date = null, string description = "tx", string? category = null,
+        bool isPending = false)
     {
         var tx = new Transaction(account.Id, account.UserId, amount,
-            date ?? DateTime.UtcNow, description, Guid.NewGuid().ToString())
+            date ?? DateTime.UtcNow, description, Guid.NewGuid().ToString(), isPending)
         {
             TransactionType = type,
             MerchantCategory = category,
@@ -93,12 +92,14 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
     /// <summary>A debit+credit conversion pair carrying a transfer category on both legs.</summary>
     private static (Transaction Debit, Transaction Credit) MakeConversion(
         BankAccount fromAccount, decimal fromAmount, BankAccount toAccount, decimal toAmount,
-        DateTime date)
+        DateTime date, bool isPending = false)
     {
         var debit = MakeTx(fromAccount, fromAmount, "debit", date,
-            description: "Currency exchange", category: CategoryKeys.TransferOut);
+            description: "Currency exchange", category: CategoryKeys.TransferOut,
+            isPending: isPending);
         var credit = MakeTx(toAccount, toAmount, "credit", date,
-            description: "Currency exchange", category: CategoryKeys.TransferIn);
+            description: "Currency exchange", category: CategoryKeys.TransferIn,
+            isPending: isPending);
         return (debit, credit);
     }
 
@@ -147,7 +148,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
 
         // Zero tolerance is stale by definition (freshness is strict), so the table installed in
         // the constructor cannot satisfy it — no dependence on how much time has elapsed.
-        await MakeJob(db, ConfigWith(30, 0.03m, maxRateAgeHours: 0)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m, maxRateAgeHours: 0)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -266,7 +267,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
                 description: "Currency exchange", category: CategoryKeys.TransferIn));
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.03m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -311,7 +312,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.02m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.02m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             userId, debit.Id, "EUR", "UAH", 39m, EurUahMarketRate,
@@ -334,7 +335,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         db.Transactions.AddRange(debit, credit);
         await db.SaveChangesAsync();
 
-        await MakeJob(db, ConfigWith(30, 0.03m)).ExecuteAsync();
+        await MakeJob(db, OptionsWith(30, 0.03m)).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -390,6 +391,72 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
             Times.Once);
         _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
             userId, debit2.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// A hold's amount is provisional, and a cross-currency conversion is where the bank revises
+    /// it on settlement — so the implied rate divided out of a hold is a rate nobody was charged.
+    /// The sentinel waits for the settled figures rather than accusing on the provisional ones.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_NoAlert_WhenTheConversionIsStillOnHold()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        // The same figures the firing case alerts on, still pending on both legs.
+        var (debit, credit) = MakeConversion(
+            eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow, isPending: true);
+        db.Transactions.AddRange(debit, credit);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The hold outlives the settled conversion it became: <c>PendingReconciler</c> retires a hold
+    /// by matching it to a posted row on (account, amount, description), and an FX hold settles at
+    /// a different amount — so both rows stay active. Both pair, and the dedup key is the debit
+    /// transaction id, so one conversion produced two alerts under two ids nothing could join.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_AlertsOnce_WhenAHoldCoexistsWithTheSettledConversionItBecame()
+    {
+        await using var db = NewDb();
+        var userId = Guid.NewGuid();
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+
+        var date = DateTime.UtcNow;
+        // The hold quotes 100 EUR → 3600 UAH; it settles at 102 → 3672 (the same implied 36).
+        // Both legs moved, so neither matches its twin on amount and the hold is never retired.
+        var (heldDebit, heldCredit) = MakeConversion(
+            eurAccount, 100m, uahAccount, 3600m, date, isPending: true);
+        var (settledDebit, settledCredit) = MakeConversion(
+            eurAccount, 102m, uahAccount, 3672m, date);
+        db.Transactions.AddRange(heldDebit, heldCredit, settledDebit, settledCredit);
+        await db.SaveChangesAsync();
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            userId, settledDebit.Id, "EUR", "UAH", 36m, EurUahMarketRate,
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+        // …and that is the only alert: the hold contributed no second one.
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

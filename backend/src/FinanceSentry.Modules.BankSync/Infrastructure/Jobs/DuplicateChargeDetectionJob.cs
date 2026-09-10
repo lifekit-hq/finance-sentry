@@ -4,8 +4,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Daily sentinel (044/US2): fires a DuplicateCharge alert when the same merchant charges the same
@@ -13,34 +13,25 @@ using Microsoft.Extensions.Logging;
 /// from BankSyncDbContext — no external feed needed. Only debits count: a charge + its refund at the
 /// same merchant/amount is a round-trip, not a duplicate. Merchant names are normalized
 /// (via <see cref="MerchantNameNormalizer"/>) before grouping so case/whitespace/suffix variants of
-/// the same merchant still group together.
+/// the same merchant still group together; the alert itself names the merchant the way the statement
+/// spelled it. Charges the normalizer cannot name are skipped rather than fused under its sentinel key.
 /// </summary>
 public sealed class DuplicateChargeDetectionJob(
     BankSyncDbContext db,
     IAlertGeneratorService alerts,
-    IConfiguration config,
+    IOptions<HygieneSentinelsOptions> options,
     ILogger<DuplicateChargeDetectionJob> logger)
 {
-    private const int DefaultDuplicateWindowDays = 5;
-
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var windowDays = config.GetValue("HygieneSentinels:DuplicateWindowDays", DefaultDuplicateWindowDays);
-        var since = DateTime.UtcNow.AddDays(-windowDays);
+        var since = DateTime.UtcNow.AddDays(-options.Value.DuplicateWindowDays);
 
         IReadOnlyList<TransactionRow> rows;
-        Dictionary<Guid, string> currencyByAccount;
+        ActiveAccountSnapshot accounts;
         try
         {
-            // Liveness policy (aligned across all 044 sentinels): only transactions on active
-            // accounts participate — a disconnected account's history must not raise new alerts.
-            currencyByAccount = await db.BankAccounts
-                .AsNoTracking()
-                .Where(a => a.IsActive)
-                .Select(a => new { a.Id, a.Currency })
-                .ToDictionaryAsync(a => a.Id, a => a.Currency, ct);
-
-            var activeAccountIds = currencyByAccount.Keys.ToList();
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            var activeAccountIds = accounts.AccountIds;
 
             // Debit-only: adapters store amounts positive with TransactionType carrying the
             // direction ("debit"/"credit"); a signed negative amount is also a debit. A refund
@@ -75,13 +66,20 @@ public sealed class DuplicateChargeDetectionJob(
             if (group.Count() < 2) continue;
 
             var (accountId, merchantKey, amount) = group.Key;
+
+            // Every unnameable merchant normalizes to one sentinel key, so this group can hold two
+            // unrelated charges that merely share an amount — a duplicate claim we cannot support.
+            if (merchantKey == MerchantNameNormalizer.UnknownKey) continue;
+
             var userId = group.First().UserId;
-            var currency = currencyByAccount.TryGetValue(accountId, out var c) ? c : "USD";
+            var currency = accounts.CurrencyOf(accountId);
+            // The alert names the merchant the way the statement does; the key is for dedup only.
+            var merchantName = MerchantNameNormalizer.GetDisplayName(group.Select(r => r.MerchantName));
 
             try
             {
                 await alerts.GenerateDuplicateChargeAlertAsync(
-                    userId, accountId, merchantKey, amount, currency, group.Count(), ct);
+                    userId, accountId, merchantKey, merchantName, amount, currency, group.Count(), ct);
             }
             catch (Exception ex)
             {

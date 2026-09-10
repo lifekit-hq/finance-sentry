@@ -29,13 +29,6 @@ public interface IAlertGeneratorService
         Guid? accountId,
         CancellationToken ct = default);
 
-    Task GenerateUnusualSpendAlertAsync(
-        Guid userId,
-        string category,
-        decimal currentMonthSpend,
-        decimal averageMonthlySpend,
-        CancellationToken ct = default);
-
     Task DeleteAlertsForAccountAsync(
         Guid accountId,
         CancellationToken ct = default);
@@ -175,12 +168,14 @@ public interface IAlertGeneratorService
 
     /// <summary>
     /// Raises a Warning alert when the same merchant charges the same amount multiple times within
-    /// the detection window on the same account (044/US2). Deduped per (accountId, merchant, amount)
-    /// so a daily sentinel never re-fires while the alert is active.
+    /// the detection window on the same account (044/US2). Deduped per
+    /// (accountId, normalized merchant key, amount) so a daily sentinel never re-fires while the
+    /// alert is active; <paramref name="merchantName"/> is the raw statement name shown to the user.
     /// </summary>
     Task GenerateDuplicateChargeAlertAsync(
         Guid userId,
         Guid accountId,
+        string merchantKey,
         string merchantName,
         decimal chargeAmount,
         string currency,

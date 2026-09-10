@@ -7,7 +7,7 @@ Each detector is a Hangfire job in `FinanceSentry.Modules.BankSync/Infrastructur
 - BankSync's own `BankSyncDbContext` (transactions / accounts) for US2, US3, US4
 - A new Core port `ISubscriptionHygieneSummaryReader` (US1) — bridging to Subscriptions module
 
-Thresholds are read from `IConfiguration` under the `HygieneSentinels:*` keys. Each job is registered in `BankSyncModule.JobRegistrar` as a daily recurring job.
+Thresholds are bound from the `HygieneSentinels` config section into `HygieneSentinelsOptions` and injected as `IOptions<>`. Each job is registered in `BankSyncModule.JobRegistrar` as a daily recurring job.
 
 New alert types (`PriceHike`, `DuplicateCharge`, `CategorySpike`, `FxSpread`) are added to `AlertType`, `IAlertGeneratorService`, `AlertGeneratorService`, `CompanionEventKind`, and `MaterialityPolicy` in one PR each.
 
@@ -57,6 +57,62 @@ Tying the baseline's lifetime to `MinOccurrences` rather than to a time window b
 re-alerting to one further monthly cycle past the 30-day alert silence — the baseline clears on
 the third charge at the new price.
 
+## One merchant, one unit (US1)
+
+Detection groups a merchant's charges by normalized name alone, but a user's accounts span
+currencies — Monobank UAH, Revolut/AIB EUR, a UK card GBP — so one group can hold amounts in
+several units. Everything downstream of that group is a comparison between two amounts: the
+15% cluster tolerance, the CV stability gate, the `MaxPriceStepRatio` guard, and the
+`HikeBaseline` the sentinel divides by. Comparing across units silently compares two things.
+
+The damage is not theoretical and it is not the large gaps — ₴449 next to €10.99 is a 40×
+ratio that `MaxPriceStepRatio` already refuses. It is the pairs that sit *inside* the guards:
+GBP→EUR (≈1.18) and GBP→USD (≈1.27) both clear the 15% cluster tolerance, stay under the 2×
+step ratio, and form a clean chronological step, so moving a subscription from a GBP card to a
+EUR one manufactures a textbook repricing. The sentinel then fires a confident, correctly
+dedup'd 20% price-hike alert for a rise no merchant charged — and symmetrically, a move in the
+other direction masks a real hike behind a fabricated cut.
+
+Decision: a merchant's price series is the charges in the currency it bills **today**
+(`InCurrentBillingCurrency`, applied before `SplitAtPriceStep`). A retired currency leaves the
+series exactly as a retired plan does — it is no longer what the merchant bills.
+
+Which currency counts as today's takes the same minimum evidence a price does
+(`MinBaselineCharges`, the file's existing "one charge is not a price" constant). Without that
+gate the partition is a far worse bug than the one it fixes: a single purchase abroad at a
+merchant the user also subscribes to would retire nine months of established charges and
+delete the subscription outright. With it, the newcomer has to bill twice before it displaces
+anything, and until then the row keeps updating in the currency it is still billed in rather
+than going stale. A same-day tie between two established currencies carries no signal, so it
+is broken on the currency name — arbitrary, but the source is an unordered query result and
+the row must not differ between runs over identical data.
+
+Why not convert to a common unit through `CurrencyConverter.ToUsd`, which the backend rules
+otherwise mandate for cross-currency comparison: that rule governs *normalising magnitudes*,
+where an approximate rate degrades a total. Here the converted number is fed to a 15% cluster
+tolerance and a 15% hike threshold, and the converter's table is approximate by contract — it
+falls back to a hardcoded seed that a feed outage leaves standing, drifting the same order as
+the tolerance itself. Converting would hand a stale rate the power to manufacture the very
+step this guard exists to refuse, which is the mistake US4 already had to undo.
+
+Cost, accepted and bounded: a subscription mid-move carries only the charges in whichever
+currency is established, so between the newcomer's second charge and its third it can sit
+under `MinOccurrences` — one monthly cycle. Detection stops *reporting* the merchant for that
+cycle; it does not delete it, so the row stays on the list at its last known price, and if the
+charges really have stopped `MarkStaleAsPotentiallyCancelledAsync` flips it to *potentially
+cancelled* after ~45 days. The row it produced before this change was an average across two
+units, so nothing true is lost either way.
+
+The restated amounts have to carry their unit with them: `UpdateFromDetection` assigns
+`Currency` alongside them, because `GetSubscriptionSummaryQuery` and
+`GetInstallmentFxImpactQuery` run `ToUsd(amount, Currency)` over the row. A row left labelled
+GBP while its amounts turned into euros is not a cosmetic mislabel — it misstates the user's
+monthly spend total by the whole GBP/EUR rate.
+
+Not affected: `DetectInstallments` groups by `(merchant, rounded plan amount)`, so two
+currencies only share a plan when the same *number* is billed in both — and then the ratio is
+1:1 and no step can be fabricated. It is bounded by its own grouping key, not by luck.
+
 Known limits, both consequences of reading detection's output rather than the raw series:
 - `AmountClusterTolerance` sets the floor on what a hike can be. A step under 15% never leaves
   its cluster, so it has no baseline and is still measured against a diluted average; lowering
@@ -86,6 +142,15 @@ Known limits, both consequences of reading detection's output rather than the ra
 - NEW `backend/src/FinanceSentry.Modules.Subscriptions/Migrations/20260906000000_M006_AddPreviousAmount.cs` (+ Designer, snapshot)
 - EDIT `ISubscriptionHygieneSummaryReader.cs` — `PreviousAmount` + `HikeBaseline`; reader projects it
 - NEW `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/PriceHikeSentinelPipelineTests.cs` — detect → persist → read → alert
+
+### Single-currency follow-up (a change of unit is not a change of price)
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/SubscriptionDetectionJob.cs` — `InCurrentBillingCurrency`
+- EDIT `backend/src/FinanceSentry.Modules.Subscriptions/Domain/DetectedSubscription.cs` — `UpdateFromDetection` restates `Currency`
+- EDIT `backend/src/FinanceSentry.Modules.Subscriptions/Application/Services/SubscriptionDetectionResultService.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Application/Subscriptions/SubscriptionDetectionAlgorithmTests.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/PriceHikeSentinelPipelineTests.cs`
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Subscriptions/DetectedSubscriptionTests.cs` — the restatement itself
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Subscriptions/GetSubscriptionSummaryQueryHandlerTests.cs` — why the restatement matters beyond the sentinel: `GetSubscriptionSummaryQuery.MonthlyInBaseCurrency` runs `ToUsd` over the stored `Currency`, so a row holding new amounts under the old unit misstates the monthly total by the whole ratio between the two rates (₴→$ 0.024 against €→$ 1.08 is 45×)
 
 ## [US2] Duplicate charge — files touched
 - EDIT `backend/src/FinanceSentry.Modules.Alerts/Domain/AlertType.cs` — add `DuplicateCharge`
@@ -143,15 +208,156 @@ skip is logged each tick so the outage is visible. `UpdateRates` ignores a null/
 *including* the freshness stamp, so an outage cannot masquerade as a refresh. A non-positive
 `MaxRateAgeHours` is never fresh, which is also the sentinel's off switch.
 
-Not in this slice: the sentinel filters `t.IsActive` but not `t.IsPending`, and a pending leg
-coexists with its posted twin as a separate active row. The two can pair with different credits and
-alert twice for one conversion, since the dedup key is the debit transaction id. Fixing it means
-deciding what `TransferDetectionService` should do with pending legs, which cash-flow also depends
-on — its own change.
+### Settled-conversion follow-up (a hold is not a conversion)
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/FxSpreadDetectionJob.cs` — `!t.IsPending` on the transaction read
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/BankSync/Infrastructure/FxSpreadDetectionJobTests.cs`
+
+The sentinel filtered `t.IsActive` but not `t.IsPending`, and it divides one leg amount by the
+other to get the rate it accuses the bank over. A hold's amount is provisional, and a
+cross-currency conversion is exactly the case a bank revises on settlement — so the implied rate
+taken from a hold is a rate nobody was charged, the same class of fiction the stale-rate stand-down
+above already refused.
+
+The double-alert is worse than "the two rows overlap for a tick". `PendingReconciler` retires a
+hold by matching it to a posted row on `(account, amount, description)`, and an FX hold that
+settles at a different amount never matches — so it lingers active indefinitely, pairs on its own,
+and alerts under a debit id the settled row's dedup key cannot join. One conversion, two permanent
+alerts.
+
+Decision: measure settled legs only. `TransferDetectionService` is untouched — its documented
+inclusion of pending rows is cash-flow's requirement (a pending transfer leg must still be excluded
+from income/spending), and this sentinel narrows its own read rather than changing a policy another
+consumer depends on.
+
+Accepted gap, stated because the obvious fix does not work. Waiting for settlement can drop a slow
+one: `ScheduledSyncService` settles a Monobank hold **in place**, keeping the row's original date,
+so a hold clearing more than `FxSpreadLookbackDays` after it was made becomes eligible only once it
+has aged out of the window. Widening the select to `PostedDate ?? TransactionDate` — the date
+money-flow buckets on and the transfer matcher pairs on — looks like the fix and is not: no adapter
+ever writes a later settlement time there. `MonobankAdapter` sets `PostedDate` to the transaction
+date even for a hold, and `TrueLayerAdapter` writes null while pending and the replacement posted
+row's own date after, which `TransactionDate` already carries. The COALESCE would select exactly
+the same rows, so it was reverted rather than shipped as an inert guard. Closing the gap means
+giving ingest a real settled-at stamp — a change to the adapter contract, and its own slice.
+
+The TrueLayer path needs nothing: settlement inserts a new posted row carrying the settled date,
+which the plain `TransactionDate` window catches on the next daily tick.
+
+### Sentinel hardening (the review pass, US1–US4 shipped)
+- DELETE `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/UnusualSpendDetectionJob.cs` — the sign predicate no ingest path can satisfy made it inert; `CategorySpikeDetectionJob` supersedes it
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/BankSyncModule.cs` — drop the registration, `RemoveIfExists` the deployed schedule
+- EDIT `backend/src/FinanceSentry.Modules.Alerts/Application/Services/AlertGeneratorService.cs` — one `EmitAsync` + a silence-window table replace 17 hand-rolled find-active/HasRecent/Add blocks
+- EDIT `backend/src/FinanceSentry.Core/Interfaces/IAlertGeneratorService.cs` — drop the retired `GenerateUnusualSpendAlertAsync`; duplicate-charge takes key **and** display name
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/DuplicateChargeDetectionJob.cs` — skip the unnameable-merchant group, name the merchant the way the statement did
+- EDIT `backend/tests/FinanceSentry.Tests.Unit/Alerts/AlertGeneratorServiceTests.cs`, `.../BankSync/Infrastructure/DuplicateChargeDetectionJobTests.cs`
+
+The dedup discipline (an open alert on the same reference wins, then the type's silence window) was
+restated in every generator, so each new alert type re-derived it and the four this feature added
+went untested. It is now one method and one table. Two generators legitimately opt out — `JobFailure`
+and `PerformanceBrief` want a row per occurrence, and a risk-rule *override* is recorded
+unconditionally — so the opt-out is named (`Dedup`) rather than implied by an absent gate.
+
+Looking a window up by alert type turns a missing entry into a `KeyNotFoundException` inside a
+background job. A reflection test asserts every live `AlertType` constant has one; `UnusualSpend` is
+listed there as retired, which is the only place the retirement has to be remembered.
+
+The duplicate-charge alert named the merchant by its normalized key ("claude" for a charge the
+statement calls "Anthropic* Claude Sub"). The raw name now rides alongside and fills the title and
+message. It stops there: `ReferenceLabel` is what `HasRecentAsync` matches on, so it stays the
+normalized key — the raw name has no stable value for a group spelled two ways (there is no majority
+spelling), and rows written before this change carry the key, so a label switch would quietly retire
+the backstop that guards a dismissed alert. Charges whose merchant
+the normalizer cannot name all collapse to `MerchantNameNormalizer.UnknownKey`, so two unrelated
+unnamed charges sharing an amount looked like a duplicate: that group is now skipped.
+
+### Sentinel hardening II — the detector's algorithm leaves the job
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Application/Services/SubscriptionDetectionAlgorithm.cs`
+- EDIT `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/SubscriptionDetectionJob.cs` — read, hand over, persist
+- EDIT the four test files that constructed `TxRow` through the job
+
+`SubscriptionDetectionJob` had grown into a Hangfire job carrying the whole recurrence/clustering
+algorithm as public statics — `DetectSubscriptions`, `DetectInstallments`, `SplitAtPriceStep`,
+`InCurrentBillingCurrency`, plus two DTO records and every tuning constant but one. The price-hike work
+above added ~85 lines to it, all of them decisions about what a subscription *is*, none of them
+about scheduling or persistence. Four test suites — including
+`SubscriptionDetectionAlgorithmTests`, already named and filed under
+`tests/…/BankSync/Application/Subscriptions/` — had to reach into `Infrastructure.Jobs` to build a
+`TxRow`, which is the structural smell stated out loud: the tests knew where the algorithm belonged
+before the code did.
+
+The split is by dependency, not by line count. `SubscriptionDetectionAlgorithm` is a static class
+in `Application/Services/` alongside `MerchantNameNormalizer` and `InstallmentPlanRecognizer` (the
+collaborators it already called): pure, synchronous, no `DbContext`, no clock, no logger. The job
+keeps exactly what needs infrastructure — the transaction query, `LookbackMonths` that bounds it,
+the per-user loop with its per-user `catch`, and the two `resultService` calls.
+
+`LookbackMonths` stays on the job deliberately: it selects which rows are fed in, so it belongs to
+the read, not to the judgment. The algorithm's documented limit (an annual subscription cannot
+produce a hike baseline) is a consequence of that window, which is why the constant now says so.
+
+Behaviour is unchanged — no test was added, weakened, or retuned; the 914 unit tests pass as
+written apart from the type name they call through.
+
+### Sentinel hardening II — the shared reads, the bound thresholds, the pinned denominator
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Application/Services/HygieneSentinelsOptions.cs`
+- NEW `backend/src/FinanceSentry.Modules.BankSync/Infrastructure/Jobs/ActiveAccountSnapshot.cs`
+- NEW `backend/tests/FinanceSentry.Tests.Unit/BankSync/Application/HygieneSentinelsOptionsTests.cs`
+- EDIT the four sentinel jobs (`IConfiguration` → `IOptions<HygieneSentinelsOptions>`; three of them
+  drop their copy of the active-accounts read), `BankSyncModule.cs` (`Configure<>`),
+  `ISubscriptionHygieneSummaryReader.cs` + `SubscriptionHygieneSummaryReader.cs` (drop `Kind`), and
+  the five sentinel test files
+
+Three things the review pass over US1–US4 left, each a way for a later change to go wrong quietly:
+
+**The thresholds were six string literals** repeated across four jobs and four test files, each with
+its own in-code default. A typo in a key name is not an error — `GetValue` returns the default, and
+that sentinel silently runs on a setting nobody chose. `HygieneSentinelsOptions` gives every
+threshold one name the compiler checks; `HygieneSentinelsOptionsTests` holds the deployed appsettings
+key spellings and the documented defaults, so renaming a property fails a test instead of orphaning a
+deployed key. The shape follows `AnalyticsOptions`/`RadarOptions` — `SectionName` const, settable
+properties carrying the defaults, `services.Configure<>` in the module. The binding test reads the
+shipped `appsettings.json` and layers overrides on top of it, so it is not the circular
+bind-your-own-literals check it would otherwise be: a renamed property leaves its deployed key
+unbound and the assertion sees the shipped value instead.
+
+**The liveness policy was copy-pasted three times.** "Only transactions on active accounts
+participate" is one decision, and it was restated (comment included) in each of the duplicate-charge,
+category-spike and FX-spread jobs, twice as a currency map plus id list and once as a triple list.
+`ActiveAccountSnapshot` reads it once and answers all three shapes. Its `CurrencyOf` throws on a miss
+rather than falling back to `"USD"`: callers only ask about accounts whose rows they selected through
+`AccountIds`, so a miss is a broken caller, not a data case — the old fallback was unreachable
+defensiveness that would have converted hryvnia as dollars if it ever *had* been reachable.
+
+**The category-spike baseline divided by the months that held rows for the category,** which made the
+sentinel weakest exactly where a spike is most visible: a category billed in 3 of 6 months carried a
+baseline twice its true monthly average, so the multiplier had to be cleared against a number no
+month ever spent.
+
+The denominator is now the months the *user* was observed for, capped at `BaselineMonths`. Both
+extremes are wrong and for different reasons. Dividing by the months holding rows for the category
+treats a month the user simply did not shop that category as if it never happened — but it is a real
+zero and belongs in the average. Dividing unconditionally by 6 makes the opposite mistake at the
+other boundary: months before the user's first transaction are *no data*, not zeros, so a freshly
+connected account would have every category deflated to two-thirds at once and be greeted with an
+alert burst. Taking the first observed month as the window's start separates the two: a gap inside
+the observed span is a zero, a gap before it is nothing.
+
+`MinHistoryMonths` (4) keeps a merely *new* category from firing off one month of history, which is a
+separate gate from the denominator — one variable had been serving both.
+`ExecuteAsync_DividesBaselineByWindow_NotByMonthsHoldingSpend` and
+`ExecuteAsync_DividesByMonthsObserved_WhenUserIsNewerThanTheWindow` pin the two sides on USD accounts
+(so `ToUsd` is the identity), each with a fixture where the candidate denominators disagree on the
+alert as well as on the number — nine of the eleven existing tests asserted the emitted baseline with
+`It.IsAny<decimal>()` and would have passed either way.
+
+`SubscriptionHygieneSummary.Kind` was projected, persisted and built in every fixture, and read by
+nobody — the price-hike sentinel treats a rising recurring charge the same whether it is a
+subscription or an installment. Dropped.
 
 ## Constraints
 - DetectedSubscription.UserId is `string`; BankAccount.UserId is `Guid` — convert at the adapter boundary with `Guid.Parse(s.UserId)`
-- All amounts compared cross-currency must go through `CurrencyConverter.ToUsd` before comparison
-- Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. Pre-existing `UnusualSpendDetectionJob` still filters on `t.Amount < 0` alone and is therefore inert — out of scope here, tracked as follow-up
+- Amounts summed or ranked across currencies go through `CurrencyConverter.ToUsd` first. Amounts compared to each other at a tolerance finer than the rate table's drift (the price-hike clustering and threshold) are not converted — they are partitioned by currency instead, so nothing is compared across units at all
+- Spend is selected by direction, never by sign: adapters persist a positive `Transaction.Amount` with `TransactionType` = `"debit"`/`"credit"`, and every persist path runs `Transaction.ValidateInvariants`, which rejects a negative amount. The 044 sentinels that filter for outflows (`DuplicateChargeDetectionJob`, `CategorySpikeDetectionJob`) use `(t.Amount < 0 || t.TransactionType == "debit")` and exclude `IsPending` — pending and posted rows coexist, so counting both doubles a month's spend. The `Amount < 0` arm is defensive; no ingest path can produce such a row. `UnusualSpendDetectionJob` filtered on `t.Amount < 0` alone and was therefore inert — it is deleted, superseded by `CategorySpikeDetectionJob`, and its Hangfire schedule withdrawn by name
+- No sentinel measures a pending row. `DuplicateChargeDetectionJob` and `CategorySpikeDetectionJob` exclude it because a hold counted alongside its posted twin doubles a month's spend; `FxSpreadDetectionJob` excludes it because a hold's amount is provisional and it divides one amount by another. `TransferDetectionService` keeps including pending rows — that is cash-flow's requirement, not a sentinel's
 - BankSync job can inject `ISubscriptionHygieneSummaryReader` without a project reference to Subscriptions — DI resolves at runtime via the composition root
 - `CurrencyConverter`'s table is only guaranteed *approximate*: unknown currencies fall back 1:1 and known ones fall back to a hardcoded seed. Normalising a total may rely on it; comparing one rate to another may not — gate on `AreRatesFresh` first

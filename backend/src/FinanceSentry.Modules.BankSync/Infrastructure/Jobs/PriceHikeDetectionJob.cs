@@ -1,8 +1,9 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Daily sentinel (044/US1): fires a PriceHike alert when a recurring subscription or installment's
@@ -13,15 +14,14 @@ using Microsoft.Extensions.Logging;
 public sealed class PriceHikeDetectionJob(
     ISubscriptionHygieneSummaryReader subscriptions,
     IAlertGeneratorService alerts,
-    IConfiguration config,
+    IOptions<HygieneSentinelsOptions> options,
     ILogger<PriceHikeDetectionJob> logger)
 {
-    private const decimal DefaultPriceHikeThreshold = 0.15m;
     private const int MinOccurrences = 3;
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var threshold = config.GetValue("HygieneSentinels:PriceHikeThreshold", DefaultPriceHikeThreshold);
+        var threshold = options.Value.PriceHikeThreshold;
 
         IReadOnlyList<SubscriptionHygieneSummary> all;
         try

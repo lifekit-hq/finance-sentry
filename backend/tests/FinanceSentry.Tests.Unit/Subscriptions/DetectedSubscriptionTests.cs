@@ -66,7 +66,7 @@ public class DetectedSubscriptionTests
         mortgage.Status.Should().Be(SubscriptionStatus.Active);
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m,
+            "516936******4992", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2036, 5, 11), new DateOnly(2036, 6, 11),
             13, 100, null, SubscriptionKinds.Installment);
 
@@ -79,7 +79,7 @@ public class DetectedSubscriptionTests
         var mortgage = CreateInstallment(display: "Іпотека");
 
         mortgage.UpdateFromDetection(
-            "516936******4992", 14060.96m, 14060.96m,
+            "516936******4992", 14060.96m, 14060.96m, "UAH",
             new DateOnly(2026, 9, 11), new DateOnly(2026, 10, 11),
             4, 100, null, SubscriptionKinds.Installment);
 
@@ -92,10 +92,29 @@ public class DetectedSubscriptionTests
         var plan = CreateInstallment(display: "ТОВ Алло");
 
         plan.UpdateFromDetection(
-            "ТОВ Алло - monomarket", 2339.95m, 2339.95m,
+            "ТОВ Алло - monomarket", 2339.95m, 2339.95m, "UAH",
             new DateOnly(2026, 9, 5), new DateOnly(2026, 10, 5),
             5, 100, null, SubscriptionKinds.Installment);
 
         plan.MerchantNameDisplay.Should().Be("ТОВ Алло - monomarket");
+    }
+
+    [Fact]
+    public void UpdateFromDetection_BillingMovedToAnotherCurrency_RestatesTheUnitWithTheAmounts()
+    {
+        // Detection re-runs daily onto the row it already wrote. When the merchant's billing
+        // moves to an account in another currency, the amounts it hands back are in that new
+        // unit — so a row that kept its old Currency would label euros as hryvnia, and
+        // GetSubscriptionSummaryQuery converts it through ToUsd at the wrong rate.
+        var plan = CreateInstallment(amount: 14060.96m);
+        plan.Currency.Should().Be("UAH");
+
+        plan.UpdateFromDetection(
+            "Іпотека", 320.50m, 320.50m, "EUR",
+            new DateOnly(2026, 9, 11), new DateOnly(2026, 10, 11),
+            4, 100, null, SubscriptionKinds.Installment);
+
+        plan.Currency.Should().Be("EUR");
+        plan.LastKnownAmount.Should().Be(320.50m);
     }
 }

@@ -1,7 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application.Subscriptions;
 
 using FinanceSentry.Modules.BankSync.Application.Services;
-using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FluentAssertions;
 using Xunit;
 
@@ -14,7 +13,7 @@ public class CommitmentKeyResolverTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private static SubscriptionDetectionJob.TxRow InstallmentTx(
+    private static SubscriptionDetectionAlgorithm.TxRow InstallmentTx(
         string description, decimal amount, int monthsAgo, int? mcc = null) =>
         new(UserId, null, description, amount,
             new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc).AddMonths(-monthsAgo),
@@ -83,7 +82,7 @@ public class CommitmentKeyResolverTests
         // The drift guard: run the real detector over a batch of repayments, then re-derive
         // each transaction's key from the transaction alone. Every stored plan key must be
         // reachable, or committed installment spend reads as discretionary.
-        var transactions = new List<SubscriptionDetectionJob.TxRow>
+        var transactions = new List<SubscriptionDetectionAlgorithm.TxRow>
         {
             InstallmentTx("Щомісячний платіж telemart - monomarket", 6499.84m, 2),
             InstallmentTx("Щомісячний платіж telemart - monomarket", 6499.85m, 1),
@@ -92,7 +91,7 @@ public class CommitmentKeyResolverTests
             InstallmentTx("Платіж Pandora", 1200m, 1, mcc: 4829),
         };
 
-        var storedKeys = SubscriptionDetectionJob.DetectInstallments(transactions)
+        var storedKeys = SubscriptionDetectionAlgorithm.DetectInstallments(transactions)
             .Select(d => d.MerchantNameNormalized)
             .ToHashSet(StringComparer.Ordinal);
 

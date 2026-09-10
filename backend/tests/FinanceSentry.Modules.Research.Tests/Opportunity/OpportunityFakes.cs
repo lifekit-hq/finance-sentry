@@ -173,7 +173,6 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task ResolveLowBalanceAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateSyncFailureAlertAsync(Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveSyncFailureAlertAsync(Guid userId, string provider, Guid? accountId, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GenerateUnusualSpendAlertAsync(Guid userId, string category, decimal currentMonthSpend, decimal averageMonthlySpend, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateThesisBreakAlertAsync(Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveThesisBreakAlertAsync(Guid userId, Guid thesisId, CancellationToken ct = default) => Task.CompletedTask;
@@ -185,7 +184,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateCashShortfallAlertAsync(Guid userId, Guid accountId, string accountName, DateOnly shortfallDate, decimal shortfallAmount, string currency, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCashShortfallAlertAsync(Guid userId, Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePriceHikeAlertAsync(Guid userId, Guid subscriptionId, string merchantName, decimal baselineAmount, decimal currentAmount, string currency, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GenerateDuplicateChargeAlertAsync(Guid userId, Guid accountId, string merchantName, decimal chargeAmount, string currency, int chargeCount, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateDuplicateChargeAlertAsync(Guid userId, Guid accountId, string merchantKey, string merchantName, decimal chargeAmount, string currency, int chargeCount, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCategorySpikeAlertAsync(Guid userId, string category, decimal currentMonthSpend, decimal baselineSpend, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFxSpreadAlertAsync(Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency, decimal impliedRate, decimal marketRate, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, CancellationToken ct = default) => Task.CompletedTask;

@@ -18,7 +18,7 @@ using FinanceSentry.Core.Interfaces;
 /// same key AND an amount that fits the plan. This is the only way to reach a mortgage, whose
 /// description is a masked card number («516936******4992») carrying no wording any keyword
 /// could match. The detector already labels such a plan <c>installment</c> (see
-/// <c>SubscriptionDetectionJob.DetectSubscriptions</c>), so the categorizer trusts that label
+/// <see cref="SubscriptionDetectionAlgorithm.DetectSubscriptions"/>), so the categorizer trusts that label
 /// rather than re-deriving a masked-PAN heuristic that would also claim one-off card-to-card
 /// transfers.</item>
 /// </list>

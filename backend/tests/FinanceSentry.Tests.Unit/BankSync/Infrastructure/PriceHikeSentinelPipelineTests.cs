@@ -1,13 +1,14 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -31,21 +32,22 @@ public class PriceHikeSentinelPipelineTests
 
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
-    private static SubscriptionDetectionJob.TxRow Charge(decimal amount, int year, int month, int day) =>
-        new(UserId, "Netflix", "Netflix.com", amount, new DateTime(year, month, day), null, null, "EUR");
+    private static SubscriptionDetectionAlgorithm.TxRow Charge(
+        decimal amount, int year, int month, int day, string currency = "EUR") =>
+        new(UserId, "Netflix", "Netflix.com", amount, new DateTime(year, month, day), null, null, currency);
 
     /// <summary>
     /// Runs the whole US1 path: detect → persist → read → alert, and hands back what the
     /// sentinel saw so a test can assert on the baseline as well as on the alert.
     /// </summary>
     private async Task<IReadOnlyList<SubscriptionHygieneSummary>> RunPipelineAsync(
-        params SubscriptionDetectionJob.TxRow[] charges)
+        params SubscriptionDetectionAlgorithm.TxRow[] charges)
     {
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
 
-        var detected = SubscriptionDetectionJob.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -53,7 +55,7 @@ public class PriceHikeSentinelPipelineTests
         var job = new PriceHikeDetectionJob(
             reader,
             _alerts.Object,
-            new ConfigurationBuilder().Build(),
+            Options.Create(new HygieneSentinelsOptions()),
             Mock.Of<ILogger<PriceHikeDetectionJob>>());
 
         await job.ExecuteAsync();
@@ -143,6 +145,88 @@ public class PriceHikeSentinelPipelineTests
     }
 
     [Fact]
+    public async Task CurrencyChange_IsNotMistakenForAHike()
+    {
+        // The user's card moves from a GBP account to a EUR one mid-series. The same
+        // subscription is now billed €13.49 where it was billed £10.99 — a 22.7% step
+        // against the old number that is not a rise in price at all, only a change of unit.
+        // Detection groups by merchant alone, so both currencies land in one group; nothing
+        // downstream of that group can tell the two apart.
+        var summaries = await RunPipelineAsync(
+            Charge(10.99m, 2026, 3, 15, "GBP"),
+            Charge(10.99m, 2026, 4, 15, "GBP"),
+            Charge(10.99m, 2026, 5, 15, "GBP"),
+            Charge(10.99m, 2026, 6, 15, "GBP"),
+            Charge(10.99m, 2026, 7, 15, "GBP"),
+            Charge(13.49m, 2026, 8, 15, "EUR"));
+
+        VerifyNoAlert();
+
+        // And the subscription is not collateral damage: one euro charge is not yet a billing
+        // arrangement, so the row keeps being reported in the pounds it is still billed in.
+        var summary = summaries.Should().ContainSingle().Subject;
+        summary.Currency.Should().Be("GBP");
+        summary.OccurrenceCount.Should().Be(5);
+        summary.LastKnownAmount.Should().Be(10.99m);
+    }
+
+    [Fact]
+    public async Task HikeAfterAMoveToANewCurrency_FiresInTheNewUnit()
+    {
+        // £9.29 and €10.99 are the same real price, so once billing has moved the merchant
+        // has three amount clusters — the one shape SplitAtPriceStep refuses outright, which
+        // left the genuine €10.99 → €13.49 rise with no series to be seen against at all.
+        var summaries = await RunPipelineAsync(
+            Charge(9.29m, 2026, 3, 15, "GBP"),
+            Charge(9.29m, 2026, 4, 15, "GBP"),
+            Charge(10.99m, 2026, 5, 15),
+            Charge(10.99m, 2026, 6, 15),
+            Charge(13.49m, 2026, 7, 15));
+
+        VerifyAlert(baseline: 10.99m, current: 13.49m, Times.Once());
+
+        var summary = summaries.Should().ContainSingle().Subject;
+        summary.Currency.Should().Be("EUR");
+        summary.OccurrenceCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task CurrencyChange_RestatesTheStoredUnitOnTheExistingRow()
+    {
+        // Detection re-runs daily onto the row it already wrote. If the update path could not
+        // restate Currency, the row would keep saying GBP while its amounts turned into euros
+        // — and the spend summaries run ToUsd over that field.
+        await using var db = new SubscriptionsDbContext(
+            new DbContextOptionsBuilder<SubscriptionsDbContext>()
+                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
+
+        var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
+
+        SubscriptionDetectionAlgorithm.TxRow[] beforeMove =
+        [
+            Charge(10.99m, 2026, 3, 15, "GBP"),
+            Charge(10.99m, 2026, 4, 15, "GBP"),
+            Charge(10.99m, 2026, 5, 15, "GBP"),
+        ];
+        await upserts.UpsertDetectedSubscriptionsAsync(
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(beforeMove).ToList());
+
+        SubscriptionDetectionAlgorithm.TxRow[] afterMove =
+        [
+            .. beforeMove,
+            Charge(13.49m, 2026, 6, 15), Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
+        ];
+        await upserts.UpsertDetectedSubscriptionsAsync(
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(afterMove).ToList());
+
+        var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
+            .Should().ContainSingle().Subject;
+
+        summary.Currency.Should().Be("EUR");
+        summary.LastKnownAmount.Should().Be(13.49m);
+    }
+
+    [Fact]
     public async Task FlatSubscription_NeverAlerts()
     {
         await RunPipelineAsync(
@@ -174,7 +258,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
-        var detected = SubscriptionDetectionJob.DetectSubscriptions(charges).ToList();
+        var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
@@ -198,20 +282,20 @@ public class PriceHikeSentinelPipelineTests
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
 
-        SubscriptionDetectionJob.TxRow[] midHike =
+        SubscriptionDetectionAlgorithm.TxRow[] midHike =
         [
             Charge(10.99m, 2026, 3, 15), Charge(10.99m, 2026, 4, 15),
             Charge(10.99m, 2026, 5, 15), Charge(13.49m, 2026, 6, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(midHike).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(midHike).ToList());
 
-        SubscriptionDetectionJob.TxRow[] settled =
+        SubscriptionDetectionAlgorithm.TxRow[] settled =
         [
             .. midHike, Charge(13.49m, 2026, 7, 15), Charge(13.49m, 2026, 8, 15),
         ];
         await upserts.UpsertDetectedSubscriptionsAsync(
-            UserId.ToString(), SubscriptionDetectionJob.DetectSubscriptions(settled).ToList());
+            UserId.ToString(), SubscriptionDetectionAlgorithm.DetectSubscriptions(settled).ToList());
 
         var summary = (await new SubscriptionHygieneSummaryReader(db).GetAllActiveAsync())
             .Should().ContainSingle().Subject;

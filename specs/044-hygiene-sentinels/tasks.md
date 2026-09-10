@@ -12,6 +12,8 @@
 - [x] Persist `PreviousAmount` on `detected_subscriptions` (M006) and surface it on `SubscriptionHygieneSummary`
 - [x] Measure the hike against `HikeBaseline`, not the average that already contains the raised charge
 - [x] Write an end-to-end test running a charge series through the real detect → persist → read → alert chain
+- [x] Price the merchant in one currency — a card moved between accounts restated the same charge as a 20% hike
+- [x] Cover the restatement's money consequence — the stored `Currency` is the unit the spend summary runs `ToUsd` over, so a restated row has to convert at the new rate
 
 ## [US2] Duplicate charge detection
 
@@ -39,3 +41,30 @@
 - [x] Stand the sentinel down on stale rates — a spread measured against the offline seed accuses honest conversions
 - [x] Pin the sentinel's tests to a refreshed table, not the seed, so reading the seed fails them
 - [x] Declare the `HygieneSentinels` block in appsettings so every threshold is discoverable
+
+## [US5] Sentinel hardening (review pass over US1–US4)
+
+- [x] Delete the inert `UnusualSpendDetectionJob` and withdraw its deployed Hangfire schedule — `CategorySpikeDetectionJob` supersedes it
+- [x] Collapse the 17 hand-rolled dedup blocks in `AlertGeneratorService` into one `EmitAsync` plus a silence-window table
+- [x] Pin the dedup discipline for `PriceHike`/`DuplicateCharge`/`CategorySpike`/`FxSpread` — active-alert gate and silence window, one pair each
+- [x] Assert every live `AlertType` declares a silence window, so a new type cannot fail first inside a background job
+- [x] Name the merchant in a duplicate-charge alert the way the statement did, keeping the normalized key as the dedup anchor
+- [x] Skip the unnameable-merchant group — every blank merchant normalizes to one key, so unrelated charges sharing an amount read as a duplicate
+
+## [US6] Sentinel hardening II (second review pass)
+
+- [x] Move the recurrence/clustering algorithm out of `SubscriptionDetectionJob` into `Application/Services/SubscriptionDetectionAlgorithm.cs`, so the job schedules and persists while the algorithm decides
+- [x] Divide the category-spike baseline by the months the spec names, not the months that happen to hold data — and pin whichever it is with a test instead of `It.IsAny<decimal>()`
+- [x] Bind one `HygieneSentinelsOptions` so the six threshold keys stop being magic strings repeated across four jobs and four test files
+- [x] Read "active accounts → currency map + id list" once instead of three copy-pasted blocks across the sentinels
+- [x] Drop `SubscriptionHygieneSummary.Kind` — projected, persisted and built in every fixture, read by nobody
+- [x] Restate the US1 firing condition in spec.md as the `PreviousAmount ?? AverageAmount` baseline that actually shipped
+- [x] Repoint `docs/money-semantics.md` at `SubscriptionDetectionAlgorithm.InCurrentBillingCurrency` — the method moved and the sweep missed this one
+- [x] Give 044 its block in `docs/claude/app-state.md`, as CLAUDE.md requires on feature landing
+
+## [US7] The FX sentinel measures settled conversions (the deferred pending-leg gap)
+
+- [x] Exclude pending legs from `FxSpreadDetectionJob`'s read — a hold's amount is provisional, and a hold that settles at a different amount is never retired by `PendingReconciler`, so it alerted a second time under its own debit id
+- [x] Pin both: a pending conversion is silent, and a hold coexisting with its settled twin alerts exactly once, keyed to the settled leg
+- [x] Record why the slow-settlement gap is left open — `PostedDate ?? TransactionDate` reads as the fix but selects the same rows, since no adapter writes a settled-at time there
+- [ ] Give ingest a real settled-at stamp so a Monobank hold clearing past the lookback window is still measured (adapter-contract change — own slice)
