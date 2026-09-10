@@ -102,7 +102,7 @@ public static class ScanNominationRules
                 : null;
 
             var reasons = nomination.Reasons;
-            if (quality >= options.ScanQualityLeaderScore)
+            if (combined is not null && quality >= options.ScanQualityLeaderScore)
             {
                 reasons = [.. nomination.Reasons, QualityMomentumReason];
             }

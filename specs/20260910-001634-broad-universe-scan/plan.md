@@ -77,14 +77,29 @@ Decisions:
   `max(ScanQualityShortlistSize, ScanMaxNominationsPerRun)`, so a shortlist misconfigured below the
   cap cannot silently starve a run of nominations.
 - **Nomination reasons stay stable strings.** `QualityMomentumReason` is a constant tagged on names
-  at/above `ScanQualityLeaderScore`; a score-bearing reason string would defeat the candidate's
-  reason dedup and accumulate a near-duplicate every run.
+  at/above `ScanQualityLeaderScore` *that carry a combined score* — a graded name whose RS never
+  resolved has no momentum to claim, so the tag follows the same missing-half rule as the score. A
+  score-bearing reason string would defeat the candidate's reason dedup and accumulate a
+  near-duplicate every run.
 - The EDGAR service caches fundamentals per ticker with a TTL, so the shortlist grade and the
   subsequent `ScoreCandidateCommand` fetch for the capped survivors share one upstream call.
 
-Constraint still open (T013): `MarketStructureReader.GetUniverseStructuresAsync` re-runs sector
-rotation + affinity per member (~14 queries each), so the scan's read cost grows with the broad
-universe even though nothing else does.
+### T013 — one sector load per read (this increment)
+
+Surface: `Modules.Radar/Domain/MarketStructure/SectorRankLookup.cs` (new, pure) and
+`Modules.Radar/Application/Services/MarketStructureReader.cs`.
+
+`GetUniverseStructuresAsync` called `GetStructureAsync` per member, and each of those re-read the
+active universe, the rotation table and every sector ETF's bars — ~24 bar reads a member, so the
+scan's read cost grew with the broad universe. The rotation table and the sector closes it ranks are
+universe-wide facts, so they load once per read into `SectorRankLookup`, which then answers
+`RankFor(ticker, series)` with no I/O. Per member the scan now costs only its own structure +
+series reads. Single-ticker `GetStructureAsync` keeps its previous cost, except that a *sector ETF*
+now also loads the sector closes it no longer needs (bounded by the 11 SPDR sectors, and the
+universe path is the hot one — not worth a branch to skip).
+
+The invariant is pinned by `UniverseStructureReadCostTests`: sector bar reads for a 2-member and an
+8-member universe must be equal, and the affinity-assigned rank must be unchanged.
 
 Constraints found while shipping US1 — all bite only with the flag on, and all belong to the slice
 that turns it on:

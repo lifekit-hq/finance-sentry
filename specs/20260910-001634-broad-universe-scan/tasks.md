@@ -27,5 +27,7 @@
       per-run nomination cap and bounding the EDGAR fan-out with a momentum shortlist.
 - [x] T012 [US2] Tests: a non-held, non-watchlisted constituent can be nominated; ranking order,
       shortlist bound and cap are deterministic.
-- [ ] T013 [US2] Hoist the per-ticker sector rotation/affinity work out of
+- [x] T013 [US2] Hoist the per-ticker sector rotation/affinity work out of
       `MarketStructureReader.GetUniverseStructuresAsync` — at ~460 members it is ~6k queries per scan.
+- [x] T014 [US2] Tag `QualityMomentumReason` only when a combined score exists — a graded name whose
+      RS never resolved has no momentum to claim.

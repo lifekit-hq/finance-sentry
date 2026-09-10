@@ -233,6 +233,8 @@ public sealed class ScanNominationRulesTests
         ranked.Select(r => r.Ticker).Should().Equal("WEAK", "NORS");
         ranked.Single(r => r.Ticker == "NORS").CombinedScore.Should().BeNull();
         ranked.Single(r => r.Ticker == "NORS").QualityScore.Should().Be(95);
+        ranked.Single(r => r.Ticker == "NORS").Reasons
+            .Should().NotContain(ScanNominationRules.QualityMomentumReason);
     }
 
     [Fact]
