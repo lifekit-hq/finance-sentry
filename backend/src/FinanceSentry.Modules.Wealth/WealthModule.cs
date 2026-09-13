@@ -20,6 +20,16 @@ public static class WealthModule
             => services.AddWealthModule(config);
     }
 
+    /// <summary>
+    /// Worker role only (issue #613): the startup catch-up is background work, and it ran in the MCP
+    /// host beside the API for as long as the module registrar carried it.
+    /// </summary>
+    private sealed class WorkerRegistrar : IWorkerRegistrar
+    {
+        public void Register(IServiceCollection services, IConfiguration config)
+            => services.AddHostedService<NetWorthSnapshotCatchUpHostedService>();
+    }
+
     private sealed class JobRegistrar : IJobRegistrar
     {
         public void RegisterJobs(IServiceProvider sp)
@@ -46,7 +56,6 @@ public static class WealthModule
         services.AddScoped<IWealthAggregationService, WealthAggregationService>();
 
         services.AddScoped<NetWorthSnapshotJob>();
-        services.AddHostedService<NetWorthSnapshotCatchUpHostedService>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
