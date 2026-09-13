@@ -11,8 +11,6 @@ public static class ModuleRegistrationExtensions
     public static IServiceCollection AddAllModules(
         this IServiceCollection services, IConfiguration config)
     {
-        var registrarType = typeof(IModuleRegistrar);
-
         // Force-load every FinanceSentry.Modules.* assembly before scanning. Referenced module
         // assemblies are otherwise loaded lazily; MVC modules happen to be force-loaded early via
         // generated ApplicationPart attributes, but MCP-only modules (no controllers, e.g. Radar)
@@ -20,15 +18,7 @@ public static class ModuleRegistrationExtensions
         // their IModuleRegistrar would never be discovered.
         EnsureModuleAssembliesLoaded();
 
-        var registrars = AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a =>
-            {
-                try { return a.GetTypes(); }
-                catch (ReflectionTypeLoadException ex) { return ex.Types.OfType<Type>(); }
-            })
-            .Where(t => registrarType.IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false })
-            .Select(t => (IModuleRegistrar)Activator.CreateInstance(t)!)
-            .ToList();
+        var registrars = Discover<IModuleRegistrar>();
 
         var moduleAssemblies = registrars.Select(r => r.GetType().Assembly).Distinct().ToArray();
         services.AddCqrs(moduleAssemblies);
@@ -36,8 +26,25 @@ public static class ModuleRegistrationExtensions
         foreach (var registrar in registrars)
             registrar.Register(services, config);
 
+        // The API is the worker host: it alone registers what only the worker may do — hosted
+        // services, key rotation, the credential key (issue #613). McpServiceRegistration loads
+        // IModuleRegistrar only, so the MCP host never inherits these.
+        foreach (var registrar in Discover<IWorkerRegistrar>())
+            registrar.Register(services, config);
+
         return services;
     }
+
+    private static List<T> Discover<T>() where T : class =>
+        AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a =>
+            {
+                try { return a.GetTypes(); }
+                catch (ReflectionTypeLoadException ex) { return ex.Types.OfType<Type>(); }
+            })
+            .Where(t => typeof(T).IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false })
+            .Select(t => (T)Activator.CreateInstance(t)!)
+            .ToList();
 
     private static void EnsureModuleAssembliesLoaded()
     {

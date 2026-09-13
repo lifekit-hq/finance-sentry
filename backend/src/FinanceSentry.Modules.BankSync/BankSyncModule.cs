@@ -19,7 +19,6 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
-using Microsoft.Extensions.Options;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +30,21 @@ public static class BankSyncModule
     {
         public void Register(IServiceCollection services, IConfiguration config)
             => services.AddBankSyncModule(config);
+    }
+
+    /// <summary>
+    /// Worker role only (issue #613): the key, its startup validation, and startup rotation of this
+    /// module's credential stores. Loaded by the API host; never by the MCP host, which crash-looped
+    /// for three days after #609 because it inherited the key validation without holding the key.
+    /// </summary>
+    private sealed class WorkerRegistrar : IWorkerRegistrar
+    {
+        public void Register(IServiceCollection services, IConfiguration config)
+        {
+            services.AddCredentialEncryption(config);
+            services.AddScoped<ICredentialRotationTarget, MonobankCredentialRotationTarget>();
+            services.AddScoped<ICredentialRotationTarget, TrueLayerConnectionRotationTarget>();
+        }
     }
 
     private sealed class JobRegistrar : IJobRegistrar
@@ -110,23 +124,12 @@ public static class BankSyncModule
 
         services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
-        // #493: validated AT STARTUP, not at first credential read. Outside Development an
-        // unconfigured or disclosed key stops the process coming up; the service itself no longer
-        // falls back to the key committed in this repository.
-        services.AddOptions<EncryptionOptions>()
-            .Bind(config.GetSection(EncryptionOptions.SectionName))
-            .ValidateOnStart();
-        services.AddSingleton<IValidateOptions<EncryptionOptions>, EncryptionOptionsValidator>();
         services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
-        services.AddSingleton<ICredentialEncryptionService, CredentialEncryptionService>();
 
-        // #493: rows written under the old key are re-encrypted on startup. Registered here
-        // because this module owns the encryption registration; every module contributes its own
-        // stores as ICredentialRotationTarget and they are discovered by that interface.
-        services.AddScoped<CredentialKeyRotationService>();
-        services.AddHostedService<CredentialKeyRotationHostedService>();
-        services.AddScoped<ICredentialRotationTarget, MonobankCredentialRotationTarget>();
-        services.AddScoped<ICredentialRotationTarget, TrueLayerConnectionRotationTarget>();
+        // Credential encryption and key rotation are NOT registered here: they belong to the worker
+        // role (WorkerRegistrar below). Every handler that injects ICredentialEncryptionService is a
+        // connect/sync path the API alone dispatches; the MCP host serves this module's queries over
+        // the same rows without ever decrypting a credential (issue #613).
 
         services.AddScoped<IBankAccountRepository, BankAccountRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();

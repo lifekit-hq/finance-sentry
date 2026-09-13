@@ -179,7 +179,7 @@ docker/
   Dockerfile.frontend                Node 22 Alpine, ng serve
 ```
 
-Each module follows the same internal structure: `Domain/` → `Application/` (CQRS via MediatR) → `Infrastructure/` (EF Core, external clients, Hangfire jobs) → `API/` (controllers). Modules register themselves via `IModuleRegistrar` / `IJobRegistrar` — no manual wiring in `Program.cs`.
+Each module follows the same internal structure: `Domain/` → `Application/` (CQRS via MediatR) → `Infrastructure/` (EF Core, external clients, Hangfire jobs) → `API/` (controllers). Modules register themselves via `IModuleRegistrar` (every host: API and MCP), `IWorkerRegistrar` (API host only: hosted services, key rotation, the credential key) and `IJobRegistrar` (API host only: Hangfire schedules) — no manual wiring in `Program.cs`.
 
 ## Versioning & Releases
 
