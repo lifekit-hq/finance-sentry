@@ -181,3 +181,7 @@ The pre-commit hook enforces a version bump in `frontend/package.json` whenever 
 ## Frontend attribute ordering
 
 Angular ESLint enforces `@angular-eslint/template/attributes-order`. The expected order is: bound properties `[prop]` first, then plain attribute strings (`icon`, `variant`), then event bindings `(event)`. Structural slot markers (like `cta`, `leading`, `trailing` on projected children) come after event bindings. Run `ng lint` or let lint-staged auto-fix before committing.
+
+## Memory (vault)
+
+Durable project knowledge lives in `~/memory/projects/finance-sentry/` (`plan.md` facts, `STATUS.md` in-flight, `log.md` events) - read `plan.md` + `STATUS.md` when starting work here and write durable decisions back there; see `~/memory/README.md` for the contract. Provider-local memories are disabled by policy.
