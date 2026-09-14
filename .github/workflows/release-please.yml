@@ -3,10 +3,7 @@ name: Release Please
 on:
   push:
     branches: [main]
-  # Dispatched by weekly-release.yml after it merges the release PR: a merge done with
-  # GITHUB_TOKEN does not fire push workflows, so the tag/release step must be invoked
-  # explicitly (workflow_dispatch is exempt from that restriction).
-  workflow_dispatch:
+  workflow_dispatch: # manual regenerate — used to rehearse the release PR path
 
 permissions:
   contents: write
@@ -16,13 +13,17 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # GITHUB_TOKEN pushes fire no workflows, so a release PR pushed with it never gets
+      # the required checks and can never merge (#623). The release bot app (Contents +
+      # Pull requests write, installed on this repo only) mints a one-hour token per run;
+      # its pushes trigger the pull_request CI runs like any other contributor's.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: googleapis/release-please-action@v5
         with:
-          # GITHUB_TOKEN pushes fire no workflows, so the release PR's head never gets the
-          # required checks on its own; weekly-release.yml dispatches them explicitly before
-          # merging (#578 — deliberately no standing PAT). The expression below is a dormant
-          # override: if a RELEASE_PLEASE_TOKEN secret ever exists it is used, otherwise
-          # GITHUB_TOKEN, with no behavior change.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

@@ -4,9 +4,9 @@ name: Weekly Release
 # Release Please keeps that PR current on every merge; this job just lands it on a cadence.
 # No releasable commits since the last release → no PR → the job no-ops.
 #
-# GITHUB_TOKEN merges do not fire push-triggered workflows, so after merging this job
-# explicitly dispatches Release Please (tags + publishes the GitHub release) and the VPS
-# deploy (ships the bumped version manifest, e.g. the UI footer version).
+# The merge uses the release bot app token (same app release-please pushes with), so it
+# is a real push to main: Release Please tags + publishes the GitHub release and the VPS
+# deploy ships the bumped version through their normal push triggers.
 
 on:
   schedule:
@@ -16,7 +16,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 concurrency:
   group: weekly-release
@@ -25,11 +24,16 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
     steps:
-      - name: Merge pending release PR, then dispatch tag + deploy
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: Merge pending release PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           pr=$(gh pr list --state open --label "autorelease: pending" --json number --jq '.[0].number // empty')
@@ -38,63 +42,9 @@ jobs:
             exit 0
           fi
 
-          # Release-please regenerates its branch with GITHUB_TOKEN pushes, which fire no
-          # workflows — so the required checks (build-and-test, lint-build-test,
-          # build-backend-image) never report on the head SHA and the merge would be
-          # rejected. Dispatch them explicitly against the release branch and wait for
-          # them to succeed on the head commit before merging.
-          head_ref=$(gh pr view "$pr" --json headRefName --jq .headRefName)
-          head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-          required_checks="build-and-test lint-build-test build-backend-image"
-
-          passed_checks() {
-            gh api "repos/$GH_REPO/commits/$head_sha/check-runs" --paginate \
-              --jq '[.check_runs[] | select(.conclusion == "success") | .name] | unique | join(" ")'
-          }
-
-          missing=""
-          for c in $required_checks; do
-            case " $(passed_checks) " in *" $c "*) ;; *) missing="$missing $c" ;; esac
-          done
-
-          if [[ -n "$missing" ]]; then
-            echo "Checks not yet green on $head_sha:$missing — dispatching CI on $head_ref"
-            gh workflow run backend-ci.yml --ref "$head_ref"
-            gh workflow run frontend-ci.yml --ref "$head_ref"
-            gh workflow run docker-build.yml --ref "$head_ref"
-
-            deadline=$(( $(date +%s) + 1500 ))  # 25 min
-            while true; do
-              # Abort if the branch moved under us (release-please regenerated mid-run).
-              current_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-              if [[ "$current_sha" != "$head_sha" ]]; then
-                echo "Release branch moved ($head_sha -> $current_sha) mid-run; aborting — rerun the workflow." >&2
-                exit 1
-              fi
-              failed=$(gh api "repos/$GH_REPO/commits/$head_sha/check-runs" --paginate \
-                --jq '[.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped") | .name] | unique | join(", ")')
-              if [[ -n "$failed" ]]; then
-                echo "Check(s) failed on the release branch: $failed — not merging." >&2
-                exit 1
-              fi
-              ok=$(passed_checks)
-              all_green=true
-              for c in $required_checks; do
-                case " $ok " in *" $c "*) ;; *) all_green=false ;; esac
-              done
-              $all_green && break
-              if (( $(date +%s) > deadline )); then
-                echo "Timed out waiting for required checks on $head_sha." >&2
-                exit 1
-              fi
-              sleep 30
-            done
-            echo "All required checks green on $head_sha."
-          else
-            echo "Required checks already green on $head_sha."
-          fi
+          # The release branch gets its checks from pull_request runs on every regeneration.
+          # Wait for any still in flight; a failed check aborts before the merge.
+          gh pr checks "$pr" --watch --fail-fast
 
           echo "Merging release PR #$pr"
           gh pr merge "$pr" --squash --delete-branch
-          gh workflow run release-please.yml --ref main
-          gh workflow run deploy.yml --ref main

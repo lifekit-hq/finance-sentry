@@ -90,7 +90,7 @@ Not auto-loaded — follow these links when the task touches them:
 | Issue labels | `P1` (firm: sized, acceptance criteria) / `P2` (named fog, unsized); `needs-refinement` = not ready to work; `devclaw-ready` = dispatchable to the autonomous instance; area labels (`frontend`, `backend`, …) | — |
 | PR body | What + why, then a **Validation** section stating exactly what was run and its result (the PR template scaffolds this) | see `.github/PULL_REQUEST_TEMPLATE.md` |
 | Milestone | `M<n> — <outcome>` — named for the outcome, never a date | `M1 — Ledger earns its keep` |
-| Releases | release-please maintains the release PR (version bump for `version.txt` + `frontend/package.json` + API csproj + CHANGELOG); the Weekly Release workflow merges it Mondays 08:00 UTC (`workflow_dispatch` = release now), then dispatches the tag + VPS deploy. Never hand-bump versions or tag ad-hoc. | — |
+| Releases | release-please maintains the release PR (version bump for `version.txt` + `frontend/package.json` + API csproj + CHANGELOG); the Weekly Release workflow merges it Mondays 08:00 UTC (`workflow_dispatch` = release now). Both workflows act through the `lifekit-release-bot` GitHub App token (`RELEASE_APP_ID` var + `RELEASE_APP_PRIVATE_KEY` secret) — GITHUB_TOKEN pushes fire no workflows, so with it the release PR never gets its required checks and never merges (#623). The app-token merge is a real push: tag + VPS deploy follow through their normal triggers. Never hand-bump versions or tag ad-hoc. | — |
 
 Backlog planning happens in dedicated sessions (plan-backlog skill); every issue must trace to a destination. Main is protected — all changes land via PR (squash), CI green first, including agent work.
 
