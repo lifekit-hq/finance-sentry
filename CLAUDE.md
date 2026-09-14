@@ -122,3 +122,7 @@ secret lives, never its value.
 - Never change `Host=postgres` to `localhost` to work around Docker issues — fix Docker instead.
 - Never modify connection strings or env config as workarounds — fix the root cause.
 - Do not create markdown files at the repo root. Only `README.md` and `CLAUDE.md` belong there. Session artifacts, debug notes, and how-to docs do not get their own files — put relevant content in `README.md` or the appropriate `.specify/` artifact.
+
+## Memory (vault)
+
+Durable knowledge about this project lives in the vault, not in provider memory: `~/memory/projects/finance-sentry/` - `plan.md` (facts), `STATUS.md` (in-flight, only while parked), `log.md` (dated events). Read `plan.md` + `STATUS.md` when starting work here; verify live state live (`gh`, `docker ps`). Write durable decisions and gotchas back to those pages in the same session (contract: `~/memory/README.md`). Claude Code auto-memory is disabled by policy (`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`); Codex/other agents follow the same pointer via `AGENTS.md`.
