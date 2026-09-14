@@ -13,8 +13,8 @@ using Moq;
 /// <summary>
 /// The Radar half of the #558 story, built the way production builds it: the real
 /// <see cref="RadarUniverseService"/> composes a universe from a held name, the seed ETFs and a
-/// broad-universe constituent, bars are persisted through the real repository, and structure is read
-/// through the real <see cref="MarketStructureReader"/> over an in-memory Radar database.
+/// stage-1 shortlisted constituent, bars are persisted through the real repository, and structure is
+/// read through the real <see cref="MarketStructureReader"/> over an in-memory Radar database.
 ///
 /// The constituent compounds fastest and the holding lags the benchmark, so momentum ordering is
 /// unambiguous: any nomination the constituent wins, it wins by genuinely out-ranking the book.
@@ -24,7 +24,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
     public const string Benchmark = "SPY";
     public const string Sector = "XLK";
 
-    /// <summary>Neither held nor watchlisted — it exists in the universe only as a constituent.</summary>
+    /// <summary>Neither held nor watchlisted — it is in the universe only because stage 1 shortlisted it.</summary>
     public const string Constituent = "CNST";
 
     /// <summary>The book's laggard: present so the constituent has to out-rank something real.</summary>
@@ -94,11 +94,12 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
         var watchlist = new Mock<IWatchlistReader>();
         watchlist.Setup(w => w.ListTickersAsync(bookOwner, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        var constituents = new Mock<IIndexConstituentSource>();
-        constituents.Setup(c => c.GetConstituents()).Returns([Constituent]);
+        var shortlist = new Mock<IScanShortlistSource>();
+        shortlist.Setup(s => s.GetShortlistAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([Constituent]);
 
         var universeService = new RadarUniverseService(
-            universeRepo, brokerage.Object, watchlist.Object, banking.Object, radarOptions, constituents.Object);
+            universeRepo, brokerage.Object, watchlist.Object, banking.Object, radarOptions, shortlist.Object);
         var members = await universeService.SyncAsync(CancellationToken.None);
 
         members.Single(m => m.Ticker == Constituent).Kind.Should().Be(

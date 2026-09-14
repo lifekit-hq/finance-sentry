@@ -2,7 +2,6 @@ namespace FinanceSentry.Modules.Radar.Tests.MarketStructure;
 
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
-using FinanceSentry.Modules.Radar.Domain.Repositories;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Xunit;
@@ -162,46 +161,4 @@ public sealed class UniverseStructureReadCostTests
 
     private sealed record UniverseRead(
         IReadOnlyList<Core.Interfaces.UniverseStructureEntry> Entries, int SectorReads, int UniverseListings);
-
-    /// <summary>Counts bar reads per ticker so a per-member fan-out cannot creep back in unnoticed.</summary>
-    private sealed class CountingDailyBarRepository(IDailyBarRepository inner) : IDailyBarRepository
-    {
-        public Dictionary<string, int> ReadsByTicker { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-        public Task<int> UpsertRangeAsync(IReadOnlyCollection<DailyBar> bars, CancellationToken ct = default)
-            => inner.UpsertRangeAsync(bars, ct);
-
-        public Task<IReadOnlyList<DailyBar>> GetSinceAsync(string ticker, DateOnly since, CancellationToken ct = default)
-        {
-            this.ReadsByTicker[ticker] = this.ReadsByTicker.TryGetValue(ticker, out var count) ? count + 1 : 1;
-            return inner.GetSinceAsync(ticker, since, ct);
-        }
-
-        public Task<DateOnly?> GetLatestDateAsync(string ticker, CancellationToken ct = default)
-            => inner.GetLatestDateAsync(ticker, ct);
-
-        public Task<IReadOnlyDictionary<string, DateOnly>> GetLatestDatesAsync(
-            IReadOnlyCollection<string> tickers, CancellationToken ct = default)
-            => inner.GetLatestDatesAsync(tickers, ct);
-    }
-
-    private sealed class CountingUniverseRepository(IRadarUniverseRepository inner) : IRadarUniverseRepository
-    {
-        public int ActiveListings { get; set; }
-
-        public Task<IReadOnlyList<RadarUniverseMember>> ListActiveAsync(CancellationToken ct = default)
-        {
-            this.ActiveListings++;
-            return inner.ListActiveAsync(ct);
-        }
-
-        public Task<IReadOnlyList<RadarUniverseMember>> ListAllAsync(CancellationToken ct = default)
-            => inner.ListAllAsync(ct);
-
-        public Task UpsertMembersAsync(IReadOnlyCollection<RadarUniverseMember> members, CancellationToken ct = default)
-            => inner.UpsertMembersAsync(members, ct);
-
-        public Task DeactivateAsync(IReadOnlyCollection<string> tickers, CancellationToken ct = default)
-            => inner.DeactivateAsync(tickers, ct);
-    }
 }

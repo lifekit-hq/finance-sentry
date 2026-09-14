@@ -45,7 +45,9 @@ public sealed class OpportunityScanJob(
         var shortlistSize = Math.Max(_options.ScanQualityShortlistSize, _options.ScanMaxNominationsPerRun);
         var shortlist = nominations.Take(shortlistSize).ToList();
         var ranked = ScanNominationRules.RankByQualityMomentum(
-            shortlist, await GradeFundamentalsAsync(shortlist, ct), _options);
+            shortlist,
+            await FundamentalsGrading.GradeAsync(secEdgar, logger, shortlist.Select(n => n.Ticker), ct),
+            _options);
         var capped = ranked.Take(_options.ScanMaxNominationsPerRun).ToList();
         if (capped.Count < nominations.Count)
         {
@@ -105,33 +107,4 @@ public sealed class OpportunityScanJob(
     private static string FormatNominee(ScanCandidateRank rank)
         => FormattableString.Invariant(
             $"{rank.Ticker}(quality {rank.QualityScore}, rs {rank.RsPercentile}, combined {rank.CombinedScore})");
-
-    /// <summary>
-    /// EDGAR fundamentals grade per shortlisted ticker. A ticker EDGAR cannot answer for — crypto,
-    /// ETFs, a delisted filer, an upstream failure — grades null and falls back to momentum-only
-    /// standing; one bad ticker never aborts the run (FR-013).
-    /// </summary>
-    private async Task<IReadOnlyDictionary<string, int?>> GradeFundamentalsAsync(
-        IReadOnlyList<ScanNomination> shortlist, CancellationToken ct)
-    {
-        var grades = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var nomination in shortlist)
-        {
-            try
-            {
-                var facts = await secEdgar.GetFundamentalsAsync(
-                    nomination.Ticker, FundamentalsScorer.FactsPerConcept, ct);
-                grades[nomination.Ticker] = FundamentalsScorer.Score(facts).Score;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                grades[nomination.Ticker] = null;
-                logger.LogWarning(ex,
-                    "Opportunity scan could not grade fundamentals for {Ticker}; ranking it on momentum only",
-                    nomination.Ticker);
-            }
-        }
-
-        return grades;
-    }
 }

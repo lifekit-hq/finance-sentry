@@ -64,3 +64,49 @@
       reasons instead of duplicating the candidate.
 - [x] T027 [US4] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`, plus a
       mutation check that the new assertions bite on production behaviour.
+
+## US5 — the two-stage funnel (#558 consolidated 2026-09-13)
+
+- [x] T028 [US5] Add the `IScanShortlistSource` port to `FinanceSentry.Core/Interfaces`.
+- [x] T029 [US5] Extract `PercentileRanks` out of `ScanNominationRules` so both funnel stages rank on
+      one implementation.
+- [x] T030 [US5] Add the pure `ScanShortlistRules`: surface ranking (quote percent change + street
+      actions) bounded by the grading budget, then the quality re-rank capped at the shortlist size.
+- [x] T031 [US5] Lift the EDGAR grading loop out of `OpportunityScanJob` into `FundamentalsGrading`
+      so stage 1 and stage 2 grade identically.
+- [x] T032 [US5] Implement `ScanShortlistService` over the constituent source, the batch quote read
+      and the analyst-action feed; register it in `ResearchModule`.
+- [x] T033 [US5] Add the `ScanShortlist*` options (size, grading budget, street weight and points,
+      quality weight, action lookback and read limit).
+- [x] T034 [US5] Point `RadarUniverseService` at the shortlist port instead of the constituent list.
+- [x] T035 [US5] Drop the rotating whole-index ingestion: `IngestDailyBarsCommand.Schedule` and
+      `RadarOptions.BroadUniverseMaxIngestPerRun` both go — the universe is the bound now.
+- [x] T036 [US5] Tests: stage-1 rules (ranking, budget, street cap, missing-half, clamped weights)
+      and the service (grades only the slate, target cuts do not count, every upstream may fail).
+- [x] T037 [US5] Tests: `ShortlistScopedIngestionTests` (a cycle fetches book + lenses + shortlist
+      over a 200-name index, and pays nothing when the flag is off) and `ShortlistStructureCostTests`
+      (structure computed for at most K + |held| + |watchlist| with bars seeded for the whole index).
+- [x] T038 [US5] Test: a name yesterday's shortlist carried and today's does not is de-activated.
+- [x] T039 [US5] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.
+
+## US6 — calibrate and re-prove the funnel (next increment)
+
+- [ ] T040 [US6] Calibrate `ScanTopDecileRsPercentile` and `ScanMaxNominationsPerRun` for a
+      shortlist-sized universe — a top-decile cut over ~45 members is a different instrument than over
+      500, and the nomination cap was set against the old width.
+- [ ] T041 [US6] Give the opportunity scan a LogOnly-style gate so a widened scan cannot fan out one
+      Alert per top-tier candidate per user; precedent is Radar's `ScannerMode`.
+- [ ] T042 [US6] Re-point `BroadUniverseScanCycleTests` at a stage-1-composed universe so the
+      acceptance proof runs *through* the funnel rather than past it, and assert the surviving
+      candidate entered via the shortlist.
+- [ ] T044 [US6] Close the candidate-staleness hole the funnel opens: a Scan candidate outside the
+      book loses bar coverage the night its ticker drops off the shortlist, so its structure and
+      invalidation monitoring go stale. Either union active-candidate tickers into the shortlist
+      (raising the clause-3 bound to K + |held| + |watchlist| + |active candidates|, capped by the
+      candidate TTL) or promote a nominated candidate to the watchlist so it rides the existing
+      |watchlist| term — the second keeps the stated bound and needs owner agreement on the semantics.
+- [ ] T045 [US6] Give stage 1 a genuinely batched quote read. `IMarketDataService.GetQuotesAsync`
+      resolves a ticker at a time behind its cache, so the market-wide momentum signal costs ~500
+      light requests a run. A batched quote endpoint (or reading the previous close from stored bars
+      for names that have them) cuts that by an order of magnitude.
+- [ ] T043 [US6] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.

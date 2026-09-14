@@ -27,7 +27,7 @@ public sealed class IngestDailyBarsCommandHandler(
         var members = await universe.SyncAsync(cancellationToken);
         var latestDates = await bars.GetLatestDatesAsync(
             members.Select(m => m.Ticker).ToList(), cancellationToken);
-        var scheduled = Schedule(members, latestDates);
+        var scheduled = Schedule(members);
 
         var lookbackSince = DateOnly.FromDateTime(DateTime.UtcNow)
             .AddDays(-CalendarDaysFor(_options.LookbackTradingDays));
@@ -78,36 +78,23 @@ public sealed class IngestDailyBarsCommandHandler(
     }
 
     /// <summary>
-    /// Core members (holdings, watchlist, seed lenses) are always ingested; broad-market constituents
-    /// then fill <see cref="RadarOptions.BroadUniverseMaxIngestPerRun"/>, least fresh first, so a
-    /// 500-name universe rotates across runs instead of stretching one run into a rate-limit wall.
+    /// Book first: holdings, watchlist and the seed lenses are fetched before the stage-1 shortlist,
+    /// so an upstream rate limit costs breadth rather than the freshness of what is actually owned.
+    /// The shortlist is tens of names (#558), so unlike the rotating index budget it replaced, every
+    /// scheduled member is fetched in the same run.
     /// </summary>
-    private List<RadarUniverseMember> Schedule(
-        IReadOnlyList<RadarUniverseMember> members, IReadOnlyDictionary<string, DateOnly> latestDates)
+    private List<RadarUniverseMember> Schedule(IReadOnlyList<RadarUniverseMember> members)
     {
-        var scheduled = members.Where(m => m.Kind != UniverseKind.IndexConstituent).ToList();
-
-        var budget = _options.BroadUniverseMaxIngestPerRun;
-        if (budget <= 0)
-        {
-            return scheduled;
-        }
-
-        var broad = members
-            .Where(m => m.Kind == UniverseKind.IndexConstituent)
-            .OrderBy(m => latestDates.TryGetValue(m.Ticker, out var latest) ? latest : DateOnly.MinValue)
+        var scheduled = members
+            .OrderBy(m => m.Kind == UniverseKind.IndexConstituent ? 1 : 0)
             .ThenBy(m => m.Ticker, StringComparer.Ordinal)
-            .Take(budget)
             .ToList();
 
-        if (broad.Count > 0)
-        {
-            logger.LogInformation(
-                "Radar ingestion scheduling {Core} core and {Broad} broad-universe tickers (budget {Budget}).",
-                scheduled.Count, broad.Count, budget);
-        }
+        logger.LogInformation(
+            "Radar ingestion scheduling {Core} core and {Shortlisted} shortlisted tickers.",
+            scheduled.Count(m => m.Kind != UniverseKind.IndexConstituent),
+            scheduled.Count(m => m.Kind == UniverseKind.IndexConstituent));
 
-        scheduled.AddRange(broad);
         return scheduled;
     }
 

@@ -9,8 +9,9 @@ using Moq;
 using Xunit;
 
 /// <summary>
-/// Broad-universe composition (#558): with the flag on, index constituents widen the universe past
-/// held + watchlist so momentum can be computed off the book; with it off, nothing changes.
+/// Broad-universe composition (#558): with the flag on, the stage-1 shortlist widens the universe
+/// past held + watchlist so momentum can be computed off the book; with it off, nothing changes and
+/// stage 1 is never asked for a shortlist at all.
 /// </summary>
 public sealed class RadarUniverseBroadCompositionTests
 {
@@ -19,18 +20,19 @@ public sealed class RadarUniverseBroadCompositionTests
     [Fact]
     public async Task Sync_WithFlagOff_KeepsUniverseAtHeldAndWatched()
     {
-        var (service, upserted) = BuildService(broadEnabled: false, constituents: ["NVDA", "PLTR"]);
+        var (service, upserted, shortlist, _) = BuildService(broadEnabled: false, shortlisted: ["NVDA", "PLTR"]);
 
         await service.SyncAsync();
 
         upserted.Should().NotContain(m => m.Kind == UniverseKind.IndexConstituent);
         upserted.Select(m => m.Ticker).Should().Contain(["AAPL", "TSLA", "SPY"]);
+        shortlist.Reads.Should().Be(0, "a disabled funnel must not pay stage 1's upstream cost");
     }
 
     [Fact]
-    public async Task Sync_WithFlagOn_AddsConstituentsAsIndexMembers()
+    public async Task Sync_WithFlagOn_AddsShortlistedNamesAsIndexMembers()
     {
-        var (service, upserted) = BuildService(broadEnabled: true, constituents: ["NVDA", "PLTR"]);
+        var (service, upserted, _, _) = BuildService(broadEnabled: true, shortlisted: ["NVDA", "PLTR"]);
 
         await service.SyncAsync();
 
@@ -39,9 +41,9 @@ public sealed class RadarUniverseBroadCompositionTests
     }
 
     [Fact]
-    public async Task Sync_WithFlagOn_KeepsOwnershipKindForATickerThatIsAlsoAConstituent()
+    public async Task Sync_WithFlagOn_KeepsOwnershipKindForATickerThatIsAlsoShortlisted()
     {
-        var (service, upserted) = BuildService(broadEnabled: true, constituents: ["AAPL", "TSLA", "SPY"]);
+        var (service, upserted, _, _) = BuildService(broadEnabled: true, shortlisted: ["AAPL", "TSLA", "SPY"]);
 
         await service.SyncAsync();
 
@@ -51,9 +53,9 @@ public sealed class RadarUniverseBroadCompositionTests
     }
 
     [Fact]
-    public async Task Sync_WithFlagOn_NormalisesAndDeduplicatesConstituents()
+    public async Task Sync_WithFlagOn_NormalisesAndDeduplicatesShortlistedNames()
     {
-        var (service, upserted) = BuildService(broadEnabled: true, constituents: [" nvda ", "NVDA", ""]);
+        var (service, upserted, _, _) = BuildService(broadEnabled: true, shortlisted: [" nvda ", "NVDA", ""]);
 
         await service.SyncAsync();
 
@@ -61,17 +63,33 @@ public sealed class RadarUniverseBroadCompositionTests
         upserted.Should().NotContain(m => m.Ticker.Length == 0);
     }
 
-    private static (RadarUniverseService Service, List<RadarUniverseMember> Upserted) BuildService(
-        bool broadEnabled, string[] constituents)
+    [Fact]
+    public async Task Sync_DeactivatesANameYesterdaysShortlistCarriedAndTodaysDoesNot()
+    {
+        var (service, _, shortlist, deactivated) = BuildService(broadEnabled: true, shortlisted: ["NVDA"]);
+
+        await service.SyncAsync();
+        shortlist.Tickers = ["PLTR"];
+        await service.SyncAsync();
+
+        deactivated.Should().Equal(
+            ["NVDA"], "the shortlist churns daily, and a member it drops must leave the universe with it");
+    }
+
+    private static Composition BuildService(bool broadEnabled, string[] shortlisted)
     {
         var upserted = new List<RadarUniverseMember>();
+        var deactivated = new List<string>();
 
         var repo = new Mock<IRadarUniverseRepository>();
         repo.Setup(r => r.UpsertMembersAsync(It.IsAny<IReadOnlyCollection<RadarUniverseMember>>(), It.IsAny<CancellationToken>()))
             .Callback<IReadOnlyCollection<RadarUniverseMember>, CancellationToken>((m, _) => upserted.AddRange(m))
             .Returns(Task.CompletedTask);
         repo.Setup(r => r.ListAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
+            .ReturnsAsync(() => upserted);
+        repo.Setup(r => r.DeactivateAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyCollection<string>, CancellationToken>((t, _) => deactivated.AddRange(t))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.ListActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => upserted);
 
@@ -87,13 +105,18 @@ public sealed class RadarUniverseBroadCompositionTests
         banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([User]);
 
-        var source = new Mock<IIndexConstituentSource>();
-        source.Setup(s => s.GetConstituents()).Returns(constituents);
+        var source = new FakeShortlistSource { Tickers = shortlisted };
 
         var options = TestSupport.Options(new RadarOptions { BroadUniverseEnabled = broadEnabled });
         var service = new RadarUniverseService(
-            repo.Object, brokerage.Object, watchlist.Object, banking.Object, options, source.Object);
+            repo.Object, brokerage.Object, watchlist.Object, banking.Object, options, source);
 
-        return (service, upserted);
+        return new Composition(service, upserted, source, deactivated);
     }
+
+    private sealed record Composition(
+        RadarUniverseService Service,
+        List<RadarUniverseMember> Upserted,
+        FakeShortlistSource Shortlist,
+        List<string> Deactivated);
 }

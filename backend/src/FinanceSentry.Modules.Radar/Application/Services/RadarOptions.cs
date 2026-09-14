@@ -60,18 +60,10 @@ public sealed class RadarOptions
     public string Benchmark { get; set; } = "SPY";
 
     /// <summary>
-    /// Widens the universe with broad-market index constituents so momentum can be ranked beyond the
-    /// book (#558). Off by default — same launch posture as <see cref="ScannerMode.LogOnly"/>.
+    /// Widens the universe past the book with the stage-1 scan shortlist — the tens of broad-market
+    /// names a mechanical pre-filter picked out of the index (#558), never the index itself. Off by
+    /// default — same launch posture as <see cref="ScannerMode.LogOnly"/>; turning it off restores
+    /// the held + watchlist + lens universe on the next sync.
     /// </summary>
     public bool BroadUniverseEnabled { get; set; }
-
-    /// <summary>
-    /// Upstream bar fetches an ingestion run may spend on index constituents. Holdings, watchlist and
-    /// seed members are always ingested first; the budget rotates over the least-fresh constituents so
-    /// successive runs converge on full coverage without one run fanning out over the whole index.
-    /// Default 275 keeps a full rotation of the 503-name seed inside
-    /// <see cref="FreshnessMaxTradingDays"/> — a slower rotation would leave most constituents
-    /// permanently stale, and stale structure is discarded downstream rather than ranked.
-    /// </summary>
-    public int BroadUniverseMaxIngestPerRun { get; set; } = 275;
 }

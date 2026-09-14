@@ -62,6 +62,38 @@ public sealed class OpportunityOptions
     /// <summary>Fundamentals grade at/above this earns the stable quality x momentum nomination reason.</summary>
     public int ScanQualityLeaderScore { get; set; } = 60;
 
+    // ── #558 stage 1: the mechanical pre-filter that bounds what stage 2 pays bar math for ──
+    /// <summary>
+    /// Tickers the stage-1 pre-filter hands to stage 2 — the cap on how far past the book the scan's
+    /// per-ticker bar math reaches. Tens, never the whole index; the funnel is pointless above that.
+    /// </summary>
+    public int ScanShortlistSize { get; set; } = 40;
+
+    /// <summary>
+    /// Constituents whose EDGAR fundamentals a stage-1 run grades. Bounds the upstream fan-out: the
+    /// index is ranked on quote + street signals first and only this many names are graded.
+    /// </summary>
+    public int ScanShortlistGradeBudget { get; set; } = 60;
+
+    /// <summary>Weight (0-1) of the street-action signal in the stage-1 surface score; the rest is coarse momentum.</summary>
+    public decimal ScanShortlistStreetWeight { get; set; } = 0.3m;
+
+    /// <summary>Surface-score points (capped at 100) each recent favourable street action is worth.</summary>
+    public int ScanShortlistStreetActionPoints { get; set; } = 50;
+
+    /// <summary>Weight (0-1) of the fundamentals grade in the stage-1 shortlist score; the rest is the surface score.</summary>
+    public decimal ScanShortlistQualityWeight { get; set; } = 0.5m;
+
+    /// <summary>Days back a stage-1 run counts upgrades, new coverage and target raises over.</summary>
+    public int ScanShortlistActionLookbackDays { get; set; } = 14;
+
+    /// <summary>
+    /// Most street actions a stage-1 run reads from the feed before counting them per ticker. The
+    /// action repository clamps any read to 200, so a larger value here buys nothing — raise the
+    /// repository's own ceiling first if the window ever needs more.
+    /// </summary>
+    public int ScanShortlistActionLimit { get; set; } = 200;
+
     /// <summary>Hour (UTC) the daily opportunity scan runs — after Radar's 23:00 UTC compute job has refreshed structure.</summary>
     public int ScanHourUtc { get; set; } = 0;
 

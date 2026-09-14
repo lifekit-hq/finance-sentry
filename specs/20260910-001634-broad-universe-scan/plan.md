@@ -205,3 +205,73 @@ behaviour: it was assumed on both sides of the scorer.
   the grade alone, is what proves the ranking.
 - **The nightly cadence is covered too**: a second cycle appends a score row and dedups nomination
   reasons rather than duplicating the candidate.
+
+### US5 — the two-stage funnel (this increment)
+
+The 2026-09-13 consolidation of #558 replaced "ingest the index on a rotation, then rank everything
+ingested" with a funnel: stage 1 is cheap and wide, stage 2 expensive and narrow. What US1/US2
+shipped is not thrown away — the constituent list, the hoisted sector read, the fixtures and the
+quality x momentum rules all stand; what changes is *which* names reach the expensive half.
+
+Surface:
+- `Core/Interfaces/IScanShortlistSource.cs` (new port — Research composes, Radar consumes).
+- `Modules.Research/Domain/Scoring/ScanShortlistRules.cs` (new, pure) +
+  `PercentileRanks.cs` (extracted from `ScanNominationRules`, now shared by both stages).
+- `Modules.Research/Application/Services/ScanShortlistService.cs` (new) and
+  `FundamentalsGrading.cs` (the EDGAR grade loop, lifted out of `OpportunityScanJob` so both stages
+  grade the same way).
+- `OpportunityOptions` — the seven `ScanShortlist*` knobs.
+- `Modules.Radar`: `RadarUniverseService` takes `IScanShortlistSource` in place of
+  `IIndexConstituentSource`; `IngestDailyBarsCommand` loses `Schedule` and `RadarOptions` loses
+  `BroadUniverseMaxIngestPerRun`.
+
+Decisions:
+- **The universe *is* the bound.** Rather than adding a second budget at the ingestion or ranking
+  step, the shortlist is what `RadarUniverseService` composes, so ingestion, structure computation
+  and nomination inherit the bound from membership. Clause 3's "at most K + |held| + |watchlist|"
+  then holds by construction instead of by a filter somebody can forget to apply.
+- **`Radar:BroadUniverseEnabled` stays the single gate.** It already exists in the API host's
+  `appsettings.json` and in the docs; with the funnel it now means "widen by the shortlist" instead
+  of "widen by the index". Off still restores held + watchlist + lenses on the next sync, and with
+  it off stage 1 is never asked for a shortlist — a disabled funnel costs no upstream call.
+- **Stage 1 is itself cheapest-first.** Grading 503 constituents through EDGAR nightly is ~3k HTTP
+  calls, so the index is ranked on the batched quote percent change and the street feed first and
+  only `ScanShortlistGradeBudget` (60) names are graded; the shortlist cap (40) then cuts that on
+  quality. The contract's three signals are all in play — the ordering is what makes it affordable.
+- **A missing half is never faked** — an ungraded name keeps its surface standing and sorts below
+  every graded name, the same rule `RankByQualityMomentum` already follows.
+- **Every stage-1 upstream degrades rather than throws.** A quote outage leaves the ranking on street
+  actions, a feed outage leaves it on quotes, both down yields an empty shortlist — which is exactly
+  the flag-off universe. The nightly cycle never fails because stage 1 had a bad night.
+- **`UniverseKind.IndexConstituent` keeps its name** even though it now means "stage-1 shortlisted".
+  `Kind` persists as a string, so renaming the enum member would strand every existing row for a
+  wording change; the semantic shift is documented on the member instead.
+- **The shortlist churns, so membership churns.** A name yesterday's shortlist carried and today's
+  does not is de-activated by the existing compose-and-deactivate path — no new teardown, and the
+  freshness watchdog stays scoped away from constituents (a name shortlisted today has no bars until
+  the run that ingests it).
+- **The dropped rotation test is replaced, not deleted.** `BroadUniverseIngestionTests` proved a
+  budget that no longer exists; `ShortlistScopedIngestionTests` proves the stronger property it was
+  standing in for — a cycle fetches the book, the lenses and the shortlist and nothing else, over a
+  200-name index. `ShortlistStructureCostTests` pins the same bound at the structure-read end, with
+  bars seeded for the *whole* index so the bound has to come from membership rather than from which
+  names happen to have history.
+
+Known costs and gaps, carried into US6 (found in review of this increment):
+- **The quote read is market-wide but not batched.** `IMarketDataService.GetQuotesAsync` fetches a
+  ticker at a time (6 concurrent) behind a 5-minute cache, so stage 1 costs ~500 light quote requests
+  a night. Still far cheaper than the ~275 full-history bar fetches plus whole-index structure
+  computation it replaces, but "batch quote read" describes the intent, not the transport (T045).
+- **A Scan candidate outside the book can go stale.** The shortlist churns nightly and the universe
+  churns with it, so a candidate nominated yesterday loses bar coverage once its ticker drops off —
+  under the resident index it never did. Fixing it either widens the clause-3 bound or promotes
+  candidates to the watchlist, so it is a contract question, not a silent patch (T044).
+- **EDGAR is asked twice per shortlisted name** — once by stage 1, once by the scan job's own
+  grading. `SecEdgarService` is a singleton caching fundamentals for 12 h and both run in the same
+  nightly window, so the second ask is a cache hit rather than a second fetch.
+
+Not in this increment (clauses 4 and 5 of the consolidated contract):
+- Calibrating the top-decile cut and `ScanMaxNominationsPerRun` for a shortlist-sized universe, and
+  the LogOnly-style gate on the opportunity scan's alert fan-out.
+- Re-pointing `BroadUniverseScanCycleTests` at a shortlist-composed universe so the acceptance proof
+  runs through stage 1 rather than past it.

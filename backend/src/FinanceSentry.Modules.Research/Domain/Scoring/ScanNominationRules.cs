@@ -35,7 +35,7 @@ public static class ScanNominationRules
             .Select(e => (e.Ticker, Rs: RsAtWindow(e.Snapshot)))
             .Where(x => x.Rs is not null)
             .ToDictionary(x => x.Ticker, x => x.Rs!.Value, StringComparer.OrdinalIgnoreCase);
-        var percentiles = PercentileRanks(rsByTicker);
+        var percentiles = PercentileRanks.Of(rsByTicker);
 
         var nominations = new List<ScanNomination>();
         foreach (var entry in eligible)
@@ -115,28 +115,6 @@ public static class ScanNominationRules
 
     private static decimal? RsAtWindow(MarketStructureSnapshot snapshot)
         => snapshot.RsByWindow.TryGetValue(RsWindowBars, out var rs) ? rs : null;
-
-    /// <summary>
-    /// Inclusive percentile rank per ticker: share of universe values at or below the ticker's RS,
-    /// scaled 0-100. A one-member universe ranks 100 (trivially at the top of what exists).
-    /// </summary>
-    private static Dictionary<string, decimal> PercentileRanks(Dictionary<string, decimal> rsByTicker)
-    {
-        var result = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        if (rsByTicker.Count == 0)
-        {
-            return result;
-        }
-
-        var values = rsByTicker.Values.OrderBy(v => v).ToList();
-        foreach (var (ticker, rs) in rsByTicker)
-        {
-            var atOrBelow = values.Count(v => v <= rs);
-            result[ticker] = Math.Round(100m * atOrBelow / values.Count, 2);
-        }
-
-        return result;
-    }
 }
 
 public sealed record ScanNomination(string Ticker, IReadOnlyList<string> Reasons, decimal? RsPercentile);
