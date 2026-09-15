@@ -275,3 +275,36 @@ Not in this increment (clauses 4 and 5 of the consolidated contract):
   the LogOnly-style gate on the opportunity scan's alert fan-out.
 - Re-pointing `BroadUniverseScanCycleTests` at a shortlist-composed universe so the acceptance proof
   runs through stage 1 rather than past it.
+
+### US6 — calibrate and re-prove the funnel (this increment)
+
+Clauses 4 and 5 of the consolidated contract: the thresholds were set against the old width, the
+Alert lane was never gated, and the acceptance proof ran past stage 1 rather than through it.
+
+Surface:
+- `Modules.Research/Domain/Opportunity/ScanAlertMode.cs` (new enum, mirroring Radar's `ScannerMode`).
+- `OpportunityOptions` — `ScanAlertMode` (default `LogOnly`), `ScanMaxNominationsPerRun` 5 → 8.
+- `ScoreCandidateCommandHandler.EmitSignalsAsync` — takes the command rather than the user id, so the
+  gate can see the nomination's source.
+- `FinanceSentry.API/appsettings.json` — an `Opportunity` section carrying the mode, so the switch has
+  a runnable path like `Radar:BroadUniverseEnabled` does.
+- Tests: `ScanAlertModeTests` (new), `BroadUniverseRadarFixture` (composes its universe from a real
+  stage-1 run), `BroadUniverseScanCycleTests` (asserts the surviving candidate entered via stage 1).
+
+Decisions:
+- **The gate sits on the Alert, not on the signal.** A widened scan's finding is still recorded as a
+  `top_tier_candidate` signal in every mode; only the interruption is withheld. Radar's `ScannerMode`
+  set the precedent — the scanner launches log-only and the Alert lane opens once the findings have
+  been read for a while.
+- **The gate is scoped to `CandidateSource.Scan`.** A User or Ledger nomination is a deliberate act
+  that was already asked for, so it alerts regardless of the mode. Gating all three would have made
+  the flag a mute button on a feature nobody complained about.
+- **The top-decile cut stays 90.** The percentile is inclusive, so the rule's absolute yield already
+  tracks the universe: ~50 names of a 500-wide ingested index, ~6 of a shortlist-sized one. Loosening
+  it would re-widen discovery on exactly the axis stage 1 just screened. Only the nomination cap
+  moved (5 → 8): at 5 the cut discarded most of an already pre-screened slate, and the alert fan-out
+  that cap doubled as a guard against is now held by `ScanAlertMode`.
+- **The acceptance fixture composes, it does not hand in.** `BroadUniverseRadarFixture` runs the real
+  `ScanShortlistService` over an index of one constituent and two decoys and asserts the decoys never
+  reach the universe, so the cycle test proves the funnel instead of assuming it. Both stages share
+  one EDGAR double, the way production shares one cached `ISecEdgarService`.

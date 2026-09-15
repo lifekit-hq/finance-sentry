@@ -16,9 +16,9 @@ using Microsoft.Extensions.Options;
 using Xunit;
 
 /// <summary>
-/// #558's acceptance criterion, end to end: after broad ingestion has put bars behind an index
-/// constituent, a ledger-scan cycle must persist a Scan-sourced candidate for a ticker that is
-/// neither held nor watchlisted, carrying both a fundamentals score and its momentum standing.
+/// #558's acceptance criterion, end to end: a ledger-scan cycle must persist a Scan-sourced candidate
+/// for a ticker that is neither held nor watchlisted, that entered through the stage-1 shortlist, and
+/// that carries both a fundamentals score and its momentum standing.
 ///
 /// <see cref="BroadUniverseScanSeamTests"/> proves the Radar→rules half; this drives the rest of the
 /// production chain — the real <see cref="OpportunityScanJob"/> over the real
@@ -27,6 +27,10 @@ using Xunit;
 /// the module under test are doubled: EDGAR (HTTP), the signal/alert/thesis writers, the brokerage
 /// book, and the Risk and regime ports.
 ///
+/// The cycle runs *through* the funnel, not past it: <see cref="BroadUniverseRadarFixture"/> composes
+/// its universe out of a real stage-1 shortlist run, and both stages grade against the one EDGAR
+/// double, the way production shares one cached service between them.
+///
 /// Note what "momentum standing" means in the row: the scan's rank is an ordering, not a persisted
 /// column, so what proves it is the persisted excess-return RS for the ranking window together with
 /// <see cref="ScanNominationRules.QualityMomentumReason"/> — a reason `RankByQualityMomentum` tags
@@ -34,11 +38,7 @@ using Xunit;
 /// </summary>
 public sealed class BroadUniverseScanCycleTests
 {
-    private const string Constituent = BroadUniverseRadarFixture.Constituent;
-
-    /// <summary>The scorer maps a revenue YoY of +45% to 95 — above the default top-tier bar of 80.</summary>
-    private const decimal ConstituentRevenueYoy = 0.45m;
-    private const int ConstituentGrade = 95;
+    private const int ConstituentGrade = BroadUniverseRadarFixture.ConstituentGrade;
 
     [Fact]
     public async Task AScanCyclePersistsAScanCandidateForANameOutsideTheBook()
@@ -49,8 +49,7 @@ public sealed class BroadUniverseScanCycleTests
         await SeedCurrentIpsAsync(databaseName, userId);
 
         var alerts = new FakeOpportunityAlertGenerator();
-
-        await RunScanCycleAsync(radar, databaseName, Edgar(), alerts);
+        await RunScanCycleAsync(radar, databaseName, alerts);
 
         // Read back through a context sharing nothing with the cycle but the database itself, so what
         // follows is what the cycle wrote, not what its change tracker still happened to hold.
@@ -58,12 +57,20 @@ public sealed class BroadUniverseScanCycleTests
 
         var candidate = (await readBack.OpportunityCandidates.AsNoTracking().ToListAsync())
             .Should().ContainSingle("the lagging holding and the ETF lenses are not nominatable").Subject;
-        candidate.Ticker.Should().Be(Constituent);
         candidate.UserId.Should().Be(userId);
         candidate.Source.Should().Be(CandidateSource.Scan);
         candidate.Status.Should().Be(CandidateStatus.Active);
         candidate.NominationReasons.Should().Contain(
             ScanNominationRules.QualityMomentumReason, "the slot was won on quality x momentum, not momentum alone");
+
+        // Clause 5 is a claim about *how* the surviving name got here, so it is asserted over the
+        // candidate's provenance rather than over its identity: outside the book, and on the list
+        // stage 1 actually returned. Naming the expected ticker first would make both checks follow
+        // from the fixture instead of from the cycle.
+        candidate.Ticker.Should().NotBe(BroadUniverseRadarFixture.Holding,
+            "re-nominating the book is the behaviour #558 was filed against");
+        radar.Shortlist.Should().Contain(candidate.Ticker,
+            "the only non-book route into the universe is the stage-1 shortlist");
 
         var score = (await readBack.CandidateScores.AsNoTracking()
                 .Where(s => s.CandidateId == candidate.Id).ToListAsync())
@@ -73,7 +80,28 @@ public sealed class BroadUniverseScanCycleTests
         score.Evidence.RsByWindow.Should().ContainKey(ScanNominationRules.RsWindowBars)
             .WhoseValue.Should().BePositive("the constituent out-ran the benchmark it is measured against");
 
-        alerts.OpportunityAlertCalls.Should().Be(1, "a top-tier candidate outside the book is the point of the scan");
+        alerts.OpportunityAlertCalls.Should().Be(0,
+            "this candidate clears the top-tier bar, and the scan still ships in the log-only posture "
+            + "clause 4 asks for — the finding lands as a signal, not as an interruption");
+    }
+
+    /// <summary>
+    /// Clause 4's flood guard, seen from the cycle rather than the handler: the same top-tier
+    /// nomination the launch posture only records does interrupt once the mode is opened, so the guard
+    /// is a switch and not a dead lane. <see cref="ScanAlertModeTests"/> pins the gate's own rules.
+    /// </summary>
+    [Fact]
+    public async Task ATopTierScanCandidateAlertsOnceTheModeIsOpened()
+    {
+        var userId = Guid.NewGuid();
+        var databaseName = $"scan-cycle-{Guid.NewGuid():N}";
+        await using var radar = await BroadUniverseRadarFixture.CreateAsync(userId);
+        await SeedCurrentIpsAsync(databaseName, userId);
+
+        var alerts = new FakeOpportunityAlertGenerator();
+        await RunScanCycleAsync(radar, databaseName, alerts, ScanAlertMode.Alerting);
+
+        alerts.OpportunityAlertCalls.Should().Be(1);
     }
 
     /// <summary>
@@ -88,8 +116,8 @@ public sealed class BroadUniverseScanCycleTests
         await using var radar = await BroadUniverseRadarFixture.CreateAsync(userId);
         await SeedCurrentIpsAsync(databaseName, userId);
 
-        await RunScanCycleAsync(radar, databaseName, Edgar(), new FakeOpportunityAlertGenerator());
-        await RunScanCycleAsync(radar, databaseName, Edgar(), new FakeOpportunityAlertGenerator());
+        await RunScanCycleAsync(radar, databaseName, new FakeOpportunityAlertGenerator());
+        await RunScanCycleAsync(radar, databaseName, new FakeOpportunityAlertGenerator());
 
         await using var readBack = ResearchDatabase(databaseName);
         var candidate = (await readBack.OpportunityCandidates.AsNoTracking().ToListAsync())
@@ -103,15 +131,27 @@ public sealed class BroadUniverseScanCycleTests
     /// against its own <see cref="ResearchDbContext"/>, the way each Hangfire run gets its own scope.
     /// A second cycle therefore re-reads its candidate from the database rather than finding the
     /// instance the first one left in a change tracker.
+    ///
+    /// Stage 2 grades through the fixture's EDGAR double — the same instance stage 1 screened on, as
+    /// production shares one cached <see cref="ISecEdgarService"/> across the funnel. A null
+    /// <paramref name="alertMode"/> leaves the production default in place, so the acceptance test's
+    /// posture is the shipped one rather than the test's own.
     /// </summary>
     private static async Task RunScanCycleAsync(
         BroadUniverseRadarFixture radar,
         string databaseName,
-        ISecEdgarService edgar,
-        IAlertGeneratorService alerts)
+        IAlertGeneratorService alerts,
+        ScanAlertMode? alertMode = null)
     {
         await using var research = ResearchDatabase(databaseName);
-        var options = Options.Create(new OpportunityOptions());
+        var settings = new OpportunityOptions();
+        if (alertMode is { } mode)
+        {
+            settings.ScanAlertMode = mode;
+        }
+
+        var options = Options.Create(settings);
+        var edgar = radar.Edgar;
         var ips = new IpsRepository(research);
         var scorer = new ScoreCandidateCommandHandler(
             new CandidateRepository(research),
@@ -132,18 +172,6 @@ public sealed class BroadUniverseScanCycleTests
 
         await job.ExecuteAsync(CancellationToken.None);
     }
-
-    private static RecordingSecEdgarService Edgar()
-        => new(new Dictionary<string, IReadOnlyList<FundamentalFact>>(StringComparer.OrdinalIgnoreCase)
-        {
-            [Constituent] = RevenueGrowthFacts(Constituent, ConstituentRevenueYoy),
-        });
-
-    private static IReadOnlyList<FundamentalFact> RevenueGrowthFacts(string ticker, decimal revenueYoy)
-        => [
-            new(ticker, "Revenue", "Revenue", "USD", 100m * (1m + revenueYoy), new DateOnly(2026, 5, 31), "Q2", 2026, "10-Q"),
-            new(ticker, "Revenue", "Revenue", "USD", 100m, new DateOnly(2025, 5, 31), "Q2", 2025, "10-Q"),
-        ];
 
     /// <summary>The scan only scores users with a current IPS on file — this is that row.</summary>
     private static async Task SeedCurrentIpsAsync(string databaseName, Guid userId)

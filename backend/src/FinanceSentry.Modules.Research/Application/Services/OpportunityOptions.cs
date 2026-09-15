@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
+using FinanceSentry.Modules.Research.Domain.Opportunity;
+
 /// <summary>
 /// All Opportunity Scanner thresholds bound from configuration (section <c>Opportunity</c>).
 /// No magic numbers in the scorers or lifecycle handlers (FR-008 parity with Radar).
@@ -19,6 +21,14 @@ public sealed class OpportunityOptions
 
     /// <summary>Structure/Fundamentals score at/above this bar triggers a top-tier ("notable") signal + Alert.</summary>
     public int TopTierScoreBar { get; set; } = 80;
+
+    /// <summary>
+    /// Whether a machine-scan nomination that clears <see cref="TopTierScoreBar"/> raises an Alert or
+    /// only records its signal. Log-only (default) is the launch posture the #558 funnel needs: a scan
+    /// reaching past the book can clear the bar on several unfamiliar names a night, once per user.
+    /// User and Ledger nominations are deliberate acts and alert regardless of this mode.
+    /// </summary>
+    public ScanAlertMode ScanAlertMode { get; set; } = ScanAlertMode.LogOnly;
 
     /// <summary>Days after creation an Active candidate auto-expires if never promoted/rejected.</summary>
     public int CandidateTtlDays { get; set; } = 30;
@@ -41,14 +51,25 @@ public sealed class OpportunityOptions
     /// <summary>Universe RS percentile at/above this is "top-quartile" for scan rule (a).</summary>
     public int ScanTopQuartileRsPercentile { get; set; } = 75;
 
-    /// <summary>Universe RS percentile at/above this is "top-decile" for scan rule (b) (FR-008b).</summary>
+    /// <summary>
+    /// Universe RS percentile at/above this is "top-decile" for scan rule (b) (FR-008b). Held at 90
+    /// through the #558 funnel: the rank is inclusive, so the rule's absolute yield already tracks the
+    /// universe — it named ~50 of a 500-wide ingested index and names ~6 of a shortlist-sized one.
+    /// Loosening it would re-widen discovery on the very axis stage 1 just screened.
+    /// </summary>
     public int ScanTopDecileRsPercentile { get; set; } = 90;
 
     /// <summary>Volume ratio at/above this counts as above-average for the breakout rule (c) (FR-008c).</summary>
     public decimal ScanBreakoutVolumeRatioMin { get; set; } = 1.2m;
 
-    /// <summary>Most nominations a single scan run may score; excess is logged and dropped (alert-flood guard).</summary>
-    public int ScanMaxNominationsPerRun { get; set; } = 5;
+    /// <summary>
+    /// Most nominations a single scan run may score; excess is logged and dropped. Calibrated for the
+    /// #558 funnel: over a shortlist-sized universe the three rules nominate ~10-15 names that stage 1
+    /// already screened out of the whole index, so a cap of 5 discarded most of a pre-screened slate.
+    /// At 8 the cut trims the tail rather than the body, and the alert fan-out the old cap doubled as a
+    /// guard against is now held by <see cref="ScanAlertMode"/>.
+    /// </summary>
+    public int ScanMaxNominationsPerRun { get; set; } = 8;
 
     /// <summary>
     /// Momentum-ranked nominations whose EDGAR fundamentals a scan run grades before the combined

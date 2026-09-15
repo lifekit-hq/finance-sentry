@@ -76,6 +76,13 @@ bars), so market-wide quality ranking already exists; only breadth of price hist
   and a constituent outside the shortlist is not ingested even when it still carries stored bars.
 - **FR-012** (US5) Every stage-1 upstream may fail without failing the cycle: an empty shortlist
   degrades the universe to its core members, which is exactly the flag-off behaviour.
+- **FR-013** (US6) A top-tier candidate the machine originated records its signal in every mode but
+  raises an Alert only when `Opportunity:ScanAlertMode` is `Alerting`; the default is `LogOnly`, so a
+  widened scan cannot fan out one Alert per top-tier name per user. A candidate the user or Ledger
+  originated alerts regardless of the mode, including on the nights the scan re-scores it.
+- **FR-014** (US6) The nomination thresholds are stated against the shortlist-sized universe rather
+  than the whole index: `Opportunity:ScanMaxNominationsPerRun` and the top-decile RS cut each carry
+  the width they were calibrated for.
 
 ## Success criteria
 
@@ -90,6 +97,10 @@ bars), so market-wide quality ranking already exists; only breadth of price hist
    ingestion source can resolve. *(US3)*
 5. A scan cycle costs the per-ticker structure computation for at most K + |held| + |watchlist|
    tickers, pinned by a test over an index of N ≫ K constituents that all carry bars. *(US5)*
+6. A full cycle through the real job, scorer and repositories persists a `Scan` candidate that came
+   off the stage-1 shortlist rather than out of the book, and raises no Alert for it under the
+   shipped `LogOnly` posture. *(US6 — `BroadUniverseScanCycleTests` over a stage-1-composed
+   universe; the gate's own rules in `ScanAlertModeTests`)*
 
 ## Out of scope
 

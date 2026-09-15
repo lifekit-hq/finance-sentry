@@ -158,6 +158,19 @@ public sealed class ScoreCandidateCommandHandler(
             $"{Scanner}:{TopTierSignalType}:{ticker}:{userId}",
             new { structureScore, fundamentalsScore }), ct);
 
+        // The signal above is the record; the Alert below is the interruption. A machine scan reaching
+        // past the book raises one per top-tier nominee per user, so it stays behind the mode gate
+        // until the nominations have been read for a while (#558 clause 4).
+        //
+        // The gate reads the CANDIDATE's source, not the command's: the nightly scan re-scores every
+        // nominated ticker with Source=Scan, including names the user put on the list themselves, and
+        // withholding those would mute a lane nobody asked to mute. Who originated the candidate is
+        // the persisted answer — UpsertActiveAsync keeps it across re-scores.
+        if (candidate.Source == CandidateSource.Scan && _options.ScanAlertMode == ScanAlertMode.LogOnly)
+        {
+            return;
+        }
+
         var reason = $"structure {structureScore?.ToString() ?? "n/a"}, fundamentals {fundamentalsScore?.ToString() ?? "n/a"}";
         await alertGenerator.GenerateOpportunityAlertAsync(userId, candidate.Id, ticker, reason, ct);
     }

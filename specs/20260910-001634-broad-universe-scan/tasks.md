@@ -89,24 +89,30 @@
 - [x] T038 [US5] Test: a name yesterday's shortlist carried and today's does not is de-activated.
 - [x] T039 [US5] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.
 
-## US6 — calibrate and re-prove the funnel (next increment)
+## US6 — calibrate and re-prove the funnel (this increment)
 
-- [ ] T040 [US6] Calibrate `ScanTopDecileRsPercentile` and `ScanMaxNominationsPerRun` for a
+- [x] T040 [US6] Calibrate `ScanTopDecileRsPercentile` and `ScanMaxNominationsPerRun` for a
       shortlist-sized universe — a top-decile cut over ~45 members is a different instrument than over
       500, and the nomination cap was set against the old width.
-- [ ] T041 [US6] Give the opportunity scan a LogOnly-style gate so a widened scan cannot fan out one
+- [x] T041 [US6] Give the opportunity scan a LogOnly-style gate so a widened scan cannot fan out one
       Alert per top-tier candidate per user; precedent is Radar's `ScannerMode`.
-- [ ] T042 [US6] Re-point `BroadUniverseScanCycleTests` at a stage-1-composed universe so the
+- [x] T042 [US6] Re-point `BroadUniverseScanCycleTests` at a stage-1-composed universe so the
       acceptance proof runs *through* the funnel rather than past it, and assert the surviving
       candidate entered via the shortlist.
-- [ ] T044 [US6] Close the candidate-staleness hole the funnel opens: a Scan candidate outside the
+- [x] T043 [US6] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.
+
+## US7 — what the funnel opened (beyond #558's clauses)
+
+Neither task below is a `Done when` clause; both are holes US5 created and US6 could not close inside
+one reviewable increment.
+
+- [ ] T044 [US7] Close the candidate-staleness hole the funnel opens: a Scan candidate outside the
       book loses bar coverage the night its ticker drops off the shortlist, so its structure and
       invalidation monitoring go stale. Either union active-candidate tickers into the shortlist
       (raising the clause-3 bound to K + |held| + |watchlist| + |active candidates|, capped by the
       candidate TTL) or promote a nominated candidate to the watchlist so it rides the existing
       |watchlist| term — the second keeps the stated bound and needs owner agreement on the semantics.
-- [ ] T045 [US6] Give stage 1 a genuinely batched quote read. `IMarketDataService.GetQuotesAsync`
+- [ ] T045 [US7] Give stage 1 a genuinely batched quote read. `IMarketDataService.GetQuotesAsync`
       resolves a ticker at a time behind its cache, so the market-wide momentum signal costs ~500
       light requests a run. A batched quote endpoint (or reading the previous close from stored bars
       for names that have them) cuts that by an order of magnitude.
-- [ ] T043 [US6] Verify: `dotnet build` warning-free + `dotnet test FinanceSentry.sln`.
