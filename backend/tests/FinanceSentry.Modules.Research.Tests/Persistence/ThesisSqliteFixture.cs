@@ -4,14 +4,17 @@ using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 /// <summary>
-/// A SQLite-backed <see cref="ResearchDbContext"/> holding only the <c>theses</c> table, so the
-/// #443 save-to-read guarantee can be exercised over real SQL on any host — no Docker, no network.
+/// A SQLite-backed <see cref="ResearchDbContext"/> holding the tables the thesis write path
+/// touches — <c>theses</c> and the <c>quote_cache</c> its Created-event hook refreshes — so the
+/// #443 save-to-read guarantee and the #626 unit-of-work guarantee can both be exercised over real
+/// SQL on any host, no Docker and no network.
 ///
 /// Two deliberate deviations from the production Postgres mapping, both narrowly scoped:
 /// <list type="bullet">
-/// <item>every entity except <see cref="InvestmentThesis"/> is dropped from the model, because the
+/// <item>every entity outside <see cref="KeptEntityTypes"/> is dropped from the model, because the
 /// rest of the schema leans on Postgres-only constructs (<c>real[]</c> vectors, <c>jsonb</c>) that
 /// SQLite cannot create;</item>
 /// <item><c>gen_random_uuid()</c> and the Postgres column types are cleared — SQLite rejects an
@@ -19,15 +22,27 @@ using Microsoft.EntityFrameworkCore;
 /// timestamps itself.</item>
 /// </list>
 ///
-/// The <c>ThesisText</c> length limit is *not* a deviation: SQLite ignores <c>varchar(n)</c>
-/// widths, so the limit the production model declares is projected into a CHECK constraint. The
-/// column therefore refuses over-length text here exactly as it does on Postgres, and shrinking
-/// <c>HasMaxLength</c> in <see cref="ResearchDbContext"/> makes the round-trip test fail rather
-/// than silently pass.
+/// Length limits are *not* a deviation: SQLite ignores <c>varchar(n)</c> widths, so the limits the
+/// production model declares are projected into CHECK constraints. Those columns therefore refuse
+/// over-length text here exactly as they do on Postgres, and shrinking a <c>HasMaxLength</c> in
+/// <see cref="ResearchDbContext"/> makes the tests fail rather than silently pass.
 /// </summary>
 public sealed class ThesisSqliteFixture : IAsyncDisposable
 {
     private const string ThesisTextLengthCheckConstraint = "ck_theses_thesis_text_length";
+
+    private const string QuoteTickerLengthCheckConstraint = "ck_quote_cache_ticker_length";
+
+    /// <summary>
+    /// <see cref="QuoteCacheEntry"/> is kept alongside the thesis because the two share the scoped
+    /// context: <c>ThesisEventRecorder</c> refreshes quotes between the thesis write and the
+    /// event write, so a quote-cache failure lands in the middle of the thesis unit of work.
+    /// </summary>
+    private static readonly HashSet<Type> KeptEntityTypes =
+    [
+        typeof(InvestmentThesis),
+        typeof(QuoteCacheEntry),
+    ];
 
     private readonly SqliteConnection connection;
 
@@ -62,7 +77,7 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
 
             var unwanted = modelBuilder.Model.GetEntityTypes()
                 .Select(e => e.ClrType)
-                .Where(t => t != typeof(InvestmentThesis))
+                .Where(t => !KeptEntityTypes.Contains(t))
                 .ToList();
 
             // Ignore rather than RemoveEntityType: it also drops the foreign keys pointing at the
@@ -79,16 +94,26 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
             thesis.Property(x => x.Catalysts).HasColumnType(null);
             thesis.Property(x => x.InvalidationTriggers).HasColumnType(null);
 
-            var declaredMaxLength = thesis.Metadata
-                .FindProperty(nameof(InvestmentThesis.ThesisText))!
-                .GetMaxLength()
-                ?? throw new InvalidOperationException(
-                    "ResearchDbContext no longer declares a max length for ThesisText, so the "
-                    + "storage limit under test has nothing to derive from.");
-
             thesis.ToTable(t => t.HasCheckConstraint(
                 ThesisTextLengthCheckConstraint,
-                $"length(\"ThesisText\") <= {declaredMaxLength}"));
+                $"length(\"ThesisText\") <= {DeclaredMaxLength(thesis.Metadata, nameof(InvestmentThesis.ThesisText))}"));
+
+            var quote = modelBuilder.Entity<QuoteCacheEntry>();
+            quote.Property(x => x.FetchedAt).HasDefaultValueSql(null);
+            quote.Property(x => x.Price).HasColumnType(null);
+            quote.Property(x => x.PreviousClose).HasColumnType(null);
+
+            // Gives a test a deterministic way to make the cache write fail mid-unit-of-work, the
+            // way a constraint violation does on Postgres.
+            quote.ToTable(t => t.HasCheckConstraint(
+                QuoteTickerLengthCheckConstraint,
+                $"length(\"Ticker\") <= {DeclaredMaxLength(quote.Metadata, nameof(QuoteCacheEntry.Ticker))}"));
         }
+
+        private static int DeclaredMaxLength(IMutableEntityType entityType, string propertyName)
+            => entityType.FindProperty(propertyName)!.GetMaxLength()
+               ?? throw new InvalidOperationException(
+                   $"ResearchDbContext no longer declares a max length for {entityType.ClrType.Name}."
+                   + $"{propertyName}, so the storage limit under test has nothing to derive from.");
     }
 }

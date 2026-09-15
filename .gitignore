@@ -107,7 +107,11 @@ backend/packages/
 # Stray agent worktree copies and QA scratch — never commit
 .claude/worktrees/
 frontend/.qa-tmp.mjs
-/.devclaw/
+
+# .devclaw/ is tracked: the workflow manifest, the verify script and the repo-memory
+# pages are what a session reads before it starts. Only the per-run scratch is ignored.
+/.devclaw/playwright-report.json
+/.devclaw/TestResults/
 
 # devclaw per-goal checkouts (boilerplate revision 2) — one goal, one clone
 # under the project workspace; never this repo's own content.

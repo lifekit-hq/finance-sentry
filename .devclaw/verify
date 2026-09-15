@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# What Backend CI runs (.github/workflows/backend-ci.yml), reproduced locally.
+#
+# Frontend CI (.github/workflows/frontend-ci.yml) is NOT run here: `npm ci` needs
+# NODE_AUTH_TOKEN with read:packages for @lifekit-hq/*, which a sandbox rarely holds.
+# Touching frontend/ means following the tarball route in AGENTS.md by hand.
+#
+# Usage: .devclaw/verify [--skip-restore]
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+SOLUTION=backend/FinanceSentry.sln
+
+# DEVCLAW_SANDBOX_CPUS/_MEMORY are the container's real limits; /proc and nproc report
+# the host. The default parallel test run gets OOM-killed inside a 2-CPU / 4-6 GB box,
+# so the whole run is serialised with -m:1 (see AGENTS.md "MCP Verification").
+MSBUILD_JOBS="-m:1"
+
+if [[ "${1:-}" != "--skip-restore" ]]; then
+  echo "==> restore"
+  dotnet restore "$SOLUTION"
+fi
+
+echo "==> build (Release, warnings are errors via Directory.Build.props)"
+dotnet build "$SOLUTION" --configuration Release --no-restore $MSBUILD_JOBS
+
+# CI runs the solution unfiltered against a postgres:14-alpine service container.
+# Locally the DB-backed tests report themselves Skipped ([DockerRequiredFact], or a
+# connection failure) — do NOT add a --filter to paper over a failure.
+echo "==> test (full solution, no filter)"
+dotnet test "$SOLUTION" --configuration Release --no-build --verbosity normal $MSBUILD_JOBS
+
+echo "==> verify OK"

@@ -1,11 +1,11 @@
 namespace FinanceSentry.Modules.Research.Tests.Persistence;
 
 using FinanceSentry.Modules.Research.Application.Commands;
-using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 /// <summary>
@@ -39,7 +39,9 @@ public sealed class ThesisTextRoundTripTests
         await using (var writeCtx = fixture.CreateContext())
         {
             var handler = new SaveThesisCommandHandler(
-                new ThesisRepository(writeCtx), new NoOpThesisEventRecorder());
+                new ThesisRepository(writeCtx),
+                new RecordingThesisEventRecorder(),
+                NullLogger<SaveThesisCommandHandler>.Instance);
 
             await handler.Handle(
                 new SaveThesisCommand(
@@ -98,17 +100,5 @@ public sealed class ThesisTextRoundTripTests
         await save.Should().ThrowAsync<DbUpdateException>(
             "the column must refuse over-length text rather than silently truncating it, which is "
             + "the failure mode #443 reported");
-    }
-
-    private sealed class NoOpThesisEventRecorder : IThesisEventRecorder
-    {
-        public Task RecordAsync(
-            Guid userId,
-            ThesisSubjectType subjectType,
-            Guid subjectId,
-            string ticker,
-            ThesisEventType eventType,
-            string? decisionNote = null,
-            CancellationToken ct = default) => Task.CompletedTask;
     }
 }
