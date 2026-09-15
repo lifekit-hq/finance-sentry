@@ -5,6 +5,18 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.9.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.8.0...v1.9.0) (2026-09-15)
+
+
+### Features
+
+* **scanner:** gate the widened scan's alerts and prove the funnel end… ([#612](https://github.com/lifekit-hq/finance-sentry/issues/612)) ([e8616ff](https://github.com/lifekit-hq/finance-sentry/commit/e8616ff6dfec3b54aa6e5cad3c4d9266ee648534))
+
+
+### Bug Fixes
+
+* **research:** stop a failed quote-cache write poisoning the thesis save ([#627](https://github.com/lifekit-hq/finance-sentry/issues/627)) ([403b1bd](https://github.com/lifekit-hq/finance-sentry/commit/403b1bd915d67fa47a2fa2e1994d98ff354c87cc)), closes [#626](https://github.com/lifekit-hq/finance-sentry/issues/626)
+
 ## [1.8.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.7.0...v1.8.0) (2026-09-14)
 
 
