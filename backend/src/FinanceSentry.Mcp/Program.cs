@@ -52,7 +52,7 @@ internal static class Program
             builder.Services
                 .AddMcpServer()
                 .WithStdioServerTransport()
-                .WithToolsFromAssembly(mcpAssembly);
+                .WithFinanceSentryTools(mcpAssembly);
 
             var host = builder.Build();
             await host.Services.GetRequiredService<LocalMcpSession>().InitializeAsync();
@@ -71,7 +71,7 @@ internal static class Program
                 // authenticated HttpContext (and thus per-request identity) flows to the tool. With
                 // stateful sessions the tool runs on a background loop where HttpContext is null.
                 .WithHttpTransport(o => o.Stateless = true)
-                .WithToolsFromAssembly(mcpAssembly);
+                .WithFinanceSentryTools(mcpAssembly);
 
             var port = int.TryParse(Environment.GetEnvironmentVariable("MCP_HTTP_PORT"), out var p) ? p : 5100;
             builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
