@@ -27,6 +27,13 @@
     <ProjectReference Include="..\..\src\FinanceSentry.Core\FinanceSentry.Core.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Research\FinanceSentry.Modules.Research.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
+    <!--
+      Test-only reference (precedent: Risk, above, for ActionTicketsGeneratorJobTests). #558's
+      nomination path spans two modules — Radar decides which universe members are rankable, Research
+      decides which rankable members get nominated — so the seam is only real when one test drives
+      Radar's actual reader into Research's actual rules.
+    -->
+    <ProjectReference Include="..\..\src\FinanceSentry.Modules.Radar\FinanceSentry.Modules.Radar.csproj" />
   </ItemGroup>
 
 </Project>

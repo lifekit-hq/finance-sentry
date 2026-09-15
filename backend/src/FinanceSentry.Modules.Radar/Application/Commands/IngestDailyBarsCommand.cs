@@ -25,6 +25,9 @@ public sealed class IngestDailyBarsCommandHandler(
     public async Task<IngestRunSummary> Handle(IngestDailyBarsCommand command, CancellationToken cancellationToken)
     {
         var members = await universe.SyncAsync(cancellationToken);
+        var latestDates = await bars.GetLatestDatesAsync(
+            members.Select(m => m.Ticker).ToList(), cancellationToken);
+        var scheduled = Schedule(members);
 
         var lookbackSince = DateOnly.FromDateTime(DateTime.UtcNow)
             .AddDays(-CalendarDaysFor(_options.LookbackTradingDays));
@@ -33,13 +36,14 @@ public sealed class IngestDailyBarsCommandHandler(
         var barsAdded = 0;
         var failed = new List<string>();
 
-        foreach (var member in members)
+        foreach (var member in scheduled)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var latest = await bars.GetLatestDateAsync(member.Ticker, cancellationToken);
-                var since = latest is not null ? latest.Value.AddDays(1) : lookbackSince;
+                var since = latestDates.TryGetValue(member.Ticker, out var latest)
+                    ? latest.AddDays(1)
+                    : lookbackSince;
 
                 var fetched = await history.GetDailyBarsAsync(member.Ticker, since, cancellationToken);
                 if (fetched.Count == 0)
@@ -71,6 +75,27 @@ public sealed class IngestDailyBarsCommandHandler(
         }
 
         return new IngestRunSummary(ingested, barsAdded, failed.Count, failed);
+    }
+
+    /// <summary>
+    /// Book first: holdings, watchlist and the seed lenses are fetched before the stage-1 shortlist,
+    /// so an upstream rate limit costs breadth rather than the freshness of what is actually owned.
+    /// The shortlist is tens of names (#558), so unlike the rotating index budget it replaced, every
+    /// scheduled member is fetched in the same run.
+    /// </summary>
+    private List<RadarUniverseMember> Schedule(IReadOnlyList<RadarUniverseMember> members)
+    {
+        var scheduled = members
+            .OrderBy(m => m.Kind == UniverseKind.IndexConstituent ? 1 : 0)
+            .ThenBy(m => m.Ticker, StringComparer.Ordinal)
+            .ToList();
+
+        logger.LogInformation(
+            "Radar ingestion scheduling {Core} core and {Shortlisted} shortlisted tickers.",
+            scheduled.Count(m => m.Kind != UniverseKind.IndexConstituent),
+            scheduled.Count(m => m.Kind == UniverseKind.IndexConstituent));
+
+        return scheduled;
     }
 
     // Convert a trading-day lookback to a calendar-day window with a weekend/holiday cushion (~1.5x).

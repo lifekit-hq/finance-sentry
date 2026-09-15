@@ -58,4 +58,12 @@ public sealed class RadarOptions
 
     /// <summary>The benchmark ticker RS is measured against.</summary>
     public string Benchmark { get; set; } = "SPY";
+
+    /// <summary>
+    /// Widens the universe past the book with the stage-1 scan shortlist — the tens of broad-market
+    /// names a mechanical pre-filter picked out of the index (#558), never the index itself. Off by
+    /// default — same launch posture as <see cref="ScannerMode.LogOnly"/>; turning it off restores
+    /// the held + watchlist + lens universe on the next sync.
+    /// </summary>
+    public bool BroadUniverseEnabled { get; set; }
 }

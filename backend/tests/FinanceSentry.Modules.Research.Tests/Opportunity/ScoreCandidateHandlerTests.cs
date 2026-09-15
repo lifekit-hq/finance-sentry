@@ -4,26 +4,12 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
-using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
 public sealed class ScoreCandidateHandlerTests
 {
-    // 039: the single-position cap is read from its single home (the Risk rule set) via this port.
-    private sealed class FakePositionCapSource(decimal? cap) : IPositionCapSource
-    {
-        public Task<decimal?> GetMaxPositionWeightAsync(Guid userId, CancellationToken ct) => Task.FromResult(cap);
-    }
-
-    // 021: regime is optional context. A null latest reading ⇒ no adjustment (raw == adjusted),
-    // so these pre-existing scoring assertions are unaffected.
-    private sealed class FakeMarketRegimeSource(MarketRegimeSnapshot? snapshot = null) : IMarketRegimeSource
-    {
-        public Task<MarketRegimeSnapshot?> GetLatestAsync(CancellationToken ct = default) => Task.FromResult(snapshot);
-    }
-
     private static ScoreCandidateCommandHandler BuildHandler(
         FakeCandidateRepository candidates,
         FakeCandidateScoreRepository scores,

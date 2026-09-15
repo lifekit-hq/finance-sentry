@@ -1,7 +1,5 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
-using System.Reflection;
-using System.Text.Json;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
@@ -20,13 +18,10 @@ public sealed class AnalystUniverseService(
     ResearchDbContext research,
     IBrokerageHoldingsReader brokerage,
     IBankingTotalsReader banking,
+    IIndexConstituentSource constituents,
     ILogger<AnalystUniverseService> logger) : IAnalystUniverseService
 {
     private const string EquityInstrumentType = "STK";
-    private const string SeedResourceName =
-        "FinanceSentry.Modules.Research.Infrastructure.Resources.sp500-constituents.json";
-
-    private static IReadOnlyList<string>? seedCache;
 
     public async Task<IReadOnlyList<AnalystUniverseMember>> SyncAsync(CancellationToken ct = default)
     {
@@ -60,7 +55,7 @@ public sealed class AnalystUniverseService(
             Add(resolved, ticker, UniverseReason.Candidate);
         }
 
-        foreach (var ticker in LoadSeed())
+        foreach (var ticker in constituents.GetConstituents())
         {
             Add(resolved, ticker, UniverseReason.IndexConstituent);
         }
@@ -94,23 +89,4 @@ public sealed class AnalystUniverseService(
             resolved.TryAdd(normalized, reason);
         }
     }
-
-    private static IReadOnlyList<string> LoadSeed()
-    {
-        if (seedCache is not null)
-        {
-            return seedCache;
-        }
-
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(SeedResourceName)
-            ?? throw new InvalidOperationException($"Embedded seed resource '{SeedResourceName}' not found.");
-        using var reader = new StreamReader(stream);
-        var json = reader.ReadToEnd();
-
-        var doc = JsonSerializer.Deserialize<SeedFile>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        seedCache = doc?.Tickers ?? [];
-        return seedCache;
-    }
-
-    private sealed record SeedFile(List<string> Tickers);
 }

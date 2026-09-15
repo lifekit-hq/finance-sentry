@@ -7,15 +7,21 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Composes the Radar universe: seed members (benchmark + sectors + industry) ∪ equity holdings
-/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers. Membership is persisted
-/// and auto-synced; departed holdings/watchlist tickers are de-activated (history retained).
+/// (across all active users, filtered to <c>STK</c>) ∪ watchlist tickers ∪ — when
+/// <see cref="RadarOptions.BroadUniverseEnabled"/> is set — the stage-1 scan shortlist (#558).
+/// Membership is persisted and auto-synced; departed tickers are de-activated (history retained).
+///
+/// The shortlist is what bounds the cost of everything downstream: bars are ingested and market
+/// structure computed for exactly these members, so widening the scan past the book costs tens of
+/// tickers a run, not a whole index.
 /// </summary>
 public sealed class RadarUniverseService(
     IRadarUniverseRepository universe,
     IBrokerageHoldingsReader brokerageReader,
     IWatchlistReader watchlistReader,
     IBankingTotalsReader bankingTotals,
-    IOptions<RadarOptions> options) : IRadarUniverseService
+    IOptions<RadarOptions> options,
+    IScanShortlistSource? shortlistSource = null) : IRadarUniverseService
 {
     private const string EquityInstrumentType = "STK";
 
@@ -46,6 +52,15 @@ public sealed class RadarUniverseService(
             foreach (var ticker in watchlist)
             {
                 Add(resolved, ticker, UniverseKind.Watchlist, UniverseSource.Auto);
+            }
+        }
+
+        // Added last so an owned or watched name keeps its ownership kind (first write wins).
+        if (_options.BroadUniverseEnabled && shortlistSource is not null)
+        {
+            foreach (var ticker in await shortlistSource.GetShortlistAsync(ct))
+            {
+                Add(resolved, ticker, UniverseKind.IndexConstituent, UniverseSource.Auto);
             }
         }
 

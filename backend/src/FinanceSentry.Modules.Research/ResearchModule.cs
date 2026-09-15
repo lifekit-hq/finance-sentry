@@ -249,7 +249,12 @@ public static class ResearchModule
         // Structured monthly consensus (feature 037). Always registered — the service no-ops via
         // IsConfigured when no key is present, keeping the DI graph stable across environments.
         services.AddSingleton<IRecommendationTrendsService, FinnhubRecommendationTrendsService>();
+        services.AddSingleton<Core.Interfaces.IIndexConstituentSource, Sp500ConstituentSource>();
         services.AddScoped<IAnalystUniverseService, AnalystUniverseService>();
+
+        // Stage 1 of the #558 scan funnel. Scoped like its collaborators (quote reads and the analyst
+        // action repository are scoped), and read by Radar's universe sync through the Core port.
+        services.AddScoped<Core.Interfaces.IScanShortlistSource, ScanShortlistService>();
         services.AddScoped<Core.Interfaces.IAnalystActionFeedReader, Infrastructure.Persistence.AnalystActionFeedReader>();
 
         // Valuation snapshot services (feature 030, US2). Both scoped: the valuation service depends on

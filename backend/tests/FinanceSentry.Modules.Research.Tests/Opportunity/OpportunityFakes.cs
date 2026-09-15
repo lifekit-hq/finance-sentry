@@ -107,6 +107,70 @@ internal sealed class FakeSecEdgarService(IReadOnlyList<FundamentalFact>? facts 
         => Task.FromResult(facts ?? []);
 }
 
+/// <summary>Structure reader over a fixed universe, for scan-job tests that need many tickers.</summary>
+internal sealed class FakeUniverseStructureReader(IReadOnlyList<UniverseStructureEntry> universe) : IMarketStructureReader
+{
+    public Task<MarketStructureSnapshot?> GetStructureAsync(string ticker, CancellationToken ct = default)
+        => Task.FromResult(universe
+            .FirstOrDefault(e => string.Equals(e.Ticker, ticker, StringComparison.OrdinalIgnoreCase))?.Snapshot);
+
+    public Task<IReadOnlyList<PairwiseCorrelation>> GetPairwiseCorrelationsAsync(
+        IReadOnlyCollection<string> tickers, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<PairwiseCorrelation>>([]);
+
+    public Task<IReadOnlyList<UniverseStructureEntry>> GetUniverseStructuresAsync(CancellationToken ct = default)
+        => Task.FromResult(universe);
+}
+
+/// <summary>EDGAR double serving per-ticker facts and recording which tickers were asked for.</summary>
+internal sealed class RecordingSecEdgarService(
+    IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>> factsByTicker,
+    IReadOnlyCollection<string>? failingTickers = null) : ISecEdgarService
+{
+    public List<string> FundamentalsRequests { get; } = [];
+
+    public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
+        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
+
+    public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+        string ticker, int maxPerConcept, CancellationToken ct = default)
+    {
+        FundamentalsRequests.Add(ticker);
+        if (failingTickers?.Contains(ticker, StringComparer.OrdinalIgnoreCase) == true)
+        {
+            throw new InvalidOperationException($"EDGAR unavailable for {ticker}");
+        }
+
+        return Task.FromResult(factsByTicker.TryGetValue(ticker, out var facts) ? facts : []);
+    }
+}
+
+/// <summary>Scorer double recording every (user, ticker) the scan job pushed through the pipeline.</summary>
+internal sealed class RecordingScoreCandidateHandler
+    : FinanceSentry.Core.Cqrs.ICommandHandler<
+        Application.Commands.ScoreCandidateCommand, Application.Commands.ScoreCandidateResult>
+{
+    public List<Application.Commands.ScoreCandidateCommand> Commands { get; } = [];
+
+    public Task<Application.Commands.ScoreCandidateResult> Handle(
+        Application.Commands.ScoreCandidateCommand command, CancellationToken ct)
+    {
+        Commands.Add(command);
+        return Task.FromResult(new Application.Commands.ScoreCandidateResult(
+            Guid.NewGuid(),
+            command.Ticker,
+            IsNewCandidate: true,
+            new Domain.Scoring.CandidateScorecard(
+                StructureScore: null,
+                FundamentalsScore: null,
+                Domain.Opportunity.CrowdingClass.Normal,
+                Domain.Scoring.IpsFitFacts.Unknown,
+                Domain.Scoring.ScoreEvidence.Empty,
+                FormulaVersion: 1)));
+    }
+}
+
 internal sealed class FakeIpsRepository(InvestmentPolicyStatement? ips = null) : Domain.Repositories.IIpsRepository
 {
     public Task<InvestmentPolicyStatement?> GetCurrentAsync(Guid userId, CancellationToken ct = default)
@@ -130,6 +194,18 @@ internal sealed class FakeBrokerageHoldingsReader(IReadOnlyList<BrokerageHolding
 {
     public Task<IReadOnlyList<BrokerageHoldingSummary>> GetHoldingsAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult(holdings ?? []);
+}
+
+/// <summary>039: the single-position cap is read from its single home (the Risk rule set) via this port.</summary>
+internal sealed class FakePositionCapSource(decimal? cap = null) : Domain.Ports.IPositionCapSource
+{
+    public Task<decimal?> GetMaxPositionWeightAsync(Guid userId, CancellationToken ct) => Task.FromResult(cap);
+}
+
+/// <summary>021: regime is optional context. A null latest reading ⇒ no adjustment (raw == adjusted).</summary>
+internal sealed class FakeMarketRegimeSource(MarketRegimeSnapshot? snapshot = null) : IMarketRegimeSource
+{
+    public Task<MarketRegimeSnapshot?> GetLatestAsync(CancellationToken ct = default) => Task.FromResult(snapshot);
 }
 
 internal sealed class RecordingRadarSignalWriter : IRadarSignalWriter

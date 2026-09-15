@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Radar.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Services;
+using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using Hangfire;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,14 @@ public sealed class RadarFreshnessWatchdogJob(
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var members = await universe.ListActiveAsync(ct);
+        // Shortlisted constituents (#558) churn nightly: a name stage 1 picked today has no bars until
+        // the run that ingests it, and a name it dropped stops gaining them. Both look like staleness
+        // and neither is an outage, so watching them would bury the real signal. The cost is that a
+        // broken ingest over the shortlist half of the universe is invisible here — the book, the
+        // benchmark and the sector lenses, which is what an outage actually threatens, are not.
+        var members = (await universe.ListActiveAsync(ct))
+            .Where(m => m.Kind != UniverseKind.IndexConstituent)
+            .ToList();
         if (members.Count == 0)
         {
             return;

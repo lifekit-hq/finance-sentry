@@ -8,6 +8,14 @@ public enum UniverseKind
     Industry,
     Holding,
     Watchlist,
+
+    /// <summary>
+    /// Broad-market index member the stage-1 scan shortlist picked up, carried for breadth rather
+    /// than because it is owned or watched — so membership churns run to run as the shortlist does.
+    /// The name persists as a string in <c>radar_universe.kind</c>; it stays <c>IndexConstituent</c>
+    /// rather than tracking the stage-1 wording so existing rows keep parsing.
+    /// </summary>
+    IndexConstituent,
 }
 
 /// <summary>Where a universe member came from.</summary>
