@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.BankSync.Application;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
@@ -243,6 +244,21 @@ public class AccountDiscoveryServiceTests
         known!.CurrentBalance.Should().Be(10m);
         known.ProductType.Should().Be("black");
         h.MonobankBalanceCache.TryGet("mono-token", "new-mono")!.CurrentBalance.Should().Be(20m);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_SkipsClientInfoWhenSiblingSyncJustFetchedIt()
+    {
+        var h = BuildSut();
+        SetupMonobank(h, new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+        h.MonobankBalanceCache.Set("mono-token", "known-mono",
+            new BankAccountInfo("known-mono", "Jar", "black", "1234", 10m, "UAH", "Owner"));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(0);
+        h.MonobankAdapter.Verify(
+            a => a.GetClientInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

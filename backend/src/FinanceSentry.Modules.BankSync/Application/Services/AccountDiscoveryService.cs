@@ -148,6 +148,14 @@ public class AccountDiscoveryService(
             {
                 var token = encryption.Decrypt(
                     credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion);
+                if (monobankBalanceCache.HasFreshEntries(token))
+                {
+                    logger.LogInformation(
+                        "Monobank client-info fetched recently for credential {CredentialId}; deferring discovery to the next run.",
+                        credential.Id);
+                    continue;
+                }
+
                 var clientInfo = await monobankAdapter.GetClientInfoAsync(token, ct);
 
                 foreach (var pa in clientInfo.Accounts)
