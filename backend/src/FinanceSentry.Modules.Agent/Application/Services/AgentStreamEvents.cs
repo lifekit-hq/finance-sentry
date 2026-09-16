@@ -22,4 +22,10 @@ public sealed record AgentDoneEvent(Guid MessageId) : AgentStreamEvent;
 /// Internal terminal event carrying the assembled final answer for persistence — consumed by the
 /// command handler, never forwarded to the client.
 /// </summary>
-public sealed record AgentCompletionEvent(string FinalText, string? ToolCallsJson) : AgentStreamEvent;
+/// <param name="IsSilenceFallback">
+/// True when the agent said nothing (empty reply or the OpenClaw <c>NO_REPLY</c> sentinel) and
+/// <paramref name="FinalText"/> is a canned greeting substituted for the chat widget. That text is
+/// never an answer to the prompt, so non-chat consumers must treat it as "no usable text".
+/// </param>
+public sealed record AgentCompletionEvent(string FinalText, string? ToolCallsJson, bool IsSilenceFallback = false)
+    : AgentStreamEvent;
