@@ -244,13 +244,13 @@ public sealed class TrueLayerHttpClient(
         };
     }
 
-    private static string ExtractLast4(string? iban, string? number)
+    internal static string ExtractLast4(string? iban, string? number)
     {
         var source = !string.IsNullOrWhiteSpace(iban) ? iban : number;
         if (string.IsNullOrWhiteSpace(source))
             return "0000";
-        var digits = new string([.. source.Where(char.IsLetterOrDigit)]);
-        return digits.Length >= 4 ? digits[^4..] : digits.PadLeft(4, '0');
+        var digits = new string([.. source.Where(char.IsDigit)]);
+        return digits.Length >= 4 ? digits[^4..] : "0000";
     }
 
     private async Task<TrueLayerTokenSet> PostTokenAsync(Dictionary<string, string> body, CancellationToken ct)

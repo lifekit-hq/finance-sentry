@@ -30,4 +30,8 @@
     <ProjectReference Include="..\FinanceSentry.Infrastructure\FinanceSentry.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="FinanceSentry.Tests.Unit" />
+  </ItemGroup>
+
 </Project>
