@@ -64,7 +64,8 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   reader boundary with the current FX rate (§3), like bank balances; a fiat code with no rate is
   valued 1:1 and logged. It counts toward the venue's value and net worth, and in
   `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
-  position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`).
+  position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Holdings page
+  groups it as "Venue cash" with no unit price (`holdings.computed.ts`).
 - **Cost basis — Binance** is reconstructed from the full fill history
   (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
   quote pair).
@@ -76,8 +77,11 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   is USD, a USD stablecoin (at par) or a fiat currency with an FX rate (converted with the
   current rate — not the rate on the fill date). Fills on crypto-quoted pairs are not priced.
   The cursor (`v1:<ms>`) is the instant every pair was walked to; the walk stops at the moment
-  the sync took just before reading balances, and at most 26 windows per run
-  (`IsComplete = false` resumes next run).
+  the sync took just before reading balances, and at most 26 windows per call
+  (`IsComplete = false` resumes next run). A never-walked holding (`TrackedQuantity` null) is
+  paged to that cut-off in one run (`SyncExchangeHoldingsCommandHandler`) — its first ledger
+  pass must reconcile the position held at connect — and if the walk stalls short of it, its
+  ledger and cursor stay untouched until a later run gets there.
   `ForwardCostBasisLedger` accumulates the fills (weighted average) into
   `TrackedQuantity` / `TrackedCostUsd`, and carries every unit the fills do not explain — the
   position held at connect, deposits, crypto-quoted fills — as `UntrackedQuantity`, taken to
