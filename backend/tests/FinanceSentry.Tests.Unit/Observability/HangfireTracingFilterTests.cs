@@ -26,18 +26,8 @@ public class HangfireTracingFilterTests
     private static readonly MethodInfo SampleMethod = typeof(SampleJob).GetMethod(nameof(SampleJob.Run))!;
 
     private readonly HangfireTracingFilter _filter = new();
-    private readonly Dictionary<(string JobId, string Name), string> _parameters = [];
+    private readonly Dictionary<string, string> _parameters = [];
     private readonly Mock<IStorageConnection> _connection = new();
-
-    public HangfireTracingFilterTests()
-    {
-        _connection
-            .Setup(c => c.SetJobParameter(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .Callback<string, string, string>((jobId, name, value) => _parameters[(jobId, name)] = value);
-        _connection
-            .Setup(c => c.GetJobParameter(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns<string, string>((jobId, name) => _parameters.GetValueOrDefault((jobId, name))!);
-    }
 
     [Fact]
     public void EnqueuedJob_WithAmbientActivity_StartsChildOfStoredContext()
@@ -48,7 +38,7 @@ public class HangfireTracingFilterTests
         using (var ambient = RequestSource.StartActivity("incoming-request"))
         {
             ambient.Should().NotBeNull();
-            _filter.OnCreated(BuildCreatedContext(jobId));
+            CreateJob();
 
             var performContext = BuildPerformContext(jobId);
             var performing = new PerformingContext(performContext);
@@ -79,11 +69,11 @@ public class HangfireTracingFilterTests
             ambient.Should().NotBeNull();
             ambientTraceId = ambient!.TraceId;
             ambientSpanId = ambient.SpanId;
-            _filter.OnCreated(BuildCreatedContext(jobId));
+            CreateJob();
         }
         // The recurring trigger itself has no ambient Activity on the Hangfire worker thread — only
         // the stored traceparent/tracestate parameters carry the original context forward.
-        _parameters[(jobId, "RecurringJobId")] = SerializationHelper.Serialize("daily-refresh");
+        _parameters["RecurringJobId"] = SerializationHelper.Serialize("daily-refresh");
 
         var performContext = BuildPerformContext(jobId);
         var performing = new PerformingContext(performContext);
@@ -118,20 +108,23 @@ public class HangfireTracingFilterTests
 
     private static string ActivityItemKey() => "FinanceSentry.Hangfire.Activity";
 
-    private CreatedContext BuildCreatedContext(string jobId)
+    private void CreateJob()
     {
         var job = new Job(typeof(SampleJob), SampleMethod);
-        var backgroundJob = new BackgroundJob(jobId, job, DateTime.UtcNow);
         var createContext = new CreateContext(
             Mock.Of<JobStorage>(), _connection.Object, job, Mock.Of<IState>());
 
-        return new CreatedContext(createContext, backgroundJob, canceled: false, exception: null);
+        _filter.OnCreating(new CreatingContext(createContext));
+        _filter.OnCreated(new CreatedContext(createContext, backgroundJob: null, canceled: false, exception: null));
+
+        foreach (var (name, value) in createContext.Parameters)
+            _parameters[name] = SerializationHelper.Serialize(value);
     }
 
     private PerformContext BuildPerformContext(string jobId)
     {
         var job = new Job(typeof(SampleJob), SampleMethod);
-        var backgroundJob = new BackgroundJob(jobId, job, DateTime.UtcNow);
+        var backgroundJob = new BackgroundJob(jobId, job, DateTime.UtcNow, new Dictionary<string, string>(_parameters));
         return new PerformContext(Mock.Of<JobStorage>(), _connection.Object, backgroundJob, Mock.Of<IJobCancellationToken>());
     }
 

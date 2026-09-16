@@ -31,18 +31,17 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
 
     public void OnCreating(CreatingContext context)
     {
-        // No-op: nothing to inspect before the job/BackgroundJob is created.
-    }
-
-    public void OnCreated(CreatedContext context)
-    {
         var activity = Activity.Current;
         if (string.IsNullOrEmpty(activity?.Id))
             return;
 
-        SetJobParameter(context, TraceParentParameter, activity.Id);
+        context.SetJobParameter(TraceParentParameter, activity.Id);
         if (!string.IsNullOrEmpty(activity.TraceStateString))
-            SetJobParameter(context, TraceStateParameter, activity.TraceStateString);
+            context.SetJobParameter(TraceStateParameter, activity.TraceStateString);
+    }
+
+    public void OnCreated(CreatedContext context)
+    {
     }
 
     public void OnPerforming(PerformingContext context)
@@ -80,14 +79,6 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
             : ActivitySource.StartActivity(name, ActivityKind.Internal, parentContext);
     }
 
-    private static void SetJobParameter(CreatedContext context, string name, string value)
-    {
-        context.Connection.SetJobParameter(context.BackgroundJob.Id, name, SerializationHelper.Serialize(value));
-    }
-
-    private static string? GetJobParameter(PerformingContext context, string name)
-    {
-        var raw = context.Connection.GetJobParameter(context.BackgroundJob.Id, name);
-        return raw is null ? null : SerializationHelper.Deserialize<string>(raw);
-    }
+    private static string? GetJobParameter(PerformingContext context, string name) =>
+        context.GetJobParameter<string>(name, allowStale: true);
 }
