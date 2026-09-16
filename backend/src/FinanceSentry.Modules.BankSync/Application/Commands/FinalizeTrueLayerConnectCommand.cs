@@ -3,7 +3,6 @@ namespace FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services;
-using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using Microsoft.Extensions.Configuration;
@@ -84,20 +83,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 continue;
             }
 
-            var account = new BankAccount(
-                userId: connection.UserId,
-                externalAccountId: pa.AccountId,
-                bankName: !string.IsNullOrWhiteSpace(pa.ProviderName) ? pa.ProviderName : connection.ProviderDisplayName,
-                accountType: pa.AccountType,
-                accountNumberLast4: pa.AccountNumberLast4,
-                ownerName: string.Empty,
-                currency: pa.Currency,
-                createdBy: connection.UserId,
-                provider: "truelayer")
-            {
-                TrueLayerConnectionId = connection.Id,
-                CurrentBalance = currentBalance
-            };
+            var account = TrueLayerAccountFactory.CreateAccount(connection, pa, currentBalance);
 
             await accounts.AddAsync(account, cancellationToken);
             createdIds.Add(account.Id);
@@ -143,22 +129,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 continue;
             }
 
-            var cardAccount = new BankAccount(
-                userId: connection.UserId,
-                externalAccountId: card.AccountId,
-                bankName: !string.IsNullOrWhiteSpace(card.ProviderName) ? card.ProviderName : connection.ProviderDisplayName,
-                accountType: "credit",
-                accountNumberLast4: card.AccountNumberLast4,
-                ownerName: string.Empty,
-                currency: card.Currency,
-                createdBy: connection.UserId,
-                provider: "truelayer")
-            {
-                TrueLayerConnectionId = connection.Id,
-                CurrentBalance = owed,
-                CreditLimit = creditLimit,
-                ProductType = TrueLayerAdapter.CardProductType
-            };
+            var cardAccount = TrueLayerAccountFactory.CreateCardAccount(connection, card, owed, creditLimit);
 
             await accounts.AddAsync(cardAccount, cancellationToken);
             createdIds.Add(cardAccount.Id);

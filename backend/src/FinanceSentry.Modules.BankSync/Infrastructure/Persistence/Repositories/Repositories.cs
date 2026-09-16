@@ -330,6 +330,9 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
     public async Task<MonobankCredential?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
         => await _context.MonobankCredentials.FirstOrDefaultAsync(mc => mc.UserId == userId, cancellationToken);
 
+    public async Task<IReadOnlyList<MonobankCredential>> GetAllAsync(CancellationToken cancellationToken = default)
+        => await _context.MonobankCredentials.ToListAsync(cancellationToken);
+
     public async Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default)
     {
         _context.MonobankCredentials.Update(credential);
@@ -370,6 +373,11 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
     public async Task<TrueLayerConnection?> GetByUserAndProviderAsync(Guid userId, string providerId, CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections.FirstOrDefaultAsync(
             tc => tc.UserId == userId && tc.ProviderId == providerId, cancellationToken);
+
+    public async Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default)
+        => await _context.TrueLayerConnections
+            .Where(tc => tc.Status == "LINKED")
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeAsync(DateTime threshold, CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections

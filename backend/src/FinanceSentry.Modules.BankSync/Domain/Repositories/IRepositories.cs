@@ -207,6 +207,12 @@ public interface IMonobankCredentialRepository
     Task<MonobankCredential> AddAsync(MonobankCredential credential, CancellationToken cancellationToken = default);
     Task<MonobankCredential?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MonobankCredential?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// All stored Monobank credentials. Used by the account-discovery pass, which re-lists
+    /// provider accounts for every connected Monobank token.
+    /// </summary>
+    Task<IReadOnlyList<MonobankCredential>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -232,6 +238,12 @@ public interface ITrueLayerConnectionRepository
     Task<TrueLayerConnection?> GetByReferenceAsync(string reference, CancellationToken cancellationToken = default);
     Task<TrueLayerConnection?> GetByUserAndProviderAsync(Guid userId, string providerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrueLayerConnection>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// All LINKED connections. Used by the account-discovery pass to re-list provider accounts
+    /// for every connection that has a usable refresh token.
+    /// </summary>
+    Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// LINKED connections whose consent expires on/before <paramref name="threshold"/> (and hasn't
