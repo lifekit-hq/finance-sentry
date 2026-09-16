@@ -148,7 +148,7 @@ public sealed class GetSyncHealthTool(
             if (credential is null)
                 return new SyncHealthEntry("ibkr", null, "never_synced", null);
 
-            // RecordSyncError sets LastSyncError without updating LastSyncAt, matching BinanceCredential.
+            // RecordSyncError sets LastSyncError without updating LastSyncAt, matching ExchangeCredential.
             if (credential.LastSyncError is not null)
                 return new SyncHealthEntry("ibkr", credential.LastSyncAt, "error", credential.LastSyncError);
 
