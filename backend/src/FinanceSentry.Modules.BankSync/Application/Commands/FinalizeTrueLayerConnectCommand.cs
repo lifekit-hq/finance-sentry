@@ -51,11 +51,6 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 "Bank returned no refresh token. Ensure offline_access scope is requested.",
                 400);
 
-        var encrypted = encryption.Encrypt(tokens.RefreshToken);
-        connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
-        connection.MarkLinked(expiresAt: DateTime.UtcNow.AddDays(90));
-        await connections.UpdateAsync(connection, cancellationToken);
-
         var providerAccounts = await client.ListAccountsAsync(tokens.AccessToken, cancellationToken);
         var createdIds = new List<Guid>();
 
@@ -163,6 +158,14 @@ public class FinalizeTrueLayerConnectCommandHandler(
             await accounts.AddAsync(cardAccount, cancellationToken);
             createdIds.Add(cardAccount.Id);
         }
+
+        // Persist the linked connection only after its accounts/cards exist — marking LINKED
+        // earlier left the connection stuck LINKED with zero accounts whenever account creation
+        // failed partway through (issue #473).
+        var encrypted = encryption.Encrypt(tokens.RefreshToken);
+        connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
+        connection.MarkLinked(expiresAt: DateTime.UtcNow.AddDays(90));
+        await connections.UpdateAsync(connection, cancellationToken);
 
         // Sync inline with the freshly-exchanged access token while its SCA session is still
         // active — this is the only window in which strict banks (e.g. AIB) will return
