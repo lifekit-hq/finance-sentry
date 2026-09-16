@@ -2,6 +2,7 @@ using System.ComponentModel;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,7 +25,7 @@ public sealed class GetSyncHealthTool(
     private readonly ILogger<GetSyncHealthTool> _logger = logger;
 
     [McpServerTool(Name = "get_sync_health")]
-    [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, IBKR). Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, Revolut X, IBKR). Defaults to the authenticated MCP identity when userId is omitted.")]
     public async Task<IReadOnlyList<SyncHealthEntry>> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
@@ -37,7 +38,8 @@ public sealed class GetSyncHealthTool(
         [
             await GetMonobankHealthAsync(userIdVal, cancellationToken),
             await GetTrueLayerHealthAsync(userIdVal, cancellationToken),
-            await GetBinanceHealthAsync(userIdVal, cancellationToken),
+            await GetExchangeHealthAsync(userIdVal, CryptoExchangeProvider.Binance, cancellationToken),
+            await GetExchangeHealthAsync(userIdVal, CryptoExchangeProvider.RevolutX, cancellationToken),
             await GetIbkrHealthAsync(userIdVal, cancellationToken),
         ];
     }
@@ -107,31 +109,31 @@ public sealed class GetSyncHealthTool(
         }
     }
 
-    private async Task<SyncHealthEntry> GetBinanceHealthAsync(Guid userId, CancellationToken ct)
+    private async Task<SyncHealthEntry> GetExchangeHealthAsync(Guid userId, string provider, CancellationToken ct)
     {
         try
         {
-            var credential = await _cryptoSync.BinanceCredentials
+            var credential = await _cryptoSync.ExchangeCredentials
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+                .FirstOrDefaultAsync(c => c.UserId == userId && c.Provider == provider, ct);
 
             if (credential is null)
-                return new SyncHealthEntry("binance", null, "never_synced", null);
+                return new SyncHealthEntry(provider, null, "never_synced", null);
 
             // MarkSyncFailed sets LastSyncError without updating LastSyncAt, so an error can exist
             // before a first successful sync.
             if (credential.LastSyncError is not null)
-                return new SyncHealthEntry("binance", credential.LastSyncAt, "error", credential.LastSyncError);
+                return new SyncHealthEntry(provider, credential.LastSyncAt, "error", credential.LastSyncError);
 
             if (credential.LastSyncAt is null)
-                return new SyncHealthEntry("binance", null, "never_synced", null);
+                return new SyncHealthEntry(provider, null, "never_synced", null);
 
-            return new SyncHealthEntry("binance", credential.LastSyncAt, "ok", null);
+            return new SyncHealthEntry(provider, credential.LastSyncAt, "ok", null);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to retrieve Binance sync health for user {UserId}.", userId);
-            return new SyncHealthEntry("binance", null, "error", "Health check unavailable.");
+            _logger.LogWarning(ex, "Failed to retrieve {Provider} sync health for user {UserId}.", provider, userId);
+            return new SyncHealthEntry(provider, null, "error", "Health check unavailable.");
         }
     }
 

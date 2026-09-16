@@ -8,7 +8,6 @@ public sealed record CostBasisResult(
     decimal RemainingQuantity,
     decimal RealizedPnlUsd,
     DateTime? LastTradeAt,
-    long LastTradeId,
     int TradeCount);
 
 /// <summary>
@@ -26,7 +25,6 @@ public sealed class CostBasisCalculator
         decimal runningCostUsd = 0m;
         decimal realizedPnl = seed?.RealizedPnlUsd ?? 0m;
         DateTime? lastAt = seed?.LastTradeAt;
-        long lastId = seed?.LastTradeId ?? 0L;
         int tradeCount = seed?.TradeCount ?? 0;
 
         if (seed is not null && seed.AverageBuyPriceUsd > 0m)
@@ -37,11 +35,11 @@ public sealed class CostBasisCalculator
                 : 0m;
         }
 
-        foreach (var trade in trades.OrderBy(t => t.Timestamp).ThenBy(t => t.TradeId))
+        // Stable sort: fills sharing a timestamp keep the order the adapter returned them in.
+        foreach (var trade in trades.OrderBy(t => t.Timestamp))
         {
             tradeCount++;
             lastAt = trade.Timestamp;
-            lastId = trade.TradeId;
 
             if (trade.IsBuyer)
             {
@@ -70,7 +68,6 @@ public sealed class CostBasisCalculator
             RemainingQuantity: Math.Round(runningQty, 12),
             RealizedPnlUsd: Math.Round(realizedPnl, 4),
             LastTradeAt: lastAt,
-            LastTradeId: lastId,
             TradeCount: tradeCount);
     }
 }

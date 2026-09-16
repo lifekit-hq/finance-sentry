@@ -1,5 +1,9 @@
 namespace FinanceSentry.Modules.CryptoSync.Domain;
 
+/// <summary>
+/// One asset held on one venue. Unique on <c>(UserId, Provider, Asset)</c> (#472): BTC on Binance
+/// and BTC on Revolut X are two rows, and neither provider's sync touches the other's.
+/// </summary>
 public sealed class CryptoHolding
 {
     public Guid Id { get; private set; }
@@ -9,35 +13,43 @@ public sealed class CryptoHolding
     public decimal LockedQuantity { get; private set; }
     public decimal UsdValue { get; private set; }
     public DateTime SyncedAt { get; private set; }
-    public string Provider { get; private set; } = "binance";
+    public string Provider { get; private set; } = string.Empty;
 
     public decimal? CostBasisUsd { get; private set; }
     public decimal? AverageBuyPriceUsd { get; private set; }
     public decimal? RealizedPnlUsd { get; private set; }
     public DateTime? LastTradeAt { get; private set; }
-    public long LastTradeId { get; private set; }
+
+    /// <summary>
+    /// Where trade ingestion resumes for this holding. Opaque here: only the adapter that produced
+    /// it (<c>ICryptoExchangeAdapter.GetTradesAsync</c>) interprets it. Null means "never walked".
+    /// </summary>
+    public string? TradeCursor { get; private set; }
+
     public int TradeCount { get; private set; }
 
     private CryptoHolding() { }
 
     public static CryptoHolding Create(
         Guid userId,
+        string provider,
         string asset,
         decimal freeQuantity,
         decimal lockedQuantity,
-        decimal usdValue,
-        string provider = "binance")
+        decimal usdValue)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+
         return new CryptoHolding
         {
             Id = Guid.NewGuid(),
             UserId = userId,
+            Provider = provider,
             Asset = asset,
             FreeQuantity = freeQuantity,
             LockedQuantity = lockedQuantity,
             UsdValue = usdValue,
             SyncedAt = DateTime.UtcNow,
-            Provider = provider,
         };
     }
 
@@ -54,14 +66,17 @@ public sealed class CryptoHolding
         decimal? averageBuyPriceUsd,
         decimal? realizedPnlUsd,
         DateTime? lastTradeAt,
-        long lastTradeId,
         int tradeCount)
     {
         CostBasisUsd = costBasisUsd;
         AverageBuyPriceUsd = averageBuyPriceUsd;
         RealizedPnlUsd = realizedPnlUsd;
         LastTradeAt = lastTradeAt;
-        LastTradeId = lastTradeId;
         TradeCount = tradeCount;
+    }
+
+    public void AdvanceTradeCursor(string? cursor)
+    {
+        TradeCursor = cursor;
     }
 }

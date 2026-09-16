@@ -18,7 +18,7 @@ public sealed class GetCryptoPnlDetailTool(
     private readonly ILogger<GetCryptoPnlDetailTool> _logger = logger;
 
     [McpServerTool(Name = "get_crypto_pnl_detail")]
-    [Description("Returns per-asset crypto P&L. Cost basis and realized P&L are derived from Binance trade history (USDT-paired). Cost basis is null for assets that have never been traded via a USD-stablecoin pair (e.g. airdrops, transfers). Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns per-asset crypto P&L across connected venues (Binance, Revolut X); each item names its provider. Cost basis and realized P&L are derived from Binance trade history (USDT-paired). Cost basis is null for assets that have never been traded via a USD-stablecoin pair (e.g. airdrops, transfers) and for Revolut X holdings, whose trade history is not ingested yet (history before connect is unrecoverable). Defaults to the authenticated MCP identity when userId is omitted.")]
     public async Task<IReadOnlyList<CryptoPnlAssetEntry>> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
@@ -50,7 +50,7 @@ public sealed class GetCryptoPnlDetailTool(
                 i.RealizedPnlUsd,
                 i.LastTradeAt,
                 i.TradeCount,
-                response.Provider))
+                i.Provider))
             .ToList();
     }
 }

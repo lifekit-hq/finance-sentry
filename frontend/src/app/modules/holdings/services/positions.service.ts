@@ -53,11 +53,11 @@ export class PositionsService extends ApiService {
           };
         });
 
-        // Binance returns no P&L, and our reconstructed crypto cost basis differs
+        // Crypto venues return no P&L, and our reconstructed crypto cost basis differs
         // from the exchange's own figure — so we do not surface a crypto P&L.
         const cryptoPositions: Position[] = (crypto?.holdings ?? []).map(h => ({
           symbol: h.asset,
-          provider: crypto?.provider ?? 'binance',
+          provider: h.provider,
           quantity: h.freeQuantity + h.lockedQuantity,
           currentValue: h.usdValue,
           currentPrice:

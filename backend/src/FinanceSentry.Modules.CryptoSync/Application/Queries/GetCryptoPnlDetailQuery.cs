@@ -22,7 +22,8 @@ public sealed record CryptoPnlAssetDto(
     decimal? UnrealizedPnlPercent,
     decimal? RealizedPnlUsd,
     DateTime? LastTradeAt,
-    int TradeCount);
+    int TradeCount,
+    string Provider);
 
 public sealed class GetCryptoPnlDetailQueryHandler(ICryptoHoldingRepository holdingRepository)
     : IQueryHandler<GetCryptoPnlDetailQuery, CryptoPnlDetailResponse>
@@ -35,7 +36,7 @@ public sealed class GetCryptoPnlDetailQueryHandler(ICryptoHoldingRepository hold
 
         if (holdings.Count == 0)
         {
-            return new CryptoPnlDetailResponse("binance", null, [], 0m, 0m);
+            return new CryptoPnlDetailResponse(CryptoHoldingsResponse.NoProvider, null, [], 0m, 0m);
         }
 
         var items = holdings
@@ -57,12 +58,13 @@ public sealed class GetCryptoPnlDetailQueryHandler(ICryptoHoldingRepository hold
                     UnrealizedPnlPercent: unrealizedPct,
                     RealizedPnlUsd: h.RealizedPnlUsd,
                     LastTradeAt: h.LastTradeAt,
-                    TradeCount: h.TradeCount);
+                    TradeCount: h.TradeCount,
+                    Provider: h.Provider);
             })
             .ToList();
 
         return new CryptoPnlDetailResponse(
-            Provider: "binance",
+            Provider: CryptoHoldingsResponse.ProviderOf(holdings.Select(h => h.Provider)),
             SyncedAt: holdings.Max(h => h.SyncedAt),
             Items: items,
             TotalUnrealizedPnlUsd: items.Sum(i => i.UnrealizedPnlUsd ?? 0m),

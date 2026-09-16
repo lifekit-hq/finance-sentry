@@ -3,7 +3,7 @@ const FMP_STOCK_IMAGE_BASE = 'https://financialmodelingprep.com/image-stock';
 
 /**
  * Builds a public logo URL for a held asset without hosting any images:
- * - crypto (Binance) → CoinCap coin icon by symbol, e.g. sol@2x.png
+ * - crypto (Binance, Revolut X) → CoinCap coin icon by symbol, e.g. sol@2x.png
  * - stock/ETF (IBKR) → Financial Modeling Prep image-stock by ticker, e.g. AAPL.png
  *
  * Both sources are keyless. Returns null for anything unrecognised — callers
@@ -18,6 +18,7 @@ export class AssetLogoUtils {
 
     switch (provider?.trim().toLowerCase()) {
       case 'binance':
+      case 'revolut_x':
         return `${COINCAP_ICON_BASE}/${sym.toLowerCase()}@2x.png`;
       case 'ibkr':
         return `${FMP_STOCK_IMAGE_BASE}/${sym.toUpperCase()}.png`;

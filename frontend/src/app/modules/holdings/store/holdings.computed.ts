@@ -52,7 +52,7 @@ const ASSET_CLASS_COLOR: Record<AssetClass, string> = {
   crypto: '#f59e0b',
 };
 
-const CRYPTO_PROVIDERS = new Set<string>(['binance']);
+const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
 
 function resolveAssetClass(provider: string): AssetClass {
   return CRYPTO_PROVIDERS.has(provider) ? 'crypto' : 'equity';

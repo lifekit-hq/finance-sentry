@@ -10,6 +10,7 @@ import {ConnectModalComponent} from './connect-modal.component';
 
 class MonobankFormStub {}
 class BinanceFormStub {}
+class RevolutXFormStub {}
 class IbkrFormStub {}
 
 const STRATEGIES: readonly ConnectStrategy[] = [
@@ -19,6 +20,11 @@ const STRATEGIES: readonly ConnectStrategy[] = [
     submit: () => null as never,
   },
   {slug: 'binance', formComponent: BinanceFormStub as Type<unknown>, submit: () => null as never},
+  {
+    slug: 'revolut_x',
+    formComponent: RevolutXFormStub as Type<unknown>,
+    submit: () => null as never,
+  },
   {slug: 'ibkr', formComponent: IbkrFormStub as Type<unknown>, submit: () => null as never},
 ];
 
@@ -44,6 +50,7 @@ describe('ConnectModalComponent', () => {
   it.each([
     ['monobank-form', MonobankFormStub],
     ['binance-form', BinanceFormStub],
+    ['revolut-x-form', RevolutXFormStub],
     ['ibkr-form', IbkrFormStub],
   ] as const)('resolves the strategy form component for %s', (step, expected) => {
     configure(buildStore(step));
@@ -52,10 +59,13 @@ describe('ConnectModalComponent', () => {
     expect(fixture.componentInstance.formInjector()).not.toBeNull();
   });
 
-  it('returns null formComponent for non-form steps', () => {
-    configure(buildStore('type-picker'));
-    const fixture = TestBed.createComponent(ConnectModalComponent);
-    expect(fixture.componentInstance.formComponent()).toBeNull();
-    expect(fixture.componentInstance.formInjector()).toBeNull();
-  });
+  it.each(['type-picker', 'provider-picker'] as const)(
+    'returns null formComponent for %s',
+    step => {
+      configure(buildStore(step));
+      const fixture = TestBed.createComponent(ConnectModalComponent);
+      expect(fixture.componentInstance.formComponent()).toBeNull();
+      expect(fixture.componentInstance.formInjector()).toBeNull();
+    }
+  );
 });

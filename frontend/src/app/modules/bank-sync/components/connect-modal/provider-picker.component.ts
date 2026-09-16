@@ -12,17 +12,14 @@ import {
   PROVIDER_CATALOG,
 } from '../../../../shared/constants/providers/providers.constants';
 import {
-  type BankProvider,
+  type PickableProvider,
   type ProviderDescriptor,
 } from '../../../../shared/models/provider/provider.model';
 import {ConnectStore} from '../../store/connect/connect.store';
-
-const BANK_PROVIDERS: readonly ProviderDescriptor[] = PROVIDER_CATALOG.filter(
-  p => p.institutionType === 'bank' && !HIDDEN_PROVIDERS.has(p.slug)
-);
+import {PROVIDER_PICKER_PROMPT} from './connect-modal.constants';
 
 @Component({
-  selector: 'fns-bank-picker',
+  selector: 'fns-provider-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TagComponent,
@@ -31,17 +28,29 @@ const BANK_PROVIDERS: readonly ProviderDescriptor[] = PROVIDER_CATALOG.filter(
     NgOptimizedImage,
     SelectableCardComponent,
   ],
-  templateUrl: './bank-picker.component.html',
+  templateUrl: './provider-picker.component.html',
 })
-export class BankPickerComponent {
+export class ProviderPickerComponent {
   public readonly store = inject(ConnectStore);
 
-  public readonly providers = BANK_PROVIDERS;
+  /** The visible providers of the institution type chosen on the previous step. */
+  public readonly providers = computed<readonly ProviderDescriptor[]>(() => {
+    const type = this.store.institutionType();
+    return PROVIDER_CATALOG.filter(
+      p => p.institutionType === type && !HIDDEN_PROVIDERS.has(p.slug)
+    );
+  });
+
+  public readonly prompt = computed(() =>
+    this.store.institutionType() === 'crypto'
+      ? PROVIDER_PICKER_PROMPT.crypto
+      : PROVIDER_PICKER_PROMPT.bank
+  );
 
   public readonly connected = computed(() => this.store.connectedProviders());
 
   public select(slug: string): void {
-    this.store.selectBankProvider(slug as BankProvider);
+    this.store.selectPickedProvider(slug as PickableProvider);
   }
 
   public back(): void {

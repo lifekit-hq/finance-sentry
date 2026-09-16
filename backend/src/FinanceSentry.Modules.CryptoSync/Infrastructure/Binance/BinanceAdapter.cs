@@ -1,3 +1,5 @@
+using System.Globalization;
+using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -18,7 +20,15 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
     private readonly ILogger<BinanceAdapter> _logger;
     private readonly decimal _dustThresholdUsd;
 
-    public string ExchangeName => "binance";
+    private static readonly string[] QuoteCandidates = ["USDT", "USDC", "FDUSD", "BUSD"];
+
+    // Stablecoins are the quote side of every pair we walk; they have no USD-pair history of their own.
+    private static readonly HashSet<string> NoTradeHistoryAssets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "USDT", "USDC", "BUSD", "FDUSD", "DAI",
+    };
+
+    public string ExchangeName => CryptoExchangeProvider.Binance;
 
     public BinanceAdapter(
         BinanceHttpClient httpClient,
@@ -77,32 +87,28 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
             _dustThresholdUsd);
     }
 
-    public async Task<IReadOnlyList<CryptoTrade>> GetTradesAsync(
+    public async Task<CryptoTradePage> GetTradesAsync(
         string apiKey,
         string apiSecret,
         string asset,
-        long sinceTradeId,
+        string? cursor,
         CancellationToken ct = default)
     {
         const int pageLimit = 1000;
         const int maxPages = 20;
 
-        if (string.Equals(asset, "USDT", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(asset, "USDC", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(asset, "BUSD", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(asset, "FDUSD", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(asset, "DAI", StringComparison.OrdinalIgnoreCase))
+        if (NoTradeHistoryAssets.Contains(asset))
         {
-            return [];
+            return new CryptoTradePage([], cursor);
         }
 
-        var quoteCandidates = new[] { "USDT", "USDC", "FDUSD", "BUSD" };
+        var nextFromIds = BinanceTradeCursor.Parse(cursor, QuoteCandidates);
         var allTrades = new List<CryptoTrade>();
 
-        foreach (var quote in quoteCandidates)
+        foreach (var quote in QuoteCandidates)
         {
             var symbol = $"{asset.ToUpperInvariant()}{quote}";
-            var fromId = sinceTradeId;
+            var fromId = nextFromIds.GetValueOrDefault(quote);
             for (var page = 0; page < maxPages; page++)
             {
                 IReadOnlyList<BinanceTradeRow> rows;
@@ -116,35 +122,39 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
                     break;
                 }
 
-                if (rows.Count == 0) break;
-
-                foreach (var r in rows)
+                // fromId is inclusive, so a row below it was already counted by an earlier run.
+                var fresh = rows.Where(r => r.Id >= fromId).ToList();
+                foreach (var r in fresh)
                 {
                     allTrades.Add(new CryptoTrade(
-                        TradeId: r.Id,
+                        TradeId: r.Id.ToString(CultureInfo.InvariantCulture),
                         Asset: asset.ToUpperInvariant(),
                         QuoteAsset: quote,
-                        Quantity: decimal.Parse(r.Quantity, System.Globalization.CultureInfo.InvariantCulture),
-                        PriceUsd: decimal.Parse(r.Price, System.Globalization.CultureInfo.InvariantCulture),
-                        QuoteQuantityUsd: decimal.Parse(r.QuoteQuantity, System.Globalization.CultureInfo.InvariantCulture),
+                        Quantity: decimal.Parse(r.Quantity, CultureInfo.InvariantCulture),
+                        PriceUsd: decimal.Parse(r.Price, CultureInfo.InvariantCulture),
+                        QuoteQuantityUsd: decimal.Parse(r.QuoteQuantity, CultureInfo.InvariantCulture),
                         IsBuyer: r.IsBuyer,
                         Timestamp: DateTimeOffset.FromUnixTimeMilliseconds(r.TimeMs).UtcDateTime));
                 }
 
+                if (fresh.Count > 0)
+                {
+                    // Ids are per symbol: the next run resumes this pair just past its last fill.
+                    fromId = fresh.Max(r => r.Id) + 1;
+                    nextFromIds[quote] = fromId;
+                }
+
                 if (rows.Count < pageLimit) break;
-                fromId = rows[^1].Id + 1;
             }
         }
 
-        return allTrades
+        var trades = allTrades
             .OrderBy(t => t.Timestamp)
-            .ThenBy(t => t.TradeId)
+            .ThenBy(t => t.QuoteAsset, StringComparer.Ordinal)
+            .ThenBy(t => long.Parse(t.TradeId, CultureInfo.InvariantCulture))
             .ToList();
-    }
 
-    public Task DisconnectAsync(CancellationToken ct = default)
-    {
-        return Task.CompletedTask;
+        return new CryptoTradePage(trades, BinanceTradeCursor.Format(nextFromIds));
     }
 
     private async Task<T> SafeFetchAsync<T>(Func<Task<T>> fetcher, string label, T fallback)

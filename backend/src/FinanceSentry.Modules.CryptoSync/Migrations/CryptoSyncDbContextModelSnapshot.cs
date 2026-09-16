@@ -18,12 +18,76 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("crypto_sync")
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.BinanceCredential", b =>
+            modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.CryptoHolding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Asset")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("AverageBuyPriceUsd")
+                        .HasPrecision(20, 8)
+                        .HasColumnType("numeric(20,8)");
+
+                    b.Property<decimal?>("CostBasisUsd")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
+
+                    b.Property<decimal>("FreeQuantity")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)");
+
+                    b.Property<DateTime?>("LastTradeAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("LockedQuantity")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("RealizedPnlUsd")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
+
+                    b.Property<DateTime>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TradeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TradeCursor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("UsdValue")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Provider", "Asset")
+                        .IsUnique();
+
+                    b.ToTable("CryptoHoldings", "crypto_sync");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.ExchangeCredential", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -69,80 +133,20 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("BinanceCredentials", "crypto_sync");
-                });
-
-            modelBuilder.Entity("FinanceSentry.Modules.CryptoSync.Domain.CryptoHolding", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Asset")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal?>("AverageBuyPriceUsd")
-                        .HasPrecision(20, 8)
-                        .HasColumnType("numeric(20,8)");
-
-                    b.Property<decimal?>("CostBasisUsd")
-                        .HasPrecision(20, 4)
-                        .HasColumnType("numeric(20,4)");
-
-                    b.Property<decimal>("FreeQuantity")
-                        .HasPrecision(30, 10)
-                        .HasColumnType("numeric(30,10)");
-
-                    b.Property<DateTime?>("LastTradeAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("LastTradeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("LockedQuantity")
-                        .HasPrecision(30, 10)
-                        .HasColumnType("numeric(30,10)");
-
                     b.Property<string>("Provider")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasDefaultValue("binance");
-
-                    b.Property<decimal?>("RealizedPnlUsd")
-                        .HasPrecision(20, 4)
-                        .HasColumnType("numeric(20,4)");
-
-                    b.Property<DateTime>("SyncedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("TradeCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("UsdValue")
-                        .HasPrecision(20, 4)
-                        .HasColumnType("numeric(20,4)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Asset")
+                    b.HasIndex("UserId", "Provider")
                         .IsUnique();
 
-                    b.ToTable("CryptoHoldings", "crypto_sync");
+                    b.ToTable("ExchangeCredentials", "crypto_sync");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,0 +1,67 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-cmn-6">
+  <cmn-form-field
+    [control]="form.controls.apiKey"
+    label="API key"
+    hint="Read-only key. Finance Sentry never asks for trading or withdrawal permissions."
+  >
+    <cmn-input
+      formControlName="apiKey"
+      type="password"
+      autocomplete="off"
+      placeholder="Revolut X API key"
+    />
+  </cmn-form-field>
+
+  <cmn-form-field
+    [control]="form.controls.privateKey"
+    label="Ed25519 private key"
+    hint="Paste the whole PEM, including the BEGIN/END PRIVATE KEY lines, whose public key you registered with Revolut X."
+  >
+    <cmn-input
+      formControlName="privateKey"
+      type="password"
+      autocomplete="off"
+      placeholder="-----BEGIN PRIVATE KEY-----"
+    />
+  </cmn-form-field>
+
+  @if (isDuplicateError()) {
+    <cmn-alert variant="error">
+      <div class="flex flex-col gap-cmn-2">
+        <span>{{ store.errorMessage() }}</span>
+        <cmn-button (clicked)="disconnectExisting()" variant="secondary" size="sm">
+          Disconnect existing
+        </cmn-button>
+      </div>
+    </cmn-alert>
+  } @else if (store.errorMessage()) {
+    <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
+  }
+
+  <a
+    [href]="helpUrl"
+    target="_blank"
+    rel="noopener"
+    class="text-cmn-xs text-accent-default hover:underline"
+  >
+    How to create a Revolut X API key →
+  </a>
+
+  <cmn-alert variant="accent" icon="ShieldCheck" title="Institutional Grade Security">
+    The key pair is checked against Revolut X before it is saved, then encrypted at rest using
+    AES-256 and never shared with third parties. Balances sync every 15 minutes; cost basis is
+    tracked only from the day you connect.
+  </cmn-alert>
+
+  <cmn-dialog-actions align="between">
+    <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
+    <cmn-button
+      [loading]="store.isBusy()"
+      [disabled]="form.invalid || store.isBusy()"
+      variant="primary"
+      type="submit"
+    >
+      Connect Revolut X
+    </cmn-button>
+  </cmn-dialog-actions>
+</form>

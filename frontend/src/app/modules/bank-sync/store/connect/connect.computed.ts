@@ -15,6 +15,8 @@ interface StateSignals {
 }
 
 const DEFAULT_BINANCE_ERROR = 'Failed to connect Binance account. Please check your API keys.';
+const DEFAULT_REVOLUT_X_ERROR =
+  'Failed to connect Revolut X. Please check your API key and Ed25519 private key.';
 const DEFAULT_IBKR_ERROR = 'Failed to connect IBKR account. Please check your credentials.';
 const DEFAULT_MONOBANK_ERROR = 'Failed to connect Monobank account. Please try again.';
 
@@ -29,6 +31,8 @@ function mapErrorByProvider(
   switch (provider) {
     case 'binance':
       return DEFAULT_BINANCE_ERROR;
+    case 'revolut_x':
+      return DEFAULT_REVOLUT_X_ERROR;
     case 'ibkr':
       return DEFAULT_IBKR_ERROR;
     default:
@@ -36,7 +40,13 @@ function mapErrorByProvider(
   }
 }
 
-const PROVIDER_SLUGS: readonly Provider[] = ['monobank', 'truelayer', 'binance', 'ibkr'];
+const PROVIDER_SLUGS: readonly Provider[] = [
+  'monobank',
+  'truelayer',
+  'binance',
+  'revolut_x',
+  'ibkr',
+];
 
 function resolveForProvider(
   errorMessages: ErrorMessageService,

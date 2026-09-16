@@ -86,6 +86,9 @@
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.2.3" />
 
+    <!-- Ed25519 request signing (Revolut X, #472) — the BCL has no Ed25519 -->
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
+
     <!-- HTML parsing (companion data layer — MarketBeat / TrendForce) -->
     <PackageVersion Include="AngleSharp" Version="1.5.2" />
 

@@ -20,9 +20,12 @@ export interface CryptoHoldingDto {
   freeQuantity: number;
   lockedQuantity: number;
   usdValue: number;
+  /** The venue this row is held on — holdings can span several. */
+  provider: string;
 }
 
 export interface CryptoHoldingsDto {
+  /** The single venue, or 'multiple' / 'none' — read each holding's own provider instead. */
   provider: string;
   syncedAt: Nullable<string>;
   isStale: boolean;

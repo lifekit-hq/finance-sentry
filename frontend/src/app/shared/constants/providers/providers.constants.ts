@@ -35,6 +35,15 @@ export const PROVIDER_CATALOG: readonly ProviderDescriptor[] = Object.freeze([
     helpUrl: 'https://www.binance.com/en/support/faq/360002502072',
   }),
   Object.freeze({
+    slug: 'revolut_x',
+    displayName: 'Revolut X',
+    institutionType: 'crypto',
+    description: 'Connect Revolut X with a read-only API key and its Ed25519 private key.',
+    iconAsset: '/assets/providers/revolut_x.svg',
+    formShape: 'key-private-key',
+    helpUrl: 'https://developer.revolut.com/docs/x-api/revolut-x-crypto-exchange-rest-api',
+  }),
+  Object.freeze({
     slug: 'ibkr',
     displayName: 'Interactive Brokers',
     institutionType: 'broker',

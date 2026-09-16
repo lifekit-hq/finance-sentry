@@ -8,6 +8,12 @@ describe('AssetLogoUtils', () => {
       );
     });
 
+    it('builds the same CoinCap icon URL for a Revolut X crypto asset', () => {
+      expect(AssetLogoUtils.logoUrl('BTC', 'revolut_x')).toBe(
+        'https://assets.coincap.io/assets/icons/btc@2x.png'
+      );
+    });
+
     it('builds an FMP image-stock URL for an IBKR ticker (uppercased)', () => {
       expect(AssetLogoUtils.logoUrl('aapl', 'ibkr')).toBe(
         'https://financialmodelingprep.com/image-stock/AAPL.png'

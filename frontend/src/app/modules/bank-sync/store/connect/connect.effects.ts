@@ -53,6 +53,7 @@ function institutionTypeForSlug(strategy: ConnectStrategy): InstitutionType {
     case 'truelayer':
       return 'bank';
     case 'binance':
+    case 'revolut_x':
       return 'crypto';
     case 'ibkr':
       return 'broker';

@@ -85,7 +85,7 @@ export class MonobankFormComponent {
   }
 
   public back(): void {
-    this.store.setModalStep('bank-picker');
+    this.store.setModalStep('provider-picker');
   }
 
   public disconnectExisting(): void {

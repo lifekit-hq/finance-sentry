@@ -59,7 +59,7 @@ export class BinanceFormComponent {
   }
 
   public back(): void {
-    this.store.setModalStep('type-picker');
+    this.store.setModalStep('provider-picker');
   }
 
   public disconnectExisting(): void {

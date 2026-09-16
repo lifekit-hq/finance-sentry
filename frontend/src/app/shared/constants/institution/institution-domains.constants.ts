@@ -3,7 +3,7 @@
  * domain here is turned into a favicon URL by {@link InstitutionLogoUtils}.
  *
  * PROVIDER_DOMAINS: direct-connect providers where the provider code IS the
- * institution (Monobank, IBKR, Binance).
+ * institution (Monobank, IBKR, Binance, Revolut X).
  *
  * BANK_NAME_DOMAINS: aggregator-connected banks (e.g. TrueLayer) where the
  * specific institution lives in the display name, not the provider code.
@@ -13,6 +13,9 @@ export const PROVIDER_DOMAINS: Readonly<Record<string, string>> = {
   monobank: 'monobank.ua',
   ibkr: 'interactivebrokers.com',
   binance: 'binance.com',
+  // Provider slugs are the backend's snake_case wire values.
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  revolut_x: 'revolut.com',
 };
 
 export const BANK_NAME_DOMAINS: readonly (readonly [string, string])[] = [

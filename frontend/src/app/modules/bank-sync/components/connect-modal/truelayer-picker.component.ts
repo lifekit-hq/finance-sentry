@@ -77,7 +77,7 @@ export class TrueLayerPickerComponent {
 
   public back(): void {
     this.providersSub?.unsubscribe();
-    this.store.setModalStep('bank-picker');
+    this.store.setModalStep('provider-picker');
   }
 
   private loadProviders(country: string): void {

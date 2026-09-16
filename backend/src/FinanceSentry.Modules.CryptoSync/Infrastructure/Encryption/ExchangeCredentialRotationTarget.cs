@@ -5,21 +5,22 @@ using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
-/// Key rotation for <c>BinanceCredentials</c> (issue #493).
+/// Key rotation for <c>ExchangeCredentials</c> — every venue's credentials, Binance and Revolut X
+/// alike (issues #493, #472).
 ///
-/// Two payloads per row — API key and API secret — share one key version, so both are re-encrypted
-/// before the row is saved. Rotating one and not the other would leave the row undecryptable under
-/// either version.
+/// Two payloads per row — API key and API secret (for Revolut X, the Ed25519 private key) — share
+/// one key version, so both are re-encrypted before the row is saved. Rotating one and not the
+/// other would leave the row undecryptable under either version.
 /// </summary>
-public sealed class BinanceCredentialRotationTarget(
+public sealed class ExchangeCredentialRotationTarget(
     CryptoSyncDbContext db,
     ICredentialEncryptionService encryption) : ICredentialRotationTarget
 {
-    public string Name => "BinanceCredentials";
+    public string Name => "ExchangeCredentials";
 
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
-        var stale = await db.BinanceCredentials
+        var stale = await db.ExchangeCredentials
             .Where(c => c.KeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 

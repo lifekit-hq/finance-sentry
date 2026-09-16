@@ -79,7 +79,7 @@ public static class RetentionPolicyRegistry
         Keep(BankSync, "merchant_keywords", "Reference bridge table."),
 
         Keep(CryptoSync, "CryptoHoldings", "Current-state holdings."),
-        Keep(CryptoSync, "BinanceCredentials", "Provider credentials."),
+        Keep(CryptoSync, "ExchangeCredentials", "Provider credentials."),
         Keep(BrokerageSync, "BrokerageHoldings", "Current-state holdings."),
         Keep(BrokerageSync, "IBKRCredentials", "Provider credentials."),
 

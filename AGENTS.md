@@ -71,7 +71,7 @@ backend/
     FinanceSentry.Mcp/               # MCP server (7 tools over stdio or HTTP)
     FinanceSentry.Modules.Auth/      # Auth module (JWT, Google OAuth, Identity)
     FinanceSentry.Modules.BankSync/  # Monobank + TrueLayer adapters, accounts, transactions
-    FinanceSentry.Modules.CryptoSync/# Binance adapter, crypto holdings
+    FinanceSentry.Modules.CryptoSync/# Binance + Revolut X adapters, crypto holdings
     FinanceSentry.Modules.BrokerageSync/ # IBKR adapter, brokerage holdings
     FinanceSentry.Modules.Wealth/    # Aggregated net-worth queries
     FinanceSentry.Modules.Alerts/    # Alert rules + Hangfire delivery
@@ -173,10 +173,6 @@ The husky pre-commit hook runs lint-staged + `npm run lint` + `npm run format:ch
 **not** run `npm ci`, so it passes without `--no-verify` once `frontend/node_modules` exists. It
 fails with `eslint … ENOENT` (not a lint error) when frontend files are staged and
 `frontend/node_modules` is absent.
-
-## Frontend pre-commit version-bump gate
-
-The pre-commit hook enforces a version bump in `frontend/package.json` whenever frontend source files change. Increment MINOR (0.12.0 → 0.13.0) for new features/components, PATCH for bug fixes. If you forget, the commit is rejected with "Frontend source files changed but frontend/package.json version was not updated."
 
 ## Frontend attribute ordering
 
