@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Commands;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
@@ -65,26 +66,7 @@ public class ConnectMonobankAccountCommandHandler(
         var created = new List<BankAccount>();
         foreach (var a in monoAccounts)
         {
-            var last4 = a.MaskedPan.Length >= 4 ? a.MaskedPan[^4..] : "0000";
-            if (!last4.All(char.IsDigit)) last4 = "0000";
-
-            var account = new BankAccount(
-                userId: request.UserId,
-                externalAccountId: a.Id,
-                bankName: "Monobank",
-                accountType: a.Type,
-                accountNumberLast4: last4,
-                ownerName: string.Empty,
-                currency: MonobankHttpClient.MapCurrency(a.CurrencyCode),
-                createdBy: request.UserId,
-                provider: "monobank")
-            {
-                MonobankCredentialId = credential.Id,
-                CurrentBalance = MonobankHttpClient.ToStoredBalance(a.Balance, a.CreditLimit),
-                CreditLimit = a.CreditLimit > 0
-                    ? MonobankHttpClient.KopecksToDecimal(a.CreditLimit) : null,
-                ProductType = a.ProductType
-            };
+            var account = MonobankAccountFactory.CreateAccount(request.UserId, credential.Id, a);
 
             await accounts.AddAsync(account, cancellationToken);
             created.Add(account);

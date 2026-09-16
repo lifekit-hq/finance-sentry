@@ -1,6 +1,5 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
-using System.Collections.Concurrent;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
@@ -50,7 +49,8 @@ public class ScheduledSyncService(
     MonobankBalanceCache monobankBalanceCache,
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
-    IEventBus eventBus) : IScheduledSyncService
+    IEventBus eventBus,
+    ITrueLayerTokenRefreshService trueLayerTokenRefresh) : IScheduledSyncService
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ITransactionRepository _transactions = transactions;
@@ -66,6 +66,7 @@ public class ScheduledSyncService(
     private readonly IAlertGeneratorService _alerts = alerts;
     private readonly IUserAlertPreferencesReader _userPreferences = userPreferences;
     private readonly IEventBus _eventBus = eventBus;
+    private readonly ITrueLayerTokenRefreshService _trueLayerTokenRefresh = trueLayerTokenRefresh;
 
     /// <summary>
     /// Error codes that represent a transient, self-healing condition (provider rate-limit /
@@ -310,12 +311,6 @@ public class ScheduledSyncService(
         return new SyncResult(true, candidates.Count, entities.Count, null, null);
     }
 
-    // Serializes the refresh-token exchange per TrueLayer connection. A connection can back several
-    // accounts, each with its own scheduled sync job firing on the same cron; without this gate two
-    // jobs could refresh the shared, rotating refresh_token concurrently — one wins, the other gets
-    // invalid_grant and the rotated token is lost, bricking the connection.
-    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> TrueLayerRefreshLocks = new();
-
     private async Task<SyncResult> SyncTrueLayerAsync(
         Domain.BankAccount account, SyncJob job, DateTime startedAt, CancellationToken ct,
         string? preAcquiredAccessToken = null)
@@ -335,9 +330,6 @@ public class ScheduledSyncService(
 
         var provider = _providerFactory.Resolve("truelayer");
 
-        // Pick up credit cards added (or newly supported) after the original consent —
-        // without this, a card only ever appears through an explicit reconnect.
-        await DiscoverTrueLayerCardsAsync(account, connectionId, accessToken, provider, ct);
         // Per-account watermark, NOT connection.LastSyncAt: a connection can back several
         // accounts, and a shared timestamp lets the first-synced account starve the others'
         // fetch windows (accounts added later never received their initial history import).
@@ -423,102 +415,16 @@ public class ScheduledSyncService(
         return new SyncResult(true, candidateCount, entities.Count, null, null);
     }
 
-    // Card discovery is one extra API call per connection; once a day is plenty — a new
-    // card appearing within 24h (or instantly via reconnect) is fine. The stamp is claimed
-    // before the call so parallel sibling-account syncs don't duplicate it.
-    private static readonly ConcurrentDictionary<Guid, DateTime> CardDiscoveryStamps = new();
-    private static readonly TimeSpan CardDiscoveryInterval = TimeSpan.FromHours(24);
-
     /// <summary>
-    /// Lists the connection's credit cards (TrueLayer serves them under /data/v1/cards only)
-    /// and creates a BankAccount for any card not yet known, under the same bank name so it
-    /// groups with the institution's existing accounts. The recurring SyncScheduler picks the
-    /// new account up on its next pass (every 10 minutes).
-    /// </summary>
-    private async Task DiscoverTrueLayerCardsAsync(
-        Domain.BankAccount account, Guid connectionId, string accessToken,
-        IBankProvider provider, CancellationToken ct)
-    {
-        if (provider is not TrueLayerAdapter adapter)
-            return;
-
-        var now = DateTime.UtcNow;
-        var last = CardDiscoveryStamps.GetOrAdd(connectionId, DateTime.MinValue);
-        if (now - last < CardDiscoveryInterval || !CardDiscoveryStamps.TryUpdate(connectionId, now, last))
-            return;
-
-        try
-        {
-            var cards = await adapter.GetCardsAsync(accessToken, ct);
-            foreach (var card in cards)
-            {
-                var existing = await _accounts.GetByExternalAccountIdAsync(card.ExternalAccountId, ct);
-                if (existing is not null)
-                    continue;
-
-                var cardAccount = new Domain.BankAccount(
-                    userId: account.UserId,
-                    externalAccountId: card.ExternalAccountId,
-                    bankName: account.BankName,
-                    accountType: "credit",
-                    accountNumberLast4: card.AccountNumberLast4,
-                    ownerName: string.Empty,
-                    currency: card.Currency,
-                    createdBy: account.UserId,
-                    provider: "truelayer")
-                {
-                    TrueLayerConnectionId = connectionId,
-                    CurrentBalance = card.CurrentBalance,
-                    CreditLimit = card.CreditLimit,
-                    ProductType = TrueLayerAdapter.CardProductType
-                };
-
-                await _accounts.AddAsync(cardAccount, ct);
-            }
-        }
-        catch (Infrastructure.TrueLayer.TrueLayerException)
-        {
-            // Provider without card support (or a transient /cards failure) — not an error.
-        }
-    }
-
-    /// <summary>
-    /// Exchanges a connection's rotating refresh_token for a fresh access_token, serialized per
-    /// connection. The rotated refresh_token is persisted <em>immediately</em> — before any transaction
-    /// fetch — so a later sync failure cannot strand a consumed token and permanently brick the
-    /// connection (the invalid_grant root cause). The connection is re-read inside the lock so parallel
-    /// per-account jobs always refresh from the latest persisted token.
+    /// Acquires a fresh access token for the connection via <see cref="ITrueLayerTokenRefreshService"/>,
+    /// which serializes the refresh-token exchange across every caller in the process (this per-account
+    /// sync and the account-discovery pass alike).
     /// </summary>
     private async Task<string> AcquireTrueLayerAccessTokenAsync(
         Guid connectionId, SyncJob job, Guid accountId, CancellationToken ct)
     {
-        var gate = TrueLayerRefreshLocks.GetOrAdd(connectionId, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(ct);
-        try
-        {
-            var connection = await _truelayerConnections.GetByIdAsync(connectionId, ct)
-                ?? throw new InvalidOperationException($"TrueLayer connection {connectionId} not found.");
-
-            var refreshToken = _encryption.Decrypt(
-                connection.EncryptedRefreshToken, connection.Iv, connection.AuthTag, connection.KeyVersion);
-            _logger.CredentialAccessed(job.CorrelationId ?? job.Id.ToString(), accountId);
-
-            var tokenSet = await _truelayerClient.RefreshAccessTokenAsync(refreshToken, ct);
-
-            // Persist the rotated refresh_token now — not after the sync — so nothing downstream can lose it.
-            if (!string.IsNullOrEmpty(tokenSet.RefreshToken) && tokenSet.RefreshToken != refreshToken)
-            {
-                var encrypted = _encryption.Encrypt(tokenSet.RefreshToken);
-                connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
-                await _truelayerConnections.UpdateAsync(connection, ct);
-            }
-
-            return tokenSet.AccessToken;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        _logger.CredentialAccessed(job.CorrelationId ?? job.Id.ToString(), accountId);
+        return await _trueLayerTokenRefresh.AcquireAccessTokenAsync(connectionId, ct);
     }
 
     private static string? ExtractErrorCode(string message, string provider)

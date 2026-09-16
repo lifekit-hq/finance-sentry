@@ -32,11 +32,22 @@ public sealed class MonobankBalanceCache
         return null;
     }
 
-    private static string BuildKey(string token, string externalAccountId)
+    /// <summary>
+    /// Whether any account snapshot for this token is still fresh — i.e. client-info was called for
+    /// the token within the TTL, so another call now would likely hit the rate limit.
+    /// </summary>
+    public bool HasFreshEntries(string token)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToHexString(bytes) + "|" + externalAccountId;
+        var prefix = BuildTokenPrefix(token);
+        var now = DateTime.UtcNow;
+        return _entries.Any(e => e.Key.StartsWith(prefix, StringComparison.Ordinal) && now - e.Value.StoredAt < Ttl);
     }
+
+    private static string BuildKey(string token, string externalAccountId)
+        => BuildTokenPrefix(token) + externalAccountId;
+
+    private static string BuildTokenPrefix(string token)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))) + "|";
 
     private readonly record struct Entry(BankAccountInfo Info, DateTime StoredAt);
 }

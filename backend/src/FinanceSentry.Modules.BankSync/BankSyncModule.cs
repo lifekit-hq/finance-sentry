@@ -171,6 +171,8 @@ public static class BankSyncModule
         services.AddScoped<IBankSyncLogger, BankSyncLogger>();
         services.AddScoped<IScheduledSyncService, ScheduledSyncService>();
         services.AddScoped<ITransactionSyncCoordinator, TransactionSyncCoordinator>();
+        services.AddScoped<ITrueLayerTokenRefreshService, TrueLayerTokenRefreshService>();
+        services.AddScoped<IAccountDiscoveryService, AccountDiscoveryService>();
 
         services.AddScoped<IAggregationService, AggregationService>();
         services.AddScoped<ICommittedOutflowPolicy, CommittedOutflowPolicy>();

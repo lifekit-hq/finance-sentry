@@ -36,6 +36,7 @@ public class ScheduledSyncServiceTests
         Mock<ITrueLayerClient> TrueLayerClient,
         Mock<IBankProvider> Provider,
         Mock<FinanceSentry.Core.Cqrs.IEventBus> EventBus,
+        Mock<ITrueLayerTokenRefreshService> TrueLayerTokenRefresh,
         BankAccount Account,
         TrueLayerConnection Connection);
 
@@ -60,6 +61,7 @@ public class ScheduledSyncServiceTests
         alertGen ??= new Mock<FinanceSentry.Core.Interfaces.IAlertGeneratorService>();
         userPrefs ??= new Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader>();
         var eventBus = new Mock<FinanceSentry.Core.Cqrs.IEventBus>();
+        var trueLayerTokenRefresh = new Mock<ITrueLayerTokenRefreshService>();
 
         var sut = new ScheduledSyncService(
             accountRepo.Object, txRepo.Object, jobRepo.Object,
@@ -67,7 +69,8 @@ public class ScheduledSyncServiceTests
             providerFactory.Object, monobankCreds.Object,
             truelayerConnections.Object, truelayerClient.Object,
             monobankBalanceCache,
-            alertGen.Object, userPrefs.Object, eventBus.Object);
+            alertGen.Object, userPrefs.Object, eventBus.Object,
+            trueLayerTokenRefresh.Object);
 
         // Default TrueLayer wiring: a linked connection with a decryptable refresh token that
         // exchanges for an access token without rotating, and a provider resolvable by name.
@@ -98,6 +101,9 @@ public class ScheduledSyncServiceTests
                   .Returns("refresh-token");
         truelayerClient.Setup(c => c.RefreshAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
                        .ReturnsAsync(new TrueLayerTokenSet("access-token", "refresh-token", 3600));
+        trueLayerTokenRefresh
+            .Setup(s => s.AcquireAccessTokenAsync(connection.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("access-token");
         txRepo.Setup(r => r.GetByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([]);
 
@@ -105,7 +111,8 @@ public class ScheduledSyncServiceTests
         providerFactory.Setup(f => f.Resolve("truelayer")).Returns(provider.Object);
 
         return new Harness(sut, accountRepo, txRepo, jobRepo, encryption, dedup,
-            providerFactory, truelayerConnections, truelayerClient, provider, eventBus, account, connection);
+            providerFactory, truelayerConnections, truelayerClient, provider, eventBus,
+            trueLayerTokenRefresh, account, connection);
     }
 
     private static void SetupProviderCandidates(Harness h, IReadOnlyList<TransactionCandidate> candidates)
@@ -458,54 +465,6 @@ public class ScheduledSyncServiceTests
             Times.Never);
     }
 
-    // ── Card discovery: a card added after consent appears without a reconnect ──
-
-    [Fact]
-    public async Task SyncTrueLayer_DiscoversNewCard_CreatesCreditAccountUnderSameBank()
-    {
-        var h = BuildSut();
-        // Discovery only runs through the real adapter (it needs the /cards endpoint family).
-        var adapter = new TrueLayerAdapter(
-            h.TrueLayerClient.Object,
-            new FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping.TrueLayerCategoryMapper(),
-            Infrastructure.StubCategoryResolver.Categorizer,
-            Infrastructure.StubActiveSubscriptionsReader.Empty);
-        h.ProviderFactory.Setup(f => f.Resolve("truelayer")).Returns(adapter);
-
-        h.TrueLayerClient.Setup(c => c.GetTransactionsAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        h.TrueLayerClient.Setup(c => c.GetPendingTransactionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        h.TrueLayerClient.Setup(c => c.GetBalanceAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerAccountBalance(100m, 100m, "EUR"));
-        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new TrueLayerAccountInfo("tl-card-1", "Revolut Credit", "EUR", "REVOLUT-IE", "credit", null, "4321")]);
-        h.TrueLayerClient.Setup(c => c.GetCardBalanceAsync("access-token", "tl-card-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerCardBalance(Current: 250m, Available: 3750m, CreditLimit: 4000m, Currency: "EUR"));
-
-        h.AccountRepo.Setup(r => r.GetByExternalAccountIdAsync("tl-card-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BankAccount?)null);
-        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
-            .Returns([]);
-
-        BankAccount? created = null;
-        h.AccountRepo.Setup(r => r.AddAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
-            .Callback((BankAccount a, CancellationToken _) => created = a)
-            .ReturnsAsync((BankAccount a, CancellationToken _) => a);
-
-        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
-
-        result.Success.Should().BeTrue();
-        created.Should().NotBeNull("the unseen card must be created during sync");
-        created!.AccountType.Should().Be("credit");
-        created.ProductType.Should().Be(TrueLayerAdapter.CardProductType);
-        created.CurrentBalance.Should().Be(250m);
-        created.CreditLimit.Should().Be(4000m);
-        created.BankName.Should().Be(h.Account.BankName, "the card must group under the same institution");
-        created.TrueLayerConnectionId.Should().Be(h.Connection.Id);
-    }
-
     // ── Unknown provider is an explicit failure, not a silent fallback ──────
 
     [Fact]
@@ -571,36 +530,19 @@ public class ScheduledSyncServiceTests
             Times.Never);
     }
 
-    // Regression: TrueLayer rotates the refresh_token on every refresh. The new token MUST be persisted
-    // before the transaction fetch, so a mid-sync failure can't strand a consumed token and brick the
-    // connection (the invalid_grant root cause). Here the provider sync throws — the rotated token must
-    // still have been saved.
+    // ScheduledSyncService now delegates the refresh-token exchange to ITrueLayerTokenRefreshService
+    // (shared with the account-discovery pass, see TrueLayerTokenRefreshServiceTests for the
+    // rotation-persistence regression that used to live here) rather than doing it inline.
     [Fact]
-    public async Task SyncTrueLayer_PersistsRotatedRefreshToken_EvenWhenSyncFails()
+    public async Task SyncTrueLayer_AcquiresAccessTokenViaSharedRefreshService()
     {
         var h = BuildSut();
+        SetupProviderCandidates(h, []);
 
-        h.Encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
-                    .Returns("old-refresh");
-        h.Encryption.Setup(e => e.Encrypt("new-refresh")).Returns(new EncryptionResult([9], [8], [7], 1));
-        h.TrueLayerClient
-            .Setup(c => c.RefreshAccessTokenAsync("old-refresh", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerTokenSet("AT", "new-refresh", 3600));
+        await h.Sut.PerformFullSyncAsync(h.Account.Id);
 
-        h.Provider
-            .Setup(p => p.SyncTransactionsAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
-                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("mid-sync failure"));
-
-        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
-
-        result.Success.Should().BeFalse("the transaction fetch threw");
-        h.TrueLayerConnections.Verify(
-            r => r.UpdateAsync(
-                It.Is<TrueLayerConnection>(c => c.EncryptedRefreshToken.Length == 1 && c.EncryptedRefreshToken[0] == 9),
-                It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce,
-            "the rotated refresh token must be persisted before the failing transaction fetch");
+        h.TrueLayerTokenRefresh.Verify(
+            s => s.AcquireAccessTokenAsync(h.Connection.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

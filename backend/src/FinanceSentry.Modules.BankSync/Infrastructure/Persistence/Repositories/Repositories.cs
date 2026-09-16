@@ -14,8 +14,16 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<BankAccount> AddAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
         account.ValidateInvariants();
-        await _context.BankAccounts.AddAsync(account, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        var entry = await _context.BankAccounts.AddAsync(account, cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            entry.State = EntityState.Detached;
+            throw;
+        }
         return account;
     }
 
@@ -29,6 +37,12 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     {
         return await _context.BankAccounts
             .FirstOrDefaultAsync(ba => ba.ExternalAccountId == externalAccountId && ba.IsActive, cancellationToken);
+    }
+
+    public async Task<bool> ExistsByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default)
+    {
+        return await _context.BankAccounts
+            .AnyAsync(ba => ba.ExternalAccountId == externalAccountId, cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -330,6 +344,9 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
     public async Task<MonobankCredential?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
         => await _context.MonobankCredentials.FirstOrDefaultAsync(mc => mc.UserId == userId, cancellationToken);
 
+    public async Task<IReadOnlyList<MonobankCredential>> GetAllAsync(CancellationToken cancellationToken = default)
+        => await _context.MonobankCredentials.ToListAsync(cancellationToken);
+
     public async Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default)
     {
         _context.MonobankCredentials.Update(credential);
@@ -370,6 +387,12 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
     public async Task<TrueLayerConnection?> GetByUserAndProviderAsync(Guid userId, string providerId, CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections.FirstOrDefaultAsync(
             tc => tc.UserId == userId && tc.ProviderId == providerId, cancellationToken);
+
+    public async Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default)
+        => await _context.TrueLayerConnections
+            .AsNoTracking()
+            .Where(tc => tc.Status == "LINKED")
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeAsync(DateTime threshold, CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections
