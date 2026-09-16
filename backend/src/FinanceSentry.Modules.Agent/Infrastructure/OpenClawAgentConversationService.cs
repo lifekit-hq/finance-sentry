@@ -26,6 +26,8 @@ using Microsoft.Extensions.Options;
 /// this endpoint (Ledger owns its persona), so we can't disable the behaviour upstream; instead this service
 /// suppresses the sentinel client-side — swapping in a greeting when the whole reply is silence, and
 /// stripping a leading <c>NO_REPLY</c> if the agent self-corrects. Substantive replies stream untouched.
+/// The greeting's completion is flagged <see cref="AgentCompletionEvent.IsSilenceFallback"/> so non-chat
+/// callers (the Ledger read) never mistake it for an answer.
 /// </para>
 /// </summary>
 public sealed class OpenClawAgentConversationService(
@@ -157,7 +159,18 @@ public sealed class OpenClawAgentConversationService(
                     break;
                 }
 
-                var delta = ExtractDelta(data);
+                // A turn that fails after the 200 headers (e.g. every model failed auth) arrives as an
+                // in-band `{"error":{...}}` chunk followed by [DONE] — a failure, never an empty reply.
+                var chunk = ParseChunk(data);
+                if (chunk is JsonObject obj && obj["error"] is { } streamError)
+                {
+                    _logger.LogWarning(
+                        "OpenClaw stream reported an error: {Error}", Truncate(streamError.ToJsonString()));
+                    yield return new AgentErrorEvent("llm_unavailable", "The finance agent is temporarily unavailable.");
+                    yield break;
+                }
+
+                var delta = ExtractDelta(chunk);
                 if (string.IsNullOrEmpty(delta))
                 {
                     continue;
@@ -198,8 +211,9 @@ public sealed class OpenClawAgentConversationService(
             // blank or show the raw sentinel: greet instead.
             if (visible.Length == 0)
             {
-                visible.Append(SilenceFallback);
                 yield return new AgentTextEvent(SilenceFallback);
+                yield return new AgentCompletionEvent(SilenceFallback, null, IsSilenceFallback: true);
+                yield break;
             }
 
             yield return new AgentCompletionEvent(visible.ToString(), null);
@@ -235,22 +249,24 @@ public sealed class OpenClawAgentConversationService(
     }
 
     /// <summary>Pulls the incremental assistant text from one OpenAI streaming chunk, if any.</summary>
-    private string? ExtractDelta(string data)
+    private static string? ExtractDelta(JsonNode? node)
     {
-        JsonNode? node;
+        var choice = node?["choices"]?.AsArray() is { Count: > 0 } choices ? choices[0] : null;
+        var content = choice?["delta"]?["content"];
+        return content?.GetValueKind() == JsonValueKind.String ? content.GetValue<string>() : null;
+    }
+
+    private JsonNode? ParseChunk(string data)
+    {
         try
         {
-            node = JsonNode.Parse(data);
+            return JsonNode.Parse(data);
         }
         catch (JsonException ex)
         {
             _logger.LogDebug(ex, "Skipping unparsable OpenClaw SSE data line.");
             return null;
         }
-
-        var choice = node?["choices"]?.AsArray() is { Count: > 0 } choices ? choices[0] : null;
-        var content = choice?["delta"]?["content"];
-        return content?.GetValueKind() == JsonValueKind.String ? content.GetValue<string>() : null;
     }
 
     private static string Truncate(string value) => value.Length <= MaxLoggedBody ? value : value[..MaxLoggedBody];

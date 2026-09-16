@@ -32,6 +32,10 @@ public sealed class LedgerNarratorAdapter(
         {
             switch (evt)
             {
+                // A canned greeting stood in for a silent agent — it is not a read of the asset.
+                case AgentCompletionEvent { IsSilenceFallback: true }:
+                    errored = true;
+                    break;
                 // The terminal completion event carries the assembled answer; prefer it over deltas.
                 case AgentCompletionEvent completion:
                     sb.Clear();

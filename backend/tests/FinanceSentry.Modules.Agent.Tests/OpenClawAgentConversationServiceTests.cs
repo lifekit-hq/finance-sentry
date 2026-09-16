@@ -62,6 +62,7 @@ public sealed class OpenClawAgentConversationServiceTests
         events.OfType<AgentToolEvent>().Should().BeEmpty("OpenClaw runs its own tools server-side");
         var completion = events.OfType<AgentCompletionEvent>().Should().ContainSingle().Subject;
         completion.FinalText.Should().Be("Your net worth is $1.8M.");
+        completion.IsSilenceFallback.Should().BeFalse();
     }
 
     [Fact]
@@ -82,6 +83,7 @@ public sealed class OpenClawAgentConversationServiceTests
         text.Should().StartWith("Hey Denys");
         var completion = events.OfType<AgentCompletionEvent>().Should().ContainSingle().Subject;
         completion.FinalText.Should().Be(text);
+        completion.IsSilenceFallback.Should().BeTrue("the greeting is a stand-in, not an answer");
     }
 
     [Fact]
@@ -155,6 +157,39 @@ public sealed class OpenClawAgentConversationServiceTests
         var error = events.OfType<AgentErrorEvent>().Should().ContainSingle().Subject;
         error.Code.Should().Be("llm_unavailable");
         events.OfType<AgentCompletionEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_MapsInBandStreamError_ToLlmUnavailable()
+    {
+        // #635: once the 200 headers are out, the gateway reports a failed turn (every model failed auth)
+        // as an `error` chunk then [DONE]. It must surface as an error, not as silence and a greeting.
+        var sse = string.Concat(
+            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n",
+            "data: [DONE]\n");
+        var service = CreateSut(new StubHandler(_ => Sse(sse)));
+
+        var events = await DrainAsync(service, "Write a concise read on CBRS");
+
+        var error = events.OfType<AgentErrorEvent>().Should().ContainSingle().Subject;
+        error.Code.Should().Be("llm_unavailable");
+        events.OfType<AgentTextEvent>().Should().BeEmpty();
+        events.OfType<AgentCompletionEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_MapsStreamErrorAfterPartialText_ToLlmUnavailable()
+    {
+        var sse = string.Concat(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"CBRS is \"}}]}\n",
+            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n",
+            "data: [DONE]\n");
+        var service = CreateSut(new StubHandler(_ => Sse(sse)));
+
+        var events = await DrainAsync(service, "Write a concise read on CBRS");
+
+        events.OfType<AgentErrorEvent>().Should().ContainSingle();
+        events.OfType<AgentCompletionEvent>().Should().BeEmpty("a truncated answer is not a completed one");
     }
 
     private static OpenClawAgentConversationService CreateSut(
