@@ -96,7 +96,11 @@
           </cmn-column>
           <cmn-column key="price" header="Price" align="right">
             <ng-template let-row cmnCell>
-              <span class="font-mono tabular-nums">{{ row.currentPrice | currencyAmount }}</span>
+              @if (row.currentPrice === null) {
+                <span class="font-mono tabular-nums text-text-secondary">—</span>
+              } @else {
+                <span class="font-mono tabular-nums">{{ row.currentPrice | currencyAmount }}</span>
+              }
             </ng-template>
           </cmn-column>
           <cmn-column key="value" header="Value" align="right">

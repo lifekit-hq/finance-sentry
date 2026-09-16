@@ -329,22 +329,72 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
     public async Task RevolutX_IncompleteWalk_AppliesFills_ButLeavesTransfersForTheWalkThatCatchesUp()
     {
         await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX, new CryptoAssetBalance("BTC", 0.1m, 0m, 6_000m));
+        Trades("BTC", null, new CryptoTradePage([Fill("t1", 0.1m, 50_000m, buy: true, 90)], "v1:1"));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
         Holdings(_revolutX, new CryptoAssetBalance("BTC", 0.3m, 0m, 18_000m));
-        Trades("BTC", null, new CryptoTradePage([Fill("t1", 0.1m, 50_000m, buy: true, 60)], "v1:1", IsComplete: false));
+        Trades("BTC", "v1:1", new CryptoTradePage([Fill("t2", 0.05m, 50_000m, buy: true, 60)], "v1:2", IsComplete: false));
 
         await SyncAsync(CryptoExchangeProvider.RevolutX);
 
         var partial = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
         partial.UntrackedQuantity.Should().Be(0m);
-        partial.TrackedQuantity.Should().Be(0.1m);
+        partial.TrackedQuantity.Should().Be(0.15m);
+        partial.TradeCursor.Should().Be("v1:2");
 
-        Trades("BTC", "v1:1", new CryptoTradePage([Fill("t2", 0.2m, 55_000m, buy: true, 30)], "v1:2"));
+        Trades("BTC", "v1:2", new CryptoTradePage([Fill("t3", 0.15m, 56_000m, buy: true, 30)], "v1:3"));
 
         await SyncAsync(CryptoExchangeProvider.RevolutX);
 
         var caughtUp = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
         caughtUp.UntrackedQuantity.Should().Be(0m);
-        caughtUp.CostBasisUsd.Should().Be(16_000m);
+        caughtUp.CostBasisUsd.Should().Be(15_900m);
+    }
+
+    [Fact]
+    public async Task RevolutX_FirstWalkLongerThanOneRun_IsWalkedToTheSnapshot_AndNeverRealizesAgainstLotsHeldAtConnect()
+    {
+        // 1 BTC held at connect; bought 1 at 50k, sold 1 at 60k, sold the rest, then rebought 0.5 —
+        // the row was recreated after the sell-out, so its walk starts again at connect.
+        await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX, new CryptoAssetBalance("BTC", 0.5m, 0m, 30_000m));
+        Trades("BTC", null, new CryptoTradePage(
+            [Fill("t1", 1m, 50_000m, buy: true, 50_000), Fill("t2", 1m, 60_000m, buy: false, 45_000)],
+            "v1:26",
+            IsComplete: false));
+        Trades("BTC", "v1:26", new CryptoTradePage(
+            [Fill("t3", 1m, 65_000m, buy: false, 20_000), Fill("t4", 0.5m, 58_000m, buy: true, 10)],
+            "v1:40"));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        var row = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
+        row.RealizedPnlUsd.Should().Be(0m, "the lots sold were partly held at connect, at a cost never seen");
+        row.CostBasisUsd.Should().Be(29_000m);
+        row.UntrackedQuantity.Should().Be(0m);
+        row.TradeCount.Should().Be(4);
+        row.TradeCursor.Should().Be("v1:40");
+    }
+
+    [Fact]
+    public async Task RevolutX_FirstWalkThatStopsAdvancing_IsHeldBack_AndLeavesTheLedgerUntouched()
+    {
+        await ConnectAsync(CryptoExchangeProvider.RevolutX);
+        Holdings(_revolutX, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        Trades("BTC", null, new CryptoTradePage(
+            [Fill("t1", 1m, 50_000m, buy: true, 90), Fill("t2", 1m, 60_000m, buy: false, 60)],
+            null,
+            IsComplete: false));
+
+        await SyncAsync(CryptoExchangeProvider.RevolutX);
+
+        var row = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
+        row.TrackedQuantity.Should().BeNull();
+        row.RealizedPnlUsd.Should().BeNull();
+        row.TradeCursor.Should().BeNull();
+        row.TradeCount.Should().Be(0);
     }
 
     [Fact]

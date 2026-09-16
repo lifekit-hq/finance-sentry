@@ -216,7 +216,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             CryptoTradePage page;
             try
             {
-                page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, walk, ct);
+                page = await WalkForwardTradesAsync(adapter, apiKey, apiSecret, holding, walk, ct);
             }
             catch (CryptoExchangeException ex)
             {
@@ -225,6 +225,11 @@ public sealed class SyncExchangeHoldingsCommandHandler(
                     holding.Asset, request.Provider, request.UserId);
                 failed.Add(holding.Asset);
                 firstFailure ??= ex;
+                continue;
+            }
+
+            if (holding.TrackedQuantity is null && !page.IsComplete)
+            {
                 continue;
             }
 
@@ -262,6 +267,38 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         {
             throw new CryptoTradeHistoryException(request.Provider, failed, firstFailure);
         }
+    }
+
+    /// <summary>
+    /// A holding's fills since its cursor. A never-walked holding is paged all the way to
+    /// <see cref="CryptoTradeWalk.AsOf"/> in one run: its first ledger pass must reconcile the
+    /// position held at connect, or a sell in it would realize P&amp;L against a cost never seen.
+    /// A walk that stops advancing comes back incomplete and the holding is left for the next run.
+    /// </summary>
+    private static async Task<CryptoTradePage> WalkForwardTradesAsync(
+        ICryptoExchangeAdapter adapter,
+        string apiKey,
+        string apiSecret,
+        CryptoHolding holding,
+        CryptoTradeWalk walk,
+        CancellationToken ct)
+    {
+        var page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, walk, ct);
+        if (holding.TrackedQuantity is not null)
+        {
+            return page;
+        }
+
+        var trades = new List<CryptoTrade>(page.Trades);
+        var cursor = holding.TradeCursor;
+        while (!page.IsComplete && page.NextCursor is not null && page.NextCursor != cursor)
+        {
+            cursor = page.NextCursor;
+            page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, cursor, walk, ct);
+            trades.AddRange(page.Trades);
+        }
+
+        return page with { Trades = trades };
     }
 
     private static decimal? TrustCostBasisForCurrentPosition(
