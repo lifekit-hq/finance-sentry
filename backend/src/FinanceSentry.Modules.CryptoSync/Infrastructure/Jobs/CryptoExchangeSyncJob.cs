@@ -3,6 +3,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Application.Commands;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
+using Hangfire;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
@@ -27,6 +28,7 @@ public abstract class CryptoExchangeSyncJob(
 {
     protected abstract string Provider { get; }
 
+    [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteAsync()
     {
         var activeCredentials = await credentialRepository.GetAllActiveAsync(Provider);

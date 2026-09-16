@@ -13,6 +13,4 @@ public sealed class CryptoExchangeAdapterRegistry(IEnumerable<ICryptoExchangeAda
         _byProvider.TryGetValue(provider, out var adapter)
             ? adapter
             : throw new UnknownExchangeProviderException(provider);
-
-    public bool IsSupported(string provider) => _byProvider.ContainsKey(provider);
 }

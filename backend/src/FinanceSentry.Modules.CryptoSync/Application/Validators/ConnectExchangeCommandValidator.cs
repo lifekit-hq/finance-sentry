@@ -8,10 +8,6 @@ public sealed class ConnectExchangeCommandValidator : AbstractValidator<ConnectE
 {
     public ConnectExchangeCommandValidator()
     {
-        RuleFor(x => x.Provider)
-            .Must(p => p is CryptoExchangeProvider.Binance or CryptoExchangeProvider.RevolutX)
-            .WithMessage("provider is not a supported crypto exchange.");
-
         RuleFor(x => x.ApiKey)
             .NotEmpty().WithMessage("apiKey is required.");
 

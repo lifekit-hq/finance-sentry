@@ -34,10 +34,4 @@ public class ConnectExchangeCommandValidatorTests
         _sut.Validate(new ConnectExchangeCommand(Guid.NewGuid(), CryptoExchangeProvider.RevolutX, "", "pem"))
             .Errors.Select(e => e.ErrorMessage).Should().Equal("apiKey is required.");
     }
-
-    [Fact]
-    public void UnknownProvider_Fails()
-    {
-        _sut.Validate(new ConnectExchangeCommand(Guid.NewGuid(), "kraken", "key", "secret")).IsValid.Should().BeFalse();
-    }
 }
