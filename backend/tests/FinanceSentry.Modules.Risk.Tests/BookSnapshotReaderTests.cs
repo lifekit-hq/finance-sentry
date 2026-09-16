@@ -56,6 +56,35 @@ public sealed class BookSnapshotReaderTests
     }
 
     [Fact]
+    public async Task SameAssetOnTwoVenues_MergedIntoOnePosition()
+    {
+        var figures = new BookFigures(
+            CashUsd: 0m,
+            BankingCashUsd: 0m,
+            BrokerageCashUsd: 0m,
+            InvestedValueUsd: 30_000m,
+            TotalValueUsd: 30_000m,
+            Positions:
+            [
+                new BookFigurePosition("BTC", AssetClassNormalizer.Crypto, 0.1m, null, 6_000m, "binance"),
+                new BookFigurePosition("BTC", AssetClassNormalizer.Crypto, 0.3m, null, 18_000m, "revolut_x"),
+                new BookFigurePosition("ETH", AssetClassNormalizer.Crypto, 2m, null, 6_000m, "revolut_x"),
+            ],
+            IsStale: false,
+            StaleSources: []);
+
+        var reader = new BookSnapshotReader(new FakeBookFigures(figures), NullLogger<BookSnapshotReader>.Instance);
+        var book = await reader.ReadAsync(UserId);
+
+        book.Positions.Should().HaveCount(2);
+        var btc = book.Positions.Single(p => p.Symbol == "BTC");
+        btc.Sleeve.Should().Be(RiskSleeve.Crypto);
+        btc.Quantity.Should().Be(0.4m);
+        btc.UsdValue.Should().Be(24_000m);
+        btc.WeightPct.Should().Be(24_000m / 30_000m);
+    }
+
+    [Fact]
     public async Task StaleBookFigures_PropagateStalenessToSnapshot()
     {
         var figures = new BookFigures(
