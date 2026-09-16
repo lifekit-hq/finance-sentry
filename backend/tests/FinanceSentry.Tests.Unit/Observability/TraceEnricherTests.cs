@@ -14,7 +14,8 @@ using Xunit;
 /// </summary>
 public class TraceEnricherTests
 {
-    private static readonly ActivitySource ActivitySource = new("FinanceSentry.Tests.TraceEnricher");
+    private const string SourceName = "FinanceSentry.Tests.TraceEnricher";
+    private static readonly ActivitySource ActivitySource = new(SourceName);
 
     [Fact]
     public void Enrich_UnderActivity_AddsTraceIdAndSpanId()
@@ -60,7 +61,7 @@ public class TraceEnricherTests
     {
         var listener = new ActivityListener
         {
-            ShouldListenTo = _ => true,
+            ShouldListenTo = source => source.Name == SourceName,
             Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
         };
         ActivitySource.AddActivityListener(listener);

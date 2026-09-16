@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using FinanceSentry.Gateway;
 using Microsoft.AspNetCore.HttpOverrides;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -10,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
 const string DefaultOtlpEndpoint = "http://otel-collector:4318";
+const string OtlpTracesPath = "/v1/traces";
+const string MetricsPath = "/metrics";
 
 // -----------------------------------------------------------------------------------------------
 // Edge gateway (feature 025) — single YARP reverse-proxy front door for frontend + API + MCP.
@@ -59,30 +62,32 @@ builder.Services.AddRateLimiter(options =>
 
 // FR-007: expose gateway metrics (request counts, proxy latency via YARP meters, throttle events)
 // on /metrics for the existing Prometheus scrape (observability stack, feature 023).
+// HTTP trace spine (spec 023 amendment, 2026-09-13): gateway span + propagated `traceparent` (YARP
+// forwards it; no extra code needed) so api's span joins the same trace. /metrics scrapes are not
+// traced. Endpoint shape matches api's Observability:Otlp:Endpoint: unset falls back to the
+// in-network collector default, an explicit empty value disables the exporter (dev).
+var gatewayOtlpEndpoint = builder.Configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("finance-sentry-gateway"))
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddMeter("Yarp.ReverseProxy")
-        .AddPrometheusExporter());
-
-// HTTP trace spine (spec 023 amendment, 2026-09-13): gateway span + propagated `traceparent` (YARP
-// forwards it; no extra code needed) so api's span joins the same trace. AddOpenTelemetry() composes
-// onto the metrics registration above rather than starting a second provider — the resource configured
-// there still applies. Endpoint shape matches api's Observability:Otlp:Endpoint: unset falls back to
-// the in-network collector default, an explicit empty value disables the exporter (dev).
-var gatewayOtlpEndpoint = builder.Configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
-builder.Services.AddOpenTelemetry()
+        .AddPrometheusExporter())
     .WithTracing(tracing =>
     {
         tracing
-            .AddAspNetCoreInstrumentation()
+            .AddAspNetCoreInstrumentation(options =>
+                options.Filter = context => !context.Request.Path.StartsWithSegments(MetricsPath))
             .AddHttpClientInstrumentation();
 
         if (!string.IsNullOrWhiteSpace(gatewayOtlpEndpoint))
         {
-            tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(gatewayOtlpEndpoint));
+            tracing.AddOtlpExporter(otlp =>
+            {
+                otlp.Protocol = OtlpExportProtocol.HttpProtobuf;
+                otlp.Endpoint = new Uri(gatewayOtlpEndpoint.TrimEnd('/') + OtlpTracesPath);
+            });
         }
     });
 
