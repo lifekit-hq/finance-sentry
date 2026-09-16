@@ -2,9 +2,12 @@ namespace FinanceSentry.Infrastructure.Observability;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 /// <summary>
 /// Wires OpenTelemetry metrics (FR-001/002): ASP.NET Core request instrumentation, .NET runtime
@@ -15,6 +18,8 @@ using OpenTelemetry.Resources;
 public static class OpenTelemetryConfiguration
 {
     private const string ServiceName = "finance-sentry";
+    private const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
+    private const string DefaultOtlpEndpoint = "http://otel-collector:4318";
 
     public static IServiceCollection AddObservabilityMetrics(this IServiceCollection services)
     {
@@ -28,6 +33,35 @@ public static class OpenTelemetryConfiguration
                 .AddRuntimeInstrumentation()
                 .AddMeter(JobMetrics.MeterName)
                 .AddPrometheusExporter());
+
+        return services;
+    }
+
+    /// <summary>
+    /// Wires the HTTP trace spine (spec 023 amendment, 2026-09-13): ASP.NET Core + HttpClient +
+    /// Npgsql spans, exported via OTLP/HTTP. <c>AddOpenTelemetry()</c> is safe to call again here —
+    /// it composes onto the same provider registrations <see cref="AddObservabilityMetrics"/> already
+    /// added to the DI container rather than starting a second one, so the resource configured there
+    /// still applies to traces. The endpoint mirrors <c>Observability:Loki:Url</c>'s shape: unset falls
+    /// back to the in-network collector default, an explicit empty value disables the exporter (dev).
+    /// </summary>
+    public static IServiceCollection AddObservabilityTracing(this IServiceCollection services, IConfiguration configuration)
+    {
+        var otlpEndpoint = configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
+
+        services.AddOpenTelemetry()
+            .WithTracing(tracing =>
+            {
+                tracing
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddNpgsql();
+
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                {
+                    tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(otlpEndpoint));
+                }
+            });
 
         return services;
     }

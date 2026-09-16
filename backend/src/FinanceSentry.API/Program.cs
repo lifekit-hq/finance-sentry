@@ -77,6 +77,9 @@ builder.Services.AddHangfireServices(builder.Configuration, builder.Environment)
 // OpenTelemetry metrics (FR-001/002) — ASP.NET Core + runtime + custom job meter, exposed at /metrics.
 builder.Services.AddObservabilityMetrics();
 
+// HTTP trace spine (spec 023 amendment, 2026-09-13) — ASP.NET Core + HttpClient + Npgsql spans via OTLP/HTTP.
+builder.Services.AddObservabilityTracing(builder.Configuration);
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(
         builder.Configuration.GetConnectionString("Default")!,

@@ -82,6 +82,9 @@ services:
       # Loki lives in lifekit-stack's compose project since 2026-09-06; the
       # service name still resolves over the shared `openclaw` bridge.
       Observability__Loki__Url: ${OBSERVABILITY_LOKI_URL:-http://loki:3100}
+      # Trace spine (spec 023 amendment, 2026-09-13): OTLP/HTTP exporter. The collector lives in
+      # lifekit-stack's compose project on the shared `openclaw` bridge, same as Loki above.
+      Observability__Otlp__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://otel-collector:4318}
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
@@ -178,6 +181,9 @@ services:
       LettuceEncrypt__DomainNames__0: ${GATEWAY_DOMAIN:-}
       LettuceEncrypt__EmailAddress: ${GATEWAY_ACME_EMAIL:-}
       LettuceEncrypt__AcceptTermsOfService: ${GATEWAY_ACME_ACCEPT_TOS:-false}
+      # Trace spine (spec 023 amendment, 2026-09-13): OTLP/HTTP exporter, reachable over `openclaw`
+      # below (same bridge api's Loki/OTLP traffic already crosses).
+      Observability__Otlp__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://otel-collector:4318}
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
       # ACME cutover: uncomment to publish the public TLS ports (requires GATEWAY_DOMAIN + DNS).
@@ -190,6 +196,7 @@ services:
         condition: service_started
     networks:
       - finance-sentry
+      - openclaw          # reaches the OTLP collector on lifekit-stack's compose_default bridge
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

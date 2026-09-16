@@ -4,8 +4,12 @@ using FinanceSentry.Gateway;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
+const string DefaultOtlpEndpoint = "http://otel-collector:4318";
 
 // -----------------------------------------------------------------------------------------------
 // Edge gateway (feature 025) — single YARP reverse-proxy front door for frontend + API + MCP.
@@ -62,6 +66,25 @@ builder.Services.AddOpenTelemetry()
         .AddRuntimeInstrumentation()
         .AddMeter("Yarp.ReverseProxy")
         .AddPrometheusExporter());
+
+// HTTP trace spine (spec 023 amendment, 2026-09-13): gateway span + propagated `traceparent` (YARP
+// forwards it; no extra code needed) so api's span joins the same trace. AddOpenTelemetry() composes
+// onto the metrics registration above rather than starting a second provider — the resource configured
+// there still applies. Endpoint shape matches api's Observability:Otlp:Endpoint: unset falls back to
+// the in-network collector default, an explicit empty value disables the exporter (dev).
+var gatewayOtlpEndpoint = builder.Configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
+
+        if (!string.IsNullOrWhiteSpace(gatewayOtlpEndpoint))
+        {
+            tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(gatewayOtlpEndpoint));
+        }
+    });
 
 // US2 / FR-003: TLS termination via ACME (Let's Encrypt) — enabled ONLY when a public domain is
 // configured AND the ToS is accepted. Empty/absent config (dev, or Tailscale-terminated prod) skips
