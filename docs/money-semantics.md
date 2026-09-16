@@ -34,8 +34,8 @@ Last verified: 2026-08-31 (PR #531).
 - **TrueLayer cards** (`/data/v1/cards/{id}/balance`): `current` is already the amount
   owed — stored as-is with type `credit`; `credit_limit` → `CreditLimit`. Cards are a
   separate endpoint family: they never appear under `/data/v1/accounts`, are discovered at
-  connect/reconnect (`FinalizeTrueLayerConnectCommand`) and by the scheduled sync's daily
-  card-discovery pass (`ScheduledSyncService.DiscoverTrueLayerCardsAsync`), and are routed
+  connect/reconnect (`FinalizeTrueLayerConnectCommand`) and on every `SyncScheduler` run by
+  the account-discovery pass (`AccountDiscoveryService`), and are routed
   by `ProductType == "card"` (`TrueLayerAdapter.CardProductType`).
 
 ### Crypto venues (`FinanceSentry.Modules.CryptoSync`)
