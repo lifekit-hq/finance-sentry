@@ -58,6 +58,7 @@ public static class OpenTelemetryConfiguration
                 options.Filter = context => !context.Request.Path.StartsWithSegments(MetricsPath))
             .AddHttpClientInstrumentation()
             .AddNpgsql()
+            .AddSource(Hangfire.HangfireTracingFilter.ActivitySourceName)
             .AddProcessor(new ParentlessNpgsqlSpanFilter());
 
         if (!string.IsNullOrWhiteSpace(otlpEndpoint))
