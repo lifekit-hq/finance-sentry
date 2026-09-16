@@ -184,6 +184,9 @@ GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertF
     new DashboardObservability.HangfireJobFailureStreakStore(),
     app.Configuration.GetValue("Observability:JobFailureAlertThreshold", 3)));
 
+// Propagate trace context into job execution spans (spec 023 amendment, #616).
+GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter());
+
 app.RegisterAllModuleJobs();
 
 // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
