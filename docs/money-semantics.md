@@ -4,7 +4,7 @@ Source of truth for Finance Sentry's money math. **Any PR that changes one of th
 behaviours must update this document in the same diff.** File references point at the
 implementing code; when they disagree, the code is the bug or this doc is stale — fix one.
 
-Last verified: 2026-08-31 (PR #531).
+Last verified: 2026-09-16 (#472 PR 2 — Revolut X trades and venue fiat).
 
 ---
 
@@ -43,8 +43,9 @@ Last verified: 2026-08-31 (PR #531).
 A `CryptoHolding` is one asset on one venue, unique on `(UserId, Provider, Asset)` — BTC on
 Binance and BTC on Revolut X are two rows, and each venue's sync upserts, reconciles and
 deletes only its own (`SyncExchangeHoldingsCommandHandler`). `FreeQuantity + LockedQuantity`
-is the position; `UsdValue` is already USD, converted by the adapter — the last place the quote
-currency is in scope — so sums over holdings are USD sums (§3). Holdings reach the book as
+is the position; the `UsdValue` readers hand out is already USD — for crypto converted by the
+adapter (the last place the quote currency is in scope), for venue fiat at the reader (below) —
+so sums over holdings are USD sums (§3). Crypto holdings reach the book as
 `AssetClassNormalizer.Crypto` positions (`BookFiguresService`), never as banking cash.
 
 - **Binance** (`BinanceHoldingsAggregator`): spot + funding + Simple Earn (flexible = free,
@@ -55,14 +56,39 @@ currency is in scope — so sums over holdings are USD sums (§3). Holdings reac
   as invariant-culture decimals. Valued from `GET /tickers` (`last_price`, else `mid`) via the
   `{asset}/USD` pair, else a USDC/USDT pair at par, else a fiat-quoted pair converted with
   `CurrencyConverter.ToUsd`; a USD stablecoin with no pair is a dollar; an asset no pair can
-  price is logged and skipped; below `RevolutX:DustThresholdUsd` dropped. **Fiat cash held on
-  the venue** (`asset_type = fiat` in `GET /configuration/currencies`) is excluded from
-  holdings and logged — it is neither crypto nor bank cash, and its representation is #472's
-  follow-up. Until then the venue's fiat is missing from net worth.
-- **Cost basis** is reconstructed from fills (`CostBasisCalculator`) and resumes from an opaque
-  per-holding `TradeCursor` the adapter owns (Binance: next trade id per quote pair). Lots the
-  venue cannot give history for keep `CostBasisUsd` null — never a guess. Revolut X trade
-  ingestion is #472's follow-up, so its cost basis is null today.
+  price is logged and skipped; below `RevolutX:DustThresholdUsd` dropped.
+- **Venue fiat** (Revolut X EUR/USD/… balances — `asset_type = fiat` in
+  `GET /configuration/currencies`, or an unconfigured code we hold an FX rate for) is kept as a
+  `CryptoHolding` with `IsFiat = true`: its quantity is the native amount, it has no cost basis
+  and is never walked for trades. Readers (`CryptoHoldingValuation`) convert it to USD at the
+  reader boundary with the current FX rate (§3), like bank balances; a fiat code with no rate is
+  valued 1:1 and logged. It counts toward the venue's value and net worth, and in
+  `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
+  position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`).
+- **Cost basis — Binance** is reconstructed from the full fill history
+  (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
+  quote pair).
+- **Cost basis — Revolut X** starts at connect (`ICryptoExchangeAdapter.TradeHistoryStartsAtConnect`):
+  the venue serves fills only in one-week windows, so history before the connect date
+  (`ExchangeCredential.CreatedAt`, reset on reconnect) is out of reach. `RevolutXAdapter`
+  walks `GET /trades/private/{BASE-QUOTE}` window by window (each ≤ 1 week, asked 1 ms wider
+  on both sides and filtered back, so a boundary fill counts once) for every pair whose quote
+  is USD, a USD stablecoin (at par) or a fiat currency with an FX rate (converted with the
+  current rate — not the rate on the fill date). Fills on crypto-quoted pairs are not priced.
+  The cursor (`v1:<ms>`) is the instant every pair was walked to; the walk stops at the moment
+  the sync took just before reading balances, and at most 26 windows per run
+  (`IsComplete = false` resumes next run).
+  `ForwardCostBasisLedger` accumulates the fills (weighted average) into
+  `TrackedQuantity` / `TrackedCostUsd`, and carries every unit the fills do not explain — the
+  position held at connect, deposits, crypto-quoted fills — as `UntrackedQuantity`, taken to
+  have arrived before the walk's fills. While `UntrackedQuantity > 0`, `CostBasisUsd` and
+  `AverageBuyPriceUsd` are **null** (never guessed) and a sell realizes nothing (its lots'
+  cost is unknown); it shrinks tracked and untracked quantities in proportion. A shortfall
+  (withdrawal, fee taken in the asset) shrinks all pools pro rata at the end. Closing the
+  position to zero clears the unknown lots. `RealizedPnlUsd` is the P&L of sells made while
+  every held lot was priced. A failed walk leaves that holding's ledger and cursor untouched
+  and fails the sync after the other holdings are walked (`CryptoTradeHistoryException`), so it
+  reaches the job-failure Telegram alert (#023) instead of freezing cost basis silently.
 
 ### Failure behaviour
 
@@ -433,6 +459,11 @@ comparison; the bars are closed periods.
   authorized with produces a new posted row; the stale pending twin is only retired if
   the amount+description reconciler key still matches.
 - Backfilled snapshot days are not historical truth (§8).
+- Revolut X fills quoted in a non-USD fiat are converted at the current FX rate, not the
+  fill-date rate (§1 "Crypto venues").
+- A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
+  balance read is seen by the balance first, so the ledger books it as unpriced quantity and
+  that holding's cost basis stays null until the position is next closed.
 - The month-to-date pace baseline (§7) prorates a monthly average linearly by elapsed
   days. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
   is directionally right rather than exact. A true same-day-last-month comparison would

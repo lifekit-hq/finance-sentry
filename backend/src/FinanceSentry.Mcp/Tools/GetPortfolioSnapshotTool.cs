@@ -11,7 +11,7 @@ public sealed class GetPortfolioSnapshotTool(
     IIdentityResolver identity)
 {
     [McpServerTool(Name = "get_portfolio_snapshot")]
-    [Description("Unified portfolio snapshot: IBKR brokerage positions + crypto holdings (Binance, Revolut X), each with unrealized P&L (USD and %) when cost basis is known, PLUS total cash (USD). cashUsd counts banking balances AND idle brokerage cash (uninvested currency balances) — the same definition the allocation-drift tool uses; bankingCashUsd/brokerageCashUsd give the split. Idle brokerage cash is NOT listed under positions or investedValueUsd. Returns per-position rows and book-level totals (invested value, cash, total value, total cost basis, total unrealized P&L). unrealizedPnlUsd/Pct are null when cost basis is unavailable. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Unified portfolio snapshot: IBKR brokerage positions + crypto holdings (Binance, Revolut X), each with unrealized P&L (USD and %) when cost basis is known, PLUS total cash (USD). cashUsd counts banking balances AND idle brokerage cash (uninvested currency balances) AND fiat held on crypto venues (e.g. EUR on Revolut X) — the same definition the allocation-drift tool uses; bankingCashUsd/brokerageCashUsd/venueCashUsd give the split. Idle brokerage cash and venue fiat are NOT listed under positions or investedValueUsd. Returns per-position rows and book-level totals (invested value, cash, total value, total cost basis, total unrealized P&L). unrealizedPnlUsd/Pct are null when cost basis is unavailable. Defaults to the authenticated MCP identity when userId is omitted.")]
     public async Task<PortfolioSnapshot> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
@@ -41,6 +41,7 @@ public sealed class GetPortfolioSnapshotTool(
             CashUsd: book.CashUsd,
             BankingCashUsd: book.BankingCashUsd,
             BrokerageCashUsd: book.BrokerageCashUsd,
+            VenueCashUsd: book.VenueCashUsd,
             InvestedValueUsd: book.InvestedValueUsd,
             TotalValueUsd: book.TotalValueUsd,
             TotalCostBasisUsd: totalCostBasisUsd,
@@ -82,11 +83,12 @@ public sealed record PortfolioSnapshot(
     decimal CashUsd,
     decimal BankingCashUsd,
     decimal BrokerageCashUsd,
+    decimal VenueCashUsd,
     decimal InvestedValueUsd,
     decimal TotalValueUsd,
     decimal? TotalCostBasisUsd,
     decimal? TotalUnrealizedPnlUsd,
     decimal? TotalUnrealizedPnlPct)
 {
-    public static PortfolioSnapshot Empty { get; } = new([], 0m, 0m, 0m, 0m, 0m, null, null, null);
+    public static PortfolioSnapshot Empty { get; } = new([], 0m, 0m, 0m, 0m, 0m, 0m, null, null, null);
 }

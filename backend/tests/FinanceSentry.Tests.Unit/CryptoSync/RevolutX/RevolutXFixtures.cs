@@ -48,6 +48,31 @@ internal static class RevolutXFixtures
         }
         """;
 
+    // BTC trades for USD and EUR (walked), and for ETH (a crypto quote: not USD-valued, skipped);
+    // ETH/USD has another base.
+    public const string Pairs = """
+        {
+          "BTC/USD": {"base": "BTC", "quote": "USD", "base_step": "0.00000001", "quote_step": "0.01", "min_order_size": "0.00001", "max_order_size": "100", "min_order_size_quote": "1", "slippage": 0.05, "status": "active"},
+          "BTC/EUR": {"base": "BTC", "quote": "EUR", "base_step": "0.00000001", "quote_step": "0.01", "min_order_size": "0.00001", "max_order_size": "100", "min_order_size_quote": "1", "slippage": 0.05, "status": "active"},
+          "BTC/ETH": {"base": "BTC", "quote": "ETH", "base_step": "0.00000001", "quote_step": "0.0001", "min_order_size": "0.00001", "max_order_size": "100", "min_order_size_quote": "0.001", "slippage": 0.05, "status": "active"},
+          "ETH/USD": {"base": "ETH", "quote": "USD", "base_step": "0.0001", "quote_step": "0.01", "min_order_size": "0.001", "max_order_size": "1000", "min_order_size_quote": "1", "slippage": 0.05, "status": "active"}
+        }
+        """;
+
+    /// <summary>
+    /// One <c>GET /trades/private/{symbol}</c> fill in the venue's short wire names (as the
+    /// revolut-engineering/revolut-x-api client maps them): <c>q</c> of <c>qc</c> at <c>p</c>
+    /// <c>pc</c>, side <c>s</c>, executed at <c>tdt</c>.
+    /// </summary>
+    public static string Fill(string tid, string baseAsset, string quote, string price, string quantity, string side, long tdt) =>
+        $$"""{"tid":"{{tid}}","aid":"x","anm":"x","p":"{{price}}","pc":"{{quote}}","pn":"MONE","q":"{{quantity}}","qc":"{{baseAsset}}","qn":"UNIT","ve":"REVX","pdt":{{tdt}},"vp":"REVX","tdt":{{tdt}},"oid":"o-{{tid}}","s":"{{side}}","im":false}""";
+
+    public static string TradesPage(string? nextCursor, params string[] fills)
+    {
+        var cursor = nextCursor is null ? string.Empty : $",\"next_cursor\":\"{nextCursor}\"";
+        return "{\"data\":[" + string.Join(",", fills) + "],\"metadata\":{\"timestamp\":1770201294631" + cursor + "}}";
+    }
+
     public const string Unauthorized = """
         {"error_id": "7d85b5e7-d0f0-4696-b7b5-a300d0d03a5e", "message": "API key can only be used for authentication from whitelisted IP", "timestamp": 3318215482991}
         """;

@@ -75,7 +75,7 @@ public class WealthAggregationService(
             if (holdings.Count > 0)
             {
                 var accounts = holdings.Select(h => new AccountBalanceDto(
-                    Guid.Empty, DisplayNameFor(h.Provider), "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
+                    Guid.Empty, DisplayNameFor(h.Provider), h.IsVenueFiat ? "cash" : "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
                     h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt))
                     .ToList<AccountBalanceDto>();
 

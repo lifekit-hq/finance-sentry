@@ -24,6 +24,8 @@ public sealed class SyncExchangeHoldingsCommandHandler(
     CryptoExchangeAdapterRegistry adapters,
     ICredentialEncryptionService encryption,
     CostBasisCalculator costBasisCalculator,
+    ForwardCostBasisLedger forwardLedger,
+    TimeProvider timeProvider,
     ILogger<SyncExchangeHoldingsCommandHandler> logger)
     : ICommandHandler<SyncExchangeHoldingsCommand, SyncExchangeHoldingsResult>
 {
@@ -67,6 +69,9 @@ public sealed class SyncExchangeHoldingsCommandHandler(
 
         try
         {
+            // Taken before the balances are read: the fills the ledger applies are then the ones
+            // that snapshot already reflects.
+            var walk = new CryptoTradeWalk(credential.CreatedAt, timeProvider.GetUtcNow().UtcDateTime);
             var balances = await adapter.GetHoldingsAsync(apiKey, apiSecret, ct);
 
             var holdings = balances
@@ -76,7 +81,8 @@ public sealed class SyncExchangeHoldingsCommandHandler(
                     b.Asset,
                     b.FreeQuantity,
                     b.LockedQuantity,
-                    b.UsdValue))
+                    b.UsdValue,
+                    b.IsFiat))
                 .ToList();
 
             await holdingRepository.UpsertRangeAsync(holdings, ct);
@@ -98,7 +104,14 @@ public sealed class SyncExchangeHoldingsCommandHandler(
                 await holdingRepository.SaveChangesAsync(ct);
             }
 
-            await UpdateCostBasisAsync(adapter, request, apiKey, apiSecret, ct);
+            if (adapter.TradeHistoryStartsAtConnect)
+            {
+                await UpdateForwardLedgerAsync(adapter, request, apiKey, apiSecret, walk, ct);
+            }
+            else
+            {
+                await UpdateCostBasisAsync(adapter, request, apiKey, apiSecret, walk, ct);
+            }
 
             var syncedAt = DateTime.UtcNow;
             credential.MarkSynced(syncedAt);
@@ -121,6 +134,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         SyncExchangeHoldingsCommand request,
         string apiKey,
         string apiSecret,
+        CryptoTradeWalk walk,
         CancellationToken ct)
     {
         var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
@@ -130,7 +144,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             CryptoTradePage page;
             try
             {
-                page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, ct);
+                page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, walk, ct);
             }
             catch (CryptoExchangeException ex)
             {
@@ -177,6 +191,77 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         }
 
         await holdingRepository.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Forward cost basis for a venue whose fills start at connect (#472). A holding whose walk
+    /// fails keeps its ledger and cursor, and the failure fails the sync once every other holding
+    /// has been walked: the next run resumes from the same cursor, and the failed run reaches the
+    /// job-failure alerting instead of silently freezing cost basis.
+    /// </summary>
+    private async Task UpdateForwardLedgerAsync(
+        ICryptoExchangeAdapter adapter,
+        SyncExchangeHoldingsCommand request,
+        string apiKey,
+        string apiSecret,
+        CryptoTradeWalk walk,
+        CancellationToken ct)
+    {
+        var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
+        var failed = new List<string>();
+        CryptoExchangeException? firstFailure = null;
+
+        foreach (var holding in persisted.Where(h => !h.IsFiat))
+        {
+            CryptoTradePage page;
+            try
+            {
+                page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, walk, ct);
+            }
+            catch (CryptoExchangeException ex)
+            {
+                logger.LogWarning(ex,
+                    "Trade history fetch failed for {Asset} on {Provider} (user {UserId}); cost basis resumes next run.",
+                    holding.Asset, request.Provider, request.UserId);
+                failed.Add(holding.Asset);
+                firstFailure ??= ex;
+                continue;
+            }
+
+            var state = holding.TrackedQuantity is null
+                ? ForwardLedgerState.Empty
+                : new ForwardLedgerState(
+                    holding.TrackedQuantity.Value,
+                    holding.TrackedCostUsd ?? 0m,
+                    holding.UntrackedQuantity ?? 0m,
+                    holding.RealizedPnlUsd ?? 0m,
+                    holding.LastTradeAt,
+                    holding.TradeCount);
+
+            var next = forwardLedger.Apply(
+                state,
+                page.Trades,
+                holding.FreeQuantity + holding.LockedQuantity,
+                reconcile: page.IsComplete);
+
+            holding.SetForwardLedger(next.TrackedQuantity, next.TrackedCostUsd, next.UntrackedQuantity);
+            holding.SetCostBasis(
+                next.CostBasisUsd,
+                next.AverageBuyPriceUsd,
+                next.RealizedPnlUsd,
+                next.LastTradeAt,
+                next.TradeCount);
+
+            // Advanced only together with the fills it covers, so a fill is never counted twice.
+            holding.AdvanceTradeCursor(page.NextCursor);
+        }
+
+        await holdingRepository.SaveChangesAsync(ct);
+
+        if (firstFailure is not null)
+        {
+            throw new CryptoTradeHistoryException(request.Provider, failed, firstFailure);
+        }
     }
 
     private static decimal? TrustCostBasisForCurrentPosition(

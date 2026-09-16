@@ -32,7 +32,10 @@ public sealed class GetCryptoPnlDetailQueryHandler(ICryptoHoldingRepository hold
 
     public async Task<CryptoPnlDetailResponse> Handle(GetCryptoPnlDetailQuery request, CancellationToken ct)
     {
-        var holdings = await _holdingRepository.GetByUserIdAsync(request.UserId, ct);
+        // Venue fiat is cash: it has no cost basis and no P&L.
+        var holdings = (await _holdingRepository.GetByUserIdAsync(request.UserId, ct))
+            .Where(h => !h.IsFiat)
+            .ToList();
 
         if (holdings.Count == 0)
         {

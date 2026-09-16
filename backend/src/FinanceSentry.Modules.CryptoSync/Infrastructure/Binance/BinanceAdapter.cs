@@ -30,6 +30,8 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
 
     public string ExchangeName => CryptoExchangeProvider.Binance;
 
+    public bool TradeHistoryStartsAtConnect => false;
+
     public BinanceAdapter(
         BinanceHttpClient httpClient,
         BinanceHoldingsAggregator aggregator,
@@ -92,6 +94,7 @@ public sealed class BinanceAdapter : ICryptoExchangeAdapter
         string apiSecret,
         string asset,
         string? cursor,
+        CryptoTradeWalk walk,
         CancellationToken ct = default)
     {
         const int pageLimit = 1000;

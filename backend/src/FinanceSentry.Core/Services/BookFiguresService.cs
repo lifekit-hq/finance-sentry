@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Single canonical implementation of <see cref="IBookFiguresService"/>.
-/// Reads all three sources once, splits idle brokerage cash (instrument type "CASH")
-/// from invested positions, and returns a consistent book snapshot.
+/// Reads all three sources once, splits idle brokerage cash (instrument type "CASH") and fiat
+/// held on crypto venues from invested positions, and returns a consistent book snapshot.
 /// </summary>
 public sealed class BookFiguresService(
     IBankingAccountsReader bankingReader,
@@ -22,6 +22,7 @@ public sealed class BookFiguresService(
         var staleSources = new List<string>();
         var bankingCashUsd = 0m;
         var brokerageCashUsd = 0m;
+        var venueCashUsd = 0m;
 
         try
         {
@@ -29,6 +30,12 @@ public sealed class BookFiguresService(
             {
                 var qty = h.FreeQuantity + h.LockedQuantity;
                 if (qty == 0m) continue;
+                if (h.IsVenueFiat)
+                {
+                    venueCashUsd += h.UsdValue;
+                    continue;
+                }
+
                 positions.Add(new BookFigurePosition(h.Asset, AssetClassNormalizer.Crypto, qty, h.CostBasisUsd, h.UsdValue, h.Provider));
             }
         }
@@ -67,7 +74,7 @@ public sealed class BookFiguresService(
             staleSources.Add("banking");
         }
 
-        var cashUsd = bankingCashUsd + brokerageCashUsd;
+        var cashUsd = bankingCashUsd + brokerageCashUsd + venueCashUsd;
         var investedValueUsd = positions.Sum(p => p.UsdValue);
 
         return new BookFigures(
@@ -78,6 +85,7 @@ public sealed class BookFiguresService(
             investedValueUsd + cashUsd,
             positions,
             staleSources.Count > 0,
-            staleSources);
+            staleSources,
+            venueCashUsd);
     }
 }

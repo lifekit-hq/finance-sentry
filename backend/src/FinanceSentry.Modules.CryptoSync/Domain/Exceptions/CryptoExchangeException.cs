@@ -20,6 +20,17 @@ public abstract class CryptoExchangeException : ApiException
     }
 }
 
+/// <summary>
+/// A sync whose holdings landed but whose trade walk failed for some assets. Raised after every
+/// other asset was walked, so the run fails loudly (#023 job-failure alerting) without losing the
+/// rest; the failed assets resume from their unchanged cursors next run.
+/// </summary>
+public sealed class CryptoTradeHistoryException(string provider, IReadOnlyList<string> assets, Exception innerException)
+    : CryptoExchangeException(
+        $"{CryptoExchangeProvider.DisplayName(provider)} trade history could not be read for "
+        + $"{string.Join(", ", assets)}: {innerException.Message}",
+        innerException);
+
 public sealed class ExchangeAlreadyConnectedException(string provider)
     : ApiException(409, "ALREADY_CONNECTED",
         $"A {CryptoExchangeProvider.DisplayName(provider)} account is already connected for this user.");

@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 
 namespace FinanceSentry.Modules.CryptoSync.Application.Queries;
@@ -39,7 +40,8 @@ public sealed record CryptoHoldingDto(
     decimal UsdValue,
     string Provider,
     decimal? CostBasisUsd = null,
-    decimal? AverageBuyPriceUsd = null);
+    decimal? AverageBuyPriceUsd = null,
+    bool IsFiat = false);
 
 public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldingsQuery, CryptoHoldingsResponse>
 {
@@ -77,10 +79,11 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
                 h.Asset,
                 h.FreeQuantity,
                 h.LockedQuantity,
-                h.UsdValue,
+                CryptoHoldingValuation.UsdValue(h),
                 h.Provider,
-                h.CostBasisUsd,
-                h.AverageBuyPriceUsd))
+                h.IsFiat ? null : h.CostBasisUsd,
+                h.IsFiat ? null : h.AverageBuyPriceUsd,
+                h.IsFiat))
             .ToList();
 
         return new CryptoHoldingsResponse(
@@ -88,6 +91,6 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
             SyncedAt: lastSyncedAt,
             IsStale: isStale,
             Holdings: dtos,
-            TotalUsdValue: holdings.Sum(h => h.UsdValue));
+            TotalUsdValue: dtos.Sum(h => h.UsdValue));
     }
 }

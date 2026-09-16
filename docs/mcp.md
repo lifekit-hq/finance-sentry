@@ -28,7 +28,7 @@ The current runtime surface contains 60 tools. The canonical list is the `Agreed
 | `list_transactions` | Read | Banking | `userId?`, `accountId?`, `fromDate?`, `toDate?`, `category?`, `page`, `pageSize` | Paginated transaction listing |
 | `get_budget_status` | Read | Budgets | `userId?`, `year?`, `month?` | Budget utilization for a period |
 | `list_active_alerts` | Read | Alerts | `userId?` | Only unread unresolved alerts |
-| `get_portfolio_snapshot` | Read | Portfolio | `userId?` | Unified brokerage + crypto holdings |
+| `get_portfolio_snapshot` | Read | Portfolio | `userId?` | Unified brokerage + crypto holdings; cash split into banking / brokerage / crypto-venue fiat |
 | `list_subscriptions` | Read | Subscriptions | `userId?` | Detected recurring charges |
 | `committed_merchants` | Read + Write | Cashflow | `action` (`list`\|`pin`\|`unpin`), `merchant?`, `userId?` | The merchants the user declared committed — rule (d) of the committed-outflow policy |
 | `get_sync_health` | Read | Sync | `userId?` | Status across Monobank, TrueLayer, Binance, Revolut X, IBKR |

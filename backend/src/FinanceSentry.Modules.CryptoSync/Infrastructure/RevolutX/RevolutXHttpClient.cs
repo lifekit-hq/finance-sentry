@@ -29,15 +29,58 @@ public sealed class RevolutXHttpClient(HttpClient httpClient, IConfiguration con
         RevolutXCredentials credentials, CancellationToken ct = default) =>
         SendSignedAsync<RevolutXTickersResponse>(credentials, "/tickers", ct);
 
-    private async Task<T> SendSignedAsync<T>(RevolutXCredentials credentials, string path, CancellationToken ct)
+    /// <summary><c>GET /configuration/pairs</c> — keyed by the slash form (<c>BTC/USD</c>).</summary>
+    public async Task<IReadOnlyDictionary<string, RevolutXPair>> GetPairsAsync(
+        RevolutXCredentials credentials, CancellationToken ct = default) =>
+        await SendSignedAsync<Dictionary<string, RevolutXPair>>(credentials, "/configuration/pairs", ct);
+
+    /// <summary>
+    /// <c>GET /trades/private/{symbol}</c> — the user's own fills on one pair between two instants
+    /// (Unix ms). <paramref name="symbol"/> is the path form (<c>BTC-USD</c>); the venue serves at
+    /// most a one-week window per call and pages within it by <paramref name="cursor"/>.
+    /// </summary>
+    public Task<RevolutXTradesResponse> GetPrivateTradesAsync(
+        RevolutXCredentials credentials,
+        string symbol,
+        long startMs,
+        long endMs,
+        string? cursor,
+        int limit,
+        CancellationToken ct = default)
+    {
+        var query = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["end_date"] = endMs.ToString(CultureInfo.InvariantCulture),
+            ["limit"] = limit.ToString(CultureInfo.InvariantCulture),
+            ["start_date"] = startMs.ToString(CultureInfo.InvariantCulture),
+        };
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            query["cursor"] = cursor;
+        }
+
+        return SendSignedAsync<RevolutXTradesResponse>(
+            credentials, $"/trades/private/{Uri.EscapeDataString(symbol)}", ct, BuildQuery(query));
+    }
+
+    /// <summary>Keys in ordinal order, each part percent-encoded — the exact string that is signed.</summary>
+    private static string BuildQuery(SortedDictionary<string, string> parameters) =>
+        string.Join('&', parameters.Select(p => $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
+
+    private async Task<T> SendSignedAsync<T>(
+        RevolutXCredentials credentials,
+        string path,
+        CancellationToken ct,
+        string query = "")
     {
         var fullPath = ApiPrefix + path;
         var timestamp = timeProvider.GetUtcNow().ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
         var signature = RevolutXSigner.Sign(
             credentials.PrivateKey,
-            RevolutXSigner.BuildMessage(timestamp, HttpMethod.Get.Method, fullPath, query: string.Empty, body: string.Empty));
+            RevolutXSigner.BuildMessage(timestamp, HttpMethod.Get.Method, fullPath, query, body: string.Empty));
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, _baseUrl + fullPath);
+        var url = _baseUrl + fullPath + (query.Length > 0 ? "?" + query : string.Empty);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Add(RevolutXSigner.ApiKeyHeader, credentials.ApiKey);
         request.Headers.Add(RevolutXSigner.TimestampHeader, timestamp);
