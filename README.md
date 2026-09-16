@@ -9,7 +9,7 @@ Personal finance aggregation platform — bank accounts, crypto, brokerage, budg
 
 ## Features
 
-- **Multi-provider sync** — TrueLayer (EU/UK open banking), Monobank, Binance, Interactive Brokers
+- **Multi-provider sync** — TrueLayer (EU/UK open banking), Monobank, Binance, Revolut X, Interactive Brokers
 - **Automatic transaction sync** with cursor-based incremental updates and webhook support
 - **Subscription detection** via a merchant/cadence heuristic over synced transactions (installment-aware for Monobank)
 - **Budget tracking** with spending analysis per category
@@ -175,7 +175,7 @@ backend/
     FinanceSentry.Infrastructure/     Cross-cutting: encryption, logging
     FinanceSentry.Modules.Auth/       Registration, login, Google OAuth, JWT + refresh tokens
     FinanceSentry.Modules.BankSync/   Monobank + TrueLayer sync, transactions, dashboard
-    FinanceSentry.Modules.CryptoSync/ Binance integration, crypto holdings
+    FinanceSentry.Modules.CryptoSync/ Binance + Revolut X integrations, crypto holdings
     FinanceSentry.Modules.BrokerageSync/ IBKR Client Portal, brokerage holdings
     FinanceSentry.Modules.Budgets/    Budget definitions, spend tracking per category
     FinanceSentry.Modules.Alerts/     Alert rules, unusual spend detection, nightly job

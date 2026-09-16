@@ -90,7 +90,7 @@ export class AccountsListComponent implements OnInit {
   public reconnect(): void {
     this.connectStore.openModal();
     this.connectStore.selectInstitutionType('bank');
-    this.connectStore.selectBankProvider('truelayer');
+    this.connectStore.selectPickedProvider('truelayer');
     this.dialog.open(ConnectModalComponent, {
       title: 'Reconnect bank',
       size: 'md',
@@ -153,6 +153,10 @@ export class AccountsListComponent implements OnInit {
         }
         if (institution.provider === 'binance') {
           this.store.disconnectBinance();
+          return;
+        }
+        if (institution.provider === 'revolut_x') {
+          this.store.disconnectRevolutX();
           return;
         }
         this.store.disconnectInstitution({

@@ -8,6 +8,8 @@ export function provideAppIcons(): EnvironmentProviders {
 
       'provider-binance': '/assets/providers/binance.svg',
 
+      'provider-revolut_x': '/assets/providers/revolut_x.svg',
+
       'provider-ibkr': '/assets/providers/ibkr.svg',
     },
   });

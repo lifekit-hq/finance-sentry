@@ -38,6 +38,32 @@ Last verified: 2026-08-31 (PR #531).
   card-discovery pass (`ScheduledSyncService.DiscoverTrueLayerCardsAsync`), and are routed
   by `ProductType == "card"` (`TrueLayerAdapter.CardProductType`).
 
+### Crypto venues (`FinanceSentry.Modules.CryptoSync`)
+
+A `CryptoHolding` is one asset on one venue, unique on `(UserId, Provider, Asset)` — BTC on
+Binance and BTC on Revolut X are two rows, and each venue's sync upserts, reconciles and
+deletes only its own (`SyncExchangeHoldingsCommandHandler`). `FreeQuantity + LockedQuantity`
+is the position; `UsdValue` is already USD, converted by the adapter — the last place the quote
+currency is in scope — so sums over holdings are USD sums (§3). Holdings reach the book as
+`AssetClassNormalizer.Crypto` positions (`BookFiguresService`), never as banking cash.
+
+- **Binance** (`BinanceHoldingsAggregator`): spot + funding + Simple Earn (flexible = free,
+  locked = locked); valued via the `{asset}USDT` pair, or `{asset}BTC × BTCUSDT`; USD
+  stablecoins at par; below `Binance:DustThresholdUsd` dropped.
+- **Revolut X** (`RevolutXHoldingsAggregator`, `GET /balances`): free = `available`, locked =
+  `reserved + staked` (`staked` sits outside `total`). Amounts arrive as strings and are parsed
+  as invariant-culture decimals. Valued from `GET /tickers` (`last_price`, else `mid`) via the
+  `{asset}/USD` pair, else a USDC/USDT pair at par, else a fiat-quoted pair converted with
+  `CurrencyConverter.ToUsd`; a USD stablecoin with no pair is a dollar; an asset no pair can
+  price is logged and skipped; below `RevolutX:DustThresholdUsd` dropped. **Fiat cash held on
+  the venue** (`asset_type = fiat` in `GET /configuration/currencies`) is excluded from
+  holdings and logged — it is neither crypto nor bank cash, and its representation is #472's
+  follow-up. Until then the venue's fiat is missing from net worth.
+- **Cost basis** is reconstructed from fills (`CostBasisCalculator`) and resumes from an opaque
+  per-holding `TradeCursor` the adapter owns (Binance: next trade id per quote pair). Lots the
+  venue cannot give history for keep `CostBasisUsd` null — never a guess. Revolut X trade
+  ingestion is #472's follow-up, so its cost basis is null today.
+
 ### Failure behaviour
 
 A failed balance fetch **keeps the prior stored balance** — never zeroes it. Both the

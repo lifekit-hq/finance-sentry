@@ -18,15 +18,17 @@ describe('connectMethods', () => {
     expect(state.statusMessage()).toBeNull();
   });
 
-  it('selectInstitutionType(crypto) resets error status and selects binance', () => {
+  it('selectInstitutionType(crypto) resets error status and opens the provider picker', () => {
     const state = signalState(initialConnectState);
     const methods = connectMethods(state);
+    methods.selectProvider('monobank');
     methods.setError('X');
 
     methods.selectInstitutionType('crypto');
 
-    expect(state.modalStep()).toBe('binance-form');
-    expect(state.selectedProvider()).toBe('binance');
+    expect(state.modalStep()).toBe('provider-picker');
+    expect(state.institutionType()).toBe('crypto');
+    expect(state.selectedProvider()).toBe('monobank');
     expect(state.status()).toBe('idle');
     expect(state.errorCode()).toBeNull();
     expect(state.statusMessage()).toBeNull();
@@ -52,7 +54,7 @@ describe('connectMethods', () => {
 
     methods.selectInstitutionType('bank');
 
-    expect(state.modalStep()).toBe('bank-picker');
+    expect(state.modalStep()).toBe('provider-picker');
     expect(state.selectedProvider()).toBe('monobank');
     expect(state.status()).toBe('idle');
   });
@@ -62,25 +64,41 @@ describe('connectMethods', () => {
     const methods = connectMethods(state);
     methods.setError('MONOBANK_TOKEN_INVALID');
 
-    methods.setModalStep('bank-picker');
+    methods.setModalStep('provider-picker');
 
-    expect(state.modalStep()).toBe('bank-picker');
+    expect(state.modalStep()).toBe('provider-picker');
     expect(state.status()).toBe('idle');
     expect(state.errorCode()).toBeNull();
     expect(state.statusMessage()).toBeNull();
   });
 
-  it('selectBankProvider resets error status and sets the provider', () => {
+  it('selectPickedProvider resets error status and sets the provider', () => {
     const state = signalState(initialConnectState);
     const methods = connectMethods(state);
     methods.setError('X');
 
-    methods.selectBankProvider('truelayer');
+    methods.selectPickedProvider('truelayer');
 
     expect(state.selectedProvider()).toBe('truelayer');
+    expect(state.institutionType()).toBe('bank');
     expect(state.modalStep()).toBe('truelayer-picker');
     expect(state.status()).toBe('idle');
     expect(state.errorCode()).toBeNull();
+  });
+
+  it.each([
+    ['monobank', 'monobank-form', 'bank'],
+    ['binance', 'binance-form', 'crypto'],
+    ['revolut_x', 'revolut-x-form', 'crypto'],
+  ] as const)('selectPickedProvider(%s) opens %s under the %s type', (slug, step, type) => {
+    const state = signalState(initialConnectState);
+    const methods = connectMethods(state);
+
+    methods.selectPickedProvider(slug);
+
+    expect(state.selectedProvider()).toBe(slug);
+    expect(state.modalStep()).toBe(step);
+    expect(state.institutionType()).toBe(type);
   });
 
   it('setInitializing clears error and statusMessage', () => {

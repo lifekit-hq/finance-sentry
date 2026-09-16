@@ -4,41 +4,36 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
 
-public sealed class BinanceCredentialRepository : IBinanceCredentialRepository
+public sealed class ExchangeCredentialRepository(CryptoSyncDbContext context) : IExchangeCredentialRepository
 {
-    private readonly CryptoSyncDbContext _context;
+    private readonly CryptoSyncDbContext _context = context;
 
-    public BinanceCredentialRepository(CryptoSyncDbContext context)
+    public async Task AddAsync(ExchangeCredential credential, CancellationToken ct = default)
     {
-        _context = context;
+        await _context.ExchangeCredentials.AddAsync(credential, ct);
     }
 
-    public async Task AddAsync(BinanceCredential credential, CancellationToken ct = default)
+    public async Task<ExchangeCredential?> GetAsync(Guid userId, string provider, CancellationToken ct = default)
     {
-        await _context.BinanceCredentials.AddAsync(credential, ct);
+        return await _context.ExchangeCredentials
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.Provider == provider, ct);
     }
 
-    public async Task<BinanceCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ExchangeCredential>> GetAllActiveAsync(string provider, CancellationToken ct = default)
     {
-        return await _context.BinanceCredentials
-            .FirstOrDefaultAsync(c => c.UserId == userId, ct);
-    }
-
-    public async Task<IReadOnlyList<BinanceCredential>> GetAllActiveAsync(CancellationToken ct = default)
-    {
-        return await _context.BinanceCredentials
-            .Where(c => c.IsActive)
+        return await _context.ExchangeCredentials
+            .Where(c => c.IsActive && c.Provider == provider)
             .ToListAsync(ct);
     }
 
-    public void Update(BinanceCredential credential)
+    public void Update(ExchangeCredential credential)
     {
-        _context.BinanceCredentials.Update(credential);
+        _context.ExchangeCredentials.Update(credential);
     }
 
-    public void Delete(BinanceCredential credential)
+    public void Delete(ExchangeCredential credential)
     {
-        _context.BinanceCredentials.Remove(credential);
+        _context.ExchangeCredentials.Remove(credential);
     }
 
     public async Task SaveChangesAsync(CancellationToken ct = default)
@@ -47,21 +42,18 @@ public sealed class BinanceCredentialRepository : IBinanceCredentialRepository
     }
 }
 
-public sealed class CryptoHoldingRepository : ICryptoHoldingRepository
+public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryptoHoldingRepository
 {
-    private readonly CryptoSyncDbContext _context;
-
-    public CryptoHoldingRepository(CryptoSyncDbContext context)
-    {
-        _context = context;
-    }
+    private readonly CryptoSyncDbContext _context = context;
 
     public async Task UpsertRangeAsync(IReadOnlyList<CryptoHolding> holdings, CancellationToken ct = default)
     {
         foreach (var holding in holdings)
         {
             var existing = await _context.CryptoHoldings
-                .FirstOrDefaultAsync(h => h.UserId == holding.UserId && h.Asset == holding.Asset, ct);
+                .FirstOrDefaultAsync(h => h.UserId == holding.UserId
+                    && h.Provider == holding.Provider
+                    && h.Asset == holding.Asset, ct);
 
             if (existing is not null)
             {
@@ -82,15 +74,23 @@ public sealed class CryptoHoldingRepository : ICryptoHoldingRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+    {
+        return await _context.CryptoHoldings
+            .Where(h => h.UserId == userId && h.Provider == provider)
+            .ToListAsync(ct);
+    }
+
     public void RemoveRange(IEnumerable<CryptoHolding> holdings)
     {
         _context.CryptoHoldings.RemoveRange(holdings);
     }
 
-    public async Task DeleteByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task DeleteByUserAndProviderAsync(Guid userId, string provider, CancellationToken ct = default)
     {
         await _context.CryptoHoldings
-            .Where(h => h.UserId == userId)
+            .Where(h => h.UserId == userId && h.Provider == provider)
             .ExecuteDeleteAsync(ct);
     }
 

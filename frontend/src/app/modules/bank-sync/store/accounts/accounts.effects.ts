@@ -7,6 +7,7 @@ import {type WealthSummaryResponse} from '../../../../shared/models/wealth/wealt
 import {BankSyncService} from '../../services/bank-sync.service';
 import {BinanceService} from '../../services/binance.service';
 import {IBKRService} from '../../services/ibkr.service';
+import {RevolutXService} from '../../services/revolut-x.service';
 import {WealthService} from '../../services/wealth.service';
 
 interface EffectsStore {
@@ -22,6 +23,7 @@ export function accountsEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
   const ibkrService = inject(IBKRService);
   const binanceService = inject(BinanceService);
+  const revolutXService = inject(RevolutXService);
 
   const load = rxMethod<void>(
     pipe(
@@ -126,6 +128,23 @@ export function accountsEffects(store: EffectsStore) {
     )
   );
 
+  const disconnectRevolutX = rxMethod<void>(
+    pipe(
+      switchMap(() =>
+        revolutXService.disconnect().pipe(
+          tap(() => {
+            store.bumpDisconnectVersion();
+            load();
+          }),
+          catchError((err: unknown) => {
+            store.setError(extractErrorCode(err));
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
   return {
     load,
     disconnectMonobank,
@@ -133,6 +152,7 @@ export function accountsEffects(store: EffectsStore) {
     disconnectInstitution,
     disconnectIBKR,
     disconnectBinance,
+    disconnectRevolutX,
   };
 }
 

@@ -8,11 +8,11 @@ namespace FinanceSentry.Mcp.Tests;
 public sealed class CostBasisCalculatorTests
 {
     private static CryptoTrade Buy(decimal qty, decimal price, long id = 1, DateTime? when = null) =>
-        new(id, "BTC", "USDT", qty, price, qty * price, true,
+        new(id.ToString(System.Globalization.CultureInfo.InvariantCulture), "BTC", "USDT", qty, price, qty * price, true,
             when ?? new DateTime(2024, 1, (int)id, 0, 0, 0, DateTimeKind.Utc));
 
     private static CryptoTrade Sell(decimal qty, decimal price, long id, DateTime? when = null) =>
-        new(id, "BTC", "USDT", qty, price, qty * price, false,
+        new(id.ToString(System.Globalization.CultureInfo.InvariantCulture), "BTC", "USDT", qty, price, qty * price, false,
             when ?? new DateTime(2024, 1, (int)id, 0, 0, 0, DateTimeKind.Utc));
 
     private readonly CostBasisCalculator _sut = new();
@@ -39,7 +39,7 @@ public sealed class CostBasisCalculatorTests
         result.AverageBuyPriceUsd.Should().Be(20_000m);
         result.RemainingQuantity.Should().Be(1m);
         result.RealizedPnlUsd.Should().Be(0m);
-        result.LastTradeId.Should().Be(1);
+        result.LastTradeAt.Should().Be(new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         result.TradeCount.Should().Be(1);
     }
 
@@ -119,7 +119,6 @@ public sealed class CostBasisCalculatorTests
             RemainingQuantity: 1m,
             RealizedPnlUsd: 0m,
             LastTradeAt: new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            LastTradeId: 1,
             TradeCount: 1);
 
         var result = _sut.Compute([Sell(qty: 1m, price: 12_000m, id: 2)], seed);

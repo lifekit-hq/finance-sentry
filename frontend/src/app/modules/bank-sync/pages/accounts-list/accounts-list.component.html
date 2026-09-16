@@ -356,7 +356,7 @@
           >
         </div>
         <cmn-card class="!p-0">
-          @for (inst of crypto.institutions; track inst.institutionId) {
+          @for (inst of crypto.institutions; track inst.provider) {
             <details class="group border-b border-border-default last:border-0" open>
               <summary
                 class="flex items-center justify-between gap-cmn-4 px-cmn-4 py-cmn-4 cursor-pointer hover:bg-surface-bg transition-colors"

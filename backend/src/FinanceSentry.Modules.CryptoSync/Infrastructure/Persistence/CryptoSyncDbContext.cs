@@ -10,7 +10,7 @@ public sealed class CryptoSyncDbContext : DbContext
     {
     }
 
-    public DbSet<BinanceCredential> BinanceCredentials => Set<BinanceCredential>();
+    public DbSet<ExchangeCredential> ExchangeCredentials => Set<ExchangeCredential>();
     public DbSet<CryptoHolding> CryptoHoldings => Set<CryptoHolding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -18,11 +18,12 @@ public sealed class CryptoSyncDbContext : DbContext
         modelBuilder.HasDefaultSchema("crypto_sync");
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<BinanceCredential>(entity =>
+        modelBuilder.Entity<ExchangeCredential>(entity =>
         {
-            entity.ToTable("BinanceCredentials");
+            entity.ToTable("ExchangeCredentials");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.Provider }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
             entity.Property(e => e.EncryptedApiKey).IsRequired();
             entity.Property(e => e.ApiKeyIv).IsRequired();
             entity.Property(e => e.ApiKeyAuthTag).IsRequired();
@@ -39,16 +40,16 @@ public sealed class CryptoSyncDbContext : DbContext
         {
             entity.ToTable("CryptoHoldings");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.UserId, e.Asset }).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.Asset }).IsUnique();
             entity.Property(e => e.Asset).IsRequired().HasMaxLength(20);
             entity.Property(e => e.FreeQuantity).HasPrecision(30, 10);
             entity.Property(e => e.LockedQuantity).HasPrecision(30, 10);
             entity.Property(e => e.UsdValue).HasPrecision(20, 4);
-            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50).HasDefaultValue("binance");
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
             entity.Property(e => e.CostBasisUsd).HasPrecision(20, 4);
             entity.Property(e => e.AverageBuyPriceUsd).HasPrecision(20, 8);
             entity.Property(e => e.RealizedPnlUsd).HasPrecision(20, 4);
-            entity.Property(e => e.LastTradeId).IsRequired();
+            entity.Property(e => e.TradeCursor).HasMaxLength(200);
             entity.Property(e => e.TradeCount).IsRequired();
         });
     }

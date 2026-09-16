@@ -61,8 +61,8 @@ public class CryptoControllerConnectContractTests(CryptoApiFactory factory) : IC
             .ThrowsAsync(new BinanceException("Invalid API key."));
 
         _factory.CredentialRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BinanceCredential?)null);
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExchangeCredential?)null);
 
         var response = await _client.PostAsJsonAsync("/api/v1/crypto/binance/connect",
             new { ApiKey = "badkey123", ApiSecret = "badsecret123" });
@@ -90,12 +90,13 @@ public class CryptoControllerConnectContractTests(CryptoApiFactory factory) : IC
     [Fact]
     public async Task Connect_AlreadyConnected_Returns409()
     {
-        var existingCredential = BinanceCredential.Create(
+        var existingCredential = ExchangeCredential.Create(
             _factory.TestUserId,
+            CryptoExchangeProvider.Binance,
             [1], [2], [3], [4], [5], [6], 1);
 
         _factory.CredentialRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), CryptoExchangeProvider.Binance, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCredential);
 
         var response = await _client.PostAsJsonAsync("/api/v1/crypto/binance/connect",
@@ -132,7 +133,7 @@ public class CryptoControllerHoldingsContractTests(CryptoApiFactory factory) : I
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<HoldingsResponseShape>();
         body.Should().NotBeNull();
-        body!.Provider.Should().Be("binance");
+        body!.Provider.Should().Be("none");
         body.Holdings.Should().BeEmpty();
         body.TotalUsdValue.Should().Be(0m);
     }
@@ -141,7 +142,7 @@ public class CryptoControllerHoldingsContractTests(CryptoApiFactory factory) : I
     public async Task GetHoldings_WithHoldings_Returns200WithShape()
     {
         var holding = CryptoHolding.Create(
-            _factory.TestUserId, "BTC", 0.5m, 0.1m, 30000m);
+            _factory.TestUserId, CryptoExchangeProvider.Binance, "BTC", 0.5m, 0.1m, 30000m);
 
         _factory.HoldingRepoMock
             .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -150,9 +151,30 @@ public class CryptoControllerHoldingsContractTests(CryptoApiFactory factory) : I
         var response = await _client.GetAsync("/api/v1/crypto/holdings");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<HoldingsResponseShape>();
-        body!.Holdings.Should().HaveCount(1);
+        body!.Provider.Should().Be("binance");
+        body.Holdings.Should().HaveCount(1);
         body.Holdings[0].Asset.Should().Be("BTC");
+        body.Holdings[0].Provider.Should().Be("binance");
         body.TotalUsdValue.Should().Be(30000m);
+    }
+
+    [Fact]
+    public async Task GetHoldings_AcrossTwoVenues_NamesEachRowsVenue()
+    {
+        _factory.HoldingRepoMock
+            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                CryptoHolding.Create(_factory.TestUserId, CryptoExchangeProvider.Binance, "BTC", 0.5m, 0m, 30000m),
+                CryptoHolding.Create(_factory.TestUserId, CryptoExchangeProvider.RevolutX, "BTC", 0.1m, 0m, 6000m),
+            ]);
+
+        var response = await _client.GetAsync("/api/v1/crypto/holdings");
+        var body = await response.Content.ReadFromJsonAsync<HoldingsResponseShape>();
+
+        body!.Provider.Should().Be("multiple");
+        body.Holdings.Select(h => (h.Asset, h.Provider)).Should().BeEquivalentTo(
+            [("BTC", "binance"), ("BTC", "revolut_x")]);
+        body.TotalUsdValue.Should().Be(36000m, "UsdValue is already USD per row, so summing it is safe");
     }
 }
 
@@ -175,10 +197,10 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
     public async Task Disconnect_NoAccountConnected_Returns404()
     {
         _factory.CredentialRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BinanceCredential?)null);
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExchangeCredential?)null);
         _factory.HoldingRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.DeleteAsync("/api/v1/crypto/binance/disconnect");
@@ -190,24 +212,113 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
     [Fact]
     public async Task Disconnect_Connected_Returns204NoContent()
     {
-        var credential = BinanceCredential.Create(
-            _factory.TestUserId, [1], [2], [3], [4], [5], [6], 1);
+        var credential = ExchangeCredential.Create(
+            _factory.TestUserId, CryptoExchangeProvider.Binance, [1], [2], [3], [4], [5], [6], 1);
 
         _factory.CredentialRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), CryptoExchangeProvider.Binance, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
         _factory.CredentialRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _factory.HoldingRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
-            .Setup(r => r.DeleteByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.DeleteByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var response = await _client.DeleteAsync("/api/v1/crypto/binance/disconnect");
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        _factory.HoldingRepoMock.Verify(
+            r => r.DeleteByUserAndProviderAsync(_factory.TestUserId, CryptoExchangeProvider.RevolutX, It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+}
+
+// ── Contract tests: /api/v1/crypto/revolut-x ─────────────────────────────────
+
+public class CryptoControllerRevolutXContractTests(CryptoApiFactory factory) : IClassFixture<CryptoApiFactory>
+{
+    private readonly HttpClient _client = factory.CreateAuthenticatedClient();
+    private readonly CryptoApiFactory _factory = factory;
+
+    [Fact]
+    public async Task Connect_NoAuth_Returns401()
+    {
+        var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/crypto/revolut-x/connect",
+            new { ApiKey = "key", PrivateKey = "pem" });
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Connect_MissingPrivateKey_Returns400()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/crypto/revolut-x/connect",
+            new { ApiKey = "key", PrivateKey = "" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("VALIDATION_ERROR").And.Contain("privateKey is required");
+    }
+
+    [Fact]
+    public async Task Connect_VenueRejectsTheKey_Returns422()
+    {
+        _factory.CredentialRepoMock
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), CryptoExchangeProvider.RevolutX, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExchangeCredential?)null);
+        _factory.RevolutXAdapterMock
+            .Setup(a => a.ValidateCredentialsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RevolutXException("Revolut X API error (HTTP 401): Unauthorized"));
+
+        var response = await _client.PostAsJsonAsync("/api/v1/crypto/revolut-x/connect",
+            new { ApiKey = "key", PrivateKey = "pem" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await response.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("INVALID_CREDENTIALS");
+        _factory.CredentialRepoMock.Verify(
+            r => r.AddAsync(It.Is<ExchangeCredential>(c => c.Provider == CryptoExchangeProvider.RevolutX), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Connect_ValidKey_Returns201_AndStoresARevolutXCredential()
+    {
+        _factory.SetupSuccessfulConnect();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/crypto/revolut-x/connect",
+            new { ApiKey = "revx-key", PrivateKey = "revx-pem" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await response.Content.ReadFromJsonAsync<ConnectResponseShape>())!.Message.Should().Contain("Revolut X");
+        _factory.RevolutXAdapterMock.Verify(
+            a => a.ValidateCredentialsAsync("revx-key", "revx-pem", It.IsAny<CancellationToken>()), Times.Once);
+        _factory.CredentialRepoMock.Verify(
+            r => r.AddAsync(It.Is<ExchangeCredential>(c => c.Provider == CryptoExchangeProvider.RevolutX), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Disconnect_RemovesOnlyRevolutXHoldings()
+    {
+        _factory.CredentialRepoMock
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), CryptoExchangeProvider.RevolutX, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExchangeCredential.Create(
+                _factory.TestUserId, CryptoExchangeProvider.RevolutX, [1], [2], [3], [4], [5], [6], 1));
+        _factory.HoldingRepoMock
+            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.DeleteAsync("/api/v1/crypto/revolut-x/disconnect");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        _factory.HoldingRepoMock.Verify(
+            r => r.DeleteByUserAndProviderAsync(_factory.TestUserId, CryptoExchangeProvider.RevolutX, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _factory.HoldingRepoMock.Verify(
+            r => r.DeleteByUserAndProviderAsync(It.IsAny<Guid>(), CryptoExchangeProvider.Binance, It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
 
@@ -215,7 +326,7 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
 
 public record ErrorShape(string Error, string ErrorCode);
 public record ConnectResponseShape(string Message, int HoldingsCount, DateTime SyncedAt);
-public record HoldingShape(string Asset, decimal FreeQuantity, decimal LockedQuantity, decimal UsdValue);
+public record HoldingShape(string Asset, decimal FreeQuantity, decimal LockedQuantity, decimal UsdValue, string Provider);
 public record HoldingsResponseShape(
     string Provider,
     DateTime? SyncedAt,
@@ -227,11 +338,18 @@ public record HoldingsResponseShape(
 
 public class CryptoApiFactory : WebApplicationFactory<Program>
 {
-    public Mock<IBinanceCredentialRepository> CredentialRepoMock { get; } = new(MockBehavior.Loose);
+    public Mock<IExchangeCredentialRepository> CredentialRepoMock { get; } = new(MockBehavior.Loose);
     public Mock<ICryptoHoldingRepository> HoldingRepoMock { get; } = new(MockBehavior.Loose);
     public Mock<ICryptoExchangeAdapter> AdapterMock { get; } = new(MockBehavior.Loose);
+    public Mock<ICryptoExchangeAdapter> RevolutXAdapterMock { get; } = new(MockBehavior.Loose);
 
     public Guid TestUserId { get; } = Guid.NewGuid();
+
+    public CryptoApiFactory()
+    {
+        AdapterMock.Setup(a => a.ExchangeName).Returns(CryptoExchangeProvider.Binance);
+        RevolutXAdapterMock.Setup(a => a.ExchangeName).Returns(CryptoExchangeProvider.RevolutX);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -239,7 +357,10 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
         {
             ReplaceService(services, CredentialRepoMock.Object);
             ReplaceService(services, HoldingRepoMock.Object);
-            ReplaceService<ICryptoExchangeAdapter>(services, AdapterMock.Object);
+            foreach (var adapter in services.Where(d => d.ServiceType == typeof(ICryptoExchangeAdapter)).ToList())
+                services.Remove(adapter);
+            services.AddScoped(_ => AdapterMock.Object);
+            services.AddScoped(_ => RevolutXAdapterMock.Object);
 
             ReplaceDbContextWithInMemory<FinanceSentry.Modules.BankSync.Infrastructure.Persistence.BankSyncDbContext>(
                 services, $"CryptoTestBankSync_{Guid.NewGuid()}");
@@ -265,35 +386,37 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
 
     public void SetupSuccessfulConnect()
     {
-        // Capture the credential saved by ConnectBinanceCommandHandler so that
-        // SyncBinanceHoldingsCommandHandler can retrieve it on the second call.
-        BinanceCredential? capturedCredential = null;
+        // Capture the credential saved by ConnectExchangeCommandHandler so that
+        // SyncExchangeHoldingsCommandHandler can retrieve it on the second call.
+        var captured = new Dictionary<string, ExchangeCredential>();
         CredentialRepoMock
-            .Setup(r => r.AddAsync(It.IsAny<BinanceCredential>(), It.IsAny<CancellationToken>()))
-            .Callback<BinanceCredential, CancellationToken>((cred, _) => capturedCredential = cred)
+            .Setup(r => r.AddAsync(It.IsAny<ExchangeCredential>(), It.IsAny<CancellationToken>()))
+            .Callback<ExchangeCredential, CancellationToken>((cred, _) => captured[cred.Provider] = cred)
             .Returns(Task.CompletedTask);
         CredentialRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => capturedCredential);
+            .Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, string provider, CancellationToken _) => captured.GetValueOrDefault(provider));
         CredentialRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         CredentialRepoMock
-            .Setup(r => r.Update(It.IsAny<BinanceCredential>()));
+            .Setup(r => r.Update(It.IsAny<ExchangeCredential>()));
 
-        AdapterMock
-            .Setup(a => a.ValidateCredentialsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        AdapterMock
-            .Setup(a => a.GetHoldingsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        AdapterMock.Setup(a => a.ExchangeName).Returns("binance");
+        foreach (var adapter in new[] { AdapterMock, RevolutXAdapterMock })
+        {
+            adapter
+                .Setup(a => a.ValidateCredentialsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            adapter
+                .Setup(a => a.GetHoldingsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync([]);
+        }
 
         HoldingRepoMock
             .Setup(r => r.UpsertRangeAsync(It.IsAny<IReadOnlyList<CryptoHolding>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         HoldingRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         HoldingRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))

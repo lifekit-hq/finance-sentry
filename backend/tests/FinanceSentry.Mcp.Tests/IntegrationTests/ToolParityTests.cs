@@ -259,7 +259,7 @@ public sealed class ToolParityTests
 
         // Seed one crypto holding.
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
-        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, "BTC", 0.1m, 0m, 6_500m));
+        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "BTC", 0.1m, 0m, 6_500m));
         await cryptoDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetAccountSummaryTool>();
@@ -394,7 +394,7 @@ public sealed class ToolParityTests
         var svc = scope.ServiceProvider;
 
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
-        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, "ETH", 2.5m, 0m, 9_000m));
+        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "ETH", 2.5m, 0m, 9_000m));
         await cryptoDb.SaveChangesAsync();
 
         var brokerageDb = svc.GetRequiredService<BrokerageSyncDbContext>();
@@ -471,7 +471,7 @@ public sealed class ToolParityTests
         await brokerageDb.SaveChangesAsync();
 
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
-        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, "BTC", 0.05m, 0m, 3_200m));
+        cryptoDb.CryptoHoldings.Add(CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "BTC", 0.05m, 0m, 3_200m));
         await cryptoDb.SaveChangesAsync();
 
         var bankDb = svc.GetRequiredService<BankSyncDbContext>();
@@ -571,8 +571,9 @@ public sealed class ToolParityTests
 
         // Seed a Binance credential with a completed sync so the tool reports "ok" for Binance.
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
-        var binanceCred = BinanceCredential.Create(
+        var binanceCred = ExchangeCredential.Create(
             userId,
+            CryptoExchangeProvider.Binance,
             encryptedApiKey: [1, 2, 3],
             apiKeyIv: [4, 5, 6],
             apiKeyAuthTag: [7, 8, 9],
@@ -581,16 +582,16 @@ public sealed class ToolParityTests
             apiSecretAuthTag: [7, 8, 9],
             keyVersion: 1);
         binanceCred.MarkSynced(DateTime.UtcNow.AddMinutes(-10));
-        cryptoDb.BinanceCredentials.Add(binanceCred);
+        cryptoDb.ExchangeCredentials.Add(binanceCred);
         await cryptoDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetSyncHealthTool>();
         var result = await tool.ExecuteAsync(userId);
 
-        // All four providers are always returned.
-        result.Should().HaveCount(4);
+        // Every provider is always returned.
+        result.Should().HaveCount(5);
         result.Select(e => e.Provider).Should()
-            .BeEquivalentTo(["monobank", "truelayer", "binance", "ibkr"]);
+            .BeEquivalentTo(["monobank", "truelayer", "binance", "revolut_x", "ibkr"]);
 
         // Every entry has required fields populated.
         result.Should().AllSatisfy(e =>
@@ -606,6 +607,8 @@ public sealed class ToolParityTests
         // Providers with no credentials are honest about it.
         result.Single(e => e.Provider == "monobank").Status.Should().Be("never_synced");
         result.Single(e => e.Provider == "ibkr").Status.Should().Be("never_synced");
+        result.Single(e => e.Provider == "revolut_x").Status.Should().Be("never_synced",
+            "a Binance credential must not report as another venue's health");
     }
 
     [Fact]
@@ -663,17 +666,16 @@ public sealed class ToolParityTests
         var svc = scope.ServiceProvider;
 
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
-        var holding = CryptoHolding.Create(userId, "BTC", freeQuantity: 0.5m, lockedQuantity: 0m, usdValue: 25_000m);
+        var holding = CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "BTC", freeQuantity: 0.5m, lockedQuantity: 0m, usdValue: 25_000m);
         holding.SetCostBasis(
             costBasisUsd: 18_000m,
             averageBuyPriceUsd: 36_000m,
             realizedPnlUsd: 500m,
             lastTradeAt: new DateTime(2024, 6, 15, 12, 0, 0, DateTimeKind.Utc),
-            lastTradeId: 42,
             tradeCount: 3);
         cryptoDb.CryptoHoldings.Add(holding);
 
-        var nullCostHolding = CryptoHolding.Create(userId, "DOGE", freeQuantity: 1_000m, lockedQuantity: 0m, usdValue: 50m);
+        var nullCostHolding = CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "DOGE", freeQuantity: 1_000m, lockedQuantity: 0m, usdValue: 50m);
         cryptoDb.CryptoHoldings.Add(nullCostHolding);
 
         await cryptoDb.SaveChangesAsync();
@@ -1258,8 +1260,8 @@ public sealed class ToolParityTests
         account.MarkActive(2_446m);
         bankDb.BankAccounts.Add(account);
 
-        var cryptoHolding = CryptoHolding.Create(userId, "SOL", 10m, 0m, 12_054m);
-        cryptoHolding.SetCostBasis(100_000m, 10_000m, null, DateTime.UtcNow, 1, 1);
+        var cryptoHolding = CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "SOL", 10m, 0m, 12_054m);
+        cryptoHolding.SetCostBasis(100_000m, 10_000m, null, DateTime.UtcNow, 1);
         var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
         cryptoDb.CryptoHoldings.Add(cryptoHolding);
 

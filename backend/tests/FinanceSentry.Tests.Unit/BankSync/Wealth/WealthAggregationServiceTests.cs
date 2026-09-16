@@ -75,6 +75,67 @@ public class WealthAggregationServiceTests
 
     // ── GetWealthSummaryAsync ─────────────────────────────────────────────────
 
+    private static WealthAggregationService BuildServiceWithCrypto(params CryptoHoldingSummary[] holdings)
+    {
+        var accountsMock = new Mock<IBankingAccountsReader>();
+        accountsMock.Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync([]);
+        var cryptoMock = new Mock<ICryptoHoldingsReader>();
+        cryptoMock.Setup(r => r.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(holdings);
+
+        return new WealthAggregationService(accountsMock.Object, Mock.Of<IBankingTransactionReader>(), cryptoMock.Object);
+    }
+
+    private static CryptoHoldingSummary Holding(string provider, string asset, decimal quantity, decimal usdValue)
+        => new(asset, quantity, 0m, usdValue, DateTime.UtcNow, provider);
+
+    [Fact]
+    public async Task GetWealthSummary_TwoCryptoVenues_AreTwoInstitutions_EachWithItsOwnAssets()
+    {
+        var svc = BuildServiceWithCrypto(
+            Holding("binance", "BTC", 0.5m, 30_000m),
+            Holding("revolut_x", "BTC", 0.1m, 6_000m),
+            Holding("revolut_x", "ETH", 2m, 6_000m));
+
+        var result = await svc.GetWealthSummaryAsync(UserId, null, null);
+
+        var crypto = result.Categories.Single(c => c.Category == "crypto");
+        crypto.TotalInBaseCurrency.Should().Be(42_000m);
+        crypto.Institutions.Select(i => (i.Provider, i.Name, i.TotalInBaseCurrency)).Should().BeEquivalentTo(
+            [("binance", "Binance", 30_000m), ("revolut_x", "Revolut X", 12_000m)]);
+        var revolutX = crypto.Institutions.Single(i => i.Provider == "revolut_x");
+        revolutX.Accounts.Select(a => (a.BankName, a.Provider, a.Currency)).Should().BeEquivalentTo(
+            [("Revolut X", "revolut_x", "BTC"), ("Revolut X", "revolut_x", "ETH")]);
+        result.Categories.Should().NotContain(c => c.Category == "banking",
+            "venue holdings are never counted as bank cash");
+    }
+
+    [Theory]
+    [InlineData("revolut_x", 6_000)]
+    [InlineData("binance", 30_000)]
+    public async Task GetWealthSummary_CryptoProviderFilter_KeepsOnlyThatVenue(string provider, decimal expected)
+    {
+        var svc = BuildServiceWithCrypto(
+            Holding("binance", "BTC", 0.5m, 30_000m),
+            Holding("revolut_x", "BTC", 0.1m, 6_000m));
+
+        var result = await svc.GetWealthSummaryAsync(UserId, null, provider);
+
+        result.Categories.Single().Institutions.Single().Provider.Should().Be(provider);
+        result.TotalNetWorth.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task GetWealthSummary_NonCryptoProviderFilter_SkipsCrypto()
+    {
+        var svc = BuildServiceWithCrypto(Holding("revolut_x", "BTC", 0.1m, 6_000m));
+
+        var result = await svc.GetWealthSummaryAsync(UserId, null, "ibkr");
+
+        result.Categories.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task GetWealthSummary_MixedCurrencies_CorrectUsdTotal()
     {

@@ -4,6 +4,9 @@ using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.CryptoSync.Domain;
+using FinanceSentry.Modules.CryptoSync.Infrastructure.Encryption;
+using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -142,5 +145,48 @@ public class CredentialKeyRotationTests
             .RotateAsync(2, default);
 
         rotated.Should().Be(0);
+    }
+    [Fact]
+    public async Task ExchangeCredentials_RotateBothHalvesOfEveryVenuesKeyPair()
+    {
+        // #472 adds a second secret to this store: a Revolut X Ed25519 private key sits in the same
+        // table as the Binance API secret, so both venues' rows must leave the old key together.
+        const string pem = "-----BEGIN PRIVATE KEY-----revolut-x-ed25519-----END PRIVATE KEY-----";
+        await using var db = new CryptoSyncDbContext(
+            new DbContextOptionsBuilder<CryptoSyncDbContext>()
+                .UseInMemoryDatabase($"rotation-crypto-{Guid.NewGuid()}")
+                .Options);
+
+        var atV1 = ServiceAtVersion(1);
+        var userId = Guid.NewGuid();
+        foreach (var (provider, key, secret) in new[]
+                 {
+                     (CryptoExchangeProvider.Binance, "binance-key", "binance-secret"),
+                     (CryptoExchangeProvider.RevolutX, "revx-key", pem),
+                 })
+        {
+            var k = atV1.Encrypt(key);
+            var s = atV1.Encrypt(secret);
+            db.ExchangeCredentials.Add(ExchangeCredential.Create(
+                userId, provider, k.Ciphertext, k.Iv, k.AuthTag, s.Ciphertext, s.Iv, s.AuthTag, k.KeyVersion));
+        }
+
+        await db.SaveChangesAsync();
+
+        var atV2 = ServiceAtVersion(2);
+        var target = new ExchangeCredentialRotationTarget(db, atV2);
+
+        target.Name.Should().Be("ExchangeCredentials");
+        (await target.RotateAsync(2, default)).Should().Be(2);
+        (await target.RotateAsync(2, default)).Should().Be(0);
+
+        var revolutX = await db.ExchangeCredentials.SingleAsync(c => c.Provider == CryptoExchangeProvider.RevolutX);
+        revolutX.KeyVersion.Should().Be(2);
+        atV2.Decrypt(revolutX.EncryptedApiKey, revolutX.ApiKeyIv, revolutX.ApiKeyAuthTag, 2).Should().Be("revx-key");
+        atV2.Decrypt(revolutX.EncryptedApiSecret, revolutX.ApiSecretIv, revolutX.ApiSecretAuthTag, 2).Should().Be(pem);
+
+        var binance = await db.ExchangeCredentials.SingleAsync(c => c.Provider == CryptoExchangeProvider.Binance);
+        atV2.Decrypt(binance.EncryptedApiSecret, binance.ApiSecretIv, binance.ApiSecretAuthTag, binance.KeyVersion)
+            .Should().Be("binance-secret");
     }
 }

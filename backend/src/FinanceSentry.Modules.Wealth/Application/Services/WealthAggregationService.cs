@@ -66,13 +66,16 @@ public class WealthAggregationService(
             })
             .ToList();
 
-        if (_cryptoReader is not null && (category is null || category == "crypto") && (provider is null || provider == "binance"))
+        if (_cryptoReader is not null && (category is null || category == "crypto")
+            && (provider is null || ProviderCategoryMapper.GetCategory(provider) == "crypto"))
         {
-            var holdings = await _cryptoReader.GetHoldingsAsync(userId, ct);
+            var holdings = (await _cryptoReader.GetHoldingsAsync(userId, ct))
+                .Where(h => provider is null || string.Equals(h.Provider, provider, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             if (holdings.Count > 0)
             {
                 var accounts = holdings.Select(h => new AccountBalanceDto(
-                    Guid.Empty, "Binance", "crypto", h.Asset, "binance", "crypto",
+                    Guid.Empty, DisplayNameFor(h.Provider), "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
                     h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt))
                     .ToList<AccountBalanceDto>();
 
@@ -245,6 +248,7 @@ public class WealthAggregationService(
     private static string DisplayNameFor(string provider) => provider.ToLowerInvariant() switch
     {
         "binance" => "Binance",
+        "revolut_x" => "Revolut X",
         "ibkr" => "Interactive Brokers",
         _ => char.ToUpperInvariant(provider[0]) + provider[1..],
     };

@@ -10,16 +10,17 @@ import {
   type Type,
 } from '@angular/core';
 
+import {type Provider} from '../../../../shared/models/provider/provider.model';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {CONNECT_STRATEGY, ConnectStrategyRegistry} from '../../strategies/connect-strategy.token';
-import {BankPickerComponent} from './bank-picker.component';
+import {ProviderPickerComponent} from './provider-picker.component';
 import {SyncingStateComponent} from './syncing-state.component';
 import {TypePickerComponent} from './type-picker.component';
 
 @Component({
   selector: 'fns-connect-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgComponentOutlet, TypePickerComponent, BankPickerComponent, SyncingStateComponent],
+  imports: [NgComponentOutlet, TypePickerComponent, ProviderPickerComponent, SyncingStateComponent],
   templateUrl: './connect-modal.component.html',
 })
 export class ConnectModalComponent {
@@ -54,7 +55,7 @@ export class ConnectModalComponent {
     });
   }
 
-  private providerSlugForCurrentStep(): Nullable<'monobank' | 'truelayer' | 'binance' | 'ibkr'> {
+  private providerSlugForCurrentStep(): Nullable<Provider> {
     switch (this.store.modalStep()) {
       case 'monobank-form':
         return 'monobank';
@@ -62,6 +63,8 @@ export class ConnectModalComponent {
         return 'truelayer';
       case 'binance-form':
         return 'binance';
+      case 'revolut-x-form':
+        return 'revolut_x';
       case 'ibkr-form':
         return 'ibkr';
       default:

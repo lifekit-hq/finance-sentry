@@ -31,7 +31,7 @@ The current runtime surface contains 60 tools. The canonical list is the `Agreed
 | `get_portfolio_snapshot` | Read | Portfolio | `userId?` | Unified brokerage + crypto holdings |
 | `list_subscriptions` | Read | Subscriptions | `userId?` | Detected recurring charges |
 | `committed_merchants` | Read + Write | Cashflow | `action` (`list`\|`pin`\|`unpin`), `merchant?`, `userId?` | The merchants the user declared committed — rule (d) of the committed-outflow policy |
-| `get_sync_health` | Read | Sync | `userId?` | Status across Monobank, TrueLayer, Binance, IBKR |
+| `get_sync_health` | Read | Sync | `userId?` | Status across Monobank, TrueLayer, Binance, Revolut X, IBKR |
 | `get_crypto_pnl_detail` | Read | Crypto | `userId?` | Per-asset crypto P&L from trade history |
 | `get_tax_lots` | Read | Brokerage | `userId?` | Current tax lots / average cost data |
 | `get_cashflow_report` | Read | Cashflow | `userId?`, `fromDate?`, `toDate?` | Monthly inflow / outflow / net |

@@ -136,6 +136,69 @@ public class BinanceAdapterContractTests
         capturedUrl.Should().Contain("timestamp=");
         capturedUrl.Should().Contain("recvWindow=");
     }
+
+    private static string TradeRow(long id, string symbol, bool isBuyer = true) =>
+        $$"""{"id":{{id}},"symbol":"{{symbol}}","price":"100.5","qty":"2","quoteQty":"201","commission":"0","commissionAsset":"BNB","time":{{1_700_000_000_000 + id}},"isBuyer":{{(isBuyer ? "true" : "false")}}}""";
+
+    [Fact]
+    public async Task GetTradesAsync_ResumesEachPairFromItsOwnCursor_AndNeverReturnsAFillTwice()
+    {
+        var urls = new List<string>();
+        var handler = new CapturingHttpMessageHandler(url =>
+        {
+            urls.Add(url);
+            if (url.Contains("symbol=BTCUSDT"))
+            {
+                // fromId is inclusive: a row below the cursor was counted by an earlier run.
+                return $"[{TradeRow(42, "BTCUSDT")},{TradeRow(43, "BTCUSDT")},{TradeRow(44, "BTCUSDT", isBuyer: false)}]";
+            }
+
+            return url.Contains("symbol=BTCUSDC") ? $"[{TradeRow(7, "BTCUSDC")}]" : "[]";
+        });
+
+        var page = await CreateAdapter(CreateHttpClient(handler))
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "btc", "USDT=43,USDC=7");
+
+        urls.Should().Contain(u => u.Contains("symbol=BTCUSDT&fromId=43"));
+        urls.Should().Contain(u => u.Contains("symbol=BTCUSDC&fromId=7"));
+        urls.Should().Contain(u => u.Contains("symbol=BTCFDUSD") && !u.Contains("fromId"));
+        page.Trades.Select(t => (t.QuoteAsset, t.TradeId)).Should().Equal(
+            ("USDC", "7"), ("USDT", "43"), ("USDT", "44"));
+        page.Trades[0].Quantity.Should().Be(2m);
+        page.Trades[0].PriceUsd.Should().Be(100.5m);
+        page.Trades[2].IsBuyer.Should().BeFalse();
+        page.NextCursor.Should().Be("USDC=8,USDT=45");
+    }
+
+    [Fact]
+    public async Task GetTradesAsync_LegacyCursor_AppliesToEveryPair()
+    {
+        var urls = new List<string>();
+        var handler = new CapturingHttpMessageHandler(url =>
+        {
+            urls.Add(url);
+            return "[]";
+        });
+
+        var page = await CreateAdapter(CreateHttpClient(handler))
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "ETH", "43");
+
+        urls.Should().HaveCount(4).And.OnlyContain(u => u.Contains("fromId=43"));
+        page.Trades.Should().BeEmpty();
+        page.NextCursor.Should().Be("BUSD=43,FDUSD=43,USDC=43,USDT=43");
+    }
+
+    [Fact]
+    public async Task GetTradesAsync_Stablecoin_HasNoHistory_AndKeepsItsCursor()
+    {
+        var handler = new CapturingHttpMessageHandler(_ => throw new InvalidOperationException("no call expected"));
+
+        var page = await CreateAdapter(CreateHttpClient(handler))
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "USDT", "anything");
+
+        page.Trades.Should().BeEmpty();
+        page.NextCursor.Should().Be("anything");
+    }
 }
 
 // ── Test doubles ──────────────────────────────────────────────────────────────

@@ -9,55 +9,48 @@ using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Modules.CryptoSync.Application.Commands;
 
-public sealed record SyncBinanceHoldingsCommand(Guid UserId) : ICommand<SyncBinanceHoldingsResult>;
+public sealed record SyncExchangeHoldingsCommand(Guid UserId, string Provider) : ICommand<SyncExchangeHoldingsResult>;
 
-public sealed record SyncBinanceHoldingsResult(int HoldingsCount, DateTime SyncedAt);
+public sealed record SyncExchangeHoldingsResult(int HoldingsCount, DateTime SyncedAt);
 
-public sealed class SyncBinanceHoldingsCommandHandler : ICommandHandler<SyncBinanceHoldingsCommand, SyncBinanceHoldingsResult>
+/// <summary>
+/// Syncs one venue's holdings for one user. Everything it reads, writes, reconciles or deletes is
+/// scoped to <see cref="SyncExchangeHoldingsCommand.Provider"/>, so two venues holding the same
+/// asset never overwrite each other (#472).
+/// </summary>
+public sealed class SyncExchangeHoldingsCommandHandler(
+    IExchangeCredentialRepository credentialRepository,
+    ICryptoHoldingRepository holdingRepository,
+    CryptoExchangeAdapterRegistry adapters,
+    ICredentialEncryptionService encryption,
+    CostBasisCalculator costBasisCalculator,
+    ILogger<SyncExchangeHoldingsCommandHandler> logger)
+    : ICommandHandler<SyncExchangeHoldingsCommand, SyncExchangeHoldingsResult>
 {
     private const decimal QuantityTolerance = 0.01m;
     private const decimal MaximumTrustedCostToValueRatio = 20m;
 
-    private readonly IBinanceCredentialRepository _credentialRepository;
-    private readonly ICryptoHoldingRepository _holdingRepository;
-    private readonly ICryptoExchangeAdapter _adapter;
-    private readonly ICredentialEncryptionService _encryption;
-    private readonly CostBasisCalculator _costBasisCalculator;
-    private readonly ILogger<SyncBinanceHoldingsCommandHandler> _logger;
-
-    public SyncBinanceHoldingsCommandHandler(
-        IBinanceCredentialRepository credentialRepository,
-        ICryptoHoldingRepository holdingRepository,
-        ICryptoExchangeAdapter adapter,
-        ICredentialEncryptionService encryption,
-        CostBasisCalculator costBasisCalculator,
-        ILogger<SyncBinanceHoldingsCommandHandler> logger)
+    public async Task<SyncExchangeHoldingsResult> Handle(SyncExchangeHoldingsCommand request, CancellationToken ct)
     {
-        _credentialRepository = credentialRepository;
-        _holdingRepository = holdingRepository;
-        _adapter = adapter;
-        _encryption = encryption;
-        _costBasisCalculator = costBasisCalculator;
-        _logger = logger;
-    }
-
-    public async Task<SyncBinanceHoldingsResult> Handle(SyncBinanceHoldingsCommand request, CancellationToken ct)
-    {
-        var credential = await _credentialRepository.GetByUserIdAsync(request.UserId, ct)
-            ?? throw new BinanceException("No active Binance credential found for this user.");
+        var adapter = adapters.Get(request.Provider);
+        var credential = await credentialRepository.GetAsync(request.UserId, request.Provider, ct);
+        if (credential is not { IsActive: true })
+        {
+            throw new ExchangeAccountNotFoundException(request.Provider);
+        }
 
         string apiKey;
         string apiSecret;
 
         try
         {
-            apiKey = _encryption.Decrypt(
+            apiKey = encryption.Decrypt(
                 credential.EncryptedApiKey,
                 credential.ApiKeyIv,
                 credential.ApiKeyAuthTag,
                 credential.KeyVersion);
 
-            apiSecret = _encryption.Decrypt(
+            apiSecret = encryption.Decrypt(
                 credential.EncryptedApiSecret,
                 credential.ApiSecretIv,
                 credential.ApiSecretAuthTag,
@@ -66,82 +59,92 @@ public sealed class SyncBinanceHoldingsCommandHandler : ICommandHandler<SyncBina
         catch (Exception ex)
         {
             credential.MarkSyncFailed("Failed to decrypt credentials.");
-            _credentialRepository.Update(credential);
-            await _credentialRepository.SaveChangesAsync(ct);
-            throw new BinanceException("Failed to decrypt Binance credentials.", ex);
+            credentialRepository.Update(credential);
+            await credentialRepository.SaveChangesAsync(ct);
+            throw new InvalidOperationException(
+                $"Failed to decrypt {CryptoExchangeProvider.DisplayName(request.Provider)} credentials.", ex);
         }
 
         try
         {
-            var balances = await _adapter.GetHoldingsAsync(apiKey, apiSecret, ct);
+            var balances = await adapter.GetHoldingsAsync(apiKey, apiSecret, ct);
 
             var holdings = balances
                 .Select(b => CryptoHolding.Create(
                     request.UserId,
+                    request.Provider,
                     b.Asset,
                     b.FreeQuantity,
                     b.LockedQuantity,
                     b.UsdValue))
                 .ToList();
 
-            await _holdingRepository.UpsertRangeAsync(holdings, ct);
-            await _holdingRepository.SaveChangesAsync(ct);
+            await holdingRepository.UpsertRangeAsync(holdings, ct);
+            await holdingRepository.SaveChangesAsync(ct);
 
-            // Reconcile: the aggregator only returns assets the user still holds (dust
-            // and zero balances are already dropped), so anything persisted but missing
-            // here was sold out — delete it instead of leaving a stale $0 holding.
+            // Reconcile: the adapter only returns assets the user still holds on this venue (dust
+            // and zero balances are already dropped), so anything this venue persisted but did not
+            // return was sold out — delete it instead of leaving a stale $0 holding.
             var freshAssets = holdings
                 .Select(h => h.Asset)
                 .ToHashSet(StringComparer.Ordinal);
-            var persisted = await _holdingRepository.GetByUserIdAsync(request.UserId, ct);
+            var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
             var stale = persisted
                 .Where(h => !freshAssets.Contains(h.Asset))
                 .ToList();
             if (stale.Count > 0)
             {
-                _holdingRepository.RemoveRange(stale);
-                await _holdingRepository.SaveChangesAsync(ct);
+                holdingRepository.RemoveRange(stale);
+                await holdingRepository.SaveChangesAsync(ct);
             }
 
-            await UpdateCostBasisAsync(request.UserId, apiKey, apiSecret, ct);
+            await UpdateCostBasisAsync(adapter, request, apiKey, apiSecret, ct);
 
             var syncedAt = DateTime.UtcNow;
             credential.MarkSynced(syncedAt);
-            _credentialRepository.Update(credential);
-            await _credentialRepository.SaveChangesAsync(ct);
+            credentialRepository.Update(credential);
+            await credentialRepository.SaveChangesAsync(ct);
 
-            return new SyncBinanceHoldingsResult(holdings.Count, syncedAt);
+            return new SyncExchangeHoldingsResult(holdings.Count, syncedAt);
         }
-        catch (BinanceException ex)
+        catch (CryptoExchangeException ex)
         {
             credential.MarkSyncFailed(ex.Message);
-            _credentialRepository.Update(credential);
-            await _credentialRepository.SaveChangesAsync(ct);
+            credentialRepository.Update(credential);
+            await credentialRepository.SaveChangesAsync(ct);
             throw;
         }
     }
 
-    private async Task UpdateCostBasisAsync(Guid userId, string apiKey, string apiSecret, CancellationToken ct)
+    private async Task UpdateCostBasisAsync(
+        ICryptoExchangeAdapter adapter,
+        SyncExchangeHoldingsCommand request,
+        string apiKey,
+        string apiSecret,
+        CancellationToken ct)
     {
-        var persisted = await _holdingRepository.GetByUserIdAsync(userId, ct);
+        var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
 
         foreach (var holding in persisted)
         {
-            IReadOnlyList<CryptoTrade> trades;
+            CryptoTradePage page;
             try
             {
-                trades = await _adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.LastTradeId, ct);
+                page = await adapter.GetTradesAsync(apiKey, apiSecret, holding.Asset, holding.TradeCursor, ct);
             }
-            catch (BinanceException ex)
+            catch (CryptoExchangeException ex)
             {
-                _logger.LogWarning(ex,
-                    "Trade history fetch failed for {Asset} (user {UserId}); cost basis left unchanged.",
-                    holding.Asset, userId);
+                logger.LogWarning(ex,
+                    "Trade history fetch failed for {Asset} on {Provider} (user {UserId}); cost basis left unchanged.",
+                    holding.Asset, request.Provider, request.UserId);
                 continue;
             }
 
-            if (trades.Count == 0 && holding.TradeCount > 0)
+            var trades = page.Trades;
+            if (trades.Count == 0)
             {
+                // Nothing new; the cursor may still have been normalised by the adapter.
+                holding.AdvanceTradeCursor(page.NextCursor);
                 continue;
             }
 
@@ -154,16 +157,10 @@ public sealed class SyncBinanceHoldingsCommandHandler : ICommandHandler<SyncBina
                         : 0m,
                     RealizedPnlUsd: holding.RealizedPnlUsd ?? 0m,
                     LastTradeAt: holding.LastTradeAt,
-                    LastTradeId: holding.LastTradeId,
                     TradeCount: holding.TradeCount)
                 : null;
 
-            var result = _costBasisCalculator.Compute(trades, seed);
-
-            if (result.TradeCount == 0)
-            {
-                continue;
-            }
+            var result = costBasisCalculator.Compute(trades, seed);
 
             var currentQuantity = holding.FreeQuantity + holding.LockedQuantity;
             var costBasis = TrustCostBasisForCurrentPosition(result, currentQuantity, holding.UsdValue);
@@ -173,11 +170,13 @@ public sealed class SyncBinanceHoldingsCommandHandler : ICommandHandler<SyncBina
                 costBasis is null ? null : result.AverageBuyPriceUsd,
                 result.RealizedPnlUsd,
                 result.LastTradeAt,
-                result.LastTradeId,
                 result.TradeCount);
+
+            // Advanced only together with the trades it covers, so a fill is never counted twice.
+            holding.AdvanceTradeCursor(page.NextCursor);
         }
 
-        await _holdingRepository.SaveChangesAsync(ct);
+        await holdingRepository.SaveChangesAsync(ct);
     }
 
     private static decimal? TrustCostBasisForCurrentPosition(

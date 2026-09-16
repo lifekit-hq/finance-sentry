@@ -1,8 +1,8 @@
 <div class="flex flex-col gap-cmn-6">
-  <p class="text-cmn-sm text-text-secondary">Choose your bank provider.</p>
+  <p class="text-cmn-sm text-text-secondary">{{ prompt() }}</p>
 
   <div class="flex flex-col gap-cmn-3">
-    @for (provider of providers; track provider.slug) {
+    @for (provider of providers(); track provider.slug) {
       <cmn-selectable-card (clicked)="select(provider.slug)" orientation="horizontal">
         <img
           [ngSrc]="provider.iconAsset"

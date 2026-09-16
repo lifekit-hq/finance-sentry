@@ -12,6 +12,10 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'Binance account already connected. Disconnect the existing one to use new keys.',
   BINANCE_ALREADY_CONNECTED:
     'Binance account already connected. Disconnect the existing one to use new keys.',
+  REVOLUT_X_INVALID_CREDENTIALS:
+    "Revolut X rejected the key pair. Check the API key belongs to the public key you registered, paste the Ed25519 private key (not the public one), and allow Finance Sentry's server IP if the key is IP-restricted.",
+  REVOLUT_X_ALREADY_CONNECTED:
+    'Revolut X account already connected. Disconnect the existing one to use a new key.',
   IBKR_INVALID_CREDENTIALS:
     'IB Gateway rejected the provided credentials. Confirm the 2FA push notification on your phone and try again.',
   IBKR_DUPLICATE: 'IBKR account already connected. Disconnect the existing one to reconnect.',

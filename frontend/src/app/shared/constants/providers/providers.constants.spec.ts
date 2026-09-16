@@ -3,7 +3,7 @@ import {describe, expect, it} from 'vitest';
 import {type Provider} from '../../models/provider/provider.model';
 import {PROVIDER_CATALOG} from './providers.constants';
 
-const ALL_SLUGS: readonly Provider[] = ['monobank', 'binance', 'ibkr', 'truelayer'];
+const ALL_SLUGS: readonly Provider[] = ['monobank', 'binance', 'revolut_x', 'ibkr', 'truelayer'];
 
 describe('PROVIDER_CATALOG', () => {
   it('contains exactly one descriptor per Provider', () => {
@@ -31,6 +31,7 @@ describe('PROVIDER_CATALOG', () => {
     const byType = new Map(PROVIDER_CATALOG.map(p => [p.slug, p.institutionType]));
     expect(byType.get('monobank')).toBe('bank');
     expect(byType.get('binance')).toBe('crypto');
+    expect(byType.get('revolut_x')).toBe('crypto');
     expect(byType.get('ibkr')).toBe('broker');
     expect(byType.get('truelayer')).toBe('bank');
   });
@@ -39,6 +40,7 @@ describe('PROVIDER_CATALOG', () => {
     const byShape = new Map(PROVIDER_CATALOG.map(p => [p.slug, p.formShape]));
     expect(byShape.get('monobank')).toBe('token');
     expect(byShape.get('binance')).toBe('key-secret');
+    expect(byShape.get('revolut_x')).toBe('key-private-key');
     expect(byShape.get('ibkr')).toBe('user-pass');
     expect(byShape.get('truelayer')).toBe('open-banking-picker');
   });

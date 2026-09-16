@@ -5,18 +5,39 @@ namespace FinanceSentry.Modules.CryptoSync.Application.Queries;
 
 public sealed record GetCryptoHoldingsQuery(Guid UserId) : IQuery<CryptoHoldingsResponse>;
 
+/// <param name="Provider">
+/// The single venue the holdings come from, <see cref="CryptoHoldingsResponse.MultipleProviders"/>
+/// when they span several (each <see cref="CryptoHoldingDto"/> names its own venue), or
+/// <see cref="CryptoHoldingsResponse.NoProvider"/> when there are none.
+/// </param>
 public sealed record CryptoHoldingsResponse(
     string Provider,
     DateTime? SyncedAt,
     bool IsStale,
     IReadOnlyList<CryptoHoldingDto> Holdings,
-    decimal TotalUsdValue);
+    decimal TotalUsdValue)
+{
+    public const string MultipleProviders = "multiple";
+    public const string NoProvider = "none";
+
+    public static string ProviderOf(IEnumerable<string> providers)
+    {
+        var distinct = providers.Distinct(StringComparer.Ordinal).ToList();
+        return distinct.Count switch
+        {
+            0 => NoProvider,
+            1 => distinct[0],
+            _ => MultipleProviders,
+        };
+    }
+}
 
 public sealed record CryptoHoldingDto(
     string Asset,
     decimal FreeQuantity,
     decimal LockedQuantity,
     decimal UsdValue,
+    string Provider,
     decimal? CostBasisUsd = null,
     decimal? AverageBuyPriceUsd = null);
 
@@ -41,7 +62,7 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
         if (holdings.Count == 0)
         {
             return new CryptoHoldingsResponse(
-                Provider: "binance",
+                Provider: CryptoHoldingsResponse.NoProvider,
                 SyncedAt: null,
                 IsStale: false,
                 Holdings: [],
@@ -57,12 +78,13 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
                 h.FreeQuantity,
                 h.LockedQuantity,
                 h.UsdValue,
+                h.Provider,
                 h.CostBasisUsd,
                 h.AverageBuyPriceUsd))
             .ToList();
 
         return new CryptoHoldingsResponse(
-            Provider: "binance",
+            Provider: CryptoHoldingsResponse.ProviderOf(holdings.Select(h => h.Provider)),
             SyncedAt: lastSyncedAt,
             IsStale: isStale,
             Holdings: dtos,

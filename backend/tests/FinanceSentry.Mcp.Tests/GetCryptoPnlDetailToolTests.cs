@@ -48,7 +48,8 @@ public sealed class GetCryptoPnlDetailToolTests
                         UnrealizedPnlPercent: 38.89m,
                         RealizedPnlUsd: 500m,
                         LastTradeAt: new DateTime(2024, 6, 15, 12, 0, 0, DateTimeKind.Utc),
-                        TradeCount: 3),
+                        TradeCount: 3,
+                        Provider: "binance"),
                 ],
                 TotalUnrealizedPnlUsd: 7_000m,
                 TotalRealizedPnlUsd: 500m));
@@ -76,7 +77,7 @@ public sealed class GetCryptoPnlDetailToolTests
                 Provider: "binance",
                 SyncedAt: DateTime.UtcNow,
                 Items: [
-                    new CryptoPnlAssetDto("DOGE", 1000m, 50m, null, null, null, null, null, null, 0),
+                    new CryptoPnlAssetDto("DOGE", 1000m, 50m, null, null, null, null, null, null, 0, "binance"),
                 ],
                 TotalUnrealizedPnlUsd: 0m,
                 TotalRealizedPnlUsd: 0m));

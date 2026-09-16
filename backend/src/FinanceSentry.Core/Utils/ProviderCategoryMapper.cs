@@ -7,6 +7,7 @@ public static class ProviderCategoryMapper
         ["monobank"] = "banking",
         ["truelayer"] = "banking",
         ["binance"] = "crypto",
+        ["revolut_x"] = "crypto",
         ["ibkr"] = "brokerage",
     };
 
