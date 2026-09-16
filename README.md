@@ -121,6 +121,12 @@ Loki sink, and the dashboards below.
 - **Logs** — Serilog ships structured logs to Loki (fire-and-forget; a shipping outage never affects
   requests). EF Core SQL is suppressed to `Warning` by default (raise via
   `Serilog:MinimumLevel:Override` in config). Retention ~14d, size-capped.
+- **Traces** — a gateway → api → Npgsql trace spine: gateway and API export OpenTelemetry traces over
+  OTLP/HTTP to `Observability__Otlp__Endpoint` (default `http://otel-collector:4318`; empty disables the
+  exporter, which is how the dev compose runs — there is no collector in dev). API log lines carry
+  `TraceId`/`SpanId` as structured JSON properties (never Loki labels), so a Tempo trace and its Loki
+  lines join on the same id. `/metrics` scrapes and parentless Npgsql spans (background polling) are
+  not traced.
 - **Dashboards** — provisioned as code under `docker/observability/grafana/provisioning/`, one home for
   both Grafanas: the dev compose mounts the directory, and `deploy.sh` publishes the same JSON to the
   host directory lifekit-stack's Grafana provisions from. The main dashboard ("Health at a glance")
@@ -142,7 +148,8 @@ curl -s http://localhost:5001/api/v1/health/ready                 # {"status":"H
 public funnel); `/metrics` is scrape-only. `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` /
 `GRAFANA_ROOT_URL` now belong to **lifekit-stack's** env file, not this repo's `.env.sops`;
 `Observability__Loki__Url` stays here (it defaults to `http://loki:3100`, which still resolves — the api
-is on the shared `openclaw` bridge where lifekit-stack's Loki lives). Alert rules are no longer deferred
+is on the shared `openclaw` bridge where lifekit-stack's Loki lives). `Observability__Otlp__Endpoint`
+likewise stays here; api and gateway both join `openclaw` to reach lifekit-stack's OTLP collector. Alert rules are no longer deferred
 and no longer this repo's: they are provisioned files in lifekit-stack. Job silent-failure alerting (US4,
 N consecutive failures → Telegram) remains the app-side slice.
 

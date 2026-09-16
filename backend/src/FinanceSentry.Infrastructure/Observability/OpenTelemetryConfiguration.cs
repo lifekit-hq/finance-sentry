@@ -2,9 +2,13 @@ namespace FinanceSentry.Infrastructure.Observability;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 /// <summary>
 /// Wires OpenTelemetry metrics (FR-001/002): ASP.NET Core request instrumentation, .NET runtime
@@ -15,8 +19,12 @@ using OpenTelemetry.Resources;
 public static class OpenTelemetryConfiguration
 {
     private const string ServiceName = "finance-sentry";
+    private const string OtlpEndpointConfigKey = "Observability:Otlp:Endpoint";
+    private const string DefaultOtlpEndpoint = "http://otel-collector:4318";
+    private const string OtlpTracesPath = "/v1/traces";
+    private const string MetricsPath = "/metrics";
 
-    public static IServiceCollection AddObservabilityMetrics(this IServiceCollection services)
+    public static IServiceCollection AddObservabilityMetrics(this IServiceCollection services, IConfiguration configuration)
     {
         // Shared singleton: the Hangfire JobMetricsFilter and the meter provider observe the same instruments.
         services.AddSingleton<JobMetrics>();
@@ -27,9 +35,41 @@ public static class OpenTelemetryConfiguration
                 .AddAspNetCoreInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter(JobMetrics.MeterName)
-                .AddPrometheusExporter());
+                .AddPrometheusExporter())
+            .WithTracing(tracing => tracing.AddObservabilityTracing(configuration));
 
         return services;
+    }
+
+    /// <summary>
+    /// Wires the HTTP trace spine (spec 023 amendment, 2026-09-13): ASP.NET Core + HttpClient +
+    /// Npgsql spans, exported via OTLP/HTTP. <c>/metrics</c> scrapes are not traced, and Npgsql spans
+    /// without a parent (background polling outside any request) are dropped by
+    /// <see cref="ParentlessNpgsqlSpanFilter"/>. The endpoint mirrors <c>Observability:Loki:Url</c>'s
+    /// shape: unset falls back to the in-network collector default, an explicit empty value disables
+    /// the exporter (dev).
+    /// </summary>
+    public static TracerProviderBuilder AddObservabilityTracing(this TracerProviderBuilder tracing, IConfiguration configuration)
+    {
+        var otlpEndpoint = configuration[OtlpEndpointConfigKey] ?? DefaultOtlpEndpoint;
+
+        tracing
+            .AddAspNetCoreInstrumentation(options =>
+                options.Filter = context => !context.Request.Path.StartsWithSegments(MetricsPath))
+            .AddHttpClientInstrumentation()
+            .AddNpgsql()
+            .AddProcessor(new ParentlessNpgsqlSpanFilter());
+
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            tracing.AddOtlpExporter(otlp =>
+            {
+                otlp.Protocol = OtlpExportProtocol.HttpProtobuf;
+                otlp.Endpoint = new Uri(otlpEndpoint.TrimEnd('/') + OtlpTracesPath);
+            });
+        }
+
+        return tracing;
     }
 
     /// <summary>Serves Prometheus exposition at <c>/metrics</c> (the exporter's default path).</summary>

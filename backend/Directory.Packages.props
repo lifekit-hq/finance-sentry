@@ -63,11 +63,14 @@
     <PackageVersion Include="Serilog.Enrichers.Context" Version="4.6.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="2.3.0" />
 
-    <!-- OpenTelemetry (metrics → Prometheus /metrics) -->
+    <!-- OpenTelemetry (metrics → Prometheus /metrics; traces → OTLP/HTTP → Tempo, feature 023 amendment) -->
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.17.0-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.3" />
 
 
     <!-- Edge gateway (025): YARP reverse proxy + ACME/Let's Encrypt (config-gated) -->

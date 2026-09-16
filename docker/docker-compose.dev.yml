@@ -65,6 +65,8 @@ services:
       GOOGLEOAUTH__CLIENTID: "${GOOGLE_CLIENT_ID:-}"
       # Ship structured logs to Loki (fire-and-forget); empty disables the sink.
       Observability__Loki__Url: http://loki:3100
+      # Trace spine (spec 023 amendment) OTLP exporter — empty so dev boots without a collector.
+      Observability__Otlp__Endpoint: ""
     ports:
       - "5001:5000"
     depends_on:
@@ -116,6 +118,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      # Trace spine (spec 023 amendment) OTLP exporter — empty so dev boots without a collector.
+      Observability__Otlp__Endpoint: ""
     ports:
       - "8080:8080"
     depends_on:

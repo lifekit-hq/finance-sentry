@@ -34,6 +34,7 @@ public static class SerilogConfiguration
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .Enrich.With<ModuleEnricher>()
+            .Enrich.With<TraceEnricher>()
             .Enrich.WithProperty("app", AppName)
             .WriteTo.Console()
             .WriteTo.File(
