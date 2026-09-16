@@ -165,6 +165,45 @@ public class AccountDiscoveryServiceTests
         h.AddedAccounts.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayer_DiscoversNewCardAsCreditAccountOnce()
+    {
+        var h = BuildSut();
+        var connection = SetupTrueLayer(h);
+        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("tl-card-1", "Revolut Credit", "EUR", "", "credit", null, "4321")]);
+        h.TrueLayerClient.Setup(c => c.GetCardBalanceAsync("access-token", "tl-card-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrueLayerCardBalance(Current: 250m, Available: 3750m, CreditLimit: 4000m, Currency: "EUR"));
+
+        var firstRun = await h.Sut.DiscoverNewAccountsAsync();
+        var secondRun = await h.Sut.DiscoverNewAccountsAsync();
+
+        firstRun.Should().Be(1);
+        secondRun.Should().Be(0);
+        var card = h.AddedAccounts.Should().ContainSingle().Subject;
+        card.AccountType.Should().Be("credit");
+        card.ProductType.Should().Be(TrueLayerAdapter.CardProductType);
+        card.CurrentBalance.Should().Be(250m);
+        card.CreditLimit.Should().Be(4000m);
+        card.BankName.Should().Be(connection.ProviderDisplayName, "the card must group under the same institution");
+        card.TrueLayerConnectionId.Should().Be(connection.Id);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayer_SoftDeletedCardIsNotRecreated()
+    {
+        var h = BuildSut();
+        SetupTrueLayer(h);
+        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TrueLayerAccountInfo("tl-card-1", "Revolut Credit", "EUR", "", "credit", null, "4321")]);
+        SeedAccount(h, "tl-card-1", isActive: false);
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(0);
+        h.AddedAccounts.Should().BeEmpty();
+    }
+
     // ── A provider listing failure on one connection is logged and skipped, others still run ──
 
     [Fact]

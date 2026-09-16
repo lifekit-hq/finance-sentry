@@ -1,6 +1,5 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
-using System.Collections.Concurrent;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
@@ -331,9 +330,6 @@ public class ScheduledSyncService(
 
         var provider = _providerFactory.Resolve("truelayer");
 
-        // Pick up credit cards added (or newly supported) after the original consent —
-        // without this, a card only ever appears through an explicit reconnect.
-        await DiscoverTrueLayerCardsAsync(account, connectionId, accessToken, provider, ct);
         // Per-account watermark, NOT connection.LastSyncAt: a connection can back several
         // accounts, and a shared timestamp lets the first-synced account starve the others'
         // fetch windows (accounts added later never received their initial history import).
@@ -417,65 +413,6 @@ public class ScheduledSyncService(
             candidateCount, entities.Count, durationMs);
 
         return new SyncResult(true, candidateCount, entities.Count, null, null);
-    }
-
-    // Card discovery is one extra API call per connection; once a day is plenty — a new
-    // card appearing within 24h (or instantly via reconnect) is fine. The stamp is claimed
-    // before the call so parallel sibling-account syncs don't duplicate it.
-    private static readonly ConcurrentDictionary<Guid, DateTime> CardDiscoveryStamps = new();
-    private static readonly TimeSpan CardDiscoveryInterval = TimeSpan.FromHours(24);
-
-    /// <summary>
-    /// Lists the connection's credit cards (TrueLayer serves them under /data/v1/cards only)
-    /// and creates a BankAccount for any card not yet known, under the same bank name so it
-    /// groups with the institution's existing accounts. The recurring SyncScheduler picks the
-    /// new account up on its next pass (every 10 minutes).
-    /// </summary>
-    private async Task DiscoverTrueLayerCardsAsync(
-        Domain.BankAccount account, Guid connectionId, string accessToken,
-        IBankProvider provider, CancellationToken ct)
-    {
-        if (provider is not TrueLayerAdapter adapter)
-            return;
-
-        var now = DateTime.UtcNow;
-        var last = CardDiscoveryStamps.GetOrAdd(connectionId, DateTime.MinValue);
-        if (now - last < CardDiscoveryInterval || !CardDiscoveryStamps.TryUpdate(connectionId, now, last))
-            return;
-
-        try
-        {
-            var cards = await adapter.GetCardsAsync(accessToken, ct);
-            foreach (var card in cards)
-            {
-                var existing = await _accounts.GetByExternalAccountIdAsync(card.ExternalAccountId, ct);
-                if (existing is not null)
-                    continue;
-
-                var cardAccount = new Domain.BankAccount(
-                    userId: account.UserId,
-                    externalAccountId: card.ExternalAccountId,
-                    bankName: account.BankName,
-                    accountType: "credit",
-                    accountNumberLast4: card.AccountNumberLast4,
-                    ownerName: string.Empty,
-                    currency: card.Currency,
-                    createdBy: account.UserId,
-                    provider: "truelayer")
-                {
-                    TrueLayerConnectionId = connectionId,
-                    CurrentBalance = card.CurrentBalance,
-                    CreditLimit = card.CreditLimit,
-                    ProductType = TrueLayerAdapter.CardProductType
-                };
-
-                await _accounts.AddAsync(cardAccount, ct);
-            }
-        }
-        catch (Infrastructure.TrueLayer.TrueLayerException)
-        {
-            // Provider without card support (or a transient /cards failure) — not an error.
-        }
     }
 
     /// <summary>

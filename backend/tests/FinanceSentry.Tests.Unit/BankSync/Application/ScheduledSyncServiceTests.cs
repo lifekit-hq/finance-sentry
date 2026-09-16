@@ -465,54 +465,6 @@ public class ScheduledSyncServiceTests
             Times.Never);
     }
 
-    // ── Card discovery: a card added after consent appears without a reconnect ──
-
-    [Fact]
-    public async Task SyncTrueLayer_DiscoversNewCard_CreatesCreditAccountUnderSameBank()
-    {
-        var h = BuildSut();
-        // Discovery only runs through the real adapter (it needs the /cards endpoint family).
-        var adapter = new TrueLayerAdapter(
-            h.TrueLayerClient.Object,
-            new FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping.TrueLayerCategoryMapper(),
-            Infrastructure.StubCategoryResolver.Categorizer,
-            Infrastructure.StubActiveSubscriptionsReader.Empty);
-        h.ProviderFactory.Setup(f => f.Resolve("truelayer")).Returns(adapter);
-
-        h.TrueLayerClient.Setup(c => c.GetTransactionsAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        h.TrueLayerClient.Setup(c => c.GetPendingTransactionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        h.TrueLayerClient.Setup(c => c.GetBalanceAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerAccountBalance(100m, 100m, "EUR"));
-        h.TrueLayerClient.Setup(c => c.ListCardsAsync("access-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new TrueLayerAccountInfo("tl-card-1", "Revolut Credit", "EUR", "REVOLUT-IE", "credit", null, "4321")]);
-        h.TrueLayerClient.Setup(c => c.GetCardBalanceAsync("access-token", "tl-card-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerCardBalance(Current: 250m, Available: 3750m, CreditLimit: 4000m, Currency: "EUR"));
-
-        h.AccountRepo.Setup(r => r.GetByExternalAccountIdAsync("tl-card-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BankAccount?)null);
-        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
-            .Returns([]);
-
-        BankAccount? created = null;
-        h.AccountRepo.Setup(r => r.AddAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
-            .Callback((BankAccount a, CancellationToken _) => created = a)
-            .ReturnsAsync((BankAccount a, CancellationToken _) => a);
-
-        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
-
-        result.Success.Should().BeTrue();
-        created.Should().NotBeNull("the unseen card must be created during sync");
-        created!.AccountType.Should().Be("credit");
-        created.ProductType.Should().Be(TrueLayerAdapter.CardProductType);
-        created.CurrentBalance.Should().Be(250m);
-        created.CreditLimit.Should().Be(4000m);
-        created.BankName.Should().Be(h.Account.BankName, "the card must group under the same institution");
-        created.TrueLayerConnectionId.Should().Be(h.Connection.Id);
-    }
-
     // ── Unknown provider is an explicit failure, not a silent fallback ──────
 
     [Fact]

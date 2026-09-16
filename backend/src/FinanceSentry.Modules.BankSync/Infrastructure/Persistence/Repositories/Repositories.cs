@@ -390,6 +390,7 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections
+            .AsNoTracking()
             .Where(tc => tc.Status == "LINKED")
             .ToListAsync(cancellationToken);
 
