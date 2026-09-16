@@ -62,9 +62,11 @@ public sealed class ExchangeCredential
         LastSyncError = null;
     }
 
+    private const int MaxSyncErrorLength = 1000;
+
     public void MarkSyncFailed(string error)
     {
-        LastSyncError = error;
+        LastSyncError = error.Length > MaxSyncErrorLength ? error[..MaxSyncErrorLength] : error;
     }
 
     public void Deactivate()

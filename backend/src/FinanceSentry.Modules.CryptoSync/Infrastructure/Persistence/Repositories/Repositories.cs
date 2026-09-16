@@ -57,7 +57,7 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
 
             if (existing is not null)
             {
-                existing.Update(holding.FreeQuantity, holding.LockedQuantity, holding.UsdValue);
+                existing.Update(holding.FreeQuantity, holding.LockedQuantity, holding.UsdValue, holding.IsFiat);
                 _context.CryptoHoldings.Update(existing);
             }
             else

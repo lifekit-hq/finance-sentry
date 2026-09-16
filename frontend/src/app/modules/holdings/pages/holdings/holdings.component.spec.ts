@@ -65,6 +65,7 @@ describe('InvestmentsComponent — positions view', () => {
           currentValue: 100,
           currentPrice: 10,
           pnlPercent: 25.3,
+          isVenueCash: false,
         },
         {
           symbol: 'SOL',
@@ -73,6 +74,7 @@ describe('InvestmentsComponent — positions view', () => {
           currentValue: 50,
           currentPrice: 50,
           pnlPercent: null,
+          isVenueCash: false,
         },
       ]),
       positionsByAssetClass: signal<PositionAssetGroup[]>([EQUITY_GROUP, CRYPTO_GROUP]),

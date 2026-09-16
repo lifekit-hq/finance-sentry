@@ -5,6 +5,7 @@ import {catchError} from 'rxjs/operators';
 
 import {
   type BrokerageHoldingsDto,
+  type CryptoHoldingDto,
   type CryptoHoldingsDto,
   type Position,
 } from '../models/position/position.model';
@@ -21,6 +22,14 @@ function providerPnlPercent(
     return null;
   }
   return ((currentValue - costBasisUsd) / costBasisUsd) * PERCENT_SCALE;
+}
+
+function cryptoUnitPrice(holding: CryptoHoldingDto): Nullable<number> {
+  if (holding.isFiat) {
+    return null;
+  }
+  const quantity = holding.freeQuantity + holding.lockedQuantity;
+  return quantity > 0 ? holding.usdValue / quantity : 0;
 }
 
 @Injectable({providedIn: 'root'})
@@ -50,6 +59,7 @@ export class PositionsService extends ApiService {
             currentValue: p.usdValue,
             currentPrice: p.quantity > 0 ? p.usdValue / p.quantity : 0,
             pnlPercent: providerPnlPercent(p.usdValue, costBasisUsd),
+            isVenueCash: false,
           };
         });
 
@@ -60,11 +70,9 @@ export class PositionsService extends ApiService {
           provider: h.provider,
           quantity: h.freeQuantity + h.lockedQuantity,
           currentValue: h.usdValue,
-          currentPrice:
-            h.freeQuantity + h.lockedQuantity > 0
-              ? h.usdValue / (h.freeQuantity + h.lockedQuantity)
-              : 0,
+          currentPrice: cryptoUnitPrice(h),
           pnlPercent: null,
+          isVenueCash: h.isFiat,
         }));
 
         return [...brokeragePositions, ...cryptoPositions];

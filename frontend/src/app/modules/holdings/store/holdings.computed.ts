@@ -14,13 +14,13 @@ interface StateSignals {
 const DEFAULT_POSITIONS_ERROR = 'Failed to load positions.';
 const WEIGHT_TO_PERCENT = 100;
 
-export type AssetClass = 'equity' | 'crypto';
+export type AssetClass = 'equity' | 'crypto' | 'venueCash';
 
 export interface PositionRow {
   symbol: string;
   provider: string;
   quantity: number;
-  currentPrice: number;
+  currentPrice: Nullable<number>;
   currentValue: number;
   pnlPercent: Nullable<number>;
   weightPercent: number;
@@ -40,22 +40,27 @@ export interface AllocationBreakdownRow {
   percent: number;
 }
 
-const ASSET_CLASS_ORDER: readonly AssetClass[] = ['equity', 'crypto'];
+const ASSET_CLASS_ORDER: readonly AssetClass[] = ['equity', 'crypto', 'venueCash'];
 
 const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   equity: 'Equities',
   crypto: 'Crypto',
+  venueCash: 'Venue cash',
 };
 
 const ASSET_CLASS_COLOR: Record<AssetClass, string> = {
   equity: '#6366f1',
   crypto: '#f59e0b',
+  venueCash: '#10b981',
 };
 
 const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
 
-function resolveAssetClass(provider: string): AssetClass {
-  return CRYPTO_PROVIDERS.has(provider) ? 'crypto' : 'equity';
+function resolveAssetClass(position: Position): AssetClass {
+  if (position.isVenueCash) {
+    return 'venueCash';
+  }
+  return CRYPTO_PROVIDERS.has(position.provider) ? 'crypto' : 'equity';
 }
 
 export function holdingsComputed(store: StateSignals) {
@@ -71,7 +76,7 @@ export function holdingsComputed(store: StateSignals) {
     const groups = new Map<AssetClass, PositionRow[]>();
 
     for (const p of positions) {
-      const assetClass = resolveAssetClass(p.provider);
+      const assetClass = resolveAssetClass(p);
       const row: PositionRow = {
         symbol: p.symbol,
         provider: p.provider,

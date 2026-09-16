@@ -17,7 +17,12 @@ public sealed record BookFigurePosition(
 /// Produced by <see cref="IBookFiguresService"/> and consumed by all three surfaces
 /// (portfolio snapshot, allocation-drift, and risk compliance) so they are guaranteed
 /// to agree on cashUsd / investedValueUsd / totalValueUsd.
+/// <see cref="CashUsd"/> is <see cref="BankingCashUsd"/> + <see cref="BrokerageCashUsd"/> +
+/// <see cref="VenueCashUsd"/>.
 /// </summary>
+/// <param name="VenueCashUsd">
+/// Fiat held on crypto venues (Revolut X EUR/USD balances, #472) — cash, but not bank cash.
+/// </param>
 public sealed record BookFigures(
     decimal CashUsd,
     decimal BankingCashUsd,
@@ -26,7 +31,8 @@ public sealed record BookFigures(
     decimal TotalValueUsd,
     IReadOnlyList<BookFigurePosition> Positions,
     bool IsStale,
-    IReadOnlyList<string> StaleSources)
+    IReadOnlyList<string> StaleSources,
+    decimal VenueCashUsd = 0m)
 {
     public static BookFigures Empty { get; } =
         new(0m, 0m, 0m, 0m, 0m, [], false, []);
@@ -35,7 +41,8 @@ public sealed record BookFigures(
 /// <summary>
 /// Aggregates banking, brokerage, and crypto sources into a <see cref="BookFigures"/>
 /// snapshot. Idle brokerage cash (instrument type "CASH") is bucketed into
-/// <see cref="BookFigures.BrokerageCashUsd"/>, not into the invested positions list —
+/// <see cref="BookFigures.BrokerageCashUsd"/>, and fiat held on crypto venues into
+/// <see cref="BookFigures.VenueCashUsd"/>, not into the invested positions list —
 /// the same convention used by the allocation-drift tool. Each source degrades
 /// gracefully: a failed read contributes zero and is recorded in
 /// <see cref="BookFigures.StaleSources"/>.

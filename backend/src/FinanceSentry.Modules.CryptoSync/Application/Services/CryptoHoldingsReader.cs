@@ -23,10 +23,11 @@ public sealed class CryptoHoldingsReader : ICryptoHoldingsReader
                 h.Asset,
                 h.FreeQuantity,
                 h.LockedQuantity,
-                h.UsdValue,
+                CryptoHoldingValuation.UsdValue(h),
                 h.SyncedAt,
                 h.Provider,
-                h.CostBasisUsd))
+                h.IsFiat ? null : h.CostBasisUsd,
+                h.IsFiat))
             .ToList();
     }
 }

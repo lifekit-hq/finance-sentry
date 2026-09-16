@@ -53,6 +53,7 @@ public static class CryptoSyncModule
 
         services.AddScoped<CryptoExchangeAdapterRegistry>();
         services.AddSingleton<CostBasisCalculator>();
+        services.AddSingleton<ForwardCostBasisLedger>();
         services.AddScoped<IExchangeCredentialRepository, ExchangeCredentialRepository>();
         // #493: this module's credential store joins key rotation.
         services.AddScoped<ICredentialRotationTarget, ExchangeCredentialRotationTarget>();

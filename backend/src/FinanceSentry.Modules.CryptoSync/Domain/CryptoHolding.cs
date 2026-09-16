@@ -15,6 +15,12 @@ public sealed class CryptoHolding
     public DateTime SyncedAt { get; private set; }
     public string Provider { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Fiat cash held on the venue (#472). Its quantity is the native amount in <see cref="Asset"/>
+    /// (the currency code); it has no cost basis and is never a crypto position or bank cash.
+    /// </summary>
+    public bool IsFiat { get; private set; }
+
     public decimal? CostBasisUsd { get; private set; }
     public decimal? AverageBuyPriceUsd { get; private set; }
     public decimal? RealizedPnlUsd { get; private set; }
@@ -28,6 +34,22 @@ public sealed class CryptoHolding
 
     public int TradeCount { get; private set; }
 
+    // The forward ledger (#472) for venues whose fill history starts at connect — null until it
+    // first runs, and always null for a venue with full history (Binance). Kept apart from the
+    // displayed figures above: those go null while any lot is unpriced, the ledger never does.
+
+    /// <summary>Quantity bought on the venue since connect, still held, with a known USD cost.</summary>
+    public decimal? TrackedQuantity { get; private set; }
+
+    /// <summary>The USD cost of <see cref="TrackedQuantity"/>.</summary>
+    public decimal? TrackedCostUsd { get; private set; }
+
+    /// <summary>
+    /// Quantity whose cost the venue never showed: held before connect, or transferred in. While
+    /// it is above zero the weighted-average cost is unknown, so cost basis stays null.
+    /// </summary>
+    public decimal? UntrackedQuantity { get; private set; }
+
     private CryptoHolding() { }
 
     public static CryptoHolding Create(
@@ -36,7 +58,8 @@ public sealed class CryptoHolding
         string asset,
         decimal freeQuantity,
         decimal lockedQuantity,
-        decimal usdValue)
+        decimal usdValue,
+        bool isFiat = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
 
@@ -49,15 +72,17 @@ public sealed class CryptoHolding
             FreeQuantity = freeQuantity,
             LockedQuantity = lockedQuantity,
             UsdValue = usdValue,
+            IsFiat = isFiat,
             SyncedAt = DateTime.UtcNow,
         };
     }
 
-    public void Update(decimal freeQuantity, decimal lockedQuantity, decimal usdValue)
+    public void Update(decimal freeQuantity, decimal lockedQuantity, decimal usdValue, bool isFiat = false)
     {
         FreeQuantity = freeQuantity;
         LockedQuantity = lockedQuantity;
         UsdValue = usdValue;
+        IsFiat = isFiat;
         SyncedAt = DateTime.UtcNow;
     }
 
@@ -73,6 +98,13 @@ public sealed class CryptoHolding
         RealizedPnlUsd = realizedPnlUsd;
         LastTradeAt = lastTradeAt;
         TradeCount = tradeCount;
+    }
+
+    public void SetForwardLedger(decimal trackedQuantity, decimal trackedCostUsd, decimal untrackedQuantity)
+    {
+        TrackedQuantity = trackedQuantity;
+        TrackedCostUsd = trackedCostUsd;
+        UntrackedQuantity = untrackedQuantity;
     }
 
     public void AdvanceTradeCursor(string? cursor)

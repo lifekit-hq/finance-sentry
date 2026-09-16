@@ -4,20 +4,25 @@ using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 
-/// <summary>What a Revolut X balances snapshot became, and what it deliberately did not.</summary>
+/// <summary>
+/// What a Revolut X balances snapshot became, and what it could not. <see cref="Holdings"/> carries
+/// crypto and venue fiat alike; <see cref="UnratedFiat"/> names venue fiat valued 1:1 because no
+/// FX rate is known for it.
+/// </summary>
 public sealed record RevolutXHoldingsSnapshot(
     IReadOnlyList<CryptoAssetBalance> Holdings,
-    IReadOnlyList<string> FiatBalancesExcluded,
-    IReadOnlyList<string> UnpricedAssets);
+    IReadOnlyList<string> UnpricedAssets,
+    IReadOnlyList<string> UnratedFiat);
 
 /// <summary>
 /// Pure transform from <c>GET /balances</c> + <c>GET /configuration/currencies</c> +
-/// <c>GET /tickers</c> into per-asset crypto holdings valued in USD (#472).
+/// <c>GET /tickers</c> into per-asset holdings valued in USD (#472).
 ///
 /// <list type="bullet">
-/// <item><b>Crypto only.</b> Fiat cash held on the venue is excluded here and reported in
-/// <see cref="RevolutXHoldingsSnapshot.FiatBalancesExcluded"/>: it is neither a crypto holding nor
-/// bank cash, and its representation is #472's follow-up PR.</item>
+/// <item><b>Venue fiat is kept, flagged.</b> Fiat cash held on the venue becomes a holding with
+/// <see cref="CryptoAssetBalance.IsFiat"/> set — its quantity the native amount — so it is neither
+/// dropped nor mistaken for a crypto position or bank cash. Its USD value is re-converted at the
+/// reader boundary with the current FX rate.</item>
 /// <item><b>USD at this boundary.</b> A pair quoted in USD is used as-is, a USD stablecoin quote is
 /// taken at par, and any other fiat quote is converted with <see cref="CurrencyConverter"/> — the one
 /// place the quote currency is still in scope. Native amounts are never summed across assets.</item>
@@ -40,8 +45,8 @@ public sealed class RevolutXHoldingsAggregator
     {
         var prices = BuildPriceIndex(tickers);
         var holdings = new List<CryptoAssetBalance>();
-        var fiat = new List<string>();
         var unpriced = new List<string>();
+        var unrated = new List<string>();
 
         foreach (var balance in balances)
         {
@@ -59,7 +64,17 @@ public sealed class RevolutXHoldingsAggregator
 
             if (IsFiat(asset, currencies))
             {
-                fiat.Add(asset);
+                if (!CurrencyConverter.IsKnown(asset))
+                {
+                    unrated.Add(asset);
+                }
+
+                var fiatUsd = CurrencyConverter.ToUsd(free + locked, asset);
+                if (fiatUsd >= dustThresholdUsd)
+                {
+                    holdings.Add(new CryptoAssetBalance(asset, free, locked, Math.Round(fiatUsd, 4), IsFiat: true));
+                }
+
                 continue;
             }
 
@@ -78,7 +93,7 @@ public sealed class RevolutXHoldingsAggregator
             holdings.Add(new CryptoAssetBalance(asset, free, locked, Math.Round(usdValue.Value, 4)));
         }
 
-        return new RevolutXHoldingsSnapshot(holdings, fiat, unpriced);
+        return new RevolutXHoldingsSnapshot(holdings, unpriced, unrated);
     }
 
     /// <summary>

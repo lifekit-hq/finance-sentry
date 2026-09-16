@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
+using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -137,6 +138,9 @@ public class BinanceAdapterContractTests
         capturedUrl.Should().Contain("recvWindow=");
     }
 
+    // Binance pages by trade id; the time bounds of a walk do not apply to it.
+    private static readonly CryptoTradeWalk AnyWalk = new(DateTime.UnixEpoch, DateTime.UtcNow);
+
     private static string TradeRow(long id, string symbol, bool isBuyer = true) =>
         $$"""{"id":{{id}},"symbol":"{{symbol}}","price":"100.5","qty":"2","quoteQty":"201","commission":"0","commissionAsset":"BNB","time":{{1_700_000_000_000 + id}},"isBuyer":{{(isBuyer ? "true" : "false")}}}""";
 
@@ -157,7 +161,7 @@ public class BinanceAdapterContractTests
         });
 
         var page = await CreateAdapter(CreateHttpClient(handler))
-            .GetTradesAsync(FakeApiKey, FakeApiSecret, "btc", "USDT=43,USDC=7");
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "btc", "USDT=43,USDC=7", AnyWalk);
 
         urls.Should().Contain(u => u.Contains("symbol=BTCUSDT&fromId=43"));
         urls.Should().Contain(u => u.Contains("symbol=BTCUSDC&fromId=7"));
@@ -181,7 +185,7 @@ public class BinanceAdapterContractTests
         });
 
         var page = await CreateAdapter(CreateHttpClient(handler))
-            .GetTradesAsync(FakeApiKey, FakeApiSecret, "ETH", "43");
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "ETH", "43", AnyWalk);
 
         urls.Should().HaveCount(4).And.OnlyContain(u => u.Contains("fromId=43"));
         page.Trades.Should().BeEmpty();
@@ -194,7 +198,7 @@ public class BinanceAdapterContractTests
         var handler = new CapturingHttpMessageHandler(_ => throw new InvalidOperationException("no call expected"));
 
         var page = await CreateAdapter(CreateHttpClient(handler))
-            .GetTradesAsync(FakeApiKey, FakeApiSecret, "USDT", "anything");
+            .GetTradesAsync(FakeApiKey, FakeApiSecret, "USDT", "anything", AnyWalk);
 
         page.Trades.Should().BeEmpty();
         page.NextCursor.Should().Be("anything");

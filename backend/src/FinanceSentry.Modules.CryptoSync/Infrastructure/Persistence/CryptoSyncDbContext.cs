@@ -51,6 +51,10 @@ public sealed class CryptoSyncDbContext : DbContext
             entity.Property(e => e.RealizedPnlUsd).HasPrecision(20, 4);
             entity.Property(e => e.TradeCursor).HasMaxLength(200);
             entity.Property(e => e.TradeCount).IsRequired();
+            entity.Property(e => e.IsFiat).IsRequired();
+            entity.Property(e => e.TrackedQuantity).HasPrecision(30, 10);
+            entity.Property(e => e.TrackedCostUsd).HasPrecision(30, 10);
+            entity.Property(e => e.UntrackedQuantity).HasPrecision(30, 10);
         });
     }
 }

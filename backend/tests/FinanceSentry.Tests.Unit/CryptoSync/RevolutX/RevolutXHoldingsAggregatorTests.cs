@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 using FluentAssertions;
 using Xunit;
@@ -18,11 +19,11 @@ public class RevolutXHoldingsAggregatorTests
             dust);
 
     [Fact]
-    public void Fixtures_ProduceOnePricedRowPerCryptoAsset()
+    public void Fixtures_ProduceOnePricedRowPerAsset_CryptoAndVenueFiat()
     {
         var snapshot = AggregateFixtures();
 
-        snapshot.Holdings.Select(h => h.Asset).Should().Equal("BTC", "ETH", "DOGE", "USDC");
+        snapshot.Holdings.Select(h => h.Asset).Should().Equal("BTC", "ETH", "DOGE", "USDC", "EUR", "USD");
     }
 
     [Fact]
@@ -58,12 +59,33 @@ public class RevolutXHoldingsAggregatorTests
     }
 
     [Fact]
-    public void FiatCash_IsExcludedFromHoldings_AndReported_NeverSilentlyDropped()
+    public void FiatCash_IsKeptAsVenueFiat_NeverSilentlyDropped()
     {
         var snapshot = AggregateFixtures();
 
-        snapshot.FiatBalancesExcluded.Should().Equal("EUR", "USD");
-        snapshot.Holdings.Should().NotContain(h => h.Asset == "EUR" || h.Asset == "USD");
+        snapshot.Holdings.Where(h => h.IsFiat).Should().BeEquivalentTo(
+        [
+            new CryptoAssetBalance("EUR", 1000m, 0m, Math.Round(CurrencyConverter.ToUsd(1000m, "EUR"), 4), IsFiat: true),
+            new CryptoAssetBalance("USD", 12.34m, 0m, 12.34m, IsFiat: true),
+        ]);
+        snapshot.Holdings.Where(h => !h.IsFiat).Select(h => h.Asset).Should().Equal("BTC", "ETH", "DOGE", "USDC");
+        snapshot.UnratedFiat.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FiatWithNoFxRate_IsKeptAtParAndReported()
+    {
+        var snapshot = _sut.Aggregate(
+            [new RevolutXBalance("CHF", "10", "0", null, "10")],
+            new Dictionary<string, RevolutXCurrency>
+            {
+                ["CHF"] = new("CHF", "Swiss Franc", 2, "fiat", "active"),
+            },
+            [],
+            0.01m);
+
+        snapshot.Holdings.Should().ContainSingle().Which.Should().Be(new CryptoAssetBalance("CHF", 10m, 0m, 10m, IsFiat: true));
+        snapshot.UnratedFiat.Should().Equal("CHF");
     }
 
     [Fact]
@@ -110,8 +132,7 @@ public class RevolutXHoldingsAggregatorTests
             [],
             0.01m);
 
-        snapshot.FiatBalancesExcluded.Should().Equal("GBP");
-        snapshot.Holdings.Should().BeEmpty();
+        snapshot.Holdings.Should().ContainSingle().Which.IsFiat.Should().BeTrue();
     }
 
     [Fact]

@@ -58,6 +58,7 @@ public sealed class NewsIngestionJob(
 
             foreach (var h in await crypto.GetHoldingsAsync(userId, ct))
             {
+                if (h.IsVenueFiat) continue;
                 tickers.Add(h.Asset + "-USD");
             }
         }
