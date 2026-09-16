@@ -34,6 +34,7 @@ public class AccountDiscoveryService(
     ITrueLayerTokenRefreshService trueLayerTokenRefresh,
     IMonobankCredentialRepository monobankCredentials,
     IMonobankAdapter monobankAdapter,
+    MonobankBalanceCache monobankBalanceCache,
     ICredentialEncryptionService encryption,
     IBankAccountRepository accounts,
     IBackgroundJobClient backgroundJobs,
@@ -77,7 +78,7 @@ public class AccountDiscoveryService(
         var providerAccounts = await trueLayerClient.ListAccountsAsync(accessToken, ct);
         foreach (var pa in providerAccounts)
         {
-            if (await accounts.GetByExternalAccountIdAsync(pa.AccountId, ct) is not null)
+            if (await accounts.ExistsByExternalAccountIdAsync(pa.AccountId, ct))
                 continue;
 
             decimal? currentBalance = null;
@@ -111,7 +112,7 @@ public class AccountDiscoveryService(
 
         foreach (var card in providerCards)
         {
-            if (await accounts.GetByExternalAccountIdAsync(card.AccountId, ct) is not null)
+            if (await accounts.ExistsByExternalAccountIdAsync(card.AccountId, ct))
                 continue;
 
             decimal? owed = null;
@@ -147,11 +148,13 @@ public class AccountDiscoveryService(
             {
                 var token = encryption.Decrypt(
                     credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion);
-                var providerAccounts = await monobankAdapter.GetAccountsAsync(token, ct);
+                var clientInfo = await monobankAdapter.GetClientInfoAsync(token, ct);
 
-                foreach (var pa in providerAccounts)
+                foreach (var pa in clientInfo.Accounts)
                 {
-                    if (await accounts.GetByExternalAccountIdAsync(pa.Id, ct) is not null)
+                    monobankBalanceCache.Set(token, pa.Id, MonobankAdapter.ToBankAccountInfo(pa, clientInfo.Name));
+
+                    if (await accounts.ExistsByExternalAccountIdAsync(pa.Id, ct))
                         continue;
 
                     var account = MonobankAccountFactory.CreateAccount(credential.UserId, credential.Id, pa);

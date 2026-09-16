@@ -32,6 +32,8 @@ public class AccountDiscoveryServiceTests
         Mock<ICredentialEncryptionService> Encryption,
         Mock<IBankAccountRepository> Accounts,
         Mock<IBackgroundJobClient> BackgroundJobs,
+        MonobankBalanceCache MonobankBalanceCache,
+        List<BankAccount> StoredAccounts,
         List<BankAccount> AddedAccounts);
 
     private static Harness BuildSut()
@@ -46,13 +48,20 @@ public class AccountDiscoveryServiceTests
         var backgroundJobs = new Mock<IBackgroundJobClient>();
         var logger = new Mock<ILogger<AccountDiscoveryService>>();
 
+        var monobankBalanceCache = new MonobankBalanceCache();
+
+        // Stateful fake: rows added by one run are visible to the existence check of the next.
+        var storedAccounts = new List<BankAccount>();
         var addedAccounts = new List<BankAccount>();
         accounts.Setup(r => r.AddAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((BankAccount a, CancellationToken _) =>
             {
+                storedAccounts.Add(a);
                 addedAccounts.Add(a);
                 return a;
             });
+        accounts.Setup(r => r.ExistsByExternalAccountIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string id, CancellationToken _) => storedAccounts.Any(a => a.ExternalAccountId == id));
 
         // Default: no linked connections / credentials until a test sets them up.
         trueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
@@ -72,13 +81,15 @@ public class AccountDiscoveryServiceTests
             trueLayerTokenRefresh.Object,
             monobankCredentials.Object,
             monobankAdapter.Object,
+            monobankBalanceCache,
             encryption.Object,
             accounts.Object,
             backgroundJobs.Object,
             logger.Object);
 
         return new Harness(sut, trueLayerConnections, trueLayerClient, trueLayerTokenRefresh,
-            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, addedAccounts);
+            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, monobankBalanceCache,
+            storedAccounts, addedAccounts);
     }
 
     private static TrueLayerConnection MakeConnection()
@@ -91,63 +102,61 @@ public class AccountDiscoveryServiceTests
     private static TrueLayerAccountInfo MakeTrueLayerAccount(string accountId)
         => new(accountId, "Checking", "EUR", "Test Bank", "checking", null, "1234");
 
-    // ── TrueLayer: one known + one new → creates exactly one row; second run creates none ──
+    private static void SeedAccount(Harness h, string externalAccountId, bool isActive = true)
+        => h.StoredAccounts.Add(new BankAccount { ExternalAccountId = externalAccountId, IsActive = isActive });
 
-    [Fact]
-    public async Task DiscoverNewAccountsAsync_TrueLayer_CreatesOnlyTheNewAccount()
+    private static TrueLayerConnection SetupTrueLayer(Harness h, params string[] accountIds)
     {
-        var h = BuildSut();
         var connection = MakeConnection();
         h.TrueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([connection]);
         h.TrueLayerTokenRefresh
             .Setup(s => s.AcquireAccessTokenAsync(connection.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync("access-token");
-
-        var known = MakeTrueLayerAccount("known-acc");
-        var discovered = MakeTrueLayerAccount("new-acc");
         h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([known, discovered]);
+            .ReturnsAsync(accountIds.Select(MakeTrueLayerAccount).ToList());
         h.TrueLayerClient
             .Setup(c => c.GetBalanceAsync("access-token", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TrueLayerAccountBalance(100m, 100m, "EUR"));
+        return connection;
+    }
 
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("known-acc", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "known-acc" });
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("new-acc", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BankAccount?)null);
+    private static void SetupMonobank(Harness h, params MonobankAccountInfo[] accounts)
+    {
+        var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
+        h.MonobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([credential]);
+        h.Encryption.Setup(e => e.Decrypt(
+                credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion))
+            .Returns("mono-token");
+        h.MonobankAdapter.Setup(a => a.GetClientInfoAsync("mono-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankClientInfo("client", "Owner", accounts));
+    }
 
-        var created = await h.Sut.DiscoverNewAccountsAsync();
+    // ── TrueLayer: one known + one new → first run creates exactly one row; second run creates none ──
 
-        created.Should().Be(1);
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayer_CreatesOnlyTheNewAccountThenNothing()
+    {
+        var h = BuildSut();
+        SetupTrueLayer(h, "known-acc", "new-acc");
+        SeedAccount(h, "known-acc");
+
+        var firstRun = await h.Sut.DiscoverNewAccountsAsync();
+        var secondRun = await h.Sut.DiscoverNewAccountsAsync();
+
+        firstRun.Should().Be(1);
+        secondRun.Should().Be(0);
         h.AddedAccounts.Should().ContainSingle(a => a.ExternalAccountId == "new-acc");
         h.BackgroundJobs.Verify(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
     }
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_TrueLayer_SecondRunCreatesNothing()
+    public async Task DiscoverNewAccountsAsync_TrueLayer_SoftDeletedAccountIsNotRecreated()
     {
         var h = BuildSut();
-        var connection = MakeConnection();
-        h.TrueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([connection]);
-        h.TrueLayerTokenRefresh
-            .Setup(s => s.AcquireAccessTokenAsync(connection.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("access-token");
-
-        var known = MakeTrueLayerAccount("known-acc");
-        var discovered = MakeTrueLayerAccount("new-acc");
-        h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([known, discovered]);
-        h.TrueLayerClient
-            .Setup(c => c.GetBalanceAsync("access-token", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrueLayerAccountBalance(100m, 100m, "EUR"));
-
-        // After the first run both accounts are now known.
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("known-acc", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "known-acc" });
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("new-acc", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "new-acc" });
+        SetupTrueLayer(h, "deleted-acc");
+        SeedAccount(h, "deleted-acc", isActive: false);
 
         var created = await h.Sut.DiscoverNewAccountsAsync();
 
@@ -179,8 +188,6 @@ public class AccountDiscoveryServiceTests
         h.TrueLayerClient
             .Setup(c => c.GetBalanceAsync("access-token-2", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TrueLayerAccountBalance(50m, 50m, "EUR"));
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("new-acc-2", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BankAccount?)null);
 
         var created = await h.Sut.DiscoverNewAccountsAsync();
 
@@ -188,60 +195,54 @@ public class AccountDiscoveryServiceTests
         h.AddedAccounts.Should().ContainSingle(a => a.ExternalAccountId == "new-acc-2");
     }
 
-    // ── Monobank: one known + one new → creates exactly one row; second run creates none ──
+    // ── Monobank: one known + one new → first run creates exactly one row; second run creates none ──
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_Monobank_CreatesOnlyTheNewAccount()
+    public async Task DiscoverNewAccountsAsync_Monobank_CreatesOnlyTheNewAccountThenNothing()
     {
         var h = BuildSut();
-        var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
-        h.MonobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([credential]);
-        h.Encryption.Setup(e => e.Decrypt(
-                credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion))
-            .Returns("mono-token");
+        SetupMonobank(h,
+            new MonobankAccountInfo("known-mono", "Jar", "black", "1234", 980, 1000, 0),
+            new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+        SeedAccount(h, "known-mono");
 
-        var known = new MonobankAccountInfo("known-mono", "Jar", "black", "1234", 980, 1000, 0);
-        var discovered = new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0);
-        h.MonobankAdapter.Setup(a => a.GetAccountsAsync("mono-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([known, discovered]);
+        var firstRun = await h.Sut.DiscoverNewAccountsAsync();
+        var secondRun = await h.Sut.DiscoverNewAccountsAsync();
 
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("known-mono", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "known-mono" });
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("new-mono", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BankAccount?)null);
-
-        var created = await h.Sut.DiscoverNewAccountsAsync();
-
-        created.Should().Be(1);
+        firstRun.Should().Be(1);
+        secondRun.Should().Be(0);
         h.AddedAccounts.Should().ContainSingle(a => a.ExternalAccountId == "new-mono");
     }
 
     [Fact]
-    public async Task DiscoverNewAccountsAsync_Monobank_SecondRunCreatesNothing()
+    public async Task DiscoverNewAccountsAsync_Monobank_SoftDeletedAccountIsNotRecreated()
     {
         var h = BuildSut();
-        var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
-        h.MonobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([credential]);
-        h.Encryption.Setup(e => e.Decrypt(
-                credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion))
-            .Returns("mono-token");
-
-        var known = new MonobankAccountInfo("known-mono", "Jar", "black", "1234", 980, 1000, 0);
-        var discovered = new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0);
-        h.MonobankAdapter.Setup(a => a.GetAccountsAsync("mono-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([known, discovered]);
-
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("known-mono", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "known-mono" });
-        h.Accounts.Setup(r => r.GetByExternalAccountIdAsync("new-mono", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BankAccount { ExternalAccountId = "new-mono" });
+        SetupMonobank(h, new MonobankAccountInfo("deleted-mono", "Card", "white", "5678", 980, 2000, 0));
+        SeedAccount(h, "deleted-mono", isActive: false);
 
         var created = await h.Sut.DiscoverNewAccountsAsync();
 
         created.Should().Be(0);
         h.AddedAccounts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_PrimesBalanceCacheForSiblingSyncs()
+    {
+        var h = BuildSut();
+        SetupMonobank(h,
+            new MonobankAccountInfo("known-mono", "Jar", "black", "1234", 980, 1000, 0, "black"),
+            new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+        SeedAccount(h, "known-mono");
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        var known = h.MonobankBalanceCache.TryGet("mono-token", "known-mono");
+        known.Should().NotBeNull();
+        known!.CurrentBalance.Should().Be(10m);
+        known.ProductType.Should().Be("black");
+        h.MonobankBalanceCache.TryGet("mono-token", "new-mono")!.CurrentBalance.Should().Be(20m);
     }
 
     [Fact]

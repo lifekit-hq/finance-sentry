@@ -14,8 +14,16 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<BankAccount> AddAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
         account.ValidateInvariants();
-        await _context.BankAccounts.AddAsync(account, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        var entry = await _context.BankAccounts.AddAsync(account, cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            entry.State = EntityState.Detached;
+            throw;
+        }
         return account;
     }
 
@@ -29,6 +37,12 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     {
         return await _context.BankAccounts
             .FirstOrDefaultAsync(ba => ba.ExternalAccountId == externalAccountId && ba.IsActive, cancellationToken);
+    }
+
+    public async Task<bool> ExistsByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default)
+    {
+        return await _context.BankAccounts
+            .AnyAsync(ba => ba.ExternalAccountId == externalAccountId, cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)

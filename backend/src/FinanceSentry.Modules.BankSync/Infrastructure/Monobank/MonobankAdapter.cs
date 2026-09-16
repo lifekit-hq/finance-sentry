@@ -39,12 +39,23 @@ public class MonobankAdapter(
         return info.Accounts;
     }
 
-    public async Task<IReadOnlyList<MonobankAccountInfo>> GetAccountsAsync(
-        string token, CancellationToken ct = default)
-    {
-        var info = await _client.GetClientInfoAsync(token, ct);
-        return info.Accounts;
-    }
+    public Task<MonobankClientInfo> GetClientInfoAsync(string token, CancellationToken ct = default)
+        => _client.GetClientInfoAsync(token, ct);
+
+    /// <summary>Maps a client-info account to the provider-neutral shape cached by <see cref="MonobankBalanceCache"/>.</summary>
+    public static BankAccountInfo ToBankAccountInfo(MonobankAccountInfo a, string ownerName)
+        => new(
+            ExternalAccountId: a.Id,
+            Name: a.Name,
+            AccountType: a.Type,
+            AccountNumberLast4: a.MaskedPan.Length >= 4
+                ? a.MaskedPan[^4..] : a.MaskedPan.PadLeft(4, '0'),
+            CurrentBalance: MonobankHttpClient.ToStoredBalance(a.Balance, a.CreditLimit),
+            Currency: MonobankHttpClient.MapCurrency(a.CurrencyCode),
+            OwnerName: ownerName,
+            ProductType: a.ProductType,
+            CreditLimit: a.CreditLimit > 0
+                ? MonobankHttpClient.KopecksToDecimal(a.CreditLimit) : null);
 
     public Task<IReadOnlyList<MonobankTransaction>> GetStatementsAsync(
         string token, string accountId, DateTimeOffset from, DateTimeOffset to,
@@ -60,18 +71,7 @@ public class MonobankAdapter(
         string credential, CancellationToken ct)
     {
         var info = await _client.GetClientInfoAsync(credential, ct);
-        return info.Accounts.Select(a => new BankAccountInfo(
-            ExternalAccountId: a.Id,
-            Name: a.Name,
-            AccountType: a.Type,
-            AccountNumberLast4: a.MaskedPan.Length >= 4
-                ? a.MaskedPan[^4..] : a.MaskedPan.PadLeft(4, '0'),
-            CurrentBalance: MonobankHttpClient.ToStoredBalance(a.Balance, a.CreditLimit),
-            Currency: MonobankHttpClient.MapCurrency(a.CurrencyCode),
-            OwnerName: info.Name,
-            ProductType: a.ProductType,
-            CreditLimit: a.CreditLimit > 0
-                ? MonobankHttpClient.KopecksToDecimal(a.CreditLimit) : null)).ToList();
+        return info.Accounts.Select(a => ToBankAccountInfo(a, info.Name)).ToList();
     }
 
     public async Task<(IReadOnlyList<TransactionCandidate> Candidates, DateTime? NextSyncFrom)> SyncTransactionsAsync(

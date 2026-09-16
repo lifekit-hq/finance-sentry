@@ -23,6 +23,12 @@ public interface IBankAccountRepository
     Task<BankAccount?> GetByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Whether any row — active or soft-deleted — already holds this provider-side external
+    /// account ID (the unique index covers both).
+    /// </summary>
+    Task<bool> ExistsByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get all accounts for a user.
     /// </summary>
     Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
