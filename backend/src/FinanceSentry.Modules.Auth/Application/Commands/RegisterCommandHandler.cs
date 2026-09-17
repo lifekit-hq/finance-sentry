@@ -25,8 +25,7 @@ public class RegisterCommandHandler(
             throw new ValidationException(
                 result.Errors.Select(e => new ValidationFailure(nameof(request.Password), e.Description)));
 
-        var accessToken = tokenService.GenerateToken(user);
-        var expiresAt = DateTime.UtcNow.AddMinutes(60);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 

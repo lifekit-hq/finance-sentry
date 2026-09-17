@@ -68,7 +68,7 @@
 
 ## 5. Decision: JWT Token Generation Location
 
-**Decision**: New `JwtTokenService` (implementing `ITokenService`) inside `FinanceSentry.Modules.Auth/Infrastructure/Services/`. Reads `Jwt:Secret` and `Jwt:ExpirationMinutes` from configuration.
+**Decision**: New `JwtTokenService` (implementing `ITokenService`) inside `FinanceSentry.Modules.Auth/Infrastructure/Services/`. Reads `Jwt:Secret` and `Jwt:ExpiryMinutes` from configuration.
 
 **Rationale**: Token generation is an auth concern, not a validation concern. The existing middleware only validates. Separating generation into the Auth module keeps responsibilities clean.
 

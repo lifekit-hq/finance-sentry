@@ -13,7 +13,7 @@ public interface IRefreshTokenService
     /// <summary>Revokes the existing token and issues a new one. Returns the new raw token and entity.</summary>
     Task<(string RawToken, RefreshToken Entity)> RotateAsync(RefreshToken existing, CancellationToken cancellationToken = default);
 
-    /// <summary>Revokes all refresh tokens for the given user (logout).</summary>
+    /// <summary>Revokes all refresh tokens for the given user (bulk revoke, e.g. "sign out everywhere").</summary>
     Task RevokeAsync(string userId, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes a specific refresh token when present.</summary>

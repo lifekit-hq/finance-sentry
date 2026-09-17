@@ -156,11 +156,10 @@ public class AuthController(
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                  ?? User.FindFirst("sub")?.Value;
+        var rawToken = Request.Cookies[RefreshTokenCookie];
 
-        if (!string.IsNullOrWhiteSpace(userId))
-            await logoutHandler.Handle(new LogoutCommand(userId), HttpContext.RequestAborted);
+        if (!string.IsNullOrWhiteSpace(rawToken))
+            await logoutHandler.Handle(new LogoutCommand(rawToken), HttpContext.RequestAborted);
 
         DeleteRefreshTokenCookie();
         DeleteAccessTokenCookie();
