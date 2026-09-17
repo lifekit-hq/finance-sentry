@@ -13,6 +13,13 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only for the shared TraceEnricher (spec 048): the gateway stays a lean host otherwise. -->
+    <ProjectReference Include="..\FinanceSentry.Core\FinanceSentry.Core.csproj" />
   </ItemGroup>
 
 </Project>

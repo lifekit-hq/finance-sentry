@@ -1,4 +1,4 @@
-namespace FinanceSentry.Infrastructure.Observability;
+namespace FinanceSentry.Core.Observability;
 
 using System.Diagnostics;
 using Serilog.Core;
@@ -8,6 +8,8 @@ using Serilog.Events;
 /// Adds <c>TraceId</c>/<c>SpanId</c> from <see cref="Activity.Current"/> so log lines correlate with
 /// OpenTelemetry traces (spec 023 amendment, 2026-09-13). Serilog 3.1.1 does not read Activity trace
 /// ids natively — this enricher is the one-increment path instead of bumping to Serilog 4.x.
+/// Lives in Core (not Infrastructure) because every host that writes logs shares it — including the
+/// lean edge gateway, which references nothing else of the monolith (spec 048).
 /// Both are structured JSON properties only, NEVER Loki labels: TraceId/SpanId are per-request and
 /// promoting either to a label would make Loki's label index cardinality-explode (see
 /// <see cref="ModuleEnricher"/> for the same house rule applied to <c>module</c>).

@@ -53,7 +53,7 @@ public sealed class GatewayConfigTests
     {
         var routes = _config.GetSection("ReverseProxy:Routes").GetChildren().ToList();
 
-        var authRoute = Assert.Single(routes.Where(r => r["RateLimiterPolicy"] == GatewayRateLimitPolicies.Auth));
+        var authRoute = Assert.Single(routes, r => r["RateLimiterPolicy"] == GatewayRateLimitPolicies.Auth);
         Assert.Equal("/api/v1/auth/{**catch-all}", authRoute["Match:Path"]);
     }
 

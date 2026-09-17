@@ -72,6 +72,63 @@ public sealed class McpJwtAuthenticationMiddlewareTests
         context.Response.Headers.WWWAuthenticate.ToString().Should().Be("Bearer");
     }
 
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/ready")]
+    [InlineData("/metrics")]
+    public async Task InvokeAsync_Passes_Anonymous_Platform_Paths_Through_Without_Token(string path)
+    {
+        var (middleware, reachedNext) = MiddlewareCapturingNext();
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        reachedNext().Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Theory]
+    [InlineData("/health/")]
+    [InlineData("/health/db")]
+    [InlineData("/HEALTH")]
+    [InlineData("/")]
+    public async Task InvokeAsync_Keeps_401_On_Every_Other_Path_Without_Token(string path)
+    {
+        var (middleware, reachedNext) = MiddlewareCapturingNext();
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        reachedNext().Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    private static (McpJwtAuthenticationMiddleware Middleware, Func<bool> ReachedNext) MiddlewareCapturingNext()
+    {
+        const string secret = "super-secret-key-for-mcp-tests-123456";
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Secret"] = secret
+            })
+            .Build();
+
+        var reached = false;
+        var middleware = new McpJwtAuthenticationMiddleware(
+            _ =>
+            {
+                reached = true;
+                return Task.CompletedTask;
+            },
+            config,
+            NullLogger<McpJwtAuthenticationMiddleware>.Instance);
+        return (middleware, () => reached);
+    }
+
     private static string CreateJwt(string secret, Guid userId, string email)
     {
         var token = new JwtSecurityToken(
