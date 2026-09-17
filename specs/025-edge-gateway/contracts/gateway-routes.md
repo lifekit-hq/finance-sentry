@@ -24,8 +24,9 @@ the `/{**}` fallback MUST be last.
 |---|---|
 | `/metrics` | Prometheus exposition (FR-007) — request counts, proxy latency, throttle counts. |
 | `/gateway/health` | Gateway liveness (so compose/monitoring can watch the SPOF). |
+| `/gateway/ready` | Gateway readiness (added by spec 048) — 200 while every cluster has an available destination, 503 naming the empty one. |
 
-> `/metrics` and `/gateway/health` are namespaced so they never collide with a proxied path.
+> `/metrics` and `/gateway/*` are namespaced so they never collide with a proxied path.
 
 ## Behavioural contract (maps to acceptance scenarios)
 

@@ -118,8 +118,9 @@ Loki sink, and the dashboards below.
 - **Metrics** — the API is instrumented with OpenTelemetry and exposes Prometheus exposition at `/metrics`
   (ASP.NET Core request rate/latency/errors, .NET runtime, and custom `finance_jobs_*` per-job counters).
   Prometheus scrapes it every 15s; retention ~30d, hard-capped at 5GB.
-- **Logs** — Serilog ships structured logs to Loki (fire-and-forget; a shipping outage never affects
-  requests). EF Core SQL is suppressed to `Warning` by default (raise via
+- **Logs** — every .NET host (api, gateway, mcp) writes one compact JSON object per stdout line with
+  `TraceId`/`SpanId` (platform contract, spec 048); the api also ships to Loki (fire-and-forget; a
+  shipping outage never affects requests). EF Core SQL is suppressed to `Warning` by default (raise via
   `Serilog:MinimumLevel:Override` in config). Retention ~14d, size-capped.
 - **Traces** — a gateway → api → Npgsql trace spine: gateway and API export OpenTelemetry traces over
   OTLP/HTTP to `Observability__Otlp__Endpoint` (default `http://otel-collector:4318`; empty disables the
