@@ -38,7 +38,7 @@
 
 3. **The reasoning layer (tier 2 — Ledger)** — reads accumulated signals, alerts, fundamentals, and the book via MCP; interprets, narrates, and delivers to Telegram. **Decision framing is strategy-driven: every recommendation must be judged against the IPS** (already stored in Finance Sentry — `SaveIps`/`GetIps`), i.e. "does this fit Denys's declared risk, concentration, and horizon rules," not generic advice. Ledger never computes signals itself.
 
-One-way dependency discipline: Finance Sentry never pushes to a Ledger-specific channel; it raises domain Alerts and exposes MCP reads.
+One-way dependency discipline (constitution Principle VII, ruled 2026-09-17): MCP is Ledger's only tool surface; the hook payload that wakes Ledger carries ids only; no endpoint may name Ledger. Finance Sentry raises domain Alerts and events and exposes MCP reads; Ledger reads back.
 
 > **Is this buildable without paid feeds?** Yes. Commercial versions of this (Bloomberg alerts, Koyfin, TrendSpider) are expensive because they serve every instrument at tick granularity. This Radar needs ~50–100 tickers at daily granularity: Yahoo (already integrated) + EDGAR (already integrated) + RSS news (already integrated) cover it. The moat is not the data — it's the accumulated signal history + thesis discipline + an agent that knows the book and the strategy.
 

@@ -1,22 +1,24 @@
-<!-- SYNC IMPACT REPORT - Constitution 1.3.1
-Version: 1.3.0 → 1.3.1
-Bump Type: PATCH (Quality gate clarifications; no new principles)
-Principles Modified:
-  - II. Code Quality Enforcement — added explicit C# build-warning gate:
-    zero dotnet build warnings required after every .cs file change; specific
-    analyzer codes enumerated (IDE0005, IDE0290, CS8618, IDE0161, etc.).
-  - VI. Frontend State & Composition Discipline — added point 5: file organization
-    rule (one concept per file) and shared/ boundary rule (cross-module code must
-    live in frontend/src/app/shared/) elevated to governance level.
+<!-- SYNC IMPACT REPORT - Constitution 1.4.0
+Version: 1.3.1 → 1.4.0
+Bump Type: MINOR (new principle; no existing principle changed)
+Principles Added:
+  - VII. Ledger Boundary — the Ledger agent's relationship to Finance Sentry is
+    fixed as three clauses: MCP is Ledger's only tool surface; the hook payload
+    carries ids only; no endpoint may name Ledger. Ruled by Denys 2026-09-17 with
+    the Ledger heartbeat design calls; landed ahead of the wake dispatcher auth
+    work, the detectors and the Events module that depend on it.
 Sections Modified:
-  - Code Review & Compliance: added three new automatic-block triggers for inline
-    interfaces, cross-module code outside shared/, and unresolved build warnings.
+  - Code Review & Compliance: added an automatic-block trigger for changes that
+    breach Principle VII.
 Follow-up TODOs:
+  - `research/assets/{symbol}/ledger-read` (GET/POST, AssetDossierController)
+    predates this principle and names Ledger in an endpoint; rename tracked as a
+    separate task.
   - Sweep remaining bank-sync components (connect-account, transaction-list,
     sync-status) to ConnectStore / TransactionsStore per Principle VI.
   - Repair or remove stale Playwright integration tests under
     frontend/tests/integration/bank-sync/.
-Prior report (1.3.0, 1.2.1 → 1.1.1 → 1.1.0) retained in git history.
+Prior report (1.3.1, 1.3.0, 1.2.1 → 1.1.1 → 1.1.0) retained in git history.
 -->
 
 # Finance Sentry Constitution
@@ -169,6 +171,23 @@ feature folder is a violation. Duplicating helpers across feature modules is a v
 Mixing an interface definition into a component or service file is a violation.
 All three block PR merge. Use the `frontend-code-quality` skill for audit sweeps.
 
+### VII. Ledger Boundary (NON-NEGOTIABLE)
+
+Finance Sentry owns the data and the events; the Ledger agent reads them. The
+dependency is one-way and the boundary is fixed by three clauses:
+
+1. **MCP is Ledger's only tool surface.** Every read Ledger performs against Finance
+   Sentry goes through the `FinanceSentry.Mcp` tool surface. No REST endpoint, direct
+   database access, or other channel is offered to Ledger as a tool.
+2. **The hook payload carries ids only.** The event push from Finance Sentry to Ledger
+   (the OpenClaw hook) contains identifiers — event id, kind, user id, entity ids — and
+   nothing else. Ledger resolves what an id means by reading back through MCP; no
+   amounts, names, narrative or other domain content ride on the hook.
+3. **No endpoint may name Ledger.** No API route, MCP tool, job or payload field is
+   named after Ledger or any other consumer. Finance Sentry surfaces are named for the
+   domain concept they expose, so any reader can consume them and Ledger stays
+   replaceable.
+
 ## Tech Stack Minimums
 
 **Backend**: .NET Core 9+, ASP.NET with OpenAPI/Swagger documentation
@@ -205,7 +224,7 @@ All work MUST follow per-task feature branching discipline:
      Tagging Policy)
   3. Open PR to `main` (or parent feature branch)
   4. Pass CI/CD (linting, tests, coverage)
-  5. Code review approval (MUST verify compliance with Principles I–V)
+  5. Code review approval (MUST verify compliance with Principles I–VII)
   6. Merge to `main`
   7. **Delete branch immediately after merge** (enforce via GitHub setting:
      "Automatically delete head branches")
@@ -213,7 +232,7 @@ All work MUST follow per-task feature branching discipline:
 
 ### Code Review & Compliance
 
-Every PR MUST verify compliance with Core Principles I–VI. Violations block merge:
+Every PR MUST verify compliance with Core Principles I–VII. Violations block merge:
 
 - Failing linter checks → automatic block
 - Missing or incomplete tests → automatic block
@@ -227,6 +246,8 @@ Every PR MUST verify compliance with Core Principles I–VI. Violations block me
   automatic block
 - Cross-module type, utility, or enum not in `shared/` (Principle VI.5) → automatic block
 - Backend `dotnet build` warnings not resolved (Principle II) → automatic block
+- Ledger given a tool surface other than MCP, a hook payload carrying more than ids, or
+  an endpoint/tool/field named after Ledger (Principle VII) → automatic block
 - Version NOT bumped on frontend/API changes → automatic block (see Versioning & Tagging
   Policy)
 - Tag NOT created for version bump → automatic block (see Versioning & Tagging Policy)
@@ -357,4 +378,4 @@ and tag creation. Missing version bump or tag blocks PR merge.
 - Each version change increments **Last Amended** date (ISO format)
 - Applies to both constitution versioning and feature versioning (frontend/backend)
 
-**Version**: 1.3.1 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-04-24
+**Version**: 1.4.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-09-17
