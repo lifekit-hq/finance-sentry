@@ -5,10 +5,15 @@ using FinanceSentry.Modules.Companion.Domain;
 /// <summary>
 /// Default materiality policy (feature 031). An alert is already "worth surfacing" (the alerts module
 /// decided so) — we map its type to a companion kind and skip types we don't surface. Disposition
-/// follows the mode: quiet suppresses, digest holds, scan/realtime queue as pending.
+/// follows the mode: quiet suppresses, digest holds, scan/realtime queue as pending. Sync failures are
+/// the one kind demoted below the mode: they ride the digest unless the source is genuinely stale.
 /// </summary>
 public sealed class MaterialityPolicy : IMaterialityPolicy
 {
+    // A transient sync error re-alerts every 12h per account and was 313 of 344 alerts over 90 days.
+    // Only a source that has not synced successfully for a full day is worth a proactive wake.
+    public TimeSpan SyncFailureEscalationAge { get; } = TimeSpan.FromHours(24);
+
     // Alert type strings are the cross-module contract value carried on each alert (Alerts module).
     public CompanionEventKind? ClassifyAlert(string alertType) => alertType switch
     {
@@ -41,15 +46,24 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         _ => EventDisposition.Pending,
     };
 
-    public EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind)
+    public EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null)
     {
         // Operational failures must reach the operator even under a quiet mode — surface instead of
         // suppressing. Digest still batches them; the other modes already queue as pending.
         if (kind == CompanionEventKind.OperationalFailure && mode == NotificationMode.Quiet)
             return EventDisposition.Pending;
 
+        // Sync failures are digest material unless the source is stale past the escalation age.
+        // Unknown staleness counts as not stale — the digest (and the agent's pulse) still sees it.
+        // Quiet keeps suppressing: a held event under quiet would surface what the mode silenced.
+        if (kind == CompanionEventKind.SyncFailure && mode != NotificationMode.Quiet && !IsStale(sourceStaleness))
+            return EventDisposition.HeldForDigest;
+
         return DispositionForMode(mode);
     }
+
+    private bool IsStale(TimeSpan? sourceStaleness)
+        => sourceStaleness is { } age && age > SyncFailureEscalationAge;
 
     public string AlertDedupKey(Guid alertId) => $"alert:{alertId}";
 

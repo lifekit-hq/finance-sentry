@@ -11,6 +11,12 @@ public sealed class CompanionOptions
     /// <summary>Outbound wake URL (the agent runtime's trigger). Empty = pull-only, no realtime push.</summary>
     public string? AgentTriggerUrl { get; set; }
 
+    /// <summary>
+    /// Bearer token the wake POST authenticates with. Read from configuration at runtime only — never
+    /// logged, never echoed in a payload. Empty = the request is sent without an Authorization header.
+    /// </summary>
+    public string? AgentTriggerToken { get; set; }
+
     public string DefaultTimeZoneId { get; set; } = "Europe/Dublin";
 
     public int? QuietHoursStartLocal { get; set; } = 22;
