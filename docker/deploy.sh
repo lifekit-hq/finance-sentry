@@ -87,18 +87,20 @@ echo "[deploy] ok — api reachable via gateway on 127.0.0.1:8080"
 # Bounded retry: the health wait above returns the moment the api answers, but the
 # `scraped` item reads Prometheus' LAST scrape of each target, and a container
 # recreated seconds ago is still `down` there until its next 15s scrape. Four
-# attempts a scrape interval apart; the last failure exits 1 — the containers stay
-# up (post-deploy assertion model), the job goes red.
+# attempts a scrape interval apart; the last failure exits 1 at the end of the
+# script (after the uptime probe refresh) — the containers stay up (post-deploy
+# assertion model), the job goes red.
 CONTRACT_PROJECT="$("${COMPOSE[@]}" config --format json | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])')"
 echo "[deploy] platform contract: running containers (project $CONTRACT_PROJECT)"
 contract_attempts=4
+contract_ok=false
 for ((attempt = 1; attempt <= contract_attempts; attempt++)); do
   if python3 "$CONTRACT" --project "$CONTRACT_PROJECT"; then
+    contract_ok=true
     break
   fi
   if [[ $attempt -eq $contract_attempts ]]; then
-    echo "error: platform contract failed after $contract_attempts attempts (table above)" >&2
-    exit 1
+    break
   fi
   echo "[deploy] platform contract: attempt $attempt failed — retrying in 15s"
   sleep 15
@@ -135,3 +137,8 @@ fi
   echo "*/5 * * * * $PROBE_DIR/uptime-probe.sh >> $PROBE_DIR/probe.log 2>&1"
 } | crontab -
 echo "[deploy] uptime probe installed"
+
+if [[ $contract_ok != true ]]; then
+  echo "error: platform contract failed after $contract_attempts attempts (table above)" >&2
+  exit 1
+fi

@@ -11,7 +11,7 @@ using Serilog.Sinks.Grafana.Loki;
 /// Central Serilog setup (FR-003/011). Console output is one compact JSON object per line — the
 /// platform contract's "JSON logs with a trace id on stdout" (guardrail 1, spec 048): the box log
 /// agent reads stdout, so the rendered message (<c>@m</c>) plus <c>TraceId</c>/<c>SpanId</c> from
-/// <see cref="TraceEnricher"/> is what every downstream reader sees. Keeps the rolling-file sink,
+/// <see cref="TraceEnricher"/> is what every downstream reader sees. Keeps the api's rolling-file sink,
 /// suppresses the EF Core <c>Database.Command</c> SQL flood that made grep-based triage slow (FR-011,
 /// override-able via config), enriches every event with a bounded <c>module</c> + <c>app</c>, and —
 /// when a Loki URL is configured — ships structured logs to Loki via the batched sink (fire-and-forget:
@@ -33,12 +33,17 @@ public static class SerilogConfiguration
 
     /// <summary>
     /// The same setup for another host of this product (the MCP server), tagged with its own
-    /// <c>app</c> so the shared log stream tells the processes apart.
+    /// <c>app</c> so the shared log stream tells the processes apart. Stdout only — no rolling file,
+    /// since such hosts have no log volume.
     /// </summary>
     public static Action<HostBuilderContext, LoggerConfiguration> For(string appName)
-        => (context, loggerConfiguration) => Configure(context, loggerConfiguration, appName);
+        => (context, loggerConfiguration) => Configure(context, loggerConfiguration, appName, writeToFile: false);
 
-    private static void Configure(HostBuilderContext context, LoggerConfiguration loggerConfiguration, string appName)
+    private static void Configure(
+        HostBuilderContext context,
+        LoggerConfiguration loggerConfiguration,
+        string appName,
+        bool writeToFile = true)
     {
         var configuration = context.Configuration;
 
@@ -52,13 +57,17 @@ public static class SerilogConfiguration
             .Enrich.With<ModuleEnricher>()
             .Enrich.With<TraceEnricher>()
             .Enrich.WithProperty("app", appName)
-            .WriteTo.Console(new RenderedCompactJsonFormatter())
-            .WriteTo.File(
+            .WriteTo.Console(new RenderedCompactJsonFormatter());
+
+        if (writeToFile)
+        {
+            loggerConfiguration.WriteTo.File(
                 "logs/app-.txt",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: RetainedFileCountLimit,
                 fileSizeLimitBytes: FileSizeLimitBytes,
                 rollOnFileSizeLimit: true);
+        }
 
         var lokiUrl = configuration[LokiUrlConfigKey];
         if (!string.IsNullOrWhiteSpace(lokiUrl))
