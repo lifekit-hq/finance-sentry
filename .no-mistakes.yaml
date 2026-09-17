@@ -1,0 +1,38 @@
+# Per-repo no-mistakes overrides (honored from the default-branch copy).
+#
+# Pin the gate's Lint and Test steps to the commands CI already runs, so
+# validation is declared here instead of decided per run by the test agent.
+# Sources of truth (keep in step; the workflows win on divergence):
+#   .github/workflows/frontend-ci.yml  job `lint-build-test`
+#   .github/workflows/backend-ci.yml   job `build-and-test`
+#
+# Lint = the frontend workflow's "Lint code" + "Format check" steps. The
+# backend has no separate lint step: C# style is enforced at build time via
+# EnforceCodeStyleInBuild (backend/Directory.Build.props), so it lives under
+# `test` with the build. Both npm-based commands self-provision `node_modules`
+# with `npm ci` the way CI does; `@lifekit-hq/*` resolves from GitHub Packages,
+# so NODE_AUTH_TOKEN (a token with read:packages) must be in the environment
+# (CI passes secrets.GITHUB_TOKEN). `.NET 10 SDK` and Docker (Testcontainers
+# for the integration suites) are host prerequisites.
+#
+# Not declared: the backend coverage ratchet step (a reportgenerator summary
+# gate over the test run, not a test; it stays a CI-only check) and the
+# CI-only ConnectionStrings__Default env (every integration test injects its
+# own Testcontainers Postgres connection string, so nothing reads it).
+commands:
+  lint: >-
+    cd frontend
+    && npm ci
+    && npm run lint
+    && npm run format:check
+  test: >-
+    dotnet restore backend/FinanceSentry.sln
+    && dotnet build backend/FinanceSentry.sln --configuration Release --no-restore
+    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build --verbosity normal
+    && cd frontend
+    && npm ci
+    && npm run build
+    && npx playwright install --with-deps chromium
+    && npm run test:ci
+    && mkdir -p playwright-report
+    && npx playwright test --reporter=json > playwright-report/results.json
