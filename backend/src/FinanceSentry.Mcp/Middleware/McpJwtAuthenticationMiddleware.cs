@@ -12,6 +12,18 @@ namespace FinanceSentry.Mcp.Middleware;
 
 public sealed class McpJwtAuthenticationMiddleware
 {
+    /// <summary>
+    /// Paths the platform probes without a token (guardrail 1, spec 048): liveness, readiness and
+    /// the Prometheus exposition. Exact, case-sensitive matches — <c>/health/x</c> still needs a token.
+    /// Nothing user-scoped is served on them.
+    /// </summary>
+    public static readonly IReadOnlySet<string> AnonymousPaths = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "/health",
+        "/ready",
+        "/metrics",
+    };
+
     private readonly RequestDelegate _next;
     private readonly ILogger<McpJwtAuthenticationMiddleware> _logger;
     private readonly TokenValidationParameters _validationParams;
@@ -40,6 +52,12 @@ public sealed class McpJwtAuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        if (AnonymousPaths.Contains(context.Request.Path.Value ?? string.Empty))
+        {
+            await _next(context);
+            return;
+        }
+
         var token = ReadToken(context);
         if (string.IsNullOrWhiteSpace(token))
         {

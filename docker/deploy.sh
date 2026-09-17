@@ -52,8 +52,20 @@ else
   echo "[deploy] warn: cannot write $DASHBOARD_DIR — dashboards not refreshed" >&2
 fi
 
+# --- Platform contract (guardrail 1, spec 048) ---------------------------------
+# The checker lives in lifekit-stack and is deployed to the box at this path; this
+# product's deploy calls it on its own compose project (docs/platform-contract.md
+# there). No existence check and no `|| true` on purpose: a missing checker fails
+# the deploy rather than silently skipping the gate. No waivers.
+CONTRACT=/srv/lifekit-stack/scripts/platform-contract.py
+COMPOSE=(docker compose -f docker/docker-compose.prod.yml --env-file docker/.env)
+
+# Static gate: every service's lifekit.contract.* declaration, before anything changes.
+echo "[deploy] platform contract: declarations"
+"${COMPOSE[@]}" config --format json | python3 "$CONTRACT" --static -
+
 echo "[deploy] docker compose build + up"
-docker compose -f docker/docker-compose.prod.yml --env-file docker/.env up -d --build --remove-orphans
+"${COMPOSE[@]}" up -d --build --remove-orphans
 
 echo "[deploy] prune dangling images (free disk on the VPS)"
 docker image prune -f >/dev/null
@@ -70,6 +82,27 @@ until curl -sf http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; do
 done
 
 echo "[deploy] ok — api reachable via gateway on 127.0.0.1:8080"
+
+# Runtime gate: probe the running containers (health, ready, metrics, scraped, logs).
+# Bounded retry: the health wait above returns the moment the api answers, but the
+# `scraped` item reads Prometheus' LAST scrape of each target, and a container
+# recreated seconds ago is still `down` there until its next 15s scrape. Four
+# attempts a scrape interval apart; the last failure exits 1 — the containers stay
+# up (post-deploy assertion model), the job goes red.
+CONTRACT_PROJECT="$("${COMPOSE[@]}" config --format json | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])')"
+echo "[deploy] platform contract: running containers (project $CONTRACT_PROJECT)"
+contract_attempts=4
+for ((attempt = 1; attempt <= contract_attempts; attempt++)); do
+  if python3 "$CONTRACT" --project "$CONTRACT_PROJECT"; then
+    break
+  fi
+  if [[ $attempt -eq $contract_attempts ]]; then
+    echo "error: platform contract failed after $contract_attempts attempts (table above)" >&2
+    exit 1
+  fi
+  echo "[deploy] platform contract: attempt $attempt failed — retrying in 15s"
+  sleep 15
+done
 
 # --- Uptime probe (issue #511) -------------------------------------------------
 # Host-level cron so outage alerts don't depend on the stack being up. Telegram

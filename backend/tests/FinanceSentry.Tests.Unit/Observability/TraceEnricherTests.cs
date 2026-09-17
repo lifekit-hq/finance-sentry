@@ -1,7 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Observability;
 
 using System.Diagnostics;
-using FinanceSentry.Infrastructure.Observability;
+using FinanceSentry.Core.Observability;
 using FluentAssertions;
 using Serilog;
 using Serilog.Events;

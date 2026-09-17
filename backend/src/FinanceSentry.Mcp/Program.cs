@@ -1,3 +1,4 @@
+using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Mcp.Middleware;
 using Microsoft.AspNetCore.Builder;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace FinanceSentry.Mcp;
 
@@ -62,8 +64,12 @@ internal static class Program
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // HTTP transport — logs can go to stdout freely.
+            // HTTP transport — logs go to stdout as compact JSON with a trace id, the product-wide shape
+            // (platform contract, spec 048), tagged app=finance-sentry-mcp.
+            builder.Host.UseSerilog(SerilogConfiguration.For(McpPlatformEndpoints.ServiceName));
+
             McpServiceRegistration.RegisterShared(builder.Services, builder.Configuration);
+            builder.Services.AddMcpPlatformEndpoints(builder.Configuration);
 
             builder.Services
                 .AddMcpServer()
@@ -77,7 +83,11 @@ internal static class Program
             builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
             var app = builder.Build();
+            app.UseSerilogRequestLogging();
+            // The middleware itself exempts /health, /ready and /metrics (AnonymousPaths); every other
+            // path keeps the bearer-token gate.
             app.UseMiddleware<McpJwtAuthenticationMiddleware>();
+            app.MapMcpPlatformEndpoints();
             app.MapMcp();
             await app.RunAsync();
         }

@@ -19,6 +19,11 @@ RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
+# krb5-libs: without it Npgsql writes two raw "Cannot load library libgssapi_krb5.so.2" lines to
+# stderr at first connect — plain text in a stdout stream that must be JSON (platform contract,
+# spec 048). The api image installs it for the same reason.
+RUN apk add --no-cache krb5-libs
+
 COPY --from=build /app/publish .
 
 ENV DOTNET_RUNNING_IN_CONTAINER=true

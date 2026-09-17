@@ -6,6 +6,12 @@
 #
 # Deploy: ./docker/deploy.sh   (which runs sops decrypt + compose up).
 # Env source: docker/.env  (decrypted from docker/.env.sops via sops/age).
+#
+# Platform contract (guardrail 1, spec 048): every traffic-serving service declares how it meets
+# the contract in `lifekit.contract.*` labels (reference: the docstring of
+# /srv/lifekit-stack/scripts/platform-contract.py). deploy.sh runs that checker as a static gate
+# on this file before `up` and as a runtime gate on the containers afterwards; a failing label set
+# never deploys, a failing probe turns the deploy red. Datastores are `none`. No waivers.
 
 services:
   api:
@@ -16,6 +22,14 @@ services:
     image: finance-sentry/api:local
     container_name: finance-sentry-api
     restart: unless-stopped
+    labels:
+      lifekit.contract: "v1"
+      lifekit.contract.port: "5000"
+      lifekit.contract.health: /api/v1/health
+      lifekit.contract.ready: /api/v1/health/ready
+      lifekit.contract.metrics: /metrics
+      lifekit.contract.ingress: internal
+      lifekit.contract.service: finance-sentry-api
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5000
@@ -112,6 +126,14 @@ services:
     image: finance-sentry/mcp:local
     container_name: finance-sentry-mcp
     restart: unless-stopped
+    labels:
+      lifekit.contract: "v1"
+      lifekit.contract.port: "5100"
+      lifekit.contract.health: /health        # anonymous — McpJwtAuthenticationMiddleware.AnonymousPaths
+      lifekit.contract.ready: /ready          # Npgsql check, api-shaped JSON
+      lifekit.contract.metrics: /metrics      # scraped as job finance-sentry-mcp (lifekit-stack prometheus.yml)
+      lifekit.contract.ingress: internal
+      lifekit.contract.service: finance-sentry-mcp
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${DB_NAME:-finance_sentry};Username=${DB_USER:-finance_user};Password=${DB_PASSWORD}"
       Deduplication__MasterKeyBase64: ${DEDUPLICATION_MASTER_KEY_BASE64}
@@ -142,6 +164,14 @@ services:
     image: finance-sentry/frontend:local
     container_name: finance-sentry-frontend
     restart: unless-stopped
+    labels:
+      lifekit.contract: "v1"
+      lifekit.contract.port: "4200"
+      lifekit.contract.health: /healthz       # nginx.frontend.conf — JSON, never the SPA fallback
+      lifekit.contract.ready: /readyz         # 503 when the built bundle is missing
+      lifekit.contract.metrics: /metrics      # stub_status → Prometheus via njs (nginx.metrics.js)
+      lifekit.contract.ingress: internal
+      lifekit.contract.service: finance-sentry-frontend
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       # Ordering only — NOT service_healthy. During a recreate the old and new api
@@ -154,6 +184,7 @@ services:
         condition: service_started
     networks:
       - finance-sentry
+      - openclaw          # so lifekit-stack's Prometheus (on compose_default) can scrape /metrics (spec 048)
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -174,6 +205,16 @@ services:
     image: finance-sentry/gateway:local
     container_name: finance-sentry-gateway
     restart: unless-stopped
+    labels:
+      lifekit.contract: "v1"
+      lifekit.contract.port: "8080"
+      lifekit.contract.health: /gateway/health
+      lifekit.contract.ready: /gateway/ready  # 200 while every YARP cluster has an available destination
+      lifekit.contract.metrics: /metrics
+      # `edge`: this is the box's front door (Tailscale Serve → loopback:8080 until Traefik lands;
+      # the checker keeps the edge item SKIP until then, and the host port goes away with Traefik).
+      lifekit.contract.ingress: edge
+      lifekit.contract.service: finance-sentry-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -205,6 +246,8 @@ services:
     image: postgres:14-alpine
     container_name: finance-sentry-postgres
     restart: unless-stopped
+    labels:
+      lifekit.contract: "none"   # datastore, not a product
     environment:
       POSTGRES_USER: ${DB_USER:-finance_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

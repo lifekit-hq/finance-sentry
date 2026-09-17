@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-17
 
-**Status**: Draft
+**Status**: Implemented (pending deploy + lifekit-stack Prometheus jobs)
 
 **Origin**: Guardrail 1 (platform contract, adopted 2026-09-16) — lifekit-stack
 [PR 161](https://github.com/lifekit-hq/lifekit-stack/pull/161) shipped the checker
