@@ -41,6 +41,39 @@ public sealed class GatewayReadinessTests
     }
 
     [Fact]
+    public void EveryDestinationUnhealthy_UnderHealthyOrPanic_IsNotReady()
+    {
+        // YARP's default HealthyOrPanic policy lists every destination as available when none is healthy.
+        var destination = new DestinationState("api-0");
+        destination.Health.Active = DestinationHealth.Unhealthy;
+        var api = new ClusterState("api")
+        {
+            DestinationsState = new ClusterDestinationsState([destination], [destination]),
+        };
+
+        var report = GatewayReadiness.Evaluate([api, Cluster("frontend", all: 1, available: 1)]);
+
+        Assert.False(report.Ready);
+        var cluster = Assert.Single(report.Clusters, c => c.Id == "api");
+        Assert.Equal((0, 1), (cluster.Available, cluster.Total));
+    }
+
+    [Fact]
+    public void PassivelyUnhealthyDestination_IsNotCountedAvailable()
+    {
+        var destination = new DestinationState("mcp-0");
+        destination.Health.Passive = DestinationHealth.Unhealthy;
+        var mcp = new ClusterState("mcp")
+        {
+            DestinationsState = new ClusterDestinationsState([destination], [destination]),
+        };
+
+        var report = GatewayReadiness.Evaluate([mcp]);
+
+        Assert.False(report.Ready);
+    }
+
+    [Fact]
     public void NoClusters_IsNotReady()
     {
         var report = GatewayReadiness.Evaluate([]);
@@ -54,9 +87,14 @@ public sealed class GatewayReadinessTests
         var destinations = Enumerable.Range(0, all)
             .Select(i => new DestinationState($"{id}-{i}"))
             .ToList();
+        foreach (var destination in destinations.Skip(available))
+        {
+            destination.Health.Active = DestinationHealth.Unhealthy;
+        }
+
         return new ClusterState(id)
         {
-            DestinationsState = new ClusterDestinationsState(destinations, destinations.Take(available).ToList()),
+            DestinationsState = new ClusterDestinationsState(destinations, destinations),
         };
     }
 }
