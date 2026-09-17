@@ -18,8 +18,7 @@ public class RefreshCommandHandler(
         var user = await userManager.FindByIdAsync(existing.UserId) ?? throw new InvalidRefreshTokenException();
         var (newRaw, _) = await refreshTokenService.RotateAsync(existing, cancellationToken);
 
-        var accessToken = tokenService.GenerateToken(user);
-        var expiresAt = DateTime.UtcNow.AddMinutes(60);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
 
         return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!), expiresAt), newRaw, accessToken);
     }

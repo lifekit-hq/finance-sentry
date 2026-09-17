@@ -7,7 +7,7 @@ public class LogoutCommandHandler(IRefreshTokenService refreshTokenService) : IC
 {
     public async Task<Unit> Handle(LogoutCommand command, CancellationToken cancellationToken)
     {
-        await refreshTokenService.RevokeAsync(command.UserId, cancellationToken);
+        await refreshTokenService.RevokeTokenAsync(command.RawRefreshToken, cancellationToken);
         return Unit.Value;
     }
 }

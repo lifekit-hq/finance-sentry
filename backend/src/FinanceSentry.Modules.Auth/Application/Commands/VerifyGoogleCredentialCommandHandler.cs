@@ -43,8 +43,7 @@ public class VerifyGoogleCredentialCommandHandler(
                 throw new InvalidOperationException("VALIDATION_ERROR:" + string.Join("|", result.Errors.Select(e => e.Description)));
         }
 
-        var accessToken = tokenService.GenerateToken(user);
-        var expiresAt = DateTime.UtcNow.AddMinutes(60);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 

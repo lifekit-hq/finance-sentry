@@ -18,11 +18,12 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
     private readonly string _secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
     private readonly int _expiryMinutes = int.TryParse(configuration["Jwt:ExpiryMinutes"], out var minutes) ? minutes : 60;
 
-    public string GenerateToken(ApplicationUser user)
+    public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var now = DateTime.UtcNow;
+        var expiresAt = now.AddMinutes(_expiryMinutes);
 
         var claims = new[]
         {
@@ -34,11 +35,11 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
         var token = new JwtSecurityToken(
             claims: claims,
             notBefore: now,
-            expires: now.AddMinutes(_expiryMinutes),
+            expires: expiresAt,
             signingCredentials: credentials
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 
     public (string Token, DateTime ExpiresAt) GenerateMcpAccessToken(ApplicationUser user)

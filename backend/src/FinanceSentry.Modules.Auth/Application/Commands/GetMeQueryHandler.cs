@@ -19,8 +19,7 @@ public class GetMeQueryHandler(
         var user = await userManager.FindByIdAsync(existing.UserId)
             ?? throw new InvalidRefreshTokenException();
 
-        var accessToken = tokenService.GenerateToken(user);
-        var expiresAt = DateTime.UtcNow.AddMinutes(60);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
         var profile = GetProfileQueryHandler.ToDto(user);
 
         return new GetMeResult(new MeResponse(new UserDto(user.Id, user.Email!), expiresAt, profile), accessToken);

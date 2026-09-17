@@ -4,7 +4,7 @@ namespace FinanceSentry.Modules.Auth.Application.Interfaces;
 
 public interface ITokenService
 {
-    string GenerateToken(ApplicationUser user);
+    (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user);
     (string Token, DateTime ExpiresAt) GenerateMcpAccessToken(ApplicationUser user);
 
     /// <summary>
