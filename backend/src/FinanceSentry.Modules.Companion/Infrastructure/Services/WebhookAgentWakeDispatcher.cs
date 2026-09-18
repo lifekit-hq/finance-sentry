@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Services;
 
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
@@ -9,7 +10,9 @@ using Microsoft.Extensions.Options;
 /// <summary>
 /// Posts a minimal wake payload to the configured agent-trigger URL (feature 031). When no URL is
 /// configured the event stays pending for the agent to pull (no realtime push). Payload carries only
-/// ids/refs — never secrets or full detail (FR-016).
+/// ids/refs — never secrets or full detail (FR-016). Authenticates with the configured bearer token
+/// and stamps each event wake with <c>Idempotency-Key: &lt;eventId&gt;</c>, so the receiver can dedup
+/// the relay's retries (the dispatch job re-posts a failed wake up to <see cref="CompanionOptions.MaxDispatchAttempts"/>).
 /// </summary>
 public sealed class WebhookAgentWakeDispatcher(
     IHttpClientFactory httpFactory,
@@ -17,6 +20,10 @@ public sealed class WebhookAgentWakeDispatcher(
     ILogger<WebhookAgentWakeDispatcher> logger) : IAgentWakeDispatcher
 {
     public const string HttpClientName = "companion-wake";
+
+    public const string IdempotencyKeyHeader = "Idempotency-Key";
+
+    private const string BearerScheme = "Bearer";
 
     private readonly CompanionOptions _options = options.Value;
 
@@ -47,7 +54,7 @@ public sealed class WebhookAgentWakeDispatcher(
             referenceId = isProposal ? evt.ReferenceId : null,
         };
 
-        return await PostAsync(payload, $"event {evt.Id}", ct);
+        return await PostAsync(payload, $"event {evt.Id}", evt.Id.ToString(), ct);
     }
 
     public async Task<WakeResult> WakeDigestAsync(Guid userId, int heldCount, CancellationToken ct = default)
@@ -58,15 +65,30 @@ public sealed class WebhookAgentWakeDispatcher(
         }
 
         var payload = new { kind = "Digest", userId, count = heldCount };
-        return await PostAsync(payload, $"digest for {userId}", ct);
+        return await PostAsync(payload, $"digest for {userId}", idempotencyKey: null, ct);
     }
 
-    private async Task<WakeResult> PostAsync(object payload, string label, CancellationToken ct)
+    private async Task<WakeResult> PostAsync(object payload, string label, string? idempotencyKey, CancellationToken ct)
     {
         try
         {
             var client = httpFactory.CreateClient(HttpClientName);
-            using var response = await client.PostAsJsonAsync(_options.AgentTriggerUrl, payload, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _options.AgentTriggerUrl)
+            {
+                Content = JsonContent.Create(payload),
+            };
+
+            if (!string.IsNullOrWhiteSpace(_options.AgentTriggerToken))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue(BearerScheme, _options.AgentTriggerToken);
+            }
+
+            if (idempotencyKey is not null)
+            {
+                request.Headers.TryAddWithoutValidation(IdempotencyKeyHeader, idempotencyKey);
+            }
+
+            using var response = await client.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             return WakeResult.Sent;
         }

@@ -59,4 +59,8 @@ For `realtime` mode the dispatch relay POSTs to `Companion:AgentTriggerUrl` (if 
 ```json
 { "eventId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…" }
 ```
+Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configuration, omitted when empty) and `Idempotency-Key: <eventId>` so the receiver dedups the relay's retries (up to `MaxDispatchAttempts`). The digest wake (`{ "kind": "Digest", "userId": "…", "count": n }`) carries the bearer header only.
+
 No secrets, no full detail — the agent resolves specifics via the tools above using its own authenticated identity (FR-016). A missing URL ⇒ no push; the agent pulls instead.
+
+Materiality note: `SyncFailure` is held for the digest in every mode except quiet unless the referenced bank account has had no successful sync for more than 24h (`MaterialityPolicy.SyncFailureEscalationAge`), in which case the mode disposition applies. Provider-level sync failures with no account reference are always held.

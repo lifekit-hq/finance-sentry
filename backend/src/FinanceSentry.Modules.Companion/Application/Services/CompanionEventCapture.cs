@@ -11,6 +11,7 @@ public sealed class CompanionEventCapture(
     IAnalystActionFeedReader analystActions,
     IBrokerageHoldingsReader holdings,
     IBankingTotalsReader banking,
+    IBankingAccountsReader accounts,
     INotificationSettingRepository settings,
     ICompanionEventRepository events,
     ICompanionCaptureStateRepository captureState,
@@ -48,6 +49,7 @@ public sealed class CompanionEventCapture(
 
         var written = 0;
         var maxSeen = watermark;
+        var accountsByUser = new Dictionary<Guid, IReadOnlyList<BankingAccountSummary>>();
         foreach (var a in rows)
         {
             maxSeen = a.CreatedAt > maxSeen ? a.CreatedAt : maxSeen;
@@ -58,6 +60,9 @@ public sealed class CompanionEventCapture(
             }
 
             var mode = (await settings.GetOrDefaultAsync(a.UserId, ct)).Mode;
+            var staleness = kind == CompanionEventKind.SyncFailure
+                ? await SourceStalenessAsync(a, accountsByUser, ct)
+                : null;
             var evt = new CompanionEvent
             {
                 UserId = a.UserId,
@@ -68,7 +73,7 @@ public sealed class CompanionEventCapture(
                 DedupKey = policy.AlertDedupKey(a.AlertId),
                 ReferenceId = a.ReferenceId ?? a.AlertId,
                 SourceModule = "alerts",
-                Disposition = policy.DispositionFor(mode, kind.Value),
+                Disposition = policy.DispositionFor(mode, kind.Value, staleness),
                 OccurredAt = a.CreatedAt,
             };
 
@@ -142,6 +147,39 @@ public sealed class CompanionEventCapture(
 
         await captureState.SetWatermarkAsync(AnalystSource, maxSeen, ct);
         return written;
+    }
+
+    /// <summary>
+    /// Time since the alert's referenced bank account last synced successfully. Null when the alert
+    /// carries no account reference (provider-level sync failures: crypto, brokerage, research feeds)
+    /// or the account has never synced — the policy treats null as "not proven stale".
+    /// </summary>
+    private async Task<TimeSpan?> SourceStalenessAsync(
+        MaterialAlertRecord alert,
+        Dictionary<Guid, IReadOnlyList<BankingAccountSummary>> accountsByUser,
+        CancellationToken ct)
+    {
+        if (alert.ReferenceId is not { } accountId)
+        {
+            return null;
+        }
+
+        if (!accountsByUser.TryGetValue(alert.UserId, out var summaries))
+        {
+            summaries = await accounts.GetAccountSummariesAsync(alert.UserId, ct);
+            accountsByUser[alert.UserId] = summaries;
+        }
+
+        var lastOk = summaries.FirstOrDefault(s => s.AccountId == accountId)?.LastSuccessfulSyncTimestamp;
+        if (lastOk is not { } last)
+        {
+            return null;
+        }
+
+        var lastUtc = last.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(last, DateTimeKind.Utc)
+            : last.ToUniversalTime();
+        return DateTimeOffset.UtcNow - new DateTimeOffset(lastUtc);
     }
 
     private static string Trim(string value, int max)

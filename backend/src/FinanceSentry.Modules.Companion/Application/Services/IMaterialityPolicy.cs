@@ -15,10 +15,19 @@ public interface IMaterialityPolicy
     EventDisposition DispositionForMode(NotificationMode mode);
 
     /// <summary>
-    /// Kind-aware disposition. Behaves like <see cref="DispositionForMode"/> except operational failures
-    /// carry elevated criticality — they are never suppressed purely by a quiet mode (US4).
+    /// Kind-aware disposition. Behaves like <see cref="DispositionForMode"/> except: operational failures
+    /// carry elevated criticality — they are never suppressed purely by a quiet mode (US4); and sync
+    /// failures are held for the digest unless the failing source has gone without a successful sync
+    /// for longer than <see cref="SyncFailureEscalationAge"/>.
     /// </summary>
-    EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind);
+    /// <param name="sourceStaleness">
+    /// Time since the event's source last synced successfully, or null when unknown (no account
+    /// reference, or never synced). Only consulted for <see cref="CompanionEventKind.SyncFailure"/>.
+    /// </param>
+    EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null);
+
+    /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest.</summary>
+    TimeSpan SyncFailureEscalationAge { get; }
 
     string AlertDedupKey(Guid alertId);
 
