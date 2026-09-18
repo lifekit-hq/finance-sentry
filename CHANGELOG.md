@@ -5,6 +5,34 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.9.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.8.0...v1.9.0) (2026-09-18)
+
+
+### Features
+
+* **048:** conform finance-sentry to the platform contract ([#639](https://github.com/lifekit-hq/finance-sentry/issues/639)) ([c065fff](https://github.com/lifekit-hq/finance-sentry/commit/c065fff011c494b4cd5f0b24e3e0472d63d9092a))
+* **bank-sync:** discover new accounts on existing connections during scheduled sync ([#637](https://github.com/lifekit-hq/finance-sentry/issues/637)) ([d164b31](https://github.com/lifekit-hq/finance-sentry/commit/d164b310bdf1e8847dc60507f198313bd75ad9d2))
+* **companion:** authenticate the agent wake and hold SyncFailure for the digest ([#641](https://github.com/lifekit-hq/finance-sentry/issues/641)) ([3f07f28](https://github.com/lifekit-hq/finance-sentry/commit/3f07f280cac8e6f12e1023d2c7f4b002d3637365))
+* **crypto:** accumulate Revolut X cost basis from trades and keep venue fiat as venue cash ([#634](https://github.com/lifekit-hq/finance-sentry/issues/634)) ([8648734](https://github.com/lifekit-hq/finance-sentry/commit/8648734d599279162a899f6537728f9a362c39fb))
+* **crypto:** sync Revolut X holdings behind a provider-keyed exchange seam ([#629](https://github.com/lifekit-hq/finance-sentry/issues/629)) ([2c8db0c](https://github.com/lifekit-hq/finance-sentry/commit/2c8db0ccf33a0df2fa9dc19e1b00bc3f9b848dae))
+* **observability:** add HTTP trace spine (gateway -&gt; api -&gt; Npgsql) with trace ids in logs ([#628](https://github.com/lifekit-hq/finance-sentry/issues/628)) ([5b991a6](https://github.com/lifekit-hq/finance-sentry/commit/5b991a665d44e4e29e382c74ca40e5e4fbef8cbd))
+* **observability:** propagate trace context into Hangfire jobs ([#632](https://github.com/lifekit-hq/finance-sentry/issues/632)) ([b3878a5](https://github.com/lifekit-hq/finance-sentry/commit/b3878a54b74a219eb602bf1ee75eb28dc188e413))
+* **scanner:** gate the widened scan's alerts and prove the funnel end… ([#612](https://github.com/lifekit-hq/finance-sentry/issues/612)) ([e8616ff](https://github.com/lifekit-hq/finance-sentry/commit/e8616ff6dfec3b54aa6e5cad3c4d9266ee648534))
+
+
+### Bug Fixes
+
+* **agent:** never save a failed or silent agent turn as a Ledger read ([#636](https://github.com/lifekit-hq/finance-sentry/issues/636)) ([f31ed3e](https://github.com/lifekit-hq/finance-sentry/commit/f31ed3e26fd41d9f807d3777af650929f117f0a2)), closes [#635](https://github.com/lifekit-hq/finance-sentry/issues/635)
+* **auth:** revoke refresh token on logout and honor configured JWT lifetime ([#638](https://github.com/lifekit-hq/finance-sentry/issues/638)) ([20a5501](https://github.com/lifekit-hq/finance-sentry/commit/20a5501edc850051c45a486a31b34541a5801fbf))
+* **backend:** match OpenTelemetry Prometheus exporter for nuget minor/patch group ([#631](https://github.com/lifekit-hq/finance-sentry/issues/631)) ([5631bfc](https://github.com/lifekit-hq/finance-sentry/commit/5631bfc48ecf2f6d5cf83b67efc1e3eb09b2630a))
+* **banksync:** keep digits-only last4 and link only after accounts exist ([#633](https://github.com/lifekit-hq/finance-sentry/issues/633)) ([1848a19](https://github.com/lifekit-hq/finance-sentry/commit/1848a19ce6888cf7b55c180e35a19f9c723d3545))
+* **research:** stop a failed quote-cache write poisoning the thesis save ([#627](https://github.com/lifekit-hq/finance-sentry/issues/627)) ([403b1bd](https://github.com/lifekit-hq/finance-sentry/commit/403b1bd915d67fa47a2fa2e1994d98ff354c87cc)), closes [#626](https://github.com/lifekit-hq/finance-sentry/issues/626)
+
+
+### Documentation
+
+* **constitution:** add Principle VII — Ledger boundary (MCP-only tools, id-only hook, no Ledger-named endpoint) ([#640](https://github.com/lifekit-hq/finance-sentry/issues/640)) ([f55c87d](https://github.com/lifekit-hq/finance-sentry/commit/f55c87d38a0ccdef74f819eeeda5bf2259aab39c))
+
 ## [1.8.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.7.0...v1.8.0) (2026-09-14)
 
 
