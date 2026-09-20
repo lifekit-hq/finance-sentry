@@ -16,9 +16,7 @@ export class DossierService extends ApiService {
 
   /** Cached "Ledger's read" — instant, never runs the agent. */
   public getLedgerRead(symbol: string): Observable<AssetLedgerReadDto> {
-    return this.get<AssetLedgerReadDto>(
-      `research/assets/${encodeURIComponent(symbol)}/narrative`
-    );
+    return this.get<AssetLedgerReadDto>(`research/assets/${encodeURIComponent(symbol)}/narrative`);
   }
 
   /** Runs the agent loop and caches the result; `force` regenerates over a fresh cached copy. */
