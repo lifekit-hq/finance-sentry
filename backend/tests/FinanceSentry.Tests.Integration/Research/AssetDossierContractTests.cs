@@ -104,7 +104,7 @@ public class AssetDossierContractTests(AssetDossierApiFactory factory)
     }
 }
 
-// ── Contract tests: {GET,POST} /api/v1/research/assets/{symbol}/ledger-read ──
+// ── Contract tests: {GET,POST} /api/v1/research/assets/{symbol}/narrative ──
 //
 // "Ledger's read" (feature 421, US3): generated on demand through the agent loop, cached
 // server-side, invalidated daily or when the dossier facts move. The agent itself is stubbed
@@ -120,14 +120,14 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
     public async Task GetLedgerRead_NoAuth_Returns401()
     {
         var anonClient = _factory.CreateClient();
-        var response = await anonClient.GetAsync("/api/v1/research/assets/AAPL/ledger-read");
+        var response = await anonClient.GetAsync("/api/v1/research/assets/AAPL/narrative");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task GetLedgerRead_NothingGeneratedYet_Returns200WithNullNarrative()
     {
-        var response = await _client.GetAsync("/api/v1/research/assets/NONE/ledger-read");
+        var response = await _client.GetAsync("/api/v1/research/assets/NONE/narrative");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<LedgerReadShape>();
@@ -144,7 +144,7 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .Setup(n => n.NarrateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("MSFT looks fine.");
 
-        var generated = await _client.PostAsync("/api/v1/research/assets/MSFT/ledger-read", null);
+        var generated = await _client.PostAsync("/api/v1/research/assets/MSFT/narrative", null);
 
         generated.StatusCode.Should().Be(HttpStatusCode.OK);
         var fresh = await generated.Content.ReadFromJsonAsync<LedgerReadShape>();
@@ -154,7 +154,7 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
         fresh.GeneratedAt.Should().NotBeNull();
 
         // The cached copy renders without regenerating.
-        var cachedResponse = await _client.GetAsync("/api/v1/research/assets/MSFT/ledger-read");
+        var cachedResponse = await _client.GetAsync("/api/v1/research/assets/MSFT/narrative");
         var cached = await cachedResponse.Content.ReadFromJsonAsync<LedgerReadShape>();
         cached!.Narrative.Should().Be("MSFT looks fine.");
         cached.Cached.Should().BeTrue();
@@ -173,8 +173,8 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .Setup(n => n.NarrateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("NVDA read.");
 
-        await _client.PostAsync("/api/v1/research/assets/NVDA/ledger-read", null);
-        var second = await _client.PostAsync("/api/v1/research/assets/NVDA/ledger-read", null);
+        await _client.PostAsync("/api/v1/research/assets/NVDA/narrative", null);
+        var second = await _client.PostAsync("/api/v1/research/assets/NVDA/narrative", null);
 
         var body = await second.Content.ReadFromJsonAsync<LedgerReadShape>();
         body!.Narrative.Should().Be("NVDA read.");
@@ -193,8 +193,8 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .ReturnsAsync("first")
             .ReturnsAsync("second");
 
-        await _client.PostAsync("/api/v1/research/assets/TSLA/ledger-read", null);
-        var forced = await _client.PostAsync("/api/v1/research/assets/TSLA/ledger-read?force=true", null);
+        await _client.PostAsync("/api/v1/research/assets/TSLA/narrative", null);
+        var forced = await _client.PostAsync("/api/v1/research/assets/TSLA/narrative?force=true", null);
 
         var body = await forced.Content.ReadFromJsonAsync<LedgerReadShape>();
         body!.Narrative.Should().Be("second");
@@ -211,7 +211,7 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .Setup(n => n.NarrateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("AMD read.");
 
-        await _client.PostAsync("/api/v1/research/assets/AMD/ledger-read", null);
+        await _client.PostAsync("/api/v1/research/assets/AMD/narrative", null);
 
         // The position appears after the read was generated — the dossier fingerprint moves.
         var pos = new BookFigurePosition("AMD", "equity", 5m, 500m, 700m, "ibkr");
@@ -222,7 +222,7 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .Setup(s => s.GetForSymbolAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var response = await _client.GetAsync("/api/v1/research/assets/AMD/ledger-read");
+        var response = await _client.GetAsync("/api/v1/research/assets/AMD/narrative");
 
         var body = await response.Content.ReadFromJsonAsync<LedgerReadShape>();
         body!.Narrative.Should().Be("AMD read.", "a stale read is still shown, just flagged");
@@ -237,7 +237,7 @@ public class AssetLedgerReadContractTests(AssetDossierApiFactory factory)
             .Setup(n => n.NarrateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        var response = await _client.PostAsync("/api/v1/research/assets/INTC/ledger-read", null);
+        var response = await _client.PostAsync("/api/v1/research/assets/INTC/narrative", null);
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         var body = await response.Content.ReadFromJsonAsync<LedgerReadErrorShape>();

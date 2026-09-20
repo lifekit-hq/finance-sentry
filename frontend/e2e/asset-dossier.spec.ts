@@ -306,7 +306,7 @@ async function mockApis(page: Page): Promise<void> {
     })
   );
   // Default: nothing generated yet. Individual tests re-route to cover the cached/stale/error paths.
-  await page.route(`${API}/research/assets/AAPL/ledger-read**`, route =>
+  await page.route(`${API}/research/assets/AAPL/narrative**`, route =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -433,7 +433,7 @@ test.describe("Ledger's read", () => {
 
   test('generate button posts to the agent and renders the returned read', async ({page}) => {
     let postCount = 0;
-    await page.route(`${API}/research/assets/AAPL/ledger-read**`, route => {
+    await page.route(`${API}/research/assets/AAPL/narrative**`, route => {
       if (route.request().method() === 'POST') {
         postCount += 1;
         return route.fulfill({
@@ -465,7 +465,7 @@ test.describe("Ledger's read", () => {
 
   test('a cached read renders on load without regenerating', async ({page}) => {
     let postCount = 0;
-    await page.route(`${API}/research/assets/AAPL/ledger-read**`, route => {
+    await page.route(`${API}/research/assets/AAPL/narrative**`, route => {
       if (route.request().method() === 'POST') {
         postCount += 1;
       }
@@ -491,7 +491,7 @@ test.describe("Ledger's read", () => {
   });
 
   test('a stale cached read still renders, flagged out of date', async ({page}) => {
-    await page.route(`${API}/research/assets/AAPL/ledger-read**`, route =>
+    await page.route(`${API}/research/assets/AAPL/narrative**`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -513,7 +513,7 @@ test.describe("Ledger's read", () => {
   });
 
   test('surfaces a friendly message when the agent is unavailable', async ({page}) => {
-    await page.route(`${API}/research/assets/AAPL/ledger-read**`, route => {
+    await page.route(`${API}/research/assets/AAPL/narrative**`, route => {
       if (route.request().method() === 'POST') {
         return route.fulfill({
           status: 503,
