@@ -1,9 +1,9 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
-using System.Text.RegularExpressions;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -36,24 +36,6 @@ public sealed class GeopoliticsSourceSeedJob(
     ICommandHandler<RegisterThesisSourceCommand, RegisteredSourceDto> registerSource,
     ILogger<GeopoliticsSourceSeedJob> logger)
 {
-    private const int MaxTermsPerQuery = 3;
-
-    /// <summary>
-    /// Geopolitics/policy terms (report §5.3, N2 examples: Ukraine ceasefire, sanctions, export
-    /// controls, SEC crypto rulings, stablecoin bill). A thesis's query is derived from whichever of
-    /// these its <c>ThesisText</c> mentions — never a fixed universal query, so a thesis with no
-    /// geopolitical exposure never gets a source registered for it.
-    /// </summary>
-    private static readonly string[] GeopoliticsTerms =
-    [
-        "sanction", "tariff", "export control", "ceasefire", "embargo",
-        "war", "conflict", "ruling", "regulation", "regulatory", "SEC", "stablecoin", "bill",
-    ];
-
-    private static readonly Regex[] GeopoliticsTermPatterns =
-        [.. GeopoliticsTerms.Select(term => new Regex(
-            $@"\b{Regex.Escape(term)}s?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled))];
-
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var theses = await research.Theses.AsNoTracking()
@@ -63,7 +45,7 @@ public sealed class GeopoliticsSourceSeedJob(
         var registered = 0;
         foreach (var thesis in theses)
         {
-            var terms = MatchTerms(thesis.ThesisText);
+            var terms = GeopoliticsTermMatcher.MatchTerms(thesis.ThesisText);
             if (terms.Count == 0)
             {
                 continue;
@@ -97,11 +79,6 @@ public sealed class GeopoliticsSourceSeedJob(
 
         logger.LogInformation("GeopoliticsSourceSeedJob registered {Count} new geopolitics sources", registered);
     }
-
-    private static List<string> MatchTerms(string thesisText)
-        => [.. GeopoliticsTerms
-            .Where((_, i) => GeopoliticsTermPatterns[i].IsMatch(thesisText))
-            .Take(MaxTermsPerQuery)];
 
     private static string BuildGoogleNewsRssUrl(Guid thesisId, string ticker, IReadOnlyList<string> terms)
     {

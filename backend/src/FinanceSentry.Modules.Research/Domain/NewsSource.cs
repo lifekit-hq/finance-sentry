@@ -34,4 +34,14 @@ public sealed class NewsSource
     public string? LastFailureReason { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// When a thesis-owned source was retired because its thesis was deleted or its thesis text no
+    /// longer matches the terms that earned the source (as opposed to <see cref="ConsecutiveFailures"/>
+    /// disabling it for health reasons); null while in service or health-disabled.
+    /// </summary>
+    public DateTimeOffset? RetiredAt { get; set; }
+
+    /// <summary>Human-readable reason paired with <see cref="RetiredAt"/>, e.g. "Owning thesis deleted".</summary>
+    public string? RetiredReason { get; set; }
 }

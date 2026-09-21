@@ -122,6 +122,14 @@ public static class ResearchModule
                 "research-geopolitics-source-seed",
                 job => job.ExecuteAsync(CancellationToken.None),
                 "30 1 * * *");
+
+            // Thesis-source staleness (text-no-longer-matches half; the orphaned half runs
+            // synchronously in DeleteThesisCommandHandler): daily, after the seed job so a thesis
+            // edited today doesn't get retired and re-registered in the same run.
+            mgr.AddOrUpdate<ThesisSourceRetirementJob>(
+                "research-thesis-source-retirement",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "45 1 * * *");
         }
     }
 
@@ -337,6 +345,7 @@ public static class ResearchModule
         services.AddScoped<FilingWatchJob>();
         services.AddScoped<NewsMaterialityJob>();
         services.AddScoped<GeopoliticsSourceSeedJob>();
+        services.AddScoped<ThesisSourceRetirementJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
