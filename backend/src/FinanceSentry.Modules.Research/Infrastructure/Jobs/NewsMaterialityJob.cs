@@ -10,7 +10,9 @@ using Microsoft.Extensions.Logging;
 /// keyword clusters in the news. Runs every 30 minutes, offset after the news ingestion sweep
 /// (<see cref="NewsIngestionJob"/>) so a freshly ingested batch — including per-thesis Google News RSS
 /// sources seeded by <see cref="GeopoliticsSourceSeedJob"/>, N2 — is visible to this run. Fires when,
-/// within <see cref="ClusterWindow"/>, a ticker's articles either (a) come from two or more distinct
+/// within <see cref="ClusterWindow"/>, a ticker's articles — those tagged with the ticker (per-ticker
+/// feeds) plus those tagged with any of its theses (registered sources, which carry thesis tags but no
+/// ticker tags) — either (a) come from two or more distinct
 /// sources, (b) include a hit from a source registered to one of the ticker's theses, or (c) mention a
 /// <see cref="MaterialKeywords"/> term. <see cref="IAlertGeneratorService.GenerateNewsClusterAlertAsync"/>
 /// dedups per (ticker, day) and article-level ContentHash dedup at ingestion already collapses
@@ -111,7 +113,13 @@ public sealed class NewsMaterialityJob(
     private async Task ProcessTickerAsync(
         Guid userId, string ticker, HashSet<Guid> thesisIds, DateTimeOffset since, DateOnly day, CancellationToken ct)
     {
-        var articles = await news.GetForTickerAsync(ticker, since, ArticleLookbackLimit, ct);
+        var articles = (await news.GetForTickerAsync(ticker, since, ArticleLookbackLimit, ct)).ToList();
+        foreach (var thesisId in thesisIds)
+        {
+            articles.AddRange(await news.SearchAsync(null, null, thesisId, since, ArticleLookbackLimit, ct));
+        }
+
+        articles = [.. articles.DistinctBy(a => a.ContentHash, StringComparer.Ordinal)];
         if (articles.Count == 0)
         {
             return;

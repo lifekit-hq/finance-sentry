@@ -22,6 +22,7 @@ public sealed class GeopoliticsSourceSeedJobTests : IDisposable
 
     private GeopoliticsSourceSeedJob Job => new(
         _db,
+        _sources,
         new RegisterThesisSourceCommandHandler(_sources),
         NullLogger<GeopoliticsSourceSeedJob>.Instance);
 
@@ -39,6 +40,54 @@ public sealed class GeopoliticsSourceSeedJobTests : IDisposable
         source.ThesisId.Should().Be(thesisId);
         source.Url.Should().StartWith("https://news.google.com/rss/search?q=");
         source.Keywords.Should().Contain("export control");
+    }
+
+    [Fact]
+    public async Task Terms_inside_ordinary_words_do_not_match()
+    {
+        await SeedThesisAsync("NVDA", "AI software leader with a $30 billion data-center sector lead.");
+
+        await Job.ExecuteAsync();
+
+        _sources.Sources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Singular_and_plural_forms_use_one_term_slot()
+    {
+        await SeedThesisAsync("TSM", "A tariff now, more tariffs later, plus export controls and an embargo.");
+
+        await Job.ExecuteAsync();
+
+        _sources.Sources.Single().Keywords.Should().BeEquivalentTo(["tariff", "export control", "embargo"]);
+    }
+
+    [Fact]
+    public async Task Two_theses_on_the_same_ticker_and_terms_each_keep_their_own_source()
+    {
+        var first = await SeedThesisAsync("NVDA", "Export controls on China sales.");
+        var second = await SeedThesisAsync("NVDA", "Export controls on China sales.");
+
+        await Job.ExecuteAsync();
+        await Job.ExecuteAsync();
+
+        _sources.Sources.Select(s => s.ThesisId).Should().BeEquivalentTo(new Guid?[] { first, second });
+    }
+
+    [Fact]
+    public async Task Rerunning_the_job_does_not_re_enable_a_retired_source()
+    {
+        await SeedThesisAsync("TSM", "Sanctions risk on Taiwan Semi given cross-strait tension.");
+        await Job.ExecuteAsync();
+        var source = _sources.Sources.Single();
+        source.Enabled = false;
+        source.ConsecutiveFailures = 12;
+
+        await Job.ExecuteAsync();
+
+        source = _sources.Sources.Single();
+        source.Enabled.Should().BeFalse();
+        source.ConsecutiveFailures.Should().Be(12);
     }
 
     [Fact]

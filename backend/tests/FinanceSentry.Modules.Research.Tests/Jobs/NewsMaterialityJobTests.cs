@@ -43,9 +43,12 @@ public sealed class NewsMaterialityJobTests
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
             .ReturnsAsync([]);
+        _news.Setup(n => n.SearchAsync(
+                null, null, It.IsAny<Guid?>(), It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([]);
     }
 
-    private static NewsArticle Article(string source, string title, string? summary = null, IReadOnlyList<Guid>? thesisIds = null)
+    private static NewsArticle Article(string source, string title, string? summary = null)
         => new()
         {
             Source = source,
@@ -53,7 +56,7 @@ public sealed class NewsMaterialityJobTests
             Url = $"https://example.test/{Guid.NewGuid()}",
             Summary = summary,
             Tickers = ["AAPL"],
-            ThesisIds = thesisIds?.ToList() ?? [],
+            ThesisIds = [],
             PublishedAt = DateTimeOffset.UtcNow,
             ContentHash = Guid.NewGuid().ToString("N"),
         };
@@ -103,20 +106,76 @@ public sealed class NewsMaterialityJobTests
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
     }
 
-    [Fact]
-    public async Task Execute_SingleSource_ThesisAttachedHit_Fires()
+    /// <summary>
+    /// Registered-source articles (thesis keyword sources, N2 geopolitics feeds) come out of
+    /// ingestion tagged with the thesis but never with a ticker — the detector must still see them.
+    /// </summary>
+    private static NewsArticle RegisteredSourceArticle(string source, string title, Guid thesisId)
+        => new()
+        {
+            Source = source,
+            Title = title,
+            Url = $"https://example.test/{Guid.NewGuid()}",
+            Tickers = [],
+            ThesisIds = [thesisId],
+            PublishedAt = DateTimeOffset.UtcNow,
+            ContentHash = Guid.NewGuid().ToString("N"),
+        };
+
+    private Guid SetupThesis(string ticker)
     {
         var thesisId = Guid.NewGuid();
         _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
-            new InvestmentThesis { Id = thesisId, UserId = _userId, Ticker = "AAPL" },
+            new InvestmentThesis { Id = thesisId, UserId = _userId, Ticker = ticker },
         ]);
-        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
-            .ReturnsAsync([Article("src:TrendForce Press Center", "AAPL supplier update", thesisIds: [thesisId])]);
+        return thesisId;
+    }
+
+    private void SetupThesisArticles(Guid thesisId, params NewsArticle[] articles)
+        => _news.Setup(n => n.SearchAsync(
+                null, null, thesisId, It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync(articles);
+
+    [Fact]
+    public async Task Execute_ThesisKeywordSourceHit_WithNoTickerTag_Fires()
+    {
+        var thesisId = SetupThesis("AAPL");
+        SetupThesisArticles(thesisId, RegisteredSourceArticle("src:TrendForce Press Center", "Supplier update", thesisId));
 
         await _job.ExecuteAsync(_nowUtc);
 
         _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
             _userId, "AAPL", It.Is<string>(r => r.Contains("thesis")), _today, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_GeopoliticsSourceArticle_WithNoTickerTag_Fires()
+    {
+        var thesisId = SetupThesis("AAPL");
+        SetupThesisArticles(
+            thesisId,
+            RegisteredSourceArticle("src:Google News: AAPL geopolitics", "New tariffs hit handset imports", thesisId));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", It.IsAny<string>(), _today, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_TickerFeedPlusThesisSource_CountsAsTwoSources()
+    {
+        var thesisId = SetupThesis("AAPL");
+        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([Article("yahoo:AAPL", "AAPL launches new product")]);
+        SetupThesisArticles(
+            thesisId,
+            RegisteredSourceArticle("src:Google News: AAPL geopolitics", "Export curbs widen", thesisId));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", It.Is<string>(r => r.Contains("2 sources")), _today, default), Times.Once);
     }
 
     [Theory]

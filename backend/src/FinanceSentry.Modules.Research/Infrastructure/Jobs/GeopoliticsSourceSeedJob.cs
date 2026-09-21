@@ -1,8 +1,10 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
+using System.Text.RegularExpressions;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
+using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -22,11 +24,15 @@ using Microsoft.Extensions.Logging;
 /// handled the same way any other registered RSS source's failure is: logged, retried, and only
 /// alerted through <see cref="NewsIngestionJob"/>'s own SyncFailure path after the health tracker's
 /// consecutive-failure threshold, never a job failure here.
-/// <see cref="RegisterThesisSourceCommand"/> is idempotent by URL, so re-running this job daily is a
-/// no-op once a thesis's geopolitics source already exists.
+/// Each source's URL carries its thesis id (as a fragment, never sent to Google), so two theses on the
+/// same ticker get separate sources instead of overwriting each other's owner. A URL that is already
+/// registered is skipped rather than re-registered, so re-running this job daily is a no-op once a
+/// thesis's geopolitics source exists — it never re-enables a source the health tracker retired.
+/// Terms match whole words only (optionally pluralised), so "war" never matches "software".
 /// </summary>
 public sealed class GeopoliticsSourceSeedJob(
     ResearchDbContext research,
+    INewsSourceRepository sources,
     ICommandHandler<RegisterThesisSourceCommand, RegisteredSourceDto> registerSource,
     ILogger<GeopoliticsSourceSeedJob> logger)
 {
@@ -40,9 +46,13 @@ public sealed class GeopoliticsSourceSeedJob(
     /// </summary>
     private static readonly string[] GeopoliticsTerms =
     [
-        "sanctions", "tariff", "tariffs", "export control", "export controls", "ceasefire", "embargo",
+        "sanction", "tariff", "export control", "ceasefire", "embargo",
         "war", "conflict", "ruling", "regulation", "regulatory", "SEC", "stablecoin", "bill",
     ];
+
+    private static readonly Regex[] GeopoliticsTermPatterns =
+        [.. GeopoliticsTerms.Select(term => new Regex(
+            $@"\b{Regex.Escape(term)}s?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled))];
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
@@ -59,13 +69,19 @@ public sealed class GeopoliticsSourceSeedJob(
                 continue;
             }
 
+            var url = BuildGoogleNewsRssUrl(thesis.Id, thesis.Ticker, terms);
             try
             {
+                if (await sources.GetByUrlAsync(url, ct) is not null)
+                {
+                    continue;
+                }
+
                 await registerSource.Handle(
                     new RegisterThesisSourceCommand(
                         thesis.Id,
                         $"Google News: {thesis.Ticker} geopolitics",
-                        BuildGoogleNewsRssUrl(thesis.Ticker, terms),
+                        url,
                         "Rss",
                         terms),
                     ct);
@@ -79,17 +95,17 @@ public sealed class GeopoliticsSourceSeedJob(
             }
         }
 
-        logger.LogInformation("GeopoliticsSourceSeedJob registered/refreshed {Count} geopolitics sources", registered);
+        logger.LogInformation("GeopoliticsSourceSeedJob registered {Count} new geopolitics sources", registered);
     }
 
     private static List<string> MatchTerms(string thesisText)
         => [.. GeopoliticsTerms
-            .Where(term => thesisText.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .Where((_, i) => GeopoliticsTermPatterns[i].IsMatch(thesisText))
             .Take(MaxTermsPerQuery)];
 
-    private static string BuildGoogleNewsRssUrl(string ticker, IReadOnlyList<string> terms)
+    private static string BuildGoogleNewsRssUrl(Guid thesisId, string ticker, IReadOnlyList<string> terms)
     {
         var query = $"{ticker} ({string.Join(" OR ", terms)})";
-        return $"https://news.google.com/rss/search?q={Uri.EscapeDataString(query)}&hl=en-US&gl=US&ceid=US:en";
+        return $"https://news.google.com/rss/search?q={Uri.EscapeDataString(query)}&hl=en-US&gl=US&ceid=US:en#thesis={thesisId:N}";
     }
 }
