@@ -21,7 +21,10 @@ updates:
       time: "06:00"
     open-pull-requests-limit: 5
     groups:
+      npm-dev-dependencies:
+        dependency-type: "development"
       npm-minor-and-patch:
+        dependency-type: "production"
         update-types:
           - minor
           - patch
@@ -34,7 +37,10 @@ updates:
       time: "06:00"
     open-pull-requests-limit: 5
     groups:
+      nuget-dev-dependencies:
+        dependency-type: "development"
       nuget-minor-and-patch:
+        dependency-type: "production"
         update-types:
           - minor
           - patch
