@@ -1,5 +1,9 @@
 # Automated dependency updates (issue #510). Weekly, grouped minor+patch to keep
 # PR noise low; security updates open immediately regardless of schedule.
+# Families that must move together are grouped across all update types (majors
+# too), so a family bump is one PR and one deploy: npm devDependencies, and the
+# Serilog* NuGet family (sibling PRs #648-#650 conflicted). NuGet labels every
+# package direct:production, so it has no dev/production split to group on.
 version: 2
 registries:
   github-npm:
