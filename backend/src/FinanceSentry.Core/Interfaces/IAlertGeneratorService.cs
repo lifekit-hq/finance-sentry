@@ -260,6 +260,22 @@ public interface IAlertGeneratorService
         string accessionNumber,
         string documentUrl,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert that a held name or thesis keyword clustered in the news (N1,
+    /// ledger-heartbeat design): two or more distinct sources within a 2h window, a thesis-attached
+    /// source hit, or a material-class keyword (guidance, downgrade, investigation, M&amp;A, halted,
+    /// recall, acquisition). Deduped per (ticker, <paramref name="day"/>) — article-level ContentHash
+    /// dedup already collapses re-ingested items at the news layer, so a feed that returns the same
+    /// items every 30 minutes produces one alert here, not 48. The loudest signal in the design
+    /// (~0.3-1 fires/day); noise controls are the feature, not a refinement.
+    /// </summary>
+    Task GenerateNewsClusterAlertAsync(
+        Guid userId,
+        string ticker,
+        string reason,
+        DateOnly day,
+        CancellationToken ct = default);
 }
 
 /// <summary>

@@ -582,6 +582,68 @@ public class AlertGeneratorServiceTests
         VerifyNothingAdded();
     }
 
+    [Fact]
+    public async Task GenerateNewsCluster_NoExisting_AddsWarningAlert()
+    {
+        var day = DateOnly.FromDateTime(DateTime.UtcNow);
+        AllowAlert(AlertType.NewsCluster);
+
+        await _service.GenerateNewsClusterAlertAsync(_userId, "AAPL", "2 sources within 2h", day);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.NewsCluster &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title.Contains("AAPL") &&
+            a.Message.Contains("2 sources within 2h")), default), Times.Once);
+    }
+
+    /// <summary>
+    /// Same ticker, same day must resolve to the same reference id — the 30-min job's core dedup
+    /// guarantee, since the job re-checks the same ticker every run within the day.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNewsCluster_SameTickerAndDay_ProducesStableReferenceId()
+    {
+        var day = DateOnly.FromDateTime(DateTime.UtcNow);
+        var written = new List<Alert>();
+        AllowAlert(AlertType.NewsCluster);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateNewsClusterAlertAsync(_userId, "AAPL", "2 sources within 2h", day);
+        await _service.GenerateNewsClusterAlertAsync(_userId, "aapl", "thesis-attached source hit", day);
+        await _service.GenerateNewsClusterAlertAsync(_userId, "AAPL", "2 sources within 2h", day.AddDays(1));
+
+        Assert.Equal(written[0].ReferenceId, written[1].ReferenceId);
+        Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
+    }
+
+    [Fact]
+    public async Task GenerateNewsCluster_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.NewsCluster);
+
+        await _service.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", "2 sources within 2h", DateOnly.FromDateTime(DateTime.UtcNow));
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    [Fact]
+    public async Task GenerateNewsCluster_RecentDismissed_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.NewsCluster);
+
+        await _service.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", "2 sources within 2h", DateOnly.FromDateTime(DateTime.UtcNow));
+
+        VerifyNothingAdded();
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection
