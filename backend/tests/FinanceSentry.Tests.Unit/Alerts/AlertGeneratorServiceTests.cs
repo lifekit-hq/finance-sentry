@@ -5,6 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
+using FluentAssertions;
 using Moq;
 using Xunit;
 
@@ -796,6 +797,89 @@ public class AlertGeneratorServiceTests
         Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
     }
 
+    [Fact]
+    public async Task GenerateMarketStructure_NoExisting_AddsWarningAlert()
+    {
+        var referenceId = Guid.NewGuid();
+        AllowAlert(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.2% intraday, above the holding 5% bar");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.MarketStructure &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceId == referenceId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title.Contains("AAPL") &&
+            a.Message.Contains("5% bar")), default), Times.Once);
+    }
+
+    /// <summary>
+    /// P1 (ledger-heartbeat design): the intraday-move-sentinel job re-checks every held/watchlisted
+    /// ticker every 15 minutes, so a name that keeps moving must announce itself once per 24h, not
+    /// once per tick — proven here at the generator level (the job always asks with the same
+    /// per-ticker reference id) rather than merely asserted in the job's own tests.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_SameTickerWithinTwentyFourHours_SecondCallIsSuppressed()
+    {
+        var referenceId = Guid.NewGuid();
+        var written = new List<Alert>();
+        _repo.SetupSequence(r => r.FindActiveAsync(_userId, AlertType.MarketStructure, referenceId, default))
+            .ReturnsAsync((Alert?)null)
+            .ReturnsAsync(new Alert { Id = Guid.NewGuid() });
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.2% intraday");
+        await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.9% intraday");
+
+        written.Should().ContainSingle("the second tick's active-alert check finds the first alert still open");
+    }
+
+    [Fact]
+    public async Task GenerateMarketStructure_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 6.2% intraday");
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    /// <summary>
+    /// Backstop path: the prior alert was dismissed (no longer active), but it is still inside the
+    /// declared 24h window — a re-run must stay quiet rather than re-alert the same ticker.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_DismissedWithinTwentyFourHourWindow_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 6.2% intraday");
+
+        VerifyNothingAdded();
+    }
+
+    [Fact]
+    public async Task GenerateMarketStructure_DifferentTicker_ProducesADifferentReferenceId_AndStillFires()
+    {
+        var aaplRef = Guid.NewGuid();
+        var msftRef = Guid.NewGuid();
+        AllowAlert(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(_userId, aaplRef, "AAPL", "moved 6.2% intraday");
+        await _service.GenerateMarketStructureAlertAsync(_userId, msftRef, "MSFT", "moved 9.1% intraday");
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Exactly(2));
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection
@@ -823,7 +907,7 @@ public class AlertGeneratorServiceTests
             .ToList();
 
         Assert.NotEmpty(live);
-        Assert.Empty(live.Where(t => !declared.ContainsKey(t)));
+        Assert.DoesNotContain(live, t => !declared.ContainsKey(t));
     }
 
     private void AllowAlert(string type)
