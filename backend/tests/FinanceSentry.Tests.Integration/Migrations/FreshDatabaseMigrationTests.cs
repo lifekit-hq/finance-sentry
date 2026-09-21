@@ -80,6 +80,40 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
             "M013_ThesisEntryPrice must have applied so theses.EntryPrice exists");
     }
 
+    [DockerRequiredFact]
+    public async Task RestartOnAMigratedDatabase_KeepsResearchDataAppliedAfterTheRiskDependency()
+    {
+        await using (var firstBoot = new FreshDatabaseApiFactory(_postgres!.GetConnectionString()))
+        {
+            firstBoot.CreateClient().Dispose();
+        }
+
+        var userId = Guid.NewGuid();
+        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await conn.OpenAsync();
+        await using (var insert = new NpgsqlCommand(
+            """
+            INSERT INTO research.asset_ledger_reads ("UserId", "Symbol", "Narrative", "SourceFingerprint")
+            VALUES (@userId, 'AAPL', 'kept across restarts', 'fp')
+            """,
+            conn))
+        {
+            insert.Parameters.AddWithValue("userId", userId);
+            await insert.ExecuteNonQueryAsync();
+        }
+
+        await using (var secondBoot = new FreshDatabaseApiFactory(_postgres!.GetConnectionString()))
+        {
+            secondBoot.CreateClient().Dispose();
+        }
+
+        await using var select = new NpgsqlCommand(
+            """SELECT count(*) FROM research.asset_ledger_reads WHERE "UserId" = @userId""", conn);
+        select.Parameters.AddWithValue("userId", userId);
+        (await select.ExecuteScalarAsync()).Should().Be(1L,
+            "a restart must not roll Research back below M014 and re-apply it onto an empty table");
+    }
+
     private sealed class FreshDatabaseApiFactory(string connectionString) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)

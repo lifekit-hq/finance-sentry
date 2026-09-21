@@ -76,7 +76,11 @@ public static class MigrationExtensions
     {
         try
         {
-            sp.GetRequiredService<TContext>().GetService<IMigrator>().Migrate(targetMigration);
+            var context = sp.GetRequiredService<TContext>();
+            if (targetMigration is not null && context.Database.GetAppliedMigrations().Contains(targetMigration))
+                return;
+
+            context.GetService<IMigrator>().Migrate(targetMigration);
         }
         catch (Exception ex)
         {
