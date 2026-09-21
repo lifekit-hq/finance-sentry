@@ -163,6 +163,34 @@ public sealed class NewsMaterialityJobTests
     }
 
     [Fact]
+    public async Task Execute_ThesisSourceArticle_WithProxyTrigger_FiresOnlyForTheThesisTicker()
+    {
+        var thesisId = Guid.NewGuid();
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+            new InvestmentThesis
+            {
+                Id = thesisId,
+                UserId = _userId,
+                Ticker = "NVDA",
+                InvalidationTriggers = [new ThesisInvalidationTrigger("gross_margin", "lessThan", 0.35m, "SOXX")],
+            },
+        ]);
+        _news.Setup(n => n.GetForTickerAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([]);
+        SetupThesisArticles(
+            thesisId,
+            RegisteredSourceArticle("src:Google News: NVDA geopolitics", "Export curbs widen", thesisId));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            _userId, "NVDA", It.IsAny<string>(), _today, default), Times.Once);
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), "SOXX", It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    [Fact]
     public async Task Execute_TickerFeedPlusThesisSource_CountsAsTwoSources()
     {
         var thesisId = SetupThesis("AAPL");

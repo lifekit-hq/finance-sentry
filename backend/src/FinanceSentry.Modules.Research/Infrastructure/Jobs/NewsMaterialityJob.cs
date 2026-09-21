@@ -87,7 +87,7 @@ public sealed class NewsMaterialityJob(
             {
                 if (!string.IsNullOrWhiteSpace(trigger.ProxyTicker))
                 {
-                    AddThesisTicker(tickerThesisIds, trigger.ProxyTicker, thesis.Id);
+                    tickerThesisIds.TryAdd(trigger.ProxyTicker, []);
                 }
             }
         }
