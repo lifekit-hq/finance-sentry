@@ -131,15 +131,14 @@ public sealed class FilingWatchJobTests
     }
 
     [Fact]
-    public async Task Execute_FilingTypeOutsideCoveredSet_EmitsNothing()
+    public async Task Execute_RequestsOnlyCoveredFormTypes()
     {
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        // A real ISecEdgarService already filters to the requested form types — this proves the job
-        // never surfaces a filing type the service hands back outside that set either.
+        // Form filtering is delegated to ISecEdgarService — the job only has to ask for 10-K/10-Q/8-K.
         _secEdgar.Setup(e => e.GetRecentFilingsAsync(
                 "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
-            .ReturnsAsync([Filing("AAPL", "10-K"), Filing("AAPL", "10-Q")]);
+            .ReturnsAsync([]);
 
         await _job.ExecuteAsync(_nowUtc);
 

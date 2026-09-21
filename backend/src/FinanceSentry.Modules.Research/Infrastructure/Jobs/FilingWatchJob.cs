@@ -14,7 +14,8 @@ using Microsoft.Extensions.Logging;
 /// filings already seen. Only filings dated today are considered, so a stale or backfilled
 /// submissions response can never surface a filing from before this job existed. EDGAR is an
 /// external dependency with no contract — a missing field, an empty submissions list or a failed
-/// fetch already come back as an empty result from <see cref="ISecEdgarService"/>, so a provider
+/// fetch already come back as an empty result from <see cref="ISecEdgarService"/> (which keeps the
+/// submissions cache shorter than the hourly cadence and never caches a failed fetch), so a provider
 /// hiccup here means no alert this run, never a job failure. Rare by design (~0.2 fires/day in
 /// earnings weeks).
 /// </summary>
