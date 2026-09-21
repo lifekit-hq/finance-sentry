@@ -96,7 +96,15 @@ public sealed class IntradayMoveSentinelJob(
                 continue;
             }
 
-            await EvaluateAsync(userId, tracker, quote, volatility, ct);
+            // One ticker's failure must not drop the rest of this user's tickers for the tick.
+            try
+            {
+                await EvaluateAsync(userId, tracker, quote, volatility, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "IntradayMoveSentinel: error evaluating {Ticker} for user {UserId}", ticker, userId);
+            }
         }
     }
 

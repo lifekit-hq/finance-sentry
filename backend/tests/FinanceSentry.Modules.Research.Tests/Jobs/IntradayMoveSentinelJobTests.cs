@@ -116,6 +116,26 @@ public sealed class IntradayMoveSentinelJobTests
             _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
+    /// <summary>One ticker's alert write failing must not drop the user's other tickers for the tick.</summary>
+    [Fact]
+    public async Task Execute_OneTickersAlertThrows_OtherTickersStillFire()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([
+                new BrokerageHoldingSummary("INTC", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR"),
+                new BrokerageHoldingSummary("MSFT", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR"),
+            ]);
+        SetQuotes(Quote("INTC", price: 112m, previousClose: 100m), Quote("MSFT", price: 106m, previousClose: 100m));
+        _alerts.Setup(a => a.GenerateMarketStructureAlertAsync(
+                _userId, It.IsAny<Guid>(), "INTC", It.IsAny<string>(), default, It.IsAny<AlertDedup>()))
+            .ThrowsAsync(new InvalidOperationException("insert failed"));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            _userId, It.IsAny<Guid>(), "MSFT", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
+    }
+
     [Fact]
     public async Task Execute_HoldingMovesBelowFivePercent_NoAlert()
     {

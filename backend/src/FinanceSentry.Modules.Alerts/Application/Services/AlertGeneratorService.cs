@@ -404,6 +404,13 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
                 return;
         }
 
+        // idx_alert_dedup allows one open alert per (user, type, reference): a SilenceOnly occurrence
+        // past its window supersedes the still-open earlier one instead of colliding with it.
+        if (draft.Dedup == AlertDedup.SilenceOnly && draft.ReferenceId is not null)
+        {
+            await ResolveAsync(userId, draft.Type, draft.ReferenceId, ct);
+        }
+
         await _alerts.AddAsync(new Alert
         {
             UserId = userId,
