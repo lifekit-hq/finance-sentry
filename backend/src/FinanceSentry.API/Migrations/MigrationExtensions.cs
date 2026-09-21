@@ -17,9 +17,21 @@ using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.Retention.Infrastructure.Persistence;
 using FinanceSentry.Modules.Agent.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 public static class MigrationExtensions
 {
+    // Research M012 (reconcile-and-drop the position cap) writes into risk.risk_rule_sets, and Risk
+    // M002 (reconcile-and-drop the allocation targets) writes into research.investment_policy_statements
+    // — a genuine data dependency in both directions between the two modules (#661). Neither module can
+    // simply migrate wholesale before the other: Research needs Risk's table (created by Risk M001)
+    // before M012 runs, and Risk needs Research's table (created by Research M003, long before M012) for
+    // its own M002. So Research migrates up to the migration before M012, Risk migrates in full (M002
+    // finds research.investment_policy_statements already there from Research M003), and only then does
+    // Research finish from M012 onward (finds risk.risk_rule_sets already there from Risk M001).
+    private const string ResearchMigrationBeforeRiskDependency = "20260806140817_M011_CleanAnalystActionFirms";
+
     public static WebApplication MigrateAllModules(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
@@ -33,9 +45,10 @@ public static class MigrationExtensions
         MigrateContext<BudgetsDbContext>(sp, app.Logger);
         MigrateContext<SubscriptionsDbContext>(sp, app.Logger);
         MigrateContext<WealthDbContext>(sp, app.Logger);
+        MigrateContext<ResearchDbContext>(sp, app.Logger, targetMigration: ResearchMigrationBeforeRiskDependency);
+        MigrateContext<RiskDbContext>(sp, app.Logger);
         MigrateContext<ResearchDbContext>(sp, app.Logger);
         MigrateContext<RadarDbContext>(sp, app.Logger);
-        MigrateContext<RiskDbContext>(sp, app.Logger);
         MigrateContext<CompanionDbContext>(sp, app.Logger);
         MigrateContext<AnalyticsDbContext>(sp, app.Logger);
         MigrateContext<RetentionDbContext>(sp, app.Logger);
@@ -58,12 +71,12 @@ public static class MigrationExtensions
         }
     }
 
-    private static void MigrateContext<TContext>(IServiceProvider sp, ILogger logger)
+    private static void MigrateContext<TContext>(IServiceProvider sp, ILogger logger, string? targetMigration = null)
         where TContext : DbContext
     {
         try
         {
-            sp.GetRequiredService<TContext>().Database.Migrate();
+            sp.GetRequiredService<TContext>().GetService<IMigrator>().Migrate(targetMigration);
         }
         catch (Exception ex)
         {
