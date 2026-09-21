@@ -5,6 +5,20 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.10.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.9.0...v1.10.0) (2026-09-21)
+
+
+### Features
+
+* **research:** add earnings-ahead detector job with EarningsAhead alerts ([#655](https://github.com/lifekit-hq/finance-sentry/issues/655)) ([f815ae7](https://github.com/lifekit-hq/finance-sentry/commit/f815ae7e81db297eda8df79d5f1566ccb1cf38d4))
+* **research:** add hourly filing-watch job emitting FilingLanded alerts ([#656](https://github.com/lifekit-hq/finance-sentry/issues/656)) ([df3b189](https://github.com/lifekit-hq/finance-sentry/commit/df3b189a3e78d36b7fc36f24e6f9f314153e0044))
+* **research:** add news-cluster detector with Google News RSS geopolitics source ([#660](https://github.com/lifekit-hq/finance-sentry/issues/660)) ([c7127e9](https://github.com/lifekit-hq/finance-sentry/commit/c7127e9c292befdb7f7b77ef202e4756ed9e29ae))
+
+
+### Refactoring
+
+* **421:** rename research/assets/{symbol}/ledger-read to /narrative (Principle VII) ([#646](https://github.com/lifekit-hq/finance-sentry/issues/646)) ([9d7f6f5](https://github.com/lifekit-hq/finance-sentry/commit/9d7f6f5a2079ec5962ad04e0eb507878d4101f5e))
+
 ## [1.9.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.8.0...v1.9.0) (2026-09-18)
 
 
