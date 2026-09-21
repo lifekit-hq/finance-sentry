@@ -30,6 +30,8 @@ public static class MigrationExtensions
     // its own M002. So Research migrates up to the migration before M012, Risk migrates in full (M002
     // finds research.investment_policy_statements already there from Research M003), and only then does
     // Research finish from M012 onward (finds risk.risk_rule_sets already there from Risk M001).
+    // The partial step is skipped once M011 is applied: Migrate(target) moves the database to exactly
+    // that migration, so on an already-migrated database it would roll back M012+ (and their data).
     private const string ResearchMigrationBeforeRiskDependency = "20260806140817_M011_CleanAnalystActionFirms";
 
     public static WebApplication MigrateAllModules(this WebApplication app)
