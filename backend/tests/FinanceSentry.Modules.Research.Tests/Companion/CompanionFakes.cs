@@ -213,10 +213,15 @@ internal sealed class FakeNewsSourceRepository : INewsSourceRepository
         => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Where(s => s.Enabled).Select(Copy).ToList());
 
     public Task<IReadOnlyList<NewsSource>> ListDisabledAsync(CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Where(s => !s.Enabled).Select(Copy).ToList());
+        => Task.FromResult<IReadOnlyList<NewsSource>>(
+            Sources.Where(s => !s.Enabled && s.RetiredReason is null).Select(Copy).ToList());
 
     public Task<IReadOnlyList<NewsSource>> ListAllAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<NewsSource>>(Sources.Select(Copy).ToList());
+
+    public Task<IReadOnlyList<NewsSource>> ListByThesisAsync(Guid thesisId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<NewsSource>>(
+            Sources.Where(s => s.ThesisId == thesisId).Select(Copy).ToList());
 
     public Task<NewsSource?> GetByUrlAsync(string url, CancellationToken ct = default)
     {
@@ -260,6 +265,8 @@ internal sealed class FakeNewsSourceRepository : INewsSourceRepository
         LastSuccessAt = s.LastSuccessAt,
         LastFailureReason = s.LastFailureReason,
         CreatedAt = s.CreatedAt,
+        RetiredAt = s.RetiredAt,
+        RetiredReason = s.RetiredReason,
     };
 }
 

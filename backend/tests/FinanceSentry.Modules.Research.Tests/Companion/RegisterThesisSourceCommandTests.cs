@@ -40,6 +40,27 @@ public sealed class RegisterThesisSourceCommandTests
     }
 
     [Fact]
+    public async Task Re_registering_a_staleness_retired_source_clears_its_retirement()
+    {
+        _repo.Sources.Add(new NewsSource
+        {
+            Name = "TrendForce Press Center",
+            Kind = NewsSourceKind.Page,
+            Url = Url,
+            Enabled = false,
+            RetiredAt = DateTimeOffset.UtcNow,
+            RetiredReason = "Owning thesis TSM was deleted",
+        });
+
+        await HandleAsync(thesisId: Guid.NewGuid());
+
+        var after = _repo.Sources.Single();
+        after.Enabled.Should().BeTrue();
+        after.RetiredAt.Should().BeNull();
+        after.RetiredReason.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Re_registering_updates_the_thesis_binding_and_keywords()
     {
         var thesisId = Guid.NewGuid();

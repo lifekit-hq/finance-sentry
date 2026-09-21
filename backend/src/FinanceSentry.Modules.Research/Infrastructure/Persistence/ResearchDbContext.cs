@@ -305,6 +305,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         nsb.Property(x => x.LastSuccessAt);
         nsb.Property(x => x.LastFailureReason);
         nsb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        nsb.Property(x => x.RetiredAt);
+        nsb.Property(x => x.RetiredReason);
         nsb.HasOne<InvestmentThesis>().WithMany().HasForeignKey(x => x.ThesisId)
             .OnDelete(DeleteBehavior.SetNull);
         nsb.HasIndex(x => x.Url).IsUnique().HasDatabaseName("idx_news_sources_url");

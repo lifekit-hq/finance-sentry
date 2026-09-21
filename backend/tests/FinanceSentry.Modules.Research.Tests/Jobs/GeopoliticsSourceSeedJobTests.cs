@@ -91,6 +91,24 @@ public sealed class GeopoliticsSourceSeedJobTests : IDisposable
     }
 
     [Fact]
+    public async Task Source_retired_for_staleness_is_revived_once_its_thesis_matches_the_same_terms_again()
+    {
+        await SeedThesisAsync("TSM", "Sanctions risk on Taiwan Semi given cross-strait tension.");
+        await Job.ExecuteAsync();
+        var source = _sources.Sources.Single();
+        source.Enabled = false;
+        source.RetiredAt = DateTimeOffset.UtcNow;
+        source.RetiredReason = "Thesis text no longer matches this source's geopolitics terms";
+
+        await Job.ExecuteAsync();
+
+        source = _sources.Sources.Single();
+        source.Enabled.Should().BeTrue();
+        source.RetiredAt.Should().BeNull();
+        source.RetiredReason.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Thesis_with_no_geopolitics_term_gets_no_source()
     {
         await SeedThesisAsync("AAPL", "Services mix shift drives margin expansion through 2028.");

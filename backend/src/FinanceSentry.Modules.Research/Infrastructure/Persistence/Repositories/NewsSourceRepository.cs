@@ -10,10 +10,15 @@ public class NewsSourceRepository(ResearchDbContext db) : INewsSourceRepository
         => await db.NewsSources.AsNoTracking().Where(s => s.Enabled).ToListAsync(ct);
 
     public async Task<IReadOnlyList<NewsSource>> ListDisabledAsync(CancellationToken ct = default)
-        => await db.NewsSources.AsNoTracking().Where(s => !s.Enabled).ToListAsync(ct);
+        => await db.NewsSources.AsNoTracking()
+            .Where(s => !s.Enabled && s.RetiredReason == null)
+            .ToListAsync(ct);
 
     public async Task<IReadOnlyList<NewsSource>> ListAllAsync(CancellationToken ct = default)
         => await db.NewsSources.AsNoTracking().OrderBy(s => s.Name).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<NewsSource>> ListByThesisAsync(Guid thesisId, CancellationToken ct = default)
+        => await db.NewsSources.AsNoTracking().Where(s => s.ThesisId == thesisId).ToListAsync(ct);
 
     public async Task<NewsSource?> GetByUrlAsync(string url, CancellationToken ct = default)
         => await db.NewsSources.AsNoTracking().FirstOrDefaultAsync(s => s.Url == url, ct);
