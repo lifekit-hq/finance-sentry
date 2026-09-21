@@ -23,6 +23,9 @@ public sealed class SecEdgarService(
     private static readonly TimeSpan TickerMapTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan ResultTtl = TimeSpan.FromHours(12);
 
+    // Shorter than the hourly filing-watch cadence, so each run sees a fresh submissions feed.
+    private static readonly TimeSpan FilingsTtl = TimeSpan.FromMinutes(30);
+
     private const int MaxConcurrentConceptFetches = 4;
 
     // Friendly name -> ordered us-gaap tags to try (first that returns data wins). Company taxonomies
@@ -97,7 +100,7 @@ public sealed class SecEdgarService(
 
     private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(string ticker, CancellationToken ct)
     {
-        if (filingsCache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < ResultTtl)
+        if (filingsCache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < FilingsTtl)
         {
             return hit.Filings;
         }
@@ -109,11 +112,17 @@ public sealed class SecEdgarService(
         }
 
         var filings = await FetchSubmissionsAsync(ticker, cik, ct);
+        if (filings is null)
+        {
+            return [];
+        }
+
         filingsCache[ticker] = new CachedFilings(DateTimeOffset.UtcNow, filings);
         return filings;
     }
 
-    private async Task<IReadOnlyList<EdgarFiling>> FetchSubmissionsAsync(string ticker, string cik, CancellationToken ct)
+    // Null on a failed fetch, so the failure is not cached and the next call retries.
+    private async Task<IReadOnlyList<EdgarFiling>?> FetchSubmissionsAsync(string ticker, string cik, CancellationToken ct)
     {
         var client = httpFactory.CreateClient(HttpClientName);
         var url = $"https://data.sec.gov/submissions/CIK{cik}.json";
@@ -174,7 +183,7 @@ public sealed class SecEdgarService(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "EDGAR submissions fetch failed for {Ticker}", ticker);
-            return [];
+            return null;
         }
     }
 
