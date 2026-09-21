@@ -126,7 +126,7 @@ module (model/service/store/page section), the error registry, and the Playwrigh
 
 Key design decisions:
 
-- **API shape**: `GET /research/assets/{symbol}/ledger-read` returns the cached read and never
+- **API shape**: `GET /research/assets/{symbol}/narrative` returns the cached read and never
   invokes the agent; `POST` (optional `?force=true`) generates. Two verbs on one route rather than
   a `/generate` sub-path — GET is the page-load path, POST is the mutation.
 - **Agent access via a port**, not a project reference: `ILedgerNarrator` in Research's

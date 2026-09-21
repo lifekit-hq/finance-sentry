@@ -21,9 +21,9 @@ public class AssetDossierController(
         return Ok(result);
     }
 
-    /// <summary>Cached "Ledger's read" — instant, never invokes the agent (feature 421, US3).</summary>
-    [HttpGet("{symbol}/ledger-read")]
-    public async Task<IActionResult> GetLedgerRead(string symbol, CancellationToken ct)
+    /// <summary>Cached asset narrative — instant, never invokes the agent (feature 421, US3).</summary>
+    [HttpGet("{symbol}/narrative")]
+    public async Task<IActionResult> GetNarrative(string symbol, CancellationToken ct)
     {
         var result = await ledgerReadHandler.Handle(
             new GetAssetLedgerReadQuery(User.RequireUserId(), symbol), ct);
@@ -31,11 +31,11 @@ public class AssetDossierController(
     }
 
     /// <summary>
-    /// Generates the "Ledger's read" through the agent loop and caches it. A fresh cached copy is
+    /// Generates the asset narrative through the agent loop and caches it. A fresh cached copy is
     /// returned as-is unless <c>force=true</c>.
     /// </summary>
-    [HttpPost("{symbol}/ledger-read")]
-    public async Task<IActionResult> GenerateLedgerRead(
+    [HttpPost("{symbol}/narrative")]
+    public async Task<IActionResult> GenerateNarrative(
         string symbol, [FromQuery] bool force, CancellationToken ct)
     {
         var result = await generateHandler.Handle(

@@ -11,9 +11,6 @@ Sections Modified:
   - Code Review & Compliance: added an automatic-block trigger for changes that
     breach Principle VII.
 Follow-up TODOs:
-  - `research/assets/{symbol}/ledger-read` (GET/POST, AssetDossierController)
-    predates this principle and names Ledger in an endpoint; rename tracked as a
-    separate task.
   - Sweep remaining bank-sync components (connect-account, transaction-list,
     sync-status) to ConnectStore / TransactionsStore per Principle VI.
   - Repair or remove stale Playwright integration tests under
