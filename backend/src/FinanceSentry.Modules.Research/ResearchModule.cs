@@ -96,6 +96,12 @@ public static class ResearchModule
                 "action-tickets-generator",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(4));
+
+            // Earnings-ahead detector (ledger-heartbeat T3), 06:00 UTC.
+            mgr.AddOrUpdate<EarningsAheadJob>(
+                "earnings-ahead",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(6));
         }
     }
 
@@ -307,6 +313,7 @@ public static class ResearchModule
         services.AddScoped<OpportunityScanJob>();
         services.AddScoped<ResearchIndexingJob>();
         services.AddScoped<ActionTicketsGeneratorJob>();
+        services.AddScoped<EarningsAheadJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

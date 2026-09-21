@@ -25,4 +25,5 @@ public enum CompanionEventKind
     PerformanceBrief,
     RebalanceProposal,
     CashSweepProposal,
+    EarningsAhead,
 }

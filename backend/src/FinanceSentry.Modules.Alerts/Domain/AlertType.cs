@@ -23,4 +23,5 @@ public static class AlertType
     public const string FxSpread = "FxSpread";
     public const string RebalanceProposal = "RebalanceProposal";
     public const string CashSweepProposal = "CashSweepProposal";
+    public const string EarningsAhead = "EarningsAhead";
 }
