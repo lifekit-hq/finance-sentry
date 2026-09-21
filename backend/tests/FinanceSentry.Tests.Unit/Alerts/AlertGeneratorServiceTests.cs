@@ -513,6 +513,75 @@ public class AlertGeneratorServiceTests
         VerifyNoSilenceWindowLookup();
     }
 
+    [Fact]
+    public async Task GenerateFilingLanded_NoExisting_AddsInfoAlert()
+    {
+        var filingDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        AllowAlert(AlertType.FilingLanded);
+
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "10-Q", filingDate, "0001-26-000123", "https://www.sec.gov/doc.htm");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.FilingLanded &&
+            a.Severity == AlertSeverity.Info &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title.Contains("10-Q") &&
+            a.Title.Contains("AAPL") &&
+            a.Message.Contains(filingDate.ToString("yyyy-MM-dd"))), default), Times.Once);
+    }
+
+    /// <summary>
+    /// Same ticker, same accession number must resolve to the same reference id — the hourly job's
+    /// core dedup guarantee, since EDGAR never reuses an accession number.
+    /// </summary>
+    [Fact]
+    public async Task GenerateFilingLanded_SameTickerAndAccession_ProducesStableReferenceId()
+    {
+        var filingDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var written = new List<Alert>();
+        AllowAlert(AlertType.FilingLanded);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "10-Q", filingDate, "0001-26-000123", "https://www.sec.gov/doc.htm");
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "aapl", "10-Q", filingDate, "0001-26-000123", "https://www.sec.gov/doc.htm");
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "8-K", filingDate, "0001-26-000456", "https://www.sec.gov/other.htm");
+
+        Assert.Equal(written[0].ReferenceId, written[1].ReferenceId);
+        Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
+    }
+
+    [Fact]
+    public async Task GenerateFilingLanded_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.FilingLanded);
+
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "10-Q", DateOnly.FromDateTime(DateTime.UtcNow), "0001-26-000123",
+            "https://www.sec.gov/doc.htm");
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    [Fact]
+    public async Task GenerateFilingLanded_RecentDismissed_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.FilingLanded);
+
+        await _service.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "10-Q", DateOnly.FromDateTime(DateTime.UtcNow), "0001-26-000123",
+            "https://www.sec.gov/doc.htm");
+
+        VerifyNothingAdded();
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection

@@ -396,5 +396,10 @@ public class RunThesisMonitorHandlerTests
             Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task GenerateFilingLandedAlertAsync(
+            Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

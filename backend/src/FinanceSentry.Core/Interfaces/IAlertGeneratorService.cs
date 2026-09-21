@@ -246,6 +246,20 @@ public interface IAlertGeneratorService
         DateOnly eventDate,
         bool isEstimate,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises an Info alert that a 10-K, 10-Q or 8-K has landed on a holding or thesis-proxy ticker.
+    /// Deduped per (ticker, EDGAR accession number) — that pair is unique forever, so the same filing
+    /// never alerts twice however many times the hourly detector re-reads the submissions feed.
+    /// </summary>
+    Task GenerateFilingLandedAlertAsync(
+        Guid userId,
+        string ticker,
+        string form,
+        DateOnly filingDate,
+        string accessionNumber,
+        string documentUrl,
+        CancellationToken ct = default);
 }
 
 /// <summary>

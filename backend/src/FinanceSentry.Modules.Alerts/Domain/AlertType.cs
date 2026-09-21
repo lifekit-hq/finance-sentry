@@ -24,4 +24,5 @@ public static class AlertType
     public const string RebalanceProposal = "RebalanceProposal";
     public const string CashSweepProposal = "CashSweepProposal";
     public const string EarningsAhead = "EarningsAhead";
+    public const string FilingLanded = "FilingLanded";
 }

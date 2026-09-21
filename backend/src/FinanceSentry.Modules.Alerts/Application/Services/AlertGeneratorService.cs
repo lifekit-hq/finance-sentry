@@ -48,6 +48,9 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         // 3-day lookahead resolves to the same reference and is caught by the active-alert check
         // first. 7 days covers a manual dismiss without re-alerting before the date passes.
         [AlertType.EarningsAhead] = TimeSpan.FromDays(7),
+        // Backstop only — the reference id already carries the EDGAR accession number, which EDGAR
+        // never reuses, so the same filing can never earn a second reference to re-check here.
+        [AlertType.FilingLanded] = TimeSpan.FromDays(30),
     };
 
     /// <summary>
@@ -327,6 +330,16 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ct);
     }
 
+    public Task GenerateFilingLandedAlertAsync(
+        Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl,
+        CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.FilingLanded, AlertSeverity.Info,
+            FilingLandedReferenceId(ticker, accessionNumber), ticker,
+            $"{form} filed: {ticker}",
+            $"{ticker} filed a {form} on {filingDate:yyyy-MM-dd}. {documentUrl}"),
+            ct);
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -389,6 +402,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// <summary>Stable per-(ticker, event type, event date) synthetic GUID — never emit twice for the same event.</summary>
     private static Guid EarningsAheadReferenceId(string ticker, string eventType, DateOnly eventDate)
         => DerivedReferenceId($"earnings-ahead:{ticker.ToUpperInvariant()}:{eventType}:{eventDate:yyyy-MM-dd}");
+
+    /// <summary>Stable per-(ticker, accession number) synthetic GUID — never emit twice for the same filing.</summary>
+    private static Guid FilingLandedReferenceId(string ticker, string accessionNumber)
+        => DerivedReferenceId($"filing-landed:{ticker.ToUpperInvariant()}:{accessionNumber}");
 
     /// <summary>
     /// A synthetic reference for alerts with no natural entity id. Not a security primitive — MD5

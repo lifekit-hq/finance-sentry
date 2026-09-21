@@ -102,6 +102,12 @@ public static class ResearchModule
                 "earnings-ahead",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(6));
+
+            // Filing-landed detector (ledger-heartbeat T2), hourly.
+            mgr.AddOrUpdate<FilingWatchJob>(
+                "filing-watch",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Hourly());
         }
     }
 
@@ -314,6 +320,7 @@ public static class ResearchModule
         services.AddScoped<ResearchIndexingJob>();
         services.AddScoped<ActionTicketsGeneratorJob>();
         services.AddScoped<EarningsAheadJob>();
+        services.AddScoped<FilingWatchJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
