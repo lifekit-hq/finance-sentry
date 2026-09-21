@@ -51,6 +51,11 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         // Backstop only — the reference id already carries the EDGAR accession number, which EDGAR
         // never reuses, so the same filing can never earn a second reference to re-check here.
         [AlertType.FilingLanded] = TimeSpan.FromDays(30),
+        // Backstop only — the reference id already carries the calendar day, so the 30-minute job
+        // re-checking the same cluster resolves to the same reference and is caught by the
+        // active-alert check first. 7 days covers a manual dismiss without re-alerting the same
+        // cluster before it ages out of the 2h window on its own.
+        [AlertType.NewsCluster] = TimeSpan.FromDays(7),
     };
 
     /// <summary>
@@ -340,6 +345,15 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"{ticker} filed a {form} on {filingDate:yyyy-MM-dd}. {documentUrl}"),
             ct);
 
+    public Task GenerateNewsClusterAlertAsync(
+        Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.NewsCluster, AlertSeverity.Warning,
+            NewsClusterReferenceId(ticker, day), ticker,
+            $"News cluster: {ticker}",
+            $"{ticker} news clustered on {day:yyyy-MM-dd}: {reason}"),
+            ct);
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -406,6 +420,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// <summary>Stable per-(ticker, accession number) synthetic GUID — never emit twice for the same filing.</summary>
     private static Guid FilingLandedReferenceId(string ticker, string accessionNumber)
         => DerivedReferenceId($"filing-landed:{ticker.ToUpperInvariant()}:{accessionNumber}");
+
+    /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
+    private static Guid NewsClusterReferenceId(string ticker, DateOnly day)
+        => DerivedReferenceId($"news-cluster:{ticker.ToUpperInvariant()}:{day:yyyy-MM-dd}");
 
     /// <summary>
     /// A synthetic reference for alerts with no natural entity id. Not a security primitive — MD5

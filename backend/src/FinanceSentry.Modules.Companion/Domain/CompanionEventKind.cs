@@ -27,4 +27,5 @@ public enum CompanionEventKind
     CashSweepProposal,
     EarningsAhead,
     FilingLanded,
+    NewsCluster,
 }

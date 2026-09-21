@@ -401,5 +401,9 @@ public class RunThesisMonitorHandlerTests
             Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task GenerateNewsClusterAlertAsync(
+            Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

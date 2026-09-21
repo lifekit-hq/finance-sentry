@@ -108,6 +108,20 @@ public static class ResearchModule
                 "filing-watch",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Hourly());
+
+            // News-cluster detector (ledger-heartbeat N1), every 30 min offset 5 min after the
+            // */30 news ingestion sweep so a freshly ingested batch is visible to this run.
+            mgr.AddOrUpdate<NewsMaterialityJob>(
+                "news-materiality",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "5,35 * * * *");
+
+            // Geopolitics/policy Google News RSS source registration per thesis (ledger-heartbeat
+            // N2), daily — well ahead of the news-sources-seed job (02:00) and news-materiality.
+            mgr.AddOrUpdate<GeopoliticsSourceSeedJob>(
+                "research-geopolitics-source-seed",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "30 1 * * *");
         }
     }
 
@@ -321,6 +335,8 @@ public static class ResearchModule
         services.AddScoped<ActionTicketsGeneratorJob>();
         services.AddScoped<EarningsAheadJob>();
         services.AddScoped<FilingWatchJob>();
+        services.AddScoped<NewsMaterialityJob>();
+        services.AddScoped<GeopoliticsSourceSeedJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
