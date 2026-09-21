@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Alerts;
 
 using System.Reflection;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
@@ -417,6 +418,99 @@ public class AlertGeneratorServiceTests
         await _service.GenerateFxSpreadAlertAsync(_userId, Guid.NewGuid(), "EUR", "USD", 0.95m, 1.00m);
 
         VerifyNothingAdded();
+    }
+
+    [Fact]
+    public async Task GenerateEarningsAhead_Earnings_NoExisting_AddsInfoAlert()
+    {
+        var eventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3);
+        AllowAlert(AlertType.EarningsAhead);
+
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.Earnings, eventDate, isEstimate: false);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.EarningsAhead &&
+            a.Severity == AlertSeverity.Info &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title.Contains("AAPL") &&
+            a.Message.Contains(eventDate.ToString("yyyy-MM-dd"))), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateEarningsAhead_ExDividend_NoExisting_AddsInfoAlertWithExDividendWording()
+    {
+        var eventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
+        AllowAlert(AlertType.EarningsAhead);
+
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "KO", EarningsAheadEventType.ExDividend, eventDate, isEstimate: false);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.EarningsAhead &&
+            a.Title.Contains("Ex-dividend") &&
+            a.Message.Contains("ex-dividend")), default), Times.Once);
+    }
+
+    /// <summary>
+    /// Same ticker, same event, same date must resolve to the same reference id so a second run
+    /// (the day after) never re-alerts it — the daily job's core dedup guarantee.
+    /// </summary>
+    [Fact]
+    public async Task GenerateEarningsAhead_SameTickerEventAndDate_ProducesStableReferenceId()
+    {
+        var eventDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3);
+        var written = new List<Alert>();
+        AllowAlert(AlertType.EarningsAhead);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.Earnings, eventDate, isEstimate: false);
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "aapl", EarningsAheadEventType.Earnings, eventDate, isEstimate: true);
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.ExDividend, eventDate, isEstimate: false);
+
+        Assert.Equal(written[0].ReferenceId, written[1].ReferenceId);
+        Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
+    }
+
+    [Fact]
+    public async Task GenerateEarningsAhead_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.EarningsAhead);
+
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.Earnings,
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3), isEstimate: false);
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    [Fact]
+    public async Task GenerateEarningsAhead_RecentDismissed_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.EarningsAhead);
+
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.Earnings,
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3), isEstimate: false);
+
+        VerifyNothingAdded();
+    }
+
+    [Fact]
+    public async Task GenerateEarningsAhead_UnknownEventType_SkipsSilently()
+    {
+        await _service.GenerateEarningsAheadAlertAsync(
+            _userId, "AAPL", "dividend", DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1), isEstimate: false);
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
     }
 
     /// <summary>

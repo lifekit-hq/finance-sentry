@@ -231,4 +231,30 @@ public interface IAlertGeneratorService
         decimal minBufferUsd,
         decimal excessUsd,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises an Info alert that a holding or watchlist ticker has earnings or an ex-dividend date
+    /// coming up. <paramref name="eventType"/> is <see cref="EarningsAheadEventType.Earnings"/> or
+    /// <see cref="EarningsAheadEventType.ExDividend"/> — the values the earnings-ahead job reads from
+    /// Yahoo quoteSummary. Deduped per (ticker, event type, event date), so the daily detector never
+    /// re-alerts the same event as the date approaches; ~0.1 fires/day by design (rare, low-noise).
+    /// </summary>
+    Task GenerateEarningsAheadAlertAsync(
+        Guid userId,
+        string ticker,
+        string eventType,
+        DateOnly eventDate,
+        bool isEstimate,
+        CancellationToken ct = default);
+}
+
+/// <summary>
+/// The small, Alerts-owned vocabulary for <see cref="IAlertGeneratorService.GenerateEarningsAheadAlertAsync"/>.
+/// Mirrors the Research module's Yahoo-sourced event-type strings without a hard reference to it —
+/// alert types cross module boundaries as plain string contracts throughout this codebase.
+/// </summary>
+public static class EarningsAheadEventType
+{
+    public const string Earnings = "earnings";
+    public const string ExDividend = "ex_dividend";
 }

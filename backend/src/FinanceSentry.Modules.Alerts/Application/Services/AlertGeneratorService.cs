@@ -44,6 +44,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         // One proposal per user per day; mirrors LowBalance/ThesisBroken cadence.
         [AlertType.RebalanceProposal] = TimeSpan.FromHours(24),
         [AlertType.CashSweepProposal] = TimeSpan.FromHours(24),
+        // Backstop only — the reference id already carries the event date, so a re-run within the
+        // 3-day lookahead resolves to the same reference and is caught by the active-alert check
+        // first. 7 days covers a manual dismiss without re-alerting before the date passes.
+        [AlertType.EarningsAhead] = TimeSpan.FromDays(7),
     };
 
     /// <summary>
@@ -294,6 +298,35 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"Idle cash ${idleCashUsd:N0} exceeds your minimum buffer ${minBufferUsd:N0}. Consider deploying the ≈ ${excessUsd:N0} excess into your IPS sleeves."),
             ct);
 
+    public Task GenerateEarningsAheadAlertAsync(
+        Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate,
+        CancellationToken ct = default)
+    {
+        var (title, message) = eventType switch
+        {
+            EarningsAheadEventType.Earnings => (
+                $"Earnings ahead: {ticker}",
+                $"{ticker} reports earnings on {eventDate:yyyy-MM-dd}{(isEstimate ? " (estimated)" : string.Empty)}."),
+            EarningsAheadEventType.ExDividend => (
+                $"Ex-dividend: {ticker}",
+                $"{ticker} goes ex-dividend on {eventDate:yyyy-MM-dd}."),
+            // An unrecognized event type is a caller bug, not a provider hiccup — the provider-facing
+            // "no signal" cases are handled upstream by the job before this is ever called. Stay
+            // silent rather than throw from inside a background job.
+            _ => ((string?)null, (string?)null),
+        };
+
+        if (title is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.EarningsAhead, AlertSeverity.Info,
+            EarningsAheadReferenceId(ticker, eventType, eventDate), ticker, title, message!),
+            ct);
+    }
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -352,6 +385,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// <summary>Stable per-user synthetic GUID for cash-sweep dedup.</summary>
     private static Guid CashSweepReferenceId(Guid userId)
         => DerivedReferenceId($"cash:sweep:{userId}");
+
+    /// <summary>Stable per-(ticker, event type, event date) synthetic GUID — never emit twice for the same event.</summary>
+    private static Guid EarningsAheadReferenceId(string ticker, string eventType, DateOnly eventDate)
+        => DerivedReferenceId($"earnings-ahead:{ticker.ToUpperInvariant()}:{eventType}:{eventDate:yyyy-MM-dd}");
 
     /// <summary>
     /// A synthetic reference for alerts with no natural entity id. Not a security primitive — MD5

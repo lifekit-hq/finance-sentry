@@ -34,6 +34,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "PerformanceBrief" => CompanionEventKind.PerformanceBrief,
         "RebalanceProposal" => CompanionEventKind.RebalanceProposal,
         "CashSweepProposal" => CompanionEventKind.CashSweepProposal,
+        "EarningsAhead" => CompanionEventKind.EarningsAhead,
         _ => null,
     };
 
