@@ -57,6 +57,8 @@ public class RegisterThesisSourceCommandHandler(INewsSourceRepository repo)
             // Leaving the counter alone meant a source past DisableThreshold was re-retired by its
             // very first failure and could never actually come back (issue #318).
             NewsSourceHealthTracker.ClearFailures(existing);
+            existing.RetiredAt = null;
+            existing.RetiredReason = null;
             await repo.UpdateAsync(existing, ct);
             return new RegisteredSourceDto(existing.Id, existing.Enabled);
         }

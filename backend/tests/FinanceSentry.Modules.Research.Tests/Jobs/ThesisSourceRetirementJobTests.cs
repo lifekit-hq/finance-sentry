@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Research.Tests.Jobs;
 
 using System.Linq;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -28,7 +29,7 @@ public sealed class ThesisSourceRetirementJobTests : IDisposable
     public async Task Source_whose_thesis_text_no_longer_matches_is_retired()
     {
         var thesisId = await SeedThesisAsync("TSM", "Services mix shift drives margin expansion through 2028.");
-        var source = SeedSource(thesisId, "https://news.google.com/rss/search?q=1");
+        var source = SeedSource(thesisId, SeededUrl(thesisId, "Sanctions risk."));
 
         await Job.ExecuteAsync();
 
@@ -41,8 +42,9 @@ public sealed class ThesisSourceRetirementJobTests : IDisposable
     [Fact]
     public async Task Source_whose_thesis_still_matches_is_untouched_across_repeated_runs()
     {
-        var thesisId = await SeedThesisAsync("TSM", "Sanctions risk on Taiwan Semi given cross-strait tension.");
-        var source = SeedSource(thesisId, "https://news.google.com/rss/search?q=2");
+        const string text = "Sanctions risk on Taiwan Semi given cross-strait tension.";
+        var thesisId = await SeedThesisAsync("TSM", text);
+        var source = SeedSource(thesisId, SeededUrl(thesisId, text));
 
         await Job.ExecuteAsync();
         await Job.ExecuteAsync();
@@ -56,8 +58,9 @@ public sealed class ThesisSourceRetirementJobTests : IDisposable
     [Fact]
     public async Task Source_that_is_merely_failing_is_left_to_the_health_tracker_not_retired()
     {
-        var thesisId = await SeedThesisAsync("TSM", "Sanctions risk on Taiwan Semi given cross-strait tension.");
-        var source = SeedSource(thesisId, "https://news.google.com/rss/search?q=3");
+        const string text = "Sanctions risk on Taiwan Semi given cross-strait tension.";
+        var thesisId = await SeedThesisAsync("TSM", text);
+        var source = SeedSource(thesisId, SeededUrl(thesisId, text));
         source.Enabled = false;
         source.ConsecutiveFailures = 12;
         source.LastFailureReason = "feed timeout";
@@ -74,7 +77,7 @@ public sealed class ThesisSourceRetirementJobTests : IDisposable
     public async Task Already_retired_source_is_not_re_touched_on_a_later_run()
     {
         var thesisId = await SeedThesisAsync("TSM", "Services mix shift drives margin expansion through 2028.");
-        SeedSource(thesisId, "https://news.google.com/rss/search?q=4");
+        SeedSource(thesisId, SeededUrl(thesisId, "Sanctions risk."));
 
         await Job.ExecuteAsync();
         var firstRetiredAt = _sources.Sources.Single().RetiredAt;
@@ -102,6 +105,35 @@ public sealed class ThesisSourceRetirementJobTests : IDisposable
         untouched.Enabled.Should().BeTrue();
         untouched.RetiredReason.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Source_whose_thesis_terms_changed_is_retired()
+    {
+        var thesisId = await SeedThesisAsync("TSM", "Tariff risk on Taiwan Semi.");
+        var source = SeedSource(thesisId, SeededUrl(thesisId, "Sanctions risk on Taiwan Semi."));
+
+        await Job.ExecuteAsync();
+
+        var retired = _sources.Sources.Single(s => s.Id == source.Id);
+        retired.Enabled.Should().BeFalse();
+        retired.RetiredReason.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task User_registered_thesis_source_is_not_judged_against_geopolitics_terms()
+    {
+        var thesisId = await SeedThesisAsync("AAPL", "Services mix shift drives margin expansion.");
+        var source = SeedSource(thesisId, "https://investor.apple.com/rss/news.xml");
+
+        await Job.ExecuteAsync();
+
+        var untouched = _sources.Sources.Single(s => s.Id == source.Id);
+        untouched.Enabled.Should().BeTrue();
+        untouched.RetiredReason.Should().BeNull();
+    }
+
+    private static string SeededUrl(Guid thesisId, string matchingText)
+        => GeopoliticsTermMatcher.SourceUrlFor(thesisId, "TSM", matchingText)!;
 
     private NewsSource SeedSource(Guid thesisId, string url)
     {

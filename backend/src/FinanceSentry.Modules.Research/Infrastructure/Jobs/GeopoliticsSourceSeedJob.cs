@@ -27,7 +27,9 @@ using Microsoft.Extensions.Logging;
 /// Each source's URL carries its thesis id (as a fragment, never sent to Google), so two theses on the
 /// same ticker get separate sources instead of overwriting each other's owner. A URL that is already
 /// registered is skipped rather than re-registered, so re-running this job daily is a no-op once a
-/// thesis's geopolitics source exists — it never re-enables a source the health tracker retired.
+/// thesis's geopolitics source exists — it never re-enables a source the health tracker retired. The
+/// one exception is a source <see cref="ThesisSourceRetirementJob"/> retired for thesis staleness: its
+/// URL being built again means the thesis matches those terms again, so it is re-registered.
 /// Terms match whole words only (optionally pluralised), so "war" never matches "software".
 /// </summary>
 public sealed class GeopoliticsSourceSeedJob(
@@ -45,16 +47,16 @@ public sealed class GeopoliticsSourceSeedJob(
         var registered = 0;
         foreach (var thesis in theses)
         {
-            var terms = GeopoliticsTermMatcher.MatchTerms(thesis.ThesisText);
-            if (terms.Count == 0)
+            var url = GeopoliticsTermMatcher.SourceUrlFor(thesis.Id, thesis.Ticker, thesis.ThesisText);
+            if (url is null)
             {
                 continue;
             }
 
-            var url = BuildGoogleNewsRssUrl(thesis.Id, thesis.Ticker, terms);
             try
             {
-                if (await sources.GetByUrlAsync(url, ct) is not null)
+                var existing = await sources.GetByUrlAsync(url, ct);
+                if (existing is not null && existing.RetiredReason is null)
                 {
                     continue;
                 }
@@ -65,7 +67,7 @@ public sealed class GeopoliticsSourceSeedJob(
                         $"Google News: {thesis.Ticker} geopolitics",
                         url,
                         "Rss",
-                        terms),
+                        GeopoliticsTermMatcher.MatchTerms(thesis.ThesisText)),
                     ct);
                 registered++;
             }
@@ -78,11 +80,5 @@ public sealed class GeopoliticsSourceSeedJob(
         }
 
         logger.LogInformation("GeopoliticsSourceSeedJob registered {Count} new geopolitics sources", registered);
-    }
-
-    private static string BuildGoogleNewsRssUrl(Guid thesisId, string ticker, IReadOnlyList<string> terms)
-    {
-        var query = $"{ticker} ({string.Join(" OR ", terms)})";
-        return $"https://news.google.com/rss/search?q={Uri.EscapeDataString(query)}&hl=en-US&gl=US&ceid=US:en#thesis={thesisId:N}";
     }
 }

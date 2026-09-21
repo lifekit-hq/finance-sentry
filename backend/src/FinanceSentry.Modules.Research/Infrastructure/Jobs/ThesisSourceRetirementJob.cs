@@ -7,10 +7,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Daily Hangfire job, paired with <see cref="GeopoliticsSourceSeedJob"/>: retires a thesis-owned news
-/// source once its thesis's text no longer mentions any of the <see cref="GeopoliticsTermMatcher"/>
-/// terms that earned the source in the first place — the thesis was edited and the geopolitical angle
-/// dropped out, so the source keeps polling under a thesis that no longer says what it said.
+/// Daily Hangfire job, paired with <see cref="GeopoliticsSourceSeedJob"/>: retires a seed-registered
+/// news source once its URL is no longer the one the seed would build from its thesis today
+/// (<see cref="GeopoliticsTermMatcher.SourceUrlFor"/>) — the thesis was edited so its matched terms
+/// changed or dropped out entirely, so the source keeps polling under a thesis that no longer says what
+/// it said. Sources a user registered to a thesis directly (not seed-built Google News URLs carrying
+/// that thesis's marker) are never judged against geopolitics terms here.
 /// <para>
 /// This covers only the "text no longer matches" half of thesis-source staleness. The other half —
 /// the thesis itself was deleted — is handled synchronously by
@@ -39,12 +41,16 @@ public sealed class ThesisSourceRetirementJob(
     INewsSourceRepository sources,
     ILogger<ThesisSourceRetirementJob> logger)
 {
-    private const string RetiredReasonText = "Thesis text no longer mentions a matched geopolitics term";
+    private const string RetiredReasonText = "Thesis text no longer matches this source's geopolitics terms";
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var all = await sources.ListAllAsync(ct);
-        var candidates = all.Where(s => s.ThesisId is not null && s.RetiredReason is null).ToList();
+        var candidates = all
+            .Where(s => s.ThesisId is not null
+                && s.RetiredReason is null
+                && GeopoliticsTermMatcher.IsSeededSourceUrl(s.Url, s.ThesisId.Value))
+            .ToList();
 
         if (candidates.Count == 0)
         {
@@ -52,10 +58,13 @@ public sealed class ThesisSourceRetirementJob(
         }
 
         var thesisIds = candidates.Select(s => s.ThesisId!.Value).Distinct().ToList();
-        var thesisTexts = await research.Theses.AsNoTracking()
+        var expectedUrls = await research.Theses.AsNoTracking()
             .Where(t => thesisIds.Contains(t.Id))
-            .Select(t => new { t.Id, t.ThesisText })
-            .ToDictionaryAsync(t => t.Id, t => t.ThesisText, ct);
+            .Select(t => new { t.Id, t.Ticker, t.ThesisText })
+            .ToDictionaryAsync(
+                t => t.Id,
+                t => GeopoliticsTermMatcher.SourceUrlFor(t.Id, t.Ticker, t.ThesisText),
+                ct);
 
         var retired = 0;
         foreach (var source in candidates)
@@ -63,12 +72,12 @@ public sealed class ThesisSourceRetirementJob(
             // Owning thesis already gone: DeleteThesisCommandHandler retires a source at delete time,
             // and the FK has already nulled ThesisId on any row that predates this feature — either
             // way there is nothing for this sweep to key an "orphaned" decision off of here.
-            if (!thesisTexts.TryGetValue(source.ThesisId!.Value, out var thesisText))
+            if (!expectedUrls.TryGetValue(source.ThesisId!.Value, out var expectedUrl))
             {
                 continue;
             }
 
-            if (GeopoliticsTermMatcher.MatchTerms(thesisText).Count > 0)
+            if (source.Url == expectedUrl)
             {
                 continue;
             }
