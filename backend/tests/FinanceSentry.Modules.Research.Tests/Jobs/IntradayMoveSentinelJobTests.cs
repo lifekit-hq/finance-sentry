@@ -12,8 +12,8 @@ using Xunit;
 /// P1 (ledger-heartbeat design): a holding moving ≥5%, a watchlist name moving ≥8%, or either moving
 /// ≥3σ against its 20-day volatility. Everything reads from the existing quote cache
 /// (<see cref="IMarketDataService"/>) — no new fetch path — and a stale/missing/malformed quote must
-/// stay silent rather than alert or fail the job. Market hours are read off the quote's own session,
-/// never a second calendar.
+/// stay silent rather than alert or fail the job. Equities are evaluated only in the NYSE regular
+/// session; crypto on every tick while its price is fresh.
 /// </summary>
 public sealed class IntradayMoveSentinelJobTests
 {
@@ -23,7 +23,11 @@ public sealed class IntradayMoveSentinelJobTests
     private readonly Mock<IWatchlistReader> _watchlist = new();
     private readonly Mock<IMarketDataService> _marketData = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
+    private readonly FixedClock _clock = new(Wednesday11amNewYork);
     private readonly IntradayMoveSentinelJob _job;
+
+    // 2026-09-16 is a Wednesday; 15:00 UTC is 11:00 EDT, inside the NYSE regular session.
+    private static readonly DateTimeOffset Wednesday11amNewYork = new(2026, 9, 16, 15, 0, 0, TimeSpan.Zero);
 
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -36,6 +40,7 @@ public sealed class IntradayMoveSentinelJobTests
             _watchlist.Object,
             _marketData.Object,
             _alerts.Object,
+            _clock,
             NullLogger<IntradayMoveSentinelJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
@@ -49,24 +54,33 @@ public sealed class IntradayMoveSentinelJobTests
             .ReturnsAsync([]);
     }
 
-    private static QuoteCacheEntry Quote(
-        string ticker, decimal price, decimal? previousClose, string session = "regular", bool isStale = false)
+    /// <summary>
+    /// Shaped like what Yahoo's chart endpoint actually yields: no marketState, so session "unknown" and
+    /// IsStale true — the job must not depend on either.
+    /// </summary>
+    private QuoteCacheEntry Quote(
+        string ticker, decimal price, decimal? previousClose, DateTimeOffset? pricedAt = null)
         => new()
         {
             Ticker = ticker,
             Price = price,
             PreviousClose = previousClose,
-            Session = session,
-            IsStale = isStale,
+            MarketState = "unknown",
+            Session = "unknown",
+            IsStale = true,
+            SourcePriceTime = pricedAt ?? _clock.GetUtcNow(),
+            RegularMarketTime = pricedAt ?? _clock.GetUtcNow(),
         };
 
     private void SetQuotes(params QuoteCacheEntry[] quotes)
         => _marketData.Setup(m => m.GetQuotesAsync(It.IsAny<IReadOnlyCollection<string>>(), default))
             .ReturnsAsync(quotes.ToDictionary(q => q.Ticker, q => q));
 
+    private static DateOnly Today => DateOnly.FromDateTime(Wednesday11amNewYork.UtcDateTime);
+
     private static IReadOnlyList<DailyClose> FlatHistory(int days, decimal close)
     {
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-days);
+        var since = Today.AddDays(-days);
         return Enumerable.Range(0, days).Select(i => new DailyClose(since.AddDays(i), close)).ToList();
     }
 
@@ -115,17 +129,19 @@ public sealed class IntradayMoveSentinelJobTests
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
-    /// <summary>Be precise about market hours: an equity outside its regular trading session is not evaluated at all.</summary>
+    /// <summary>Be precise about market hours: an equity outside the NYSE regular session is not evaluated at all.</summary>
     [Theory]
-    [InlineData("pre_market")]
-    [InlineData("post_market")]
-    [InlineData("closed")]
-    [InlineData("unknown")]
-    public async Task Execute_EquityOutsideRegularSession_IsNotEvaluated(string session)
+    [InlineData("2026-09-16T13:29:00Z")] // 09:29 EDT, pre-market
+    [InlineData("2026-09-16T20:00:00Z")] // 16:00 EDT, the close
+    [InlineData("2026-09-16T23:00:00Z")] // 19:00 EDT, post-market
+    [InlineData("2026-09-19T15:00:00Z")] // Saturday
+    [InlineData("2026-12-01T14:15:00Z")] // 09:15 EST — winter offset, still pre-market
+    public async Task Execute_EquityOutsideRegularSession_IsNotEvaluated(string nowUtc)
     {
+        _clock.Now = DateTimeOffset.Parse(nowUtc, System.Globalization.CultureInfo.InvariantCulture);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        SetQuotes(Quote("AAPL", price: 120m, previousClose: 100m, session: session, isStale: session != "pre_market" && session != "post_market"));
+        SetQuotes(Quote("AAPL", price: 120m, previousClose: 100m));
 
         await _job.ExecuteAsync();
 
@@ -133,18 +149,60 @@ public sealed class IntradayMoveSentinelJobTests
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
-    /// <summary>Crypto has no exchange session — it is evaluated on every tick regardless of the quote's session field.</summary>
     [Fact]
-    public async Task Execute_CryptoHolding_EvaluatedRegardlessOfSession()
+    public async Task Execute_EquityWinterSession_IsEvaluated()
     {
+        _clock.Now = new DateTimeOffset(2026, 12, 1, 14, 45, 0, TimeSpan.Zero); // 09:45 EST
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        SetQuotes(Quote("AAPL", price: 106m, previousClose: 100m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+    }
+
+    /// <summary>An exchange holiday inside regular hours: the last regular-market trade is a previous session's.</summary>
+    [Fact]
+    public async Task Execute_EquityLastTradedOnAPreviousSession_IsNotEvaluated()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        SetQuotes(Quote("AAPL", price: 120m, previousClose: 100m, pricedAt: Wednesday11amNewYork.AddDays(-1)));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    /// <summary>Crypto has no exchange session — it is evaluated around the clock, weekends included.</summary>
+    [Fact]
+    public async Task Execute_CryptoHolding_EvaluatedOutsideEquityHours()
+    {
+        _clock.Now = new DateTimeOffset(2026, 9, 19, 3, 0, 0, TimeSpan.Zero); // Saturday night
         _crypto.Setup(c => c.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new CryptoHoldingSummary("BTC", 1m, 0m, 50000m, DateTime.UtcNow, "Binance")]);
-        SetQuotes(Quote("BTC-USD", price: 53000m, previousClose: 50000m, session: "unknown"));
+        SetQuotes(Quote("BTC-USD", price: 53000m, previousClose: 50000m));
 
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
             _userId, It.IsAny<Guid>(), "BTC-USD", It.IsAny<string>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_CryptoQuoteWithOldSourcePrice_IsSkipped()
+    {
+        _crypto.Setup(c => c.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new CryptoHoldingSummary("BTC", 1m, 0m, 50000m, DateTime.UtcNow, "Binance")]);
+        SetQuotes(Quote("BTC-USD", price: 53000m, previousClose: 50000m, pricedAt: Wednesday11amNewYork.AddHours(-3)));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 
     [Fact]
@@ -219,7 +277,7 @@ public sealed class IntradayMoveSentinelJobTests
     /// <summary>21 closes with one tiny wiggle: enough history for a full 20-return window with a nonzero, small σ.</summary>
     private static IReadOnlyList<DailyClose> FlatHistoryWithOneWiggle()
     {
-        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30);
+        var since = Today.AddDays(-30);
         var closes = new List<DailyClose>();
         for (var i = 0; i < 21; i++)
         {
@@ -229,6 +287,51 @@ public sealed class IntradayMoveSentinelJobTests
         }
 
         return closes;
+    }
+
+    /// <summary>
+    /// Today's in-progress bar closes at the current price, i.e. the very move under test; it must not
+    /// count toward the volatility it is measured against.
+    /// </summary>
+    [Fact]
+    public async Task Execute_TodaysInProgressBar_IsExcludedFromTheVolatilityWindow()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("KO", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        SetQuotes(Quote("KO", price: 102m, previousClose: 100m));
+        // Alternating ±0.57% returns put the 2% move at ~3.4σ; counting today's +2% bar in the window
+        // would inflate σ enough to drag it to ~2.75σ and swallow the alert.
+        var history = Enumerable.Range(0, 21)
+            .Select(i => new DailyClose(Today.AddDays(i - 21), i % 2 == 0 ? 100m : 100.57m))
+            .Append(new DailyClose(Today, 102m))
+            .ToList();
+        _marketData.Setup(m => m.GetDailyClosesAsync("KO", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync(history);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
+            _userId, It.IsAny<Guid>(), "KO", It.Is<string>(r => r.Contains('σ')), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_SameTickerForSeveralUsers_FetchesHistoryOncePerRun()
+    {
+        var userId2 = Guid.NewGuid();
+        _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId, userId2]);
+        foreach (var user in new[] { _userId, userId2 })
+        {
+            _brokerage.Setup(b => b.GetHoldingsAsync(user, default))
+                .ReturnsAsync([new BrokerageHoldingSummary("KO", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+            _crypto.Setup(c => c.GetHoldingsAsync(user, default)).ReturnsAsync([]);
+            _watchlist.Setup(w => w.ListTickersAsync(user, default)).ReturnsAsync([]);
+        }
+
+        SetQuotes(Quote("KO", price: 100.5m, previousClose: 100m));
+
+        await _job.ExecuteAsync();
+
+        _marketData.Verify(m => m.GetDailyClosesAsync("KO", It.IsAny<DateOnly>(), default), Times.Once);
     }
 
     [Fact]
@@ -254,19 +357,6 @@ public sealed class IntradayMoveSentinelJobTests
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _marketData.Setup(m => m.GetQuotesAsync(It.IsAny<IReadOnlyCollection<string>>(), default))
             .ReturnsAsync(new Dictionary<string, QuoteCacheEntry>());
-
-        await _job.ExecuteAsync();
-
-        _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
-    }
-
-    [Fact]
-    public async Task Execute_StaleQuote_IsSkipped()
-    {
-        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
-            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        SetQuotes(Quote("AAPL", price: 120m, previousClose: 100m, isStale: true));
 
         await _job.ExecuteAsync();
 
@@ -344,5 +434,12 @@ public sealed class IntradayMoveSentinelJobTests
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
             userId2, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }

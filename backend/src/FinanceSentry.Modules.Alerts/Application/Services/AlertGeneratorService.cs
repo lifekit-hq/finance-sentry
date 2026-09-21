@@ -137,7 +137,12 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         => EmitAsync(userId, new AlertDraft(
             AlertType.MarketStructure, AlertSeverity.Warning, referenceId, ticker,
             $"Unusual move: {ticker}",
-            $"Market structure flagged {ticker}: {reason}"),
+            $"Market structure flagged {ticker}: {reason}")
+        {
+            // Each move is its own event: an unread alert for the ticker must not swallow the next
+            // one once the 24h per-ticker window has passed.
+            Dedup = Dedup.SilenceOnly,
+        },
             ct);
 
     public Task GenerateMarketStructureFreshnessAlertAsync(

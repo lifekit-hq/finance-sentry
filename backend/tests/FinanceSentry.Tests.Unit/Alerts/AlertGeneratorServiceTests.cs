@@ -818,18 +818,17 @@ public class AlertGeneratorServiceTests
 
     /// <summary>
     /// P1 (ledger-heartbeat design): the intraday-move-sentinel job re-checks every held/watchlisted
-    /// ticker every 15 minutes, so a name that keeps moving must announce itself once per 24h, not
-    /// once per tick — proven here at the generator level (the job always asks with the same
-    /// per-ticker reference id) rather than merely asserted in the job's own tests.
+    /// ticker every 15 minutes with the same per-ticker reference id, so the 24h silence window is what
+    /// keeps a name that keeps moving to one alert a day.
     /// </summary>
     [Fact]
     public async Task GenerateMarketStructure_SameTickerWithinTwentyFourHours_SecondCallIsSuppressed()
     {
         var referenceId = Guid.NewGuid();
         var written = new List<Alert>();
-        _repo.SetupSequence(r => r.FindActiveAsync(_userId, AlertType.MarketStructure, referenceId, default))
-            .ReturnsAsync((Alert?)null)
-            .ReturnsAsync(new Alert { Id = Guid.NewGuid() });
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, referenceId, "AAPL", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(() => written.Count > 0);
         _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
             .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
             .Returns(Task.CompletedTask);
@@ -837,19 +836,25 @@ public class AlertGeneratorServiceTests
         await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.2% intraday");
         await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.9% intraday");
 
-        written.Should().ContainSingle("the second tick's active-alert check finds the first alert still open");
+        written.Should().ContainSingle("the second tick falls inside the first alert's 24h silence window");
     }
 
+    /// <summary>
+    /// Each move is its own event: an alert left unread from an earlier day must not swallow a new move
+    /// once the 24h window has passed.
+    /// </summary>
     [Fact]
-    public async Task GenerateMarketStructure_ExistingActive_SkipsCreation()
+    public async Task GenerateMarketStructure_ExistingActiveOutsideSilenceWindow_StillFires()
     {
         SuppressByActiveAlert(AlertType.MarketStructure);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
 
         await _service.GenerateMarketStructureAlertAsync(
-            _userId, Guid.NewGuid(), "AAPL", "moved 6.2% intraday");
+            _userId, Guid.NewGuid(), "AAPL", "moved 9.0% intraday");
 
-        VerifyNothingAdded();
-        VerifyNoSilenceWindowLookup();
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Once);
     }
 
     /// <summary>

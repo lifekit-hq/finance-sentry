@@ -56,10 +56,16 @@ public class QuoteCacheRepository(ResearchDbContext db) : IQuoteCacheRepository
         {
             if (existing.TryGetValue(entry.Ticker, out var row))
             {
+                row.ResolvedTicker = entry.ResolvedTicker;
                 row.Price = entry.Price;
                 row.PreviousClose = entry.PreviousClose;
                 row.Currency = entry.Currency;
                 row.FetchedAt = entry.FetchedAt;
+                row.MarketState = entry.MarketState;
+                row.Session = entry.Session;
+                row.IsStale = entry.IsStale;
+                row.SourcePriceTime = entry.SourcePriceTime;
+                row.RegularMarketTime = entry.RegularMarketTime;
                 staged.Add(db.Entry(row));
             }
             else

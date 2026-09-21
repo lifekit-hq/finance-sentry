@@ -11,15 +11,18 @@ using Microsoft.Extensions.Logging;
 /// Hangfire job (P1, ledger-heartbeat design), every 15 minutes: raises a MarketStructure alert when a
 /// held ticker moves ≥5%, a watchlist ticker moves ≥8%, or either moves ≥3σ against its 20-day daily
 /// return volatility. Prices come from <see cref="IMarketDataService.GetQuotesAsync"/>, the existing
-/// 5-minute Yahoo quote cache — no new live-price fetch path. Market hours are read from the quote
-/// itself rather than a second calendar definition: Yahoo's <c>marketState</c> is already surfaced as
-/// <see cref="QuoteCacheEntry.Session"/>, so a US equity is only evaluated in the "regular" session,
-/// while a held crypto asset (no exchange session) is evaluated on every tick. A missing, stale or
-/// malformed quote is silently skipped — never an alert, never a job failure — since Yahoo's quote
-/// endpoint has no contract. The 20-day volatility check needs <see cref="IMarketDataService.GetDailyClosesAsync"/>
+/// 5-minute Yahoo quote cache — no new live-price fetch path. Yahoo's chart endpoint does not report a
+/// <c>marketState</c>, so market hours are an explicit NYSE regular-session check (weekday,
+/// 09:30–16:00 America/New_York) plus the quote's own <see cref="QuoteCacheEntry.RegularMarketTime"/>
+/// being from today's session (which keeps exchange holidays quiet); a held crypto asset (no exchange
+/// session) is evaluated on every tick as long as its price is recent. A missing, stale or malformed
+/// quote is silently skipped — never an alert, never a job failure — since Yahoo's quote endpoint has
+/// no contract. The 20-day volatility check needs <see cref="IMarketDataService.GetDailyClosesAsync"/>
 /// (already used elsewhere in Research for historical closes) only when the plain move threshold did
-/// not already fire, keeping the common case to the quote cache alone. Fewer than 21 daily closes (20
-/// returns) makes the z-score not evaluable — the job never fires on a thin sample. Alerts ride the
+/// not already fire, and each ticker's volatility is fetched at most once per run, shared across users.
+/// Today's in-progress bar is excluded from the window so the move being tested never dampens its own
+/// z-score. Fewer than 21 prior daily closes (20 returns) makes the z-score not evaluable — the job
+/// never fires on a thin sample. Alerts ride the
 /// existing <see cref="IAlertGeneratorService.GenerateMarketStructureAlertAsync"/> and its already
 /// declared 24-hour, per-reference silence window — one per-ticker reference derived here, so a name
 /// that keeps moving announces itself once a day, not once every 15 minutes. Rare by design
@@ -32,14 +35,17 @@ public sealed class IntradayMoveSentinelJob(
     IWatchlistReader watchlist,
     IMarketDataService marketData,
     IAlertGeneratorService alerts,
+    TimeProvider clock,
     ILogger<IntradayMoveSentinelJob> logger)
 {
     private const string EquityInstrumentType = "STK";
 
-    // Yahoo's marketState for an equity in its normal trading session, as surfaced onto
-    // QuoteCacheEntry.Session by YahooMarketDataService. A US equity outside this session (pre/post
-    // market, closed, or unknown) is not evaluated at all — crypto has no session to check.
-    private const string RegularSession = "regular";
+    private static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+    private static readonly TimeSpan RegularOpen = new(9, 30, 0);
+    private static readonly TimeSpan RegularClose = new(16, 0, 0);
+
+    // A crypto quote whose source price is older than this is stale — Yahoo prices crypto continuously.
+    private static readonly TimeSpan CryptoMaxPriceAge = TimeSpan.FromHours(1);
 
     private const decimal HoldingMoveThreshold = 0.05m;
     private const decimal WatchlistMoveThreshold = 0.08m;
@@ -58,11 +64,12 @@ public sealed class IntradayMoveSentinelJob(
             return;
         }
 
+        var volatility = new Dictionary<string, decimal?>(StringComparer.Ordinal);
         foreach (var userId in userIds)
         {
             try
             {
-                await ProcessUserAsync(userId, ct);
+                await ProcessUserAsync(userId, volatility, ct);
             }
             catch (Exception ex)
             {
@@ -71,7 +78,7 @@ public sealed class IntradayMoveSentinelJob(
         }
     }
 
-    private async Task ProcessUserAsync(Guid userId, CancellationToken ct)
+    private async Task ProcessUserAsync(Guid userId, Dictionary<string, decimal?> volatility, CancellationToken ct)
     {
         var tracked = await BuildTrackedTickersAsync(userId, ct);
         if (tracked.Count == 0)
@@ -88,7 +95,7 @@ public sealed class IntradayMoveSentinelJob(
                 continue;
             }
 
-            await EvaluateAsync(userId, tracker, quote, ct);
+            await EvaluateAsync(userId, tracker, quote, volatility, ct);
         }
     }
 
@@ -123,24 +130,22 @@ public sealed class IntradayMoveSentinelJob(
             var ticker = rawTicker.ToUpperInvariant();
 
             // A ticker already tracked as a holding keeps the holding's stricter threshold and
-            // session gating — the watchlist adds names that aren't already covered.
+            // market-hours gating — the watchlist adds names that aren't already covered.
             tracked.TryAdd(ticker, new TrackedTicker(ticker, IsEquity: true, MoveThreshold: WatchlistMoveThreshold));
         }
 
         return tracked;
     }
 
-    private async Task EvaluateAsync(Guid userId, TrackedTicker tracker, QuoteCacheEntry quote, CancellationToken ct)
+    private async Task EvaluateAsync(
+        Guid userId, TrackedTicker tracker, QuoteCacheEntry quote, Dictionary<string, decimal?> volatility,
+        CancellationToken ct)
     {
-        // Yahoo's own session read is the market-hours signal — a US equity outside "regular" is not
-        // evaluated at all. Crypto has no session to gate on and is evaluated around the clock.
-        if (tracker.IsEquity && !string.Equals(quote.Session, RegularSession, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
+        var now = clock.GetUtcNow();
+        var isLive = tracker.IsEquity ? IsInUsRegularSession(quote, now) : IsFreshCryptoQuote(quote, now);
 
-        // A stale, missing or malformed quote is an ordinary case, never a signal.
-        if (quote.IsStale || quote.PreviousClose is null or 0m || quote.Price <= 0m)
+        // Outside market hours, or a stale, missing or malformed quote, is an ordinary case, never a signal.
+        if (!isLive || quote.PreviousClose is null or 0m || quote.Price <= 0m)
         {
             return;
         }
@@ -159,27 +164,51 @@ public sealed class IntradayMoveSentinelJob(
         }
 
         // The z-score check needs a second Yahoo call for daily history — only made when the plain
-        // move threshold didn't already resolve this tick, keeping the common case to the quote cache.
-        var zScore = await ComputeZScoreAsync(ticker, movePct, ct);
-        if (zScore is not null && Math.Abs(zScore.Value) >= ZScoreThreshold)
+        // move threshold didn't already resolve this tick, and at most once per ticker per run.
+        if (!volatility.TryGetValue(ticker, out var stdDev))
+        {
+            stdDev = await ComputeStdDevAsync(ticker, DateOnly.FromDateTime(now.UtcDateTime), ct);
+            volatility[ticker] = stdDev;
+        }
+
+        if (stdDev is not null && Math.Abs(movePct / stdDev.Value) >= ZScoreThreshold)
         {
             await RaiseAsync(
                 userId, ticker,
-                $"moved {zScore.Value:0.0}σ vs its 20-day volatility (bar {ZScoreThreshold:0.0}σ)",
+                $"moved {movePct / stdDev.Value:0.0}σ vs its 20-day volatility (bar {ZScoreThreshold:0.0}σ)",
                 ct);
         }
     }
 
+    /// <summary>
+    /// NYSE regular session (weekday, 09:30–16:00 New York time) and the quote's last regular-market
+    /// trade is from today's New York date — on an exchange holiday that time is a previous session's.
+    /// </summary>
+    private static bool IsInUsRegularSession(QuoteCacheEntry quote, DateTimeOffset now)
+    {
+        var local = TimeZoneInfo.ConvertTime(now, NewYork);
+        if (local.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ||
+            local.TimeOfDay < RegularOpen || local.TimeOfDay >= RegularClose)
+        {
+            return false;
+        }
+
+        return quote.RegularMarketTime is { } traded &&
+            TimeZoneInfo.ConvertTime(traded, NewYork).Date == local.Date;
+    }
+
+    private static bool IsFreshCryptoQuote(QuoteCacheEntry quote, DateTimeOffset now)
+        => quote.SourcePriceTime is { } priced && now - priced <= CryptoMaxPriceAge;
+
     private Task RaiseAsync(Guid userId, string ticker, string reason, CancellationToken ct)
         => alerts.GenerateMarketStructureAlertAsync(userId, ReferenceId(ticker), ticker, reason, ct);
 
-    private async Task<decimal?> ComputeZScoreAsync(string ticker, decimal movePct, CancellationToken ct)
+    private async Task<decimal?> ComputeStdDevAsync(string ticker, DateOnly today, CancellationToken ct)
     {
         IReadOnlyList<DailyClose> closes;
         try
         {
-            var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-HistoryLookbackDays);
-            closes = await marketData.GetDailyClosesAsync(ticker, since, ct);
+            closes = await marketData.GetDailyClosesAsync(ticker, today.AddDays(-HistoryLookbackDays), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -187,16 +216,15 @@ public sealed class IntradayMoveSentinelJob(
             return null;
         }
 
-        return ZScore(closes, movePct);
+        return StdDev(closes.Where(c => c.Date < today).ToList());
     }
 
     /// <summary>
-    /// Sample z-score of <paramref name="movePct"/> against the standard deviation of the last
-    /// <see cref="VolatilityWindow"/> daily returns. Explicitly not evaluable — returns null, never a
-    /// fabricated score — when there isn't a full window of history yet (a new listing, a fetch that
-    /// came back thin) or the window is degenerate (zero volatility).
+    /// Sample standard deviation of the last <see cref="VolatilityWindow"/> daily returns. Explicitly not
+    /// evaluable — returns null, never a fabricated figure — when there isn't a full window of history
+    /// yet (a new listing, a fetch that came back thin) or the window is degenerate (zero volatility).
     /// </summary>
-    private static decimal? ZScore(IReadOnlyList<DailyClose> closes, decimal movePct)
+    private static decimal? StdDev(IReadOnlyList<DailyClose> closes)
     {
         if (closes.Count < VolatilityWindow + 1)
         {
@@ -224,7 +252,7 @@ public sealed class IntradayMoveSentinelJob(
         var variance = slice.Sum(r => (r - mean) * (r - mean)) / (VolatilityWindow - 1);
         var stdDev = (decimal)Math.Sqrt((double)variance);
 
-        return stdDev == 0m ? null : movePct / stdDev;
+        return stdDev == 0m ? null : stdDev;
     }
 
     // Stable per-ticker reference id, independent of the nightly Radar unusual-move checker's own
