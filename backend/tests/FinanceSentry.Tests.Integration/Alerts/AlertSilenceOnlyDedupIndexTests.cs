@@ -83,4 +83,46 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
         alerts.Single(a => a.Id == old.Id).IsResolved.Should().BeTrue("the new occurrence supersedes it");
         alerts.Single(a => a.Id != old.Id).Should().Match<Alert>(a => !a.IsResolved && !a.IsDismissed);
     }
+
+    [DockerRequiredFact]
+    public async Task AddAsync_FailedInsert_DoesNotPoisonLaterSavesOnTheSameContext()
+    {
+        await using (var setup = CreateContext())
+        {
+            await setup.Database.EnsureCreatedAsync();
+        }
+
+        var userId = Guid.NewGuid();
+        var solReference = Guid.NewGuid();
+        await using (var seed = CreateContext())
+        {
+            seed.Alerts.Add(NewAlert(userId, solReference, "SOL-USD"));
+            await seed.SaveChangesAsync();
+        }
+
+        var xrpReference = Guid.NewGuid();
+        await using (var ctx = CreateContext())
+        {
+            var repository = new AlertRepository(ctx);
+
+            var failing = () => repository.AddAsync(NewAlert(userId, solReference, "SOL-USD"));
+            await failing.Should().ThrowAsync<DbUpdateException>("idx_alert_dedup rejects a second open alert");
+
+            await repository.AddAsync(NewAlert(userId, xrpReference, "XRP-USD"));
+        }
+
+        await using var read = CreateContext();
+        var alerts = await read.Alerts.AsNoTracking().Where(a => a.UserId == userId).ToListAsync();
+        alerts.Select(a => a.ReferenceLabel).Should().BeEquivalentTo(["SOL-USD", "XRP-USD"]);
+    }
+
+    private static Alert NewAlert(Guid userId, Guid referenceId, string ticker) => new()
+    {
+        UserId = userId,
+        Type = AlertType.MarketStructure,
+        Title = $"Unusual move: {ticker}",
+        Message = "moved intraday",
+        ReferenceId = referenceId,
+        ReferenceLabel = ticker,
+    };
 }
