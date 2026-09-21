@@ -23,9 +23,10 @@ using Microsoft.Extensions.Logging;
 /// Today's in-progress bar is excluded from the window so the move being tested never dampens its own
 /// z-score. Fewer than 21 prior daily closes (20 returns) makes the z-score not evaluable — the job
 /// never fires on a thin sample. Alerts ride the
-/// existing <see cref="IAlertGeneratorService.GenerateMarketStructureAlertAsync"/> and its already
-/// declared 24-hour, per-reference silence window — one per-ticker reference derived here, so a name
-/// that keeps moving announces itself once a day, not once every 15 minutes. Rare by design
+/// existing <see cref="IAlertGeneratorService.GenerateMarketStructureAlertAsync"/> with
+/// <see cref="AlertDedup.SilenceOnly"/>: only its declared 24-hour, per-reference silence window
+/// applies — one per-ticker reference derived here, so a name that keeps moving announces itself once
+/// a day, not once every 15 minutes, and an unread earlier alert never swallows a later move. Rare by design
 /// (~0.1 fires/day, per the design's observed volume).
 /// </summary>
 public sealed class IntradayMoveSentinelJob(
@@ -201,7 +202,7 @@ public sealed class IntradayMoveSentinelJob(
         => quote.SourcePriceTime is { } priced && now - priced <= CryptoMaxPriceAge;
 
     private Task RaiseAsync(Guid userId, string ticker, string reason, CancellationToken ct)
-        => alerts.GenerateMarketStructureAlertAsync(userId, ReferenceId(ticker), ticker, reason, ct);
+        => alerts.GenerateMarketStructureAlertAsync(userId, ReferenceId(ticker), ticker, reason, ct, AlertDedup.SilenceOnly);
 
     private async Task<decimal?> ComputeStdDevAsync(string ticker, DateOnly today, CancellationToken ct)
     {

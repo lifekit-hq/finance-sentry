@@ -113,7 +113,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     /// <summary>Be precise about market hours: an equity outside the NYSE regular session is not evaluated at all.</summary>
@@ -146,7 +146,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     /// <summary>An exchange holiday inside regular hours: the last regular-market trade is a previous session's.</summary>
@@ -174,7 +174,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     /// <summary>Crypto has no exchange session — it is evaluated around the clock, weekends included.</summary>
@@ -189,7 +189,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "BTC-USD", It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "BTC-USD", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "TSLA", It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "TSLA", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     /// <summary>Above the holding bar but below the watchlist's own, stricter bar — proves the two thresholds are distinct.</summary>
@@ -238,7 +238,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     /// <summary>A ticker that is both a holding and watchlisted keeps the holding's stricter 5% bar.</summary>
@@ -253,7 +253,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     /// <summary>A move too small for the plain bar but large against a genuinely quiet 20-day history fires on z-score alone.</summary>
@@ -271,7 +271,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "KO", It.Is<string>(r => r.Contains('σ')), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "KO", It.Is<string>(r => r.Contains('σ')), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     /// <summary>21 closes with one tiny wiggle: enough history for a full 20-return window with a nonzero, small σ.</summary>
@@ -311,7 +311,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            _userId, It.IsAny<Guid>(), "KO", It.Is<string>(r => r.Contains('σ')), default), Times.Once);
+            _userId, It.IsAny<Guid>(), "KO", It.Is<string>(r => r.Contains('σ')), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     [Fact]
@@ -347,7 +347,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     [Fact]
@@ -361,7 +361,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     [Fact]
@@ -374,7 +374,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), default, It.IsAny<AlertDedup>()), Times.Never);
     }
 
     [Fact]
@@ -404,8 +404,8 @@ public sealed class IntradayMoveSentinelJobTests
         SetQuotes(Quote("AAPL", price: 106m, previousClose: 100m));
         var seenReferenceIds = new List<Guid>();
         _alerts.Setup(a => a.GenerateMarketStructureAlertAsync(
-                _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default))
-            .Callback<Guid, Guid, string, string, CancellationToken>((_, refId, _, _, _) => seenReferenceIds.Add(refId))
+                _userId, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly))
+            .Callback<Guid, Guid, string, string, CancellationToken, AlertDedup>((_, refId, _, _, _, _) => seenReferenceIds.Add(refId))
             .Returns(Task.CompletedTask);
 
         await _job.ExecuteAsync();
@@ -433,7 +433,7 @@ public sealed class IntradayMoveSentinelJobTests
         await _job.ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateMarketStructureAlertAsync(
-            userId2, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default), Times.Once);
+            userId2, It.IsAny<Guid>(), "AAPL", It.IsAny<string>(), default, AlertDedup.SilenceOnly), Times.Once);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

@@ -833,18 +833,20 @@ public class AlertGeneratorServiceTests
             .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
             .Returns(Task.CompletedTask);
 
-        await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.2% intraday");
-        await _service.GenerateMarketStructureAlertAsync(_userId, referenceId, "AAPL", "moved 6.9% intraday");
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.2% intraday", dedup: AlertDedup.SilenceOnly);
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.9% intraday", dedup: AlertDedup.SilenceOnly);
 
         written.Should().ContainSingle("the second tick falls inside the first alert's 24h silence window");
     }
 
     /// <summary>
-    /// Each move is its own event: an alert left unread from an earlier day must not swallow a new move
-    /// once the 24h window has passed.
+    /// Intraday-move-sentinel direction: each move is its own event, so with an unread alert already
+    /// open for the ticker, a SilenceOnly caller still raises a new one once the 24h window has passed.
     /// </summary>
     [Fact]
-    public async Task GenerateMarketStructure_ExistingActiveOutsideSilenceWindow_StillFires()
+    public async Task GenerateMarketStructure_SilenceOnly_ExistingActiveOutsideSilenceWindow_StillFires()
     {
         SuppressByActiveAlert(AlertType.MarketStructure);
         _repo.Setup(r => r.HasRecentAsync(
@@ -852,9 +854,27 @@ public class AlertGeneratorServiceTests
             .ReturnsAsync(false);
 
         await _service.GenerateMarketStructureAlertAsync(
-            _userId, Guid.NewGuid(), "AAPL", "moved 9.0% intraday");
+            _userId, Guid.NewGuid(), "AAPL", "moved 9.0% intraday", dedup: AlertDedup.SilenceOnly);
 
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Once);
+    }
+
+    /// <summary>
+    /// Nightly Radar unusual-move direction: that caller passes no dedup mode, and with an unread alert
+    /// already open for the ticker a repeat stays suppressed even once the 24h window has passed.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_DefaultDedup_ExistingActiveOutsideSilenceWindow_IsSuppressed()
+    {
+        SuppressByActiveAlert(AlertType.MarketStructure);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 3.4σ vs its 63-day volatility", CancellationToken.None);
+
+        VerifyNothingAdded();
     }
 
     /// <summary>

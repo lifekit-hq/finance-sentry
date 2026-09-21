@@ -1,5 +1,24 @@
 namespace FinanceSentry.Core.Interfaces;
 
+/// <summary>How much of the dedup discipline applies to one alert emission.</summary>
+public enum AlertDedup
+{
+    /// <summary>An open alert on the same reference suppresses a new one; then the silence window.</summary>
+    ActiveThenSilence,
+
+    /// <summary>Silence window only — each occurrence deserves its own row once the window has passed.</summary>
+    SilenceOnly,
+
+    /// <summary>Always record: the caller has already decided this event must be seen.</summary>
+    Always,
+
+    /// <summary>
+    /// Once per reference, ever: any alert already raised on the reference — open, dismissed or
+    /// resolved — suppresses a new one. No silence window applies.
+    /// </summary>
+    OncePerReference,
+}
+
 public interface IAlertGeneratorService
 {
     Task GenerateLowBalanceAlertAsync(
@@ -48,13 +67,16 @@ public interface IAlertGeneratorService
     /// <summary>
     /// Raises a market-structure Alert for a held ticker (e.g. an unusual move at/above the alert bar).
     /// <paramref name="referenceId"/> is a deterministic per-ticker id so dedup/resolve is stable.
+    /// <paramref name="dedup"/> is the caller's choice: by default an open alert on the ticker suppresses
+    /// a new one; <see cref="AlertDedup.SilenceOnly"/> lets each move past the silence window through.
     /// </summary>
     Task GenerateMarketStructureAlertAsync(
         Guid userId,
         Guid referenceId,
         string ticker,
         string reason,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        AlertDedup dedup = AlertDedup.ActiveThenSilence);
 
     /// <summary>
     /// Raises a market-structure freshness Alert when the Radar data is stale or an ingestion run failed.
