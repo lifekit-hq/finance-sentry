@@ -130,7 +130,17 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public async Task AddAsync(Alert alert, CancellationToken ct = default)
     {
         _db.Alerts.Add(alert);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // A rejected insert must not stay tracked as Added, or every later save on this
+            // (scoped) context retries it and fails the same way.
+            _db.Entry(alert).State = EntityState.Detached;
+            throw;
+        }
     }
 
     public async Task<bool> AcknowledgeAsync(Guid userId, Guid alertId, string decision, CancellationToken ct = default)

@@ -335,7 +335,8 @@ public class RunThesisMonitorHandlerTests
         }
 
         public Task GenerateMarketStructureAlertAsync(
-            Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default)
+            Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default,
+            AlertDedup dedup = AlertDedup.ActiveThenSilence)
             => Task.CompletedTask;
 
         public Task GenerateMarketStructureFreshnessAlertAsync(

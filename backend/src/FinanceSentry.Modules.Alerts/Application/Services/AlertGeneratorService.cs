@@ -67,25 +67,6 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
 
     private readonly IAlertRepository _alerts = alerts;
 
-    /// <summary>How much of the dedup discipline applies to one emission.</summary>
-    private enum Dedup
-    {
-        /// <summary>An open alert on the same reference suppresses a new one; then the silence window.</summary>
-        ActiveThenSilence,
-
-        /// <summary>Silence window only — each occurrence deserves its own row once the window has passed.</summary>
-        SilenceOnly,
-
-        /// <summary>Always record: the caller has already decided this event must be seen.</summary>
-        Always,
-
-        /// <summary>
-        /// Once per reference, ever: any alert already raised on the reference — open, dismissed or
-        /// resolved — suppresses a new one. No silence window applies.
-        /// </summary>
-        OncePerReference,
-    }
-
     public Task GenerateLowBalanceAlertAsync(
         Guid userId, Guid accountId, string accountName,
         decimal balance, decimal threshold, CancellationToken ct = default)
@@ -133,11 +114,16 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         => ResolveAsync(userId, AlertType.ThesisBroken, thesisId, ct);
 
     public Task GenerateMarketStructureAlertAsync(
-        Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default)
+        Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default,
+        AlertDedup dedup = AlertDedup.ActiveThenSilence)
         => EmitAsync(userId, new AlertDraft(
             AlertType.MarketStructure, AlertSeverity.Warning, referenceId, ticker,
             $"Unusual move: {ticker}",
-            $"Market structure flagged {ticker}: {reason}"),
+            $"Market structure flagged {ticker}: {reason}")
+        {
+            Dedup = dedup,
+            SupersedeOpen = dedup == AlertDedup.SilenceOnly,
+        },
             ct);
 
     public Task GenerateMarketStructureFreshnessAlertAsync(
@@ -167,7 +153,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         {
             // An override is a deliberate act by the user: it is recorded every time, never
             // swallowed by an alert the same rule raised earlier.
-            Dedup = isOverride ? Dedup.Always : Dedup.ActiveThenSilence,
+            Dedup = isOverride ? AlertDedup.Always : AlertDedup.ActiveThenSilence,
         },
             ct);
     }
@@ -210,7 +196,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         {
             // Each streak should produce a fresh alert row (a fresh Telegram message); the failure
             // filter guarantees one call per streak, so an open alert must not suppress the next.
-            Dedup = Dedup.SilenceOnly,
+            Dedup = AlertDedup.SilenceOnly,
         },
             ct);
     }
@@ -221,7 +207,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             AlertType.PerformanceBrief, AlertSeverity.Info, null, "weekly", headline, body)
         {
             // Every week's brief is its own row — an unread one must not swallow the next.
-            Dedup = Dedup.SilenceOnly,
+            Dedup = AlertDedup.SilenceOnly,
         },
             ct);
 
@@ -373,7 +359,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             BudgetBreachReferenceId("near-limit", budgetId, year, month), category,
             $"Budget nearing limit: {category} ({period})",
             $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
-        { Dedup = Dedup.OncePerReference },
+        { Dedup = AlertDedup.OncePerReference },
             ct);
     }
 
@@ -389,7 +375,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             BudgetBreachReferenceId("exceeded", budgetId, year, month), category,
             $"Budget limit exceeded: {category} ({period})",
             $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
-        { Dedup = Dedup.OncePerReference },
+        { Dedup = AlertDedup.OncePerReference },
             ct);
     }
 
@@ -400,23 +386,30 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// </summary>
     private async Task EmitAsync(Guid userId, AlertDraft draft, CancellationToken ct)
     {
-        if (draft.Dedup == Dedup.OncePerReference)
+        if (draft.Dedup == AlertDedup.OncePerReference)
         {
             if (await _alerts.ExistsAsync(userId, draft.Type, draft.ReferenceId, ct)) return;
         }
-        else if (draft.Dedup == Dedup.ActiveThenSilence)
+        else if (draft.Dedup == AlertDedup.ActiveThenSilence)
         {
             var existing = await _alerts.FindActiveAsync(userId, draft.Type, draft.ReferenceId, ct);
             if (existing is not null) return;
         }
 
-        if (draft.Dedup is Dedup.ActiveThenSilence or Dedup.SilenceOnly)
+        if (draft.Dedup is AlertDedup.ActiveThenSilence or AlertDedup.SilenceOnly)
         {
             var window = draft.SilenceWindow ?? SilenceWindows[draft.Type];
             var quietSince = DateTimeOffset.UtcNow - window;
             if (await _alerts.HasRecentAsync(
                     userId, draft.Type, draft.ReferenceId, draft.ReferenceLabel, quietSince, ct))
                 return;
+        }
+
+        // idx_alert_dedup allows one open alert per (user, type, reference): an occurrence that opts in
+        // supersedes the still-open earlier one instead of colliding with it.
+        if (draft.SupersedeOpen && draft.ReferenceId is not null)
+        {
+            await ResolveAsync(userId, draft.Type, draft.ReferenceId, ct);
         }
 
         await _alerts.AddAsync(new Alert
@@ -496,9 +489,12 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         string Title,
         string Message)
     {
-        public Dedup Dedup { get; init; } = Dedup.ActiveThenSilence;
+        public AlertDedup Dedup { get; init; } = AlertDedup.ActiveThenSilence;
 
         /// <summary>Overrides the type's declared window where one type carries two distinct events.</summary>
         public TimeSpan? SilenceWindow { get; init; }
+
+        /// <summary>Resolves a still-open alert on the same reference before recording this one.</summary>
+        public bool SupersedeOpen { get; init; }
     }
 }

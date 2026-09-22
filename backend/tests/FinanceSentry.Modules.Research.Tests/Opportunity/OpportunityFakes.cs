@@ -252,7 +252,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateThesisBreakAlertAsync(Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveThesisBreakAlertAsync(Guid userId, Guid thesisId, CancellationToken ct = default) => Task.CompletedTask;
-    public Task GenerateMarketStructureAlertAsync(Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateMarketStructureAlertAsync(Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default, AlertDedup dedup = AlertDedup.ActiveThenSilence) => Task.CompletedTask;
     public Task GenerateMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, string reason, CancellationToken ct = default) => Task.CompletedTask;
     public Task GeneratePolicyViolationAlertAsync(Guid userId, string ruleKey, string subject, decimal observedValue, decimal limitValue, bool isOverride = false, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolvePolicyViolationAlertAsync(Guid userId, string ruleKey, string subject, CancellationToken ct = default) => Task.CompletedTask;

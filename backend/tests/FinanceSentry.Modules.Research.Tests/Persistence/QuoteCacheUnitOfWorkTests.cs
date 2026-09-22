@@ -79,4 +79,36 @@ public sealed class QuoteCacheUnitOfWorkTests
         persisted.Price.Should().Be(2.09m,
             "the rejected batch's update must not be committed by the next unrelated SaveChanges");
     }
+
+    [Fact]
+    public async Task ARefresh_OverwritesTheSessionMetadata_NotJustThePrice()
+    {
+        await using var fixture = await ThesisSqliteFixture.CreateAsync();
+        await using var ctx = fixture.CreateContext();
+        var cache = new QuoteCacheRepository(ctx);
+
+        var original = Quote("BTC-USD");
+        original.IsStale = false;
+        original.Session = "regular";
+        await cache.UpsertManyAsync([original], CancellationToken.None);
+
+        var pricedAt = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
+        var refreshed = Quote("BTC-USD");
+        refreshed.ResolvedTicker = "BTC-USD";
+        refreshed.MarketState = "REGULAR";
+        refreshed.Session = "unknown";
+        refreshed.IsStale = true;
+        refreshed.SourcePriceTime = pricedAt;
+        refreshed.RegularMarketTime = pricedAt;
+        await cache.UpsertManyAsync([refreshed], CancellationToken.None);
+
+        await using var readCtx = fixture.CreateContext();
+        var persisted = await readCtx.QuoteCache.SingleAsync(q => q.Ticker == "BTC-USD");
+        persisted.ResolvedTicker.Should().Be("BTC-USD");
+        persisted.MarketState.Should().Be("REGULAR");
+        persisted.Session.Should().Be("unknown");
+        persisted.IsStale.Should().BeTrue();
+        persisted.SourcePriceTime.Should().Be(pricedAt);
+        persisted.RegularMarketTime.Should().Be(pricedAt);
+    }
 }

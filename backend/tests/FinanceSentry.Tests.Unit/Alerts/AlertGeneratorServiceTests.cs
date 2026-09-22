@@ -5,6 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
+using FluentAssertions;
 using Moq;
 using Xunit;
 
@@ -796,6 +797,114 @@ public class AlertGeneratorServiceTests
         Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
     }
 
+    [Fact]
+    public async Task GenerateMarketStructure_NoExisting_AddsWarningAlert()
+    {
+        var referenceId = Guid.NewGuid();
+        AllowAlert(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.2% intraday, above the holding 5% bar");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.MarketStructure &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceId == referenceId &&
+            a.ReferenceLabel == "AAPL" &&
+            a.Title.Contains("AAPL") &&
+            a.Message.Contains("5% bar")), default), Times.Once);
+    }
+
+    /// <summary>
+    /// P1 (ledger-heartbeat design): the intraday-move-sentinel job re-checks every held/watchlisted
+    /// ticker every 15 minutes with the same per-ticker reference id, so the 24h silence window is what
+    /// keeps a name that keeps moving to one alert a day.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_SameTickerWithinTwentyFourHours_SecondCallIsSuppressed()
+    {
+        var referenceId = Guid.NewGuid();
+        var written = new List<Alert>();
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, referenceId, "AAPL", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(() => written.Count > 0);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.2% intraday", dedup: AlertDedup.SilenceOnly);
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, referenceId, "AAPL", "moved 6.9% intraday", dedup: AlertDedup.SilenceOnly);
+
+        written.Should().ContainSingle("the second tick falls inside the first alert's 24h silence window");
+    }
+
+    /// <summary>
+    /// Intraday-move-sentinel direction: each move is its own event, so with an unread alert already
+    /// open for the ticker, a SilenceOnly caller still raises a new one once the 24h window has passed.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_SilenceOnly_ExistingActiveOutsideSilenceWindow_StillFires()
+    {
+        SuppressByActiveAlert(AlertType.MarketStructure);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 9.0% intraday", dedup: AlertDedup.SilenceOnly);
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Once);
+    }
+
+    /// <summary>
+    /// Nightly Radar unusual-move direction: that caller passes no dedup mode, and with an unread alert
+    /// already open for the ticker a repeat stays suppressed even once the 24h window has passed.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_DefaultDedup_ExistingActiveOutsideSilenceWindow_IsSuppressed()
+    {
+        SuppressByActiveAlert(AlertType.MarketStructure);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.MarketStructure, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 3.4σ vs its 63-day volatility", CancellationToken.None);
+
+        VerifyNothingAdded();
+    }
+
+    /// <summary>
+    /// Backstop path: the prior alert was dismissed (no longer active), but it is still inside the
+    /// declared 24h window — a re-run must stay quiet rather than re-alert the same ticker.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMarketStructure_DismissedWithinTwentyFourHourWindow_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(
+            _userId, Guid.NewGuid(), "AAPL", "moved 6.2% intraday");
+
+        VerifyNothingAdded();
+    }
+
+    [Fact]
+    public async Task GenerateMarketStructure_DifferentTicker_ProducesADifferentReferenceId_AndStillFires()
+    {
+        var aaplRef = Guid.NewGuid();
+        var msftRef = Guid.NewGuid();
+        AllowAlert(AlertType.MarketStructure);
+
+        await _service.GenerateMarketStructureAlertAsync(_userId, aaplRef, "AAPL", "moved 6.2% intraday");
+        await _service.GenerateMarketStructureAlertAsync(_userId, msftRef, "MSFT", "moved 9.1% intraday");
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Exactly(2));
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection
@@ -823,7 +932,7 @@ public class AlertGeneratorServiceTests
             .ToList();
 
         Assert.NotEmpty(live);
-        Assert.Empty(live.Where(t => !declared.ContainsKey(t)));
+        Assert.DoesNotContain(live, t => !declared.ContainsKey(t));
     }
 
     private void AllowAlert(string type)

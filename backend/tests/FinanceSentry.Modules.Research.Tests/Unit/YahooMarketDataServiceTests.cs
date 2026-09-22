@@ -48,6 +48,27 @@ public sealed class YahooMarketDataServiceTests
         result["DRAM"].IsStale.Should().BeFalse();
     }
 
+    /// <summary>
+    /// On the 5-day chart, chartPreviousClose is the close before the whole window — a weekly baseline.
+    /// The previous close is the prior session's bar, so a quote's change is a daily one.
+    /// </summary>
+    [Fact]
+    public async Task GetQuotesAsync_PreviousCloseIsThePriorSessionsBar_NotTheChartWindowBaseline()
+    {
+        // regularMarketTime 1783958400 = 2026-07-13 16:00 UTC; bars run 07-07 .. 07-13 at 13:30 UTC.
+        var handler = new StubHttpMessageHandler(_ => QuoteJson(
+            symbol: "PSX",
+            marketState: "REGULAR",
+            regularMarketPrice: 273.13m,
+            chartPreviousClose: 259.47m,
+            bars: [(1783431000, 262m), (1783517400, 265m), (1783603800, 268m), (1783690200, 271.5m), (1783949400, 273.13m)]));
+        var sut = CreateSut(handler);
+
+        var result = await sut.GetQuotesAsync(["PSX"]);
+
+        result["PSX"].PreviousClose.Should().Be(271.5m);
+    }
+
     [Fact]
     public async Task GetQuotesAsync_RefusesUnexpectedYahooSymbol()
     {
@@ -94,10 +115,15 @@ public sealed class YahooMarketDataServiceTests
         decimal regularMarketPrice,
         decimal chartPreviousClose,
         decimal? preMarketPrice = null,
-        decimal? postMarketPrice = null)
+        decimal? postMarketPrice = null,
+        (long Timestamp, decimal Close)[]? bars = null)
     {
         var preMarket = preMarketPrice is null ? string.Empty : $@",""preMarketPrice"":{preMarketPrice}";
         var postMarket = postMarketPrice is null ? string.Empty : $@",""postMarketPrice"":{postMarketPrice}";
+        var series = bars is null
+            ? string.Empty
+            : $@",""timestamp"":[{string.Join(',', bars.Select(b => b.Timestamp))}]," +
+              $@"""indicators"":{{""quote"":[{{""close"":[{string.Join(',', bars.Select(b => b.Close.ToString(System.Globalization.CultureInfo.InvariantCulture)))}]}}]}}";
         return $$"""
         {
           "chart": {
@@ -115,6 +141,7 @@ public sealed class YahooMarketDataServiceTests
                   {{preMarket}}
                   {{postMarket}}
                 }
+                {{series}}
               }
             ]
           }

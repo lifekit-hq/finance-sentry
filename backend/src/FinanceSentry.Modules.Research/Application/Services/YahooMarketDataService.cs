@@ -141,11 +141,11 @@ public class YahooMarketDataService(
                 return null;
             }
 
-            var prev = ReadDecimal(meta, "chartPreviousClose") ?? ReadDecimal(meta, "previousClose");
             var currency = meta.TryGetProperty("currency", out var currencyProp)
                 ? currencyProp.GetString() ?? "USD"
                 : "USD";
             var regularMarketTime = ReadUnixTime(meta, "regularMarketTime");
+            var prev = PriorSessionClose(first, regularMarketTime) ?? ReadDecimal(meta, "previousClose");
             var sourcePriceTime = selected.Session switch
             {
                 PreMarketSession => ReadUnixTime(meta, "preMarketTime") ?? regularMarketTime,
@@ -203,47 +203,67 @@ public class YahooMarketDataService(
                 return [];
             }
 
-            var first = resultArray[0];
-            if (!first.TryGetProperty("timestamp", out var timestamps) ||
-                timestamps.ValueKind is not JsonValueKind.Array ||
-                !first.TryGetProperty("indicators", out var indicators) ||
-                !indicators.TryGetProperty("quote", out var quoteArray) ||
-                quoteArray.ValueKind is not JsonValueKind.Array ||
-                quoteArray.GetArrayLength() == 0 ||
-                !quoteArray[0].TryGetProperty("close", out var closes) ||
-                closes.ValueKind is not JsonValueKind.Array)
-            {
-                return [];
-            }
-
-            var result = new List<DailyClose>();
-            var count = Math.Min(timestamps.GetArrayLength(), closes.GetArrayLength());
-            for (var i = 0; i < count; i++)
-            {
-                var closeElement = closes[i];
-                if (closeElement.ValueKind is not JsonValueKind.Number ||
-                    !closeElement.TryGetDecimal(out var close))
-                {
-                    continue;
-                }
-
-                var epochSeconds = timestamps[i].GetInt64();
-                var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(epochSeconds).UtcDateTime);
-                if (date < since)
-                {
-                    continue;
-                }
-
-                result.Add(new DailyClose(date, close));
-            }
-
-            return result;
+            return ReadDailyBars(resultArray[0]).Where(c => c.Date >= since).ToList();
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Yahoo Finance daily close fetch failed for {Ticker}", normalized);
             return [];
         }
+    }
+
+    /// <summary>
+    /// The previous session's close, read from the chart's daily bars: the last close dated before the
+    /// session <paramref name="regularMarketTime"/> belongs to (or before the latest bar when that time is
+    /// absent). <c>chartPreviousClose</c> is not used — on a 5-day range it is the close before the whole
+    /// window, which would turn a daily change into a weekly one.
+    /// </summary>
+    private static decimal? PriorSessionClose(JsonElement result, DateTimeOffset? regularMarketTime)
+    {
+        var bars = ReadDailyBars(result);
+        if (bars.Count == 0)
+        {
+            return null;
+        }
+
+        var sessionDate = regularMarketTime is { } time
+            ? DateOnly.FromDateTime(time.UtcDateTime)
+            : bars[^1].Date;
+
+        return bars.LastOrDefault(b => b.Date < sessionDate)?.Close;
+    }
+
+    private static List<DailyClose> ReadDailyBars(JsonElement result)
+    {
+        var bars = new List<DailyClose>();
+        if (!result.TryGetProperty("timestamp", out var timestamps) ||
+            timestamps.ValueKind is not JsonValueKind.Array ||
+            !result.TryGetProperty("indicators", out var indicators) ||
+            !indicators.TryGetProperty("quote", out var quoteArray) ||
+            quoteArray.ValueKind is not JsonValueKind.Array ||
+            quoteArray.GetArrayLength() == 0 ||
+            !quoteArray[0].TryGetProperty("close", out var closes) ||
+            closes.ValueKind is not JsonValueKind.Array)
+        {
+            return bars;
+        }
+
+        var count = Math.Min(timestamps.GetArrayLength(), closes.GetArrayLength());
+        for (var i = 0; i < count; i++)
+        {
+            var closeElement = closes[i];
+            if (closeElement.ValueKind is not JsonValueKind.Number ||
+                !closeElement.TryGetDecimal(out var close) ||
+                !timestamps[i].TryGetInt64(out var epochSeconds))
+            {
+                continue;
+            }
+
+            var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(epochSeconds).UtcDateTime);
+            bars.Add(new DailyClose(date, close));
+        }
+
+        return bars;
     }
 
     private static string ResolveRange(DateOnly since)

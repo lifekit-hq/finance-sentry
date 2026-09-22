@@ -12,6 +12,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 public static class ResearchModule
@@ -130,6 +131,13 @@ public static class ResearchModule
                 "research-thesis-source-retirement",
                 job => job.ExecuteAsync(CancellationToken.None),
                 "45 1 * * *");
+
+            // Intraday-move detector (ledger-heartbeat P1), every 15 minutes around the clock — the
+            // job itself gates each equity to the NYSE regular session; crypto is evaluated on every tick.
+            mgr.AddOrUpdate<IntradayMoveSentinelJob>(
+                "intraday-move-sentinel",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "*/15 * * * *");
         }
     }
 
@@ -346,6 +354,8 @@ public static class ResearchModule
         services.AddScoped<NewsMaterialityJob>();
         services.AddScoped<GeopoliticsSourceSeedJob>();
         services.AddScoped<ThesisSourceRetirementJob>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IntradayMoveSentinelJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
