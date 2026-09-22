@@ -194,17 +194,33 @@ GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertF
 // Propagate trace context into job execution spans (spec 023 amendment, #616).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter());
 
-app.RegisterAllModuleJobs();
+// Registering jobs writes to Hangfire's storage, which outside the Testing environment is the same
+// PostgreSQL database MigrateAllModules just found unreachable — an AddOrUpdate against it throws
+// and would end the process before it serves a request, turning the documented non-fatal
+// "database unreachable at startup" path into a crash. Skip registration on that path: the API comes
+// up, the "migrations" readiness check names the skipped migrations, and the restart it prescribes
+// registers this build's jobs as well. Recurring jobs registered by earlier starts persist in storage.
+if (app.Services.GetRequiredService<StartupMigrationStatus>().MigrationsSkipped)
+{
+    app.Logger.LogError(
+        "Skipping startup job registration: the database was unreachable when migrations ran, and " +
+        "registering jobs writes to Hangfire's storage in that database. Restart the API once the " +
+        "database is reachable so the skipped migrations run and this build's jobs are registered.");
+}
+else
+{
+    app.RegisterAllModuleJobs();
 
-// Live FX rates: refresh daily, and once immediately so we leave the hardcoded
-// fallback table behind as soon as the app is up.
-var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
-recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
-    "exchange-rate-refresh",
-    job => job.RunAsync(CancellationToken.None),
-    Cron.Daily());
-app.Services.GetRequiredService<IBackgroundJobClient>()
-    .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
+    // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
+    // fallback table behind as soon as the app is up.
+    var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
+        "exchange-rate-refresh",
+        job => job.RunAsync(CancellationToken.None),
+        Cron.Daily());
+    app.Services.GetRequiredService<IBackgroundJobClient>()
+        .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
+}
 
 app.Run();
 
