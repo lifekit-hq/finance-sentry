@@ -282,7 +282,8 @@ public interface IAlertGeneratorService
     /// limit (C2, ledger-heartbeat design). Deduped per (<paramref name="budgetId"/>,
     /// <paramref name="year"/>, <paramref name="month"/>) — a budget crosses 90% at most once per
     /// month regardless of how many times the daily hygiene run re-checks it, a mid-month limit
-    /// edit, or a refund that later lets spend cross back over the line.
+    /// edit, or a refund that later lets spend cross back over the line. Once raised, the alert is
+    /// never raised again for that month, even after the user dismisses or resolves it.
     /// </summary>
     Task GenerateBudgetNearLimitAlertAsync(
         Guid userId,

@@ -53,6 +53,12 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
             .FirstOrDefaultAsync(ct);
     }
 
+    public Task<bool> ExistsAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
+    {
+        return _db.Alerts.AsNoTracking()
+            .AnyAsync(a => a.UserId == userId && a.Type == type && a.ReferenceId == referenceId, ct);
+    }
+
     public Task<bool> HasRecentAsync(
         Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
         CancellationToken ct = default)

@@ -35,7 +35,8 @@ using Microsoft.Extensions.Logging;
 /// - A refund that drops spend back under an already-alerted threshold does not resolve that
 ///   alert — BudgetBreach has no Resolve method, like the other hygiene sentinels (PriceHike,
 ///   CategorySpike, …). If spend later climbs back over the same threshold in the same month, the
-///   still-active alert on that (budget, kind, month) reference suppresses a second one.
+///   alert already raised on that (budget, kind, month) reference — open, dismissed or resolved —
+///   suppresses a second one.
 /// </summary>
 public sealed class BudgetBreachDetectionJob(
     IBudgetRepository budgets,

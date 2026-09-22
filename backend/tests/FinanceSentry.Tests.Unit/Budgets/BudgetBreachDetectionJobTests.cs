@@ -1,6 +1,9 @@
 namespace FinanceSentry.Tests.Unit.Budgets;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Alerts.Application.Services;
+using FinanceSentry.Modules.Alerts.Domain;
+using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using FinanceSentry.Modules.Budgets.Application.Services;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
@@ -371,6 +374,47 @@ public sealed class BudgetBreachDetectionJobTests
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// End to end through the real alert generator: a September breach alert the user dismissed
+    /// stays dismissed when the Oct 1 run re-evaluates September inside the grace window.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_DismissedPriorMonthAlert_StaysSilentInGraceWindowRun()
+    {
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+        SetMonthSpend(userId, "GROCERIES", 2026, 10, 0m);
+
+        var ledger = new List<Alert>();
+        var repo = new Mock<IAlertRepository>();
+        repo.Setup(r => r.ExistsAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid u, string type, Guid? referenceId, CancellationToken _) =>
+                ledger.Any(a => a.UserId == u && a.Type == type && a.ReferenceId == referenceId));
+        repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), It.IsAny<CancellationToken>()))
+            .Callback<Alert, CancellationToken>((a, _) => ledger.Add(a))
+            .Returns(Task.CompletedTask);
+        var job = new BudgetBreachDetectionJob(
+            _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
+            At(2026, 9, 30), NullLogger<BudgetBreachDetectionJob>.Instance);
+
+        await job.ExecuteAsync();
+        Assert.Equal(2, ledger.Count);
+        foreach (var alert in ledger)
+        {
+            alert.IsDismissed = true;
+            alert.CreatedAt = new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero);
+        }
+
+        job = new BudgetBreachDetectionJob(
+            _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
+            At(2026, 10, 1), NullLogger<BudgetBreachDetectionJob>.Instance);
+        await job.ExecuteAsync();
+
+        Assert.Equal(2, ledger.Count);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
