@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Integration.Migrations;
 
+using FinanceSentry.API.Migrations;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
@@ -112,6 +113,57 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
         select.Parameters.AddWithValue("userId", userId);
         (await select.ExecuteScalarAsync()).Should().Be(1L,
             "a restart must not roll Research back below M014 and re-apply it onto an empty table");
+    }
+
+    /// <summary>
+    /// A migration that fails during startup must stop the API from starting at all, rather than
+    /// being logged and left behind while the rest of the app comes up on a half-migrated schema
+    /// (#661/#664's actual bug). Reproduced here without touching any migration's content or ordering:
+    /// pre-creating the table Auth's very first migration (M005_IdentitySchema) is about to create
+    /// forces that migration to fail with "relation already exists", the same shape of failure Research's
+    /// M012 hit against a missing table.
+    /// </summary>
+    [DockerRequiredFact]
+    public async Task StartupMigrationFailure_HaltsStartupInsteadOfServingAHalfMigratedSchema()
+    {
+        var postgres = new PostgreSqlBuilder("postgres:14-alpine").Build();
+        await postgres.StartAsync();
+        try
+        {
+            await using (var conn = new NpgsqlConnection(postgres.GetConnectionString()))
+            {
+                await conn.OpenAsync();
+                await using var collide = new NpgsqlCommand(
+                    """CREATE TABLE "AspNetRoles" ("Id" text NOT NULL PRIMARY KEY)""", conn);
+                await collide.ExecuteNonQueryAsync();
+            }
+
+            Action buildHost = () =>
+            {
+                using var factory = new FreshDatabaseApiFactory(postgres.GetConnectionString());
+                using var client = factory.CreateClient();
+            };
+
+            buildHost.Should().Throw<Exception>(
+                    "a migration failure must abort startup rather than let the API come up")
+                .Where(ex => ContainsStartupMigrationException(ex),
+                    "the halt must be traceable to the specific failed migration, not a generic crash");
+        }
+        finally
+        {
+            await postgres.DisposeAsync();
+        }
+    }
+
+    private static bool ContainsStartupMigrationException(Exception ex)
+    {
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is StartupMigrationException)
+                return true;
+        }
+
+        return false;
     }
 
     private sealed class FreshDatabaseApiFactory(string connectionString) : WebApplicationFactory<Program>

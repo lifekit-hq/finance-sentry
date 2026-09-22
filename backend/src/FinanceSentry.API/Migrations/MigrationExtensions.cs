@@ -73,20 +73,57 @@ public static class MigrationExtensions
         }
     }
 
+    // A failed migration is left half-applied (EF Core wraps each migration in its own transaction, so
+    // everything before it committed) — a half-migrated schema that the API then serves on is exactly
+    // the silent failure #661 cost us (Research's M012 threw for a missing risk.risk_rule_sets, the API
+    // started anyway, and the first anyone knew was an unrelated 500 on saving a thesis). So a migration
+    // failure against a reachable database is no longer caught here: it is logged with enough to name
+    // the module, the migration, and the fix, then left to propagate out of MigrateAllModules and abort
+    // startup before app.Run() — loud and immediate rather than a silent partial schema.
+    //
+    // This is deliberately narrower than "any exception here stops startup": a database that cannot be
+    // reached at all (down, still starting, or — in tests — pointed at a connection string that is
+    // unreachable on purpose to exercise the /api/v1/health/ready "database" check, see
+    // ObservabilityApiFactory) is a different failure the app already has a contract for (SC-003
+    // readiness). CanConnect() tells the two apart: only a migration that fails while the database is
+    // reachable is treated as the #661 half-migrated-schema hazard.
     private static void MigrateContext<TContext>(IServiceProvider sp, ILogger logger, string? targetMigration = null)
         where TContext : DbContext
     {
+        var context = sp.GetRequiredService<TContext>();
+
+        // Test hosts swap individual contexts onto EF Core's InMemory provider (e.g.
+        // BankSyncApiFactory.ReplaceDbContextWithInMemory), which has no migrations at all — relational
+        // APIs like GetMigrations()/GetAppliedMigrations() throw for it by design. Nothing to migrate
+        // there, so skip rather than treat "not a relational database" as a migration failure.
+        if (!context.Database.IsRelational())
+            return;
+
+        if (!context.Database.CanConnect())
+        {
+            logger.LogError(
+                "Cannot reach the database for {Context}; skipping its migration. If this is unexpected, " +
+                "check /api/v1/health/ready — the database check there reports connectivity independently.",
+                typeof(TContext).Name);
+            return;
+        }
+
+        if (targetMigration is not null && context.Database.GetAppliedMigrations().Contains(targetMigration))
+            return;
+
         try
         {
-            var context = sp.GetRequiredService<TContext>();
-            if (targetMigration is not null && context.Database.GetAppliedMigrations().Contains(targetMigration))
-                return;
-
             context.GetService<IMigrator>().Migrate(targetMigration);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Migration failed for {Context}. Startup will continue.", typeof(TContext).Name);
+            var failedMigration = context.Database.GetMigrations()
+                .Except(context.Database.GetAppliedMigrations())
+                .FirstOrDefault() ?? "(unknown)";
+
+            var startupException = new StartupMigrationException(typeof(TContext).Name, failedMigration, ex);
+            logger.LogCritical(startupException, "Startup migration failed — the API will not start.");
+            throw startupException;
         }
     }
 }
