@@ -78,9 +78,10 @@ GET /health/ready → 503
 ```
 
 **Steps:**
-1. Check response body: `{ "status": "Unhealthy", "checks": { "npgsql": "Unhealthy" } }`
-2. If `npgsql` unhealthy: PostgreSQL is unreachable. Check Docker container status.
+1. Check response body: `{ "status": "Unhealthy", "checks": [ { "name": "database", "status": "Unhealthy" }, ... ] }` — each check is named; a check with a `description` says what is wrong in words.
+2. If `database` unhealthy: PostgreSQL is unreachable. Check Docker container status.
 3. If still failing after DB restart: check connection string in `appsettings.json`.
+4. If `migrations` unhealthy (or Degraded): the database was unreachable when the API started, so startup skipped module migrations and the API is serving whatever schema the database has. The `description` lists the pending migrations per module. Restart the API once the database is reachable; migrations then run as usual (§8 if one fails). Until then, requests against the missing schema fail with ordinary database errors that never mention migrations — this check is where that cause is named.
 
 ## 8. Startup Migration Failure
 

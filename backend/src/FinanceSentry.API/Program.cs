@@ -78,6 +78,10 @@ builder.Services.AddHangfireServices(builder.Configuration, builder.Environment)
 // plus the HTTP trace spine (spec 023 amendment, 2026-09-13): ASP.NET Core + HttpClient + Npgsql spans via OTLP/HTTP.
 builder.Services.AddObservabilityMetrics(builder.Configuration);
 
+// Records whether MigrateAllModules skipped migrations (database unreachable at startup) so the
+// "migrations" readiness check below can name that as the cause once the database is back.
+builder.Services.AddSingleton<StartupMigrationStatus>();
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(
         builder.Configuration.GetConnectionString("Default")!,
@@ -86,6 +90,9 @@ builder.Services.AddHealthChecks()
     .AddHangfire(
         options => options.MinimumAvailableServers = 1,
         name: "hangfire",
+        tags: ["ready"])
+    .AddCheck<StartupMigrationsHealthCheck>(
+        StartupMigrationsHealthCheck.Name,
         tags: ["ready"]);
 
 builder.Services.AddRateLimiter(options =>

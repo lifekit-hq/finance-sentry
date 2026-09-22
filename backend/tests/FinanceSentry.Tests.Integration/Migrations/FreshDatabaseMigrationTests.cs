@@ -1,5 +1,8 @@
 namespace FinanceSentry.Tests.Integration.Migrations;
 
+using System.Net;
+using System.Net.Sockets;
+using System.Text.Json;
 using FinanceSentry.API.Migrations;
 using FinanceSentry.Modules.Agent.Infrastructure;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -216,6 +219,108 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
                 "a connection lost after earlier modules migrated must abort startup rather than serve a half-migrated schema")
             .Where(ex => ContainsStartupMigrationException(ex),
                 "the halt must be the named startup-migration failure, not a generic crash");
+    }
+
+    /// <summary>
+    /// The case the halt work deliberately left non-fatal: the database is unreachable when the API
+    /// starts, so startup skips every module's migrations and the API comes up anyway. When the database
+    /// then returns, the <c>database</c> readiness check goes Healthy while the schema is still whatever
+    /// the database has — here, completely empty. Readiness must then say so: the <c>migrations</c>
+    /// check stays Unhealthy, names the pending migrations, and tells the operator to restart, so the
+    /// cause is visible at /api/v1/health/ready rather than only as unrelated 500s from request handlers.
+    /// </summary>
+    [DockerRequiredFact]
+    public async Task DatabaseUnreachableAtStartupThenReachable_ReadinessNamesTheSkippedMigrations()
+    {
+        // Reserve a host port now, boot the API against it while nothing listens, then start Postgres
+        // bound to that same port so the very connection string startup could not reach becomes live.
+        var port = ReserveFreeTcpPort();
+        var connectionString = new NpgsqlConnectionStringBuilder
+        {
+            Host = "127.0.0.1",
+            Port = port,
+            Database = "finance_sentry",
+            Username = "postgres",
+            Password = "postgres",
+            Timeout = 2,
+        }.ConnectionString;
+
+        await using var factory = new FreshDatabaseApiFactory(connectionString);
+        using var client = factory.CreateClient();
+
+        var status = factory.Services.GetRequiredService<StartupMigrationStatus>();
+        status.MigrationsSkipped.Should().BeTrue(
+            "an unreachable database must not stop startup, but the skip must be recorded");
+
+        var whileUnreachable = await ReadReadiness(client);
+        whileUnreachable.Status.Should().Be(HttpStatusCode.ServiceUnavailable);
+        whileUnreachable.CheckStatus("database").Should().Be("Unhealthy");
+        whileUnreachable.CheckStatus("migrations").Should().Be("Unhealthy");
+
+        var postgres = new PostgreSqlBuilder("postgres:14-alpine")
+            .WithDatabase("finance_sentry")
+            .WithUsername("postgres")
+            .WithPassword("postgres")
+            .WithPortBinding(port, PostgreSqlBuilder.PostgreSqlPort)
+            .Build();
+        await postgres.StartAsync();
+        try
+        {
+            var nowReachable = await ReadReadiness(client);
+
+            nowReachable.CheckStatus("database").Should().Be("Healthy",
+                "the database is back, and that check alone would now make the API look ready");
+            nowReachable.Status.Should().Be(HttpStatusCode.ServiceUnavailable,
+                "readiness must still fail: this process never migrated the schema it is serving on");
+            nowReachable.CheckStatus("migrations").Should().Be("Unhealthy");
+
+            var description = nowReachable.CheckDescription("migrations");
+            description.Should().Contain("skipped at startup");
+            description.Should().Contain("Restart the API");
+            description.Should().Contain("pending migrations", "the schema is behind and readiness must say so");
+            description.Should().Contain(nameof(ResearchDbContext), "each module behind is named");
+            description.Should().Contain("M013", "the specific migration the original 500 was missing is listed");
+
+            var researchPending = await ResearchPendingMigrationsCount(factory);
+            researchPending.Should().BeGreaterThan(0,
+                "nothing migrated: the health check reports, it does not migrate on the operator's behalf");
+        }
+        finally
+        {
+            await postgres.DisposeAsync();
+        }
+    }
+
+    private static int ReserveFreeTcpPort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
+    }
+
+    private static async Task<int> ResearchPendingMigrationsCount(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var research = scope.ServiceProvider.GetRequiredService<ResearchDbContext>();
+        return (await research.Database.GetPendingMigrationsAsync()).Count();
+    }
+
+    private static async Task<ReadinessReport> ReadReadiness(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/v1/health/ready");
+        var json = await response.Content.ReadAsStringAsync();
+        return new ReadinessReport(response.StatusCode, JsonDocument.Parse(json));
+    }
+
+    private sealed record ReadinessReport(HttpStatusCode Status, JsonDocument Body)
+    {
+        public string? CheckStatus(string name) => Check(name).GetProperty("status").GetString();
+
+        public string? CheckDescription(string name) =>
+            Check(name).TryGetProperty("description", out var description) ? description.GetString() : null;
+
+        private JsonElement Check(string name) => Body.RootElement.GetProperty("checks").EnumerateArray()
+            .Single(check => check.GetProperty("name").GetString() == name);
     }
 
     private static bool ContainsStartupMigrationException(Exception ex)
