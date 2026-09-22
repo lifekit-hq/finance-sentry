@@ -18,7 +18,8 @@ using Xunit;
 /// <summary>
 /// Unit tests for <see cref="HangfireTracingFilter"/> (#616, spec 023 amendment): an enqueued job with
 /// an ambient trace parents a child activity, a recurring job links to its stored context instead of
-/// parenting onto it, and a thrown job exception marks the activity as errored.
+/// parenting onto it, a retried attempt does the same rather than stretching the request trace across
+/// the retry back-off, and a thrown job exception marks the activity as errored.
 /// </summary>
 public class HangfireTracingFilterTests
 {
@@ -84,6 +85,56 @@ public class HangfireTracingFilterTests
         activity.ParentSpanId.Should().Be(default(ActivitySpanId));
         activity.Links.Should().ContainSingle(link =>
             link.Context.TraceId == ambientTraceId && link.Context.SpanId == ambientSpanId);
+
+        _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
+    }
+
+    [Fact]
+    public void RetriedJob_LinksToStoredContext_InsteadOfParenting()
+    {
+        using var exported = TraceCollector.Start();
+        const string jobId = "job-4";
+        const int retryAttempt = 2;
+
+        ActivityTraceId ambientTraceId;
+        ActivitySpanId ambientSpanId;
+        using (var ambient = RequestSource.StartActivity("incoming-request"))
+        {
+            ambient.Should().NotBeNull();
+            ambientTraceId = ambient!.TraceId;
+            ambientSpanId = ambient.SpanId;
+            CreateJob();
+        }
+        // AutomaticRetryAttribute writes RetryCount before rescheduling; the worker re-performs the same
+        // job with the same stored traceparent, possibly hours later.
+        _parameters["RetryCount"] = SerializationHelper.Serialize(retryAttempt);
+
+        var performContext = BuildPerformContext(jobId);
+        _filter.OnPerforming(new PerformingContext(performContext));
+
+        var activity = (Activity)performContext.Items[ActivityItemKey()]!;
+        activity.TraceId.Should().NotBe(ambientTraceId);
+        activity.ParentSpanId.Should().Be(default(ActivitySpanId));
+        activity.Links.Should().ContainSingle(link =>
+            link.Context.TraceId == ambientTraceId && link.Context.SpanId == ambientSpanId);
+        activity.GetTagItem("hangfire.retry_count").Should().Be(retryAttempt);
+        activity.GetTagItem("hangfire.job_id").Should().Be(jobId);
+
+        _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
+    }
+
+    [Fact]
+    public void FirstAttempt_CarriesJobIdAndZeroRetryCountTags()
+    {
+        using var exported = TraceCollector.Start();
+        const string jobId = "job-5";
+
+        var performContext = BuildPerformContext(jobId);
+        _filter.OnPerforming(new PerformingContext(performContext));
+
+        var activity = (Activity)performContext.Items[ActivityItemKey()]!;
+        activity.GetTagItem("hangfire.job_id").Should().Be(jobId);
+        activity.GetTagItem("hangfire.retry_count").Should().Be(0);
 
         _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
     }
