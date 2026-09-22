@@ -21,6 +21,13 @@ using Microsoft.Extensions.Logging;
 /// <see cref="IAlertGeneratorService"/> (its reference id carries the budget, the crossing kind, and
 /// the year/month); this job just reports what it observed on every run.
 ///
+/// Month-end grace: for the first <see cref="PreviousMonthGraceDays"/> days of a month each run
+/// also re-evaluates the PREVIOUS month, so spend posted on its last day (after the final run that
+/// covered it) and bank transactions that post late are still seen. Seven days matches the bank
+/// adapters' resync overlap (ResyncLookbackDays in the Monobank and TrueLayer adapters) — the
+/// window in which a transaction dated last month can still arrive. The month-scoped reference id
+/// keeps both periods' alerts apart, so no second dedup mechanism is needed.
+///
 /// Two decisions worth stating (each pinned by its own test):
 /// - A mid-month limit edit is never snapshotted — every run reads the budget's CURRENT
 ///   MonthlyLimit and recomputes against it. An edit changes what counts as a crossing going
@@ -40,14 +47,15 @@ public sealed class BudgetBreachDetectionJob(
 {
     private const decimal NearLimitThreshold = 0.90m;
     private const decimal ExceededThreshold = 1.0m;
+    private const int PreviousMonthGraceDays = 7;
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var now = clock.GetUtcNow();
-        var year = now.Year;
-        var month = now.Month;
-        var from = new DateOnly(year, month, 1);
-        var to = from.AddMonths(1).AddDays(-1);
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        var currentMonth = new DateOnly(today.Year, today.Month, 1);
+        List<DateOnly> months = today.Day <= PreviousMonthGraceDays
+            ? [currentMonth.AddMonths(-1), currentMonth]
+            : [currentMonth];
 
         IReadOnlyList<Budget> all;
         try
@@ -62,18 +70,21 @@ public sealed class BudgetBreachDetectionJob(
 
         foreach (var group in all.GroupBy(b => b.UserId))
         {
-            await ProcessUserAsync(group.Key, group.ToList(), from, to, year, month, ct);
+            foreach (var monthStart in months)
+            {
+                await ProcessUserAsync(group.Key, group.ToList(), monthStart, ct);
+            }
         }
     }
 
     private async Task ProcessUserAsync(
-        Guid userId, IReadOnlyList<Budget> userBudgets, DateOnly from, DateOnly to, int year, int month,
-        CancellationToken ct)
+        Guid userId, IReadOnlyList<Budget> userBudgets, DateOnly monthStart, CancellationToken ct)
     {
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
         IReadOnlyDictionary<string, decimal> rawSpending;
         try
         {
-            rawSpending = await merchantSpending.GetSpendingByCategoryUsdAsync(userId, from, to, ct);
+            rawSpending = await merchantSpending.GetSpendingByCategoryUsdAsync(userId, monthStart, monthEnd, ct);
         }
         catch (Exception ex)
         {
@@ -92,7 +103,7 @@ public sealed class BudgetBreachDetectionJob(
         {
             try
             {
-                await EvaluateAsync(budget, spentByCategory, year, month, ct);
+                await EvaluateAsync(budget, spentByCategory, monthStart.Year, monthStart.Month, ct);
             }
             catch (Exception ex)
             {
