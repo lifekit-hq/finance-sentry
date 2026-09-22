@@ -215,9 +215,9 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
 
 ### Edge Cases
 
-- A ticker held **and** watchlisted appears once per (kind, date). Rows collapse on `referenceId`
-  when present, otherwise on (kind, subject, date, title) - two macro rows on one day (FOMC and
-  CPI both on 2026-12-10) and two catalysts on one ticker and day all survive.
+- A ticker held **and** watchlisted appears once per (kind, date). Rows collapse on (kind,
+  subject, date, referenceId, title, detail) - two macro rows on one day (FOMC and CPI both on
+  2026-12-10) and two catalysts of one thesis on one day all survive.
 - When Yahoo or EDGAR fails, the corporate and filings sources read `ok` with no rows (see US1
   scenario 2); the empty agenda is the only signal until the Research services expose failure.
 - Yahoo's 6h in-process cache means the first calendar read after the cache expires pays one

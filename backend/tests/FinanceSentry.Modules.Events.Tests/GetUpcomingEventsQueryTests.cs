@@ -183,4 +183,22 @@ public sealed class GetUpcomingEventsQueryTests
 
         result.Items.Select(i => i.Title).Should().Equal("CPI (Sep)", "FOMC rate decision + SEP");
     }
+
+    [Fact]
+    public async Task Two_catalysts_of_one_thesis_on_one_date_both_survive()
+    {
+        var thesisId = Guid.NewGuid();
+        var day = new DateOnly(2026, 10, 15);
+        _theses.Setup(t => t.ListActiveAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ThesisCatalystEntry(thesisId, "MU", day, "Q3 earnings"),
+                new ThesisCatalystEntry(thesisId, "MU", day, "HBM4 ramp update"),
+            ]);
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["thesis_catalyst"]), CancellationToken.None);
+
+        result.Items.Should().HaveCount(2);
+        result.Items.Should().OnlyContain(i => i.ReferenceId == thesisId && i.Date == day);
+        result.Items.Select(i => i.Detail).Should().BeEquivalentTo(["Q3 earnings", "HBM4 ramp update"]);
+    }
 }

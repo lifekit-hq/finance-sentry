@@ -38,7 +38,7 @@ The current runtime surface contains 62 tools. The canonical list is the `Agreed
 | `get_net_worth_history` | Read | Wealth | `userId?`, `fromDate?`, `toDate?` | Historical net worth snapshots |
 | `get_macro_calendar` | Read | Research | `from?`, `to?`, `regions?`, `minImportance?` | Scheduled macro events |
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?`, `userId?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
-| `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified`, `userId?` | Records the reader's judgement on a fired companion event; an acknowledged event with no verdict reads as silence |
+| `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified`, `userId?` | Records the reader's judgement on a fired, alert-sourced companion event; an acknowledged event with no verdict reads as silence; `recorded=false` for a foreign, unknown or analyst-action event or a blank verdict |
 | `get_news_for_ticker` | Read | Research | `ticker`, `since?`, `limit` | Recent ticker-specific news |
 | `get_quotes` | Read | Research | `tickers` | Current quotes for one or more tickers, including requested/resolved ticker identity and market-session freshness metadata |
 | `search_market_news` | Read | Research | `query?`, `tickers?`, `since?`, `limit` | Search ingested market news |

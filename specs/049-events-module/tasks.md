@@ -19,8 +19,8 @@ away under D1(b); D2(b) changes T030's layout only.
       `IPeriodicFilingReader` (+ the ticker universe from Core's `IBrokerageHoldingsReader` /
       `IWatchlistReader`)
 - [x] T005 `GetUpcomingEventsQuery` handler - window validation (`EVENTS_WINDOW_INVALID`), kind
-      filter, per-source isolation → `sources[]`, sort by date then subject, dedupe on `referenceId`
-      else (kind, subject, date, title)
+      filter, per-source isolation → `sources[]`, sort by date then subject, dedupe on (kind, subject,
+      date, referenceId, title, detail)
 - [x] T006 `GetUpcomingEventsQueryTests` - union of sources, one source throws → others returned +
       `unavailable`, kind filter skips the source call, broken thesis excluded, default window,
       invalid window rejected

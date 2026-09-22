@@ -77,7 +77,12 @@
             <ul class="divide-y divide-border-default rounded-cmn-md border border-border-default">
               @for (
                 item of group.items;
-                track item.kind + item.subject + item.date + (item.referenceId ?? item.title)
+                track item.kind +
+                  item.subject +
+                  item.date +
+                  item.referenceId +
+                  item.title +
+                  item.detail
               ) {
                 <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
                   <cmn-tag [variant]="kindMeta(item.kind).variant">

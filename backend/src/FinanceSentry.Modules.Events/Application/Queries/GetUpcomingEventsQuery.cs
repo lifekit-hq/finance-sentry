@@ -144,7 +144,7 @@ public sealed class GetUpcomingEventsQueryHandler(
         }
 
         var ordered = items
-            .DistinctBy(e => (e.Kind, e.Subject, e.Date, e.ReferenceId?.ToString() ?? e.Title))
+            .DistinctBy(e => (e.Kind, e.Subject, e.Date, e.ReferenceId, e.Title, e.Detail))
             .OrderBy(e => e.Date)
             .ThenBy(e => e.Time ?? TimeOnly.MaxValue)
             .ThenBy(e => e.Subject, StringComparer.Ordinal)
