@@ -69,7 +69,15 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
     private bool IsStale(TimeSpan? sourceStaleness)
         => sourceStaleness is { } age && age > SyncFailureEscalationAge;
 
-    public string AlertDedupKey(Guid alertId) => $"alert:{alertId}";
+    private const string AlertKeyPrefix = "alert:";
+
+    public string AlertDedupKey(Guid alertId) => $"{AlertKeyPrefix}{alertId}";
+
+    public Guid? AlertIdFromDedupKey(string dedupKey)
+        => dedupKey.StartsWith(AlertKeyPrefix, StringComparison.Ordinal)
+           && Guid.TryParse(dedupKey.AsSpan(AlertKeyPrefix.Length), out var alertId)
+            ? alertId
+            : null;
 
     public string AnalystDedupKey(Guid userId, Guid analystActionId) => $"analyst:{userId}:{analystActionId}";
 }

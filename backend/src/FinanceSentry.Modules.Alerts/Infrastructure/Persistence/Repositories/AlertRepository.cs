@@ -178,4 +178,20 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         await _db.SaveChangesAsync(ct);
         return true;
     }
+
+    public async Task<(IReadOnlyList<Alert> Items, int TotalCount)> GetByTypesPagedAsync(
+        Guid userId, IReadOnlyCollection<string> types, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _db.Alerts.AsNoTracking()
+            .Where(a => a.UserId == userId && !a.IsDismissed && types.Contains(a.Type));
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
 }

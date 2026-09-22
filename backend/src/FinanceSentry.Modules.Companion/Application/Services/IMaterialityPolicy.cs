@@ -31,5 +31,8 @@ public interface IMaterialityPolicy
 
     string AlertDedupKey(Guid alertId);
 
+    /// <summary>The alert id an <see cref="AlertDedupKey"/> was built from; null for any other key.</summary>
+    Guid? AlertIdFromDedupKey(string dedupKey);
+
     string AnalystDedupKey(Guid userId, Guid analystActionId);
 }

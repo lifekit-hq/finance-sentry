@@ -7,7 +7,7 @@
 cd backend && dotnet restore FinanceSentry.sln
 dotnet build FinanceSentry.sln --no-restore -c Release
 
-# Run tests — no filter. CI runs the full solution too (509); container-backed tests
+# Run tests — no filter. CI runs the full solution too; container-backed tests
 # report themselves as Skipped where no Docker daemon is reachable.
 dotnet test FinanceSentry.sln --no-build -c Release
 ```

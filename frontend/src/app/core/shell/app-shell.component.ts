@@ -33,6 +33,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Budgets, label: 'Budgets', icon: 'Zap', group: 'Pages'},
   {id: AppRoute.Subscriptions, label: 'Subscriptions', icon: 'RefreshCw', group: 'Pages'},
   {id: AppRoute.Alerts, label: 'Alerts', icon: 'Bell', group: 'Pages'},
+  {id: AppRoute.Events, label: 'Events', icon: 'CalendarDays', group: 'Pages'},
   {id: AppRoute.Ledger, label: 'Ledger', icon: 'Sparkles', group: 'Pages'},
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
   {id: '_connect', label: 'Connect Account', icon: 'Link', group: 'Actions'},
@@ -100,6 +101,7 @@ export class AppShellComponent {
       route: AppRoute.Alerts,
       badge: () => this.alertsStore.unreadCount(),
     },
+    {label: 'Events', icon: 'CalendarDays', route: AppRoute.Events},
     {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
     {label: 'Settings', icon: 'Settings2', route: AppRoute.Settings},
   ];

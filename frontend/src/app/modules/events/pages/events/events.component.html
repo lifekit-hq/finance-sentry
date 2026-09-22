@@ -1,0 +1,195 @@
+<div class="mx-auto flex h-full w-full max-w-[960px] flex-col p-cmn-6">
+  <cmn-page-header
+    title="Events"
+    subtitle="What is coming for your book, what fired, and what the reader made of it"
+  />
+
+  <div class="mt-cmn-5 flex flex-wrap gap-cmn-2" role="tablist" aria-label="Events view">
+    @for (opt of viewOptions; track opt.id) {
+      <cmn-chip
+        [selected]="store.view() === opt.id"
+        [attr.aria-selected]="store.view() === opt.id"
+        (clicked)="store.setView(opt.id)"
+        role="tab"
+      >
+        {{ opt.label }}
+      </cmn-chip>
+    }
+  </div>
+
+  @if (store.view() === 'calendar') {
+    <div class="mt-cmn-4 flex flex-wrap items-center gap-cmn-2" data-testid="horizon-chips">
+      <span class="text-cmn-xs uppercase tracking-wide text-text-secondary">Next</span>
+      @for (days of horizons; track days) {
+        <cmn-chip
+          [selected]="store.horizonDays() === days"
+          (clicked)="store.selectHorizon(days)"
+          data-testid="horizon-chip"
+        >
+          {{ days }} days
+        </cmn-chip>
+      }
+    </div>
+
+    <div class="mt-cmn-2 flex flex-wrap items-center gap-cmn-2" data-testid="kind-chips">
+      <span class="text-cmn-xs uppercase tracking-wide text-text-secondary">Kinds</span>
+      @for (kind of kinds; track kind) {
+        <cmn-chip [selected]="store.isKindSelected()(kind)" (clicked)="store.toggleKind(kind)">
+          {{ kindMeta(kind).label }}
+        </cmn-chip>
+      }
+    </div>
+
+    @if (store.unavailableSourceLabels().length > 0) {
+      <cmn-alert variant="warning" class="mt-cmn-4 block" data-testid="sources-unavailable">
+        Some sources did not answer: {{ store.unavailableSourceLabels().join(', ') }}. Days may look
+        emptier than they are.
+      </cmn-alert>
+    }
+
+    @if (store.upcomingErrorMessage(); as error) {
+      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
+    } @else if (store.isUpcomingLoading()) {
+      <div class="mt-cmn-5 space-y-cmn-3" data-testid="upcoming-loading">
+        @for (row of skeletonRows; track row) {
+          <cmn-skeleton height="2.5rem" width="100%" />
+        }
+      </div>
+    } @else if (store.isUpcomingEmpty()) {
+      <div class="flex min-h-0 flex-1 items-center justify-center">
+        <cmn-empty-state
+          message="Nothing scheduled"
+          subMessage="No dated events for your holdings, watchlist, theses or the macro calendar in this window."
+          icon="CalendarDays"
+          iconClass="text-text-secondary"
+        />
+      </div>
+    } @else {
+      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-5 overflow-auto pr-cmn-1">
+        @for (group of store.upcomingByDay(); track group.date) {
+          <section [attr.data-testid]="'day-' + group.date">
+            <h2
+              class="mb-cmn-2 flex items-baseline gap-cmn-2 text-cmn-sm font-semibold text-text-primary"
+            >
+              {{ group.date | eventDayLabel }}
+              <span class="text-cmn-xs font-normal text-text-secondary">{{ group.date }}</span>
+            </h2>
+            <ul class="divide-y divide-border-default rounded-cmn-md border border-border-default">
+              @for (
+                item of group.items;
+                track item.kind +
+                  item.subject +
+                  item.date +
+                  item.referenceId +
+                  item.title +
+                  item.detail
+              ) {
+                <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
+                  <cmn-tag [variant]="kindMeta(item.kind).variant">
+                    {{ kindMeta(item.kind).label }}
+                  </cmn-tag>
+                  <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                    {{ item.subject }}
+                  </span>
+                  <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
+                    {{ item.title }}
+                    @if (item.detail) {
+                      <span class="text-text-secondary"> · {{ item.detail }}</span>
+                    }
+                  </span>
+                  @if (item.time) {
+                    <span class="text-cmn-xs text-text-secondary">{{ item.time.slice(0, 5) }}</span>
+                  }
+                  @if (item.isEstimate) {
+                    <cmn-tag variant="warning">Estimate</cmn-tag>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+    }
+  } @else {
+    @if (store.hasFiredRows()) {
+      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
+        @for (event of store.fired(); track event.alertId) {
+          <article
+            class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
+            data-testid="fired-event"
+          >
+            <div class="flex flex-wrap items-center gap-cmn-2">
+              <cmn-tag [variant]="firedKindMeta(event.kind).variant">
+                {{ firedKindMeta(event.kind).label }}
+              </cmn-tag>
+              <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                {{ event.subject }}
+              </span>
+              <span class="ml-auto text-cmn-xs text-text-secondary">
+                {{ event.occurredAt | date: 'd MMM, HH:mm' }}
+              </span>
+              <cmn-tag [variant]="outcomeMeta(event.outcome).variant" data-testid="outcome">
+                {{ outcomeMeta(event.outcome).label }}
+              </cmn-tag>
+            </div>
+            <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">{{ event.title }}</p>
+            <p class="text-cmn-sm text-text-secondary">{{ event.message }}</p>
+            @if (event.verdict; as verdict) {
+              <blockquote
+                class="mt-cmn-2 border-l-2 border-accent-default pl-cmn-3 text-cmn-sm text-text-primary"
+                data-testid="verdict"
+              >
+                {{ verdict.text }}
+                <span class="block text-cmn-xs text-text-secondary">
+                  {{ verdict.notified ? 'Told you' : 'Kept quiet' }} ·
+                  {{ verdict.recordedAt | date: 'd MMM, HH:mm' }}
+                </span>
+              </blockquote>
+            } @else {
+              <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                {{ outcomeMeta(event.outcome).description }}
+              </p>
+            }
+          </article>
+        }
+        @if (store.isFiredLoading()) {
+          <div class="space-y-cmn-2" data-testid="fired-loading">
+            @for (row of skeletonRows; track row) {
+              <cmn-skeleton height="4rem" width="100%" />
+            }
+          </div>
+        } @else {
+          @if (store.firedErrorMessage(); as error) {
+            <cmn-alert variant="error" class="block" data-testid="fired-more-error">
+              {{ error }}
+            </cmn-alert>
+          }
+          @if (store.hasMoreFired()) {
+            <div class="flex justify-center p-cmn-4">
+              <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
+                >Load more</cmn-button
+              >
+            </div>
+          }
+        }
+      </div>
+    } @else if (store.firedErrorMessage(); as error) {
+      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
+    } @else if (store.isFiredEmpty()) {
+      <div class="flex min-h-0 flex-1 items-center justify-center">
+        <cmn-empty-state
+          message="Nothing has fired"
+          subMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
+          icon="BellOff"
+          iconClass="text-text-secondary"
+        />
+      </div>
+    } @else {
+      <div class="mt-cmn-5 space-y-cmn-2" data-testid="fired-loading">
+        @for (row of skeletonRows; track row) {
+          <cmn-skeleton height="4rem" width="100%" />
+        }
+      </div>
+    }
+  }
+</div>

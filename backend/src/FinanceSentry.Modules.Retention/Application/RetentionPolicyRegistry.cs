@@ -27,6 +27,7 @@ public static class RetentionPolicyRegistry
     private const string Public = "public";
     private const string Retention = "retention";
     private const string Agent = "agent";
+    private const string Events = "events";
 
     /// <summary>
     /// Every <c>DbContext</c> the retention policy set must account for. The coverage-guard test
@@ -38,7 +39,7 @@ public static class RetentionPolicyRegistry
         "AuthDbContext", "BankSyncDbContext", "CryptoSyncDbContext", "BrokerageSyncDbContext",
         "AlertsDbContext", "BudgetsDbContext", "SubscriptionsDbContext", "WealthDbContext",
         "ResearchDbContext", "RadarDbContext", "RiskDbContext", "CompanionDbContext",
-        "AnalyticsDbContext", "RetentionDbContext", "AgentDbContext",
+        "AnalyticsDbContext", "RetentionDbContext", "AgentDbContext", "EventsDbContext",
     };
 
     /// <summary>All retention decisions — exactly one per persistent table.</summary>
@@ -54,6 +55,8 @@ public static class RetentionPolicyRegistry
         Purge(Research, "macro_events", "EventDate", 365, "Past macro-calendar entries."),
         Purge(Research, "recommendation_trends", "IngestedAt", 365, "Monthly consensus; stale once a ticker stops being covered."),
         Purge(Risk, "holding_snapshots", "CapturedAt", 180, "Risk holding time-series."),
+        // Events (049): the reader's verdict on a fired event outlives the 90d companion row it points at.
+        Purge(Events, "event_verdicts", "RecordedAt", 365, "Reader verdicts on fired events; the alert they explain purges at 90d."),
         // The retention module governs its own run-record tables (one row per run; drill rows aren't
         // artifact-pruned). 180d keeps a recent Verified backup_runs row for the SC-002 query.
         Purge(Retention, "retention_runs", "StartedAt", 180, "Retention/downsample run history."),

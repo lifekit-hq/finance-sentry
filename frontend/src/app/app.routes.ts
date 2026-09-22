@@ -88,6 +88,11 @@ export const APP_ROUTES: Routes = [
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),
       },
       {
+        path: AppRoute.Events.slice(1),
+        loadComponent: () =>
+          import('./modules/events/pages/events/events.component').then(m => m.EventsComponent),
+      },
+      {
         path: AppRoute.Ledger.slice(1),
         loadComponent: () =>
           import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(

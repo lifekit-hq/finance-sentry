@@ -32,6 +32,7 @@
     <ProjectReference Include="..\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Companion\FinanceSentry.Modules.Companion.csproj" />
     <ProjectReference Include="..\FinanceSentry.Modules.Analytics\FinanceSentry.Modules.Analytics.csproj" />
+    <ProjectReference Include="..\FinanceSentry.Modules.Events\FinanceSentry.Modules.Events.csproj" />
     <ProjectReference Include="..\FinanceSentry.Integration\FinanceSentry.Integration.csproj" />
   </ItemGroup>
 

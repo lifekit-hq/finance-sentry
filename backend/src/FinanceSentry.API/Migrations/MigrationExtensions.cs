@@ -16,6 +16,7 @@ using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.Retention.Infrastructure.Persistence;
 using FinanceSentry.Modules.Agent.Infrastructure;
+using FinanceSentry.Modules.Events.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -57,6 +58,7 @@ public static class MigrationExtensions
         MigrateContext<AnalyticsDbContext>(sp, app.Logger, ref anyContextMigrated);
         MigrateContext<RetentionDbContext>(sp, app.Logger, ref anyContextMigrated);
         MigrateContext<AgentDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<EventsDbContext>(sp, app.Logger, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
 

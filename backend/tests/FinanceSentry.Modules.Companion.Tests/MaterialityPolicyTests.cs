@@ -39,4 +39,15 @@ public sealed class MaterialityPolicyTests
         _policy.AnalystDedupKey(userId, actionId).Should().Be($"analyst:{userId}:{actionId}");
         _policy.AlertDedupKey(alertId).Should().NotBe(_policy.AnalystDedupKey(userId, actionId));
     }
+
+    [Fact]
+    public void Alert_id_round_trips_through_its_dedup_key_and_other_keys_yield_nothing()
+    {
+        var alertId = Guid.NewGuid();
+
+        _policy.AlertIdFromDedupKey(_policy.AlertDedupKey(alertId)).Should().Be(alertId);
+        _policy.AlertIdFromDedupKey(_policy.AnalystDedupKey(Guid.NewGuid(), Guid.NewGuid())).Should().BeNull();
+        _policy.AlertIdFromDedupKey("alert:not-a-guid").Should().BeNull();
+        _policy.AlertIdFromDedupKey(string.Empty).Should().BeNull();
+    }
 }
