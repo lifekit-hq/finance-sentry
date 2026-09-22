@@ -26,6 +26,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   VALIDATION_ERROR: 'Some fields look wrong — please review the highlighted errors.',
   ALERT_NOT_FOUND: 'Alert not found.',
   ALERT_LOAD_FAILED: 'Failed to load alerts.',
+  EVENTS_WINDOW_INVALID: 'The events window is invalid. Pick a range of at most a year.',
   BUDGET_NOT_FOUND: 'Budget not found.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'Invalid budget category.',

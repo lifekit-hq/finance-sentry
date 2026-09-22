@@ -2,6 +2,7 @@ namespace FinanceSentry.Integration;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Services;
+using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Ports;
@@ -20,6 +21,14 @@ public static class CrossModulePortRegistration
 
         services.AddScoped<IAllocationPolicySource, IpsAllocationPolicySource>();
         services.AddScoped<IPositionCapSource, RiskPositionCapSource>();
+
+        // 049: the Events module reads calendars, alerts and the companion outbox through these ports.
+        services.AddScoped<IUpcomingCorporateEventReader, EventsCorporateCalendarAdapter>();
+        services.AddScoped<IMacroEventReader, EventsMacroEventAdapter>();
+        services.AddScoped<IThesisCatalystReader, EventsThesisCatalystAdapter>();
+        services.AddScoped<IPeriodicFilingReader, EventsPeriodicFilingAdapter>();
+        services.AddScoped<IFiredAlertReader, EventsFiredAlertAdapter>();
+        services.AddScoped<IEventDeliveryReader, EventsDeliveryAdapter>();
 
         // 412: portfolio value source for book-vs-benchmark TWR; bridges Wealth snapshots → Radar.
         services.AddScoped<IPortfolioValueSource, RadarPortfolioValueSource>();

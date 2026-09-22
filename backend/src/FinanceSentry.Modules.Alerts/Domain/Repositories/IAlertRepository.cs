@@ -47,4 +47,11 @@ public interface IAlertRepository
     /// reference anchor from the wake payload.
     /// </summary>
     Task<bool> AcknowledgeByReferenceAsync(Guid userId, string alertType, Guid referenceId, string decision, CancellationToken ct = default);
+
+    /// <summary>
+    /// Non-dismissed alerts whose <c>Type</c> is in <paramref name="types"/>, newest first, paged
+    /// (feature 049: the fired-events feed). Read-only; the generator and its dedup are untouched.
+    /// </summary>
+    Task<(IReadOnlyList<Alert> Items, int TotalCount)> GetByTypesPagedAsync(
+        Guid userId, IReadOnlyCollection<string> types, int page, int pageSize, CancellationToken ct = default);
 }

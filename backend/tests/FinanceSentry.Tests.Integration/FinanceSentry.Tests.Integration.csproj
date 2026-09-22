@@ -36,6 +36,9 @@
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Subscriptions\FinanceSentry.Modules.Subscriptions.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Research\FinanceSentry.Modules.Research.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Modules.Companion\FinanceSentry.Modules.Companion.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Modules.Events\FinanceSentry.Modules.Events.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Integration\FinanceSentry.Integration.csproj" />
   </ItemGroup>
 
 </Project>

@@ -26,4 +26,8 @@ public interface ICompanionEventRepository
 
     /// <summary>Mark the given events for a user as <see cref="EventDisposition.Delivered"/>.</summary>
     Task<int> MarkDeliveredAsync(Guid userId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
+    /// <summary>A user's events whose <c>DedupKey</c> is in the given set (feature 049: alert → outbox row lookup).</summary>
+    Task<IReadOnlyList<CompanionEvent>> ListByDedupKeysAsync(
+        Guid userId, IReadOnlyCollection<string> dedupKeys, CancellationToken ct = default);
 }

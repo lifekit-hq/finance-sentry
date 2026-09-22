@@ -73,6 +73,10 @@ public sealed class CompanionDispatchCapTests
         public Task<CompanionEvent?> GetAsync(Guid id, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<CompanionEvent>> ListByDedupKeysAsync(
+            Guid userId, IReadOnlyCollection<string> dedupKeys, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task UpdateAsync(CompanionEvent evt, CancellationToken ct = default)
         {
             Updated.Add(evt);

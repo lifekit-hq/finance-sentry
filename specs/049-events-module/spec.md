@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-22
 
-**Status**: Draft (two open decisions, see "Open decisions" - routed to firstmate before build)
+**Status**: Implemented (D1(a) and D2(a) decided by firstmate 2026-09-22; the reader-side call to `record_event_verdict` is separate lifekit-stack work)
 
 **Origin**: Ledger heartbeat design (second mate `data/ledger-heartbeat-s1/report.md`, ruled by
 Denys 2026-09-17) - the last piece of the set that began with the five detectors now on main:

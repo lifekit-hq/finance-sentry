@@ -92,4 +92,17 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
         await db.SaveChangesAsync(ct);
         return rows.Count;
     }
+
+    public async Task<IReadOnlyList<CompanionEvent>> ListByDedupKeysAsync(
+        Guid userId, IReadOnlyCollection<string> dedupKeys, CancellationToken ct = default)
+    {
+        if (dedupKeys.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.Events.AsNoTracking()
+            .Where(e => e.UserId == userId && dedupKeys.Contains(e.DedupKey))
+            .ToListAsync(ct);
+    }
 }
