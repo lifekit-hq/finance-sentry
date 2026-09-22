@@ -128,7 +128,9 @@ Loki sink, and the dashboards below.
   `TraceId`/`SpanId` as structured JSON properties (never Loki labels), so a Tempo trace and its Loki
   lines join on the same id. Hangfire jobs carry the context across the queue (`HangfireTracingFilter`,
   source `FinanceSentry.Hangfire`): an ad-hoc enqueue runs as a child span of the enqueuing request, while
-  a recurring run starts its own trace and links to the scheduling context instead. `/metrics` scrapes
+  a recurring run — and every automatic retry, which may fire hours after the request closed — starts
+  its own trace and links to the originating context instead (`hangfire.job_id` / `hangfire.retry_count`
+  tags group the attempts of one job). `/metrics` scrapes
   and parentless Npgsql spans (polling outside any request or job) are not traced.
 - **Dashboards** — provisioned as code under `docker/observability/grafana/provisioning/`, one home for
   both Grafanas: the dev compose mounts the directory, and `deploy.sh` publishes the same JSON to the
