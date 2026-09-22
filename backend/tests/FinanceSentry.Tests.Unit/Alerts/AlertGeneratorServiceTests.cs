@@ -644,6 +644,158 @@ public class AlertGeneratorServiceTests
         VerifyNothingAdded();
     }
 
+    [Fact]
+    public async Task GenerateBudgetNearLimit_NoExisting_AddsWarningAlert()
+    {
+        var budgetId = Guid.NewGuid();
+        AllowAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.BudgetBreach &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "Groceries" &&
+            a.Title.Contains("Groceries") &&
+            a.Title.Contains("September 2026") &&
+            a.Message.Contains("92%") &&
+            a.Message.Contains("September 2026")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetExceeded_NoExisting_AddsWarningAlert()
+    {
+        var budgetId = Guid.NewGuid();
+        AllowAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 110m, 100m, 2026, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.BudgetBreach &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "Groceries" &&
+            a.Title.Contains("exceeded") &&
+            a.Title.Contains("September 2026") &&
+            a.Message.Contains("110%") &&
+            a.Message.Contains("September 2026")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetNearLimit_AlreadyRaisedForReference_SkipsCreation()
+    {
+        _repo.Setup(r => r.ExistsAsync(_userId, AlertType.BudgetBreach, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(true);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, Guid.NewGuid(), "Groceries", 92m, 100m, 2026, 9);
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+        _repo.Verify(r => r.FindActiveAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), default), Times.Never);
+    }
+
+    /// <summary>
+    /// A dismissal sticks for the whole month: the dedup asks whether the reference was EVER raised,
+    /// not whether it is still open or was raised recently — so an alert dismissed weeks ago (well
+    /// past any silence window) is still not raised again for the same budget and month.
+    /// </summary>
+    [Fact]
+    public async Task GenerateBudgetNearLimit_DismissedEarlierSameMonth_NotRaisedAgain()
+    {
+        var budgetId = Guid.NewGuid();
+        var ledger = TrackAlerts();
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        ledger[0].IsDismissed = true;
+        ledger[0].CreatedAt = DateTimeOffset.UtcNow.AddDays(-20);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 97m, 100m, 2026, 9);
+
+        Assert.Single(ledger);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetBreach_NearLimitThenExceededSameMonth_BothFireOnceEach()
+    {
+        var budgetId = Guid.NewGuid();
+        var ledger = TrackAlerts();
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        ledger[0].IsDismissed = true;
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 104m, 100m, 2026, 9);
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 104m, 100m, 2026, 9);
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 110m, 100m, 2026, 9);
+
+        Assert.Equal(2, ledger.Count);
+        Assert.Contains("nearing", ledger[0].Title);
+        Assert.Contains("exceeded", ledger[1].Title);
+    }
+
+    /// <summary>
+    /// 90% and 100% are distinct references, so both can be active for the same budget in the same
+    /// month — reaching 100% later must still get through even though 90% already alerted.
+    /// </summary>
+    [Fact]
+    public async Task GenerateBudgetBreach_NearLimitAndExceeded_ProduceDifferentReferenceIds()
+    {
+        var budgetId = Guid.NewGuid();
+        var written = new List<Alert>();
+        AllowAlert(AlertType.BudgetBreach);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 105m, 100m, 2026, 9);
+
+        Assert.NotEqual(written[0].ReferenceId, written[1].ReferenceId);
+    }
+
+    /// <summary>
+    /// Same budget, same crossing kind, same month must resolve to the same reference id — the daily
+    /// hygiene run's core "once per budget per month" guarantee. A mid-month limit edit or a refund
+    /// that drops spend and later lets it climb back over the line never changes this reference, so
+    /// the active-alert dedup above keeps suppressing a second alert for the rest of the month. A new
+    /// month is a different reference, so next month can alert again.
+    /// </summary>
+    [Fact]
+    public async Task GenerateBudgetNearLimit_SameBudgetAndMonth_ProducesStableReferenceId()
+    {
+        var budgetId = Guid.NewGuid();
+        var written = new List<Alert>();
+        AllowAlert(AlertType.BudgetBreach);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        // Same crossing, re-checked the next day with a different spend/limit split (e.g. after a
+        // mid-month limit edit, or spend that dipped from a refund and climbed back up) — still the
+        // same reference for the month.
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 190m, 200m, 2026, 9);
+        // Next month: a fresh reference.
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 10);
+
+        Assert.Equal(written[0].ReferenceId, written[1].ReferenceId);
+        Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection
@@ -656,6 +808,8 @@ public class AlertGeneratorServiceTests
         // Retired types keep their constant so stored alerts still resolve, but nothing generates
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
+        // Deduped once per reference, ever — no silence window applies.
+        var oncePerReference = new[] { AlertType.BudgetBreach };
 
         var declared = (Dictionary<string, TimeSpan>)typeof(AlertGeneratorService)
             .GetField("SilenceWindows", BindingFlags.NonPublic | BindingFlags.Static)!
@@ -665,7 +819,7 @@ public class AlertGeneratorServiceTests
             .GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(f => f.IsLiteral && f.FieldType == typeof(string))
             .Select(f => (string)f.GetRawConstantValue()!)
-            .Where(t => !retired.Contains(t))
+            .Where(t => !retired.Contains(t) && !oncePerReference.Contains(t))
             .ToList();
 
         Assert.NotEmpty(live);
@@ -679,6 +833,18 @@ public class AlertGeneratorServiceTests
         _repo.Setup(r => r.HasRecentAsync(
                 _userId, type, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
             .ReturnsAsync(false);
+    }
+
+    private List<Alert> TrackAlerts()
+    {
+        var ledger = new List<Alert>();
+        _repo.Setup(r => r.ExistsAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), default))
+            .ReturnsAsync((Guid userId, string type, Guid? referenceId, CancellationToken _) =>
+                ledger.Any(a => a.UserId == userId && a.Type == type && a.ReferenceId == referenceId));
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => ledger.Add(a))
+            .Returns(Task.CompletedTask);
+        return ledger;
     }
 
     private void SuppressByActiveAlert(string type)

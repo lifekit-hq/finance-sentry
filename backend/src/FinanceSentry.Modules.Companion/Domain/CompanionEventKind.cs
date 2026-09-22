@@ -28,4 +28,5 @@ public enum CompanionEventKind
     EarningsAhead,
     FilingLanded,
     NewsCluster,
+    BudgetBreach,
 }

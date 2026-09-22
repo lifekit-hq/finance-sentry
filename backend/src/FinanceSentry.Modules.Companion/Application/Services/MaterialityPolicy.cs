@@ -37,6 +37,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "EarningsAhead" => CompanionEventKind.EarningsAhead,
         "FilingLanded" => CompanionEventKind.FilingLanded,
         "NewsCluster" => CompanionEventKind.NewsCluster,
+        "BudgetBreach" => CompanionEventKind.BudgetBreach,
         _ => null,
     };
 

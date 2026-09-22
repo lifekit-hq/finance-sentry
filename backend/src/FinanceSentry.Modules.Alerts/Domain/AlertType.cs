@@ -26,4 +26,5 @@ public static class AlertType
     public const string EarningsAhead = "EarningsAhead";
     public const string FilingLanded = "FilingLanded";
     public const string NewsCluster = "NewsCluster";
+    public const string BudgetBreach = "BudgetBreach";
 }

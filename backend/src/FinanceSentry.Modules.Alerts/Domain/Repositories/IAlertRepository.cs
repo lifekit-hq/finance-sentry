@@ -10,6 +10,12 @@ public interface IAlertRepository
     Task<Alert?> FindActiveAsync(
         Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Whether an alert of <paramref name="type"/> on <paramref name="referenceId"/> was ever raised
+    /// for the user, whatever its state (open, read, dismissed or resolved).
+    /// </summary>
+    Task<bool> ExistsAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default);
+
     Task<bool> HasRecentAsync(
         Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
         CancellationToken ct = default);

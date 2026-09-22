@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Alerts.Application.Services;
 
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using FinanceSentry.Core.Interfaces;
@@ -77,6 +78,12 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
 
         /// <summary>Always record: the caller has already decided this event must be seen.</summary>
         Always,
+
+        /// <summary>
+        /// Once per reference, ever: any alert already raised on the reference — open, dismissed or
+        /// resolved — suppresses a new one. No silence window applies.
+        /// </summary>
+        OncePerReference,
     }
 
     public Task GenerateLowBalanceAlertAsync(
@@ -354,6 +361,38 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"{ticker} news clustered on {day:yyyy-MM-dd}: {reason}"),
             ct);
 
+    public Task GenerateBudgetNearLimitAlertAsync(
+        Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+        int year, int month, CancellationToken ct = default)
+    {
+        var pct = limitUsd == 0m ? 0 : (int)Math.Round(spentUsd / limitUsd * 100);
+        var period = BudgetPeriodLabel(year, month);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("near-limit", budgetId, year, month), category,
+            $"Budget nearing limit: {category} ({period})",
+            $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
+        { Dedup = Dedup.OncePerReference },
+            ct);
+    }
+
+    public Task GenerateBudgetExceededAlertAsync(
+        Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+        int year, int month, CancellationToken ct = default)
+    {
+        var pct = limitUsd == 0m ? 0 : (int)Math.Round(spentUsd / limitUsd * 100);
+        var period = BudgetPeriodLabel(year, month);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("exceeded", budgetId, year, month), category,
+            $"Budget limit exceeded: {category} ({period})",
+            $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
+        { Dedup = Dedup.OncePerReference },
+            ct);
+    }
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -361,13 +400,17 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// </summary>
     private async Task EmitAsync(Guid userId, AlertDraft draft, CancellationToken ct)
     {
-        if (draft.Dedup == Dedup.ActiveThenSilence)
+        if (draft.Dedup == Dedup.OncePerReference)
+        {
+            if (await _alerts.ExistsAsync(userId, draft.Type, draft.ReferenceId, ct)) return;
+        }
+        else if (draft.Dedup == Dedup.ActiveThenSilence)
         {
             var existing = await _alerts.FindActiveAsync(userId, draft.Type, draft.ReferenceId, ct);
             if (existing is not null) return;
         }
 
-        if (draft.Dedup != Dedup.Always)
+        if (draft.Dedup is Dedup.ActiveThenSilence or Dedup.SilenceOnly)
         {
             var window = draft.SilenceWindow ?? SilenceWindows[draft.Type];
             var quietSince = DateTimeOffset.UtcNow - window;
@@ -424,6 +467,18 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
     private static Guid NewsClusterReferenceId(string ticker, DateOnly day)
         => DerivedReferenceId($"news-cluster:{ticker.ToUpperInvariant()}:{day:yyyy-MM-dd}");
+
+    /// <summary>
+    /// Stable per-(budget, crossing kind, year, month) synthetic GUID — 90% and 100% are distinct
+    /// references so each fires once for the month independently of the other, a new month always
+    /// gets a fresh reference, and a mid-month limit edit or a refund never changes which reference
+    /// an alert resolves to.
+    /// </summary>
+    private static Guid BudgetBreachReferenceId(string crossingKind, Guid budgetId, int year, int month)
+        => DerivedReferenceId($"budget-breach:{crossingKind}:{budgetId:N}:{year:D4}-{month:D2}");
+
+    private static string BudgetPeriodLabel(int year, int month)
+        => new DateOnly(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// A synthetic reference for alerts with no natural entity id. Not a security primitive — MD5

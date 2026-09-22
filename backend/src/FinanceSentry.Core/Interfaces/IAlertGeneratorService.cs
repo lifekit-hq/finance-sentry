@@ -276,6 +276,41 @@ public interface IAlertGeneratorService
         string reason,
         DateOnly day,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert that a monthly budget's month-to-date spend has reached 90% of its
+    /// limit (C2, ledger-heartbeat design). Deduped per (<paramref name="budgetId"/>,
+    /// <paramref name="year"/>, <paramref name="month"/>) — a budget crosses 90% at most once per
+    /// month regardless of how many times the daily hygiene run re-checks it, a mid-month limit
+    /// edit, or a refund that later lets spend cross back over the line. Once raised, the alert is
+    /// never raised again for that month, even after the user dismisses or resolves it.
+    /// </summary>
+    Task GenerateBudgetNearLimitAlertAsync(
+        Guid userId,
+        Guid budgetId,
+        string category,
+        decimal spentUsd,
+        decimal limitUsd,
+        int year,
+        int month,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert that a monthly budget's month-to-date spend has reached or passed
+    /// 100% of its limit (C2, ledger-heartbeat design). A distinct alert from
+    /// <see cref="GenerateBudgetNearLimitAlertAsync"/> — reaching 100% later in the same month
+    /// after a 90% alert already fired is its own event and still gets through. Deduped the same
+    /// way, per (<paramref name="budgetId"/>, <paramref name="year"/>, <paramref name="month"/>).
+    /// </summary>
+    Task GenerateBudgetExceededAlertAsync(
+        Guid userId,
+        Guid budgetId,
+        string category,
+        decimal spentUsd,
+        decimal limitUsd,
+        int year,
+        int month,
+        CancellationToken ct = default);
 }
 
 /// <summary>
