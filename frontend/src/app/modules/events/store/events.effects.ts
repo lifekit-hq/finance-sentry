@@ -40,31 +40,23 @@ export function eventsEffects(store: EffectsStore) {
     );
   };
 
+  const loadUpcoming = rxMethod<void>(
+    pipe(
+      tap(() => store.setUpcomingLoading()),
+      switchMap(fetchUpcoming)
+    )
+  );
+
   return {
-    loadUpcoming: rxMethod<void>(
-      pipe(
-        tap(() => store.setUpcomingLoading()),
-        switchMap(fetchUpcoming)
-      )
-    ),
-    selectHorizon: rxMethod<number>(
-      pipe(
-        tap(days => {
-          store.setHorizonDays(days);
-          store.setUpcomingLoading();
-        }),
-        switchMap(fetchUpcoming)
-      )
-    ),
-    toggleKind: rxMethod<EventKind>(
-      pipe(
-        tap(kind => {
-          store.toggleKindLocal(kind);
-          store.setUpcomingLoading();
-        }),
-        switchMap(fetchUpcoming)
-      )
-    ),
+    loadUpcoming,
+    selectHorizon(days: number): void {
+      store.setHorizonDays(days);
+      loadUpcoming();
+    },
+    toggleKind(kind: EventKind): void {
+      store.toggleKindLocal(kind);
+      loadUpcoming();
+    },
     loadFired: rxMethod<void>(
       pipe(
         tap(() => store.setFiredLoading()),

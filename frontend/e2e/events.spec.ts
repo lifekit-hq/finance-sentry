@@ -7,10 +7,14 @@ const AUTH_RESPONSE = {
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
+const DATE_PART_PAD = 2;
+
 function isoDate(daysFromToday: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromToday);
-  return d.toISOString().slice(0, 10);
+  const month = String(d.getMonth() + 1).padStart(DATE_PART_PAD, '0');
+  const day = String(d.getDate()).padStart(DATE_PART_PAD, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 const UPCOMING = {

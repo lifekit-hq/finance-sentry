@@ -38,6 +38,8 @@ function buildSignals(
     upcomingErrorCode: Nullable<string>;
     fired: FiredEvent[];
     firedTotalCount: number;
+    firedPage: number;
+    firedPageSize: number;
     firedStatus: AsyncStatus;
     firedErrorCode: Nullable<string>;
   }> = {}
@@ -51,6 +53,8 @@ function buildSignals(
     upcomingErrorCode: signal<Nullable<string>>(overrides.upcomingErrorCode ?? null),
     fired: signal<FiredEvent[]>(overrides.fired ?? []),
     firedTotalCount: signal(overrides.firedTotalCount ?? 0),
+    firedPage: signal(overrides.firedPage ?? 1),
+    firedPageSize: signal(overrides.firedPageSize ?? 20),
     firedStatus: signal<AsyncStatus>(overrides.firedStatus ?? 'idle'),
     firedErrorCode: signal<Nullable<string>>(overrides.firedErrorCode ?? null),
   };
@@ -147,22 +151,17 @@ describe('eventsComputed', () => {
     expect(build({fired: [one], firedStatus: 'error'}).hasFiredRows()).toBe(true);
   });
 
-  it('hasMoreFired compares the loaded count with the total', () => {
-    const one: FiredEvent = {
-      alertId: 'a',
-      kind: 'NewsCluster',
-      severity: 'Warning',
-      subject: 'MU',
-      title: 't',
-      message: 'm',
-      occurredAt: '2026-09-22T10:00:00Z',
-      isRead: false,
-      delivery: null,
-      verdict: null,
-      outcome: 'awaiting',
-    };
-    expect(build({fired: [one], firedTotalCount: 2}).hasMoreFired()).toBe(true);
-    expect(build({fired: [one], firedTotalCount: 1}).hasMoreFired()).toBe(false);
+  it('hasMoreFired is decided by the page cursor, not by how many rows survived dedup', () => {
+    expect(build({firedPage: 1, firedPageSize: 20, firedTotalCount: 25}).hasMoreFired()).toBe(true);
+    expect(build({firedPage: 2, firedPageSize: 20, firedTotalCount: 25}).hasMoreFired()).toBe(
+      false
+    );
+    expect(build({firedPage: 1, firedPageSize: 20, firedTotalCount: 20}).hasMoreFired()).toBe(
+      false
+    );
+    expect(
+      build({fired: [], firedPage: 2, firedPageSize: 20, firedTotalCount: 25}).hasMoreFired()
+    ).toBe(false);
   });
 
   it('firedErrorMessage falls back to the feed default', () => {

@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {of, throwError} from 'rxjs';
+import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
@@ -95,6 +95,29 @@ describe('eventsEffects', () => {
 
     expect(store.toggleKindLocal).toHaveBeenCalledWith('macro');
     expect(api.getUpcoming).toHaveBeenCalledWith('2026-09-22', '2026-10-22', ['macro']);
+  });
+
+  it('a filter change cancels the calendar request still in flight', () => {
+    const store = buildStore();
+    const slow = new Subject<UpcomingEventsResult>();
+    const fast = new Subject<UpcomingEventsResult>();
+    const api = buildApi();
+    api.getUpcoming.mockReturnValueOnce(slow).mockReturnValueOnce(fast);
+    configure(api);
+
+    TestBed.runInInjectionContext(() => {
+      const effects = eventsEffects(store);
+      effects.selectHorizon(90);
+      effects.toggleKind('macro');
+    });
+    const macroOnly: UpcomingEventsResult = {...UPCOMING, to: '2026-12-21'};
+    fast.next(macroOnly);
+    fast.complete();
+    slow.next(UPCOMING);
+    slow.complete();
+
+    expect(store.setUpcoming).toHaveBeenCalledOnce();
+    expect(store.setUpcoming).toHaveBeenCalledWith(macroOnly);
   });
 
   it('loadUpcoming forwards the backend error code', () => {

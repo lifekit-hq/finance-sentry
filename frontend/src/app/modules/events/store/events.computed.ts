@@ -21,6 +21,8 @@ interface StateSignals {
   upcomingErrorCode: Signal<Nullable<string>>;
   fired: Signal<FiredEvent[]>;
   firedTotalCount: Signal<number>;
+  firedPage: Signal<number>;
+  firedPageSize: Signal<number>;
   firedStatus: Signal<AsyncStatus>;
   firedErrorCode: Signal<Nullable<string>>;
 }
@@ -68,6 +70,8 @@ export function eventsComputed(store: StateSignals) {
     }),
     isFiredEmpty: computed(() => store.firedStatus() === 'idle' && store.fired().length === 0),
     hasFiredRows: computed(() => store.fired().length > 0),
-    hasMoreFired: computed(() => store.fired().length < store.firedTotalCount()),
+    hasMoreFired: computed(
+      () => store.firedPage() * store.firedPageSize() < store.firedTotalCount()
+    ),
   };
 }
