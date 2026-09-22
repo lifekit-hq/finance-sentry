@@ -85,6 +85,47 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task SilenceOnly_JobFailurePastWindowWithEarlierAlertStillOpen_DoesNotSupersedeIt()
+    {
+        await using (var setup = CreateContext())
+        {
+            await setup.Database.EnsureCreatedAsync();
+        }
+
+        var userId = Guid.NewGuid();
+        var referenceId = Guid.NewGuid();
+        var old = new Alert
+        {
+            UserId = userId,
+            Type = AlertType.JobFailure,
+            Title = "Job failing: sync",
+            Message = "earlier streak",
+            ReferenceId = referenceId,
+            ReferenceLabel = "sync",
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+        };
+        await using (var seed = CreateContext())
+        {
+            seed.Alerts.Add(old);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var ctx = CreateContext())
+        {
+            var generator = new AlertGeneratorService(new AlertRepository(ctx));
+            var second = () => generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
+            await second.Should().ThrowAsync<DbUpdateException>("job-failure alerting keeps its pre-existing behaviour");
+        }
+
+        await using var read = CreateContext();
+        var alerts = await read.Alerts.AsNoTracking()
+            .Where(a => a.UserId == userId && a.ReferenceId == referenceId)
+            .ToListAsync();
+
+        alerts.Should().ContainSingle().Which.Should().Match<Alert>(a => a.Id == old.Id && !a.IsResolved);
+    }
+
+    [DockerRequiredFact]
     public async Task AddAsync_FailedInsert_DoesNotPoisonLaterSavesOnTheSameContext()
     {
         await using (var setup = CreateContext())

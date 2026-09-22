@@ -122,6 +122,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"Market structure flagged {ticker}: {reason}")
         {
             Dedup = dedup,
+            SupersedeOpen = dedup == AlertDedup.SilenceOnly,
         },
             ct);
 
@@ -404,9 +405,9 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
                 return;
         }
 
-        // idx_alert_dedup allows one open alert per (user, type, reference): a SilenceOnly occurrence
-        // past its window supersedes the still-open earlier one instead of colliding with it.
-        if (draft.Dedup == AlertDedup.SilenceOnly && draft.ReferenceId is not null)
+        // idx_alert_dedup allows one open alert per (user, type, reference): an occurrence that opts in
+        // supersedes the still-open earlier one instead of colliding with it.
+        if (draft.SupersedeOpen && draft.ReferenceId is not null)
         {
             await ResolveAsync(userId, draft.Type, draft.ReferenceId, ct);
         }
@@ -492,5 +493,8 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
 
         /// <summary>Overrides the type's declared window where one type carries two distinct events.</summary>
         public TimeSpan? SilenceWindow { get; init; }
+
+        /// <summary>Resolves a still-open alert on the same reference before recording this one.</summary>
+        public bool SupersedeOpen { get; init; }
     }
 }
