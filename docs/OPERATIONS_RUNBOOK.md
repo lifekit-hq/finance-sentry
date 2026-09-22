@@ -82,6 +82,17 @@ GET /health/ready → 503
 2. If `npgsql` unhealthy: PostgreSQL is unreachable. Check Docker container status.
 3. If still failing after DB restart: check connection string in `appsettings.json`.
 
+## 8. Startup Migration Failure
+
+**Symptoms:** `deploy.sh` fails with `STARTUP MIGRATION FAILURE`, or the api container crash-loops and `docker compose -f docker/docker-compose.prod.yml logs api | grep StartupMigrationException` matches.
+
+**Meaning:** a module's EF Core migration failed against a reachable database (or the database connection was lost after earlier modules had migrated), and the API refused to start rather than serve a half-migrated schema.
+
+**Steps:**
+1. Find the `STARTUP MIGRATION FAILURE: <Context> could not apply migration <Migration>` log line — it names the module's `DbContext` and the migration; the attached `StartupMigrationException` inner exception is the underlying database error.
+2. Fix the underlying migration issue (or restore database connectivity) and ship a new commit.
+3. Migrations are idempotent: the next start resumes from the failed migration rather than re-running earlier ones.
+
 ## Contact
 
 - On-call channel: `#finance-sentry-oncall`

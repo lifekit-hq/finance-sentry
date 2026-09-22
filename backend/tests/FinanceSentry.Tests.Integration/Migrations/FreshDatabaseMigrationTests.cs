@@ -1,12 +1,16 @@
 namespace FinanceSentry.Tests.Integration.Migrations;
 
+using FinanceSentry.API.Migrations;
+using FinanceSentry.Modules.Agent.Infrastructure;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -114,10 +118,125 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
             "a restart must not roll Research back below M014 and re-apply it onto an empty table");
     }
 
-    private sealed class FreshDatabaseApiFactory(string connectionString) : WebApplicationFactory<Program>
+    /// <summary>
+    /// A migration that fails during startup must stop the API from starting at all, rather than
+    /// being logged and left behind while the rest of the app comes up on a half-migrated schema
+    /// (#661/#664's actual bug). Reproduced here without touching any migration's content or ordering:
+    /// pre-creating the table Auth's very first migration (M005_IdentitySchema) is about to create
+    /// forces that migration to fail with "relation already exists", the same shape of failure Research's
+    /// M012 hit against a missing table.
+    /// </summary>
+    [DockerRequiredFact]
+    public async Task StartupMigrationFailure_HaltsStartupInsteadOfServingAHalfMigratedSchema()
+    {
+        var postgres = new PostgreSqlBuilder("postgres:14-alpine").Build();
+        await postgres.StartAsync();
+        try
+        {
+            await using (var conn = new NpgsqlConnection(postgres.GetConnectionString()))
+            {
+                await conn.OpenAsync();
+                await using var collide = new NpgsqlCommand(
+                    """CREATE TABLE "AspNetRoles" ("Id" text NOT NULL PRIMARY KEY)""", conn);
+                await collide.ExecuteNonQueryAsync();
+            }
+
+            Action buildHost = () =>
+            {
+                using var factory = new FreshDatabaseApiFactory(postgres.GetConnectionString());
+                using var client = factory.CreateClient();
+            };
+
+            buildHost.Should().Throw<Exception>(
+                    "a migration failure must abort startup rather than let the API come up")
+                .Where(ex => ContainsStartupMigrationException(ex),
+                    "the halt must be traceable to the specific failed migration, not a generic crash");
+        }
+        finally
+        {
+            await postgres.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// A reachable Postgres server whose database has not been created yet must be migrated (EF's
+    /// Migrate() creates the database), not mistaken for an unreachable database and skipped — which
+    /// would leave the API serving with no schema at all.
+    /// </summary>
+    [DockerRequiredFact]
+    public async Task StartupOnAReachableServerWithoutTheDatabase_CreatesAndMigratesIt()
+    {
+        var missingDatabase = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString())
+        {
+            Database = "not_yet_created",
+        }.ConnectionString;
+
+        await using var factory = new FreshDatabaseApiFactory(missingDatabase);
+        using (factory.CreateClient())
+        {
+            using var scope = factory.Services.CreateScope();
+            var research = scope.ServiceProvider.GetRequiredService<ResearchDbContext>();
+
+            (await research.Database.GetPendingMigrationsAsync()).Should().BeEmpty(
+                "a missing database on a reachable server must be created and migrated, not skipped");
+        }
+    }
+
+    /// <summary>
+    /// Losing the database after earlier modules have already migrated leaves a half-migrated
+    /// application, which must halt startup the same way a failed migration does. Reproduced by
+    /// pointing only the last-migrated context (Agent) at an unreachable server while every earlier
+    /// context migrates against the real one.
+    /// </summary>
+    [DockerRequiredFact]
+    public void DatabaseLostAfterEarlierModulesMigrated_HaltsStartup()
+    {
+        Action buildHost = () =>
+        {
+            using var factory = new FreshDatabaseApiFactory(
+                _postgres!.GetConnectionString(),
+                services =>
+                {
+                    var toRemove = services
+                        .Where(d => d.ServiceType == typeof(DbContextOptions<AgentDbContext>)
+                                 || d.ServiceType == typeof(AgentDbContext)
+                                 || d.ServiceType == typeof(IDbContextOptionsConfiguration<AgentDbContext>))
+                        .ToList();
+                    foreach (var d in toRemove)
+                        services.Remove(d);
+
+                    services.AddDbContext<AgentDbContext>(o => o.UseNpgsql(
+                        "Host=127.0.0.1;Port=1;Database=unreachable;Username=test;Password=test;Timeout=1",
+                        b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")));
+                });
+            using var client = factory.CreateClient();
+        };
+
+        buildHost.Should().Throw<Exception>(
+                "a connection lost after earlier modules migrated must abort startup rather than serve a half-migrated schema")
+            .Where(ex => ContainsStartupMigrationException(ex),
+                "the halt must be the named startup-migration failure, not a generic crash");
+    }
+
+    private static bool ContainsStartupMigrationException(Exception ex)
+    {
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is StartupMigrationException)
+                return true;
+        }
+
+        return false;
+    }
+
+    private sealed class FreshDatabaseApiFactory(
+        string connectionString, Action<IServiceCollection>? configureTestServices = null) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            if (configureTestServices is not null)
+                builder.ConfigureTestServices(configureTestServices);
+
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Default", connectionString);
             builder.UseSetting("ConnectionStrings:ReadOnly", connectionString);

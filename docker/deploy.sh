@@ -74,6 +74,13 @@ echo "[deploy] wait for api health (via gateway — direct api port closed in 02
 deadline=$((SECONDS + 120))
 until curl -sf http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; do
   if [[ $SECONDS -gt $deadline ]]; then
+    api_logs="$(docker compose -f docker/docker-compose.prod.yml logs api 2>&1 || true)"
+    if grep -q StartupMigrationException <<<"$api_logs"; then
+      echo "error: STARTUP MIGRATION FAILURE — the api refused to start rather than serve a half-migrated schema" >&2
+      echo "error: see docs/OPERATIONS_RUNBOOK.md §8 (Startup Migration Failure)" >&2
+      grep "STARTUP MIGRATION FAILURE" <<<"$api_logs" | tail -n 1 >&2 || true
+      exit 1
+    fi
     echo "error: api health check timed out after 120s" >&2
     docker compose -f docker/docker-compose.prod.yml logs --tail 60 api
     exit 1

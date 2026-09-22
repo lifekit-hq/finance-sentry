@@ -19,6 +19,7 @@ using FinanceSentry.Modules.Agent.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql;
 
 public static class MigrationExtensions
 {
@@ -38,23 +39,24 @@ public static class MigrationExtensions
     {
         using var scope = app.Services.CreateScope();
         var sp = scope.ServiceProvider;
+        var anyContextMigrated = false;
 
-        MigrateContext<AuthDbContext>(sp, app.Logger);
-        MigrateContext<BankSyncDbContext>(sp, app.Logger);
-        MigrateContext<CryptoSyncDbContext>(sp, app.Logger);
-        MigrateContext<BrokerageSyncDbContext>(sp, app.Logger);
-        MigrateContext<AlertsDbContext>(sp, app.Logger);
-        MigrateContext<BudgetsDbContext>(sp, app.Logger);
-        MigrateContext<SubscriptionsDbContext>(sp, app.Logger);
-        MigrateContext<WealthDbContext>(sp, app.Logger);
-        MigrateContext<ResearchDbContext>(sp, app.Logger, targetMigration: ResearchMigrationBeforeRiskDependency);
-        MigrateContext<RiskDbContext>(sp, app.Logger);
-        MigrateContext<ResearchDbContext>(sp, app.Logger);
-        MigrateContext<RadarDbContext>(sp, app.Logger);
-        MigrateContext<CompanionDbContext>(sp, app.Logger);
-        MigrateContext<AnalyticsDbContext>(sp, app.Logger);
-        MigrateContext<RetentionDbContext>(sp, app.Logger);
-        MigrateContext<AgentDbContext>(sp, app.Logger);
+        MigrateContext<AuthDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<BankSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<CryptoSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<BrokerageSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<AlertsDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<BudgetsDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<SubscriptionsDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<WealthDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<ResearchDbContext>(sp, app.Logger, ref anyContextMigrated, targetMigration: ResearchMigrationBeforeRiskDependency);
+        MigrateContext<RiskDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<ResearchDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<RadarDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<CompanionDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<AnalyticsDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<RetentionDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<AgentDbContext>(sp, app.Logger, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
 
@@ -73,20 +75,102 @@ public static class MigrationExtensions
         }
     }
 
-    private static void MigrateContext<TContext>(IServiceProvider sp, ILogger logger, string? targetMigration = null)
+    // A failed migration is left half-applied (EF Core wraps each migration in its own transaction, so
+    // everything before it committed) — a half-migrated schema that the API then serves on is exactly
+    // the silent failure #661 cost us (Research's M012 threw for a missing risk.risk_rule_sets, the API
+    // started anyway, and the first anyone knew was an unrelated 500 on saving a thesis). Three outcomes:
+    // (a) A failed migration against a reachable database stops startup.
+    // (b) A half-migrated startup caused by losing the database connection partway through also stops startup.
+    // (c) A database that is simply not reachable yet (nothing has migrated against it so far) is unchanged
+    //     and does not stop startup — /api/v1/health/ready reports it, and test hosts such as
+    //     ObservabilityApiFactory point contexts at a deliberately unreachable database and rely on it.
+    // A reachable server whose database does not exist yet counts as reachable: Migrate() creates it.
+    private static void MigrateContext<TContext>(
+        IServiceProvider sp, ILogger logger, ref bool anyContextMigrated, string? targetMigration = null)
         where TContext : DbContext
     {
+        var context = sp.GetRequiredService<TContext>();
+        var contextName = typeof(TContext).Name;
+
+        // Test hosts swap individual contexts onto EF Core's InMemory provider (e.g.
+        // BankSyncApiFactory.ReplaceDbContextWithInMemory), which has no migrations at all — relational
+        // APIs like GetMigrations()/GetAppliedMigrations() throw for it by design. Nothing to migrate
+        // there, so skip rather than treat "not a relational database" as a migration failure.
+        if (!context.Database.IsRelational())
+            return;
+
+        var connectivityError = ProbeConnectivity(context.Database);
+        if (connectivityError is not null)
+        {
+            if (anyContextMigrated)
+            {
+                const string migration = "(not attempted — database connection lost after earlier modules migrated)";
+                var halfMigrated = new StartupMigrationException(contextName, migration, connectivityError);
+                logger.LogCritical(
+                    halfMigrated,
+                    "STARTUP MIGRATION FAILURE: {Context} could not apply migration {Migration} — the API will not start.",
+                    contextName, migration);
+                throw halfMigrated;
+            }
+
+            logger.LogError(
+                connectivityError,
+                "Cannot reach the database for {Context}; skipping its migration. If this is unexpected, " +
+                "check /api/v1/health/ready — the database check there reports connectivity independently.",
+                contextName);
+            return;
+        }
+
+        if (targetMigration is not null && context.Database.GetAppliedMigrations().Contains(targetMigration))
+        {
+            anyContextMigrated = true;
+            return;
+        }
+
         try
         {
-            var context = sp.GetRequiredService<TContext>();
-            if (targetMigration is not null && context.Database.GetAppliedMigrations().Contains(targetMigration))
-                return;
-
             context.GetService<IMigrator>().Migrate(targetMigration);
+            anyContextMigrated = true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Migration failed for {Context}. Startup will continue.", typeof(TContext).Name);
+            var failedMigration = FindFailedMigration(context.Database);
+            var startupException = new StartupMigrationException(contextName, failedMigration, ex);
+            logger.LogCritical(
+                startupException,
+                "STARTUP MIGRATION FAILURE: {Context} could not apply migration {Migration} — the API will not start.",
+                contextName, failedMigration);
+            throw startupException;
+        }
+    }
+
+    private static Exception? ProbeConnectivity(DatabaseFacade database)
+    {
+        try
+        {
+            using var connection = new NpgsqlConnection(database.GetConnectionString());
+            connection.Open();
+            return null;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.InvalidCatalogName)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex;
+        }
+    }
+
+    private static string FindFailedMigration(DatabaseFacade database)
+    {
+        try
+        {
+            return database.GetMigrations().Except(database.GetAppliedMigrations()).FirstOrDefault() ?? "(unknown)";
+        }
+        catch (Exception)
+        {
+            return "(unknown)";
         }
     }
 }
