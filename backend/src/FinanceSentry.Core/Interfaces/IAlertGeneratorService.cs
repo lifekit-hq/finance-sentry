@@ -68,7 +68,8 @@ public interface IAlertGeneratorService
     /// Raises a market-structure Alert for a held ticker (e.g. an unusual move at/above the alert bar).
     /// <paramref name="referenceId"/> is a deterministic per-ticker id so dedup/resolve is stable.
     /// <paramref name="dedup"/> is the caller's choice: by default an open alert on the ticker suppresses
-    /// a new one; <see cref="AlertDedup.SilenceOnly"/> lets each move past the silence window through.
+    /// a new one; <see cref="AlertDedup.SilenceOnly"/> lets each move past the silence window through,
+    /// resolving the still-open earlier alert on the ticker first.
     /// </summary>
     Task GenerateMarketStructureAlertAsync(
         Guid userId,
