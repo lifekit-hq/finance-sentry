@@ -25,6 +25,19 @@ using global::Hangfire.Server;
 /// originating request, and carries <c>hangfire.job_id</c> + <c>hangfire.retry_count</c> tags so all
 /// attempts of one job can still be grouped from either end.
 /// </para>
+///
+/// <para>
+/// <b>Where that rule stops.</b> "Retry" here means Hangfire's automatic retry counter and nothing
+/// else: the decision keys on the <c>RetryCount</c> job parameter, which only
+/// <c>AutomaticRetryAttribute</c> writes. A manual dashboard Requeue is not an automatic retry, so it
+/// re-performs under the originally stored <c>traceparent</c> and shows up as a child span on the
+/// original request's trace however much later it happens — a week-old trace gaining a fresh span is
+/// this, not broken propagation. Because the counter persists once exhausted, the same Requeue also
+/// behaves differently by job type: a job declared with <c>Attempts = 0</c> never has a
+/// <c>RetryCount</c>, so its requeue is parented; a job whose automatic retries ran out keeps
+/// <c>RetryCount &gt; 0</c>, so its requeue is linked. Manual requeues are tracked as their own
+/// follow-up item.
+/// </para>
 /// </summary>
 public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
 {
@@ -89,7 +102,10 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
     /// <summary>
     /// Core start-activity decision (internal for unit testing, no Hangfire context required). The stored
     /// context becomes the parent only for the first attempt of an ad-hoc enqueue; recurring runs and
-    /// retries start their own trace and link to it instead.
+    /// automatic retries (<paramref name="retryCount"/> &gt; 0, i.e. Hangfire's <c>RetryCount</c>
+    /// parameter) start their own trace and link to it instead. A manual dashboard Requeue leaves
+    /// <paramref name="retryCount"/> as whatever the automatic retries left behind, so it is parented
+    /// for a job that never retried and linked for one whose retries were exhausted.
     /// </summary>
     internal static Activity? StartActivity(Job? job, string? traceParent, string? traceState, bool isRecurring, int retryCount = 0)
     {

@@ -130,7 +130,11 @@ Loki sink, and the dashboards below.
   source `FinanceSentry.Hangfire`): an ad-hoc enqueue runs as a child span of the enqueuing request, while
   a recurring run — and every automatic retry, which may fire hours after the request closed — starts
   its own trace and links to the originating context instead (`hangfire.job_id` / `hangfire.retry_count`
-  tags group the attempts of one job). `/metrics` scrapes
+  tags group the attempts of one job). The retry rule keys on Hangfire's automatic `RetryCount` only:
+  a manual dashboard Requeue re-performs under the stored `traceparent` and appears as a child span on
+  the original request trace however much later it runs (a job with `Attempts = 0` never has a
+  `RetryCount`, so its requeue is parented; one whose retries were exhausted keeps it, so its requeue is
+  linked) — a known gap tracked as its own follow-up. `/metrics` scrapes
   and parentless Npgsql spans (polling outside any request or job) are not traced.
 - **Dashboards** — provisioned as code under `docker/observability/grafana/provisioning/`, one home for
   both Grafanas: the dev compose mounts the directory, and `deploy.sh` publishes the same JSON to the
