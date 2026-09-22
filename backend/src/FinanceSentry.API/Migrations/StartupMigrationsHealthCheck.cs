@@ -11,7 +11,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 /// database was unreachable at startup and later returns, <c>database</c> goes Healthy while the schema
 /// may still be behind; this check stays Unhealthy, names the pending migrations per module, and says
 /// what to do (restart the API), so the cause is visible at the readiness endpoint rather than having
-/// to be traced back from an unrelated failing request.
+/// to be traced back from an unrelated failing request. Reachable again with nothing pending is Healthy:
+/// the schema is current, no request fails, and the startup log already records the skip.
 /// </summary>
 public sealed class StartupMigrationsHealthCheck(
     StartupMigrationStatus status, IServiceScopeFactory scopeFactory) : IHealthCheck
@@ -23,6 +24,8 @@ public sealed class StartupMigrationsHealthCheck(
         "running against whatever schema the database has. Restart the API once the database is " +
         "reachable so the skipped migrations run.";
 
+    private const string StillUnreachable = " Database still unreachable.";
+
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -30,7 +33,6 @@ public sealed class StartupMigrationsHealthCheck(
             return HealthCheckResult.Healthy("All module migrations were applied at startup.");
 
         var pending = new List<string>();
-        var stillUnreachable = new List<string>();
 
         using var scope = scopeFactory.CreateScope();
         foreach (var contextType in status.SkippedContexts)
@@ -44,21 +46,15 @@ public sealed class StartupMigrationsHealthCheck(
             }
             catch (Exception)
             {
-                stillUnreachable.Add(contextType.Name);
+                return HealthCheckResult.Unhealthy(SkippedAtStartup + StillUnreachable);
             }
         }
 
-        var description = new StringBuilder(SkippedAtStartup);
-        if (stillUnreachable.Count > 0)
-            description.Append(" Database still unreachable for: ").Append(string.Join(", ", stillUnreachable)).Append('.');
-        if (pending.Count > 0)
-            description.Append(" Schema is behind — pending migrations: ").Append(string.Join("; ", pending)).Append('.');
+        if (pending.Count == 0)
+            return HealthCheckResult.Healthy("Module migrations were skipped at startup, but the schema is up to date.");
 
-        // Reachable again with nothing pending: the schema happens to be current, so requests will work,
-        // but this process never verified that itself — worth a restart, not worth failing readiness.
-        if (stillUnreachable.Count == 0 && pending.Count == 0)
-            return HealthCheckResult.Degraded(description.Append(" The schema is currently up to date.").ToString());
-
+        var description = new StringBuilder(SkippedAtStartup)
+            .Append(" Schema is behind — pending migrations: ").Append(string.Join("; ", pending)).Append('.');
         return HealthCheckResult.Unhealthy(description.ToString());
     }
 }

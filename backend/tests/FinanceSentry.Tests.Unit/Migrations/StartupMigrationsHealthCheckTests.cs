@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Unit.Migrations;
 
 using FinanceSentry.API.Migrations;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
+using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,9 +11,9 @@ using Xunit;
 
 /// <summary>
 /// The <c>migrations</c> readiness check turns <see cref="StartupMigrationStatus"/> into the signal an
-/// operator sees: Healthy when startup migrated everything, Unhealthy naming the skipped module when
-/// the database was unreachable at startup (and still is). The reachable-again path needs a real
-/// database and lives in the integration suite (FreshDatabaseMigrationTests).
+/// operator sees: Healthy when startup migrated everything, Unhealthy when the database was unreachable
+/// at startup (and still is). Per-module detail is reserved for the pending-migrations list, which needs
+/// a reachable database and lives in the integration suite (FreshDatabaseMigrationTests).
 /// </summary>
 public sealed class StartupMigrationsHealthCheckTests
 {
@@ -31,10 +32,11 @@ public sealed class StartupMigrationsHealthCheckTests
     }
 
     [Fact]
-    public async Task WhenAModuleWasSkippedAndTheDatabaseIsStillUnreachable_ReportsUnhealthyNamingTheModule()
+    public async Task WhenModulesWereSkippedAndTheDatabaseIsStillUnreachable_ReportsUnhealthyOnce()
     {
         var status = new StartupMigrationStatus();
         status.RecordSkipped(typeof(ResearchDbContext));
+        status.RecordSkipped(typeof(RiskDbContext));
         var check = new StartupMigrationsHealthCheck(status, BuildScopeFactory());
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
@@ -44,8 +46,8 @@ public sealed class StartupMigrationsHealthCheckTests
             "the operator must be told migrations never ran in this process");
         result.Description.Should().Contain("Restart the API",
             "the signal must say what to do, not just that something is wrong");
-        result.Description.Should().Contain(nameof(ResearchDbContext),
-            "the module whose schema is unverified must be named");
+        result.Description.Should().ContainEquivalentOf("still unreachable").And.NotContain(nameof(ResearchDbContext),
+            "the sibling database check already reports unreachability; module names belong to the pending list");
     }
 
     [Fact]
@@ -64,6 +66,7 @@ public sealed class StartupMigrationsHealthCheckTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<ResearchDbContext>(o => o.UseNpgsql(UnreachableDatabase));
+        services.AddDbContext<RiskDbContext>(o => o.UseNpgsql(UnreachableDatabase));
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
     }
 }
