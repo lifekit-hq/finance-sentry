@@ -11,9 +11,6 @@ import {
 } from '@lifekit-hq/ui';
 
 import {
-  DEFAULT_EVENT_KIND_META,
-  DEFAULT_FIRED_KIND_META,
-  DEFAULT_OUTCOME_META,
   EVENT_HORIZON_DAYS,
   EVENT_KIND_META_REGISTRY,
   EVENT_KIND_ORDER,
@@ -23,6 +20,11 @@ import {
   OUTCOME_META_REGISTRY,
   type OutcomeMeta,
 } from '../../constants/event/event.constants';
+import {
+  type EventKind,
+  type EventOutcome,
+  type FiredEventKind,
+} from '../../models/event/event.model';
 import {EventDayLabelPipe} from '../../pipes/event-day-label.pipe';
 import {EventsStore} from '../../store/events.store';
 
@@ -53,24 +55,15 @@ export class EventsComponent {
   public readonly kinds = EVENT_KIND_ORDER;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
 
-  public kindMeta(kind: string): EventKindMeta {
-    return (
-      (EVENT_KIND_META_REGISTRY as Record<string, EventKindMeta | undefined>)[kind] ??
-      DEFAULT_EVENT_KIND_META
-    );
+  public kindMeta(kind: EventKind): EventKindMeta {
+    return EVENT_KIND_META_REGISTRY[kind];
   }
 
-  public firedKindMeta(kind: string): EventKindMeta {
-    return (
-      (FIRED_KIND_META_REGISTRY as Record<string, EventKindMeta | undefined>)[kind] ??
-      DEFAULT_FIRED_KIND_META
-    );
+  public firedKindMeta(kind: FiredEventKind): EventKindMeta {
+    return FIRED_KIND_META_REGISTRY[kind];
   }
 
-  public outcomeMeta(outcome: string): OutcomeMeta {
-    return (
-      (OUTCOME_META_REGISTRY as Record<string, OutcomeMeta | undefined>)[outcome] ??
-      DEFAULT_OUTCOME_META
-    );
+  public outcomeMeta(outcome: EventOutcome): OutcomeMeta {
+    return OUTCOME_META_REGISTRY[outcome];
   }
 }

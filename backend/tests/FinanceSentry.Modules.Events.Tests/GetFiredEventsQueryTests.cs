@@ -17,6 +17,14 @@ public sealed class GetFiredEventsQueryTests
     private readonly Mock<IEventDeliveryReader> _delivery = new();
     private readonly Mock<IEventVerdictRepository> _verdicts = new();
 
+    public GetFiredEventsQueryTests()
+    {
+        _delivery.Setup(d => d.ListForAlertsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     private GetFiredEventsQueryHandler Handler() => new(_alerts.Object, _delivery.Object, _verdicts.Object);
 
     private static FiredAlertRecord Alert(Guid id, string type, string? label = "MU") => new(
@@ -72,8 +80,8 @@ public sealed class GetFiredEventsQueryTests
                 new EventDeliveryRecord(verdictEvent, verdictId, "EarningsAhead", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow),
                 new EventDeliveryRecord(suppressedEvent, suppressedId, "MarketStructure", "SuppressedByRateLimit", DateTimeOffset.UtcNow, null, null),
             ]);
-        _verdicts.Setup(v => v.ListByEventIdsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = verdictEvent, Verdict = "Priced in.", Notified = false }]);
+        _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = verdictEvent, AlertId = verdictId, Verdict = "Priced in.", Notified = false }]);
 
         var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
 
@@ -97,13 +105,27 @@ public sealed class GetFiredEventsQueryTests
     {
         _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FiredAlertPage([Alert(Guid.NewGuid(), FiredEventTypes.FilingLanded)], 1));
-        _delivery.Setup(d => d.ListForAlertsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
 
         var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
 
         result.Items.Should().ContainSingle().Which.Outcome.Should().Be(EventOutcome.Awaiting);
-        _verdicts.Verify(v => v.ListByEventIdsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_verdict_still_renders_after_its_companion_row_has_purged()
+    {
+        var alertId = Guid.NewGuid();
+        _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FiredAlertPage([Alert(alertId, FiredEventTypes.EarningsAhead)], 1));
+        _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(alertId)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = alertId, Verdict = "Beat and raised.", Notified = true }]);
+
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
+
+        var row = result.Items.Should().ContainSingle().Subject;
+        row.Delivery.Should().BeNull();
+        row.Outcome.Should().Be(EventOutcome.Verdict);
+        row.Verdict!.Text.Should().Be("Beat and raised.");
     }
 
     [Fact]
@@ -111,8 +133,6 @@ public sealed class GetFiredEventsQueryTests
     {
         _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FiredAlertPage([Alert(Guid.NewGuid(), FiredEventTypes.NewsCluster, null)], 1));
-        _delivery.Setup(d => d.ListForAlertsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
 
         var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
 

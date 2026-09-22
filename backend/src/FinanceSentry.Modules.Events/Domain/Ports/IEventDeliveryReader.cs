@@ -2,7 +2,8 @@ namespace FinanceSentry.Modules.Events.Domain.Ports;
 
 /// <summary>
 /// The companion outbox's view of a fired alert: whether and how it reached the reader (adapter over
-/// the Companion module). <c>Disposition</c> is the Companion <c>EventDisposition</c> name as a string.
+/// the Companion module). <c>Disposition</c> is the Companion <c>EventDisposition</c> name as a string;
+/// <c>AlertId</c> is read back from the row's dedup key and is null for a row not captured from an alert.
 /// </summary>
 public interface IEventDeliveryReader
 {

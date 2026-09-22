@@ -91,9 +91,13 @@ filing-due row for MU derived from its last periodic filing; each row carries `k
    (`kind = earnings | ex_dividend`), macro events in the window (`kind = macro`), catalysts of
    the user's unbroken theses dated in the window (`kind = thesis_catalyst`), and derived periodic
    filing due dates for the same tickers (`kind = filing_due`), sorted by date then subject.
-2. **Given** one source throws or times out (Yahoo down, EDGAR 403), **When** upcoming events are
-   requested, **Then** the other sources still return, and the response's `sources[]` marks that
-   source `unavailable` - a day with nothing on it is never mistaken for a day nothing happens.
+2. **Given** one source throws or times out, **When** upcoming events are requested, **Then** the
+   other sources still return, and the response's `sources[]` marks that source `unavailable`.
+   Today only the database-backed sources can say so - `macro` and `theses`, whose reads throw
+   when the database is down. The two external ones cannot: `corporate` (earnings / ex-dividend
+   via Yahoo) and `filings` (EDGAR) sit over Research services that swallow provider failures and
+   return empty, so when Yahoo or EDGAR is down the agenda looks empty and `sources[]` still says
+   `ok`. Surfacing those failures is a Research change filed as separate work.
 3. **Given** no `from`/`to`, **When** requested, **Then** the window is today .. today + 90 days;
    a window longer than 366 days or with `to < from` is rejected (400, `EVENTS_WINDOW_INVALID`).
 4. **Given** `kinds=macro,earnings`, **When** requested, **Then** only those kinds are computed
@@ -211,7 +215,11 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
 
 ### Edge Cases
 
-- A ticker held **and** watchlisted appears once per (kind, date).
+- A ticker held **and** watchlisted appears once per (kind, date). Rows collapse on `referenceId`
+  when present, otherwise on (kind, subject, date, title) - two macro rows on one day (FOMC and
+  CPI both on 2026-12-10) and two catalysts on one ticker and day all survive.
+- When Yahoo or EDGAR fails, the corporate and filings sources read `ok` with no rows (see US1
+  scenario 2); the empty agenda is the only signal until the Research services expose failure.
 - Yahoo's 6h in-process cache means the first calendar read after the cache expires pays one
   fetch per ticker (bounded by `MaxConcurrentFetches = 4`); the page shows a skeleton, the MCP call
   simply waits. If this proves too slow in practice the fallback is a materialised table refreshed
@@ -221,7 +229,8 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
   type is unmapped in `MaterialityPolicy`". All five event types are mapped today; the module does
   not distinguish and reports `awaiting`.
 - Companion rows purge at 90 days; a verdict outlives its companion row (365-day purge) and still
-  renders on the alert while the alert row exists.
+  renders on the alert while the alert row exists, because the alert id is persisted on the
+  verdict at record time and the feed looks verdicts up by alert id, not through the companion row.
 - The verdict text is bounded (≤ 2000 chars) and never logged.
 - The fired feed is alert-centric: a Radar nightly market-structure alert and an intraday one
   both carry `MarketStructure` and both appear - the feed shows "what fired", not "which job".
@@ -231,8 +240,9 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
 ### Functional Requirements
 
 - **FR-001**: A new module `FinanceSentry.Modules.Events` (schema `events`) MUST own one table,
-  `event_verdicts` (`Id`, `UserId`, `CompanionEventId` unique, `Verdict` ≤ 2000, `Notified`,
-  `RecordedAt`), migrated by `MigrateAllModules`, with a retention decision registered.
+  `event_verdicts` (`Id`, `UserId`, `CompanionEventId` unique, `AlertId` indexed with `UserId`,
+  `Verdict` ≤ 2000, `Notified`, `RecordedAt`), migrated by `MigrateAllModules`, with a retention
+  decision registered.
 - **FR-002**: Upcoming events MUST be computed at read time from the existing sources through
   read ports (`IUpcomingCorporateEventReader`, `IMacroEventReader`, `IThesisCatalystReader`,
   `IPeriodicFilingReader`) whose adapters live in `FinanceSentry.Integration`; the module MUST
@@ -269,15 +279,18 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
   `message`, `occurredAt`, `isRead`, `delivery` `{eventId?, disposition?, dispatchedAt?,
   deliveredAt?}`, `verdict?` `{text, notified, recordedAt}`, `outcome`.
 - **EventVerdict** (stored): the reader's judgement on one companion event; one per event per
-  user, replaceable.
+  user, replaceable; carries the alert id the companion row was captured from, which is how the
+  feed finds it. Recording on an event not captured from an alert is refused.
 
 ## Success Criteria
 
 ### Measurable Outcomes
 
 - **SC-001**: With the test user's book, `GET /events/upcoming` (90 days) returns rows of at least
-  three kinds and `sources[]` all `ok` when Yahoo and EDGAR answer; with Yahoo blocked, the same
-  call returns the other kinds and `earnings: unavailable` in under the request timeout.
+  three kinds and `sources[]` all `ok` when Yahoo and EDGAR answer; with the database source for
+  macro events throwing, the same call returns the other kinds and `macro: unavailable` in under
+  the request timeout. With Yahoo blocked the call returns the other kinds with `corporate: ok`
+  and no earnings rows (US1 scenario 2).
 - **SC-002**: Every fired event in the feed carries exactly one outcome from the table; the
   derivation is pinned by a table-driven unit test covering all nine dispositions × verdict
   presence.

@@ -32,6 +32,9 @@ namespace FinanceSentry.Modules.Events.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("AlertId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CompanionEventId")
                         .HasColumnType("uuid");
 
@@ -50,6 +53,8 @@ namespace FinanceSentry.Modules.Events.Migrations
                         .HasColumnType("character varying(2000)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId", "AlertId");
 
                     b.HasIndex("UserId", "CompanionEventId")
                         .IsUnique();

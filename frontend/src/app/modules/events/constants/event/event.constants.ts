@@ -55,13 +55,6 @@ export const EVENT_KIND_META_REGISTRY = {
   ['thesis_catalyst']: {label: 'Thesis catalyst', icon: 'Target', variant: 'info'},
 } satisfies Record<EventKind, EventKindMeta>;
 
-/** Fallback for a kind the backend adds before this registry catches up. */
-export const DEFAULT_EVENT_KIND_META: EventKindMeta = {
-  label: 'Event',
-  icon: 'CalendarDays',
-  variant: 'neutral',
-};
-
 export const FIRED_KIND_META_REGISTRY = {
   ['EarningsAhead']: {label: 'Earnings ahead', icon: 'ChartColumn', variant: 'info'},
   ['FilingLanded']: {label: 'Filing landed', icon: 'FileText', variant: 'neutral'},
@@ -69,12 +62,6 @@ export const FIRED_KIND_META_REGISTRY = {
   ['MarketStructure']: {label: 'Market move', icon: 'Activity', variant: 'warning'},
   ['BudgetBreach']: {label: 'Budget breach', icon: 'Zap', variant: 'error'},
 } satisfies Record<FiredEventKind, EventKindMeta>;
-
-export const DEFAULT_FIRED_KIND_META: EventKindMeta = {
-  label: 'Event',
-  icon: 'Bell',
-  variant: 'neutral',
-};
 
 export const OUTCOME_META_REGISTRY = {
   ['verdict']: {
@@ -103,12 +90,6 @@ export const OUTCOME_META_REGISTRY = {
     description: 'Suppressed or failed before it reached the reader.',
   },
 } satisfies Record<EventOutcome, OutcomeMeta>;
-
-export const DEFAULT_OUTCOME_META: OutcomeMeta = {
-  label: 'Unknown',
-  variant: 'neutral',
-  description: '',
-};
 
 export const EVENT_SOURCE_LABELS = {
   ['corporate']: 'earnings and ex-dividend dates',

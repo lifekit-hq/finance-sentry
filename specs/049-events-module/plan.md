@@ -33,7 +33,7 @@
   event types (new Alerts query `GetAlertsByTypesQuery` → `IAlertRepository.GetByTypesPagedAsync`,
   additive, same shape as `GetPagedAsync`), then one batch lookup of companion rows by
   `DedupKey ∈ {alert:{id}}` (new `ICompanionEventRepository.ListByDedupKeysAsync`, additive), then
-  one batch lookup of verdicts by companion event id (this module's table). Outcome derivation is
+  one batch lookup of verdicts by alert id (this module's table). Outcome derivation is
   a pure function `EventOutcome.From(disposition?, verdict?)` pinned by a table test. Nothing in
   `AlertGeneratorService`, `MaterialityPolicy`, the detectors or the dispatch loop changes.
 
@@ -41,7 +41,10 @@
   (wake payload, `get_pending_companion_events`); the alert id never reaches it. `RecordEvent
   VerdictCommand` validates the event through `IEventDeliveryReader.FindAsync(userId, eventId)`
   (adapter over `ICompanionEventRepository.GetAsync` + user check) so a foreign or unknown id
-  writes nothing. Upsert on `(UserId, CompanionEventId)`.
+  writes nothing. The adapter reads the alert id back from the row's dedup key
+  (`IMaterialityPolicy.AlertIdFromDedupKey`); an event not captured from an alert writes nothing.
+  The alert id is persisted on the verdict and is the feed's lookup key, so the verdict survives
+  the companion row's 90-day purge. Upsert on `(UserId, CompanionEventId)`.
 
 - **MCP tools are thin adapters, as every sibling.** `GetEventCalendarTool` composes the two
   query handlers (`GetUpcomingEventsQuery`, `GetFiredEventsQuery`) into one response so the

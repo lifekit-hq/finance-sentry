@@ -22,19 +22,17 @@ public sealed class EventsDeliveryAdapter(
             return [];
         }
 
-        var alertByKey = alertIds.Distinct().ToDictionary(id => policy.AlertDedupKey(id), id => id);
-        var rows = await events.ListByDedupKeysAsync(userId, alertByKey.Keys.ToList(), ct);
-        return rows
-            .Select(e => ToRecord(e, alertByKey.TryGetValue(e.DedupKey, out var alertId) ? alertId : null))
-            .ToList();
+        var keys = alertIds.Distinct().Select(policy.AlertDedupKey).ToList();
+        var rows = await events.ListByDedupKeysAsync(userId, keys, ct);
+        return rows.Select(ToRecord).ToList();
     }
 
     public async Task<EventDeliveryRecord?> FindAsync(Guid userId, Guid eventId, CancellationToken ct = default)
     {
         var evt = await events.GetAsync(eventId, ct);
-        return evt is null || evt.UserId != userId ? null : ToRecord(evt, null);
+        return evt is null || evt.UserId != userId ? null : ToRecord(evt);
     }
 
-    private static EventDeliveryRecord ToRecord(CompanionEvent e, Guid? alertId)
-        => new(e.Id, alertId, e.Kind.ToString(), e.Disposition.ToString(), e.OccurredAt, e.DispatchedAt, e.DeliveredAt);
+    private EventDeliveryRecord ToRecord(CompanionEvent e)
+        => new(e.Id, policy.AlertIdFromDedupKey(e.DedupKey), e.Kind.ToString(), e.Disposition.ToString(), e.OccurredAt, e.DispatchedAt, e.DeliveredAt);
 }

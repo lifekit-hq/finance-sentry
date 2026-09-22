@@ -7,8 +7,9 @@ using FinanceSentry.Modules.Events.Domain.Repositories;
 
 /// <summary>
 /// Records the reader's judgement on one fired event (feature 049, US3). Returns true when written.
-/// A foreign or unknown event id, or a blank / over-long verdict, writes nothing and returns false -
-/// the reader is told, never thrown at.
+/// A foreign or unknown event id, an event not captured from an alert, or a blank / over-long
+/// verdict writes nothing and returns false - the reader is told, never thrown at. The alert id is
+/// persisted alongside so the verdict outlives the companion row.
 /// </summary>
 public sealed record RecordEventVerdictCommand(
     Guid UserId,
@@ -30,7 +31,7 @@ public sealed class RecordEventVerdictCommandHandler(
         }
 
         var evt = await delivery.FindAsync(command.UserId, command.EventId, ct);
-        if (evt is null)
+        if (evt?.AlertId is null)
         {
             return false;
         }
@@ -39,6 +40,7 @@ public sealed class RecordEventVerdictCommandHandler(
         {
             UserId = command.UserId,
             CompanionEventId = command.EventId,
+            AlertId = evt.AlertId.Value,
             Verdict = text,
             Notified = command.Notified,
             RecordedAt = DateTimeOffset.UtcNow,

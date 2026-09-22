@@ -8,11 +8,12 @@ using FluentAssertions;
 using Moq;
 using Xunit;
 
-/// <summary>Feature 049 US3: a verdict is written only for the user's own, existing event.</summary>
+/// <summary>Feature 049 US3: a verdict is written only for the user's own, existing, alert-sourced event.</summary>
 public sealed class RecordEventVerdictCommandTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid EventId = Guid.NewGuid();
+    private static readonly Guid AlertId = Guid.NewGuid();
 
     private readonly Mock<IEventDeliveryReader> _delivery = new();
     private readonly Mock<IEventVerdictRepository> _verdicts = new();
@@ -21,7 +22,7 @@ public sealed class RecordEventVerdictCommandTests
 
     private void EventExists() => _delivery
         .Setup(d => d.FindAsync(UserId, EventId, It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new EventDeliveryRecord(EventId, Guid.NewGuid(), "NewsCluster", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow));
+        .ReturnsAsync(new EventDeliveryRecord(EventId, AlertId, "NewsCluster", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow));
 
     [Fact]
     public async Task Writes_the_trimmed_verdict_for_an_owned_event()
@@ -37,6 +38,7 @@ public sealed class RecordEventVerdictCommandTests
         saved.Should().NotBeNull();
         saved!.UserId.Should().Be(UserId);
         saved.CompanionEventId.Should().Be(EventId);
+        saved.AlertId.Should().Be(AlertId);
         saved.Verdict.Should().Be("Guidance cut is priced in.");
         saved.Notified.Should().BeTrue();
     }
@@ -47,6 +49,18 @@ public sealed class RecordEventVerdictCommandTests
         _delivery.Setup(d => d.FindAsync(UserId, EventId, It.IsAny<CancellationToken>())).ReturnsAsync((EventDeliveryRecord?)null);
 
         var ok = await Handler().Handle(new RecordEventVerdictCommand(UserId, EventId, "text", false), CancellationToken.None);
+
+        ok.Should().BeFalse();
+        _verdicts.Verify(v => v.UpsertAsync(It.IsAny<EventVerdict>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Event_not_captured_from_an_alert_writes_nothing()
+    {
+        _delivery.Setup(d => d.FindAsync(UserId, EventId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EventDeliveryRecord(EventId, null, "AnalystAction", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow));
+
+        var ok = await Handler().Handle(new RecordEventVerdictCommand(UserId, EventId, "text", true), CancellationToken.None);
 
         ok.Should().BeFalse();
         _verdicts.Verify(v => v.UpsertAsync(It.IsAny<EventVerdict>(), It.IsAny<CancellationToken>()), Times.Never);

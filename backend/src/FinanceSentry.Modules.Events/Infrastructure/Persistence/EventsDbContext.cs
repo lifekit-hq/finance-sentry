@@ -18,6 +18,7 @@ public class EventsDbContext(DbContextOptions<EventsDbContext> options) : DbCont
             e.ToTable("event_verdicts");
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.UserId, x.CompanionEventId }).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.AlertId });
             e.Property(x => x.Verdict).HasMaxLength(EventVerdict.MaxVerdictLength);
         });
     }

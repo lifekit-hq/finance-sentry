@@ -75,7 +75,10 @@
               <span class="text-cmn-xs font-normal text-text-secondary">{{ group.date }}</span>
             </h2>
             <ul class="divide-y divide-border-default rounded-cmn-md border border-border-default">
-              @for (item of group.items; track item.kind + item.subject + item.date) {
+              @for (
+                item of group.items;
+                track item.kind + item.subject + item.date + (item.referenceId ?? item.title)
+              ) {
                 <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
                   <cmn-tag [variant]="kindMeta(item.kind).variant">
                     {{ kindMeta(item.kind).label }}

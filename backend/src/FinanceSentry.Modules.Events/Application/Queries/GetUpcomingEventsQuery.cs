@@ -81,9 +81,10 @@ public sealed class GetUpcomingEventsQueryHandler(
                         continue;
                     }
 
-                    var title = kind == EventKind.Earnings ? $"Earnings: {e.Ticker}" : $"Ex-dividend: {e.Ticker}";
+                    var symbol = e.Ticker.ToUpperInvariant();
+                    var title = kind == EventKind.Earnings ? $"Earnings: {symbol}" : $"Ex-dividend: {symbol}";
                     items.Add(new UpcomingEvent(
-                        kind, e.Date, null, e.Ticker.ToUpperInvariant(), title, null, e.IsEstimate,
+                        kind, e.Date, null, symbol, title, null, e.IsEstimate,
                         string.IsNullOrWhiteSpace(e.Source) ? CorporateSourceLabel : e.Source, null));
                 }
             });
@@ -143,8 +144,7 @@ public sealed class GetUpcomingEventsQueryHandler(
         }
 
         var ordered = items
-            .GroupBy(e => (e.Kind, e.Subject, e.Date))
-            .Select(g => g.First())
+            .DistinctBy(e => (e.Kind, e.Subject, e.Date, e.ReferenceId?.ToString() ?? e.Title))
             .OrderBy(e => e.Date)
             .ThenBy(e => e.Time ?? TimeOnly.MaxValue)
             .ThenBy(e => e.Subject, StringComparer.Ordinal)

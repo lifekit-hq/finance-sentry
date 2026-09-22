@@ -21,6 +21,7 @@ namespace FinanceSentry.Modules.Events.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     CompanionEventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AlertId = table.Column<Guid>(type: "uuid", nullable: false),
                     Verdict = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
                     Notified = table.Column<bool>(type: "boolean", nullable: false),
                     RecordedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -36,6 +37,12 @@ namespace FinanceSentry.Modules.Events.Migrations
                 table: "event_verdicts",
                 columns: new[] { "UserId", "CompanionEventId" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_event_verdicts_UserId_AlertId",
+                schema: "events",
+                table: "event_verdicts",
+                columns: new[] { "UserId", "AlertId" });
         }
 
         /// <inheritdoc />

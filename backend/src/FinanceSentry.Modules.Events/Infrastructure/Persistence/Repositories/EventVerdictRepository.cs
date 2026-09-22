@@ -17,6 +17,7 @@ public class EventVerdictRepository(EventsDbContext db) : IEventVerdictRepositor
         }
         else
         {
+            existing.AlertId = verdict.AlertId;
             existing.Verdict = verdict.Verdict;
             existing.Notified = verdict.Notified;
             existing.RecordedAt = verdict.RecordedAt;
@@ -25,16 +26,16 @@ public class EventVerdictRepository(EventsDbContext db) : IEventVerdictRepositor
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<EventVerdict>> ListByEventIdsAsync(
-        Guid userId, IReadOnlyCollection<Guid> companionEventIds, CancellationToken ct = default)
+    public async Task<IReadOnlyList<EventVerdict>> ListByAlertIdsAsync(
+        Guid userId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
     {
-        if (companionEventIds.Count == 0)
+        if (alertIds.Count == 0)
         {
             return [];
         }
 
         return await db.Verdicts.AsNoTracking()
-            .Where(v => v.UserId == userId && companionEventIds.Contains(v.CompanionEventId))
+            .Where(v => v.UserId == userId && alertIds.Contains(v.AlertId))
             .ToListAsync(ct);
     }
 }

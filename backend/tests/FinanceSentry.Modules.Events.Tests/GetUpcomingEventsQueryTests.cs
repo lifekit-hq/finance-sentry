@@ -168,4 +168,19 @@ public sealed class GetUpcomingEventsQueryTests
 
         result.Items.Should().ContainSingle();
     }
+
+    [Fact]
+    public async Task Two_macro_rows_on_one_date_both_survive()
+    {
+        var day = new DateOnly(2026, 10, 15);
+        _macro.Setup(m => m.QueryAsync(From, To, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new MacroCalendarEntry(Guid.NewGuid(), day, new TimeOnly(14, 0), "FOMC rate decision + SEP", "US", "high", "fed"),
+                new MacroCalendarEntry(Guid.NewGuid(), day, new TimeOnly(8, 30), "CPI (Sep)", "US", "high", "bls"),
+            ]);
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["macro"]), CancellationToken.None);
+
+        result.Items.Select(i => i.Title).Should().Equal("CPI (Sep)", "FOMC rate decision + SEP");
+    }
 }

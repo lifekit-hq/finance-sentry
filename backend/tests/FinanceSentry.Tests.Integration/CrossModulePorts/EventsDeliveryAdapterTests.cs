@@ -27,7 +27,7 @@ public sealed class EventsDeliveryAdapterTests : IDisposable
         _adapter = new EventsDeliveryAdapter(new CompanionEventRepository(_db), _policy);
     }
 
-    private async Task<CompanionEvent> Captured(Guid userId, Guid alertId, EventDisposition disposition)
+    private async Task<CompanionEvent> Captured(Guid userId, Guid alertId, EventDisposition disposition, string? dedupKey = null)
     {
         var evt = new CompanionEvent
         {
@@ -36,7 +36,7 @@ public sealed class EventsDeliveryAdapterTests : IDisposable
             Subject = "MU",
             Severity = "Warning",
             Summary = "News cluster: MU",
-            DedupKey = _policy.AlertDedupKey(alertId),
+            DedupKey = dedupKey ?? _policy.AlertDedupKey(alertId),
             ReferenceId = alertId,
             SourceModule = "alerts",
             Disposition = disposition,
@@ -70,14 +70,29 @@ public sealed class EventsDeliveryAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task Find_returns_only_the_users_own_event()
+    public async Task Find_returns_only_the_users_own_event_with_its_alert_id()
     {
-        var mine = await Captured(User, Guid.NewGuid(), EventDisposition.Delivered);
+        var alertId = Guid.NewGuid();
+        var mine = await Captured(User, alertId, EventDisposition.Delivered);
         var theirs = await Captured(Guid.NewGuid(), Guid.NewGuid(), EventDisposition.Delivered);
 
-        (await _adapter.FindAsync(User, mine.Id))!.EventId.Should().Be(mine.Id);
+        var found = await _adapter.FindAsync(User, mine.Id);
+        found!.EventId.Should().Be(mine.Id);
+        found.AlertId.Should().Be(alertId);
         (await _adapter.FindAsync(User, theirs.Id)).Should().BeNull();
         (await _adapter.FindAsync(User, Guid.NewGuid())).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Find_reports_no_alert_id_for_a_row_not_captured_from_an_alert()
+    {
+        var analyst = await Captured(User, Guid.NewGuid(), EventDisposition.Delivered,
+            _policy.AnalystDedupKey(User, Guid.NewGuid()));
+
+        var found = await _adapter.FindAsync(User, analyst.Id);
+
+        found!.EventId.Should().Be(analyst.Id);
+        found.AlertId.Should().BeNull();
     }
 
     [Fact]

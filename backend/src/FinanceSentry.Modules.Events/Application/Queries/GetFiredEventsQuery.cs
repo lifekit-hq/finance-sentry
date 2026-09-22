@@ -15,7 +15,8 @@ public sealed record GetFiredEventsQuery(
 
 /// <summary>
 /// Alert-centric feed enriched left to right: the alerts that fired, the outbox row that carried
-/// each to the reader, the verdict the reader recorded. The outcome is derived per row by
+/// each to the reader, the verdict the reader recorded. Verdicts are looked up by alert id, so one
+/// still renders after its companion row has purged. The outcome is derived per row by
 /// <see cref="EventOutcome.From"/>; an absent reader leaves every row awaiting or not delivered and
 /// nothing here fails.
 /// </summary>
@@ -50,19 +51,14 @@ public sealed class GetFiredEventsQueryHandler(
             .GroupBy(d => d.AlertId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.OccurredAt).First());
 
-        var eventIds = deliveryByAlert.Values.Select(d => d.EventId).ToList();
-        var verdictByEvent = eventIds.Count == 0
+        var verdictByAlert = alertIds.Count == 0
             ? new Dictionary<Guid, EventVerdict>()
-            : (await verdicts.ListByEventIdsAsync(query.UserId, eventIds, ct)).ToDictionary(v => v.CompanionEventId);
+            : (await verdicts.ListByAlertIdsAsync(query.UserId, alertIds, ct)).ToDictionary(v => v.AlertId);
 
         var items = fired.Items.Select(a =>
         {
             deliveryByAlert.TryGetValue(a.AlertId, out var d);
-            EventVerdict? v = null;
-            if (d is not null)
-            {
-                verdictByEvent.TryGetValue(d.EventId, out v);
-            }
+            verdictByAlert.TryGetValue(a.AlertId, out var v);
 
             return new FiredEventDto(
                 a.AlertId,
