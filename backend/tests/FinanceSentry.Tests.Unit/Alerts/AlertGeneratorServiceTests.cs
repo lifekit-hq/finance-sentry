@@ -644,6 +644,119 @@ public class AlertGeneratorServiceTests
         VerifyNothingAdded();
     }
 
+    [Fact]
+    public async Task GenerateBudgetNearLimit_NoExisting_AddsWarningAlert()
+    {
+        var budgetId = Guid.NewGuid();
+        AllowAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.BudgetBreach &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "Groceries" &&
+            a.Title.Contains("Groceries") &&
+            a.Message.Contains("92%")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetExceeded_NoExisting_AddsWarningAlert()
+    {
+        var budgetId = Guid.NewGuid();
+        AllowAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 110m, 100m, 2026, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.BudgetBreach &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "Groceries" &&
+            a.Title.Contains("exceeded") &&
+            a.Message.Contains("110%")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateBudgetNearLimit_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, Guid.NewGuid(), "Groceries", 92m, 100m, 2026, 9);
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    [Fact]
+    public async Task GenerateBudgetNearLimit_RecentDismissed_SkipsCreation()
+    {
+        SuppressBySilenceWindow(AlertType.BudgetBreach);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, Guid.NewGuid(), "Groceries", 92m, 100m, 2026, 9);
+
+        VerifyNothingAdded();
+    }
+
+    /// <summary>
+    /// 90% and 100% are distinct references, so both can be active for the same budget in the same
+    /// month — reaching 100% later must still get through even though 90% already alerted.
+    /// </summary>
+    [Fact]
+    public async Task GenerateBudgetBreach_NearLimitAndExceeded_ProduceDifferentReferenceIds()
+    {
+        var budgetId = Guid.NewGuid();
+        var written = new List<Alert>();
+        AllowAlert(AlertType.BudgetBreach);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        await _service.GenerateBudgetExceededAlertAsync(
+            _userId, budgetId, "Groceries", 105m, 100m, 2026, 9);
+
+        Assert.NotEqual(written[0].ReferenceId, written[1].ReferenceId);
+    }
+
+    /// <summary>
+    /// Same budget, same crossing kind, same month must resolve to the same reference id — the daily
+    /// hygiene run's core "once per budget per month" guarantee. A mid-month limit edit or a refund
+    /// that drops spend and later lets it climb back over the line never changes this reference, so
+    /// the active-alert dedup above keeps suppressing a second alert for the rest of the month. A new
+    /// month is a different reference, so next month can alert again.
+    /// </summary>
+    [Fact]
+    public async Task GenerateBudgetNearLimit_SameBudgetAndMonth_ProducesStableReferenceId()
+    {
+        var budgetId = Guid.NewGuid();
+        var written = new List<Alert>();
+        AllowAlert(AlertType.BudgetBreach);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        // Same crossing, re-checked the next day with a different spend/limit split (e.g. after a
+        // mid-month limit edit, or spend that dipped from a refund and climbed back up) — still the
+        // same reference for the month.
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 9);
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 190m, 200m, 2026, 9);
+        // Next month: a fresh reference.
+        await _service.GenerateBudgetNearLimitAlertAsync(
+            _userId, budgetId, "Groceries", 92m, 100m, 2026, 10);
+
+        Assert.Equal(written[0].ReferenceId, written[1].ReferenceId);
+        Assert.NotEqual(written[0].ReferenceId, written[2].ReferenceId);
+    }
+
     /// <summary>
     /// The silence window is looked up by alert type, so a type that reaches the generator without a
     /// declared window throws at alert time — in a background job, where nobody is watching. Reflection

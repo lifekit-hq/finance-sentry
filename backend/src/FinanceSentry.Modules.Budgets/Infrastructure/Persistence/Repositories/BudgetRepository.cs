@@ -8,6 +8,11 @@ public class BudgetRepository(BudgetsDbContext db) : IBudgetRepository
 {
     private readonly BudgetsDbContext _db = db;
 
+    public Task<IReadOnlyList<Budget>> GetAllAsync(CancellationToken ct = default)
+        => _db.Budgets.AsNoTracking()
+            .ToListAsync(ct)
+            .ContinueWith<IReadOnlyList<Budget>>(t => t.Result, ct);
+
     public Task<IReadOnlyList<Budget>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
         => _db.Budgets.AsNoTracking()
             .Where(b => b.UserId == userId)

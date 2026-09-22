@@ -405,5 +405,15 @@ public class RunThesisMonitorHandlerTests
         public Task GenerateNewsClusterAlertAsync(
             Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task GenerateBudgetNearLimitAlertAsync(
+            Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task GenerateBudgetExceededAlertAsync(
+            Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

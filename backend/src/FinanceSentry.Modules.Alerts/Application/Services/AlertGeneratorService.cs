@@ -56,6 +56,11 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         // active-alert check first. 7 days covers a manual dismiss without re-alerting the same
         // cluster before it ages out of the 2h window on its own.
         [AlertType.NewsCluster] = TimeSpan.FromDays(7),
+        // Backstop only — the reference id already carries (budget, year, month), so the daily
+        // hygiene run re-checking the same crossing resolves to the same reference and is caught by
+        // the active-alert check first. 7 days covers a manual dismiss without re-alerting before
+        // the month rolls over and a fresh reference takes its place.
+        [AlertType.BudgetBreach] = TimeSpan.FromDays(7),
     };
 
     /// <summary>
@@ -354,6 +359,34 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"{ticker} news clustered on {day:yyyy-MM-dd}: {reason}"),
             ct);
 
+    public Task GenerateBudgetNearLimitAlertAsync(
+        Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+        int year, int month, CancellationToken ct = default)
+    {
+        var pct = limitUsd == 0m ? 0 : (int)Math.Round(spentUsd / limitUsd * 100);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("near-limit", budgetId, year, month), category,
+            $"Budget nearing limit: {category}",
+            $"Your {category} budget has reached {pct}% of its {limitUsd:F2} USD monthly limit ({spentUsd:F2} USD spent)."),
+            ct);
+    }
+
+    public Task GenerateBudgetExceededAlertAsync(
+        Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+        int year, int month, CancellationToken ct = default)
+    {
+        var pct = limitUsd == 0m ? 0 : (int)Math.Round(spentUsd / limitUsd * 100);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("exceeded", budgetId, year, month), category,
+            $"Budget limit exceeded: {category}",
+            $"Your {category} budget has reached {pct}% of its {limitUsd:F2} USD monthly limit ({spentUsd:F2} USD spent)."),
+            ct);
+    }
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
@@ -424,6 +457,15 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
     private static Guid NewsClusterReferenceId(string ticker, DateOnly day)
         => DerivedReferenceId($"news-cluster:{ticker.ToUpperInvariant()}:{day:yyyy-MM-dd}");
+
+    /// <summary>
+    /// Stable per-(budget, crossing kind, year, month) synthetic GUID — 90% and 100% are distinct
+    /// references so each fires once for the month independently of the other, a new month always
+    /// gets a fresh reference, and a mid-month limit edit or a refund never changes which reference
+    /// an alert resolves to.
+    /// </summary>
+    private static Guid BudgetBreachReferenceId(string crossingKind, Guid budgetId, int year, int month)
+        => DerivedReferenceId($"budget-breach:{crossingKind}:{budgetId:N}:{year:D4}-{month:D2}");
 
     /// <summary>
     /// A synthetic reference for alerts with no natural entity id. Not a security primitive — MD5
