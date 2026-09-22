@@ -21,12 +21,9 @@ using Microsoft.Extensions.Logging;
 /// <see cref="IAlertGeneratorService"/> (its reference id carries the budget, the crossing kind, and
 /// the year/month); this job just reports what it observed on every run.
 ///
-/// Month-end grace: for the first <see cref="PreviousMonthGraceDays"/> days of a month each run
-/// also re-evaluates the PREVIOUS month, so spend posted on its last day (after the final run that
-/// covered it) and bank transactions that post late are still seen. Seven days matches the bank
-/// adapters' resync overlap (ResyncLookbackDays in the Monobank and TrueLayer adapters) — the
-/// window in which a transaction dated last month can still arrive. The month-scoped reference id
-/// keeps both periods' alerts apart, so no second dedup mechanism is needed.
+/// A run evaluates only its own UTC month. It is scheduled late in the UTC day (see
+/// <c>BudgetsModule</c>) so the last run covering a month happens after that month's final day of
+/// spending has synced.
 ///
 /// Two decisions worth stating (each pinned by its own test):
 /// - A mid-month limit edit is never snapshotted — every run reads the budget's CURRENT
@@ -48,15 +45,12 @@ public sealed class BudgetBreachDetectionJob(
 {
     private const decimal NearLimitThreshold = 0.90m;
     private const decimal ExceededThreshold = 1.0m;
-    private const int PreviousMonthGraceDays = 7;
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-        var currentMonth = new DateOnly(today.Year, today.Month, 1);
-        List<DateOnly> months = today.Day <= PreviousMonthGraceDays
-            ? [currentMonth.AddMonths(-1), currentMonth]
-            : [currentMonth];
+        // A breach that only becomes visible after the month closes, because a bank posted late, is not alerted.
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
 
         IReadOnlyList<Budget> all;
         try
@@ -71,10 +65,7 @@ public sealed class BudgetBreachDetectionJob(
 
         foreach (var group in all.GroupBy(b => b.UserId))
         {
-            foreach (var monthStart in months)
-            {
-                await ProcessUserAsync(group.Key, group.ToList(), monthStart, ct);
-            }
+            await ProcessUserAsync(group.Key, group.ToList(), monthStart, ct);
         }
     }
 

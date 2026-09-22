@@ -297,97 +297,32 @@ public sealed class BudgetBreachDetectionJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_CrossingOnLastDayOfMonth_AlertsOnNextRun()
+    public async Task ExecuteAsync_LateRunOnLastDayOfMonth_SeesThatDaysSpend()
     {
-        // Spend posted on Sep 30 lands after the Sep 30 00:00 run; the Oct 1 run must still see it.
         var userId = Guid.NewGuid();
         var budget = MakeBudget(userId, "GROCERIES", 100m);
         _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
         SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 0m);
 
-        await MakeJob(At(2026, 10, 1)).ExecuteAsync();
+        await MakeJob(new FixedClock(new DateTimeOffset(2026, 9, 30, 23, 55, 0, TimeSpan.Zero))).ExecuteAsync();
 
         _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
             userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
             userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_LatePostingIntoPreviousMonth_InsideGraceWindow_Alerts()
-    {
-        // A September transaction that only syncs on Oct 6 pushes September over 90%.
-        var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
-        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 93m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 10m);
-
-        await MakeJob(At(2026, 10, 7)).ExecuteAsync();
-
-        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 93m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_BothMonthsEvaluated_EachCrossingReportedOncePerMonth()
-    {
-        var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
-        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 105m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 95m);
-
-        await MakeJob(At(2026, 10, 2)).ExecuteAsync();
-
-        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
-        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            userId, budget.Id, "GROCERIES", 105m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
-        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            userId, budget.Id, "GROCERIES", 95m, 100m, 2026, 10, It.IsAny<CancellationToken>()), Times.Once);
-        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_PastGraceWindow_PreviousMonthBreachDoesNotResurface()
-    {
-        var userId = Guid.NewGuid();
-        var budget = MakeBudget(userId, "GROCERIES", 100m);
-        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
-        SetMonthSpend(userId, "GROCERIES", 2026, 9, 150m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 10m);
-
-        await MakeJob(At(2026, 10, 8)).ExecuteAsync();
-
-        _spending.Verify(s => s.GetSpendingByCategoryUsdAsync(
-            userId, new DateOnly(2026, 9, 1), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
-        _alerts.Verify(a => a.GenerateBudgetNearLimitAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
-            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>
-    /// End to end through the real alert generator: a September breach alert the user dismissed
-    /// stays dismissed when the Oct 1 run re-evaluates September inside the grace window.
+    /// End to end through the real alert generator: breach alerts the user dismissed stay dismissed
+    /// when a later run in the same month still sees spend over both thresholds.
     /// </summary>
     [Fact]
-    public async Task ExecuteAsync_DismissedPriorMonthAlert_StaysSilentInGraceWindowRun()
+    public async Task ExecuteAsync_DismissedAlert_StaysSilentOnLaterRunSameMonth()
     {
         var userId = Guid.NewGuid();
         var budget = MakeBudget(userId, "GROCERIES", 100m);
         _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
         SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
-        SetMonthSpend(userId, "GROCERIES", 2026, 10, 0m);
 
         var ledger = new List<Alert>();
         var repo = new Mock<IAlertRepository>();
@@ -399,19 +334,19 @@ public sealed class BudgetBreachDetectionJobTests
             .Returns(Task.CompletedTask);
         var job = new BudgetBreachDetectionJob(
             _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
-            At(2026, 9, 30), NullLogger<BudgetBreachDetectionJob>.Instance);
+            At(2026, 9, 5), NullLogger<BudgetBreachDetectionJob>.Instance);
 
         await job.ExecuteAsync();
         Assert.Equal(2, ledger.Count);
         foreach (var alert in ledger)
         {
             alert.IsDismissed = true;
-            alert.CreatedAt = new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero);
+            alert.CreatedAt = new DateTimeOffset(2026, 9, 5, 0, 0, 0, TimeSpan.Zero);
         }
 
         job = new BudgetBreachDetectionJob(
             _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
-            At(2026, 10, 1), NullLogger<BudgetBreachDetectionJob>.Instance);
+            At(2026, 9, 30), NullLogger<BudgetBreachDetectionJob>.Instance);
         await job.ExecuteAsync();
 
         Assert.Equal(2, ledger.Count);

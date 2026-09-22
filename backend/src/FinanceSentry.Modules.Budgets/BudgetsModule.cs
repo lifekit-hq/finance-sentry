@@ -26,12 +26,13 @@ public static class BudgetsModule
         {
             var mgr = sp.GetRequiredService<IRecurringJobManager>();
 
-            // Same cadence as BankSync's daily hygiene sentinels (PriceHike, DuplicateCharge, …) —
-            // this check rides that existing run rather than a schedule of its own.
+            // Daily like BankSync's hygiene sentinels, but at 23:55 UTC rather than 00:00: the job
+            // evaluates only its own month, so its last run for a month must see that month's final
+            // day of spending (the bank sync scheduler runs every 10 minutes).
             mgr.AddOrUpdate<BudgetBreachDetectionJob>(
                 "budget-breach-detection",
                 job => job.ExecuteAsync(CancellationToken.None),
-                Cron.Daily());
+                Cron.Daily(23, 55));
         }
     }
 
