@@ -50,13 +50,16 @@ export function eventsMethods(store: WritableStateSource<EventsState>) {
       });
     },
     appendFired(response: FiredEventsPageResponse): void {
-      patchState(store, state => ({
-        fired: [...state.fired, ...response.items],
-        firedTotalCount: response.totalCount,
-        firedPage: response.page,
-        firedStatus: 'idle' as AsyncStatus,
-        firedErrorCode: null,
-      }));
+      patchState(store, state => {
+        const loaded = new Set(state.fired.map(event => event.alertId));
+        return {
+          fired: [...state.fired, ...response.items.filter(event => !loaded.has(event.alertId))],
+          firedTotalCount: response.totalCount,
+          firedPage: response.page,
+          firedStatus: 'idle' as AsyncStatus,
+          firedErrorCode: null,
+        };
+      });
     },
     setFiredError(errorCode: Nullable<string>): void {
       patchState(store, {firedStatus: 'error', firedErrorCode: errorCode});

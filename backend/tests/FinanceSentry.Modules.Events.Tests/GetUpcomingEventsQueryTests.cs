@@ -165,6 +165,30 @@ public sealed class GetUpcomingEventsQueryTests
     }
 
     [Fact]
+    public async Task Unknown_kind_among_valid_ones_rejects_the_whole_request_and_names_it()
+    {
+        var act = () => Handler().Handle(
+            new GetUpcomingEventsQuery(UserId, From, To, ["macro", "earning"]), CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<EventsKindsInvalidException>();
+        ex.Which.StatusCode.Should().Be(400);
+        ex.Which.ErrorCode.Should().Be("EVENTS_KINDS_INVALID");
+        ex.Which.Message.Should().Contain("earning");
+        _macro.Verify(m => m.QueryAsync(It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Wholly_unknown_kinds_are_rejected()
+    {
+        var act = () => Handler().Handle(
+            new GetUpcomingEventsQuery(UserId, From, To, ["filings", "dividend"]), CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<EventsKindsInvalidException>();
+        ex.Which.ErrorCode.Should().Be("EVENTS_KINDS_INVALID");
+        ex.Which.Message.Should().Contain("filings").And.Contain("dividend");
+    }
+
+    [Fact]
     public async Task Duplicate_rows_from_a_source_collapse_to_one()
     {
         _corporate.Setup(c => c.GetForTickersAsync(It.IsAny<IReadOnlyCollection<string>>(), From, To, It.IsAny<CancellationToken>()))

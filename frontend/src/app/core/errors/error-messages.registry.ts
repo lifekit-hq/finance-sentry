@@ -27,6 +27,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   ALERT_NOT_FOUND: 'Alert not found.',
   ALERT_LOAD_FAILED: 'Failed to load alerts.',
   EVENTS_WINDOW_INVALID: 'The events window is invalid. Pick a range of at most a year.',
+  EVENTS_KINDS_INVALID: 'One of the requested event kinds is not recognised.',
   BUDGET_NOT_FOUND: 'Budget not found.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'Invalid budget category.',

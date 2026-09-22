@@ -101,7 +101,9 @@ filing-due row for MU derived from its last periodic filing; each row carries `k
 3. **Given** no `from`/`to`, **When** requested, **Then** the window is today .. today + 90 days;
    a window longer than 366 days or with `to < from` is rejected (400, `EVENTS_WINDOW_INVALID`).
 4. **Given** `kinds=macro,earnings`, **When** requested, **Then** only those kinds are computed
-   and returned (a filtered-out source is not called).
+   and returned (a filtered-out source is not called). A kind outside the five known ones rejects
+   the whole request (400, `EVENTS_KINDS_INVALID`, naming the unknown kinds) rather than silently
+   yielding an empty calendar.
 5. **Given** a broken thesis (`BrokenAt` set), **When** requested, **Then** its catalysts are not
    listed.
 

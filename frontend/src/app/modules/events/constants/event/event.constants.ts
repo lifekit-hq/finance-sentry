@@ -1,5 +1,3 @@
-import {type LucideIconName} from '@lifekit-hq/ui';
-
 import {
   type EventKind,
   type EventOutcome,
@@ -11,7 +9,6 @@ import {
 
 export interface EventKindMeta {
   label: string;
-  icon: LucideIconName;
   variant: EventTagVariant;
 }
 
@@ -48,19 +45,19 @@ export const EVENT_KIND_ORDER: readonly EventKind[] = [
 ];
 
 export const EVENT_KIND_META_REGISTRY = {
-  ['earnings']: {label: 'Earnings', icon: 'ChartColumn', variant: 'info'},
-  ['ex_dividend']: {label: 'Ex-dividend', icon: 'Coins', variant: 'success'},
-  ['filing_due']: {label: 'Filing due', icon: 'FileText', variant: 'neutral'},
-  ['macro']: {label: 'Macro', icon: 'Globe', variant: 'warning'},
-  ['thesis_catalyst']: {label: 'Thesis catalyst', icon: 'Target', variant: 'info'},
+  ['earnings']: {label: 'Earnings', variant: 'info'},
+  ['ex_dividend']: {label: 'Ex-dividend', variant: 'success'},
+  ['filing_due']: {label: 'Filing due', variant: 'neutral'},
+  ['macro']: {label: 'Macro', variant: 'warning'},
+  ['thesis_catalyst']: {label: 'Thesis catalyst', variant: 'info'},
 } satisfies Record<EventKind, EventKindMeta>;
 
 export const FIRED_KIND_META_REGISTRY = {
-  ['EarningsAhead']: {label: 'Earnings ahead', icon: 'ChartColumn', variant: 'info'},
-  ['FilingLanded']: {label: 'Filing landed', icon: 'FileText', variant: 'neutral'},
-  ['NewsCluster']: {label: 'News cluster', icon: 'Newspaper', variant: 'warning'},
-  ['MarketStructure']: {label: 'Market move', icon: 'Activity', variant: 'warning'},
-  ['BudgetBreach']: {label: 'Budget breach', icon: 'Zap', variant: 'error'},
+  ['EarningsAhead']: {label: 'Earnings ahead', variant: 'info'},
+  ['FilingLanded']: {label: 'Filing landed', variant: 'neutral'},
+  ['NewsCluster']: {label: 'News cluster', variant: 'warning'},
+  ['MarketStructure']: {label: 'Market move', variant: 'warning'},
+  ['BudgetBreach']: {label: 'Budget breach', variant: 'error'},
 } satisfies Record<FiredEventKind, EventKindMeta>;
 
 export const OUTCOME_META_REGISTRY = {

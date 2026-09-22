@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Upcoming events for a user in a window (feature 049, US1). <paramref name="From"/>/<paramref name="To"/>
-/// default to today .. today + 90 days; <paramref name="Kinds"/> null or empty means every kind.
+/// default to today .. today + 90 days; <paramref name="Kinds"/> null or empty means every kind, and any
+/// kind outside <see cref="EventKind.All"/> rejects the whole request (400, <c>EVENTS_KINDS_INVALID</c>).
 /// </summary>
 public sealed record GetUpcomingEventsQuery(
     Guid UserId,
@@ -180,10 +181,16 @@ public sealed class GetUpcomingEventsQueryHandler(
             return EventKind.All;
         }
 
-        return requested
+        var normalised = requested
             .Select(k => k.Trim().ToLowerInvariant())
-            .Where(EventKind.All.Contains)
             .ToHashSet(StringComparer.Ordinal);
+        var unknown = normalised.Where(k => !EventKind.All.Contains(k)).ToList();
+        if (unknown.Count > 0)
+        {
+            throw new EventsKindsInvalidException(unknown);
+        }
+
+        return normalised;
     }
 
     private async Task<IReadOnlyCollection<string>> ResolveTickersAsync(Guid userId, CancellationToken ct)

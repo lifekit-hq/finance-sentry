@@ -86,6 +86,17 @@ describe('eventsMethods', () => {
     expect(state.firedStatus()).toBe('idle');
   });
 
+  it('appendFired skips rows already loaded when a page overlaps', () => {
+    const state = signalState(initialEventsState);
+    const methods = eventsMethods(state);
+
+    methods.setFired(page([fired('a'), fired('b')], 1, 4));
+    methods.appendFired(page([fired('b'), fired('c')], 2, 4));
+
+    expect(state.fired().map(f => f.alertId)).toEqual(['a', 'b', 'c']);
+    expect(state.firedPage()).toBe(2);
+  });
+
   it('setView and setHorizonDays patch their fields only', () => {
     const state = signalState(initialEventsState);
     const methods = eventsMethods(state);

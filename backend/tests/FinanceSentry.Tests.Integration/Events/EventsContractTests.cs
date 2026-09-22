@@ -86,6 +86,16 @@ public class EventsContractTests(EventsApiFactory factory) : IClassFixture<Event
     }
 
     [Fact]
+    public async Task GetUpcoming_UnknownKind_Returns400WithErrorCode()
+    {
+        var response = await _client.GetAsync("/api/v1/events/upcoming?kinds=macro,earning");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorShape>();
+        body!.ErrorCode.Should().Be("EVENTS_KINDS_INVALID");
+    }
+
+    [Fact]
     public async Task GetUpcoming_UnavailableSource_StillReturns200()
     {
         _factory.MacroMock

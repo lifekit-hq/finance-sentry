@@ -19,7 +19,7 @@ away under D1(b); D2(b) changes T030's layout only.
       `IPeriodicFilingReader` (+ the ticker universe from Core's `IBrokerageHoldingsReader` /
       `IWatchlistReader`)
 - [x] T005 `GetUpcomingEventsQuery` handler - window validation (`EVENTS_WINDOW_INVALID`), kind
-      filter, per-source isolation → `sources[]`, sort by date then subject, dedupe on (kind, subject,
+      filter (unknown kinds rejected with `EVENTS_KINDS_INVALID`), per-source isolation → `sources[]`, sort by date then subject, dedupe on (kind, subject,
       date, referenceId, title, detail)
 - [x] T006 `GetUpcomingEventsQueryTests` - union of sources, one source throws → others returned +
       `unavailable`, kind filter skips the source call, broken thesis excluded, default window,
@@ -65,7 +65,7 @@ away under D1(b); D2(b) changes T030's layout only.
 - [x] T022 `models/event/event.model.ts` (`UpcomingEvent`, `UpcomingEventsResult`, `FiredEvent`,
       `FiredEventsPageResponse`, literal unions for kind / outcome / source status)
 - [x] T023 `constants/event/event.constants.ts` - `EVENT_KIND_META`, `OUTCOME_META`, horizons,
-      page size; `error-messages.registry.ts` gains `EVENTS_WINDOW_INVALID`
+      page size; `error-messages.registry.ts` gains `EVENTS_WINDOW_INVALID` / `EVENTS_KINDS_INVALID`
 - [x] T024 `services/events.service.ts` (`ApiService`, prefix `events`) + spec
 - [x] T025 `utils/event-day.utils.ts` (`groupByDay`, `dayLabel`) + spec; `pipes/event-day-label.pipe.ts`
 - [x] T026 Store: `events.state.ts`, `events.methods.ts`, `events.computed.ts`, `events.effects.ts`
