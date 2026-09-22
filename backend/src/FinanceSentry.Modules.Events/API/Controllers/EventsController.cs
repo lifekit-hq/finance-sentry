@@ -30,11 +30,9 @@ public class EventsController(
     public async Task<ActionResult<FiredEventsPageResponse>> GetFired(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = GetFiredEventsQueryHandler.DefaultPageSize,
-        [FromQuery] string? kinds = null,
         CancellationToken ct = default)
     {
-        var result = await fired.Handle(
-            new GetFiredEventsQuery(User.RequireUserId(), page, pageSize, SplitKinds(kinds)), ct);
+        var result = await fired.Handle(new GetFiredEventsQuery(User.RequireUserId(), page, pageSize), ct);
         return Ok(result);
     }
 

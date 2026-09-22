@@ -6,12 +6,11 @@ using FinanceSentry.Modules.Events.Domain;
 using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Events.Domain.Repositories;
 
-/// <summary>Fired events for a user, newest first, paged. <paramref name="Kinds"/> narrows within the five event types.</summary>
+/// <summary>Fired events for a user - the five detector alert types - newest first, paged.</summary>
 public sealed record GetFiredEventsQuery(
     Guid UserId,
     int Page,
-    int PageSize,
-    IReadOnlyCollection<string>? Kinds) : IQuery<FiredEventsPageResponse>;
+    int PageSize) : IQuery<FiredEventsPageResponse>;
 
 /// <summary>
 /// Alert-centric feed enriched left to right: the alerts that fired, the outbox row that carried
@@ -33,14 +32,7 @@ public sealed class GetFiredEventsQueryHandler(
     {
         var page = query.Page < 1 ? 1 : query.Page;
         var pageSize = query.PageSize is < 1 or > MaxPageSize ? DefaultPageSize : query.PageSize;
-        var types = ResolveTypes(query.Kinds);
-
-        if (types.Count == 0)
-        {
-            return new FiredEventsPageResponse([], 0, page, pageSize, 0);
-        }
-
-        var fired = await alerts.ListAsync(query.UserId, types, page, pageSize, ct);
+        var fired = await alerts.ListAsync(query.UserId, FiredEventTypes.All, page, pageSize, ct);
         var alertIds = fired.Items.Select(a => a.AlertId).ToList();
 
         var deliveries = alertIds.Count == 0
@@ -76,16 +68,5 @@ public sealed class GetFiredEventsQueryHandler(
 
         var totalPages = (int)Math.Ceiling((double)fired.TotalCount / pageSize);
         return new FiredEventsPageResponse(items, fired.TotalCount, page, pageSize, totalPages);
-    }
-
-    private static IReadOnlyCollection<string> ResolveTypes(IReadOnlyCollection<string>? kinds)
-    {
-        if (kinds is null || kinds.Count == 0)
-        {
-            return FiredEventTypes.All;
-        }
-
-        var wanted = kinds.Select(k => k.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return FiredEventTypes.All.Where(wanted.Contains).ToList();
     }
 }

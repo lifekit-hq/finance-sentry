@@ -129,6 +129,24 @@ describe('eventsComputed', () => {
     expect(build().upcomingErrorMessage()).toBe('');
   });
 
+  it('hasFiredRows is true once any row is loaded', () => {
+    const one: FiredEvent = {
+      alertId: 'a',
+      kind: 'NewsCluster',
+      severity: 'Warning',
+      subject: 'MU',
+      title: 't',
+      message: 'm',
+      occurredAt: '2026-09-22T10:00:00Z',
+      isRead: false,
+      delivery: null,
+      verdict: null,
+      outcome: 'awaiting',
+    };
+    expect(build().hasFiredRows()).toBe(false);
+    expect(build({fired: [one], firedStatus: 'error'}).hasFiredRows()).toBe(true);
+  });
+
   it('hasMoreFired compares the loaded count with the total', () => {
     const one: FiredEvent = {
       alertId: 'a',

@@ -111,18 +111,7 @@
       </div>
     }
   } @else {
-    @if (store.firedErrorMessage(); as error) {
-      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
-    } @else if (store.isFiredEmpty()) {
-      <div class="flex min-h-0 flex-1 items-center justify-center">
-        <cmn-empty-state
-          message="Nothing has fired"
-          subMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
-          icon="BellOff"
-          iconClass="text-text-secondary"
-        />
-      </div>
-    } @else {
+    @if (store.hasFiredRows()) {
       <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
         @for (event of store.fired(); track event.alertId) {
           <article
@@ -169,12 +158,36 @@
               <cmn-skeleton height="4rem" width="100%" />
             }
           </div>
-        } @else if (store.hasMoreFired()) {
-          <div class="flex justify-center p-cmn-4">
-            <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
-              >Load more</cmn-button
-            >
-          </div>
+        } @else {
+          @if (store.firedErrorMessage(); as error) {
+            <cmn-alert variant="error" class="block" data-testid="fired-more-error">
+              {{ error }}
+            </cmn-alert>
+          }
+          @if (store.hasMoreFired()) {
+            <div class="flex justify-center p-cmn-4">
+              <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
+                >Load more</cmn-button
+              >
+            </div>
+          }
+        }
+      </div>
+    } @else if (store.firedErrorMessage(); as error) {
+      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
+    } @else if (store.isFiredEmpty()) {
+      <div class="flex min-h-0 flex-1 items-center justify-center">
+        <cmn-empty-state
+          message="Nothing has fired"
+          subMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
+          icon="BellOff"
+          iconClass="text-text-secondary"
+        />
+      </div>
+    } @else {
+      <div class="mt-cmn-5 space-y-cmn-2" data-testid="fired-loading">
+        @for (row of skeletonRows; track row) {
+          <cmn-skeleton height="4rem" width="100%" />
         }
       </div>
     }

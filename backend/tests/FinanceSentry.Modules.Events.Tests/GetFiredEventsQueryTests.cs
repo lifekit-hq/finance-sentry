@@ -31,29 +31,20 @@ public sealed class GetFiredEventsQueryTests
         id, type, "Warning", $"{type} title", "message", Guid.NewGuid(), label, false, false, DateTimeOffset.UtcNow);
 
     [Fact]
-    public async Task Requests_the_five_event_types_by_default_and_pages_like_alerts()
+    public async Task Requests_the_five_event_types_and_pages_like_alerts()
     {
         IReadOnlyCollection<string>? types = null;
         _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
             .Callback<Guid, IReadOnlyCollection<string>, int, int, CancellationToken>((_, t, _, _, _) => types = t)
             .ReturnsAsync(new FiredAlertPage([], 0));
 
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 0, 500, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 0, 500), CancellationToken.None);
 
         types.Should().BeEquivalentTo(FiredEventTypes.All);
         result.Page.Should().Be(1);
         result.PageSize.Should().Be(20);
         result.TotalPages.Should().Be(0);
         _delivery.Verify(d => d.ListForAlertsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Kinds_outside_the_event_set_are_ignored_and_an_empty_set_returns_nothing()
-    {
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, ["SyncFailure", "PriceHike"]), CancellationToken.None);
-
-        result.Items.Should().BeEmpty();
-        _alerts.Verify(a => a.ListAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -83,7 +74,7 @@ public sealed class GetFiredEventsQueryTests
         _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = verdictEvent, AlertId = verdictId, Verdict = "Priced in.", Notified = false }]);
 
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20), CancellationToken.None);
 
         result.TotalCount.Should().Be(4);
         result.TotalPages.Should().Be(1);
@@ -106,7 +97,7 @@ public sealed class GetFiredEventsQueryTests
         _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FiredAlertPage([Alert(Guid.NewGuid(), FiredEventTypes.FilingLanded)], 1));
 
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20), CancellationToken.None);
 
         result.Items.Should().ContainSingle().Which.Outcome.Should().Be(EventOutcome.Awaiting);
     }
@@ -120,7 +111,7 @@ public sealed class GetFiredEventsQueryTests
         _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(alertId)), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = alertId, Verdict = "Beat and raised.", Notified = true }]);
 
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20), CancellationToken.None);
 
         var row = result.Items.Should().ContainSingle().Subject;
         row.Delivery.Should().BeNull();
@@ -134,7 +125,7 @@ public sealed class GetFiredEventsQueryTests
         _alerts.Setup(a => a.ListAsync(UserId, It.IsAny<IReadOnlyCollection<string>>(), 1, 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FiredAlertPage([Alert(Guid.NewGuid(), FiredEventTypes.NewsCluster, null)], 1));
 
-        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20, null), CancellationToken.None);
+        var result = await Handler().Handle(new GetFiredEventsQuery(UserId, 1, 20), CancellationToken.None);
 
         result.Items.Single().Subject.Should().Be("NewsCluster title");
     }

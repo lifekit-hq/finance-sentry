@@ -77,6 +77,7 @@ describe('EventsComponent', () => {
     isFiredEmpty: ReturnType<typeof signal<boolean>>;
     isFiredLoading: ReturnType<typeof signal<boolean>>;
     hasMoreFired: ReturnType<typeof signal<boolean>>;
+    hasFiredRows: ReturnType<typeof signal<boolean>>;
     fired: ReturnType<typeof signal<FiredEvent[]>>;
     setView: ReturnType<typeof vi.fn>;
     selectHorizon: ReturnType<typeof vi.fn>;
@@ -111,6 +112,7 @@ describe('EventsComponent', () => {
       isFiredEmpty: signal(false),
       isFiredLoading: signal(false),
       hasMoreFired: signal(false),
+      hasFiredRows: signal(true),
       fired: signal<FiredEvent[]>([
         fired('a', 'silent'),
         fired('b', 'judged_immaterial', {
@@ -209,9 +211,36 @@ describe('EventsComponent', () => {
   it('shows the fired empty state when nothing has fired', () => {
     mockStore.view.set('fired');
     mockStore.fired.set([]);
+    mockStore.hasFiredRows.set(false);
     mockStore.isFiredEmpty.set(true);
 
     expect(render().text).toContain('Nothing has fired');
+  });
+
+  it('keeps the loaded rows on screen when the next page fails', () => {
+    mockStore.view.set('fired');
+    mockStore.hasMoreFired.set(true);
+    mockStore.firedErrorMessage.set('Failed to load fired events.');
+
+    const {host, text} = render();
+
+    expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(3);
+    expect(host.querySelector('[data-testid="fired-more-error"]')).not.toBeNull();
+    expect(text).toContain('Failed to load fired events.');
+    expect(text).toContain('Load more');
+  });
+
+  it('shows only the error when the first page fails', () => {
+    mockStore.view.set('fired');
+    mockStore.fired.set([]);
+    mockStore.hasFiredRows.set(false);
+    mockStore.firedErrorMessage.set('Failed to load fired events.');
+
+    const {host, text} = render();
+
+    expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(0);
+    expect(host.querySelector('[data-testid="fired-more-error"]')).toBeNull();
+    expect(text).toContain('Failed to load fired events.');
   });
 
   it('offers load more only while the feed has more rows', () => {

@@ -50,6 +50,9 @@ public sealed class GetUpcomingEventsQueryTests
         _filings.Setup(f => f.GetRecentAsync("PLTR", It.IsAny<CancellationToken>())).ReturnsAsync([]);
     }
 
+    private static DateOnly EndOfMonth(DateOnly date)
+        => new(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
+
     private GetUpcomingEventsQueryHandler Handler() => new(
         _brokerage.Object, _watchlist.Object, _corporate.Object, _macro.Object, _theses.Object, _filings.Object,
         NullLogger<GetUpcomingEventsQueryHandler>.Instance);
@@ -90,13 +93,19 @@ public sealed class GetUpcomingEventsQueryTests
     [Fact]
     public async Task Filing_due_is_derived_per_ticker_and_flagged_as_estimate()
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var reportDate = EndOfMonth(today.AddMonths(-2));
+        var expectedDue = EndOfMonth(reportDate.AddMonths(3)).AddDays(FilingDueCalculator.QuarterlyDeadlineDays);
+        _filings.Setup(f => f.GetRecentAsync("MU", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new PeriodicFiling("10-Q", reportDate.AddDays(1), reportDate)]);
+
         var result = await Handler().Handle(
-            new GetUpcomingEventsQuery(UserId, From, new DateOnly(2026, 12, 31), [EventKind.FilingDue]), CancellationToken.None);
+            new GetUpcomingEventsQuery(UserId, today, today.AddDays(200), [EventKind.FilingDue]), CancellationToken.None);
 
         var due = result.Items.Should().ContainSingle().Subject;
         due.Kind.Should().Be(EventKind.FilingDue);
         due.Subject.Should().Be("MU");
-        due.Date.Should().Be(new DateOnly(2026, 11, 9));
+        due.Date.Should().Be(expectedDue);
         due.IsEstimate.Should().BeTrue();
         due.Title.Should().Be("10-Q due: MU");
     }

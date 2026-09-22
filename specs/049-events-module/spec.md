@@ -184,11 +184,14 @@ mocked endpoints.
 1. **Given** upcoming events across several days, **When** the calendar view renders, **Then**
    rows are grouped under day headers in date order, each row showing kind tag, subject, title,
    an "estimate" marker when `isEstimate`, and macro rows show their time when present.
-2. **Given** `sources[]` marks `earnings` unavailable, **When** rendered, **Then** a `cmn-alert`
-   states the calendar is missing that source; the rest of the agenda still renders.
-3. **Given** the fired view, **When** rendered, **Then** each row shows severity, kind, subject,
-   title, time ago, an outcome tag (`Verdict`, `Judged immaterial`, `Silent`, `Awaiting`,
-   `Not delivered`) and the verdict text when present.
+2. **Given** `sources[]` marks `corporate` unavailable, **When** rendered, **Then** a `cmn-alert`
+   states the calendar is missing that source (labelled "earnings and ex-dividend dates"); the
+   rest of the agenda still renders.
+3. **Given** the fired view, **When** rendered, **Then** each row shows a kind tag, subject, the
+   absolute time it fired, an outcome tag (`Verdict`, `Judged immaterial`, `Silent`, `Awaiting`,
+   `Not delivered`), title, message, and the verdict text when present. A failed fetch of the
+   next page keeps every loaded row on screen and shows the error beneath them with the
+   load-more control; only a failed first page shows the error alone.
 4. **Given** the horizon chip changes from 30 to 90 days, **When** clicked, **Then** the store
    re-queries with `to = today + 90` (pinned in the effects spec).
 5. **Given** the sidebar, **When** rendered, **Then** "Events" appears as a nav item and a
@@ -254,7 +257,7 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
   Companion lookup by `DedupKey` set and by id); no detector, alert type, silence window or
   generator code changes.
 - **FR-005**: REST: `GET /api/v1/events/upcoming` (`from`, `to`, `kinds`) and
-  `GET /api/v1/events/fired` (`page`, `pageSize`, `kinds`), user from the JWT, each with a
+  `GET /api/v1/events/fired` (`page`, `pageSize`), user from the JWT, each with a
   contract test (401 without auth, response shape, 400 on an invalid window).
 - **FR-006**: MCP: `get_event_calendar` (read) and `record_event_verdict` (write), thin adapters
   over the module's query/command handlers, identity from `IIdentityResolver`, optional `userId`

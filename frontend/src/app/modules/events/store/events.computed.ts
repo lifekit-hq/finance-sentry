@@ -67,6 +67,7 @@ export function eventsComputed(store: StateSignals) {
       return errorMessages.resolve(store.firedErrorCode()) ?? DEFAULT_FIRED_ERROR;
     }),
     isFiredEmpty: computed(() => store.firedStatus() === 'idle' && store.fired().length === 0),
+    hasFiredRows: computed(() => store.fired().length > 0),
     hasMoreFired: computed(() => store.fired().length < store.firedTotalCount()),
   };
 }

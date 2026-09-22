@@ -53,7 +53,7 @@ public sealed class GetEventCalendarTool(
             new GetUpcomingEventsQuery(effective.Value, today, today.AddDays(ahead), kinds), cancellationToken);
 
         var firedResult = await fired.Handle(
-            new GetFiredEventsQuery(effective.Value, 1, firedLimit, null), cancellationToken);
+            new GetFiredEventsQuery(effective.Value, 1, firedLimit), cancellationToken);
 
         var since = new DateTimeOffset(today.AddDays(-back).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var firedInWindow = firedResult.Items.Where(f => f.OccurredAt >= since).ToList();
