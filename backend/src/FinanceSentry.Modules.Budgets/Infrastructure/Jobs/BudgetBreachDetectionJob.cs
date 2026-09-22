@@ -21,9 +21,11 @@ using Microsoft.Extensions.Logging;
 /// <see cref="IAlertGeneratorService"/> (its reference id carries the budget, the crossing kind, and
 /// the year/month); this job just reports what it observed on every run.
 ///
-/// A run evaluates only its own UTC month. It is scheduled late in the UTC day (see
-/// <c>BudgetsModule</c>) so the last run covering a month happens after that month's final day of
-/// spending has synced.
+/// A run evaluates only the UTC month of the daily slot it was scheduled for
+/// (<see cref="ScheduledSlotUtc"/>), not of the moment it happens to execute: the slot is late in
+/// the UTC day so the last run covering a month happens after that month's final day of spending
+/// has synced, and a last-day run that starts a few minutes after midnight still covers that month.
+/// A run starting more than <see cref="MaxStartDelay"/> past its slot is skipped.
 ///
 /// Two decisions worth stating (each pinned by its own test):
 /// - A mid-month limit edit is never snapshotted — every run reads the budget's CURRENT
@@ -46,11 +48,33 @@ public sealed class BudgetBreachDetectionJob(
     private const decimal NearLimitThreshold = 0.90m;
     private const decimal ExceededThreshold = 1.0m;
 
+    /// <summary>The daily UTC slot this job is scheduled for (see <c>BudgetsModule</c>).</summary>
+    public static readonly TimeOnly ScheduledSlotUtc = new(23, 55);
+
+    /// <summary>
+    /// How late a run may start past its slot and still evaluate the slot's month — enough for a
+    /// redeploy or a queue backlog. A run starting later than this is skipped, not caught up.
+    /// </summary>
+    public static readonly TimeSpan MaxStartDelay = TimeSpan.FromHours(2);
+
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var slot = DateOnly.FromDateTime(now).ToDateTime(ScheduledSlotUtc, DateTimeKind.Utc);
+        if (slot > now)
+        {
+            slot = slot.AddDays(-1);
+        }
+
+        if (now - slot > MaxStartDelay)
+        {
+            logger.LogWarning(
+                "BudgetBreachDetectionJob: started {Delay} after its {Slot:O} slot — skipped", now - slot, slot);
+            return;
+        }
+
         // A breach that only becomes visible after the month closes, because a bank posted late, is not alerted.
-        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var monthStart = new DateOnly(slot.Year, slot.Month, 1);
 
         IReadOnlyList<Budget> all;
         try

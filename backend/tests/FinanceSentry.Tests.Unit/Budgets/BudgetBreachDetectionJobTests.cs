@@ -25,7 +25,7 @@ public sealed class BudgetBreachDetectionJobTests
     private readonly Mock<IMerchantSpendingReader> _spending = new();
     private readonly Mock<ICategoryNormalizationService> _normalization = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
-    private readonly FixedClock _clock = new(new DateTimeOffset(2026, 9, 16, 0, 0, 0, TimeSpan.Zero));
+    private readonly FixedClock _clock = new(new DateTimeOffset(2026, 9, 16, 23, 55, 0, TimeSpan.Zero));
 
     public BudgetBreachDetectionJobTests()
     {
@@ -40,7 +40,27 @@ public sealed class BudgetBreachDetectionJobTests
             NullLogger<BudgetBreachDetectionJob>.Instance);
 
     private static FixedClock At(int year, int month, int day) =>
-        new(new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.Zero));
+        new(new DateTimeOffset(year, month, day, 23, 55, 0, TimeSpan.Zero));
+
+    private static FixedClock At(int year, int month, int day, int hour, int minute) =>
+        new(new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.Zero));
+
+    private (List<Alert> Ledger, AlertGeneratorService Generator) RealGenerator()
+    {
+        var ledger = new List<Alert>();
+        var repo = new Mock<IAlertRepository>();
+        repo.Setup(r => r.ExistsAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid u, string type, Guid? referenceId, CancellationToken _) =>
+                ledger.Any(a => a.UserId == u && a.Type == type && a.ReferenceId == referenceId));
+        repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), It.IsAny<CancellationToken>()))
+            .Callback<Alert, CancellationToken>((a, _) => ledger.Add(a))
+            .Returns(Task.CompletedTask);
+        return (ledger, new AlertGeneratorService(repo.Object));
+    }
+
+    private BudgetBreachDetectionJob MakeJob(IAlertGeneratorService generator, TimeProvider clock) =>
+        new(_budgets.Object, _spending.Object, _normalization.Object, generator, clock,
+            NullLogger<BudgetBreachDetectionJob>.Instance);
 
     private void SetMonthSpend(Guid userId, string category, int year, int month, decimal usdAmount)
     {
@@ -324,17 +344,8 @@ public sealed class BudgetBreachDetectionJobTests
         _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
         SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
 
-        var ledger = new List<Alert>();
-        var repo = new Mock<IAlertRepository>();
-        repo.Setup(r => r.ExistsAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid u, string type, Guid? referenceId, CancellationToken _) =>
-                ledger.Any(a => a.UserId == u && a.Type == type && a.ReferenceId == referenceId));
-        repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), It.IsAny<CancellationToken>()))
-            .Callback<Alert, CancellationToken>((a, _) => ledger.Add(a))
-            .Returns(Task.CompletedTask);
-        var job = new BudgetBreachDetectionJob(
-            _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
-            At(2026, 9, 5), NullLogger<BudgetBreachDetectionJob>.Instance);
+        var (ledger, generator) = RealGenerator();
+        var job = MakeJob(generator, At(2026, 9, 5));
 
         await job.ExecuteAsync();
         Assert.Equal(2, ledger.Count);
@@ -344,12 +355,62 @@ public sealed class BudgetBreachDetectionJobTests
             alert.CreatedAt = new DateTimeOffset(2026, 9, 5, 0, 0, 0, TimeSpan.Zero);
         }
 
-        job = new BudgetBreachDetectionJob(
-            _budgets.Object, _spending.Object, _normalization.Object, new AlertGeneratorService(repo.Object),
-            At(2026, 9, 30), NullLogger<BudgetBreachDetectionJob>.Instance);
+        job = MakeJob(generator, At(2026, 9, 30));
         await job.ExecuteAsync();
 
         Assert.Equal(2, ledger.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LastDaySlotStartingAfterMidnight_EvaluatesThatMonth()
+    {
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+
+        await MakeJob(At(2026, 10, 1, 0, 3)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetExceededAlertAsync(
+            userId, budget.Id, "GROCERIES", 104m, 100m, 2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+        _spending.Verify(s => s.GetSpendingByCategoryUsdAsync(
+            userId, new DateOnly(2026, 10, 1), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(1, 3, 0)]
+    [InlineData(1, 12, 0)]
+    [InlineData(3, 9, 0)]
+    public async Task ExecuteAsync_StartingPastMaxDelayAfterSlot_IsSkipped(int day, int hour, int minute)
+    {
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetMonthSpend(userId, "GROCERIES", 2026, 9, 150m);
+        SetMonthSpend(userId, "GROCERIES", 2026, 10, 150m);
+
+        await MakeJob(At(2026, 10, day, hour, minute)).ExecuteAsync();
+
+        _budgets.Verify(b => b.GetAllAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnTimeThenLateThenSkippedRuns_RaiseEachCrossingOncePerMonth()
+    {
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetMonthSpend(userId, "GROCERIES", 2026, 9, 104m);
+        SetMonthSpend(userId, "GROCERIES", 2026, 10, 104m);
+        var (ledger, generator) = RealGenerator();
+
+        await MakeJob(generator, At(2026, 9, 30)).ExecuteAsync();
+        await MakeJob(generator, At(2026, 10, 1, 0, 3)).ExecuteAsync();
+        await MakeJob(generator, At(2026, 10, 1, 4, 0)).ExecuteAsync();
+
+        Assert.Equal(2, ledger.Count);
+        Assert.All(ledger, a => Assert.Contains("September 2026", a.Title));
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
