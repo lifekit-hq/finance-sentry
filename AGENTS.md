@@ -106,6 +106,9 @@ Example of such a mismatch that was fixed: `ConnectBinanceResult` was missing `M
 - Queries: `IQuery<TResult>` → `IQueryHandler<TQuery, TResult>`
 - All live under `Application/Commands/` or `Application/Queries/` in each module.
 
+### Cross-module migration ordering
+Module migrations run module-by-module in a fixed sequence (`backend/src/FinanceSentry.API/Migrations/MigrationExtensions.cs`), not interleaved by timestamp. A migration that reads/writes another module's schema (cross-schema SQL) genuinely depends on that module's schema-creating migration having run first — on a brand-new database this is a real ordering constraint, not just a timestamp coincidence. Grep both modules' migrations for the other's schema name before adding one; if a dependency exists, split the earlier context's `Database.Migrate()` at the dependent migration (`IMigrator.Migrate(targetMigration)`) so the other module's context can run in between, and skip that partial step once the target is already applied — `Migrate(target)` is an exact target, not an upper bound, so on an already-migrated database it would roll back (and drop data from) every later migration on each boot. See the Research/Risk split there and `FreshDatabaseMigrationTests` (`backend/tests/FinanceSentry.Tests.Integration/Migrations/`) for the pattern. A failed module migration is logged and swallowed (startup continues) rather than failing fast — a fresh-database migration test is the only thing that actually guards this class of bug.
+
 ### Auth middleware
 `JwtAuthenticationMiddleware` reads `fs_access_token` cookie. In tests, inject the JWT via `client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={jwt}")`.
 

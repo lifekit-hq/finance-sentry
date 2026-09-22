@@ -35,6 +35,7 @@
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Budgets\FinanceSentry.Modules.Budgets.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Subscriptions\FinanceSentry.Modules.Subscriptions.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Research\FinanceSentry.Modules.Research.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Modules.Risk\FinanceSentry.Modules.Risk.csproj" />
   </ItemGroup>
 
 </Project>
