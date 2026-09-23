@@ -136,7 +136,9 @@ public interface IAlertGeneratorService
     /// Raises an operational Alert that a scheduled job has failed <paramref name="consecutiveCount"/>
     /// times in a row (US4 / FR-009). <paramref name="referenceId"/> is a stable per-job id so the streak
     /// dedups within the silence window; the caller (the Hangfire failure filter) guarantees one call per
-    /// streak and clears the streak on the next success so a later failure can re-alert.
+    /// streak and clears the streak on the next success so a later failure can re-alert. A newer streak
+    /// supersedes a still-open (unread, undismissed) earlier alert for the same job — the old row is
+    /// resolved and a fresh one inserted — so re-alerting never collides with <c>idx_alert_dedup</c>.
     /// </summary>
     Task GenerateJobFailureAlertAsync(
         Guid userId,

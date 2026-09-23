@@ -196,7 +196,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         {
             // Each streak should produce a fresh alert row (a fresh Telegram message); the failure
             // filter guarantees one call per streak, so an open alert must not suppress the next.
+            // A newer streak supersedes the still-open earlier alert for the same job rather than
+            // colliding with it on idx_alert_dedup — the newest streak is the current truth.
             Dedup = AlertDedup.SilenceOnly,
+            SupersedeOpen = true,
         },
             ct);
     }
