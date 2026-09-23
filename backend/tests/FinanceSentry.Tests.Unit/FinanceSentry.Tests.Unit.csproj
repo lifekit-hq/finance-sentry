@@ -15,6 +15,7 @@
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +23,14 @@
          Architecture tests (MigrationDiscoveryTests) scanning all module assemblies —
          including ones this project doesn't reference directly and future ones. -->
     <ProjectReference Include="..\..\src\FinanceSentry.API\FinanceSentry.API.csproj" />
+    <!-- Mcp is a host too, but API doesn't reference it — the namespace boundary tests
+         (finance-sentry#502) need its DLL in the test output to scan it. Gateway is deliberately
+         NOT referenced here: it pulls LettuceEncrypt -> Portable.BouncyCastle 1.9.0, whose
+         Org.BouncyCastle types collide (CS0433) with the BouncyCastle.Cryptography 2.7.0 this test
+         project already references for Revolut X signing. NamespaceBoundaryTests locates Gateway's
+         built DLL from its own bin output instead of via ProjectReference. -->
+    <ProjectReference Include="..\..\src\FinanceSentry.Mcp\FinanceSentry.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\FinanceSentry.Integration\FinanceSentry.Integration.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Core\FinanceSentry.Core.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Infrastructure\FinanceSentry.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.BankSync\FinanceSentry.Modules.BankSync.csproj" />
