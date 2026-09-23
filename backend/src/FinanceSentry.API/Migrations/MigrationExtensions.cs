@@ -40,25 +40,26 @@ public static class MigrationExtensions
     {
         using var scope = app.Services.CreateScope();
         var sp = scope.ServiceProvider;
+        var status = sp.GetRequiredService<StartupMigrationStatus>();
         var anyContextMigrated = false;
 
-        MigrateContext<AuthDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<BankSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<CryptoSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<BrokerageSyncDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<AlertsDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<BudgetsDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<SubscriptionsDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<WealthDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<ResearchDbContext>(sp, app.Logger, ref anyContextMigrated, targetMigration: ResearchMigrationBeforeRiskDependency);
-        MigrateContext<RiskDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<ResearchDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<RadarDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<CompanionDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<AnalyticsDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<RetentionDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<AgentDbContext>(sp, app.Logger, ref anyContextMigrated);
-        MigrateContext<EventsDbContext>(sp, app.Logger, ref anyContextMigrated);
+        MigrateContext<AuthDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<BankSyncDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<CryptoSyncDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<BrokerageSyncDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<AlertsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<BudgetsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<SubscriptionsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<WealthDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<ResearchDbContext>(sp, app.Logger, status, ref anyContextMigrated, targetMigration: ResearchMigrationBeforeRiskDependency);
+        MigrateContext<RiskDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<ResearchDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<RadarDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<CompanionDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<AnalyticsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<RetentionDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<AgentDbContext>(sp, app.Logger, status, ref anyContextMigrated);
+        MigrateContext<EventsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
 
@@ -86,9 +87,12 @@ public static class MigrationExtensions
     // (c) A database that is simply not reachable yet (nothing has migrated against it so far) is unchanged
     //     and does not stop startup — /api/v1/health/ready reports it, and test hosts such as
     //     ObservabilityApiFactory point contexts at a deliberately unreachable database and rely on it.
+    //     The skip is recorded in StartupMigrationStatus so the "migrations" readiness check can say,
+    //     once the database is back, that this process is serving a schema it never migrated.
     // A reachable server whose database does not exist yet counts as reachable: Migrate() creates it.
     private static void MigrateContext<TContext>(
-        IServiceProvider sp, ILogger logger, ref bool anyContextMigrated, string? targetMigration = null)
+        IServiceProvider sp, ILogger logger, StartupMigrationStatus status, ref bool anyContextMigrated,
+        string? targetMigration = null)
         where TContext : DbContext
     {
         var context = sp.GetRequiredService<TContext>();
@@ -115,10 +119,12 @@ public static class MigrationExtensions
                 throw halfMigrated;
             }
 
+            status.RecordSkipped(typeof(TContext));
             logger.LogError(
                 connectivityError,
-                "Cannot reach the database for {Context}; skipping its migration. If this is unexpected, " +
-                "check /api/v1/health/ready — the database check there reports connectivity independently.",
+                "Cannot reach the database for {Context}; skipping its migration. Until the API is restarted " +
+                "it serves whatever schema the database has — /api/v1/health/ready reports connectivity " +
+                "(\"database\") and the skipped migrations (\"migrations\") independently.",
                 contextName);
             return;
         }
