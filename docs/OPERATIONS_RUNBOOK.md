@@ -78,7 +78,7 @@ GET /health/ready → 503
 ```
 
 **Steps:**
-1. Check response body: `{ "status": "Unhealthy", "checks": [ { "name": "database", "status": "Unhealthy" }, ... ] }` — each check is named; a check with a `description` says what is wrong in words.
+1. Check response body: `{ "status": "Unhealthy", "checks": [ { "name": "database", "status": "Unhealthy" }, ... ] }` — each check is named. The `migrations` check adds a `description` saying what is wrong in words; `database` and `hangfire` carry name and status only (their failure detail is in the API log, not the response).
 2. If `database` unhealthy: PostgreSQL is unreachable. Check Docker container status.
 3. If still failing after DB restart: check connection string in `appsettings.json`.
 4. If `migrations` unhealthy: the database was unreachable when the API started, so startup skipped module migrations and the API is serving a schema that is behind. The `description` lists the pending migrations per module (or just says the database is still unreachable — then step 2 applies first). Startup also skipped registering this build's Hangfire jobs (they write to the same database). Restart the API once the database is reachable; migrations then run as usual (§8 if one fails) and the jobs are registered. Until then, requests against the missing schema fail with ordinary database errors that never mention migrations — this check is where that cause is named.
