@@ -1,6 +1,7 @@
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.BankSync.Application.Queries;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -12,25 +13,42 @@ public sealed class GetCashflowReportToolTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private readonly Mock<IQueryHandler<GetAllTransactionsQuery, AllTransactionsResult>> _handler = new();
+    private readonly Mock<IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>>> _handler = new();
 
     private GetCashflowReportTool CreateSut() =>
         new(_handler.Object, new FakeIdentityResolver(), NullLogger<GetCashflowReportTool>.Instance);
 
-    private static GlobalTransactionDto Txn(decimal amount, DateTime date, string transactionType = "debit") =>
-        new(Guid.NewGuid(), Guid.NewGuid(), "TestBank", "USD", amount, amount, date, date, "Test", transactionType, null, false, DateTime.UtcNow);
+    private static MonthlyFlow Flow(
+        string month,
+        string currency,
+        decimal inflowUsd,
+        decimal outflowUsd,
+        decimal familySupportOutflowUsd = 0m,
+        decimal investedOutflowUsd = 0m) =>
+        new(
+            month,
+            currency,
+            Inflow: inflowUsd,
+            Outflow: outflowUsd,
+            Net: inflowUsd - outflowUsd,
+            InflowUsd: inflowUsd,
+            OutflowUsd: outflowUsd,
+            NetUsd: inflowUsd - outflowUsd,
+            CommittedOutflowUsd: 0m,
+            DiscretionaryOutflowUsd: outflowUsd,
+            FamilySupportOutflowUsd: familySupportOutflowUsd,
+            InvestedOutflowUsd: investedOutflowUsd);
 
-    private static GlobalTransactionDto Credit(decimal amount, DateTime date) => Txn(amount, date, "credit");
-    private static GlobalTransactionDto Debit(decimal amount, DateTime date) => Txn(amount, date, "debit");
-
-    private static AllTransactionsResult ResultOf(params GlobalTransactionDto[] txns) =>
-        new([.. txns], txns.Length, false, 0, txns.Length);
+    private void SetupHandler(params MonthlyFlow[] flows) =>
+        _handler
+            .Setup(h => h.Handle(It.IsAny<GetMoneyFlowStatisticsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<MonthlyFlow>)flows);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenHandlerThrows()
     {
         _handler
-            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
+            .Setup(h => h.Handle(It.IsAny<GetMoneyFlowStatisticsQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
         var result = await CreateSut().ExecuteAsync(UserId);
@@ -39,11 +57,9 @@ public sealed class GetCashflowReportToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ReturnsEmpty_WhenNoTransactions()
+    public async Task ExecuteAsync_ReturnsEmpty_WhenNoFlows()
     {
-        _handler
-            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultOf());
+        SetupHandler();
 
         var result = await CreateSut().ExecuteAsync(UserId);
 
@@ -60,21 +76,20 @@ public sealed class GetCashflowReportToolTests
 
         result.Should().BeEmpty();
         _handler.Verify(
-            h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()),
+            h => h.Handle(It.IsAny<GetMoneyFlowStatisticsQuery>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task ExecuteAsync_GroupsByMonth_AndSplitsInflowOutflow()
+    public async Task ExecuteAsync_SumsUsdFiguresAcrossCurrencyRows_PerMonth()
     {
-        _handler
-            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultOf(
-                Credit(2000m, new DateTime(2024, 1, 10, 0, 0, 0, DateTimeKind.Utc)),
-                Debit(500m, new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc)),
-                Debit(200m, new DateTime(2024, 1, 20, 0, 0, 0, DateTimeKind.Utc)),
-                Credit(3000m, new DateTime(2024, 2, 5, 0, 0, 0, DateTimeKind.Utc)),
-                Debit(1000m, new DateTime(2024, 2, 10, 0, 0, 0, DateTimeKind.Utc))));
+        // Two per-currency rows plus the synthetic USD counterparty row for the same month —
+        // the tool must sum InflowUsd/OutflowUsd across all three without double-counting.
+        SetupHandler(
+            Flow("2024-01", "USD", inflowUsd: 2000m, outflowUsd: 500m),
+            Flow("2024-01", "UAH", inflowUsd: 0m, outflowUsd: 200m),
+            Flow("2024-01", "USD", inflowUsd: 100m, outflowUsd: 50m, familySupportOutflowUsd: 50m),
+            Flow("2024-02", "USD", inflowUsd: 3000m, outflowUsd: 1000m));
 
         var result = await CreateSut().ExecuteAsync(
             UserId,
@@ -84,27 +99,60 @@ public sealed class GetCashflowReportToolTests
         result.Should().HaveCount(2);
 
         var jan = result.Single(e => e.Period == "2024-01");
-        jan.Inflow.Should().Be(2000m);
-        jan.Outflow.Should().Be(700m);
-        jan.Net.Should().Be(1300m);
-        jan.TransactionCount.Should().Be(3);
+        jan.Inflow.Should().Be(2100m);
+        jan.Outflow.Should().Be(750m);
+        jan.Net.Should().Be(1350m);
+        jan.TransactionCount.Should().Be(0);
 
         var feb = result.Single(e => e.Period == "2024-02");
         feb.Inflow.Should().Be(3000m);
         feb.Outflow.Should().Be(1000m);
         feb.Net.Should().Be(2000m);
-        feb.TransactionCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExcludesTransferClassifiedFlows_ReflectingClassifiedFigures()
+    {
+        // Regression for #675: the money-flow statistics service already strips internal
+        // transfers before producing MonthlyFlow rows, so a transfer pair between the user's
+        // own accounts must never surface as both inflow and outflow here. The mocked handler
+        // stands in for that classification — its rows already reflect the transfer exclusion.
+        SetupHandler(Flow("2024-03", "USD", inflowUsd: 5000m, outflowUsd: 1200m));
+
+        var result = await CreateSut().ExecuteAsync(
+            UserId,
+            fromDate: new DateOnly(2024, 3, 1),
+            toDate: new DateOnly(2024, 3, 31));
+
+        var mar = result.Single();
+        mar.Inflow.Should().Be(5000m);
+        mar.Outflow.Should().Be(1200m);
+        mar.Net.Should().Be(3800m);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FiltersMonthsOutsideRequestedRange()
+    {
+        SetupHandler(
+            Flow("2024-01", "USD", inflowUsd: 100m, outflowUsd: 10m),
+            Flow("2024-02", "USD", inflowUsd: 200m, outflowUsd: 20m),
+            Flow("2024-03", "USD", inflowUsd: 300m, outflowUsd: 30m));
+
+        var result = await CreateSut().ExecuteAsync(
+            UserId,
+            fromDate: new DateOnly(2024, 2, 1),
+            toDate: new DateOnly(2024, 2, 29));
+
+        result.Select(e => e.Period).Should().ContainSingle().Which.Should().Be("2024-02");
     }
 
     [Fact]
     public async Task ExecuteAsync_OrdersResults_Chronologically()
     {
-        _handler
-            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultOf(
-                Txn(100m, new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc)),
-                Txn(100m, new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)),
-                Txn(100m, new DateTime(2024, 2, 1, 0, 0, 0, DateTimeKind.Utc))));
+        SetupHandler(
+            Flow("2024-03", "USD", inflowUsd: 100m, outflowUsd: 0m),
+            Flow("2024-01", "USD", inflowUsd: 100m, outflowUsd: 0m),
+            Flow("2024-02", "USD", inflowUsd: 100m, outflowUsd: 0m));
 
         var result = await CreateSut().ExecuteAsync(
             UserId,
@@ -117,18 +165,15 @@ public sealed class GetCashflowReportToolTests
     [Fact]
     public async Task ExecuteAsync_DefaultsToLastSixMonths_WhenNoDatesProvided()
     {
-        GetAllTransactionsQuery? captured = null;
+        GetMoneyFlowStatisticsQuery? captured = null;
         _handler
-            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .Callback<GetAllTransactionsQuery, CancellationToken>((q, _) => captured = q)
-            .ReturnsAsync(ResultOf());
+            .Setup(h => h.Handle(It.IsAny<GetMoneyFlowStatisticsQuery>(), It.IsAny<CancellationToken>()))
+            .Callback<GetMoneyFlowStatisticsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync((IReadOnlyList<MonthlyFlow>)[]);
 
         await CreateSut().ExecuteAsync(UserId);
 
         captured.Should().NotBeNull();
-        captured!.From.Should().NotBeNull();
-        captured.To.Should().NotBeNull();
-        var spanDays = (captured.To!.Value - captured.From!.Value).TotalDays;
-        spanDays.Should().BeApproximately(183, 5);
+        captured!.Months.Should().Be(6);
     }
 }
