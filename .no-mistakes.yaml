@@ -15,6 +15,12 @@
 # (CI passes secrets.GITHUB_TOKEN). `.NET 10 SDK` and Docker (Testcontainers
 # for the integration suites) are host prerequisites.
 #
+# The dotnet steps (one shell string so restore state survives) run: directly when `dotnet`
+# is on the PATH (a CI-like runner), otherwise inside the
+# mcr.microsoft.com/dotnet/sdk:10.0 image with the repo mounted, host networking
+# and the Docker socket passed through so the Testcontainers suites still run
+# (they skip on their own when no daemon is reachable).
+#
 # Not declared: the backend coverage ratchet step (a reportgenerator summary
 # gate over the test run, not a test; it stays a CI-only check) and the
 # CI-only ConnectionStrings__Default env (every integration test injects its
@@ -26,9 +32,15 @@ commands:
     && npm run lint
     && npm run format:check
   test: >-
-    dotnet restore backend/FinanceSentry.sln
-    && dotnet build backend/FinanceSentry.sln --configuration Release --no-restore
-    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build --verbosity normal
+    dn='dotnet restore backend/FinanceSentry.sln
+    && dotnet build backend/FinanceSentry.sln --configuration Release --no-restore -m:1
+    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build --verbosity normal'
+    && if command -v dotnet >/dev/null 2>&1; then sh -c "$dn"; else
+    docker run --rm --network host -u "$(id -u):$(id -g)"
+    --group-add "$(stat -c %g /var/run/docker.sock)"
+    -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1
+    -v /var/run/docker.sock:/var/run/docker.sock
+    -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 sh -c "$dn"; fi
     && cd frontend
     && npm ci
     && npm run build
