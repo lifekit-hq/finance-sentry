@@ -12,8 +12,9 @@ using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
-/// A SilenceOnly market-structure alert (the intraday-move sentinel's mode) re-fires once its 24h
-/// window has passed even while the earlier alert on the same reference is still open. Real Postgres
+/// A SilenceOnly alert (the intraday-move sentinel's mode, and job-failure alerting) re-fires once
+/// its silence window has passed even while the earlier alert on the same reference is still open,
+/// superseding it instead of colliding with the unique index. Real Postgres
 /// is required: the <c>idx_alert_dedup</c> partial unique index on (UserId, Type, ReferenceId) over
 /// open alerts is what rejected the second insert, and the in-memory provider does not enforce it.
 /// </summary>
@@ -85,7 +86,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
-    public async Task SilenceOnly_JobFailurePastWindowWithEarlierAlertStillOpen_DoesNotSupersedeIt()
+    public async Task SilenceOnly_JobFailurePastWindowWithEarlierAlertStillOpen_SupersedesItInsteadOfViolatingIndex()
     {
         await using (var setup = CreateContext())
         {
@@ -113,8 +114,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
         await using (var ctx = CreateContext())
         {
             var generator = new AlertGeneratorService(new AlertRepository(ctx));
-            var second = () => generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
-            await second.Should().ThrowAsync<DbUpdateException>("job-failure alerting keeps its pre-existing behaviour");
+            await generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
         }
 
         await using var read = CreateContext();
@@ -122,7 +122,9 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
             .Where(a => a.UserId == userId && a.ReferenceId == referenceId)
             .ToListAsync();
 
-        alerts.Should().ContainSingle().Which.Should().Match<Alert>(a => a.Id == old.Id && !a.IsResolved);
+        alerts.Should().HaveCount(2);
+        alerts.Single(a => a.Id == old.Id).IsResolved.Should().BeTrue("the newer failure streak supersedes it");
+        alerts.Single(a => a.Id != old.Id).Should().Match<Alert>(a => !a.IsResolved && !a.IsDismissed);
     }
 
     [DockerRequiredFact]
