@@ -251,7 +251,8 @@ public class RunThesisMonitorHandlerTests
         : ISecEdgarService
     {
         public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-            string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default)
+            string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
+            bool surfaceProviderFailure = false)
             => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
 
         public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(

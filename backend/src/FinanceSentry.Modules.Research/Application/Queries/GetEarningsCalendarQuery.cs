@@ -9,12 +9,15 @@ using FinanceSentry.Modules.Research.Domain.Repositories;
 
 // Tickers explicit? Use them. Otherwise, when a UserId is supplied, resolve the user's own
 // universe: equity brokerage holdings + watchlist. Crypto has no earnings, so it is excluded.
+// SurfaceProviderFailure defaults false so every caller but the Events module (feature 615) keeps
+// today's behaviour: a provider fetch failure just yields no events, never an exception.
 public record GetEarningsCalendarQuery(
     IReadOnlyList<string>? Tickers,
     Guid? UserId,
     DateOnly From,
     DateOnly To,
-    string? EventType) : IQuery<IReadOnlyList<EarningsEventDto>>;
+    string? EventType,
+    bool SurfaceProviderFailure = false) : IQuery<IReadOnlyList<EarningsEventDto>>;
 
 public class GetEarningsCalendarQueryHandler(
     IEarningsCalendarService svc,
@@ -30,7 +33,8 @@ public class GetEarningsCalendarQueryHandler(
             return [];
         }
 
-        var events = await svc.GetForTickersAsync(tickers, query.From, query.To, query.EventType, ct);
+        var events = await svc.GetForTickersAsync(
+            tickers, query.From, query.To, query.EventType, ct, query.SurfaceProviderFailure);
         return events
             .Select(e => new EarningsEventDto(e.Ticker, e.EventType, e.EventDate, e.IsEstimate, e.Source))
             .ToList();

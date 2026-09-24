@@ -25,6 +25,14 @@ public sealed record GetUpcomingEventsQuery(
 /// job, no new feed. Each source runs in isolation - a throwing source contributes nothing and is
 /// reported <c>unavailable</c> on the result, so an empty day is never mistaken for a quiet one.
 /// Sources run sequentially on purpose: two of them share the scoped Research DbContext.
+///
+/// Feature 615 - <c>corporate</c> and <c>filings</c> sit over Research services that swallow
+/// provider failures by default; the Events adapters opt into each service's failure signal so a
+/// Yahoo/EDGAR outage marks the source unavailable too, not just the database-backed sources. A
+/// partial per-ticker failure does not: <c>corporate</c> fetches its ticker set in one batch and
+/// only throws when every ticker in it failed; <c>filings</c> reads one ticker at a time and only
+/// marks itself unavailable when every requested ticker's read failed — either way, whichever
+/// tickers succeeded still contribute their events/filings.
 /// </summary>
 public sealed class GetUpcomingEventsQueryHandler(
     IBrokerageHoldingsReader brokerage,
@@ -126,10 +134,29 @@ public sealed class GetUpcomingEventsQueryHandler(
         {
             await RunSourceAsync(EventSource.Filings, sources, ct, async token =>
             {
+                if (tickers.Count == 0)
+                {
+                    return;
+                }
+
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                var failedTickers = 0;
                 foreach (var ticker in tickers)
                 {
-                    var recent = await filings.GetRecentAsync(ticker, token);
+                    IReadOnlyList<PeriodicFiling> recent;
+                    try
+                    {
+                        recent = await filings.GetRecentAsync(ticker, token);
+                    }
+                    catch (FilingReadFailedException ex)
+                    {
+                        // A single ticker's provider failure does not blank the whole source —
+                        // only every requested ticker failing this way does (checked below).
+                        logger.LogWarning(ex, "Upcoming events: filing read failed for {Ticker}", ticker);
+                        failedTickers++;
+                        continue;
+                    }
+
                     var due = FilingDueCalculator.Next(recent, today);
                     if (due is null || due.DueDate < from || due.DueDate > to)
                     {
@@ -140,6 +167,11 @@ public sealed class GetUpcomingEventsQueryHandler(
                     items.Add(new UpcomingEvent(
                         EventKind.FilingDue, due.DueDate, null, symbol, $"{due.Form} due: {symbol}",
                         $"Period ending {due.PeriodEnd:yyyy-MM-dd}", true, "SEC EDGAR", null));
+                }
+
+                if (failedTickers > 0 && failedTickers == tickers.Count)
+                {
+                    throw new FilingReadFailedException("EDGAR filing read failed for every requested ticker.");
                 }
             });
         }

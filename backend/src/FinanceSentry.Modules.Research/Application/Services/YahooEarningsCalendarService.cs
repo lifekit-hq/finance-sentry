@@ -34,7 +34,8 @@ public sealed class YahooEarningsCalendarService(
         DateOnly from,
         DateOnly to,
         string? eventType,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool surfaceProviderFailure = false)
     {
         var normalized = tickers
             .Select(t => t.Trim().ToUpperInvariant())
@@ -61,10 +62,20 @@ public sealed class YahooEarningsCalendarService(
             }
         });
 
+        var results = await Task.WhenAll(tasks);
+
+        // Opt-in only: every existing caller leaves surfaceProviderFailure false and keeps
+        // today's behaviour (an all-failed batch just contributes no events, same as this).
+        if (surfaceProviderFailure && Array.TrueForAll(results, r => r.Failed))
+        {
+            throw new EarningsCalendarProviderException(
+                $"Yahoo earnings fetch failed for all {normalized.Length} requested ticker(s).");
+        }
+
         var typeFilter = string.IsNullOrWhiteSpace(eventType) ? null : eventType.Trim().ToLowerInvariant();
 
-        return (await Task.WhenAll(tasks))
-            .SelectMany(e => e)
+        return results
+            .SelectMany(r => r.Events)
             .Where(e => e.EventDate >= from && e.EventDate <= to)
             .Where(e => typeFilter is null || e.EventType == typeFilter)
             .OrderBy(e => e.EventDate)
@@ -72,11 +83,11 @@ public sealed class YahooEarningsCalendarService(
             .ToList();
     }
 
-    private async Task<IReadOnlyList<EarningsEvent>> FetchTickerAsync(string ticker, CancellationToken ct)
+    private async Task<TickerFetchResult> FetchTickerAsync(string ticker, CancellationToken ct)
     {
         if (cache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < CacheTtl)
         {
-            return hit.Events;
+            return new TickerFetchResult(hit.Events, false);
         }
 
         var client = httpFactory.CreateClient(HttpClientName);
@@ -84,24 +95,29 @@ public sealed class YahooEarningsCalendarService(
         var crumbValue = await GetCrumbAsync(client, forceRefresh: false, ct);
         if (crumbValue is null)
         {
-            return [];
+            return new TickerFetchResult([], true);
         }
 
-        var (events, unauthorized) = await QueryYahooAsync(client, ticker, crumbValue, ct);
+        var (events, unauthorized, failed) = await QueryYahooAsync(client, ticker, crumbValue, ct);
         if (unauthorized)
         {
             // Crumb likely stale — refresh once and retry.
             crumbValue = await GetCrumbAsync(client, forceRefresh: true, ct);
             if (crumbValue is null)
             {
-                return [];
+                return new TickerFetchResult([], true);
             }
 
-            (events, _) = await QueryYahooAsync(client, ticker, crumbValue, ct);
+            (events, _, failed) = await QueryYahooAsync(client, ticker, crumbValue, ct);
+        }
+
+        if (failed)
+        {
+            return new TickerFetchResult([], true);
         }
 
         cache[ticker] = new CachedEvents(DateTimeOffset.UtcNow, events);
-        return events;
+        return new TickerFetchResult(events, false);
     }
 
     private async Task<string?> GetCrumbAsync(HttpClient client, bool forceRefresh, CancellationToken ct)
@@ -154,7 +170,7 @@ public sealed class YahooEarningsCalendarService(
         }
     }
 
-    private async Task<(IReadOnlyList<EarningsEvent> Events, bool Unauthorized)> QueryYahooAsync(
+    private async Task<(IReadOnlyList<EarningsEvent> Events, bool Unauthorized, bool Failed)> QueryYahooAsync(
         HttpClient client, string ticker, string crumbValue, CancellationToken ct)
     {
         var url = $"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{Uri.EscapeDataString(ticker)}"
@@ -165,19 +181,19 @@ public sealed class YahooEarningsCalendarService(
             using var response = await client.GetAsync(url, ct);
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                return ([], true);
+                return ([], true, false);
             }
 
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-            return (Parse(ticker, doc.RootElement), false);
+            return (Parse(ticker, doc.RootElement), false, false);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Yahoo earnings fetch failed for {Ticker}", ticker);
-            return ([], false);
+            return ([], false, true);
         }
     }
 
@@ -259,4 +275,8 @@ public sealed class YahooEarningsCalendarService(
     }
 
     private readonly record struct CachedEvents(DateTimeOffset FetchedAt, IReadOnlyList<EarningsEvent> Events);
+
+    // Failed distinguishes "this ticker's fetch errored at the provider" from "fetched fine, no
+    // events" — only the former can make a surfaceProviderFailure batch throw.
+    private readonly record struct TickerFetchResult(IReadOnlyList<EarningsEvent> Events, bool Failed);
 }
