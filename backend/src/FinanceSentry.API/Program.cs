@@ -194,6 +194,10 @@ GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertF
 // Propagate trace context into job execution spans (spec 023 amendment, #616).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter());
 
+// Mark a manual dashboard Requeue so HangfireTracingFilter links it like an automatic retry
+// instead of re-parenting it onto a possibly day-old request trace (#616 follow-up).
+GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireManualRequeueDetectionFilter());
+
 // Registering jobs writes to Hangfire's storage, which outside the Testing environment is the same
 // PostgreSQL database MigrateAllModules just found unreachable — an AddOrUpdate against it throws
 // and would end the process before it serves a request, turning the documented non-fatal

@@ -12,8 +12,8 @@ using global::Hangfire.Server;
 /// Baggage, neither of which survives the serialize/deserialize round trip through job storage. On
 /// execution (<see cref="IServerFilter"/>) it starts an <see cref="Activity"/> from
 /// <see cref="ActivitySource"/> <c>FinanceSentry.Hangfire</c>: a child of the stored context for the
-/// first attempt of an ad-hoc enqueue, or an <see cref="ActivityLink"/> to it for a recurring trigger
-/// and for every automatic retry. A thrown job exception marks the activity
+/// first attempt of an ad-hoc enqueue, or an <see cref="ActivityLink"/> to it for a recurring trigger,
+/// every automatic retry, and every manual requeue. A thrown job exception marks the activity
 /// <see cref="ActivityStatusCode.Error"/> before it closes.
 ///
 /// <para>
@@ -27,16 +27,16 @@ using global::Hangfire.Server;
 /// </para>
 ///
 /// <para>
-/// <b>Where that rule stops.</b> "Retry" here means Hangfire's automatic retry counter and nothing
-/// else: the decision keys on the <c>RetryCount</c> job parameter, which only
-/// <c>AutomaticRetryAttribute</c> writes. A manual dashboard Requeue is not an automatic retry, so it
-/// re-performs under the originally stored <c>traceparent</c> and shows up as a child span on the
-/// original request's trace however much later it happens — a week-old trace gaining a fresh span is
-/// this, not broken propagation. Because the counter persists once exhausted, the same Requeue also
-/// behaves differently by job type: a job declared with <c>Attempts = 0</c> never has a
-/// <c>RetryCount</c>, so its requeue is parented; a job whose automatic retries ran out keeps
-/// <c>RetryCount &gt; 0</c>, so its requeue is linked. Manual requeues are tracked as their own
-/// follow-up item.
+/// <b>Manual requeue gets the same treatment.</b> An operator's dashboard Requeue is not an automatic
+/// retry — <c>AutomaticRetryAttribute</c> never writes <c>RetryCount</c> for it, so keying on that
+/// counter alone would re-parent the job onto the original request's trace however much later the
+/// requeue happens (a week-old trace gaining a fresh span), and would do so inconsistently: a job
+/// declared with <c>Attempts = 0</c> is always parented, while one whose automatic retries already ran
+/// out stays linked purely because the stale counter is still positive. <see
+/// cref="HangfireManualRequeueDetectionFilter"/> closes that gap with a signal the requeue itself
+/// produces — a state-election filter, not job age — and records <see
+/// cref="ManualRequeueParameter"/>; this filter treats that marker exactly like <c>RetryCount &gt; 0</c>
+/// and then clears it so a later automatic retry of the requeued run follows the ordinary retry rule.
 /// </para>
 /// </summary>
 public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
@@ -49,6 +49,13 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
 
     /// <summary>Set by Hangfire's <c>AutomaticRetryAttribute</c> before each retry attempt; absent on the first run.</summary>
     internal const string RetryCountParameter = "RetryCount";
+
+    /// <summary>
+    /// Set by <see cref="HangfireManualRequeueDetectionFilter"/> when a job is elected into
+    /// <c>Enqueued</c> by a manual dashboard Requeue rather than automatic retry; cleared here once
+    /// read, in <see cref="OnPerforming"/>.
+    /// </summary>
+    internal const string ManualRequeueParameter = "FinanceSentryManualRequeue";
 
     internal const string JobIdTag = "hangfire.job_id";
     internal const string RetryCountTag = "hangfire.retry_count";
@@ -78,8 +85,11 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
         var traceState = GetJobParameter<string>(context, TraceStateParameter);
         var isRecurring = !string.IsNullOrEmpty(GetJobParameter<string>(context, RecurringJobIdParameter));
         var retryCount = GetJobParameter<int>(context, RetryCountParameter);
+        var isManualRequeue = GetJobParameter<bool>(context, ManualRequeueParameter);
+        if (isManualRequeue)
+            context.SetJobParameter(ManualRequeueParameter, false);
 
-        var activity = StartActivity(context.BackgroundJob.Job, traceParent, traceState, isRecurring, retryCount);
+        var activity = StartActivity(context.BackgroundJob.Job, traceParent, traceState, isRecurring, retryCount, isManualRequeue);
         if (activity is null)
             return;
 
@@ -101,20 +111,19 @@ public sealed class HangfireTracingFilter : IClientFilter, IServerFilter
 
     /// <summary>
     /// Core start-activity decision (internal for unit testing, no Hangfire context required). The stored
-    /// context becomes the parent only for the first attempt of an ad-hoc enqueue; recurring runs and
+    /// context becomes the parent only for the first attempt of an ad-hoc enqueue; recurring runs,
     /// automatic retries (<paramref name="retryCount"/> &gt; 0, i.e. Hangfire's <c>RetryCount</c>
-    /// parameter) start their own trace and link to it instead. A manual dashboard Requeue leaves
-    /// <paramref name="retryCount"/> as whatever the automatic retries left behind, so it is parented
-    /// for a job that never retried and linked for one whose retries were exhausted.
+    /// parameter), and manual requeues (<paramref name="isManualRequeue"/>, set by <see
+    /// cref="HangfireManualRequeueDetectionFilter"/>) start their own trace and link to it instead.
     /// </summary>
-    internal static Activity? StartActivity(Job? job, string? traceParent, string? traceState, bool isRecurring, int retryCount = 0)
+    internal static Activity? StartActivity(Job? job, string? traceParent, string? traceState, bool isRecurring, int retryCount = 0, bool isManualRequeue = false)
     {
         var name = JobMetricsFilter.JobName(job);
 
         if (string.IsNullOrEmpty(traceParent) || !ActivityContext.TryParse(traceParent, traceState, out var parentContext))
             return ActivitySource.StartActivity(name, ActivityKind.Internal);
 
-        var linkInsteadOfParent = isRecurring || retryCount > 0;
+        var linkInsteadOfParent = isRecurring || retryCount > 0 || isManualRequeue;
         return linkInsteadOfParent
             ? ActivitySource.StartActivity(name, ActivityKind.Internal, default(ActivityContext), links: [new ActivityLink(parentContext)])
             : ActivitySource.StartActivity(name, ActivityKind.Internal, parentContext);

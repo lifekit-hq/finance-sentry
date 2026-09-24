@@ -124,6 +124,93 @@ public class HangfireTracingFilterTests
     }
 
     [Fact]
+    public void ManualRequeue_OfJobWithNoAutomaticRetries_StartsNewRootLinkedToStoredContext()
+    {
+        using var exported = TraceCollector.Start();
+        const string jobId = "job-6";
+
+        ActivityTraceId ambientTraceId;
+        ActivitySpanId ambientSpanId;
+        using (var ambient = RequestSource.StartActivity("incoming-request"))
+        {
+            ambient.Should().NotBeNull();
+            ambientTraceId = ambient!.TraceId;
+            ambientSpanId = ambient.SpanId;
+            CreateJob();
+        }
+        // HangfireManualRequeueDetectionFilter marks a manual dashboard Requeue this way; no RetryCount
+        // is present because the job never declared automatic retries.
+        _parameters[ManualRequeueParameterName()] = SerializationHelper.Serialize(true);
+
+        var performContext = BuildPerformContext(jobId);
+        _filter.OnPerforming(new PerformingContext(performContext));
+
+        var activity = (Activity)performContext.Items[ActivityItemKey()]!;
+        activity.TraceId.Should().NotBe(ambientTraceId);
+        activity.ParentSpanId.Should().Be(default(ActivitySpanId));
+        activity.Links.Should().ContainSingle(link =>
+            link.Context.TraceId == ambientTraceId && link.Context.SpanId == ambientSpanId);
+
+        _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
+    }
+
+    [Fact]
+    public void ManualRequeue_OfJobWithExhaustedRetryCount_StartsNewRootLinkedToStoredContext()
+    {
+        using var exported = TraceCollector.Start();
+        const string jobId = "job-7";
+        const int exhaustedRetryCount = 3;
+
+        ActivityTraceId ambientTraceId;
+        ActivitySpanId ambientSpanId;
+        using (var ambient = RequestSource.StartActivity("incoming-request"))
+        {
+            ambient.Should().NotBeNull();
+            ambientTraceId = ambient!.TraceId;
+            ambientSpanId = ambient.SpanId;
+            CreateJob();
+        }
+        // Hangfire never clears RetryCount once retries are exhausted; before the manual-requeue marker
+        // existed, this case behaved as "linked" only by accident of the stale counter. The marker makes
+        // it deliberate rather than incidental — it should still resolve to "linked".
+        _parameters["RetryCount"] = SerializationHelper.Serialize(exhaustedRetryCount);
+        _parameters[ManualRequeueParameterName()] = SerializationHelper.Serialize(true);
+
+        var performContext = BuildPerformContext(jobId);
+        _filter.OnPerforming(new PerformingContext(performContext));
+
+        var activity = (Activity)performContext.Items[ActivityItemKey()]!;
+        activity.TraceId.Should().NotBe(ambientTraceId);
+        activity.ParentSpanId.Should().Be(default(ActivitySpanId));
+        activity.Links.Should().ContainSingle(link =>
+            link.Context.TraceId == ambientTraceId && link.Context.SpanId == ambientSpanId);
+
+        _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
+    }
+
+    [Fact]
+    public void ManualRequeue_ClearsMarker_SoALaterAutomaticRetryFollowsTheOrdinaryRule()
+    {
+        using var exported = TraceCollector.Start();
+        const string jobId = "job-8";
+
+        CreateJob();
+        _parameters[ManualRequeueParameterName()] = SerializationHelper.Serialize(true);
+
+        var performContext = BuildPerformContext(jobId);
+        _filter.OnPerforming(new PerformingContext(performContext));
+        _filter.OnPerformed(new PerformedContext(performContext, result: null, canceled: false, exception: null));
+
+        // SetJobParameter writes through to storage; GetJobParameter(allowStale: true) reads the
+        // BackgroundJob's parameter snapshot captured at construction, which a same-context write never
+        // updates — so the clear is observed on the connection the filter wrote to, not by re-reading it
+        // off this same context.
+        _connection.Verify(
+            c => c.SetJobParameter(jobId, ManualRequeueParameterName(), SerializationHelper.Serialize(false)),
+            Times.Once);
+    }
+
+    [Fact]
     public void FirstAttempt_CarriesJobIdAndZeroRetryCountTags()
     {
         using var exported = TraceCollector.Start();
@@ -158,6 +245,8 @@ public class HangfireTracingFilterTests
     }
 
     private static string ActivityItemKey() => "FinanceSentry.Hangfire.Activity";
+
+    private static string ManualRequeueParameterName() => "FinanceSentryManualRequeue";
 
     private void CreateJob()
     {
