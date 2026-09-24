@@ -50,6 +50,52 @@ public sealed class SecEdgarServiceTests
     }
 
     [Fact]
+    public async Task GetRecentFilingsAsync_FailedSubmissionsFetch_SurfaceProviderFailureTrue_Throws()
+    {
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json(TickerMapJson);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        });
+
+        var act = () => sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10, surfaceProviderFailure: true);
+
+        await act.Should().ThrowAsync<EdgarProviderException>();
+    }
+
+    [Fact]
+    public async Task GetRecentFilingsAsync_TickerNotAFiler_SurfaceProviderFailureTrue_StaysEmpty()
+    {
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json(TickerMapJson); // a real map that just doesn't contain NOTAFILER
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        });
+
+        var result = await sut.GetRecentFilingsAsync("NOTAFILER", ["10-Q"], 10, surfaceProviderFailure: true);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetRecentFilingsAsync_TickerMapFetchFailed_SurfaceProviderFailureTrue_Throws()
+    {
+        var sut = CreateSut(request => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+
+        var act = () => sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10, surfaceProviderFailure: true);
+
+        await act.Should().ThrowAsync<EdgarProviderException>();
+    }
+
+    [Fact]
     public async Task GetRecentFilingsAsync_SuccessfulSubmissionsFetch_IsCached()
     {
         var submissionsCalls = 0;

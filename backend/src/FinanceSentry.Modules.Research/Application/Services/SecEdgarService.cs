@@ -48,14 +48,15 @@ public sealed class SecEdgarService(
     private DateTimeOffset tickerMapFetchedAt;
 
     public async Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default)
+        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
+        bool surfaceProviderFailure = false)
     {
         var upper = ticker.Trim().ToUpperInvariant();
         var forms = formTypes is { Count: > 0 }
             ? formTypes.Select(f => f.Trim().ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : DefaultFormTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var all = await GetAllFilingsAsync(upper, ct);
+        var all = await GetAllFilingsAsync(upper, surfaceProviderFailure, ct);
         return all
             .Where(f => forms.Contains(f.Form))
             .Take(Math.Max(1, limit))
@@ -73,7 +74,7 @@ public sealed class SecEdgarService(
             return Trim(hit.Facts, perConcept);
         }
 
-        var cik = await ResolveCikAsync(upper, ct);
+        var (cik, _) = await ResolveCikAsync(upper, ct);
         if (cik is null)
         {
             return [];
@@ -98,22 +99,35 @@ public sealed class SecEdgarService(
         return Trim(facts, perConcept);
     }
 
-    private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(string ticker, CancellationToken ct)
+    private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(
+        string ticker, bool surfaceProviderFailure, CancellationToken ct)
     {
         if (filingsCache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < FilingsTtl)
         {
             return hit.Filings;
         }
 
-        var cik = await ResolveCikAsync(ticker, ct);
+        var (cik, mapFetchFailed) = await ResolveCikAsync(ticker, ct);
         if (cik is null)
         {
+            // mapFetchFailed distinguishes "EDGAR's map fetch never succeeded" (a provider
+            // outage) from "the map is fine, this ticker just isn't a filer" (not a failure).
+            if (surfaceProviderFailure && mapFetchFailed)
+            {
+                throw new EdgarProviderException($"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}.");
+            }
+
             return [];
         }
 
         var filings = await FetchSubmissionsAsync(ticker, cik, ct);
         if (filings is null)
         {
+            if (surfaceProviderFailure)
+            {
+                throw new EdgarProviderException($"EDGAR submissions fetch failed for {ticker}.");
+            }
+
             return [];
         }
 
@@ -287,10 +301,18 @@ public sealed class SecEdgarService(
             .ThenByDescending(f => f.PeriodEnd)
             .ToList();
 
-    private async Task<string?> ResolveCikAsync(string ticker, CancellationToken ct)
+    // MapFetchFailed is true only when the ticker->CIK map was never fetched successfully (no
+    // cached copy to fall back on) — a provider outage, distinct from the ticker legitimately
+    // not being an EDGAR filer once a real map is in hand.
+    private async Task<(string? Cik, bool MapFetchFailed)> ResolveCikAsync(string ticker, CancellationToken ct)
     {
         var map = await GetTickerMapAsync(ct);
-        return map is not null && map.TryGetValue(ticker, out var cik) ? cik : null;
+        if (map is null)
+        {
+            return (null, true);
+        }
+
+        return (map.TryGetValue(ticker, out var cik) ? cik : null, false);
     }
 
     private async Task<IReadOnlyDictionary<string, string>?> GetTickerMapAsync(CancellationToken ct)

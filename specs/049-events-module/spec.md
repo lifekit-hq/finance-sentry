@@ -93,11 +93,14 @@ filing-due row for MU derived from its last periodic filing; each row carries `k
    filing due dates for the same tickers (`kind = filing_due`), sorted by date then subject.
 2. **Given** one source throws or times out, **When** upcoming events are requested, **Then** the
    other sources still return, and the response's `sources[]` marks that source `unavailable`.
-   Today only the database-backed sources can say so - `macro` and `theses`, whose reads throw
-   when the database is down. The two external ones cannot: `corporate` (earnings / ex-dividend
-   via Yahoo) and `filings` (EDGAR) sit over Research services that swallow provider failures and
-   return empty, so when Yahoo or EDGAR is down the agenda looks empty and `sources[]` still says
-   `ok`. Surfacing those failures is a Research change filed as separate work.
+   The database-backed sources say so directly - `macro` and `theses`, whose reads throw when the
+   database is down. The two external ones (feature 615) opt into their Research services'
+   provider-failure signal, which each service raises only for a genuine outage, never for "no
+   events today": `corporate` (earnings / ex-dividend via Yahoo) fetches its ticker set in one
+   batch and reports `unavailable` only when every ticker in it failed - a partial failure still
+   returns whichever tickers succeeded, with `corporate: ok`. `filings` (EDGAR) reads one ticker
+   at a time and reports `unavailable` only when every requested ticker's read failed the same
+   way; one bad ticker among several does not blank the source.
 3. **Given** no `from`/`to`, **When** requested, **Then** the window is today .. today + 90 days;
    a window longer than 366 days or with `to < from` is rejected (400, `EVENTS_WINDOW_INVALID`).
 4. **Given** `kinds=macro,earnings`, **When** requested, **Then** only those kinds are computed
@@ -294,8 +297,10 @@ lists both; `ToolResolutionTests` constructs both from the shared graph.
 - **SC-001**: With the test user's book, `GET /events/upcoming` (90 days) returns rows of at least
   three kinds and `sources[]` all `ok` when Yahoo and EDGAR answer; with the database source for
   macro events throwing, the same call returns the other kinds and `macro: unavailable` in under
-  the request timeout. With Yahoo blocked the call returns the other kinds with `corporate: ok`
-  and no earnings rows (US1 scenario 2).
+  the request timeout. With Yahoo down for every requested ticker the call returns the other
+  kinds with `corporate: unavailable` and no earnings rows; with Yahoo down for only some of the
+  requested tickers, `corporate: ok` with earnings rows for the tickers that succeeded (US1
+  scenario 2).
 - **SC-002**: Every fired event in the feed carries exactly one outcome from the table; the
   derivation is pinned by a table-driven unit test covering all nine dispositions × verdict
   presence.

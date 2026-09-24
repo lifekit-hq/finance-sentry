@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.CrossModulePorts;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Integration;
+using FinanceSentry.Modules.Events.Domain.Exceptions;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Application.Services;
@@ -37,7 +38,7 @@ public sealed class EventsResearchAdapterTests
     public async Task Periodic_filings_keep_only_rows_with_a_period_end()
     {
         var edgar = new Mock<ISecEdgarService>();
-        edgar.Setup(e => e.GetRecentFilingsAsync("MU", It.Is<IReadOnlyCollection<string>>(f => f.Contains("10-K") && f.Contains("10-Q")), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        edgar.Setup(e => e.GetRecentFilingsAsync("MU", It.Is<IReadOnlyCollection<string>>(f => f.Contains("10-K") && f.Contains("10-Q")), It.IsAny<int>(), It.IsAny<CancellationToken>(), true))
             .ReturnsAsync([
                 new EdgarFiling("MU", "10-Q", new DateOnly(2026, 7, 1), new DateOnly(2026, 5, 28), "q", "0001-26-1", "https://sec/1", true),
                 new EdgarFiling("MU", "10-K", new DateOnly(2025, 10, 10), null, "k", "0001-25-1", "https://sec/2", true),
@@ -48,6 +49,18 @@ public sealed class EventsResearchAdapterTests
         var row = rows.Should().ContainSingle().Subject;
         row.Form.Should().Be("10-Q");
         row.ReportDate.Should().Be(new DateOnly(2026, 5, 28));
+    }
+
+    [Fact]
+    public async Task Periodic_filings_translates_the_provider_failure_signal()
+    {
+        var edgar = new Mock<ISecEdgarService>();
+        edgar.Setup(e => e.GetRecentFilingsAsync("MU", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), true))
+            .ThrowsAsync(new EdgarProviderException("EDGAR down"));
+
+        var act = () => new EventsPeriodicFilingAdapter(edgar.Object).GetRecentAsync("MU");
+
+        await act.Should().ThrowAsync<FilingReadFailedException>();
     }
 
     [Fact]
@@ -64,7 +77,21 @@ public sealed class EventsResearchAdapterTests
 
         captured!.Tickers.Should().BeEquivalentTo(["MU"]);
         captured.UserId.Should().BeNull();
+        captured.SurfaceProviderFailure.Should().BeTrue();
         rows.Should().ContainSingle().Which.EventType.Should().Be("earnings");
+    }
+
+    [Fact]
+    public async Task Corporate_calendar_lets_the_provider_failure_signal_bubble_unchanged()
+    {
+        var handler = new Mock<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>();
+        handler.Setup(h => h.Handle(It.IsAny<GetEarningsCalendarQuery>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new EarningsCalendarProviderException("yahoo down"));
+
+        var act = () => new EventsCorporateCalendarAdapter(handler.Object)
+            .GetForTickersAsync(["MU"], new DateOnly(2026, 9, 22), new DateOnly(2026, 10, 22));
+
+        await act.Should().ThrowAsync<EarningsCalendarProviderException>();
     }
 
     [Fact]

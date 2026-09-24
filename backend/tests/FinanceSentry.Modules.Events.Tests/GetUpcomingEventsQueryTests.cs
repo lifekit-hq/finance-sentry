@@ -126,6 +126,31 @@ public sealed class GetUpcomingEventsQueryTests
     }
 
     [Fact]
+    public async Task Filings_unavailable_when_every_requested_ticker_fails()
+    {
+        _filings.Setup(f => f.GetRecentAsync("MU", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FilingReadFailedException("EDGAR down"));
+        _filings.Setup(f => f.GetRecentAsync("PLTR", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FilingReadFailedException("EDGAR down"));
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["filing_due"]), CancellationToken.None);
+
+        result.Sources.Should().Contain(s => s.Source == EventSource.Filings && s.Status == EventSourceStatus.Unavailable);
+        result.Items.Should().NotContain(i => i.Kind == EventKind.FilingDue);
+    }
+
+    [Fact]
+    public async Task Filings_stays_ok_when_only_some_tickers_fail()
+    {
+        _filings.Setup(f => f.GetRecentAsync("PLTR", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FilingReadFailedException("EDGAR down"));
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["filing_due"]), CancellationToken.None);
+
+        result.Sources.Should().Contain(s => s.Source == EventSource.Filings && s.Status == EventSourceStatus.Ok);
+    }
+
+    [Fact]
     public async Task Kinds_filter_skips_the_sources_it_does_not_need()
     {
         var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["macro"]), CancellationToken.None);
