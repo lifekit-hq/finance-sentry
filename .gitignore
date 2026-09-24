@@ -116,4 +116,3 @@ frontend/.qa-tmp.mjs
 # devclaw per-goal checkouts (boilerplate revision 2) — one goal, one clone
 # under the project workspace; never this repo's own content.
 .goals/
-.dotnet-home/
