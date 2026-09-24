@@ -33,6 +33,17 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
             .ToHashSet(StringComparer.Ordinal);
     }
 
+    public async Task<IReadOnlyList<string>> GetActiveManualCommitmentMerchantNamesAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        var subscriptions = await _repository.GetActiveByUserIdAsync(userId.ToString(), ct);
+
+        return subscriptions
+            .Where(s => s.IsManual)
+            .Select(s => s.MerchantNameDisplay)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<ActiveInstallmentPlan>> GetActiveInstallmentPlansAsync(
         Guid userId, CancellationToken ct = default)
     {

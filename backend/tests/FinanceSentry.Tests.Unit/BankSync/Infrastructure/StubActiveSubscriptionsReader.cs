@@ -23,6 +23,10 @@ internal sealed class StubActiveSubscriptionsReader(params ActiveInstallmentPlan
         Guid userId, CancellationToken ct = default)
         => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal));
 
+    public Task<IReadOnlyList<string>> GetActiveManualCommitmentMerchantNamesAsync(
+        Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<string>>([]);
+
     public Task<IReadOnlyList<ActiveInstallmentPlan>> GetActiveInstallmentPlansAsync(
         Guid userId, CancellationToken ct = default)
         => Task.FromResult(_plans);
