@@ -334,6 +334,15 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   keeps the stored key and the matched key from drifting apart. A plan's identity includes its
   rounded monthly amount, so concurrent plans at one shop stay distinct and only the plan the
   user actually holds is claimed.
+  A manual row (`DetectedSubscription.CreateManual`, `IsManual`) is stored under
+  `manual:{kind}:{merchant}` — a form no transaction ever derives, by design: that key is how
+  the row is found and re-used on the next manual edit, and detection never re-keys or
+  overwrites a manual row (`SubscriptionDetectionResultService.ShouldUpdate`). Rule (a) still
+  claims its debits: `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual
+  rows' display names via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync`
+  and folds `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same
+  key set rule (a) matches against — the stored key is untouched, only the match set is widened
+  (#560).
 - **(b) a committed category** — `RENT_AND_UTILITIES` or `LOAN_PAYMENTS`. Rent is the largest
   fixed outflow in the book and the detector can never see it: the same payee for the same
   amount every month is not a merchant recurrence signature. A loan payment is a debt
@@ -379,6 +388,12 @@ the total.
   detector uses payoffs only to mark a plan completed, and a completed plan is no longer
   `active` — so a payoff reads as discretionary unless its category carries it. Ordinary spend
   — groceries, restaurants, clothes — is discretionary by construction, which is the point.
+- **Known under-count, narrow**: a manual commitment (see rule (a) above) still cannot match a
+  debit whose statement carries no `MerchantName` and names the merchant only inside its free-text
+  `Description` in a form `MerchantNameNormalizer.Normalize` cannot recover verbatim from the
+  merchant's display name — the same shape of gap rule (d) documents for pins. This is now the
+  only case a manual row cannot match; every other debit for a manually pinned merchant is
+  committed (#560).
 - **Known over-claim**: rule (b) inherits whatever the ingest ladder (#553) put in its two
   keys, and `RENT_AND_UTILITIES` is wider than rent — the telecom MCC range 4812–4900 and the
   `top-up` keyword land there, so an ad-hoc mobile top-up reads as committed alongside the

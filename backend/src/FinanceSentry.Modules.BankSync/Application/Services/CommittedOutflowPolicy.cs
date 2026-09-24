@@ -169,11 +169,21 @@ public class CommittedOutflowPolicy(
         // Sequential, not Task.WhenAll: both reads sit behind scoped DbContexts, which forbid
         // concurrent operations on one instance.
         var commitmentKeys = await _activeSubscriptions.GetActiveCommitmentMerchantKeysAsync(userId, ct);
+        var manualMerchantNames = await _activeSubscriptions.GetActiveManualCommitmentMerchantNamesAsync(userId, ct);
         var pinnedKeys = await _pins.GetPinnedKeysAsync(userId, ct);
+
+        // A manual row's stored key (manual:{kind}:{merchant}) never matches a transaction-
+        // derived key, so it is re-keyed here the same way an automatically detected row already
+        // is at detection time: by normalized merchant name. This does not touch the stored
+        // MerchantNameNormalized — that form is how a manual row is found and re-used on the
+        // next edit — it only widens the set rule (a) matches transactions against (#560).
+        var activeCommitmentKeys = new HashSet<string>(commitmentKeys, StringComparer.Ordinal);
+        foreach (var merchantName in manualMerchantNames)
+            activeCommitmentKeys.Add(MerchantNameNormalizer.NormalizeDetectionKey(merchantName, description: null));
 
         return new CommittedOutflowRules
         {
-            ActiveCommitmentKeys = commitmentKeys,
+            ActiveCommitmentKeys = activeCommitmentKeys,
             PinnedMerchantKeys = pinnedKeys,
         };
     }

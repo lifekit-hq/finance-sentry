@@ -127,4 +127,46 @@ public class ActiveSubscriptionsReaderTests
 
         keys.Should().BeEmpty();
     }
+
+    // ── #560: manual commitments ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetActiveManualCommitmentMerchantNames_ReturnsOnlyManualRows()
+    {
+        var detected = Make("netflix", "Netflix");
+        var manual = DetectedSubscription.CreateManual(
+            UserId.ToString(), "Claude.ai", 20m, "USD",
+            DateOnly.FromDateTime(DateTime.UtcNow), termCount: null, kind: SubscriptionKinds.Subscription);
+        var (reader, _) = MakeSut(detected, manual);
+
+        var names = await reader.GetActiveManualCommitmentMerchantNamesAsync(UserId);
+
+        names.Should().BeEquivalentTo(["Claude.ai"]);
+    }
+
+    [Fact]
+    public async Task GetActiveManualCommitmentMerchantNames_ReadsOnlyActiveRows()
+    {
+        var manual = DetectedSubscription.CreateManual(
+            UserId.ToString(), "Claude.ai", 20m, "USD",
+            DateOnly.FromDateTime(DateTime.UtcNow), termCount: null, kind: SubscriptionKinds.Subscription);
+        var (reader, repo) = MakeSut(manual);
+
+        await reader.GetActiveManualCommitmentMerchantNamesAsync(UserId);
+
+        repo.Verify(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(
+            r => r.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetActiveManualCommitmentMerchantNames_NoManualRows_ReturnsEmpty()
+    {
+        var (reader, _) = MakeSut(Make("netflix", "Netflix"));
+
+        var names = await reader.GetActiveManualCommitmentMerchantNamesAsync(UserId);
+
+        names.Should().BeEmpty();
+    }
 }

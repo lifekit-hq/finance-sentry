@@ -17,6 +17,20 @@ public interface IActiveSubscriptionsReader
         Guid userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Display names of ACTIVE manual commitments only (<c>DetectedSubscription.IsManual</c>,
+    /// any kind) — subscriptions and installments the user added by hand rather than the
+    /// detector finding them. A manual row's <c>MerchantNameNormalized</c> is stored as
+    /// <c>manual:{kind}:{merchant}</c> (see <c>DetectedSubscription.CreateManual</c>), a form no
+    /// transaction-derived key ever takes, so it can never appear in
+    /// <see cref="GetActiveCommitmentMerchantKeysAsync"/>'s matches. The stored key stays that
+    /// way deliberately — it is how the row is found and re-used on the next manual edit — so
+    /// callers instead derive a transaction-matching key themselves from the display name
+    /// returned here (<c>MerchantNameNormalizer.NormalizeDetectionKey</c>).
+    /// </summary>
+    Task<IReadOnlyList<string>> GetActiveManualCommitmentMerchantNamesAsync(
+        Guid userId, CancellationToken ct = default);
+
+    /// <summary>
     /// The <c>installment</c>-kind half of <see cref="GetActiveCommitmentMerchantKeysAsync"/>:
     /// the user's ACTIVE repayment obligations only — розстрочка plans and loans the detector
     /// recognised behind a masked card number (the mortgage). Categorization reads these to

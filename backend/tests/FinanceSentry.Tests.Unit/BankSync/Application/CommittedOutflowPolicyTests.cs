@@ -5,6 +5,9 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Modules.Subscriptions.Application.Services;
+using FinanceSentry.Modules.Subscriptions.Domain;
+using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -257,6 +260,8 @@ public class CommittedOutflowPolicyTests
         var subscriptions = new Mock<IActiveSubscriptionsReader>();
         subscriptions.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
                      .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
+        subscriptions.Setup(r => r.GetActiveManualCommitmentMerchantNamesAsync(UserId, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(Array.Empty<string>());
         var pins = new Mock<ICommittedMerchantPinRepository>();
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
@@ -268,14 +273,86 @@ public class CommittedOutflowPolicyTests
 
         subscriptions.Verify(
             r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
+        subscriptions.Verify(
+            r => r.GetActiveManualCommitmentMerchantNamesAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
         pins.Verify(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    private static CommittedOutflowPolicy Policy(string[] commitmentKeys, string[] pinnedKeys)
+    [Fact]
+    public async Task LoadForUserAsync_ManualActiveCommitment_MatchesItsDebitsAsCommitted()
+    {
+        // #560: a hand-added subscription is keyed manual:{kind}:{merchant} on the row, a form
+        // no transaction-derived key ever takes. The rule set must still claim its debits.
+        var rules = await Policy(
+            commitmentKeys: [], pinnedKeys: [], manualMerchantNames: ["Claude.ai"]).LoadForUserAsync(UserId);
+
+        rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LoadForUserAsync_InactiveManualCommitment_DoesNotMatch()
+    {
+        // GetActiveManualCommitmentMerchantNamesAsync already scopes to active rows (via
+        // GetActiveByUserIdAsync) — this guards the policy against ever widening that itself.
+        var rules = await Policy(
+            commitmentKeys: [], pinnedKeys: [], manualMerchantNames: []).LoadForUserAsync(UserId);
+
+        rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeFalse();
+    }
+
+    // ── #560: end to end through the real Subscriptions-module reader ───────────
+
+    [Fact]
+    public async Task LoadForUserAsync_ManualSubscriptionEndToEnd_ItsDebitLandsInCommittedOutflow()
+    {
+        // The issue's exact scenario: a manually added subscription, wired through the real
+        // ActiveSubscriptionsReader (not a stub of its output), still claims a matching debit.
+        var manual = DetectedSubscription.CreateManual(
+            UserId.ToString(), "Claude.ai", 20m, "USD",
+            DateOnly.FromDateTime(DateTime.UtcNow), termCount: null, kind: SubscriptionKinds.Subscription);
+
+        var repo = new Mock<IDetectedSubscriptionRepository>();
+        repo.Setup(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([manual]);
+
+        var reader = new ActiveSubscriptionsReader(repo.Object);
+        var pins = new Mock<ICommittedMerchantPinRepository>();
+        pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
+
+        var rules = await new CommittedOutflowPolicy(reader, pins.Object).LoadForUserAsync(UserId);
+
+        rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LoadForUserAsync_DismissedManualSubscriptionEndToEnd_ItsDebitStaysDiscretionary()
+    {
+        // Negative case: a manual row the user dismissed must not keep claiming its merchant's
+        // debits. GetActiveByUserIdAsync already excludes it, so the repository simply never
+        // hands it back — this pins that the policy does not widen the set on its own.
+        var repo = new Mock<IDetectedSubscriptionRepository>();
+        repo.Setup(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var reader = new ActiveSubscriptionsReader(repo.Object);
+        var pins = new Mock<ICommittedMerchantPinRepository>();
+        pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<string>(StringComparer.Ordinal));
+
+        var rules = await new CommittedOutflowPolicy(reader, pins.Object).LoadForUserAsync(UserId);
+
+        rules.IsCommitted(Debit(20m, "CARD PAYMENT", merchantName: "Claude.ai")).Should().BeFalse();
+    }
+
+    private static CommittedOutflowPolicy Policy(
+        string[] commitmentKeys, string[] pinnedKeys, string[]? manualMerchantNames = null)
     {
         var subscriptions = new Mock<IActiveSubscriptionsReader>();
         subscriptions.Setup(r => r.GetActiveCommitmentMerchantKeysAsync(UserId, It.IsAny<CancellationToken>()))
                      .ReturnsAsync(commitmentKeys.ToHashSet(StringComparer.Ordinal));
+        subscriptions.Setup(r => r.GetActiveManualCommitmentMerchantNamesAsync(UserId, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(manualMerchantNames ?? []);
 
         var pins = new Mock<ICommittedMerchantPinRepository>();
         pins.Setup(p => p.GetPinnedKeysAsync(UserId, It.IsAny<CancellationToken>()))
