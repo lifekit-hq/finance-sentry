@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -184,6 +185,16 @@ public sealed class ToolParityTests
         // Domain service + BankSync spend read port needed by GetBudgetSummaryQueryHandler.
         services.AddScoped<ICategoryNormalizationService, CategoryNormalizationService>();
         services.AddScoped<IMerchantSpendingReader, MerchantSpendingReader>();
+
+        // Money-flow statistics stack (spec 044) needed by GetMoneyFlowStatisticsQueryHandler,
+        // which GetCashflowReportTool now depends on instead of raw transactions (#675).
+        services.AddScoped<ICounterpartyRepository, CounterpartyRepository>();
+        services.AddScoped<ICommittedMerchantPinRepository, CommittedMerchantPinRepository>();
+        services.AddScoped<IActiveSubscriptionsReader, FinanceSentry.Modules.Subscriptions.Application.Services.ActiveSubscriptionsReader>();
+        services.AddScoped<ICommittedOutflowPolicy, CommittedOutflowPolicy>();
+        services.AddScoped<ITransferDetectionService, TransferDetectionService>();
+        services.AddScoped<ICounterpartyClassificationService, CounterpartyClassificationService>();
+        services.AddScoped<IMoneyFlowStatisticsService, MoneyFlowStatisticsService>();
 
         // CQRS: registers all IQueryHandler / ICommandHandler / IEventHandler
         // implementations from each module assembly, wrapped in validation and logging
@@ -748,7 +759,7 @@ public sealed class ToolParityTests
     }
 
     [Fact]
-    public async Task GetCashflowReport_AggregatesTransactionsByMonth()
+    public async Task GetCashflowReport_AggregatesTransactionsByMonth_AndExcludesInternalTransfers()
     {
         var userId = Guid.NewGuid();
         await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
@@ -759,36 +770,57 @@ public sealed class ToolParityTests
         var account = new BankAccount(userId, "ext-cf-001", "Chase", "checking", "1111", "Test User", "USD", userId, "truelayer");
         account.BeginSync();
         account.MarkActive(0m);
-        bankDb.BankAccounts.Add(account);
+        var savings = new BankAccount(userId, "ext-cf-002", "Chase", "savings", "2222", "Test User", "USD", userId, "truelayer");
+        savings.BeginSync();
+        savings.MarkActive(0m);
+        bankDb.BankAccounts.AddRange(account, savings);
 
-        var jan = new DateTime(2024, 1, 15, 12, 0, 0, DateTimeKind.Utc);
-        var feb = new DateTime(2024, 2, 10, 12, 0, 0, DateTimeKind.Utc);
+        // The money-flow statistics window is anchored to the current calendar month, not to
+        // the tool's fromDate/toDate — the underlying service always reads "last N months from
+        // now" (see MonthWindow). So the seeded data must sit in the last two complete/current
+        // months rather than a fixed historical date.
+        var today = DateTime.UtcNow;
+        var thisMonthStart = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var lastMonthStart = thisMonthStart.AddMonths(-1);
+        var lastMonth = lastMonthStart.AddDays(1);
+        var thisMonth = thisMonthStart.AddDays(1);
+
         // Providers store Amount as a positive magnitude; direction lives in
         // TransactionType ("credit" = inflow, "debit" = outflow).
-        var salary1 = new Transaction(account.Id, userId, 2_000m, jan, "Salary", "hash-cf-001") { TransactionType = "credit" };
-        var groceries = new Transaction(account.Id, userId, 300m, jan, "Groceries", "hash-cf-002") { TransactionType = "debit" };
-        var salary2 = new Transaction(account.Id, userId, 2_500m, feb, "Salary", "hash-cf-003") { TransactionType = "credit" };
-        var rent = new Transaction(account.Id, userId, 800m, feb, "Rent", "hash-cf-004") { TransactionType = "debit" };
-        bankDb.Transactions.AddRange(salary1, groceries, salary2, rent);
+        var salary1 = new Transaction(account.Id, userId, 2_000m, lastMonth, "Salary", "hash-cf-001") { TransactionType = "credit" };
+        var groceries = new Transaction(account.Id, userId, 300m, lastMonth, "Groceries", "hash-cf-002") { TransactionType = "debit" };
+        var salary2 = new Transaction(account.Id, userId, 2_500m, thisMonth, "Salary", "hash-cf-003") { TransactionType = "credit" };
+        var rent = new Transaction(account.Id, userId, 800m, thisMonth, "Rent", "hash-cf-004") { TransactionType = "debit" };
+
+        // A transfer-like pair between the user's own accounts: equal magnitude, close dates,
+        // matching descriptions — the routing rules TransferDetectionService applies. Must be
+        // excluded from both inflow and outflow (#675), not counted on both sides.
+        var transferOut = new Transaction(account.Id, userId, 500m, lastMonth, "Internal Transfer Savings", "hash-cf-005") { TransactionType = "debit" };
+        var transferIn = new Transaction(savings.Id, userId, 500m, lastMonth, "Internal Transfer Savings", "hash-cf-006") { TransactionType = "credit" };
+
+        bankDb.Transactions.AddRange(salary1, groceries, salary2, rent, transferOut, transferIn);
         await bankDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetCashflowReportTool>();
         var result = await tool.ExecuteAsync(
             userId,
-            fromDate: new DateOnly(2024, 1, 1),
-            toDate: new DateOnly(2024, 2, 29));
+            fromDate: DateOnly.FromDateTime(lastMonthStart),
+            toDate: DateOnly.FromDateTime(today));
 
         result.Should().HaveCount(2);
 
-        var janEntry = result.Single(e => e.Period == "2024-01");
-        janEntry.Inflow.Should().Be(2_000m);
-        janEntry.Outflow.Should().Be(300m);
-        janEntry.Net.Should().Be(1_700m);
+        var lastMonthPeriod = lastMonthStart.ToString("yyyy-MM");
+        var thisMonthPeriod = thisMonthStart.ToString("yyyy-MM");
 
-        var febEntry = result.Single(e => e.Period == "2024-02");
-        febEntry.Inflow.Should().Be(2_500m);
-        febEntry.Outflow.Should().Be(800m);
-        febEntry.Net.Should().Be(1_700m);
+        var lastMonthEntry = result.Single(e => e.Period == lastMonthPeriod);
+        lastMonthEntry.Inflow.Should().Be(2_000m);
+        lastMonthEntry.Outflow.Should().Be(300m);
+        lastMonthEntry.Net.Should().Be(1_700m);
+
+        var thisMonthEntry = result.Single(e => e.Period == thisMonthPeriod);
+        thisMonthEntry.Inflow.Should().Be(2_500m);
+        thisMonthEntry.Outflow.Should().Be(800m);
+        thisMonthEntry.Net.Should().Be(1_700m);
     }
 
     [Fact]

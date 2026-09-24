@@ -1,9 +1,8 @@
 using System.ComponentModel;
-using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Core.Utils;
 using FinanceSentry.Mcp.Abstractions;
 using FinanceSentry.Modules.BankSync.Application.Queries;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -11,19 +10,19 @@ namespace FinanceSentry.Mcp.Tools;
 
 [McpServerToolType]
 public sealed class GetCashflowReportTool(
-    IQueryHandler<GetAllTransactionsQuery, AllTransactionsResult> transactionsHandler,
+    IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> moneyFlowHandler,
     IIdentityResolver identity,
     ILogger<GetCashflowReportTool> logger)
 {
     private const int MaxMonthsBack = 24;
     private const int DefaultMonthsBack = 6;
 
-    private readonly IQueryHandler<GetAllTransactionsQuery, AllTransactionsResult> _transactionsHandler = transactionsHandler;
+    private readonly IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>> _moneyFlowHandler = moneyFlowHandler;
     private readonly IIdentityResolver _identity = identity;
     private readonly ILogger<GetCashflowReportTool> _logger = logger;
 
     [McpServerTool(Name = "get_cashflow_report")]
-    [Description("Returns a monthly cashflow report (inflow, outflow, net) aggregated from bank transactions. Negative amounts are treated as outflows, positive as inflows. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns a monthly cashflow report (inflow, outflow, net) from the classified money-flow statistics — internal transfers between the user's own accounts are excluded. Defaults to the authenticated MCP identity when userId is omitted.")]
     public async Task<IReadOnlyList<CashflowReportEntry>> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Optional inclusive start date. Defaults to 6 months ago.")] DateOnly? fromDate = null,
@@ -44,54 +43,53 @@ public sealed class GetCashflowReportTool(
         if (to.DayNumber - from.DayNumber > MaxMonthsBack * 31)
             from = to.AddMonths(-MaxMonthsBack);
 
-        AllTransactionsResult result;
+        // Months back from "to", not "today" — the window the caller asked for. With no
+        // dates given this reduces to DefaultMonthsBack, matching the old default exactly.
+        var months = Math.Max(1, ((to.Year - from.Year) * 12) + to.Month - from.Month);
+
+        IReadOnlyList<MonthlyFlow> flows;
         try
         {
-            result = await _transactionsHandler.Handle(
-                new GetAllTransactionsQuery(
-                    userIdVal,
-                    new PagedRequest(0, int.MaxValue),
-                    from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
-                    to.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc)),
+            flows = await _moneyFlowHandler.Handle(
+                new GetMoneyFlowStatisticsQuery(userIdVal, months),
                 cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Transactions query unavailable for user {UserId}; returning empty cashflow report.", userIdVal);
+            _logger.LogWarning(ex, "Money-flow statistics query unavailable for user {UserId}; returning empty cashflow report.", userIdVal);
             return [];
         }
 
-        // Providers store Amount as a positive magnitude. The direction
-        // lives in TransactionType ("credit" = inflow, "debit" = outflow). Sign of
-        // Amount is NOT used.
-        return result.Transactions
-            .GroupBy(t => new { (t.PostedDate ?? t.Date).Year, (t.PostedDate ?? t.Date).Month })
-            .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
+        // Each month has one row per currency (transfers and counterparty-matched transactions
+        // already excluded upstream) plus at most one synthetic USD row carrying that month's
+        // counterparty flows. Summing InflowUsd/OutflowUsd across every row for a month gives
+        // the whole picture with nothing double-counted: the per-currency rows and the
+        // synthetic row partition the transaction set, they never overlap it.
+        return flows
+            .Where(f => IsWithinRange(f.Month, from, to))
+            .GroupBy(f => f.Month)
+            .OrderBy(g => g.Key)
             .Select(g =>
             {
-                // Convert to USD by each transaction's currency — accounts span currencies and
-                // summing native magnitudes would mix hryvnia with euros/dollars.
-                var inflow = g
-                    .Where(t => IsCredit(t.TransactionType))
-                    .Sum(t => CurrencyConverter.ToUsd(Math.Abs(t.Amount), t.Currency));
-                var outflow = g
-                    .Where(t => IsDebit(t.TransactionType))
-                    .Sum(t => CurrencyConverter.ToUsd(Math.Abs(t.Amount), t.Currency));
+                var inflow = g.Sum(f => f.InflowUsd);
+                var outflow = g.Sum(f => f.OutflowUsd);
                 return new CashflowReportEntry(
-                    $"{g.Key.Year:D4}-{g.Key.Month:D2}",
+                    g.Key,
                     inflow,
                     outflow,
                     inflow - outflow,
-                    g.Count());
+                    0);
             })
             .ToList();
     }
 
-    private static bool IsCredit(string? transactionType) =>
-        string.Equals(transactionType, "credit", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsDebit(string? transactionType) =>
-        string.Equals(transactionType, "debit", StringComparison.OrdinalIgnoreCase);
+    private static bool IsWithinRange(string month, DateOnly from, DateOnly to)
+    {
+        if (!DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var monthStart))
+            return false;
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        return monthStart <= to && monthEnd >= from;
+    }
 }
 
 public sealed record CashflowReportEntry(

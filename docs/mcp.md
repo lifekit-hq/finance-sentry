@@ -34,7 +34,7 @@ The current runtime surface contains 62 tools. The canonical list is the `Agreed
 | `get_sync_health` | Read | Sync | `userId?` | Status across Monobank, TrueLayer, Binance, Revolut X, IBKR |
 | `get_crypto_pnl_detail` | Read | Crypto | `userId?` | Per-asset crypto P&L from trade history |
 | `get_tax_lots` | Read | Brokerage | `userId?` | Current tax lots / average cost data |
-| `get_cashflow_report` | Read | Cashflow | `userId?`, `fromDate?`, `toDate?` | Monthly inflow / outflow / net |
+| `get_cashflow_report` | Read | Cashflow | `userId?`, `fromDate?`, `toDate?` | Monthly inflow / outflow / net from the classified money-flow statistics (internal transfers excluded, USD); `TransactionCount` is always 0 — the source query doesn't expose one |
 | `get_net_worth_history` | Read | Wealth | `userId?`, `fromDate?`, `toDate?` | Historical net worth snapshots |
 | `get_macro_calendar` | Read | Research | `from?`, `to?`, `regions?`, `minImportance?` | Scheduled macro events |
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?`, `userId?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
