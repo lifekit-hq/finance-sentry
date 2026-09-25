@@ -22,10 +22,22 @@ public interface IHistoricalExchangeRateService
     /// </summary>
     Task<IReadOnlyDictionary<DateOnly, decimal>> GetDailySeriesAsync(
         string currency, DateOnly from, DateOnly to, CancellationToken ct = default);
+
+    /// <summary>
+    /// The USD-per-unit rate a feed actually published for <paramref name="date"/> — or, when the
+    /// feed skips that day (weekend, holiday), for the closest earlier day within
+    /// <see cref="CachingHistoricalExchangeRateService.PublishedLookbackDays"/>. Returns null when
+    /// no feed published one. Unlike <see cref="GetDailySeriesAsync"/> it never substitutes
+    /// today's live rate, so a caller that must not guess can tell a real rate from a fallback.
+    /// </summary>
+    Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default);
 }
 
 public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRateService
 {
+    /// <summary>How far back a non-publishing day (weekend, holiday) may borrow the last published rate.</summary>
+    public const int PublishedLookbackDays = 7;
+
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(12);
 
     private readonly IReadOnlyList<IHistoricalExchangeRateProvider> _providers;
@@ -59,6 +71,18 @@ public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRa
 
         _cache.Set(cacheKey, series, CacheLifetime);
         return series;
+    }
+
+    public async Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(currency))
+            return null;
+
+        var normalized = currency.Trim().ToUpperInvariant();
+        var published = await FetchPublishedAsync(normalized, date.AddDays(-PublishedLookbackDays), date, ct);
+
+        var onOrBefore = published.Where(kv => kv.Key <= date).OrderByDescending(kv => kv.Key).ToList();
+        return onOrBefore.Count > 0 ? onOrBefore[0].Value : null;
     }
 
     private async Task<IReadOnlyDictionary<DateOnly, decimal>> FetchPublishedAsync(

@@ -73,5 +73,6 @@ public static class ExchangeRateServiceCollectionExtensions
         // be captured by a singleton (stale DNS / socket reuse).
         services.AddMemoryCache();
         services.AddScoped<IHistoricalExchangeRateService, CachingHistoricalExchangeRateService>();
+        services.AddScoped<IEurReportingConverter, EurReportingConverter>();
     }
 }
