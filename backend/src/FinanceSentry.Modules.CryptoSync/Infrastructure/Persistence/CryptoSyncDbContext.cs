@@ -12,6 +12,7 @@ public sealed class CryptoSyncDbContext : DbContext
 
     public DbSet<ExchangeCredential> ExchangeCredentials => Set<ExchangeCredential>();
     public DbSet<CryptoHolding> CryptoHoldings => Set<CryptoHolding>();
+    public DbSet<CryptoTradeRecord> CryptoTrades => Set<CryptoTradeRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,22 @@ public sealed class CryptoSyncDbContext : DbContext
             entity.Property(e => e.TrackedQuantity).HasPrecision(30, 10);
             entity.Property(e => e.TrackedCostUsd).HasPrecision(30, 10);
             entity.Property(e => e.UntrackedQuantity).HasPrecision(30, 10);
+        });
+
+        modelBuilder.Entity<CryptoTradeRecord>(entity =>
+        {
+            entity.ToTable("CryptoTrades");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.TradeId }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.TradeId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Asset).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.QuoteAsset).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Quantity).HasPrecision(30, 10);
+            entity.Property(e => e.PriceUsd).HasPrecision(20, 8);
+            entity.Property(e => e.QuoteQuantityUsd).HasPrecision(20, 4);
+            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.RecordedAt).IsRequired();
         });
     }
 }

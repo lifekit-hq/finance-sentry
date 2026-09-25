@@ -3,6 +3,7 @@ using System;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.CryptoSync.Migrations
 {
     [DbContext(typeof(CryptoSyncDbContext))]
-    partial class CryptoSyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925120906_M006_PersistCryptoTrades")]
+    partial class M006_PersistCryptoTrades
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

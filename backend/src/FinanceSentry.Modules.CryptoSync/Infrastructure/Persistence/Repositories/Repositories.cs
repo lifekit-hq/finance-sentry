@@ -1,4 +1,5 @@
 using FinanceSentry.Modules.CryptoSync.Domain;
+using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -97,5 +98,36 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
     public async Task SaveChangesAsync(CancellationToken ct = default)
     {
         await _context.SaveChangesAsync(ct);
+    }
+}
+
+public sealed class CryptoTradeRepository(CryptoSyncDbContext context) : ICryptoTradeRepository
+{
+    private readonly CryptoSyncDbContext _context = context;
+
+    public async Task AddNewAsync(
+        Guid userId, string provider, IReadOnlyList<CryptoTrade> trades, CancellationToken ct = default)
+    {
+        if (trades.Count == 0)
+        {
+            return;
+        }
+
+        var tradeIds = trades.Select(t => t.TradeId).Distinct(StringComparer.Ordinal).ToList();
+        var existingTradeIds = await _context.CryptoTrades
+            .Where(t => t.UserId == userId && t.Provider == provider && tradeIds.Contains(t.TradeId))
+            .Select(t => t.TradeId)
+            .ToListAsync(ct);
+        var existing = existingTradeIds.ToHashSet(StringComparer.Ordinal);
+
+        var toAdd = trades
+            .Where(t => existing.Add(t.TradeId))
+            .Select(t => CryptoTradeRecord.Create(userId, provider, t))
+            .ToList();
+
+        if (toAdd.Count > 0)
+        {
+            await _context.CryptoTrades.AddRangeAsync(toAdd, ct);
+        }
     }
 }

@@ -21,6 +21,7 @@ public sealed record SyncExchangeHoldingsResult(int HoldingsCount, DateTime Sync
 public sealed class SyncExchangeHoldingsCommandHandler(
     IExchangeCredentialRepository credentialRepository,
     ICryptoHoldingRepository holdingRepository,
+    ICryptoTradeRepository tradeRepository,
     CryptoExchangeAdapterRegistry adapters,
     ICredentialEncryptionService encryption,
     CostBasisCalculator costBasisCalculator,
@@ -162,6 +163,8 @@ public sealed class SyncExchangeHoldingsCommandHandler(
                 continue;
             }
 
+            await tradeRepository.AddNewAsync(request.UserId, request.Provider, trades, ct);
+
             var seed = holding.TradeCount > 0
                 ? new CostBasisResult(
                     CostBasisUsd: holding.CostBasisUsd ?? 0m,
@@ -226,6 +229,11 @@ public sealed class SyncExchangeHoldingsCommandHandler(
                 failed.Add(holding.Asset);
                 firstFailure ??= ex;
                 continue;
+            }
+
+            if (page.Trades.Count > 0)
+            {
+                await tradeRepository.AddNewAsync(request.UserId, request.Provider, page.Trades, ct);
             }
 
             if (holding.TrackedQuantity is null && !page.IsComplete)
