@@ -121,6 +121,15 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   (`Program.cs`), seeded with hardcoded fallbacks until the first refresh.
 - **Unknown currency falls back 1:1.** Use `CurrencyConverter.IsKnown` to flag a total as
   approximate rather than trusting the silent fallback.
+- **Dated EUR boundary (reporting, e.g. tax schedules).** `IEurReportingConverter.ToEurAsync(
+  amount, currency, onDate)` values an amount in EUR at the rate for the *transaction date*, never
+  today's rate. EUR in is EUR out unchanged. It routes through
+  `IHistoricalExchangeRateService.GetPublishedRateAsync`, which returns only a rate a feed
+  actually published for that date (or the closest earlier published day within 7 days, for
+  weekends/holidays). **No published rate → `EurConversion.RateMissing = true` with a null
+  amount** — it does not fall back to the live table (unlike `GetDailySeriesAsync`, which does)
+  and never returns zero; callers must surface the gap. Cross rate = USD-per-unit(currency) ÷
+  USD-per-unit(EUR) on that date. It is additive: the USD aggregation path above is unchanged.
 - **A rate may never be compared to another rate without a freshness check.** The seed table
   is live until the first refresh and survives any feed outage after it (the refresh job
   keeps the current table when the feed yields nothing), so `IsKnown` says nothing about

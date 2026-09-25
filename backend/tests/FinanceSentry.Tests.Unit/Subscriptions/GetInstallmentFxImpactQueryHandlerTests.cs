@@ -33,6 +33,9 @@ public class GetInstallmentFxImpactQueryHandlerTests
 
             return Task.FromResult<IReadOnlyDictionary<DateOnly, decimal>>(series);
         }
+
+        public Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default) =>
+            Task.FromResult<decimal?>(null);
     }
 
     private static DetectedSubscription Installment(
