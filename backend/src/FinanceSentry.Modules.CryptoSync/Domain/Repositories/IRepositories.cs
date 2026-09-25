@@ -1,3 +1,5 @@
+using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
+
 namespace FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 
 public interface IExchangeCredentialRepository
@@ -29,4 +31,13 @@ public interface ICryptoHoldingRepository
     Task DeleteByUserAndProviderAsync(Guid userId, string provider, CancellationToken ct = default);
 
     Task SaveChangesAsync(CancellationToken ct = default);
+}
+
+public interface ICryptoTradeRepository
+{
+    /// <summary>
+    /// Persists fills the walk returned, skipping any already recorded for
+    /// <c>(UserId, Provider, TradeId)</c> so a re-walk of an already-covered page adds nothing.
+    /// </summary>
+    Task AddNewAsync(Guid userId, string provider, IReadOnlyList<CryptoTrade> trades, CancellationToken ct = default);
 }

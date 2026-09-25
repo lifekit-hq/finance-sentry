@@ -58,6 +58,7 @@ public static class CryptoSyncModule
         // #493: this module's credential store joins key rotation.
         services.AddScoped<ICredentialRotationTarget, ExchangeCredentialRotationTarget>();
         services.AddScoped<ICryptoHoldingRepository, CryptoHoldingRepository>();
+        services.AddScoped<ICryptoTradeRepository, CryptoTradeRepository>();
         services.AddScoped<ICryptoHoldingsReader, CryptoHoldingsReader>();
         services.AddScoped<BinanceSyncJob>();
         services.AddScoped<RevolutXSyncJob>();

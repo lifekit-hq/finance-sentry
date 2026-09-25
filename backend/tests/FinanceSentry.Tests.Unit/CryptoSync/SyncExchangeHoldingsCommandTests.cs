@@ -60,6 +60,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         new(
             new ExchangeCredentialRepository(_db),
             new CryptoHoldingRepository(_db),
+            new CryptoTradeRepository(_db),
             new CryptoExchangeAdapterRegistry([_binance.Object, _revolutX.Object]),
             _encryption.Object,
             new CostBasisCalculator(),
@@ -191,6 +192,72 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         after.TradeCursor.Should().Be("USDT=43");
         after.TradeCount.Should().Be(1);
         after.CostBasisUsd.Should().Be(50_000m);
+    }
+
+    [Fact]
+    public async Task WalkedFills_ArePersisted_ToTheCryptoTradesTable()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", null, It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CryptoTradePage(
+                [new CryptoTrade("42", "BTC", "USDT", 1m, 50_000m, 50_000m, IsBuyer: true, Now.UtcDateTime)],
+                "USDT=43"));
+
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        var row = await _db.CryptoTrades.AsNoTracking().SingleAsync();
+        row.UserId.Should().Be(_userId);
+        row.Provider.Should().Be(CryptoExchangeProvider.Binance);
+        row.TradeId.Should().Be("42");
+        row.Asset.Should().Be("BTC");
+        row.QuoteAsset.Should().Be("USDT");
+        row.Quantity.Should().Be(1m);
+        row.PriceUsd.Should().Be(50_000m);
+        row.QuoteQuantityUsd.Should().Be(50_000m);
+        row.IsBuyer.Should().BeTrue();
+        row.Timestamp.Should().Be(Now.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task ReWalkingTheSamePage_AddsNothing()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        var page = new CryptoTradePage(
+            [new CryptoTrade("42", "BTC", "USDT", 1m, 50_000m, 50_000m, IsBuyer: true, Now.UtcDateTime)],
+            "USDT=43");
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", It.IsAny<string?>(), It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(page);
+
+        await SyncAsync(CryptoExchangeProvider.Binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        var rows = await _db.CryptoTrades.AsNoTracking().ToListAsync();
+        rows.Should().ContainSingle().Which.TradeId.Should().Be("42");
+    }
+
+    [Fact]
+    public async Task ClosedPosition_KeepsItsPersistedFills_WhenTheHoldingRowIsRemoved()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", null, It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CryptoTradePage(
+                [new CryptoTrade("42", "BTC", "USDT", 1m, 50_000m, 50_000m, IsBuyer: true, Now.UtcDateTime)],
+                "USDT=43"));
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        // Position fully sold out on the venue: the holding row is reconciled away next sync.
+        Holdings(_binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        (await _db.CryptoHoldings.AsNoTracking().ToListAsync()).Should().BeEmpty();
+        var row = await _db.CryptoTrades.AsNoTracking().SingleAsync();
+        row.TradeId.Should().Be("42", "a persisted fill outlives the holding row it came from");
     }
 
     [Fact]
