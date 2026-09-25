@@ -202,6 +202,9 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
         _factory.HoldingRepoMock
             .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        _factory.HoldingRepoMock
+            .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
         var response = await _client.DeleteAsync("/api/v1/crypto/binance/disconnect");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -223,6 +226,9 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
             .Returns(Task.CompletedTask);
         _factory.HoldingRepoMock
             .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _factory.HoldingRepoMock
+            .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
             .Setup(r => r.DeleteByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -308,6 +314,9 @@ public class CryptoControllerRevolutXContractTests(CryptoApiFactory factory) : I
                 _factory.TestUserId, CryptoExchangeProvider.RevolutX, [1], [2], [3], [4], [5], [6], 1));
         _factory.HoldingRepoMock
             .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _factory.HoldingRepoMock
+            .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.DeleteAsync("/api/v1/crypto/revolut-x/disconnect");
@@ -417,6 +426,9 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
             .Returns(Task.CompletedTask);
         HoldingRepoMock
             .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        HoldingRepoMock
+            .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         HoldingRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))

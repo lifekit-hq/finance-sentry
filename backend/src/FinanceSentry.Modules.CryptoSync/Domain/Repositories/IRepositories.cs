@@ -20,8 +20,12 @@ public interface ICryptoHoldingRepository
     /// <summary>Every venue's holdings for the user.</summary>
     Task<IReadOnlyList<CryptoHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
 
-    /// <summary>One venue's holdings for the user.</summary>
+    /// <summary>One venue's open holdings for the user — closed rows (#435 S2) are excluded.</summary>
     Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default);
+
+    /// <summary>One venue's holdings for the user, closed rows included (sync and disconnect only).</summary>
+    Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderAsync(
         Guid userId, string provider, CancellationToken ct = default);
 
     /// <summary>Marks the given tracked holdings for deletion (used to reconcile sold-out assets).</summary>

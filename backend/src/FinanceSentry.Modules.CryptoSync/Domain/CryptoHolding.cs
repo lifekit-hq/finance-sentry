@@ -34,6 +34,14 @@ public sealed class CryptoHolding
 
     public int TradeCount { get; private set; }
 
+    /// <summary>
+    /// Set when the position left the venue (#435 S2). A closed row keeps its cursor and realized
+    /// totals so a later reopen continues the same walk; current-holdings reads exclude it.
+    /// </summary>
+    public DateTime? ClosedAt { get; private set; }
+
+    public bool IsClosed => ClosedAt is not null;
+
     // The forward ledger (#472) for venues whose fill history starts at connect — null until it
     // first runs, and always null for a venue with full history (Binance). Kept apart from the
     // displayed figures above: those go null while any lot is unpriced, the ledger never does.
@@ -84,6 +92,16 @@ public sealed class CryptoHolding
         UsdValue = usdValue;
         IsFiat = isFiat;
         SyncedAt = DateTime.UtcNow;
+        ClosedAt = null;
+    }
+
+    public void Close()
+    {
+        FreeQuantity = 0m;
+        LockedQuantity = 0m;
+        UsdValue = 0m;
+        SyncedAt = DateTime.UtcNow;
+        ClosedAt ??= DateTime.UtcNow;
     }
 
     public void SetCostBasis(

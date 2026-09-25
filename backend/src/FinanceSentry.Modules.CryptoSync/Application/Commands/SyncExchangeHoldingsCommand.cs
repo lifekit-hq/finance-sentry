@@ -90,8 +90,9 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             await holdingRepository.SaveChangesAsync(ct);
 
             // Reconcile: the adapter only returns assets the user still holds on this venue (dust
-            // and zero balances are already dropped), so anything this venue persisted but did not
-            // return was sold out — delete it instead of leaving a stale $0 holding.
+            // and zero balances are already dropped), so anything this venue held but did not
+            // return was sold out — soft-close it (#435 S2) so its cursor and realized totals
+            // survive; a later reappearance reopens the same row via the upsert above.
             var freshAssets = holdings
                 .Select(h => h.Asset)
                 .ToHashSet(StringComparer.Ordinal);
@@ -99,19 +100,25 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             var stale = persisted
                 .Where(h => !freshAssets.Contains(h.Asset))
                 .ToList();
+            foreach (var holding in stale)
+            {
+                holding.Close();
+            }
+
             if (stale.Count > 0)
             {
-                holdingRepository.RemoveRange(stale);
                 await holdingRepository.SaveChangesAsync(ct);
             }
 
+            var justClosed = stale.Select(h => h.Asset).ToHashSet(StringComparer.Ordinal);
+
             if (adapter.TradeHistoryStartsAtConnect)
             {
-                await UpdateForwardLedgerAsync(adapter, request, apiKey, apiSecret, walk, ct);
+                await UpdateForwardLedgerAsync(adapter, request, apiKey, apiSecret, walk, justClosed, ct);
             }
             else
             {
-                await UpdateCostBasisAsync(adapter, request, apiKey, apiSecret, walk, ct);
+                await UpdateCostBasisAsync(adapter, request, apiKey, apiSecret, walk, justClosed, ct);
             }
 
             var syncedAt = DateTime.UtcNow;
@@ -130,15 +137,29 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         }
     }
 
+    /// <summary>
+    /// Open holdings plus those closed by this run: their last fills are still unwalked. Holdings
+    /// closed by an earlier run are left alone until they reopen and resume from their cursor.
+    /// </summary>
+    private async Task<IReadOnlyList<CryptoHolding>> WalkableHoldingsAsync(
+        SyncExchangeHoldingsCommand request,
+        IReadOnlySet<string> justClosed,
+        CancellationToken ct)
+    {
+        var all = await holdingRepository.GetAllByUserAndProviderAsync(request.UserId, request.Provider, ct);
+        return all.Where(h => !h.IsClosed || justClosed.Contains(h.Asset)).ToList();
+    }
+
     private async Task UpdateCostBasisAsync(
         ICryptoExchangeAdapter adapter,
         SyncExchangeHoldingsCommand request,
         string apiKey,
         string apiSecret,
         CryptoTradeWalk walk,
+        IReadOnlySet<string> justClosed,
         CancellationToken ct)
     {
-        var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
+        var persisted = await WalkableHoldingsAsync(request, justClosed, ct);
 
         foreach (var holding in persisted)
         {
@@ -208,9 +229,10 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         string apiKey,
         string apiSecret,
         CryptoTradeWalk walk,
+        IReadOnlySet<string> justClosed,
         CancellationToken ct)
     {
-        var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
+        var persisted = await WalkableHoldingsAsync(request, justClosed, ct);
         var failed = new List<string>();
         CryptoExchangeException? firstFailure = null;
 

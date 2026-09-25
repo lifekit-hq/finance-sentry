@@ -71,11 +71,19 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
     public async Task<IReadOnlyList<CryptoHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.CryptoHoldings
-            .Where(h => h.UserId == userId)
+            .Where(h => h.UserId == userId && h.ClosedAt == null)
             .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+    {
+        return await _context.CryptoHoldings
+            .Where(h => h.UserId == userId && h.Provider == provider && h.ClosedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderAsync(
         Guid userId, string provider, CancellationToken ct = default)
     {
         return await _context.CryptoHoldings
