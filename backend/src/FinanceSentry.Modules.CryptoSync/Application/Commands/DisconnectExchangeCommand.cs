@@ -18,7 +18,7 @@ public sealed class DisconnectExchangeCommandHandler(
     public async Task<Unit> Handle(DisconnectExchangeCommand command, CancellationToken cancellationToken)
     {
         var credential = await credentialRepository.GetAsync(command.UserId, command.Provider, cancellationToken);
-        var holdings = await holdingRepository.GetByUserAndProviderAsync(
+        var holdings = await holdingRepository.GetAllByUserAndProviderAsync(
             command.UserId, command.Provider, cancellationToken);
 
         var hasActiveCredential = credential is { IsActive: true };

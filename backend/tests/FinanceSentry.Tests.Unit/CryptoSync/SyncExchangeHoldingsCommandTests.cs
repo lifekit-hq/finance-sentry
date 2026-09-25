@@ -106,7 +106,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task SoldOutOnOneVenue_RemovesOnlyThatVenuesRow()
+    public async Task SoldOutOnOneVenue_ClosesOnlyThatVenuesRow()
     {
         await ConnectAsync(CryptoExchangeProvider.Binance);
         await ConnectAsync(CryptoExchangeProvider.RevolutX);
@@ -119,7 +119,8 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
         await SyncAsync(CryptoExchangeProvider.RevolutX);
 
         var rows = await _db.CryptoHoldings.AsNoTracking().ToListAsync();
-        rows.Should().ContainSingle().Which.Provider.Should().Be(CryptoExchangeProvider.Binance);
+        rows.Should().ContainSingle(h => !h.IsClosed).Which.Provider.Should().Be(CryptoExchangeProvider.Binance);
+        rows.Should().ContainSingle(h => h.IsClosed).Which.Provider.Should().Be(CryptoExchangeProvider.RevolutX);
     }
 
     [Fact]
@@ -240,7 +241,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task ClosedPosition_KeepsItsPersistedFills_WhenTheHoldingRowIsRemoved()
+    public async Task ClosedPosition_KeepsItsPersistedFills()
     {
         await ConnectAsync(CryptoExchangeProvider.Binance);
         Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
@@ -251,13 +252,76 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
                 "USDT=43"));
         await SyncAsync(CryptoExchangeProvider.Binance);
 
-        // Position fully sold out on the venue: the holding row is reconciled away next sync.
+        // Position fully sold out on the venue: the holding row is soft-closed next sync.
         Holdings(_binance);
         await SyncAsync(CryptoExchangeProvider.Binance);
 
-        (await _db.CryptoHoldings.AsNoTracking().ToListAsync()).Should().BeEmpty();
+        (await _db.CryptoHoldings.AsNoTracking().SingleAsync()).IsClosed.Should().BeTrue();
         var row = await _db.CryptoTrades.AsNoTracking().SingleAsync();
-        row.TradeId.Should().Be("42", "a persisted fill outlives the holding row it came from");
+        row.TradeId.Should().Be("42", "a persisted fill outlives the holding closing");
+    }
+
+    private static CryptoTradePage BuyPage(string id, string cursor) =>
+        new([new CryptoTrade(id, "BTC", "USDT", 1m, 50_000m, 50_000m, IsBuyer: true, Now.UtcDateTime)], cursor);
+
+    [Fact]
+    public async Task ClosedPosition_KeepsRowCursorAndRealizedTotal_AndReadsExcludeIt()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", null, It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuyPage("1", "USDT=2"));
+        await SyncAsync(CryptoExchangeProvider.Binance);
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", "USDT=2", It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CryptoTradePage(
+                [new CryptoTrade("2", "BTC", "USDT", 1m, 70_000m, 70_000m, IsBuyer: false, Now.UtcDateTime)],
+                "USDT=3"));
+
+        Holdings(_binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        var row = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
+        row.IsClosed.Should().BeTrue();
+        row.FreeQuantity.Should().Be(0m);
+        row.UsdValue.Should().Be(0m);
+        row.TradeCursor.Should().Be("USDT=3");
+        row.RealizedPnlUsd.Should().Be(20_000m);
+
+        var repo = new CryptoHoldingRepository(_db);
+        (await repo.GetByUserIdAsync(_userId)).Should().BeEmpty();
+        (await repo.GetByUserAndProviderAsync(_userId, CryptoExchangeProvider.Binance)).Should().BeEmpty();
+        (await repo.GetAllByUserAndProviderAsync(_userId, CryptoExchangeProvider.Binance)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ReappearingPosition_ReopensTheSameRow_AndContinuesItsCursor()
+    {
+        await ConnectAsync(CryptoExchangeProvider.Binance);
+        Holdings(_binance, new CryptoAssetBalance("BTC", 1m, 0m, 60_000m));
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", null, It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuyPage("1", "USDT=2"));
+        await SyncAsync(CryptoExchangeProvider.Binance);
+        var id = (await _db.CryptoHoldings.AsNoTracking().SingleAsync()).Id;
+        Holdings(_binance);
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        Holdings(_binance, new CryptoAssetBalance("BTC", 2m, 0m, 120_000m));
+        _binance
+            .Setup(a => a.GetTradesAsync("api-key", "api-secret", "BTC", "USDT=2", It.IsAny<CryptoTradeWalk>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuyPage("3", "USDT=4"));
+        await SyncAsync(CryptoExchangeProvider.Binance);
+
+        var row = await _db.CryptoHoldings.AsNoTracking().SingleAsync();
+        row.Id.Should().Be(id);
+        row.IsClosed.Should().BeFalse();
+        row.FreeQuantity.Should().Be(2m);
+        row.TradeCursor.Should().Be("USDT=4");
+        (await new CryptoHoldingRepository(_db).GetByUserIdAsync(_userId)).Should().ContainSingle();
+        (await _db.CryptoTrades.AsNoTracking().Select(t => t.TradeId).OrderBy(t => t).ToListAsync())
+            .Should().Equal("1", "3");
     }
 
     [Fact]
