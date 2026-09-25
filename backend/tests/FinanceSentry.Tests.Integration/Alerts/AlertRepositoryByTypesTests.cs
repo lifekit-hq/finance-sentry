@@ -21,12 +21,15 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
         _repo = new AlertRepository(_db);
     }
 
-    private Alert Add(string type, int minutesAgo, bool dismissed = false, Guid? user = null)
+    private Alert Add(
+        string type, int minutesAgo, bool dismissed = false, Guid? user = null,
+        bool isRead = false, bool isResolved = false)
     {
         var a = new Alert
         {
             UserId = user ?? User, Type = type, Severity = AlertSeverity.Info, Title = type, Message = "m",
-            IsDismissed = dismissed, CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
+            IsDismissed = dismissed, IsRead = isRead, IsResolved = isResolved,
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
         };
         _db.Alerts.Add(a);
         return a;
@@ -58,6 +61,30 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
 
         total.Should().Be(5);
         page2.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetUnreadCountAsync_excludes_resolved_alerts()
+    {
+        Add(AlertType.LowBalance, 10, isRead: false, isResolved: false);
+        Add(AlertType.SyncFailure, 5, isRead: false, isResolved: true);
+        await _db.SaveChangesAsync();
+
+        var count = await _repo.GetUnreadCountAsync(User);
+
+        count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_unread_count_leg_excludes_resolved_alerts()
+    {
+        Add(AlertType.LowBalance, 10, isRead: false, isResolved: false);
+        Add(AlertType.SyncFailure, 5, isRead: false, isResolved: true);
+        await _db.SaveChangesAsync();
+
+        var (_, _, unreadCount) = await _repo.GetPagedAsync(User, filter: null, page: 1, pageSize: 10);
+
+        unreadCount.Should().Be(1);
     }
 
     public void Dispose() => _db.Dispose();

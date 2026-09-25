@@ -24,7 +24,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         };
 
         var totalCount = await filtered.CountAsync(ct);
-        var unreadCount = await baseQuery.CountAsync(a => !a.IsRead, ct);
+        var unreadCount = await baseQuery.CountAsync(a => !a.IsRead && !a.IsResolved, ct);
 
         var items = await filtered
             .OrderByDescending(a => a.CreatedAt)
@@ -38,7 +38,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
     {
         return _db.Alerts.AsNoTracking()
-            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead, ct);
+            .CountAsync(a => a.UserId == userId && !a.IsDismissed && !a.IsRead && !a.IsResolved, ct);
     }
 
     public Task<Alert?> FindActiveAsync(
