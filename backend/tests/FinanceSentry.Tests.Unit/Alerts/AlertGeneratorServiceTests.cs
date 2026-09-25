@@ -121,6 +121,35 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task SyncFailure_ProviderLevel_TwoProvidersAlertIndependently()
+    {
+        var store = new List<Alert>();
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync((Guid uid, string t, Guid? refId, CancellationToken _) =>
+                store.FirstOrDefault(a => a.ReferenceId == refId && !a.IsResolved));
+        _repo.Setup(r => r.HasRecentAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+                It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback((Alert a, CancellationToken _) => store.Add(a))
+            .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ResolveAsync(It.IsAny<Guid>(), default))
+            .Callback((Guid id, CancellationToken _) => store.First(a => a.Id == id).IsResolved = true)
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateSyncFailureAlertAsync(_userId, "binance", null, null, "ERR");
+        await _service.GenerateSyncFailureAlertAsync(_userId, "ibkr", null, null, "ERR");
+
+        Assert.Equal(2, store.Count);
+
+        await _service.ResolveSyncFailureAlertAsync(_userId, "binance", null);
+
+        Assert.True(store.Single(a => a.Message.Contains("binance")).IsResolved);
+        Assert.False(store.Single(a => a.Message.Contains("ibkr")).IsResolved);
+    }
+
+    [Fact]
     public async Task GenerateSyncFailure_RecentDismissed_SkipsCreation()
     {
         _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, _accountId, default))
