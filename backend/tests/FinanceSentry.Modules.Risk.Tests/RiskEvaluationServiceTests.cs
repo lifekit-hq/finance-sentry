@@ -431,6 +431,29 @@ public sealed class RiskEvaluationServiceTests
     }
 
     [Fact]
+    public void EvaluateProposal_Paper_BreachesMinCashBuffer_StillAllowed()
+    {
+        var book = new BookSnapshot(10000m, 1500m, [], false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MinCashBufferPct = 0.1m };
+
+        var verdict = _service.EvaluateProposal(book, ruleSet, "NVDA", 1000m, 0, isPaper: true);
+
+        verdict.Decision.Should().Be(RiskDecision.Allowed, "paper/tracking promotions never draw down real cash (finance-sentry#704)");
+    }
+
+    [Fact]
+    public void EvaluateProposal_Paper_BreachesMaxPositionWeight_StillRefused()
+    {
+        var book = new BookSnapshot(10000m, 1500m, [], false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 0.25m, MinCashBufferPct = 0.5m };
+
+        var verdict = _service.EvaluateProposal(book, ruleSet, "NVDA", 5000m, 0, isPaper: true);
+
+        verdict.Decision.Should().Be(RiskDecision.Refused, "concentration rules still apply to paper promotions");
+        verdict.RuleKey.Should().Be(RiskRuleKeys.MaxPositionWeight);
+    }
+
+    [Fact]
     public void EvaluateProposal_BreachesMaxNewPosition_ReturnsRefused()
     {
         var book = new BookSnapshot(10000m, 5000m, [], false, [], 0m);

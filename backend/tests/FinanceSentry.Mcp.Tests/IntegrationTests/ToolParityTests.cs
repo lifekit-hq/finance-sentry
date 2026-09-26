@@ -1424,6 +1424,61 @@ public sealed class ToolParityTests
     }
 
     [Fact]
+    public async Task PromoteCandidate_Paper_BelowCashFloor_IsAllowed_ButRealBook_IsStillRefused()
+    {
+        var quotes = new Dictionary<string, QuoteCacheEntry>
+        {
+            ["AMD"] = new() { Ticker = "AMD", Price = 100m },
+            ["INTC"] = new() { Ticker = "INTC", Price = 50m },
+        };
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var userId = Guid.NewGuid();
+
+        // Real book: mostly invested, cash sits well below a 10% floor ($200 cash / $10,000 book).
+        var bankDb = svc.GetRequiredService<BankSyncDbContext>();
+        var account = new BankAccount(userId, "ext-paper-cash", "Chase", "checking", "1234", "Test", "USD", userId, "truelayer");
+        account.BeginSync();
+        account.MarkActive(200m);
+        bankDb.BankAccounts.Add(account);
+        await bankDb.SaveChangesAsync();
+
+        var cryptoHolding = CryptoHolding.Create(userId, CryptoExchangeProvider.Binance, "SOL", 10m, 0m, 9_800m);
+        cryptoHolding.SetCostBasis(50_000m, 9_800m, null, DateTime.UtcNow, 1);
+        var cryptoDb = svc.GetRequiredService<CryptoSyncDbContext>();
+        cryptoDb.CryptoHoldings.Add(cryptoHolding);
+        await cryptoDb.SaveChangesAsync();
+
+        var saveRiskRules = svc.GetRequiredService<SaveRiskRulesTool>();
+        await saveRiskRules.ExecuteAsync(minCashBufferPct: 0.10m, userId: userId);
+
+        var scoreTool = svc.GetRequiredService<ScoreCandidateTool>();
+        var scoredPaper = await scoreTool.ExecuteAsync("AMD", userId: userId);
+        var scoredReal = await scoreTool.ExecuteAsync("INTC", userId: userId);
+
+        var promoteTool = svc.GetRequiredService<PromoteCandidateTool>();
+
+        // Paper/tracking promotion: MinCashBuffer must not block it — no override needed.
+        var paperResult = await promoteTool.ExecuteAsync(
+            id: scoredPaper!.CandidateId, proposedUsd: 100m, userId: userId, paper: true);
+
+        paperResult.Should().NotBeNull();
+        paperResult!.Gate.Decision.Should().Be(RiskGateDecision.Allowed);
+        paperResult.ThesisId.Should().NotBeNull();
+
+        // Same book, same size, paper=false (default): today's real-book rule set still refuses.
+        var realResult = await promoteTool.ExecuteAsync(
+            id: scoredReal!.CandidateId, proposedUsd: 100m, userId: userId);
+
+        realResult.Should().NotBeNull();
+        realResult!.Gate.Decision.Should().Be(RiskGateDecision.Refused);
+        realResult.Gate.RuleKey.Should().Be(RiskRuleKeys.MinCashBuffer);
+        realResult.ThesisId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task RejectCandidate_MarksRejected_WithReason()
     {
         var userId = Guid.NewGuid();

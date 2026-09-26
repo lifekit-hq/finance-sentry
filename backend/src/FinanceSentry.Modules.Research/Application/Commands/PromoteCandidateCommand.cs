@@ -15,6 +15,10 @@ using Microsoft.Extensions.Options;
 /// unless the caller passes <see cref="OverrideRisk"/>, in which case the override is recorded as a
 /// signal (never silent — FR-007). Invalidation triggers are the caller's when supplied, else the
 /// deterministic <see cref="TriggerPrefill"/> derived from the candidate's latest scorecard.
+/// <see cref="Paper"/> (finance-sentry#704) marks the promotion as tracking-only: it never draws
+/// down real cash, so the gate skips the real-book cash-funding rule (MinCashBuffer) for it while
+/// still enforcing concentration/sizing rules (MaxPositionWeight, MaxNewPosition, Turnover). Real
+/// (non-paper) promotions keep today's full rule set unchanged.
 /// </summary>
 public record PromoteCandidateCommand(
     Guid UserId,
@@ -22,7 +26,8 @@ public record PromoteCandidateCommand(
     IReadOnlyList<ThesisInvalidationTrigger>? Triggers = null,
     bool OverrideRisk = false,
     decimal ProposedUsd = 0m,
-    string? DecisionNote = null) : ICommand<PromoteCandidateResult>;
+    string? DecisionNote = null,
+    bool Paper = false) : ICommand<PromoteCandidateResult>;
 
 public sealed record PromoteCandidateResult(
     Guid? ThesisId,
@@ -56,7 +61,7 @@ public sealed class PromoteCandidateCommandHandler(
         }
 
         var gate = await riskGate.CheckProposalAsync(
-            command.UserId, candidate.Ticker, command.ProposedUsd, command.OverrideRisk, ct);
+            command.UserId, candidate.Ticker, command.ProposedUsd, command.OverrideRisk, command.Paper, ct);
 
         if (gate.Decision == RiskGateDecision.Refused && !command.OverrideRisk)
         {
