@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="BrokerageSync\Flex\Fixtures\sample-flex-statement.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The API host references every deployable module, so this one reference keeps the
          Architecture tests (MigrationDiscoveryTests) scanning all module assemblies —
          including ones this project doesn't reference directly and future ones. -->

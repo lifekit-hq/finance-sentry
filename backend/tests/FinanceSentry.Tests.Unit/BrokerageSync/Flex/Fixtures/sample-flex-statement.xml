@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fully synthetic IBKR Activity Flex Query statement used by IbkrFlexClient tests. Every
+  symbol, quantity, price, account id and trade/execution id below is made up — this is not
+  data from a real IBKR account and must never be replaced with one (public repo).
+-->
+<FlexQueryResponse queryName="SyntheticActivityQuery" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U0000001" fromDate="20220103" toDate="20220103" period="LastBusinessDay" whenGenerated="20220104;010000">
+      <Trades>
+        <Trade accountId="U0000001" currency="USD" fxRateToBase="1" assetCategory="STK" symbol="ZZZQ" description="ZZZ HOLDINGS INC" conid="900000001" securityID="US0000000001" cusip="000000001" isin="US0000000001" figi="BBG000000001" listingExchange="NASDAQ" tradeID="700000001" reportDate="20220103" tradeDate="20220103" tradeTime="143000" settleDateTarget="20220105" transactionType="ExchTrade" quantity="10" tradePrice="123.45" tradeMoney="1234.50" proceeds="-1234.50" taxes="0" ibCommission="-1.00" ibCommissionCurrency="USD" closePrice="124.00" openCloseIndicator="O" notes="" cost="1235.50" fifoPnlRealized="0" mtmPnl="5.50" buySell="BUY" ibOrderID="800000001" ibExecID="0000abcd.00000001.01" openDateTime="20220103;143000" holdingPeriodDateTime="" netCash="-1235.50" levelOfDetail="EXECUTION" />
+        <Trade accountId="U0000001" currency="USD" fxRateToBase="1" assetCategory="STK" symbol="ZZZQ" description="ZZZ HOLDINGS INC" conid="900000001" securityID="US0000000001" cusip="000000001" isin="US0000000001" figi="BBG000000001" listingExchange="NASDAQ" tradeID="700000002" reportDate="20220103" tradeDate="20220103" tradeTime="153000" settleDateTarget="20220105" transactionType="ExchTrade" quantity="-4" tradePrice="126.00" tradeMoney="-504.00" proceeds="504.00" taxes="0" ibCommission="-1.00" ibCommissionCurrency="USD" closePrice="124.00" openCloseIndicator="C" notes="" cost="-494.20" fifoPnlRealized="8.80" mtmPnl="-1.00" buySell="SELL" ibOrderID="800000002" ibExecID="0000abcd.00000001.02" openDateTime="20220103;143000" holdingPeriodDateTime="20220103;153000" netCash="503.00" levelOfDetail="EXECUTION" />
+      </Trades>
+      <CashTransactions>
+        <CashTransaction accountId="U0000001" currency="USD" fxRateToBase="1" assetCategory="STK" symbol="ZZZQ" description="ZZZ HOLDINGS INC(US0000000001) CASH DIVIDEND USD 0.10 PER SHARE" conid="900000001" securityID="US0000000001" cusip="000000001" isin="US0000000001" figi="BBG000000001" dateTime="20220103;000000" amount="1.00" type="Dividends" tradeID="" code="" section871m="0.00" />
+        <CashTransaction accountId="U0000001" currency="USD" fxRateToBase="1" assetCategory="" symbol="" description="ELECTRONIC FUND TRANSFER" conid="" securityID="" cusip="" isin="" figi="" dateTime="20220102;000000" amount="5000.00" type="Deposits/Withdrawals" tradeID="" code="" section871m="" />
+      </CashTransactions>
+      <FinancialInstrumentInformation>
+        <FinancialInstrument assetCategory="STK" symbol="ZZZQ" description="ZZZ HOLDINGS INC" conid="900000001" securityID="US0000000001" cusip="000000001" isin="US0000000001" figi="BBG000000001" listingExchange="NASDAQ" subCategory="COMMON" multiplier="1" expiry="" strike="" issuer="" maturity="" issueDate="" code="" type="COMMON" />
+      </FinancialInstrumentInformation>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

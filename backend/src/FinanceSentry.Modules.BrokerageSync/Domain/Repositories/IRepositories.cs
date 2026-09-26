@@ -11,6 +11,15 @@ public interface IIBKRCredentialRepository
     Task SaveChangesAsync(CancellationToken ct = default);
 }
 
+public interface IIBKRFlexCredentialRepository
+{
+    Task AddAsync(IBKRFlexCredential credential, CancellationToken ct = default);
+    Task<IBKRFlexCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<IBKRFlexCredential>> GetAllActiveAsync(CancellationToken ct = default);
+    void Update(IBKRFlexCredential credential);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+
 public interface IBrokerageHoldingRepository
 {
     Task UpsertRangeAsync(IEnumerable<BrokerageHolding> holdings, CancellationToken ct = default);

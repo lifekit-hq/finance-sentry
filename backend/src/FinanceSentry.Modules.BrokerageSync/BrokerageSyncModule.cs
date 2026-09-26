@@ -5,6 +5,7 @@ using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Interfaces;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
@@ -59,6 +60,18 @@ public static class BrokerageSyncModule
         services.AddScoped<IIBKRCredentialRepository, IBKRCredentialRepository>();
         // #493: this module's credential store joins key rotation.
         services.AddScoped<ICredentialRotationTarget, IBKRCredentialRotationTarget>();
+
+        // IBKR Flex Web Service: a second, separate broker credential (token +
+        // Activity Flex Query id) for historical statement pulls. Additive to
+        // the OAuth connection above — no shared state, no shared session.
+        services.Configure<IbkrFlexOptions>(config.GetSection(IbkrFlexOptions.SectionName));
+        services.AddScoped<IIbkrFlexConnector, IbkrFlexConnector>();
+        services.AddScoped<IIbkrFlexCredentialResolver, IbkrFlexCredentialResolver>();
+        services.AddSingleton<IbkrFlexRateLimiter>();
+        services.AddHttpClient<IIbkrFlexClient, IbkrFlexClient>();
+        services.AddScoped<IIbkrFlexStatementFetcher, IbkrFlexStatementFetcher>();
+        services.AddScoped<IIBKRFlexCredentialRepository, IBKRFlexCredentialRepository>();
+        services.AddScoped<ICredentialRotationTarget, IBKRFlexCredentialRotationTarget>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
         services.AddScoped<IBrokerageInstrumentRepository, BrokerageInstrumentRepository>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
