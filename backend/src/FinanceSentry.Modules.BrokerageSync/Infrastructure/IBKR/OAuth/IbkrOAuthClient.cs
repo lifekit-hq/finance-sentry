@@ -85,7 +85,7 @@ public sealed class IbkrOAuthClient(
             // next call re-derives a fresh one.
             _tokens.TryRemove(credentials.UserId, out _);
             throw new BrokerAuthException(
-                $"IBKR rejected the signed request to {path} ({(int)response.StatusCode}).", "IBKR");
+                $"IBKR rejected the signed request to {path} ({(int)response.StatusCode}).", "IBKR", response.StatusCode);
         }
         response.EnsureSuccessStatusCode();
         return response;
@@ -151,7 +151,7 @@ public sealed class IbkrOAuthClient(
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             throw new BrokerAuthException(
-                $"IBKR live-session-token request failed ({(int)response.StatusCode}): {body}", "IBKR");
+                $"IBKR live-session-token request failed ({(int)response.StatusCode}): {body}", "IBKR", response.StatusCode);
         }
 
         var payload = await response.Content.ReadFromJsonAsync<LiveSessionTokenResponse>(ct)
