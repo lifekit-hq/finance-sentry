@@ -102,6 +102,32 @@ public class ConsecutiveFailureAlertFilterTests
             Times.AtLeast(2));
     }
 
+    [Fact]
+    public void SuccessAfterAlertedStreak_ResolvesAlert()
+    {
+        var filter = Build();
+
+        Fail(filter, times: Threshold);
+        filter.RecordOutcome(Job, succeeded: true, error: null);
+
+        _generator.Verify(g => g.ResolveJobFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void SuccessWithoutPriorAlert_DoesNotResolve()
+    {
+        var filter = Build();
+
+        Fail(filter, times: Threshold - 1);
+        filter.RecordOutcome(Job, succeeded: true, error: null);
+
+        _generator.Verify(g => g.ResolveJobFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private ConsecutiveFailureAlertFilter Build()
     {
         var services = new ServiceCollection();

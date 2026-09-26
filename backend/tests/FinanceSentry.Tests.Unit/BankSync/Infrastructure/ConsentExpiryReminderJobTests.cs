@@ -18,6 +18,12 @@ public class ConsentExpiryReminderJobTests
     private readonly Mock<ITrueLayerConnectionRepository> _connections = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
 
+    public ConsentExpiryReminderJobTests()
+    {
+        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     [Fact]
     public async Task ExecuteAsync_RaisesOneAlertPerExpiringConnection()
     {
@@ -60,6 +66,42 @@ public class ConsentExpiryReminderJobTests
         // Threshold is ~ReminderWindowDays in the future (allow scheduling slack).
         var expected = DateTime.UtcNow.AddDays(ConsentExpiryReminderJob.ReminderWindowDays);
         Assert.True(Math.Abs((askedThreshold!.Value - expected).TotalMinutes) < 5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResolvesLinkedConnection_NoLongerExpiring()
+    {
+        var conn = new TrueLayerConnection(Guid.NewGuid(), "ob-aib", "AIB", "ref-1");
+        conn.MarkLinked(DateTime.UtcNow.AddDays(60));
+
+        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([conn]);
+
+        await MakeJob().ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveConsentExpiringAlertAsync(conn.UserId, conn.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoResolve_WhenConnectionStillExpiring()
+    {
+        var expiresAt = DateTime.UtcNow.AddDays(3);
+        var conn = new TrueLayerConnection(Guid.NewGuid(), "ob-aib", "AIB", "ref-1");
+        conn.MarkLinked(expiresAt);
+
+        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([conn]);
+        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([conn]);
+
+        await MakeJob().ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveConsentExpiringAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     private ConsentExpiryReminderJob MakeJob()
