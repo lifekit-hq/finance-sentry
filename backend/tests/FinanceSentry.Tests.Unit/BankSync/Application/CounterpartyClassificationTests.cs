@@ -497,4 +497,53 @@ public class CounterpartyClassificationTests
         result.Matches![uahRent.Id].Name.Should().Be("Мама");
         result.Matches[uahRent.Id].FlowRole.Should().Be(FlowRoles.FamilySupport);
     }
+
+    // ── #434 S1: native per-currency subtotals on CounterpartyMonthlyFlow ──────
+
+    [Fact]
+    public async Task Classify_CounterpartyWithTwoAccountCurrencies_ProducesTwoNativeSubtotalsSummingToUsdTotal()
+    {
+        var mama = MakeCounterparty("Мама", ("description_contains", "мама"));
+        var sut = BuildSut(mama);
+
+        var uahAccountId = Guid.NewGuid();
+        var eurAccountId = Guid.NewGuid();
+        var uahCredit = MakeTx(18000m, "credit", "від мама", accountId: uahAccountId);
+        var eurDebit = MakeTx(200m, "debit", "мама переказ", accountId: eurAccountId);
+        var accountCurrencies = new Dictionary<Guid, string> { [uahAccountId] = "UAH", [eurAccountId] = "EUR" };
+
+        var result = await sut.ClassifyAsync(UserId, [uahCredit, eurDebit], accountCurrencies);
+
+        var flow = result.MonthlyFlows.Should().ContainSingle().Subject;
+        flow.ByCurrency.Should().HaveCount(2);
+
+        var uah = flow.ByCurrency!.Single(c => c.Currency == "UAH");
+        uah.Received.Should().Be(18000m);
+        uah.Sent.Should().Be(0m);
+
+        var eur = flow.ByCurrency!.Single(c => c.Currency == "EUR");
+        eur.Received.Should().Be(0m);
+        eur.Sent.Should().Be(200m);
+
+        CurrencyConverter.ToUsd(uah.Received, "UAH")
+            .Should().BeApproximately(flow.InflowUsd, 0.01m);
+        CurrencyConverter.ToUsd(eur.Sent, "EUR")
+            .Should().BeApproximately(flow.OutflowUsd, 0.01m);
+    }
+
+    [Fact]
+    public async Task Classify_SingleCurrencyCounterparty_ProducesOneNativeSubtotal()
+    {
+        var mama = MakeCounterparty("Мама", ("description_contains", "мама"));
+        var sut = BuildSut(mama);
+
+        var credit = MakeTx(5000m, "credit", "від мама");
+        var result = await sut.ClassifyAsync(UserId, [credit], UsdAccount);
+
+        var flow = result.MonthlyFlows.Should().ContainSingle().Subject;
+        var only = flow.ByCurrency.Should().ContainSingle().Subject;
+        only.Currency.Should().Be("USD");
+        only.Received.Should().Be(5000m);
+        only.Sent.Should().Be(0m);
+    }
 }

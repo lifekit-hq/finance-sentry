@@ -321,6 +321,16 @@ one and a transfer in the other.
 - Each month's counterparty flows are emitted as **one synthetic USD row per month**
   (native amounts zero — the classification is already currency-normalised), never
   folded into a per-currency bucket's USD figures.
+- **Native per-currency subtotals** (`CounterpartyMonthlyFlow.ByCurrency`, one
+  `CounterpartyCurrencyFlow(Currency, Received, Sent)` per account currency the counterparty
+  moved money in that month): a presentational breakdown alongside `InflowUsd`/`OutflowUsd`,
+  never a second source of truth. `InflowUsd`/`OutflowUsd` remain the sum, across
+  `ByCurrency`, of each entry's native `Received`/`Sent` converted once via
+  `CurrencyConverter.ToUsd` — the same per-transaction conversion the USD totals were already
+  built from, just no longer discarded after summing. A statement or digest that wants to show
+  a reader "you owe them ₴X, not some converted figure" reads `ByCurrency`; every aggregation
+  (money-flow statistics, top categories, savings rate) reads only the USD fields and never
+  sums a native amount across currencies, per the cross-account rule in §0/backend rules.
 
 ### 5a. Committed vs discretionary outflow
 
