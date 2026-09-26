@@ -33,7 +33,7 @@ public sealed class BookSnapshotReader(
         // One position per asset: the same symbol held on several venues (e.g. BTC on Binance
         // and Revolut X) is a single concentration for every weight rule.
         var positions = book.Positions
-            .GroupBy(p => (Symbol: p.Symbol.ToUpperInvariant(), Sleeve: ToRiskSleeve(p.AssetClass)))
+            .GroupBy(p => (Symbol: p.Symbol.ToUpperInvariant(), Sleeve: ToRiskSleeve(p.AssetClass), p.AssetClass))
             .Select(g =>
             {
                 var usdValue = g.Sum(p => p.UsdValue);
@@ -42,7 +42,8 @@ public sealed class BookSnapshotReader(
                     g.Key.Sleeve,
                     g.Sum(p => p.Quantity),
                     usdValue,
-                    book.TotalValueUsd > 0 ? usdValue / book.TotalValueUsd : 0m);
+                    book.TotalValueUsd > 0 ? usdValue / book.TotalValueUsd : 0m,
+                    g.Key.AssetClass);
             })
             .ToList();
 
