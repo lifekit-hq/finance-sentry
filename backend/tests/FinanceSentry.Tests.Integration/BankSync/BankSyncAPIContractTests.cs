@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Integration.BankSync;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FluentAssertions;
@@ -98,11 +99,9 @@ public class BankSyncAPIContractTests(BankSyncApiFactory factory) : IClassFixtur
                 provider: "truelayer"));
 
         _factory.TransactionRepoMock
-            .Setup(r => r.GetByAccountIdAsync(accountId, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<Modules.BankSync.Domain.Transaction>());
-        _factory.TransactionRepoMock
-            .Setup(r => r.CountByAccountIdAsync(accountId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+            .Setup(r => r.GetFilteredByAccountIdAsync(
+                accountId, It.IsAny<TransactionFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Array.Empty<Modules.BankSync.Domain.Transaction>(), 0));
 
         var url = $"/api/v1/accounts/{accountId}/transactions?offset=0&limit=50";
         var response = await _client.GetAsync(url);
@@ -115,11 +114,244 @@ public class BankSyncAPIContractTests(BankSyncApiFactory factory) : IClassFixtur
         body.HasMore.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task GetTransactions_Returns400_WhenDateRangeInvalid()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_def",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        var url = $"/api/v1/accounts/{accountId}/transactions?from=2025-06-01&to=2025-01-01";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_DATE_RANGE");
+    }
+
+    [Fact]
+    public async Task GetTransactions_Returns400_WhenAmountRangeInvalid()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_ghi",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        var url = $"/api/v1/accounts/{accountId}/transactions?minAmount=100&maxAmount=10";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_AMOUNT_RANGE");
+    }
+
+    [Fact]
+    public async Task GetTransactions_Returns400_WhenCategoryUnknown()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_jkl",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        var url = $"/api/v1/accounts/{accountId}/transactions?category=NOT_A_REAL_CATEGORY";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_CATEGORY");
+    }
+
+    [Fact]
+    public async Task GetTransactions_Returns400_WhenTransactionTypeInvalid()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_mno",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        var url = $"/api/v1/accounts/{accountId}/transactions?transactionType=weird";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_TRANSACTION_TYPE");
+    }
+
+    [Fact]
+    public async Task GetTransactions_Returns400_WhenSearchTooLong()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_pqr",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        var search = new string('a', 101);
+        var url = $"/api/v1/accounts/{accountId}/transactions?search={search}";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_SEARCH");
+    }
+
+    [Fact]
+    public async Task GetTransactions_ClampsLimit_WhenAboveMax()
+    {
+        var accountId = Guid.NewGuid();
+        var userId = _factory.TestUserId;
+
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByIdAsync(accountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Modules.BankSync.Domain.BankAccount(
+                userId: userId,
+                externalAccountId: "item_stu",
+                bankName: "Revolut",
+                accountType: "checking",
+                accountNumberLast4: "5678",
+                ownerName: "Jane Doe",
+                currency: "EUR",
+                createdBy: userId,
+                provider: "truelayer"));
+
+        _factory.TransactionRepoMock
+            .Setup(r => r.GetFilteredByAccountIdAsync(
+                accountId, It.IsAny<TransactionFilter>(), It.IsAny<int>(), 200, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Array.Empty<Modules.BankSync.Domain.Transaction>(), 0));
+
+        var url = $"/api/v1/accounts/{accountId}/transactions?limit=9999";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<TransactionsListResponse>();
+        body!.Limit.Should().Be(200);
+    }
+
+    // ── GET /accounts/transactions (global ledger) ────────────────────────────
+
+    [Fact]
+    public async Task GetAllTransactions_Returns200_WithPaginatedShape_WhenNoFiltersGiven()
+    {
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByUserIdAsync(_factory.TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _factory.TransactionRepoMock
+            .Setup(r => r.GetFilteredByUserIdAsync(
+                _factory.TestUserId, It.IsAny<TransactionFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Array.Empty<Modules.BankSync.Domain.Transaction>(), 0));
+
+        var response = await _client.GetAsync("/api/v1/accounts/transactions");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<TransactionsPageResponse>();
+        body.Should().NotBeNull();
+        body!.Items.Should().NotBeNull();
+        body.TotalCount.Should().Be(0);
+        body.HasMore.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAllTransactions_Returns400_WhenAmountRangeInvalid()
+    {
+        var url = "/api/v1/accounts/transactions?minAmountUsd=100&maxAmountUsd=10";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_AMOUNT_RANGE");
+    }
+
+    [Fact]
+    public async Task GetAllTransactions_Returns400_WhenDateInvalidFormat()
+    {
+        var url = "/api/v1/accounts/transactions?from=not-a-date";
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        body!.ErrorCode.Should().Be("INVALID_DATE_RANGE");
+    }
+
+    [Fact]
+    public async Task GetAllTransactions_ClampsLimit_WhenBelowMin()
+    {
+        _factory.BankAccountRepoMock
+            .Setup(r => r.GetByUserIdAsync(_factory.TestUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _factory.TransactionRepoMock
+            .Setup(r => r.GetFilteredByUserIdAsync(
+                _factory.TestUserId, It.IsAny<TransactionFilter>(), It.IsAny<int>(), 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Array.Empty<Modules.BankSync.Domain.Transaction>(), 0));
+
+        var response = await _client.GetAsync("/api/v1/accounts/transactions?limit=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<TransactionsPageResponse>();
+        body!.Limit.Should().Be(1);
+    }
+
     // ── Response shape records (contract definitions) ────────────────────────
 
     private record AccountsListResponse(object[] Accounts, int TotalCount, object CurrencyTotals);
     private record TransactionsListResponse(string AccountId, string BankName, string Currency,
         object[] Items, int TotalCount, int Offset, int Limit, bool HasMore);
+    private record TransactionsPageResponse(object[] Items, int TotalCount, int Offset, int Limit, bool HasMore);
+    private record ErrorResponse(string Error, string ErrorCode);
 }
 
 /// <summary>

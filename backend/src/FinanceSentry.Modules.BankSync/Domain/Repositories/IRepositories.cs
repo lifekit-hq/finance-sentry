@@ -130,6 +130,23 @@ public interface ITransactionRepository
     Task<IEnumerable<Transaction>> GetByUserIdSinceAsync(Guid userId, DateTime since, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Composed, server-side filtered read for the global ledger: applies every dimension of
+    /// <paramref name="filter"/> in SQL (account, category, date range, amount, search, type),
+    /// orders by <c>PostedDate ?? TransactionDate</c> descending, and pages the result. The
+    /// returned count reflects the filtered set, not the user's whole transaction table.
+    /// </summary>
+    Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetFilteredByUserIdAsync(
+        Guid userId, TransactionFilter filter, int offset, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Composed, server-side filtered read scoped to one account (per-account transaction page).
+    /// Same filter dimensions as <see cref="GetFilteredByUserIdAsync"/> minus account selection,
+    /// which is fixed by <paramref name="accountId"/>.
+    /// </summary>
+    Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetFilteredByAccountIdAsync(
+        Guid accountId, TransactionFilter filter, int offset, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Soft-deletes all transactions for an account (sets IsActive=false) for account removal flow.
     /// Uses IgnoreQueryFilters() internally to find already-inactive rows (idempotent).
     /// </summary>

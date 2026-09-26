@@ -207,6 +207,89 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetFilteredByUserIdAsync(
+        Guid userId, TransactionFilter filter, int offset, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = ApplyFilter(_context.Transactions.Where(t => t.UserId == userId), filter);
+        return await PageAsync(query, offset, limit, cancellationToken);
+    }
+
+    public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetFilteredByAccountIdAsync(
+        Guid accountId, TransactionFilter filter, int offset, int limit, CancellationToken cancellationToken = default)
+    {
+        var query = ApplyFilter(_context.Transactions.Where(t => t.AccountId == accountId), filter);
+        return await PageAsync(query, offset, limit, cancellationToken);
+    }
+
+    private static async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> PageAsync(
+        IQueryable<Transaction> query, int offset, int limit, CancellationToken cancellationToken)
+    {
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(t => t.PostedDate ?? t.TransactionDate)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Applies every dimension of <paramref name="filter"/> in SQL. The date bound is the house
+    /// "PostedDate falls back to TransactionDate" predicate (renders as COALESCE); search covers
+    /// Description and MerchantName via ILIKE (<c>NewsRepository</c> precedent). Amount is split
+    /// into two shapes: a single native <see cref="TransactionFilter.MinAmount"/>/<see cref="TransactionFilter.MaxAmount"/>
+    /// pair for a single-currency scope (the per-account query), or <see cref="TransactionFilter.AmountRanges"/> —
+    /// one native bound per currency group — for the multi-currency global ledger, unioned so no
+    /// native amount is ever compared across currencies.
+    /// </summary>
+    private static IQueryable<Transaction> ApplyFilter(IQueryable<Transaction> query, TransactionFilter filter)
+    {
+        if (filter.AccountIds is { Count: > 0 } accountIds)
+            query = query.Where(t => accountIds.Contains(t.AccountId));
+
+        if (filter.Categories is { Count: > 0 } categories)
+            query = query.Where(t => t.MerchantCategory != null && categories.Contains(t.MerchantCategory));
+
+        if (filter.From.HasValue)
+            query = query.Where(t => (t.PostedDate ?? t.TransactionDate) >= filter.From.Value);
+
+        if (filter.To.HasValue)
+            query = query.Where(t => (t.PostedDate ?? t.TransactionDate) <= filter.To.Value);
+
+        if (!string.IsNullOrEmpty(filter.TransactionType))
+            query = query.Where(t => t.TransactionType == filter.TransactionType);
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var like = $"%{filter.Search.Trim()}%";
+            query = query.Where(t => EF.Functions.ILike(t.Description, like) || EF.Functions.ILike(t.MerchantName ?? "", like));
+        }
+
+        if (filter.MinAmount.HasValue)
+            query = query.Where(t => t.Amount >= filter.MinAmount.Value);
+
+        if (filter.MaxAmount.HasValue)
+            query = query.Where(t => t.Amount <= filter.MaxAmount.Value);
+
+        if (filter.AmountRanges is { Count: > 0 } ranges)
+        {
+            IQueryable<Transaction>? unioned = null;
+            foreach (var range in ranges)
+            {
+                var groupIds = range.AccountIds;
+                var group = query.Where(t => groupIds.Contains(t.AccountId));
+                if (range.Min.HasValue)
+                    group = group.Where(t => t.Amount >= range.Min.Value);
+                if (range.Max.HasValue)
+                    group = group.Where(t => t.Amount <= range.Max.Value);
+                unioned = unioned is null ? group : unioned.Union(group);
+            }
+            query = unioned ?? query.Where(_ => false);
+        }
+
+        return query;
+    }
+
     public async Task SoftDeleteByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

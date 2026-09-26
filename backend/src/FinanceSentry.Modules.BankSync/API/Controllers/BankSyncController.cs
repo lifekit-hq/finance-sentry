@@ -5,9 +5,11 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.BankSync.API.Extensions;
 using FinanceSentry.Modules.BankSync.API.Responses;
+using FinanceSentry.Modules.BankSync.API.Validation;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
+using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Hangfire;
 using Microsoft.AspNetCore.Mvc;
@@ -55,17 +57,55 @@ public class BankSyncController(
 
     // ── GET /api/accounts/transactions ── T208-G ─────────────────────────────
 
+    private const int MinTransactionsLimit = 1;
+    private const int MaxTransactionsLimit = 200;
+
     [HttpGet("transactions")]
     public async Task<IActionResult> GetAllTransactions(
         [FromQuery] int offset = 0,
         [FromQuery] int limit = 50,
-        [FromQuery] DateTime? from = null,
-        [FromQuery] DateTime? to = null,
+        [FromQuery] string? from = null,
+        [FromQuery] string? to = null,
         [FromQuery] string? transactionType = null,
+        [FromQuery] List<Guid>? accountId = null,
+        [FromQuery] List<string>? category = null,
+        [FromQuery] decimal? minAmountUsd = null,
+        [FromQuery] decimal? maxAmountUsd = null,
+        [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
+        var fromDateError = TransactionFilterValidator.ValidateDate(from, out var fromDate);
+        if (fromDateError != null)
+            return BadRequest(fromDateError);
+        var toDateError = TransactionFilterValidator.ValidateDate(to, out var toDate);
+        if (toDateError != null)
+            return BadRequest(toDateError);
+
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+
+        var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
+            ?? TransactionFilterValidator.ValidateAmountRange(minAmountUsd, maxAmountUsd)
+            ?? TransactionFilterValidator.ValidateCategories(category)
+            ?? TransactionFilterValidator.ValidateTransactionType(transactionType)
+            ?? TransactionFilterValidator.ValidateSearch(search);
+        if (validationError != null)
+            return BadRequest(validationError);
+
+        limit = Math.Clamp(limit, MinTransactionsLimit, MaxTransactionsLimit);
+
         var result = await _allTransactionsHandler.Handle(
-            new GetAllTransactionsQuery(User.RequireUserId(), new PagedRequest(offset, limit), from, to, transactionType), ct);
+            new GetAllTransactionsQuery(
+                User.RequireUserId(),
+                new PagedRequest(offset, limit),
+                fromDateTime,
+                toDateTime,
+                transactionType,
+                accountId,
+                category,
+                minAmountUsd,
+                maxAmountUsd,
+                search), ct);
 
         return Ok(PaginationExtensions.CreatePaginatedResponse(
             result.Transactions, result.TotalCount, result.Offset, result.Limit));
@@ -78,8 +118,13 @@ public class BankSyncController(
         Guid accountId,
         [FromQuery] int offset = 0,
         [FromQuery] int limit = 50,
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? from = null,
+        [FromQuery] string? to = null,
+        [FromQuery] string? transactionType = null,
+        [FromQuery] List<string>? category = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
         var userId = User.RequireUserId();
@@ -88,8 +133,36 @@ public class BankSyncController(
         if (account == null || account.UserId != userId)
             return NotFound(new ApiErrorBody("Account not found.", "ACCOUNT_NOT_FOUND"));
 
-        var txList = (await _transactions.GetByAccountIdAsync(accountId, offset, limit, ct)).ToList();
-        var totalCount = await _transactions.CountByAccountIdAsync(accountId, ct);
+        var fromDateError = TransactionFilterValidator.ValidateDate(from, out var fromDate);
+        if (fromDateError != null)
+            return BadRequest(fromDateError);
+        var toDateError = TransactionFilterValidator.ValidateDate(to, out var toDate);
+        if (toDateError != null)
+            return BadRequest(toDateError);
+
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+
+        var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
+            ?? TransactionFilterValidator.ValidateAmountRange(minAmount, maxAmount)
+            ?? TransactionFilterValidator.ValidateCategories(category)
+            ?? TransactionFilterValidator.ValidateTransactionType(transactionType)
+            ?? TransactionFilterValidator.ValidateSearch(search);
+        if (validationError != null)
+            return BadRequest(validationError);
+
+        limit = Math.Clamp(limit, MinTransactionsLimit, MaxTransactionsLimit);
+
+        var filter = new TransactionFilter(
+            Categories: category,
+            From: fromDateTime,
+            To: toDateTime,
+            TransactionType: transactionType,
+            Search: search,
+            MinAmount: minAmount,
+            MaxAmount: maxAmount);
+
+        var (txList, totalCount) = await _transactions.GetFilteredByAccountIdAsync(accountId, filter, offset, limit, ct);
 
         var items = txList.Select(t => new TransactionDto(
             t.Id,
