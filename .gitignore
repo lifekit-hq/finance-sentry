@@ -116,3 +116,7 @@ frontend/.qa-tmp.mjs
 # devclaw per-goal checkouts (boilerplate revision 2) — one goal, one clone
 # under the project workspace; never this repo's own content.
 .goals/
+
+# scratch home for containerized dotnet runs (fs-689 proof)
+.dotnet-home/
+.ci-scratch/

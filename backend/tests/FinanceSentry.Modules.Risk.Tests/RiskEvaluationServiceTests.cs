@@ -81,6 +81,76 @@ public sealed class RiskEvaluationServiceTests
         report.Violations.Should().ContainSingle(v => v.RuleKey == RiskRuleKeys.MinCashBuffer && v.Subject == "CASH");
     }
 
+    // #689: the agent-facing risk check must carry acknowledgement state on each violation so a
+    // caller can decide whether to report without re-deriving anything from prior turns.
+
+    [Fact]
+    public void Evaluate_UnacknowledgedViolation_IsReportable_AndNotAcknowledged()
+    {
+        var book = new BookSnapshot(15000m, 1000m, [new BookPosition("DRAM", RiskSleeve.Brokerage, 100m, 6900m, 0.46m)], false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 0.25m };
+
+        var report = _service.Evaluate(book, ruleSet, [], []);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Reportable.Should().BeTrue();
+        violation.IsAcknowledged.Should().BeFalse();
+        violation.HasWorsenedPastStep.Should().BeFalse();
+        violation.WorseningStepPct.Should().BeNull();
+    }
+
+    [Fact]
+    public void Evaluate_AcknowledgedViolation_NotWorsened_IsNotReportable_ButStillVisibleInPolicyView()
+    {
+        var book = new BookSnapshot(15000m, 1000m, [new BookPosition("DRAM", RiskSleeve.Brokerage, 100m, 6900m, 0.46m)], false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 0.25m };
+        var ack = new PolicyViolationAck
+        {
+            UserId = UserId,
+            RuleKey = RiskRuleKeys.MaxPositionWeight,
+            Subject = "DRAM",
+            RemediationNote = "trim DRAM on strength to <=30% by Q4",
+            ObservedAtAck = 0.46m,
+            WorseningStepPct = 0.05m,
+        };
+
+        var report = _service.Evaluate(book, ruleSet, [], [ack]);
+
+        // Still in the policy view — acknowledging never hides a breach.
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Status.Should().Be(PolicyViolationStatus.Acknowledged);
+        violation.IsAcknowledged.Should().BeTrue();
+        violation.WorseningStepPct.Should().Be(0.05m);
+        violation.HasWorsenedPastStep.Should().BeFalse();
+
+        // But it must not be re-reported.
+        violation.Reportable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Evaluate_AcknowledgedViolation_WorsenedPastStep_IsReportableAgain()
+    {
+        var book = new BookSnapshot(15000m, 1000m, [new BookPosition("DRAM", RiskSleeve.Brokerage, 100m, 8000m, 0.55m)], false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 0.25m };
+        var ack = new PolicyViolationAck
+        {
+            UserId = UserId,
+            RuleKey = RiskRuleKeys.MaxPositionWeight,
+            Subject = "DRAM",
+            RemediationNote = "trim DRAM on strength to <=30% by Q4",
+            ObservedAtAck = 0.46m,
+            WorseningStepPct = 0.05m,
+        };
+
+        var report = _service.Evaluate(book, ruleSet, [], [ack]);
+
+        var violation = report.Violations.Should().ContainSingle().Subject;
+        violation.Status.Should().Be(PolicyViolationStatus.Worsened);
+        violation.IsAcknowledged.Should().BeTrue();
+        violation.HasWorsenedPastStep.Should().BeTrue();
+        violation.Reportable.Should().BeTrue();
+    }
+
     [Fact]
     public void Evaluate_AcknowledgedViolation_ReportsAcknowledged_NotNew()
     {
