@@ -180,6 +180,42 @@ public sealed class EarningsAheadJobTests
     }
 
     [Fact]
+    public async Task Execute_EventDatePassed_ResolvesTheAlert()
+    {
+        var pastDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2);
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        _earningsCalendar.Setup(e => e.GetForTickersAsync(
+                It.Is<IReadOnlyCollection<string>>(t => t.Contains("AAPL")),
+                It.Is<DateOnly>(d => d >= DateOnly.FromDateTime(DateTime.UtcNow)), It.IsAny<DateOnly>(), null, default))
+            .ReturnsAsync([]);
+        _earningsCalendar.Setup(e => e.GetForTickersAsync(
+                It.Is<IReadOnlyCollection<string>>(t => t.Contains("AAPL")),
+                It.Is<DateOnly>(d => d < DateOnly.FromDateTime(DateTime.UtcNow)), It.IsAny<DateOnly>(), null, default))
+            .ReturnsAsync([new EarningsEvent("AAPL", EarningsEventType.Earnings, pastDate, false, "yahoo")]);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveEarningsAheadAlertAsync(
+            _userId, "AAPL", EarningsAheadEventType.Earnings, pastDate, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_NoPastEvents_DoesNotResolve()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        _earningsCalendar.Setup(e => e.GetForTickersAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), null, default))
+            .ReturnsAsync([]);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveEarningsAheadAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    [Fact]
     public async Task Execute_UserThrows_ContinuesToNextUser()
     {
         var userId2 = Guid.NewGuid();

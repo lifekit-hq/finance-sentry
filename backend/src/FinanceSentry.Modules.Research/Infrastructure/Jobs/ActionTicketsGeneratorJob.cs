@@ -50,17 +50,18 @@ public sealed class ActionTicketsGeneratorJob(
     {
         var drift = await driftQuery.Handle(new GetAllocationDriftQuery(userId), ct);
 
-        if (drift.HasIps && drift.NeedsRebalance)
+        var orders = drift.HasIps && drift.NeedsRebalance ? BuildOrderLines(drift) : [];
+        if (orders.Count > 0)
         {
-            var orders = BuildOrderLines(drift);
-            if (orders.Count > 0)
-            {
-                var summary = BuildOrderSummary(orders, drift.TotalValueUsd);
-                logger.LogInformation(
-                    "ActionTicketsGenerator: rebalance proposal for user {UserId} — {OrderCount} order(s), book ${TotalValueUsd:N0}",
-                    userId, orders.Count, drift.TotalValueUsd);
-                await alerts.GenerateRebalanceProposalAlertAsync(userId, orders.Count, summary, ct);
-            }
+            var summary = BuildOrderSummary(orders, drift.TotalValueUsd);
+            logger.LogInformation(
+                "ActionTicketsGenerator: rebalance proposal for user {UserId} — {OrderCount} order(s), book ${TotalValueUsd:N0}",
+                userId, orders.Count, drift.TotalValueUsd);
+            await alerts.GenerateRebalanceProposalAlertAsync(userId, orders.Count, summary, ct);
+        }
+        else
+        {
+            await alerts.ResolveRebalanceProposalAlertAsync(userId, ct);
         }
 
         await TryGenerateCashSweepAsync(userId, drift, ct);
@@ -79,7 +80,10 @@ public sealed class ActionTicketsGeneratorJob(
         var excessUsd = Math.Round(drift.CashUsd - minBufferUsd, 2);
 
         if (excessUsd <= 0)
+        {
+            await alerts.ResolveCashSweepProposalAlertAsync(userId, ct);
             return;
+        }
 
         logger.LogInformation(
             "ActionTicketsGenerator: cash-sweep proposal for user {UserId} — idle ${CashUsd:N0} > buffer ${MinBufferUsd:N0}, excess ${ExcessUsd:N0}",

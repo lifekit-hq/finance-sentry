@@ -417,5 +417,33 @@ public class RunThesisMonitorHandlerTests
             Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task ResolveOpportunityAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveConsentExpiringAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolvePriceHikeAlertAsync(Guid userId, Guid subscriptionId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveCategorySpikeAlertAsync(Guid userId, string category, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveEarningsAheadAlertAsync(
+            Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

@@ -41,13 +41,52 @@ public sealed class FreshnessWatchdogScopeTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task NoStaleMembers_ResolvesTheAlert()
+    {
+        var alerts = await RunAsync(
+            [Member("AAPL", UniverseKind.Holding)],
+            seedFreshBarFor: "AAPL");
+
+        alerts.Verify(
+            a => a.ResolveMarketStructureFreshnessAlertAsync(User, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        alerts.Verify(
+            a => a.GenerateMarketStructureFreshnessAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task StaleHoldingStillPresent_DoesNotResolve()
+    {
+        var alerts = await RunAsync(Member("AAPL", UniverseKind.Holding));
+
+        alerts.Verify(
+            a => a.ResolveMarketStructureFreshnessAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task NoWatchedMembers_ResolvesTheAlert()
+    {
+        var alerts = await RunAsync(Member("AAA", UniverseKind.IndexConstituent));
+
+        alerts.Verify(
+            a => a.ResolveMarketStructureFreshnessAlertAsync(User, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private static RadarUniverseMember Member(string ticker, UniverseKind kind) => new()
     {
         Ticker = ticker, Kind = kind, Source = UniverseSource.Auto, Active = true,
     };
 
-    // No bars are stored for any member, so every watched ticker is stale by definition.
-    private static async Task<Mock<IAlertGeneratorService>> RunAsync(params RadarUniverseMember[] members)
+    // No bars are stored for any member, so every watched ticker is stale by definition, unless
+    // `seedFreshBarFor` names a ticker to backdate a fresh bar for.
+    private static async Task<Mock<IAlertGeneratorService>> RunAsync(
+        RadarUniverseMember[] members, string? seedFreshBarFor = null)
     {
         var universe = new Mock<IRadarUniverseRepository>();
         universe.Setup(u => u.ListActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(members);
@@ -58,6 +97,17 @@ public sealed class FreshnessWatchdogScopeTests
         var alerts = new Mock<IAlertGeneratorService>();
 
         await using var db = TestSupport.NewContext();
+        if (seedFreshBarFor is not null)
+        {
+            db.DailyBars.Add(new DailyBar
+            {
+                Id = Guid.NewGuid(),
+                Ticker = seedFreshBarFor,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            });
+            await db.SaveChangesAsync();
+        }
+
         var job = new RadarFreshnessWatchdogJob(
             universe.Object,
             new DailyBarRepository(db),
@@ -69,4 +119,7 @@ public sealed class FreshnessWatchdogScopeTests
         await job.ExecuteAsync(CancellationToken.None);
         return alerts;
     }
+
+    private static Task<Mock<IAlertGeneratorService>> RunAsync(params RadarUniverseMember[] members)
+        => RunAsync(members, seedFreshBarFor: null);
 }

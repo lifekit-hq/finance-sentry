@@ -39,6 +39,7 @@ public sealed class RadarFreshnessWatchdogJob(
             .ToList();
         if (members.Count == 0)
         {
+            await ResolveFreshnessAlertsAsync(ct);
             return;
         }
 
@@ -55,6 +56,7 @@ public sealed class RadarFreshnessWatchdogJob(
 
         if (stale.Count == 0)
         {
+            await ResolveFreshnessAlertsAsync(ct);
             return;
         }
 
@@ -66,6 +68,15 @@ public sealed class RadarFreshnessWatchdogJob(
         foreach (var userId in userIds)
         {
             await alerts.GenerateMarketStructureFreshnessAlertAsync(userId, FreshnessReferenceId, reason, ct);
+        }
+    }
+
+    private async Task ResolveFreshnessAlertsAsync(CancellationToken ct)
+    {
+        var userIds = await bankingTotals.GetActiveUserIdsAsync(ct);
+        foreach (var userId in userIds)
+        {
+            await alerts.ResolveMarketStructureFreshnessAlertAsync(userId, FreshnessReferenceId, ct);
         }
     }
 }

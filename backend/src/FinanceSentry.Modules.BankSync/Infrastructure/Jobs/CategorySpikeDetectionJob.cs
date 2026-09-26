@@ -88,7 +88,11 @@ public sealed class CategorySpikeDetectionJob(
             if (historicMonths.Count < MinHistoryMonths) continue;
 
             var currentKey = new { currentMonthStart.Year, currentMonthStart.Month };
-            if (!byMonth.TryGetValue(currentKey, out var currentMonth) || currentMonth <= 0) continue;
+            if (!byMonth.TryGetValue(currentKey, out var currentMonth) || currentMonth <= 0)
+            {
+                await alerts.ResolveCategorySpikeAlertAsync(group.Key.UserId, group.Key.Category, ct);
+                continue;
+            }
 
             // Average monthly spend over the months observed, not over the months that happen to
             // hold rows for this category. Dividing by the latter made the sentinel quietly weakest
@@ -98,7 +102,11 @@ public sealed class CategorySpikeDetectionJob(
             var baseline = historicMonths.Sum(kv => kv.Value) / observedMonthsByUser[group.Key.UserId];
             if (baseline <= 0) continue;
 
-            if (currentMonth <= baseline * multiplier) continue;
+            if (currentMonth <= baseline * multiplier)
+            {
+                await alerts.ResolveCategorySpikeAlertAsync(group.Key.UserId, group.Key.Category, ct);
+                continue;
+            }
 
             try
             {

@@ -61,6 +61,40 @@ public class ActionTicketsGeneratorJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_NeedsRebalanceFalse_ResolvesExistingProposal()
+    {
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(needsRebalance: false, []));
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
+            .ReturnsAsync((RiskRuleSetDto?)null);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveRebalanceProposalAlertAsync(_userId, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OverBandSleeve_DoesNotResolveRebalanceProposal()
+    {
+        var sleeves = new List<AllocationSleeveDrift>
+        {
+            new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
+        };
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
+            .ReturnsAsync((RiskRuleSetDto?)null);
+        _alerts.Setup(a => a.GenerateRebalanceProposalAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), default)).Returns(Task.CompletedTask);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveRebalanceProposalAlertAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_HasIpsFalse_NoAlertGenerated()
     {
         _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
@@ -258,6 +292,37 @@ public class ActionTicketsGeneratorJobTests
 
         _alerts.Verify(a => a.GenerateCashSweepProposalAlertAsync(
             It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CashBelowBuffer_ResolvesExistingCashSweepProposal()
+    {
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 5_000m));
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
+            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveCashSweepProposalAlertAsync(_userId, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CashExceedsBuffer_DoesNotResolveCashSweepProposal()
+    {
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
+            .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
+        _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
+            .ReturnsAsync(BuildRules(minCashBufferPct: 10m));
+        _alerts.Setup(a => a.GenerateCashSweepProposalAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<decimal>(), default))
+            .Returns(Task.CompletedTask);
+
+        await _job.ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolveCashSweepProposalAlertAsync(It.IsAny<Guid>(), default), Times.Never);
     }
 
     [Fact]
