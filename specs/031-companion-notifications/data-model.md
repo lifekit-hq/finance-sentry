@@ -6,7 +6,7 @@ New context: **`CompanionDbContext`** — schema `companion`, history table `__e
 
 - **`NotificationMode`**: `Quiet | Digest | Scan | Realtime`. Default `Scan`.
 - **`CompanionEventKind`**: `RiskViolation | SyncFailure | UnusualSpend | Opportunity | ThesisBreak | AnalystAction`.
-- **`EventDisposition`**: `Pending | Dispatched | HeldForDigest | Delivered | SuppressedByMode | SuppressedByDedup | SuppressedByRateLimit | DeferredQuietHours | Failed`.
+- **`EventDisposition`**: `Pending | Dispatched | HeldForDigest | Delivered | SuppressedByMode | SuppressedByDedup | SuppressedByRateLimit | DeferredQuietHours | Failed | Expired`.
 
 ## Entity: `CompanionNotificationSetting` (table `companion_notification_settings`)
 
@@ -25,6 +25,12 @@ One row per user (the user's proactivity dial + guardrails).
 | `UpdatedAt` | DateTimeOffset | |
 
 Validation: `Mode` must parse to the enum (FR-005); quiet-hours are optional; a missing row means defaults (mode `Scan`) — created lazily on first set/read.
+
+**Provisioning (issue #686)**: a row is created eagerly, not only lazily, when a user is provisioned — `RegisterCommandHandler` and `VerifyGoogleCredentialCommandHandler` (Auth) publish `UserRegisteredEvent` (`FinanceSentry.Core.Cqrs`) after creating the `ApplicationUser`; Companion's `UserRegisteredSettingsProvisioningHandler` reacts by upserting the default row (`Mode=Scan`, defaults from `CompanionOptions`). This is best-effort (publish failures never fail registration) and exists so the policy path (quiet hours, per-hour cap, digest) has a real row to read from day one instead of depending on `GetOrDefaultAsync`'s unsaved default, which the digest job cannot iterate. Migration `M002_NotificationSettingsProvisioning` backfills the same default row for every pre-existing user.
+
+**Digest job gating**: `CompanionDigestJob` iterates users who currently have at least one `HeldForDigest` event (`ICompanionEventRepository.ListHeldForDigestUserIdsAsync`), not users with a persisted `Mode=Digest` row — `MaterialityPolicy` holds some kinds (e.g. `SyncFailure`) for the digest regardless of mode, so gating on mode alone stranded them. The settings row is used only for `TimeZoneId`/`DigestHourLocal` timing.
+
+**Stranded events (issue #686 migration)**: events already `HeldForDigest` before this fix shipped predate any scheduled delivery path and could be stale (sync failures from weeks/months prior). `M002_NotificationSettingsProvisioning` explicitly transitions them to the new terminal disposition `Expired` (with a `LastError` note) rather than letting them silently deliver on the first post-deploy digest tick.
 
 ## Entity: `CompanionEvent` (table `companion_events`)
 

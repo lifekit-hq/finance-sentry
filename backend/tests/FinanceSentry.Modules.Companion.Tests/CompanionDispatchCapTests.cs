@@ -67,6 +67,9 @@ public sealed class CompanionDispatchCapTests
         public Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestAsync(Guid userId, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
             => Task.FromResult(DispatchedInLastHour);
 

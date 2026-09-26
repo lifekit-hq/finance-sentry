@@ -58,6 +58,13 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
             .OrderBy(e => e.OccurredAt)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default)
+        => await db.Events.AsNoTracking()
+            .Where(e => e.Disposition == EventDisposition.HeldForDigest)
+            .Select(e => e.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
     public async Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
         => await db.Events.AsNoTracking()
             .CountAsync(e => e.UserId == userId && e.DispatchedAt != null && e.DispatchedAt >= since, ct);

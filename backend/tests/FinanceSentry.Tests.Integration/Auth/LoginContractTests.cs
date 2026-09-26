@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using Moq;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -112,6 +113,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
 {
     private static readonly InMemoryDatabaseRoot _bankSyncDbRoot = new();
     private static readonly InMemoryDatabaseRoot _authDbRoot = new();
+    private static readonly InMemoryDatabaseRoot _companionDbRoot = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -119,6 +121,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
         {
             ReplaceWithInMemory<BankSyncDbContext>(services, "auth-contract-banksync", _bankSyncDbRoot);
             ReplaceWithInMemory<AuthDbContext>(services, "auth-contract-auth", _authDbRoot);
+            ReplaceWithInMemory<CompanionDbContext>(services, "auth-contract-companion", _companionDbRoot);
 
             services.Configure<FinanceSentry.Infrastructure.Encryption.EncryptionOptions>(opts =>
             {

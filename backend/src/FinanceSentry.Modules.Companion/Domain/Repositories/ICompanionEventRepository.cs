@@ -17,6 +17,9 @@ public interface ICompanionEventRepository
     /// <summary>All held-for-digest events for a user, oldest first.</summary>
     Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>Distinct user ids with at least one event currently held for the digest.</summary>
+    Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default);
+
     /// <summary>Count of proactive events dispatched for a user since a cutoff (rate limiting).</summary>
     Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default);
 
