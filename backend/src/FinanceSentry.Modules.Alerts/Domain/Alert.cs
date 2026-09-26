@@ -19,4 +19,7 @@ public class Alert
     /// <summary>"Accept" or "Defer" — null until the user taps the one-tap acknowledgement (432 US3).</summary>
     public string? AcknowledgementDecision { get; set; }
     public DateTimeOffset? AcknowledgedAt { get; set; }
+    /// <summary>How many times a suppressed repeat has bumped this row instead of inserting a new one (finance-sentry#419 S5).</summary>
+    public int OccurrenceCount { get; set; } = 1;
+    public DateTimeOffset LastOccurredAt { get; set; } = DateTimeOffset.UtcNow;
 }

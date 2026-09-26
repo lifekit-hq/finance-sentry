@@ -39,6 +39,10 @@ public class AlertExpiryJobTests
         => _repo.Setup(r => r.GetOpenAlertsByTypesAsync(It.IsAny<IReadOnlyCollection<string>>(), default))
             .ReturnsAsync(alerts);
 
+    private void SetDeferredCandidates(params Alert[] alerts)
+        => _repo.Setup(r => r.GetOpenDeferredAlertsAsync(default))
+            .ReturnsAsync(alerts);
+
     [Theory]
     [InlineData(AlertType.NewsCluster, 3)]
     [InlineData(AlertType.FilingLanded, 14)]
@@ -168,6 +172,48 @@ public class AlertExpiryJobTests
         await MakeJob().ExecuteAsync();
 
         Assert.DoesNotContain(type, queriedTypes!);
+    }
+
+    [Fact]
+    public async Task Deferred_JustInsideSevenDays_LeavesAlertOpen()
+    {
+        var alert = MakeAlert(AlertType.LowBalance, DateTimeOffset.UtcNow);
+        alert.AcknowledgementDecision = "Defer";
+        alert.AcknowledgedAt = DateTimeOffset.UtcNow.AddDays(-7).AddMinutes(1);
+        SetDeferredCandidates(alert);
+
+        await MakeJob().ExecuteAsync();
+
+        _repo.Verify(r => r.ResolveAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Deferred_JustPastSevenDays_ResolvesAlertRegardlessOfType()
+    {
+        // LowBalance has no per-type TTL and normally never expires by age — the Defer path
+        // overrides that and expires it 7 days after the user's decision (#419 S5).
+        var alert = MakeAlert(AlertType.LowBalance, DateTimeOffset.UtcNow);
+        alert.AcknowledgementDecision = "Defer";
+        alert.AcknowledgedAt = DateTimeOffset.UtcNow.AddDays(-7).AddMinutes(-1);
+        SetDeferredCandidates(alert);
+
+        await MakeJob().ExecuteAsync();
+
+        _repo.Verify(r => r.ResolveAsync(alert.Id, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Deferred_AlsoReturnedByTypeQuery_IsResolvedOnce()
+    {
+        var alert = MakeAlert(AlertType.PriceHike, DateTimeOffset.UtcNow.AddDays(-1));
+        alert.AcknowledgementDecision = "Defer";
+        alert.AcknowledgedAt = DateTimeOffset.UtcNow.AddDays(-7).AddMinutes(-1);
+        SetCandidates(alert);
+        SetDeferredCandidates(alert);
+
+        await MakeJob().ExecuteAsync();
+
+        _repo.Verify(r => r.ResolveAsync(alert.Id, default), Times.Once);
     }
 
     [Fact]

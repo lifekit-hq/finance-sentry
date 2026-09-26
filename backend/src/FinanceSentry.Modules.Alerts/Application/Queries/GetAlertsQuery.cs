@@ -26,7 +26,7 @@ public class GetAlertsQueryHandler(IAlertRepository alerts) : IQueryHandler<GetA
         var dtos = items.Select(a => new AlertDto(
             a.Id, a.Type, a.Severity, a.Title, a.Message,
             a.ReferenceId, a.ReferenceLabel, a.IsRead, a.IsResolved,
-            a.CreatedAt, a.ResolvedAt)).ToList();
+            a.CreatedAt, a.ResolvedAt, a.OccurrenceCount, a.LastOccurredAt)).ToList();
 
         var totalPages = pageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
 

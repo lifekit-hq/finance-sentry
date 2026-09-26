@@ -113,6 +113,17 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task BumpOccurrenceAsync(Guid alertId, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await _db.Alerts
+            .Where(a => a.Id == alertId)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(a => a.OccurrenceCount, a => a.OccurrenceCount + 1)
+                .SetProperty(a => a.LastOccurredAt, now)
+                .SetProperty(a => a.UpdatedAt, now), ct);
+    }
+
     public Task<int> PurgeOldAsync(DateTimeOffset olderThan, CancellationToken ct = default)
     {
         return _db.Alerts
@@ -174,6 +185,10 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
             alert.IsResolved = true;
             alert.ResolvedAt = now;
         }
+        else if (decision == "Defer")
+        {
+            alert.IsRead = true;
+        }
 
         await _db.SaveChangesAsync(ct);
         return true;
@@ -200,6 +215,13 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     {
         return await _db.Alerts
             .Where(a => !a.IsResolved && !a.IsDismissed && types.Contains(a.Type))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Alert>> GetOpenDeferredAlertsAsync(CancellationToken ct = default)
+    {
+        return await _db.Alerts
+            .Where(a => !a.IsResolved && !a.IsDismissed && a.AcknowledgementDecision == "Defer")
             .ToListAsync(ct);
     }
 }

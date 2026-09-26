@@ -11,4 +11,6 @@ public record AlertDto(
     bool IsRead,
     bool IsResolved,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ResolvedAt);
+    DateTimeOffset? ResolvedAt,
+    int OccurrenceCount,
+    DateTimeOffset LastOccurredAt);

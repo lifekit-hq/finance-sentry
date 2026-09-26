@@ -34,7 +34,7 @@ public class GetAlertsByTypesQueryHandler(IAlertRepository alerts) : IQueryHandl
         var dtos = items.Select(a => new AlertDto(
             a.Id, a.Type, a.Severity, a.Title, a.Message,
             a.ReferenceId, a.ReferenceLabel, a.IsRead, a.IsResolved,
-            a.CreatedAt, a.ResolvedAt)).ToList();
+            a.CreatedAt, a.ResolvedAt, a.OccurrenceCount, a.LastOccurredAt)).ToList();
 
         return new AlertsByTypePage(dtos, totalCount);
     }

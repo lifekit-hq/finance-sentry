@@ -28,6 +28,12 @@ public sealed class AlertExpiryJob(
     private const string MarketStructureFreshnessLabel = "freshness";
 
     /// <summary>
+    /// Defer means "not now", not "never" (§3.3, #419 S5): a deferred alert resolves 7 days after
+    /// the user's decision regardless of type, ahead of any per-type TTL below.
+    /// </summary>
+    private static readonly TimeSpan DeferralPeriod = TimeSpan.FromDays(7);
+
+    /// <summary>
     /// Rule of thumb for future point-event types: Info-severity expires in 14 days, Warning in 30,
     /// Error never. A type with an observable clear gets a resolve-on-cleared-condition path (§3.1)
     /// and uses this table only as a floor. TTLs below are the design report's table as written;
@@ -55,7 +61,12 @@ public sealed class AlertExpiryJob(
 
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var candidates = await alerts.GetOpenAlertsByTypesAsync(ExpirableTypes, ct);
+        var byType = await alerts.GetOpenAlertsByTypesAsync(ExpirableTypes, ct) ?? [];
+        var deferred = await alerts.GetOpenDeferredAlertsAsync(ct) ?? [];
+        var candidates = byType
+            .Concat(deferred)
+            .GroupBy(a => a.Id)
+            .Select(g => g.First());
         var now = clock.GetUtcNow();
         var expiredCount = 0;
 
@@ -75,6 +86,11 @@ public sealed class AlertExpiryJob(
 
     private static DateTimeOffset? GetExpiresAt(Alert alert)
     {
+        if (alert.AcknowledgementDecision == "Defer" && alert.AcknowledgedAt is not null)
+        {
+            return alert.AcknowledgedAt.Value + DeferralPeriod;
+        }
+
         if (alert.Type == AlertType.MarketStructure)
         {
             return alert.ReferenceLabel == MarketStructureFreshnessLabel

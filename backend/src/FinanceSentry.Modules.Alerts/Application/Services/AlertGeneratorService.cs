@@ -446,7 +446,13 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         else if (draft.Dedup == AlertDedup.ActiveThenSilence)
         {
             var existing = await _alerts.FindActiveAsync(userId, draft.Type, draft.ReferenceId, ct);
-            if (existing is not null) return;
+            if (existing is not null)
+            {
+                // A suppressed repeat still happened — bump the existing row instead of dropping it
+                // silently, so the recurrence is recorded while the row count stays at 1 (#419 S5).
+                await _alerts.BumpOccurrenceAsync(existing.Id, ct);
+                return;
+            }
         }
 
         if (draft.Dedup is AlertDedup.ActiveThenSilence or AlertDedup.SilenceOnly)
