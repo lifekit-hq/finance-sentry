@@ -34,10 +34,9 @@ public record AllTransactionsResult(
 // ── Query ────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// The trailing filter fields (from <see cref="AccountIds"/> on) are additive: the MCP
-/// <c>list_transactions</c> tool still calls this positionally through <see cref="TransactionType"/>
-/// only (its own account/category filtering stays client-side until #418 S2), so every field
-/// after it must keep a default and never change meaning.
+/// The trailing filter fields (from <see cref="AccountIds"/> on) are additive — every field
+/// after <see cref="TransactionType"/> must keep a default and never change meaning, since the
+/// MCP <c>list_transactions</c> tool constructs this positionally.
 /// </summary>
 public record GetAllTransactionsQuery(
     Guid UserId,

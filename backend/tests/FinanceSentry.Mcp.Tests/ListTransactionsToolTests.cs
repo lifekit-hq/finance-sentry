@@ -121,11 +121,14 @@ public sealed class ListTransactionsToolTests
     public async Task ExecuteAsync_FiltersByAccountId()
     {
         var accountA = Guid.NewGuid();
-        var accountB = Guid.NewGuid();
 
+        // The query now performs account filtering itself; the mock stands in for that,
+        // returning only the matching row, and we assert the tool delegated the filter.
+        GetAllTransactionsQuery? captured = null;
         _queryHandler
             .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultWith(MakeTransaction(accountA), MakeTransaction(accountB)));
+            .Callback<GetAllTransactionsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync(ResultWith(MakeTransaction(accountA)));
         _accountsReader
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
@@ -134,6 +137,7 @@ public sealed class ListTransactionsToolTests
 
         result.Should().HaveCount(1);
         result[0].AccountId.Should().Be(accountA.ToString());
+        captured!.AccountIds.Should().Equal(accountA);
     }
 
     [Fact]
@@ -155,11 +159,13 @@ public sealed class ListTransactionsToolTests
     [Fact]
     public async Task ExecuteAsync_FiltersByCategory_CaseInsensitive()
     {
+        // The query now performs category filtering itself; the mock stands in for that,
+        // returning only the matching row, and we assert the tool delegated the filter.
+        GetAllTransactionsQuery? captured = null;
         _queryHandler
             .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultWith(
-                MakeTransaction(category: "FOOD_AND_DRINK"),
-                MakeTransaction(category: "TRAVEL")));
+            .Callback<GetAllTransactionsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync(ResultWith(MakeTransaction(category: "FOOD_AND_DRINK")));
         _accountsReader
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
@@ -168,6 +174,7 @@ public sealed class ListTransactionsToolTests
 
         result.Should().HaveCount(1);
         result[0].Category.Should().Be("FOOD_AND_DRINK");
+        captured!.Categories.Should().Equal("food_and_drink");
     }
 
     [Fact]
@@ -175,9 +182,15 @@ public sealed class ListTransactionsToolTests
     {
         var txns = Enumerable.Range(0, 5).Select(_ => MakeTransaction()).ToArray();
 
+        // Paging now happens in the query; the mock stands in for that, slicing by the
+        // PagedRequest the tool passes through.
         _queryHandler
             .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResultWith(txns));
+            .ReturnsAsync((GetAllTransactionsQuery q, CancellationToken _) =>
+            {
+                var page = txns.Skip(q.Paging.Offset).Take(q.Paging.Limit).ToArray();
+                return new AllTransactionsResult(page, txns.Length, q.Paging.Offset + page.Length < txns.Length, q.Paging.Offset, q.Paging.Limit);
+            });
         _accountsReader
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
@@ -212,6 +225,24 @@ public sealed class ListTransactionsToolTests
         captured.Should().NotBeNull();
         captured!.From.Should().Be(from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
         captured.To.Should().Be(to.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PassesSearchToQueryHandler()
+    {
+        GetAllTransactionsQuery? captured = null;
+        _queryHandler
+            .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
+            .Callback<GetAllTransactionsQuery, CancellationToken>((q, _) => captured = q)
+            .ReturnsAsync(EmptyResult());
+        _accountsReader
+            .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await CreateSut().ExecuteAsync(UserId, search: "coffee");
+
+        captured.Should().NotBeNull();
+        captured!.Search.Should().Be("coffee");
     }
 
     [Fact]
