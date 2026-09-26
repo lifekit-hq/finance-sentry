@@ -46,7 +46,7 @@ public class IbkrFlexClientTests
             .Enqueue("/AccountManagement/FlexWebService/GetStatement", LoadSampleStatementXml());
         var client = CreateClient(handler);
 
-        var statement = await client.FetchStatementAsync(Credentials, CancellationToken.None);
+        var statement = await client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         statement.AccountId.Should().Be("U0000001");
         handler.RequestUris.Should().HaveCount(2);
@@ -65,7 +65,7 @@ public class IbkrFlexClientTests
             .Enqueue("/AccountManagement/FlexWebService/GetStatement", LoadSampleStatementXml());
         var client = CreateClient(handler);
 
-        var statement = await client.FetchStatementAsync(Credentials, CancellationToken.None);
+        var statement = await client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         statement.AccountId.Should().Be("U0000001");
         handler.RequestUris.Should().HaveCount(4);
@@ -83,7 +83,7 @@ public class IbkrFlexClientTests
             PollInterval = TimeSpan.FromMilliseconds(1),
         });
 
-        var act = () => client.FetchStatementAsync(Credentials, CancellationToken.None);
+        var act = () => client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         await act.Should().ThrowAsync<IbkrFlexException>();
         handler.RequestUris.Should().HaveCount(4); // SendRequest + 3 polls
@@ -97,7 +97,7 @@ public class IbkrFlexClientTests
         var handler = new SequencedHttpStubHandler().Enqueue("/AccountManagement/FlexWebService/SendRequest", error);
         var client = CreateClient(handler);
 
-        var act = () => client.FetchStatementAsync(Credentials, CancellationToken.None);
+        var act = () => client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         var thrown = await act.Should().ThrowAsync<IbkrFlexException>();
         thrown.Which.FlexErrorCode.Should().Be("1003");
@@ -112,7 +112,7 @@ public class IbkrFlexClientTests
             .Enqueue("/AccountManagement/FlexWebService/GetStatement", LoadSampleStatementXml());
         var client = CreateClient(handler);
 
-        var statement = await client.FetchStatementAsync(Credentials, CancellationToken.None);
+        var statement = await client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         statement.Trades.Should().HaveCount(expectedTradeCount);
         statement.Trades[0].Symbol.Should().Be("ZZZQ");

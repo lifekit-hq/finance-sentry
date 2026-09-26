@@ -34,6 +34,13 @@ public static class BrokerageSyncModule
             // The IBeam health-check job (per-user container reconcile) is
             // obsolete under OAuth — remove any previously-scheduled instance.
             mgr.RemoveIfExists("ibeam-health-check");
+
+            mgr.AddOrUpdate<IbkrFlexIncrementalSyncJob>(
+                "ibkr-flex-incremental-sync", job => job.ExecuteAsync(), "0 6 * * *");
+            // One-shot full-history backfill: never fires on its own (Cron.Never()),
+            // only triggered manually from the Hangfire dashboard.
+            mgr.AddOrUpdate<IbkrFlexBackfillJob>(
+                "ibkr-flex-backfill", job => job.ExecuteAsync(), Cron.Never());
         }
     }
 
@@ -74,8 +81,13 @@ public static class BrokerageSyncModule
         services.AddScoped<ICredentialRotationTarget, IBKRFlexCredentialRotationTarget>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
         services.AddScoped<IBrokerageInstrumentRepository, BrokerageInstrumentRepository>();
+        services.AddScoped<IBrokerageTradeRepository, BrokerageTradeRepository>();
+        services.AddScoped<IBrokerageCashTransactionRepository, BrokerageCashTransactionRepository>();
+        services.AddScoped<IIbkrFlexTradeSyncService, IbkrFlexTradeSyncService>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         services.AddScoped<IBKRSyncJob>();
+        services.AddScoped<IbkrFlexIncrementalSyncJob>();
+        services.AddScoped<IbkrFlexBackfillJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

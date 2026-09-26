@@ -148,6 +148,83 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
     }
 }
 
+public sealed class BrokerageTradeRepository : IBrokerageTradeRepository
+{
+    private readonly BrokerageSyncDbContext _context;
+
+    public BrokerageTradeRepository(BrokerageSyncDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<BrokerageTrade?> GetByExecutionIdAsync(
+        Guid userId, string provider, string ibExecutionId, CancellationToken ct = default)
+    {
+        return await _context.BrokerageTrades
+            .FirstOrDefaultAsync(
+                t => t.UserId == userId && t.Provider == provider && t.IbExecutionId == ibExecutionId,
+                ct);
+    }
+
+    public async Task AddAsync(BrokerageTrade trade, CancellationToken ct = default)
+    {
+        await _context.BrokerageTrades.AddAsync(trade, ct);
+    }
+
+    public void Update(BrokerageTrade trade)
+    {
+        _context.BrokerageTrades.Update(trade);
+    }
+
+    public async Task<IReadOnlyList<BrokerageTrade>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.BrokerageTrades
+            .Where(t => t.UserId == userId)
+            .ToListAsync(ct);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        await _context.SaveChangesAsync(ct);
+    }
+}
+
+public sealed class BrokerageCashTransactionRepository : IBrokerageCashTransactionRepository
+{
+    private readonly BrokerageSyncDbContext _context;
+
+    public BrokerageCashTransactionRepository(BrokerageSyncDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<BrokerageCashTransaction?> GetByIdempotencyKeyAsync(
+        Guid userId, string provider, string idempotencyKey, CancellationToken ct = default)
+    {
+        return await _context.BrokerageCashTransactions
+            .FirstOrDefaultAsync(
+                c => c.UserId == userId && c.Provider == provider && c.IdempotencyKey == idempotencyKey,
+                ct);
+    }
+
+    public async Task AddAsync(BrokerageCashTransaction transaction, CancellationToken ct = default)
+    {
+        await _context.BrokerageCashTransactions.AddAsync(transaction, ct);
+    }
+
+    public async Task<IReadOnlyList<BrokerageCashTransaction>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.BrokerageCashTransactions
+            .Where(c => c.UserId == userId)
+            .ToListAsync(ct);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        await _context.SaveChangesAsync(ct);
+    }
+}
+
 public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentRepository
 {
     private readonly BrokerageSyncDbContext _context;
