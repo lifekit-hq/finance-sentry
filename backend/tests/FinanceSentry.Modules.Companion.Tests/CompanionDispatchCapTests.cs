@@ -80,6 +80,10 @@ public sealed class CompanionDispatchCapTests
             Guid userId, IReadOnlyCollection<string> dedupKeys, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<CompanionEvent>> ListByOccurredRangeAsync(
+            Guid userId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task UpdateAsync(CompanionEvent evt, CancellationToken ct = default)
         {
             Updated.Add(evt);

@@ -39,7 +39,8 @@ The current runtime surface contains 63 tools. The canonical list is the `Agreed
 | `get_net_worth_history` | Read | Wealth | `userId?`, `fromDate?`, `toDate?` | Historical net worth snapshots |
 | `get_macro_calendar` | Read | Research | `from?`, `to?`, `regions?`, `minImportance?` | Scheduled macro events |
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?`, `userId?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
-| `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified`, `userId?` | Records the reader's judgement on a fired, alert-sourced companion event; an acknowledged event with no verdict reads as silence; `recorded=false` for a foreign, unknown or analyst-action event or a blank verdict |
+| `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified`, `userId?` | Records the reader's judgement on a fired companion event, alert-sourced or not (e.g. `AnalystAction`); an acknowledged event with no verdict reads as silence; `recorded=false` for a foreign, unknown event or a blank verdict |
+| `get_daily_event_outcomes` | Read | Events | `date?`, `userId?` | Accountability view for one UTC day: every companion event that fired, of any kind, with fired/judged/sent/withheld counts and the per-item outcome; unlike `get_event_calendar` it is not limited to the five alert-backed event types |
 | `get_news_for_ticker` | Read | Research | `ticker`, `since?`, `limit` | Recent ticker-specific news |
 | `get_quotes` | Read | Research | `tickers` | Current quotes for one or more tickers, including requested/resolved ticker identity and market-session freshness metadata |
 | `search_market_news` | Read | Research | `query?`, `tickers?`, `since?`, `limit` | Search ingested market news |

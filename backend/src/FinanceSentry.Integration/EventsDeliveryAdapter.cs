@@ -33,6 +33,15 @@ public sealed class EventsDeliveryAdapter(
         return evt is null || evt.UserId != userId ? null : ToRecord(evt);
     }
 
+    public async Task<IReadOnlyList<EventDeliveryRecord>> ListForDateAsync(
+        Guid userId, DateOnly date, CancellationToken ct = default)
+    {
+        var from = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var to = from.AddDays(1);
+        var rows = await events.ListByOccurredRangeAsync(userId, from, to, ct);
+        return rows.Select(ToRecord).ToList();
+    }
+
     private EventDeliveryRecord ToRecord(CompanionEvent e)
-        => new(e.Id, policy.AlertIdFromDedupKey(e.DedupKey), e.Kind.ToString(), e.Disposition.ToString(), e.OccurredAt, e.DispatchedAt, e.DeliveredAt);
+        => new(e.Id, policy.AlertIdFromDedupKey(e.DedupKey), e.Kind.ToString(), e.Subject, e.Disposition.ToString(), e.OccurredAt, e.DispatchedAt, e.DeliveredAt);
 }

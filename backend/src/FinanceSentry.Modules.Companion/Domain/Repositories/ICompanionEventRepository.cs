@@ -33,4 +33,9 @@ public interface ICompanionEventRepository
     /// <summary>A user's events whose <c>DedupKey</c> is in the given set (feature 049: alert → outbox row lookup).</summary>
     Task<IReadOnlyList<CompanionEvent>> ListByDedupKeysAsync(
         Guid userId, IReadOnlyCollection<string> dedupKeys, CancellationToken ct = default);
+
+    /// <summary>A user's events that occurred in [from, to), any kind or disposition (feature 687: the
+    /// per-day outcome view - what fired regardless of whether it was ever delivered).</summary>
+    Task<IReadOnlyList<CompanionEvent>> ListByOccurredRangeAsync(
+        Guid userId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default);
 }

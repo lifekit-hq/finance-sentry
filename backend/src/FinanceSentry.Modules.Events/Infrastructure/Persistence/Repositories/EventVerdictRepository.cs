@@ -35,7 +35,20 @@ public class EventVerdictRepository(EventsDbContext db) : IEventVerdictRepositor
         }
 
         return await db.Verdicts.AsNoTracking()
-            .Where(v => v.UserId == userId && alertIds.Contains(v.AlertId))
+            .Where(v => v.UserId == userId && v.AlertId != null && alertIds.Contains(v.AlertId!.Value))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<EventVerdict>> ListByCompanionEventIdsAsync(
+        Guid userId, IReadOnlyCollection<Guid> companionEventIds, CancellationToken ct = default)
+    {
+        if (companionEventIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.Verdicts.AsNoTracking()
+            .Where(v => v.UserId == userId && companionEventIds.Contains(v.CompanionEventId))
             .ToListAsync(ct);
     }
 }

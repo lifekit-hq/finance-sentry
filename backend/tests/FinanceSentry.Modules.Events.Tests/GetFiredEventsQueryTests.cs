@@ -67,9 +67,9 @@ public sealed class GetFiredEventsQueryTests
             ], 4));
         _delivery.Setup(d => d.ListForAlertsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([
-                new EventDeliveryRecord(silentEvent, silentId, "NewsCluster", "Delivered", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
-                new EventDeliveryRecord(verdictEvent, verdictId, "EarningsAhead", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow),
-                new EventDeliveryRecord(suppressedEvent, suppressedId, "MarketStructure", "SuppressedByRateLimit", DateTimeOffset.UtcNow, null, null),
+                new EventDeliveryRecord(silentEvent, silentId, "NewsCluster", "Subject", "Delivered", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+                new EventDeliveryRecord(verdictEvent, verdictId, "EarningsAhead", "Subject", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow),
+                new EventDeliveryRecord(suppressedEvent, suppressedId, "MarketStructure", "Subject", "SuppressedByRateLimit", DateTimeOffset.UtcNow, null, null),
             ]);
         _verdicts.Setup(v => v.ListByAlertIdsAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new EventVerdict { UserId = UserId, CompanionEventId = verdictEvent, AlertId = verdictId, Verdict = "Priced in.", Notified = false }]);

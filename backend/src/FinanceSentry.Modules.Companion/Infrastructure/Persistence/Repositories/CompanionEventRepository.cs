@@ -112,4 +112,11 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
             .Where(e => e.UserId == userId && dedupKeys.Contains(e.DedupKey))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<CompanionEvent>> ListByOccurredRangeAsync(
+        Guid userId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+        => await db.Events.AsNoTracking()
+            .Where(e => e.UserId == userId && e.OccurredAt >= from && e.OccurredAt < to)
+            .OrderBy(e => e.OccurredAt)
+            .ToListAsync(ct);
 }
