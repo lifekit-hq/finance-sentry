@@ -294,11 +294,13 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
 internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyGate
 {
     public string? LastTicker { get; private set; }
+    public bool? LastIsPaper { get; private set; }
 
     public Task<RiskGateVerdict> CheckProposalAsync(
-        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, CancellationToken ct = default)
+        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default)
     {
         LastTicker = ticker;
+        LastIsPaper = isPaper;
         return Task.FromResult(verdict);
     }
 }

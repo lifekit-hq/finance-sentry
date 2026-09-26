@@ -16,9 +16,9 @@ public sealed class RiskPolicyGate(IQueryHandler<CheckRiskRulesQuery, CheckRiskR
     private const string NoRuleSetNote = "no rules on file";
 
     public async Task<RiskGateVerdict> CheckProposalAsync(
-        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, CancellationToken ct = default)
+        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default)
     {
-        var proposal = new RiskProposal(ticker, proposedUsd, overrideFlag);
+        var proposal = new RiskProposal(ticker, proposedUsd, overrideFlag, isPaper);
         var result = await queryHandler.Handle(new CheckRiskRulesQuery(userId, proposal), ct);
 
         if (!result.HasRuleSet || result.Verdict is null)

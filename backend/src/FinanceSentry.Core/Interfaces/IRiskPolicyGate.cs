@@ -8,7 +8,7 @@ namespace FinanceSentry.Core.Interfaces;
 public interface IRiskPolicyGate
 {
     Task<RiskGateVerdict> CheckProposalAsync(
-        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, CancellationToken ct = default);
+        Guid userId, string ticker, decimal proposedUsd, bool overrideFlag, bool isPaper = false, CancellationToken ct = default);
 }
 
 public enum RiskGateDecision
