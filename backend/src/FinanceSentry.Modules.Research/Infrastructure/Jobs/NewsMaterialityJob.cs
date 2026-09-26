@@ -10,20 +10,26 @@ using Microsoft.Extensions.Logging;
 /// keyword clusters in the news. Runs every 30 minutes, offset after the news ingestion sweep
 /// (<see cref="NewsIngestionJob"/>) so a freshly ingested batch — including per-thesis Google News RSS
 /// sources seeded by <see cref="GeopoliticsSourceSeedJob"/>, N2 — is visible to this run. Fires when,
-/// within <see cref="ClusterWindow"/>, a ticker's articles — those tagged with the ticker (per-ticker
-/// feeds) plus those tagged with any of its theses (registered sources, which carry thesis tags but no
-/// ticker tags) — either (a) come from two or more distinct
-/// sources, (b) include a hit from a source registered to one of the ticker's theses, or (c) mention a
-/// <see cref="MaterialKeywords"/> term. <see cref="IAlertGeneratorService.GenerateNewsClusterAlertAsync"/>
-/// dedups per (ticker, day) and article-level ContentHash dedup at ingestion already collapses
-/// re-fetched items, so a feed re-reading the same articles every 30 minutes never re-fires. The
-/// loudest signal in the design (~0.3-1 fires/day) — noise controls are the feature.
+/// within <see cref="ClusterWindow"/>, a ticker's retrievable articles (#693: those with a usable URL —
+/// see <see cref="IsRetrievable"/>) — those tagged with the ticker (per-ticker feeds) plus those tagged
+/// with any of its theses (registered sources, which carry thesis tags but no ticker tags) — either
+/// (a) come from two or more distinct sources reporting two or more distinct stories (#693: a story
+/// reprinted verbatim by a second distributor is not independent corroboration — see
+/// <see cref="NormalizeTitle"/>), (b) include a hit from a source registered to one of the ticker's
+/// theses, or (c) mention a term from <see cref="IMaterialityTermRepository"/>.
+/// <see cref="IAlertGeneratorService.GenerateNewsClusterAlertAsync"/> dedups per (ticker, day) and
+/// article-level ContentHash dedup at ingestion already collapses re-fetched items, so a feed
+/// re-reading the same articles every 30 minutes never re-fires. Designed as the loudest signal
+/// (~0.3-1 fires/day); the retrievable-article and distinct-story gates above are #693's fix for that
+/// rate drifting several times over target, mostly overnight when wire syndication reposts the same
+/// story under multiple distributor names.
 /// </summary>
 public sealed class NewsMaterialityJob(
     IBankingTotalsReader banking,
     IBrokerageHoldingsReader brokerage,
     IThesisRepository theses,
     INewsRepository news,
+    IMaterialityTermRepository materialityTerms,
     IAlertGeneratorService alerts,
     ILogger<NewsMaterialityJob> logger)
 {
@@ -31,15 +37,14 @@ public sealed class NewsMaterialityJob(
     private const int MinClusterSources = 2;
     private const int ArticleLookbackLimit = 50;
 
-    private static readonly TimeSpan ClusterWindow = TimeSpan.FromHours(2);
-
     /// <summary>
-    /// The configured material class (report §5.3, N1): a hit on any of these terms fires regardless
-    /// of source count. Deliberately small — breadth belongs to the multi-source clustering rule, not
-    /// this list.
+    /// #693: a cluster backed by fewer than this many articles with a retrievable (non-blank,
+    /// well-formed) URL is noise, not a signal — at least one produced alert had zero underlying
+    /// articles a reader could actually open.
     /// </summary>
-    private static readonly string[] MaterialKeywords =
-        ["guidance", "downgrade", "investigation", "M&A", "halted", "recall", "acquisition"];
+    private const int MinRetrievableArticles = 1;
+
+    private static readonly TimeSpan ClusterWindow = TimeSpan.FromHours(2);
 
     public Task ExecuteAsync(CancellationToken ct = default) => ExecuteAsync(DateTimeOffset.UtcNow, ct);
 
@@ -54,12 +59,13 @@ public sealed class NewsMaterialityJob(
         }
 
         var day = DateOnly.FromDateTime(nowUtc.UtcDateTime);
+        var terms = await materialityTerms.ListEnabledTermsAsync(ct);
 
         foreach (var userId in userIds)
         {
             try
             {
-                await ProcessUserAsync(userId, nowUtc, day, ct);
+                await ProcessUserAsync(userId, nowUtc, day, terms, ct);
             }
             catch (Exception ex)
             {
@@ -68,7 +74,8 @@ public sealed class NewsMaterialityJob(
         }
     }
 
-    private async Task ProcessUserAsync(Guid userId, DateTimeOffset nowUtc, DateOnly day, CancellationToken ct)
+    private async Task ProcessUserAsync(
+        Guid userId, DateTimeOffset nowUtc, DateOnly day, IReadOnlyList<string> terms, CancellationToken ct)
     {
         var tickerThesisIds = new Dictionary<string, HashSet<Guid>>(StringComparer.OrdinalIgnoreCase);
 
@@ -95,7 +102,7 @@ public sealed class NewsMaterialityJob(
         var since = nowUtc - ClusterWindow;
         foreach (var (ticker, thesisIds) in tickerThesisIds)
         {
-            await ProcessTickerAsync(userId, ticker, thesisIds, since, day, ct);
+            await ProcessTickerAsync(userId, ticker, thesisIds, since, day, terms, ct);
         }
     }
 
@@ -111,7 +118,13 @@ public sealed class NewsMaterialityJob(
     }
 
     private async Task ProcessTickerAsync(
-        Guid userId, string ticker, HashSet<Guid> thesisIds, DateTimeOffset since, DateOnly day, CancellationToken ct)
+        Guid userId,
+        string ticker,
+        HashSet<Guid> thesisIds,
+        DateTimeOffset since,
+        DateOnly day,
+        IReadOnlyList<string> terms,
+        CancellationToken ct)
     {
         var articles = (await news.GetForTickerAsync(ticker, since, ArticleLookbackLimit, ct)).ToList();
         foreach (var thesisId in thesisIds)
@@ -120,34 +133,53 @@ public sealed class NewsMaterialityJob(
         }
 
         articles = [.. articles.DistinctBy(a => a.ContentHash, StringComparer.Ordinal)];
-        if (articles.Count == 0)
+
+        // #693: a cluster with no article a reader could actually open is noise, whatever else it
+        // qualifies on — filter down to retrievable articles before applying any firing rule.
+        var retrievable = articles.Where(IsRetrievable).ToList();
+        if (retrievable.Count < MinRetrievableArticles)
         {
             return;
         }
 
-        var distinctSources = articles.Select(a => a.Source).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-        if (distinctSources >= MinClusterSources)
+        var distinctSources = retrievable.Select(a => a.Source).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        var distinctStories = retrievable.Select(a => NormalizeTitle(a.Title)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        if (distinctSources >= MinClusterSources && distinctStories >= MinClusterSources)
         {
             await alerts.GenerateNewsClusterAlertAsync(
                 userId, ticker, $"{distinctSources} sources within {ClusterWindow.TotalHours:0}h", day, ct);
             return;
         }
 
-        var thesisHit = thesisIds.Count > 0 && articles.Any(a => a.ThesisIds.Any(thesisIds.Contains));
+        var thesisHit = thesisIds.Count > 0 && retrievable.Any(a => a.ThesisIds.Any(thesisIds.Contains));
         if (thesisHit)
         {
             await alerts.GenerateNewsClusterAlertAsync(userId, ticker, "thesis-attached source hit", day, ct);
             return;
         }
 
-        var matchedKeyword = articles
-            .SelectMany(a => MaterialKeywords.Where(k => Mentions(a, k)))
+        var matchedKeyword = retrievable
+            .SelectMany(a => terms.Where(k => Mentions(a, k)))
             .FirstOrDefault();
         if (matchedKeyword is not null)
         {
             await alerts.GenerateNewsClusterAlertAsync(userId, ticker, $"material keyword: {matchedKeyword}", day, ct);
         }
     }
+
+    /// <summary>An article with no usable link is not a retrievable underlying source (#693).</summary>
+    private static bool IsRetrievable(NewsArticle article)
+        => !string.IsNullOrWhiteSpace(article.Url)
+            && Uri.IsWellFormedUriString(article.Url, UriKind.Absolute);
+
+    /// <summary>
+    /// Collapses a headline to whitespace/case-insensitive text so the same story reprinted verbatim
+    /// by a second wire distributor doesn't count as a second, independent story (#693).
+    /// </summary>
+    private static string NormalizeTitle(string title)
+        => string.Join(' ', title.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .Trim()
+            .TrimEnd('.', '!', '?');
 
     private static bool Mentions(NewsArticle article, string keyword)
         => article.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase)

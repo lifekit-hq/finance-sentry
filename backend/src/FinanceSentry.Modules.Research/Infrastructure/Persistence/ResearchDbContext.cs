@@ -44,6 +44,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
 
     public DbSet<AssetLedgerRead> AssetLedgerReads { get; set; } = null!;
 
+    public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("research");
@@ -311,6 +313,15 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
             .OnDelete(DeleteBehavior.SetNull);
         nsb.HasIndex(x => x.Url).IsUnique().HasDatabaseName("idx_news_sources_url");
         nsb.HasIndex(x => x.ThesisId).HasDatabaseName("idx_news_sources_thesis");
+
+        var mtb = modelBuilder.Entity<MaterialityTerm>();
+        mtb.ToTable("materiality_terms");
+        mtb.HasKey(x => x.Id);
+        mtb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+        mtb.Property(x => x.Term).IsRequired().HasMaxLength(40);
+        mtb.Property(x => x.Enabled).IsRequired();
+        mtb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        mtb.HasIndex(x => x.Term).IsUnique().HasDatabaseName("idx_materiality_terms_term");
 
         var vsb = modelBuilder.Entity<ValuationSnapshot>();
         vsb.ToTable("valuation_snapshots");

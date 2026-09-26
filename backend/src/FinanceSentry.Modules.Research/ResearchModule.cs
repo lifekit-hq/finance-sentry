@@ -163,6 +163,7 @@ public static class ResearchModule
         services.AddScoped<IAnalystActionRepository, AnalystActionRepository>();
         services.AddScoped<IAnalystUniverseRepository, AnalystUniverseRepository>();
         services.AddScoped<INewsSourceRepository, NewsSourceRepository>();
+        services.AddScoped<IMaterialityTermRepository, MaterialityTermRepository>();
         services.AddScoped<IValuationSnapshotRepository, ValuationSnapshotRepository>();
         services.AddScoped<IRecommendationTrendRepository, RecommendationTrendRepository>();
         services.AddScoped<IResearchDocumentRepository, ResearchDocumentRepository>();
