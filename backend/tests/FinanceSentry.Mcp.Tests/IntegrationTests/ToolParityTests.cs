@@ -110,6 +110,8 @@ public sealed class ToolParityTests
         services.AddScoped<ISyncJobRepository, SyncJobRepository>();
         services.AddScoped<ICryptoHoldingRepository, CryptoHoldingRepository>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
+        services.AddScoped<IBrokerageTradeRepository, BrokerageTradeRepository>();
+        services.AddSingleton<BrokerageCostBasisReconciler>();
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
@@ -647,6 +649,27 @@ public sealed class ToolParityTests
             5m,
             2_500m,
             "ibkr"));
+        brokerageDb.BrokerageTrades.Add(new BrokerageTrade(
+            userId,
+            "ibkr",
+            ibExecutionId: "exec-1",
+            ibTradeId: "trade-1",
+            conid: null,
+            isin: null,
+            symbol: "AAPL",
+            openCloseIndicator: "O",
+            openDateTime: null,
+            tradeDateTime: DateTime.UtcNow.AddYears(-2),
+            quantity: 10m,
+            price: 150m,
+            proceeds: -1_500m,
+            costBasis: null,
+            realizedPnl: null,
+            commission: null,
+            commissionCurrency: "USD",
+            taxes: null,
+            currency: "USD",
+            fxRateToBase: null));
         await brokerageDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetTaxLotsTool>();
@@ -660,12 +683,14 @@ public sealed class ToolParityTests
         aapl.UnrealizedPnlUsd.Should().Be(400m);
         aapl.IsLongTerm.Should().BeTrue();
         aapl.Provider.Should().Be("ibkr");
+        aapl.BasisState.Should().Be("Verified");
 
         var spy = result.Single(e => e.Symbol == "SPY");
         spy.AverageCostUsd.Should().BeNull();
         spy.CostBasisUsd.Should().BeNull();
         spy.UnrealizedPnlUsd.Should().BeNull();
         spy.IsLongTerm.Should().BeFalse();
+        spy.BasisState.Should().Be("Unknown");
     }
 
     [Fact]
