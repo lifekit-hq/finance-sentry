@@ -11,7 +11,8 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 public class RegisterCommandHandler(
     UserManager<ApplicationUser> userManager,
     ITokenService tokenService,
-    IRefreshTokenService refreshTokenService) : ICommandHandler<RegisterCommand, AuthResult>
+    IRefreshTokenService refreshTokenService,
+    IEventBus eventBus) : ICommandHandler<RegisterCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
@@ -25,10 +26,28 @@ public class RegisterCommandHandler(
             throw new ValidationException(
                 result.Errors.Select(e => new ValidationFailure(nameof(request.Password), e.Description)));
 
+        await PublishUserRegisteredAsync(user.Id, cancellationToken);
+
         var (accessToken, expiresAt) = tokenService.GenerateToken(user);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
         return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!), expiresAt), rawRefreshToken, accessToken);
+    }
+
+    /// <summary>
+    /// Best-effort: a downstream module's per-user provisioning (e.g. Companion notification
+    /// settings, issue #686) must not fail registration.
+    /// </summary>
+    private async Task PublishUserRegisteredAsync(string userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await eventBus.Publish(new UserRegisteredEvent(Guid.Parse(userId)), cancellationToken);
+        }
+        catch
+        {
+            // best-effort
+        }
     }
 }
