@@ -357,7 +357,7 @@ disagree with the money-flow reader above.
   It does not count `investment` buckets — those are excluded from the statement's own accounting
   entirely, since C2 scoped the statement to family, not every non-`self_routing` role.
 - Rent fields are intentionally absent from this contract (Ship 3 of issue #434); adding them
-  requires a captain ruling on how "confirmed" is established (a stored expectation vs. a
+  requires a product decision on how "confirmed" is established (a stored expectation vs. a
   per-transaction label vs. a heuristic).
 
 ### 5a. Committed vs discretionary outflow
