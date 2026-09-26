@@ -23,4 +23,18 @@ public class CounterpartyRepository(BankSyncDbContext context) : ICounterpartyRe
             .OrderBy(c => c.Id)
             .ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<Counterparty?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Counterparties.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Counterparty> UpdateAsync(Counterparty counterparty, CancellationToken cancellationToken = default)
+    {
+        _context.Counterparties.Update(counterparty);
+        await _context.SaveChangesAsync(cancellationToken);
+        return counterparty;
+    }
 }

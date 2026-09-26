@@ -356,9 +356,17 @@ disagree with the money-flow reader above.
   statement for that month, so a reader sees money was deliberately excluded rather than missing.
   It does not count `investment` buckets — those are excluded from the statement's own accounting
   entirely, since C2 scoped the statement to family, not every non-`self_routing` role.
-- Rent fields are intentionally absent from this contract (Ship 3 of issue #434); adding them
-  requires a product decision on how "confirmed" is established (a stored expectation vs. a
-  per-transaction label vs. a heuristic).
+- **Rent fields** (Ship 3 of issue #434): `Counterparty` carries a nullable
+  `ExpectedMonthlyInflowAmount`/`ExpectedMonthlyInflowCurrency` pair, set or cleared together via
+  the `PUT /api/v1/counterparties/{id}/expected-inflow` endpoint (ownership-scoped; rejects a
+  non-ISO-4217 currency or a non-positive amount). A line's `RentExpectedAmount`/
+  `RentExpectedCurrency`/`RentConfirmed`/`RentShortfall` are populated only when the counterparty
+  is `family_support` **and** has an expectation configured; otherwise all four are null.
+  `RentConfirmed` compares the month's **native** gross received in the expected currency (read
+  from `ByCurrency`, not `ReceivedUsd`) against the expected amount — **deliberately no FX
+  conversion**: an inflow in a different currency never counts toward confirmation, since "rent
+  arrived" is a same-currency fact, not a cross-currency total. `RentShortfall` is the positive
+  gap (`expected − native received`) when not confirmed, and null once confirmed.
 
 ### 5a. Committed vs discretionary outflow
 

@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Queries;
 
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Core.Cqrs;
 
 // ── Result types ───────────────────────────────────────────────────────────────
@@ -23,13 +24,30 @@ public record CounterpartyStatementCurrencySubtotal(string Currency, decimal Rec
 /// fed back into <see cref="MonthlyFlow"/> or any aggregation; the flow math stays gross per
 /// direction per the 2026-09-03 owner ruling (spec 044 §US2).
 /// </param>
+/// <param name="RentExpectedAmount">
+/// The counterparty's configured expected monthly inflow (e.g. rent), or null when none is
+/// configured or this counterparty isn't <see cref="FlowRoles.FamilySupport"/>. See
+/// docs/money-semantics.md §5.1.
+/// </param>
+/// <param name="RentExpectedCurrency">ISO 4217 currency of <see cref="RentExpectedAmount"/>, or null.</param>
+/// <param name="RentConfirmed">
+/// True when this month's native gross received in <see cref="RentExpectedCurrency"/> (from
+/// <see cref="ByCurrency"/>) is at least <see cref="RentExpectedAmount"/>. Deliberately no FX
+/// conversion — an inflow in a different currency never counts. Null alongside the other rent
+/// fields when no expectation applies.
+/// </param>
+/// <param name="RentShortfall">The positive gap when not confirmed; null otherwise.</param>
 public record CounterpartyStatementLine(
     string Name,
     string FlowRole,
     decimal ReceivedUsd,
     decimal SentUsd,
     decimal NetUsd,
-    IReadOnlyList<CounterpartyStatementCurrencySubtotal> ByCurrency);
+    IReadOnlyList<CounterpartyStatementCurrencySubtotal> ByCurrency,
+    decimal? RentExpectedAmount = null,
+    string? RentExpectedCurrency = null,
+    bool? RentConfirmed = null,
+    decimal? RentShortfall = null);
 
 /// <summary>
 /// One month's family clearing house: who sent/received what, gross, plus the month's
@@ -76,10 +94,12 @@ public record GetFamilyClearingStatementQuery(Guid UserId, string? Month = null,
 /// counterparties are never lines, but self-routing ones are counted in
 /// <see cref="FamilyClearingStatement.ExcludedRoutingLegs"/>.
 /// </summary>
-public class GetFamilyClearingStatementQueryHandler(ICounterpartyClassificationService classification)
+public class GetFamilyClearingStatementQueryHandler(
+    ICounterpartyClassificationService classification, ICounterpartyRepository counterparties)
     : IQueryHandler<GetFamilyClearingStatementQuery, FamilyClearingStatement>
 {
     private readonly ICounterpartyClassificationService _classification = classification;
+    private readonly ICounterpartyRepository _counterparties = counterparties;
 
     public async Task<FamilyClearingStatement> Handle(
         GetFamilyClearingStatementQuery request, CancellationToken cancellationToken)
@@ -90,20 +110,59 @@ public class GetFamilyClearingStatementQueryHandler(ICounterpartyClassificationS
         var month = request.Month ?? LastCompleteMonth();
         var monthFlows = result.MonthlyFlows.Where(f => f.Month == month).ToList();
 
+        // Keyed by name, family_support only: the classification service only exposes
+        // counterparties by name (CounterpartyMonthlyFlow.CounterpartyName), not id, and a
+        // non-family_support counterparty must never contribute rent fields even if it happens
+        // to share a name with a family_support one. Prefers the caller's own row over a system
+        // default (UserId == Guid.Empty) when both exist for the same name.
+        var expectedInflowByName = (await _counterparties.GetForUserAsync(request.UserId, cancellationToken))
+            .Where(c => c.FlowRole == FlowRoles.FamilySupport)
+            .OrderByDescending(c => c.UserId == request.UserId)
+            .GroupBy(c => c.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
         var lines = monthFlows
             .Where(f => f.FlowRole == FlowRoles.FamilySupport)
             .OrderBy(f => f.CounterpartyName, StringComparer.Ordinal)
-            .Select(f => new CounterpartyStatementLine(
-                f.CounterpartyName,
-                f.FlowRole,
-                f.InflowUsd,
-                f.OutflowUsd,
-                f.InflowUsd - f.OutflowUsd,
-                (f.ByCurrency ?? [])
+            .Select(f =>
+            {
+                var byCurrency = (f.ByCurrency ?? [])
                     .Select(c => new CounterpartyStatementCurrencySubtotal(
                         c.Currency, c.Received, c.Sent, c.Received - c.Sent))
                     .OrderBy(c => c.Currency, StringComparer.Ordinal)
-                    .ToList()))
+                    .ToList();
+
+                decimal? rentExpectedAmount = null;
+                string? rentExpectedCurrency = null;
+                bool? rentConfirmed = null;
+                decimal? rentShortfall = null;
+
+                if (expectedInflowByName.TryGetValue(f.CounterpartyName, out var counterparty)
+                    && counterparty.ExpectedMonthlyInflowAmount is { } expectedAmount
+                    && counterparty.ExpectedMonthlyInflowCurrency is { } expectedCurrency)
+                {
+                    var nativeReceived = byCurrency
+                        .FirstOrDefault(c => c.Currency == expectedCurrency)
+                        ?.Received ?? 0m;
+
+                    rentExpectedAmount = expectedAmount;
+                    rentExpectedCurrency = expectedCurrency;
+                    rentConfirmed = nativeReceived >= expectedAmount;
+                    rentShortfall = rentConfirmed == true ? null : expectedAmount - nativeReceived;
+                }
+
+                return new CounterpartyStatementLine(
+                    f.CounterpartyName,
+                    f.FlowRole,
+                    f.InflowUsd,
+                    f.OutflowUsd,
+                    f.InflowUsd - f.OutflowUsd,
+                    byCurrency,
+                    rentExpectedAmount,
+                    rentExpectedCurrency,
+                    rentConfirmed,
+                    rentShortfall);
+            })
             .ToList();
 
         var excludedRoutingLegs = monthFlows.Count(f => f.FlowRole == FlowRoles.SelfRouting);

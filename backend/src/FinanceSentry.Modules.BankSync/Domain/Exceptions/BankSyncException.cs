@@ -38,3 +38,20 @@ public class CredentialExpiredException()
 /// </summary>
 public class UnpinnableMerchantException()
     : BankSyncException("VALIDATION_ERROR", "A committed pin needs a recognisable merchant name.", 400);
+
+/// <summary>
+/// No counterparty exists for the given id that belongs to the caller. Also thrown when the
+/// counterparty exists but belongs to a different user, so the response cannot be used to probe
+/// for another user's counterparty ids.
+/// </summary>
+public class CounterpartyNotFoundException(Guid counterpartyId)
+    : BankSyncException("COUNTERPARTY_NOT_FOUND", $"Counterparty {counterpartyId} not found.", 404);
+
+/// <summary>
+/// The expected-monthly-inflow amount/currency offered to
+/// <c>SetCounterpartyExpectedInflowCommand</c> failed validation — a non-positive amount, an
+/// invalid ISO 4217 currency code, or only one of the pair supplied. Reuses
+/// <c>VALIDATION_ERROR</c>, matching <see cref="UnpinnableMerchantException"/>.
+/// </summary>
+public class InvalidExpectedInflowException(string message)
+    : BankSyncException("VALIDATION_ERROR", message, 400);
