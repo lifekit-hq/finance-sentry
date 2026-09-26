@@ -280,6 +280,7 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateNewsClusterAlertAsync(Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetNearLimitAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetExceededAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateBudgetPaceAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveConsentExpiringAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;

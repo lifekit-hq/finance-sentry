@@ -413,6 +413,99 @@ public sealed class BudgetBreachDetectionJobTests
         Assert.All(ledger, a => Assert.Contains("September 2026", a.Title));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_PaceRatioAt115OnDay14_FiresPaceAlert()
+    {
+        // Day 14 of a 30-day September: elapsed fraction 14/30. 46 USD spent against a 100 USD
+        // limit gives a pace ratio of 46 / (100 * 14/30) = ~0.986 — just under. Bump to 47 USD to
+        // clear 1.15: 47 / (100 * 14/30) ≈ 1.007, still under. Use 58 USD: 58 / 46.67 ≈ 1.243 — over.
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetSpend(userId, "GROCERIES", 58m);
+
+        await MakeJob(At(2026, 9, 14)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetPaceAlertAsync(
+            userId, budget.Id, "GROCERIES", 58m, 100m, It.Is<decimal>(p => p > 124m && p < 125m),
+            2026, 9, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PaceRatioJustBelow115OnDay14_FiresNoPaceAlert()
+    {
+        // 53 USD spent, elapsed fraction 14/30 -> pace ratio 53 / 46.67 ≈ 1.136 — under 1.15.
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetSpend(userId, "GROCERIES", 53m);
+
+        await MakeJob(At(2026, 9, 14)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<decimal>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PaceRatioOver115OnDay6_FiresNoPaceAlert()
+    {
+        // Before the day-7 window opens, even a wildly off-pace spend does not fire — the small
+        // elapsed-fraction denominator this early would invent a crisis out of one large charge.
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetSpend(userId, "GROCERIES", 90m);
+
+        await MakeJob(At(2026, 9, 6)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<decimal>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PaceRatioOver115OnDay22_FiresNoPaceAlert()
+    {
+        // Past the day-21 window close, the exceeded/near-limit thresholds are the better signal —
+        // a pace alert here would be a second notification about the same thing.
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        SetSpend(userId, "GROCERIES", 85m);
+
+        await MakeJob(At(2026, 9, 22)).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateBudgetPaceAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<decimal>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// End to end through the real alert generator: a second evaluation later in the same month's
+    /// pace window does not re-fire the pace alert for the same budget/month.
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_SecondEvaluationSameMonth_DoesNotRefirePaceAlert()
+    {
+        var userId = Guid.NewGuid();
+        var budget = MakeBudget(userId, "GROCERIES", 100m);
+        _budgets.Setup(b => b.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([budget]);
+        // 78 USD spent stays over the 1.15 pace ratio on both day 14 (ratio ~1.67) and day 20
+        // (ratio ~1.17), while staying under the 90% near-limit threshold throughout, so the pace
+        // dedup is exercised in isolation, with no near-limit/exceeded alert also landing in the
+        // ledger.
+        SetMonthSpend(userId, "GROCERIES", 2026, 9, 78m);
+        var (ledger, generator) = RealGenerator();
+
+        await MakeJob(generator, At(2026, 9, 14)).ExecuteAsync();
+        Assert.Single(ledger);
+
+        await MakeJob(generator, At(2026, 9, 20)).ExecuteAsync();
+
+        Assert.Single(ledger);
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

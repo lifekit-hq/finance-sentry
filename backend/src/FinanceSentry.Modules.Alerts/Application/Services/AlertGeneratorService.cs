@@ -416,6 +416,22 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ct);
     }
 
+    public Task GenerateBudgetPaceAlertAsync(
+        Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+        decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default)
+    {
+        var projectedPct = limitUsd == 0m ? 0 : (int)Math.Round(projectedMonthEndSpendUsd / limitUsd * 100);
+        var period = BudgetPeriodLabel(year, month);
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.BudgetBreach, AlertSeverity.Warning,
+            BudgetBreachReferenceId("pace", budgetId, year, month), category,
+            $"Budget off pace: {category} ({period})",
+            $"Your {category} budget is on track to finish {period} at {projectedPct}% of its {limitUsd:F2} USD monthly limit ({spentUsd:F2} USD spent so far).")
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+    }
+
     /// <summary>
     /// The one place an alert is written. Every generator funnels through here so the dedup
     /// discipline — open alert on the same reference wins, then the type's silence window — is
