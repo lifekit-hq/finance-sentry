@@ -28,6 +28,8 @@ public class AlertsDbContext(DbContextOptions<AlertsDbContext> options) : DbCont
         ab.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ab.Property(a => a.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ab.Property(a => a.AcknowledgementDecision).HasMaxLength(10);
+        ab.Property(a => a.OccurrenceCount).IsRequired().HasDefaultValue(1);
+        ab.Property(a => a.LastOccurredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         ab.HasIndex(a => new { a.UserId, a.CreatedAt })
             .HasDatabaseName("idx_alert_user_created")

@@ -28,6 +28,13 @@ public interface IAlertRepository
 
     Task ResolveAsync(Guid alertId, CancellationToken ct = default);
 
+    /// <summary>
+    /// A suppressed repeat of an open alert (finance-sentry#419 S5): increments <c>OccurrenceCount</c>
+    /// and refreshes <c>LastOccurredAt</c>/<c>UpdatedAt</c> on the existing row instead of inserting a
+    /// new one, so the row count stays at 1 while the recurrence is still recorded.
+    /// </summary>
+    Task BumpOccurrenceAsync(Guid alertId, CancellationToken ct = default);
+
     Task<int> PurgeOldAsync(DateTimeOffset olderThan, CancellationToken ct = default);
 
     Task DeleteByReferenceIdAsync(Guid referenceId, CancellationToken ct = default);
@@ -62,4 +69,11 @@ public interface IAlertRepository
     /// </summary>
     Task<IReadOnlyList<Alert>> GetOpenAlertsByTypesAsync(
         IReadOnlyCollection<string> types, CancellationToken ct = default);
+
+    /// <summary>
+    /// Open (not resolved, not dismissed) alerts across all users and types whose acknowledgement
+    /// decision is "Defer" — the candidate set <see cref="Infrastructure.Jobs.AlertExpiryJob"/> checks
+    /// against the 7-day deferral expiry, independent of the per-type TTL table (finance-sentry#419 S5).
+    /// </summary>
+    Task<IReadOnlyList<Alert>> GetOpenDeferredAlertsAsync(CancellationToken ct = default);
 }

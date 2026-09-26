@@ -34,7 +34,9 @@ public sealed class ListActiveAlertsToolTests
             isRead,
             isResolved,
             DateTimeOffset.UtcNow,
-            isResolved ? DateTimeOffset.UtcNow : null);
+            isResolved ? DateTimeOffset.UtcNow : null,
+            1,
+            DateTimeOffset.UtcNow);
 
     private static AlertsPageResponse PageOf(params AlertDto[] items) =>
         new(items, items.Length, 0, 1, 100, 1);

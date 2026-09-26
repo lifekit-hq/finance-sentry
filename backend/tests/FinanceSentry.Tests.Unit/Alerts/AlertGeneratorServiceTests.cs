@@ -339,6 +339,19 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GeneratePriceHike_ExistingActive_BumpsOccurrenceInsteadOfDropping()
+    {
+        var existingId = Guid.NewGuid();
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.PriceHike, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(new Alert { Id = existingId });
+
+        await _service.GeneratePriceHikeAlertAsync(_userId, Guid.NewGuid(), "Netflix", 10m, 12.50m, "EUR");
+
+        _repo.Verify(r => r.BumpOccurrenceAsync(existingId, default), Times.Once);
+        VerifyNothingAdded();
+    }
+
+    [Fact]
     public async Task GenerateDuplicateCharge_NoExisting_AddsWarningAlertNamingTheMerchant()
     {
         AllowAlert(AlertType.DuplicateCharge);
