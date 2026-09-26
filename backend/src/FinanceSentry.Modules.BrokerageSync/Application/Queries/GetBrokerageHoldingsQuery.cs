@@ -1,17 +1,24 @@
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 
 namespace FinanceSentry.Modules.BrokerageSync.Application.Queries;
 
 public sealed record GetBrokerageHoldingsQuery(Guid UserId) : IQuery<BrokerageHoldingsResponse>;
 
+/// <summary>
+/// <see cref="BasisState"/> is "Verified", "Unverified" or "Unknown" (fs-688) — see
+/// <c>BrokerageCostBasisReconciler</c>. <see cref="CostBasisUsd"/> and <see cref="AverageCostUsd"/> are
+/// null whenever it is not "Verified".
+/// </summary>
 public sealed record BrokeragePositionDto(
     string Symbol,
     string InstrumentType,
     decimal Quantity,
     decimal UsdValue,
-    decimal? CostBasisUsd = null,
-    decimal? AverageCostUsd = null);
+    decimal? CostBasisUsd,
+    decimal? AverageCostUsd,
+    string BasisState);
 
 public sealed record BrokerageHoldingsResponse(
     string Provider,
@@ -20,17 +27,17 @@ public sealed record BrokerageHoldingsResponse(
     IReadOnlyList<BrokeragePositionDto> Positions,
     decimal TotalUsdValue);
 
-public sealed class GetBrokerageHoldingsQueryHandler
+public sealed class GetBrokerageHoldingsQueryHandler(
+    IBrokerageHoldingRepository holdingRepository,
+    IBrokerageTradeRepository tradeRepository,
+    BrokerageCostBasisReconciler reconciler)
     : IQueryHandler<GetBrokerageHoldingsQuery, BrokerageHoldingsResponse>
 {
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(1);
 
-    private readonly IBrokerageHoldingRepository _holdingRepository;
-
-    public GetBrokerageHoldingsQueryHandler(IBrokerageHoldingRepository holdingRepository)
-    {
-        _holdingRepository = holdingRepository;
-    }
+    private readonly IBrokerageHoldingRepository _holdingRepository = holdingRepository;
+    private readonly IBrokerageTradeRepository _tradeRepository = tradeRepository;
+    private readonly BrokerageCostBasisReconciler _reconciler = reconciler;
 
     public async Task<BrokerageHoldingsResponse> Handle(
         GetBrokerageHoldingsQuery request, CancellationToken ct)
@@ -50,18 +57,26 @@ public sealed class GetBrokerageHoldingsQueryHandler
                 TotalUsdValue: 0m);
         }
 
+        var trades = await _tradeRepository.GetByUserIdAsync(request.UserId, ct);
         var latestSyncedAt = holdings.Max(h => h.SyncedAt);
         var isStale = DateTime.UtcNow - latestSyncedAt > StaleThreshold;
         var totalUsd = holdings.Sum(h => h.UsdValue);
 
         var positions = holdings
-            .Select(h => new BrokeragePositionDto(
-                h.Symbol,
-                h.InstrumentType,
-                h.Quantity,
-                h.UsdValue,
-                h.CostBasisUsd,
-                h.AverageCostUsd))
+            .Select(h =>
+            {
+                var reconciliation = _reconciler.Reconcile(h, trades);
+                var verified = reconciliation.State == BasisState.Verified;
+
+                return new BrokeragePositionDto(
+                    h.Symbol,
+                    h.InstrumentType,
+                    h.Quantity,
+                    h.UsdValue,
+                    verified ? h.CostBasisUsd : null,
+                    verified ? h.AverageCostUsd : null,
+                    reconciliation.State.ToString());
+            })
             .ToList();
 
         return new BrokerageHoldingsResponse(

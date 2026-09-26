@@ -49,7 +49,8 @@ public sealed class GetTaxLotsToolTests
                         UnrealizedPnlUsd: 400m,
                         UnrealizedPnlPercent: 26.67m,
                         AcquiredAt: acq,
-                        IsLongTerm: true),
+                        IsLongTerm: true,
+                        BasisState: "Verified"),
                 ],
                 TotalCostBasisUsd: 1_500m,
                 TotalUnrealizedPnlUsd: 400m));
@@ -66,6 +67,7 @@ public sealed class GetTaxLotsToolTests
         aapl.IsLongTerm.Should().BeTrue();
         aapl.AcquiredAt.Should().Be(acq);
         aapl.Provider.Should().Be("ibkr");
+        aapl.BasisState.Should().Be("Verified");
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public sealed class GetTaxLotsToolTests
                 Provider: "ibkr",
                 SyncedAt: DateTime.UtcNow,
                 Items: [
-                    new TaxLotDto("SPY", "STK", 5m, 2_500m, null, null, null, null, null, false),
+                    new TaxLotDto("SPY", "STK", 5m, 2_500m, null, null, null, null, null, false, "Unknown"),
                 ],
                 TotalCostBasisUsd: 0m,
                 TotalUnrealizedPnlUsd: 0m));
