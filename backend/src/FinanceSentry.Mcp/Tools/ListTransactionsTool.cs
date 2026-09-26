@@ -22,13 +22,14 @@ public sealed class ListTransactionsTool(
     private readonly ILogger<ListTransactionsTool> _logger = logger;
 
     [McpServerTool(Name = "list_transactions")]
-    [Description("Returns a paginated list of bank transactions, optionally filtered by account, date range, or merchant category. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns a paginated list of bank transactions, optionally filtered by account, date range, merchant category, or free-text search. Defaults to the authenticated MCP identity when userId is omitted.")]
     public async Task<IReadOnlyList<TransactionEntry>> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Optional account ID (GUID string) to scope results to a single account.")] string? accountId = null,
         [Description("Optional inclusive start date (e.g. 2024-01-01) for filtering transactions.")] DateOnly? fromDate = null,
         [Description("Optional inclusive end date (e.g. 2024-12-31) for filtering transactions.")] DateOnly? toDate = null,
         [Description("Optional merchant category to filter on (e.g. 'FOOD_AND_DRINK'). Case-insensitive.")] string? category = null,
+        [Description("Optional free-text search over the transaction description and merchant name.")] string? search = null,
         [Description("1-based page number. Defaults to 1.")] int page = 1,
         [Description("Number of transactions per page. Defaults to 50.")] int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -55,9 +56,12 @@ public sealed class ListTransactionsTool(
             queryResult = await _transactionQueryHandler.Handle(
                 new GetAllTransactionsQuery(
                     userIdVal,
-                    new PagedRequest(0, int.MaxValue),
+                    new PagedRequest((page - 1) * pageSize, pageSize),
                     fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
-                    toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc)),
+                    toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc),
+                    AccountIds: accountGuid.HasValue ? [accountGuid.Value] : null,
+                    Categories: category is not null ? [category] : null,
+                    Search: search),
                 cancellationToken);
         }
         catch (Exception ex)
@@ -78,19 +82,7 @@ public sealed class ListTransactionsTool(
             accountMeta = [];
         }
 
-        IEnumerable<GlobalTransactionDto> filtered = queryResult.Transactions;
-
-        if (accountGuid.HasValue)
-            filtered = filtered.Where(t => t.AccountId == accountGuid.Value);
-
-        if (category is not null)
-            filtered = filtered.Where(t => string.Equals(t.MerchantCategory, category, StringComparison.OrdinalIgnoreCase));
-
-        int offset = (page - 1) * pageSize;
-
-        return filtered
-            .Skip(offset)
-            .Take(pageSize)
+        return queryResult.Transactions
             .Select(t =>
             {
                 accountMeta.TryGetValue(t.AccountId, out var meta);
