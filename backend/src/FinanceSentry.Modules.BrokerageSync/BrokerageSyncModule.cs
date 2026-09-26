@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BrokerageSync;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Interfaces;
@@ -14,6 +15,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
 
@@ -86,6 +88,9 @@ public static class BrokerageSyncModule
         services.AddScoped<IIbkrFlexTradeSyncService, IbkrFlexTradeSyncService>();
         services.AddSingleton<BrokerageCostBasisReconciler>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
+        // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
+        // durable, storage-backed streak state, keyed separately per job/credential.
+        services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
         services.AddScoped<IBKRSyncJob>();
         services.AddScoped<IbkrFlexIncrementalSyncJob>();
         services.AddScoped<IbkrFlexBackfillJob>();

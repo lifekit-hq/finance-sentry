@@ -1,6 +1,9 @@
+using System.Net;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FluentAssertions;
@@ -17,9 +20,27 @@ public class IBKRSyncJobTests
 
     private readonly Mock<FinanceSentry.Core.Interfaces.IAlertGeneratorService> _alerts = new(MockBehavior.Loose);
     private readonly Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader> _userPrefs = new(MockBehavior.Loose);
+    private readonly IJobFailureStreakStore _failureStreaks = new InMemoryJobFailureStreakStore();
+
+    public IBKRSyncJobTests()
+    {
+        _userPrefs
+            .Setup(p => p.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new FinanceSentry.Core.Interfaces.UserAlertPreferences(true, 0m, true));
+    }
 
     private IBKRSyncJob CreateJob() =>
-        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, NullLogger<IBKRSyncJob>.Instance);
+        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, NullLogger<IBKRSyncJob>.Instance);
+
+    private sealed class InMemoryJobFailureStreakStore : IJobFailureStreakStore
+    {
+        private readonly Dictionary<string, JobFailureStreak> _streaks = [];
+
+        public JobFailureStreak Get(string jobName) =>
+            _streaks.TryGetValue(jobName, out var streak) ? streak : JobFailureStreak.Empty;
+
+        public void Set(string jobName, JobFailureStreak streak) => _streaks[jobName] = streak;
+    }
 
     private static IBKRCredential MakeCredential(Guid userId)
     {
@@ -101,6 +122,98 @@ public class IBKRSyncJobTests
             h => h.Handle(
                 It.Is<SyncIBKRHoldingsCommand>(c => c.UserId == successUser),
                 It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SingleTransientFailure_DoesNotAlert()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR live-session-token request failed (503): Error 500 - Server Error", "IBKR", HttpStatusCode.ServiceUnavailable));
+
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TransientFailurePersistsAcrossTicks_EscalatesToOneAlert()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR live-session-token request failed (503): Error 500 - Server Error", "IBKR", HttpStatusCode.ServiceUnavailable));
+
+        // Simulate three consecutive 15-minute ticks all hitting the same transient blip.
+        await CreateJob().ExecuteAsync();
+        await CreateJob().ExecuteAsync();
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NonTransientFailure_AlertsImmediately()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR rejected the signed request (401).", "IBKR", HttpStatusCode.Unauthorized));
+
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SuccessAfterFailure_ResetsStreakAndResolvesAlert()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .SetupSequence(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR live-session-token request failed (503): Error 500 - Server Error", "IBKR", HttpStatusCode.ServiceUnavailable))
+            .ReturnsAsync(new SyncIBKRHoldingsResult(1, DateTime.UtcNow));
+
+        await CreateJob().ExecuteAsync();
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }
