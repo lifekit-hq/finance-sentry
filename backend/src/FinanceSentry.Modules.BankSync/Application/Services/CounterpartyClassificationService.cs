@@ -7,17 +7,48 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 // ── Public result types ────────────────────────────────────────────────────────
 
 /// <summary>
+/// Native (account-currency) gross inbound/outbound subtotal for one counterparty, one month,
+/// one currency. <see cref="Received"/>/<see cref="Sent"/> are the account-currency figures that
+/// <see cref="CounterpartyMonthlyFlow.InflowUsd"/>/<see cref="CounterpartyMonthlyFlow.OutflowUsd"/>
+/// convert and sum from — see docs/money-semantics.md §5.1.
+/// </summary>
+public record CounterpartyCurrencyFlow(string Currency, decimal Received, decimal Sent);
+
+/// <summary>
 /// Gross inbound and outbound movement (in USD) between the user and one counterparty
 /// in a given month. Each direction is reported whole: a rent credit and a support debit
 /// in the same month with the same counterparty are two separate facts, never one net
 /// figure. See <see cref="ICounterpartyClassificationService"/> for why.
 /// </summary>
+/// <param name="ByCurrency">
+/// Native per-currency subtotals underlying <paramref name="InflowUsd"/>/<paramref name="OutflowUsd"/>
+/// — see docs/money-semantics.md §5.1. Defaults to empty for call sites built before this field
+/// existed; production classification always fills it.
+/// </param>
 public record CounterpartyMonthlyFlow(
     string Month,
     string CounterpartyName,
     string FlowRole,
     decimal InflowUsd,
-    decimal OutflowUsd);
+    decimal OutflowUsd,
+    IReadOnlyList<CounterpartyCurrencyFlow>? ByCurrency = null)
+{
+    // Record-synthesized equality compares ByCurrency by list reference, so two
+    // classification runs over the same input would never compare equal even with
+    // identical native subtotals. Sequence-compare it instead; every other field keeps
+    // value equality via ==.
+    public virtual bool Equals(CounterpartyMonthlyFlow? other) =>
+        other is not null
+        && Month == other.Month
+        && CounterpartyName == other.CounterpartyName
+        && FlowRole == other.FlowRole
+        && InflowUsd == other.InflowUsd
+        && OutflowUsd == other.OutflowUsd
+        && (ByCurrency ?? []).SequenceEqual(other.ByCurrency ?? []);
+
+    public override int GetHashCode() =>
+        HashCode.Combine(Month, CounterpartyName, FlowRole, InflowUsd, OutflowUsd);
+}
 
 /// <summary>
 /// The counterparty a single transaction matched — who it was and what role the movement
@@ -145,8 +176,10 @@ public class CounterpartyClassificationService(
 
         var matchedIds = new HashSet<Guid>();
         var matchesById = new Dictionary<Guid, CounterpartyMatch>();
-        // Key: (counterpartyName, flowRole, month) → (grossInflowUsd, grossOutflowUsd)
-        var buckets = new Dictionary<(string Name, string FlowRole, string Month), (decimal Inflow, decimal Outflow)>();
+        // Key: (counterpartyName, flowRole, month) → (grossInflowUsd, grossOutflowUsd, native per-currency subtotals)
+        var buckets = new Dictionary<
+            (string Name, string FlowRole, string Month),
+            (decimal Inflow, decimal Outflow, Dictionary<string, (decimal Received, decimal Sent)> ByCurrency)>();
 
         foreach (var tx in transactions)
         {
@@ -174,10 +207,15 @@ public class CounterpartyClassificationService(
             var key = (matched.Name, matched.FlowRole, month);
 
             buckets.TryGetValue(key, out var existing);
+            existing.ByCurrency ??= [];
+            existing.ByCurrency.TryGetValue(currency, out var nativeExisting);
+            existing.ByCurrency[currency] = isCredit
+                ? (nativeExisting.Received + tx.Amount, nativeExisting.Sent)
+                : (nativeExisting.Received, nativeExisting.Sent + tx.Amount);
 
             buckets[key] = isCredit
-                ? (existing.Inflow + amountUsd, existing.Outflow)
-                : (existing.Inflow, existing.Outflow + amountUsd);
+                ? (existing.Inflow + amountUsd, existing.Outflow, existing.ByCurrency)
+                : (existing.Inflow, existing.Outflow + amountUsd, existing.ByCurrency);
         }
 
         var monthlyFlows = buckets
@@ -186,7 +224,11 @@ public class CounterpartyClassificationService(
                 kv.Key.Name,
                 kv.Key.FlowRole,
                 kv.Value.Inflow,
-                kv.Value.Outflow))
+                kv.Value.Outflow,
+                kv.Value.ByCurrency
+                    .Select(c => new CounterpartyCurrencyFlow(c.Key, c.Value.Received, c.Value.Sent))
+                    .OrderBy(c => c.Currency, StringComparer.Ordinal)
+                    .ToList()))
             .OrderBy(f => f.Month, StringComparer.Ordinal)
             .ThenBy(f => f.CounterpartyName, StringComparer.Ordinal)
             .ToList();

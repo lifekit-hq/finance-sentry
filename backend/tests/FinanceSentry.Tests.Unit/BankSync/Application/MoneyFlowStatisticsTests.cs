@@ -1069,4 +1069,38 @@ public class MoneyFlowStatisticsTests
         (synthetic.CommittedOutflowUsd + synthetic.DiscretionaryOutflowUsd)
             .Should().Be(synthetic.OutflowUsd);
     }
+
+    // ── #434 S1: native per-currency subtotals must not change money-flow output ──
+
+    [Fact]
+    public async Task GetMonthlyFlow_ByCurrencyPopulatedOrAbsent_ProducesIdenticalOutput()
+    {
+        // A fixed fixture run twice: once with the pre-change shape (ByCurrency defaulted,
+        // as every call site compiled before this ship) and once with native per-currency
+        // subtotals attached to the same flow. MoneyFlowStatisticsService never reads
+        // ByCurrency, so the two runs must produce byte-identical MonthlyFlow output.
+        var (account, accountId) = MakeAccount("USD");
+        var date = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        var transactions = new List<Transaction>
+        {
+            MakeTx(accountId, 1000m, "credit", date),
+            MakeTx(accountId, 400m, "debit", date),
+        };
+
+        var sut = new MoneyFlowStatisticsService(
+            TxRepo(transactions).Object, AccountRepo(account).Object,
+            new TransferDetectionService(), CommittedPolicy());
+
+        var withoutByCurrency = CounterpartyResults.WithFlows(
+            new CounterpartyMonthlyFlow("2026-05", "Mom", FlowRoles.FamilySupport, 720m, 500m));
+        var withByCurrency = CounterpartyResults.WithFlows(
+            new CounterpartyMonthlyFlow("2026-05", "Mom", FlowRoles.FamilySupport, 720m, 500m,
+                [new CounterpartyCurrencyFlow("EUR", 720m, 0m), new CounterpartyCurrencyFlow("USD", 0m, 500m)]));
+
+        var resultWithout = await sut.GetMonthlyFlowAsync(UserId, withoutByCurrency, 6);
+        var resultWith = await sut.GetMonthlyFlowAsync(UserId, withByCurrency, 6);
+
+        resultWith.Should().BeEquivalentTo(resultWithout, opts => opts.WithStrictOrdering());
+    }
 }
