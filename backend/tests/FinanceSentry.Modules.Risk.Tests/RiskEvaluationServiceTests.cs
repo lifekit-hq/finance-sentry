@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.Risk.Application.Services;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Ports;
@@ -324,6 +325,61 @@ public sealed class RiskEvaluationServiceTests
         var report = _service.Evaluate(book, ruleSet, [], []);
 
         report.Violations.Should().NotContain(v => v.RuleKey == RiskRuleKeys.AllocationDrift);
+    }
+
+    // finance-sentry#690: a target's AssetClass (the IPS taxonomy — Equities/Bonds/Crypto/...) is a
+    // different axis from the coarse RiskSleeve grouping (brokerage/crypto) the concentration rules
+    // use. Matching drift targets against Sleeve — as this rule used to — meant a real, non-empty
+    // "Equities" sleeve could never match the literal string "brokerage", so its observed weight was
+    // silently reported as 0 regardless of what was actually held.
+    [Fact]
+    public void Evaluate_NonCryptoSleeveHoldsRealPosition_ReportsItsActualWeight_NotZero()
+    {
+        var book = new BookSnapshot(
+            10000m, 0m,
+            [new BookPosition("DRAM", RiskSleeve.Brokerage, 100m, 8000m, 0.80m, AssetClassNormalizer.Equities)],
+            false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 0.90m };
+        AllocationDriftTarget[] targets = [new(AssetClassNormalizer.Equities, 0.30m, 0.05m)];
+
+        var report = _service.Evaluate(book, ruleSet, targets, []);
+
+        var drift = report.Violations.Should()
+            .ContainSingle(v => v.RuleKey == RiskRuleKeys.AllocationDrift).Subject;
+        drift.ObservedValue.Should().Be(0.80m, "the Equities sleeve is 80% of the book, not empty");
+    }
+
+    [Fact]
+    public void Evaluate_TargetAssetClassAbsentFromBook_BookStale_SkipsRatherThanReportingZero()
+    {
+        var book = new BookSnapshot(
+            10000m, 0m,
+            [new BookPosition("BTC", RiskSleeve.Crypto, 1m, 10000m, 1.00m, AssetClassNormalizer.Crypto)],
+            true, ["ibkr"], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 1.00m };
+        AllocationDriftTarget[] targets = [new(AssetClassNormalizer.Equities, 0.30m, 0.05m)];
+
+        var report = _service.Evaluate(book, ruleSet, targets, []);
+
+        report.Violations.Should().NotContain(v => v.RuleKey == RiskRuleKeys.AllocationDrift,
+            "Equities isn't in this run's positions while a source is stale — that's a data gap, not a computed 0%");
+    }
+
+    [Fact]
+    public void Evaluate_TargetAssetClassAbsentFromBook_BookFresh_FlagsGenuineZeroWeight()
+    {
+        var book = new BookSnapshot(
+            10000m, 0m,
+            [new BookPosition("BTC", RiskSleeve.Crypto, 1m, 10000m, 1.00m, AssetClassNormalizer.Crypto)],
+            false, [], 0m);
+        var ruleSet = new RiskRuleSet { UserId = UserId, MaxPositionWeightPct = 1.00m };
+        AllocationDriftTarget[] targets = [new(AssetClassNormalizer.Equities, 0.30m, 0.05m)];
+
+        var report = _service.Evaluate(book, ruleSet, targets, []);
+
+        var drift = report.Violations.Should()
+            .ContainSingle(v => v.RuleKey == RiskRuleKeys.AllocationDrift).Subject;
+        drift.ObservedValue.Should().Be(0m, "a fully-synced book with no Equities positions really is 0%");
     }
 
     [Fact]

@@ -1,15 +1,19 @@
 namespace FinanceSentry.Modules.Risk.Application.Services;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Ports;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Pure evaluation logic (SC-001): no I/O, no clock reads beyond the injected `now`. Deterministic
 /// facts only — no LLM, no composite/blended score (FR-008). 039: the target allocation is read from
 /// its single home (the IPS) by the caller and passed into <c>Evaluate</c> as the allocation-targets
-/// argument; the service stays pure.
+/// argument; the service stays pure. <paramref name="logger"/> is diagnostic-only (finance-sentry#690:
+/// the allocation-drift rule logs when it can't compute a sleeve's weight) and defaults to null so the
+/// service stays trivially constructible in tests.
 /// </summary>
-public sealed class RiskEvaluationService : IRiskEvaluationService
+public sealed class RiskEvaluationService(ILogger<RiskEvaluationService>? logger = null) : IRiskEvaluationService
 {
     public ComplianceReport Evaluate(
         BookSnapshot book,
@@ -25,7 +29,7 @@ public sealed class RiskEvaluationService : IRiskEvaluationService
             return new ComplianceReport(generatedAt, book.IsStale, book.StaleSources, [], HasRuleSet: false);
         }
 
-        var raw = ComputeRawViolations(book, ruleSet, allocationTargets);
+        var raw = ComputeRawViolations(book, ruleSet, allocationTargets, logger);
         var acked = ApplyAcks(raw, acks);
 
         return new ComplianceReport(generatedAt, book.IsStale, book.StaleSources, acked, HasRuleSet: true);
@@ -156,7 +160,10 @@ public sealed class RiskEvaluationService : IRiskEvaluationService
     }
 
     private static List<PolicyViolation> ComputeRawViolations(
-        BookSnapshot book, RiskRuleSet ruleSet, IReadOnlyList<AllocationDriftTarget> allocationTargets)
+        BookSnapshot book,
+        RiskRuleSet ruleSet,
+        IReadOnlyList<AllocationDriftTarget> allocationTargets,
+        ILogger? logger)
     {
         var violations = new List<PolicyViolation>();
 
@@ -221,15 +228,39 @@ public sealed class RiskEvaluationService : IRiskEvaluationService
         // band. ExcessUsd is the rebalancing amount the drift implies (facts; clients attach
         // friction estimates before suggesting a trade). 039: targets come from the IPS (single
         // home), pre-translated to fraction target + symmetric drift band by the caller.
+        //
+        // Matched on AssetClass (the AssetClassNormalizer bucket — Equities/Bonds/Crypto/...), not
+        // Sleeve (the coarse Crypto/Brokerage split MaxPositionWeight/MaxSleeveWeight use): an IPS
+        // target's AssetClass essentially never equals "brokerage"/"crypto" literally, so matching
+        // against Sleeve made every non-crypto target's observed weight structurally 0 regardless of
+        // real holdings (finance-sentry#690).
         if (allocationTargets.Count > 0 && book.TotalUsd > 0)
         {
-            var weightBySleeve = book.Positions
-                .GroupBy(p => p.Sleeve, StringComparer.OrdinalIgnoreCase)
+            var weightByAssetClass = book.Positions
+                .GroupBy(p => p.AssetClass, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Sum(p => p.WeightPct), StringComparer.OrdinalIgnoreCase);
 
             foreach (var target in allocationTargets)
             {
-                var actual = weightBySleeve.TryGetValue(target.AssetClass, out var w) ? w : 0m;
+                var assetClass = AssetClassNormalizer.Normalize(target.AssetClass);
+                if (!weightByAssetClass.TryGetValue(assetClass, out var actual))
+                {
+                    // No positions landed in this asset class this run. With a fully-synced book
+                    // that is a genuine 0% observation (flag it below). While the book is stale we
+                    // cannot tell a real 0% apart from a sync gap that dropped the sleeve's positions
+                    // entirely — emitting 0 either way would be a fabricated observation, so skip.
+                    if (book.IsStale)
+                    {
+                        logger?.LogWarning(
+                            "Allocation drift for {AssetClass}: book is stale ({StaleSources}); weight is not " +
+                            "computable this run — skipping instead of reporting a 0% observation.",
+                            assetClass, string.Join(", ", book.StaleSources));
+                        continue;
+                    }
+
+                    actual = 0m;
+                }
+
                 var drift = actual - target.TargetPct;
                 if (Math.Abs(drift) > target.DriftBandPct)
                 {
