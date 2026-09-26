@@ -29,11 +29,31 @@ public class GetFamilyClearingStatementQueryTests
     }
 
     private static async Task<FamilyClearingStatement> RunAsync(
-        Mock<ICounterpartyClassificationService> classification, string? month = Month)
+        Mock<ICounterpartyClassificationService> classification, string? month = Month,
+        IReadOnlyList<Counterparty>? counterparties = null)
     {
-        var sut = new GetFamilyClearingStatementQueryHandler(classification.Object);
+        var sut = new GetFamilyClearingStatementQueryHandler(
+            classification.Object, CounterpartyRepoWith(counterparties ?? []));
         return await sut.Handle(new GetFamilyClearingStatementQuery(UserId, month, Months), CancellationToken.None);
     }
+
+    private static ICounterpartyRepository CounterpartyRepoWith(IReadOnlyList<Counterparty> counterparties)
+    {
+        var mock = new Mock<ICounterpartyRepository>();
+        mock.Setup(r => r.GetForUserAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(counterparties);
+        return mock.Object;
+    }
+
+    private static Counterparty MakeCounterparty(
+        string name, string flowRole, decimal? expectedAmount = null, string? expectedCurrency = null)
+        => new()
+        {
+            UserId = UserId,
+            Name = name,
+            FlowRole = flowRole,
+            ExpectedMonthlyInflowAmount = expectedAmount,
+            ExpectedMonthlyInflowCurrency = expectedCurrency,
+        };
 
     // ── done_when #1: gross received/sent, both directions in full ─────────────
 
@@ -111,7 +131,7 @@ public class GetFamilyClearingStatementQueryTests
         var classification = new CounterpartyClassificationResult([], flows);
 
         var statementHandler = new GetFamilyClearingStatementQueryHandler(
-            ClassificationServiceReturning(classification));
+            ClassificationServiceReturning(classification), CounterpartyRepoWith([]));
         var statement = await statementHandler.Handle(
             new GetFamilyClearingStatementQuery(UserId, Month, Months), CancellationToken.None);
 
@@ -176,6 +196,113 @@ public class GetFamilyClearingStatementQueryTests
 
         first.Should().BeEquivalentTo(second, o => o.WithStrictOrdering());
         first.Counterparties.Select(l => l.Name).Should().Equal("Aunt Vira", "Mom", "Zoya");
+    }
+
+    // ── Ship 3: rent fields (issue #434) ────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NativeReceivedExactlyMatchesExpected_RentConfirmedTrue_NoShortfall()
+    {
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Tenant", FlowRoles.FamilySupport, 300m, 0m,
+            ByCurrency: [new CounterpartyCurrencyFlow("EUR", 500m, 0m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Tenant", FlowRoles.FamilySupport, 500m, "EUR");
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentExpectedAmount.Should().Be(500m);
+        line.RentExpectedCurrency.Should().Be("EUR");
+        line.RentConfirmed.Should().BeTrue();
+        line.RentShortfall.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_NativeReceivedBelowExpected_RentConfirmedFalse_ShortfallIsGap()
+    {
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Tenant", FlowRoles.FamilySupport, 240m, 0m,
+            ByCurrency: [new CounterpartyCurrencyFlow("EUR", 400m, 0m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Tenant", FlowRoles.FamilySupport, 500m, "EUR");
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentConfirmed.Should().BeFalse();
+        line.RentShortfall.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task Handle_NativeReceivedAboveExpected_RentConfirmedTrue_NoShortfall()
+    {
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Tenant", FlowRoles.FamilySupport, 330m, 0m,
+            ByCurrency: [new CounterpartyCurrencyFlow("EUR", 550m, 0m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Tenant", FlowRoles.FamilySupport, 500m, "EUR");
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentConfirmed.Should().BeTrue();
+        line.RentShortfall.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_NoExpectationConfigured_AllRentFieldsNull()
+    {
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Mom", FlowRoles.FamilySupport, 720m, 500m,
+            ByCurrency: [new CounterpartyCurrencyFlow("EUR", 720m, 500m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Mom", FlowRoles.FamilySupport);
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentExpectedAmount.Should().BeNull();
+        line.RentExpectedCurrency.Should().BeNull();
+        line.RentConfirmed.Should().BeNull();
+        line.RentShortfall.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_InboundInDifferentCurrency_DoesNotCountTowardConfirmation()
+    {
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Tenant", FlowRoles.FamilySupport, 600m, 0m,
+            ByCurrency: [new CounterpartyCurrencyFlow("UAH", 20000m, 0m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Tenant", FlowRoles.FamilySupport, 500m, "EUR");
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentConfirmed.Should().BeFalse();
+        line.RentShortfall.Should().Be(500m); // 0 native EUR received, full expected amount short
+    }
+
+    [Fact]
+    public async Task Handle_NonFamilySupportCounterpartyWithExpectationSet_StillGetsNullRentFields()
+    {
+        // The statement itself only ever projects family_support flows into lines, but this
+        // guards the lookup directly: even if a family_support flow shared a name with a
+        // non-family_support counterparty row, that row must never leak its expectation in.
+        var flow = new CounterpartyMonthlyFlow(
+            Month, "Brokerage", FlowRoles.FamilySupport, 300m, 0m,
+            ByCurrency: [new CounterpartyCurrencyFlow("USD", 300m, 0m)]);
+        var classification = ClassificationReturning(flow);
+        var counterparty = MakeCounterparty("Brokerage", FlowRoles.Investment, 500m, "USD");
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        var line = statement.Counterparties.Single();
+        line.RentExpectedAmount.Should().BeNull();
+        line.RentExpectedCurrency.Should().BeNull();
+        line.RentConfirmed.Should().BeNull();
+        line.RentShortfall.Should().BeNull();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

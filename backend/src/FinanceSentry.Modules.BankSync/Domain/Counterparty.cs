@@ -25,4 +25,14 @@ public class Counterparty : Entity
 
     /// <summary>Navigation: match rules for this counterparty.</summary>
     public ICollection<CounterpartyRule> Rules { get; set; } = [];
+
+    /// <summary>
+    /// The monthly amount this counterparty is expected to send (e.g. rent), in
+    /// <see cref="ExpectedMonthlyInflowCurrency"/>. Null when no expectation is configured — the
+    /// pair is always set or cleared together. See docs/money-semantics.md §5.1.
+    /// </summary>
+    public decimal? ExpectedMonthlyInflowAmount { get; set; }
+
+    /// <summary>ISO 4217 currency of <see cref="ExpectedMonthlyInflowAmount"/>, or null.</summary>
+    public string? ExpectedMonthlyInflowCurrency { get; set; }
 }

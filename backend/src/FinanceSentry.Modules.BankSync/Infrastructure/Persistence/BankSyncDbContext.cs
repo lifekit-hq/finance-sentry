@@ -123,6 +123,8 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options) : Db
         cpb.Property(cp => cp.Name).IsRequired().HasMaxLength(255);
         cpb.Property(cp => cp.FlowRole).IsRequired().HasMaxLength(50);
         cpb.Property(cp => cp.UserId).IsRequired();
+        cpb.Property(cp => cp.ExpectedMonthlyInflowAmount).HasPrecision(15, 2);
+        cpb.Property(cp => cp.ExpectedMonthlyInflowCurrency).HasMaxLength(3);
         cpb.HasIndex(cp => cp.UserId).HasDatabaseName("idx_counterparty_user_id");
         cpb.HasMany(cp => cp.Rules).WithOne(r => r.Counterparty).HasForeignKey(r => r.CounterpartyId).OnDelete(DeleteBehavior.Cascade);
 

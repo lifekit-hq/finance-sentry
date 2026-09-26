@@ -252,6 +252,12 @@ public interface ICounterpartyRepository
     /// </summary>
     Task<IReadOnlyList<Counterparty>> GetForUserAsync(
         Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the counterparty by id, or null when it does not exist.</summary>
+    Task<Counterparty?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Persists changes made to a previously-fetched counterparty.</summary>
+    Task<Counterparty> UpdateAsync(Counterparty counterparty, CancellationToken cancellationToken = default);
 }
 
 public interface ITrueLayerConnectionRepository
