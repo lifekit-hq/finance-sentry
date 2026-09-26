@@ -332,6 +332,34 @@ one and a transfer in the other.
   (money-flow statistics, top categories, savings rate) reads only the USD fields and never
   sums a native amount across currencies, per the cross-account rule in §0/backend rules.
 
+**The family clearing statement** (`GetFamilyClearingStatementQuery`,
+`Application/Queries/GetFamilyClearingStatementQuery.cs`) projects one month of
+`CounterpartyMonthlyFlow` into a `FamilyClearingStatement` for direct reading — "who sent/received
+what this month" — without re-deriving anything: it calls
+`ICounterpartyClassificationService.ClassifyForWindowAsync` and nothing else, so it can never
+disagree with the money-flow reader above.
+
+- **Lines are `family_support` counterparties only.** `household` is a bill, not a person;
+  `investment` is not a family flow; `self_routing` is the user's own money mid-hop. Each line
+  carries gross `ReceivedUsd`/`SentUsd` (never netted, same rule as above) and a `ByCurrency`
+  list of native `(Currency, Received, Sent, Net)` subtotals mirroring `CounterpartyMonthlyFlow.ByCurrency`
+  — `Net` here is presentational too.
+- **`NetUsd` on a line and `SupportTotalUsd`/`ReceivedTotalUsd` on the statement are
+  presentational only.** They are derived from the already-gross `ReceivedUsd`/`SentUsd` figures
+  for display and never feed back into `MonthlyFlow` or any aggregation.
+- **Reconciliation invariant:** because `SupportTotalUsd` is the sum of `SentUsd` over the
+  statement's (`family_support`-only) lines, and both are computed from the same
+  `CounterpartyMonthlyFlow` rows for the same month and window, `SupportTotalUsd` always equals
+  `MonthlyFlow.FamilySupportOutflowUsd` for that month — the two cannot drift because they share
+  one input.
+- **`ExcludedRoutingLegs`** counts the `self_routing` counterparty-month buckets left out of the
+  statement for that month, so a reader sees money was deliberately excluded rather than missing.
+  It does not count `investment` buckets — those are excluded from the statement's own accounting
+  entirely, since C2 scoped the statement to family, not every non-`self_routing` role.
+- Rent fields are intentionally absent from this contract (Ship 3 of issue #434); adding them
+  requires a captain ruling on how "confirmed" is established (a stored expectation vs. a
+  per-transaction label vs. a heuristic).
+
 ### 5a. Committed vs discretionary outflow
 
 `OutflowUsd` is partitioned into `CommittedOutflowUsd` + `DiscretionaryOutflowUsd`; the two
