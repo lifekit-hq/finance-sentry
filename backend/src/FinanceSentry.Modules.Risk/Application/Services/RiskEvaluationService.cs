@@ -274,6 +274,7 @@ public sealed class RiskEvaluationService : IRiskEvaluationService
             {
                 Status = worsenedPastStep ? PolicyViolationStatus.Worsened : PolicyViolationStatus.Acknowledged,
                 RemediationNote = ack.RemediationNote,
+                WorseningStepPct = ack.WorseningStepPct,
             });
         }
 

@@ -170,7 +170,7 @@ public sealed class RiskCheckJob(
         }
 
         var alertWorthy = report.Violations
-            .Where(v => v.Status is PolicyViolationStatus.New or PolicyViolationStatus.Worsened)
+            .Where(v => v.Reportable)
             .ToList();
 
         foreach (var violation in alertWorthy)
