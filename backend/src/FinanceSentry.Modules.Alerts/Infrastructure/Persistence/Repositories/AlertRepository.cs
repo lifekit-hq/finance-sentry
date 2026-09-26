@@ -194,4 +194,12 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
 
         return (items, totalCount);
     }
+
+    public async Task<IReadOnlyList<Alert>> GetOpenAlertsByTypesAsync(
+        IReadOnlyCollection<string> types, CancellationToken ct = default)
+    {
+        return await _db.Alerts
+            .Where(a => !a.IsResolved && !a.IsDismissed && types.Contains(a.Type))
+            .ToListAsync(ct);
+    }
 }

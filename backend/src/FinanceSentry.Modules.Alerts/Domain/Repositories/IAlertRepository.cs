@@ -54,4 +54,12 @@ public interface IAlertRepository
     /// </summary>
     Task<(IReadOnlyList<Alert> Items, int TotalCount)> GetByTypesPagedAsync(
         Guid userId, IReadOnlyCollection<string> types, int page, int pageSize, CancellationToken ct = default);
+
+    /// <summary>
+    /// Open (not resolved, not dismissed) alerts across all users whose <c>Type</c> is in
+    /// <paramref name="types"/> — the candidate set <see cref="Infrastructure.Jobs.AlertExpiryJob"/>
+    /// checks against its per-type TTL table (finance-sentry#419 S4).
+    /// </summary>
+    Task<IReadOnlyList<Alert>> GetOpenAlertsByTypesAsync(
+        IReadOnlyCollection<string> types, CancellationToken ct = default);
 }
