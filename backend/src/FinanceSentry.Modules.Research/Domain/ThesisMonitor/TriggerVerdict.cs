@@ -29,4 +29,6 @@ public static class NonEvaluableReason
     public const string DivideByZero = "divide_by_zero";
     public const string NoPriceHistory = "no_price_history";
     public const string UnsupportedMetric = "unsupported_metric";
+    public const string InvalidDirection = "invalid_direction";
+    public const string InvalidConsecutivePeriods = "invalid_consecutive_periods";
 }

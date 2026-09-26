@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 [Route("research/theses")]
 public class ThesesController(
     IQueryHandler<GetThesesQuery, IReadOnlyList<ThesisDto>> getTheses,
+    IQueryHandler<GetThesisEvaluabilityQuery, IReadOnlyList<ThesisEvaluabilityReport>> getEvaluability,
     ICommandHandler<SaveThesisCommand, ThesisDto> saveThesis,
     ICommandHandler<DeleteThesisCommand, bool> deleteThesis) : ControllerBase
 {
@@ -21,6 +22,13 @@ public class ThesesController(
     {
         var items = await getTheses.Handle(new GetThesesQuery(User.RequireUserId()), ct);
         return Ok(items);
+    }
+
+    [HttpGet("evaluability")]
+    public async Task<IActionResult> Evaluability(CancellationToken ct)
+    {
+        var report = await getEvaluability.Handle(new GetThesisEvaluabilityQuery(User.RequireUserId()), ct);
+        return Ok(report);
     }
 
     [HttpPost]
