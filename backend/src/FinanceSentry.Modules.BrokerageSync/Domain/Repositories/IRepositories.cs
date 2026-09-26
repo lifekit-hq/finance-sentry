@@ -44,3 +44,20 @@ public interface IBrokerageInstrumentRepository
     void Update(BrokerageInstrument instrument);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
+
+public interface IBrokerageTradeRepository
+{
+    Task<BrokerageTrade?> GetByExecutionIdAsync(Guid userId, string provider, string ibExecutionId, CancellationToken ct = default);
+    Task AddAsync(BrokerageTrade trade, CancellationToken ct = default);
+    void Update(BrokerageTrade trade);
+    Task<IReadOnlyList<BrokerageTrade>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+
+public interface IBrokerageCashTransactionRepository
+{
+    Task<BrokerageCashTransaction?> GetByIdempotencyKeyAsync(Guid userId, string provider, string idempotencyKey, CancellationToken ct = default);
+    Task AddAsync(BrokerageCashTransaction transaction, CancellationToken ct = default);
+    Task<IReadOnlyList<BrokerageCashTransaction>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}

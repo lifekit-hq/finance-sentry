@@ -12,7 +12,7 @@ public interface IIbkrFlexStatementFetcher
     /// step a human takes in IBKR's account management — so this never throws or retries for
     /// that case, it just logs and returns.
     /// </summary>
-    Task<FlexStatementXml?> FetchAsync(Guid userId, CancellationToken ct = default);
+    Task<FlexStatementXml?> FetchAsync(Guid userId, FlexStatementWindow? window = null, CancellationToken ct = default);
 }
 
 public sealed class IbkrFlexStatementFetcher(
@@ -21,7 +21,7 @@ public sealed class IbkrFlexStatementFetcher(
     IIbkrFlexClient flexClient,
     ILogger<IbkrFlexStatementFetcher> logger) : IIbkrFlexStatementFetcher
 {
-    public async Task<FlexStatementXml?> FetchAsync(Guid userId, CancellationToken ct = default)
+    public async Task<FlexStatementXml?> FetchAsync(Guid userId, FlexStatementWindow? window = null, CancellationToken ct = default)
     {
         var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
         if (credential is null || !credential.IsActive)
@@ -34,7 +34,7 @@ public sealed class IbkrFlexStatementFetcher(
 
         try
         {
-            var statement = await flexClient.FetchStatementAsync(credentials, ct);
+            var statement = await flexClient.FetchStatementAsync(credentials, window, ct);
             credential.RecordUseSuccess();
             await credentialRepository.SaveChangesAsync(ct);
             return statement;

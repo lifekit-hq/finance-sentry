@@ -10,7 +10,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 
 public interface IIbkrFlexClient
 {
-    Task<FlexStatementXml> FetchStatementAsync(IbkrFlexCredentials credentials, CancellationToken ct = default);
+    Task<FlexStatementXml> FetchStatementAsync(
+        IbkrFlexCredentials credentials, FlexStatementWindow? window = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -34,9 +35,10 @@ public sealed class IbkrFlexClient(
     private static readonly XmlSerializer ErrorSerializer = new(typeof(FlexStatementResponseXml));
     private static readonly XmlSerializer StatementSerializer = new(typeof(FlexQueryResponseXml));
 
-    public async Task<FlexStatementXml> FetchStatementAsync(IbkrFlexCredentials credentials, CancellationToken ct = default)
+    public async Task<FlexStatementXml> FetchStatementAsync(
+        IbkrFlexCredentials credentials, FlexStatementWindow? window = null, CancellationToken ct = default)
     {
-        var referenceCode = await SendRequestAsync(credentials, ct);
+        var referenceCode = await SendRequestAsync(credentials, window, ct);
 
         for (var attempt = 1; attempt <= options.Value.MaxPollAttempts; attempt++)
         {
@@ -58,10 +60,13 @@ public sealed class IbkrFlexClient(
             $"IBKR Flex statement for reference {referenceCode} was not ready after {options.Value.MaxPollAttempts} polls.");
     }
 
-    private async Task<string> SendRequestAsync(IbkrFlexCredentials credentials, CancellationToken ct)
+    private async Task<string> SendRequestAsync(IbkrFlexCredentials credentials, FlexStatementWindow? window, CancellationToken ct)
     {
         var url = $"{options.Value.BaseUrl.TrimEnd('/')}/SendRequest?t={Uri.EscapeDataString(credentials.Token)}" +
                   $"&q={Uri.EscapeDataString(credentials.QueryId)}&v={options.Value.Version}";
+
+        if (window is not null)
+            url += $"&fd={window.FromDateWire}&td={window.ToDateWire}";
 
         var body = await SendAsync(url, ct);
         var ack = DeserializeError(body);

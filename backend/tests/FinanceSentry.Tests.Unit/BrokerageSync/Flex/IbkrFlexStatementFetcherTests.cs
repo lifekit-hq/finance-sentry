@@ -29,12 +29,14 @@ public class IbkrFlexStatementFetcherTests
             .Setup(r => r.GetByUserIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IBKRFlexCredential?)null);
 
-        var result = await CreateFetcher().FetchAsync(userId, CancellationToken.None);
+        var result = await CreateFetcher().FetchAsync(userId, ct: CancellationToken.None);
 
         result.Should().BeNull();
         _resolver.Verify(r => r.Resolve(It.IsAny<IBKRFlexCredential>()), Times.Never);
         _flexClient.Verify(
-            c => c.FetchStatementAsync(It.IsAny<IbkrFlexCredentials>(), It.IsAny<CancellationToken>()), Times.Never);
+            c => c.FetchStatementAsync(
+                It.IsAny<IbkrFlexCredentials>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -47,11 +49,13 @@ public class IbkrFlexStatementFetcherTests
             .Setup(r => r.GetByUserIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
 
-        var result = await CreateFetcher().FetchAsync(userId, CancellationToken.None);
+        var result = await CreateFetcher().FetchAsync(userId, ct: CancellationToken.None);
 
         result.Should().BeNull();
         _flexClient.Verify(
-            c => c.FetchStatementAsync(It.IsAny<IbkrFlexCredentials>(), It.IsAny<CancellationToken>()), Times.Never);
+            c => c.FetchStatementAsync(
+                It.IsAny<IbkrFlexCredentials>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -67,11 +71,11 @@ public class IbkrFlexStatementFetcherTests
             .ReturnsAsync(credential);
         _resolver.Setup(r => r.Resolve(credential)).Returns(resolved);
         _flexClient
-            .Setup(c => c.FetchStatementAsync(resolved, It.IsAny<CancellationToken>()))
+            .Setup(c => c.FetchStatementAsync(resolved, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(statement);
         _credentialRepo.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var result = await CreateFetcher().FetchAsync(userId, CancellationToken.None);
+        var result = await CreateFetcher().FetchAsync(userId, ct: CancellationToken.None);
 
         result.Should().BeSameAs(statement);
         credential.LastUsedAt.Should().NotBeNull();

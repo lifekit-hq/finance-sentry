@@ -14,6 +14,8 @@ public sealed class BrokerageSyncDbContext : DbContext
     public DbSet<IBKRFlexCredential> IBKRFlexCredentials => Set<IBKRFlexCredential>();
     public DbSet<BrokerageHolding> BrokerageHoldings => Set<BrokerageHolding>();
     public DbSet<BrokerageInstrument> BrokerageInstruments => Set<BrokerageInstrument>();
+    public DbSet<BrokerageTrade> BrokerageTrades => Set<BrokerageTrade>();
+    public DbSet<BrokerageCashTransaction> BrokerageCashTransactions => Set<BrokerageCashTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +91,53 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.Classification).HasConversion<string>().HasMaxLength(30);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<BrokerageTrade>(entity =>
+        {
+            entity.ToTable("BrokerageTrades");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.IbExecutionId }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.IbExecutionId).IsRequired().HasMaxLength(60);
+            entity.Property(e => e.IbTradeId).IsRequired().HasMaxLength(30);
+            entity.Property(e => e.Isin).HasMaxLength(12);
+            entity.Property(e => e.Symbol).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.OpenCloseIndicator).HasMaxLength(5);
+            entity.Property(e => e.Quantity).HasPrecision(30, 10);
+            entity.Property(e => e.Price).HasPrecision(20, 8);
+            entity.Property(e => e.Proceeds).HasPrecision(20, 4);
+            entity.Property(e => e.CostBasis).HasPrecision(20, 4);
+            entity.Property(e => e.RealizedPnl).HasPrecision(20, 4);
+            entity.Property(e => e.Commission).HasPrecision(20, 4);
+            entity.Property(e => e.CommissionCurrency).HasMaxLength(3);
+            entity.Property(e => e.Taxes).HasPrecision(20, 4);
+            entity.Property(e => e.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(e => e.FxRateToBase).HasPrecision(20, 8);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
+            entity.HasOne<BrokerageInstrument>()
+                .WithMany()
+                .HasForeignKey(e => e.InstrumentId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BrokerageCashTransaction>(entity =>
+        {
+            entity.ToTable("BrokerageCashTransactions");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.IdempotencyKey }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Isin).HasMaxLength(12);
+            entity.Property(e => e.Symbol).HasMaxLength(50);
+            entity.Property(e => e.Amount).HasPrecision(20, 4);
+            entity.Property(e => e.TransactionType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Code).HasMaxLength(30);
+            entity.Property(e => e.WithholdingTax).HasPrecision(20, 4);
+            entity.Property(e => e.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(e => e.FxRateToBase).HasPrecision(20, 8);
+            entity.Property(e => e.CreatedAt).IsRequired();
         });
     }
 }
