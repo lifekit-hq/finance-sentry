@@ -22,6 +22,7 @@ public sealed class ToolNameContractTests
         "get_analyst_actions",
         "get_earnings_calendar",
         "get_event_calendar",
+        "get_family_clearing_statement",
         "get_fundamentals",
         "get_ips",
         "get_macro_calendar",

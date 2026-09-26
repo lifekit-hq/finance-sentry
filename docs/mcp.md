@@ -20,7 +20,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 62 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 63 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -35,6 +35,7 @@ The current runtime surface contains 62 tools. The canonical list is the `Agreed
 | `get_crypto_pnl_detail` | Read | Crypto | `userId?` | Per-asset crypto P&L from trade history |
 | `get_tax_lots` | Read | Brokerage | `userId?` | Current tax lots / average cost data |
 | `get_cashflow_report` | Read | Cashflow | `userId?`, `fromDate?`, `toDate?` | Monthly inflow / outflow / net from the classified money-flow statistics (internal transfers excluded, USD); `TransactionCount` is always 0 — the source query doesn't expose one |
+| `get_family_clearing_statement` | Read | Cashflow | `userId?`, `month?`, `months?` | One calendar month's family clearing house: per-`family_support`-counterparty gross received/sent with a presentational net, native per-currency subtotals, and the month's support/received totals; excluded self-routing legs are counted, not dropped silently |
 | `get_net_worth_history` | Read | Wealth | `userId?`, `fromDate?`, `toDate?` | Historical net worth snapshots |
 | `get_macro_calendar` | Read | Research | `from?`, `to?`, `regions?`, `minImportance?` | Scheduled macro events |
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?`, `userId?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
