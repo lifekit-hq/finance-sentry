@@ -14,4 +14,6 @@ public record UserProfileDto(
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
     bool SyncFailureAlerts,
-    bool TwoFactor);
+    bool TwoFactor,
+    decimal SafeWithdrawalRate,
+    decimal RealAnnualReturn);

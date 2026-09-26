@@ -13,4 +13,10 @@ public class ApplicationUser : IdentityUser
     public bool LowBalanceAlerts { get; set; } = true;
     public decimal LowBalanceThreshold { get; set; } = 500m;
     public bool SyncFailureAlerts { get; set; } = true;
+
+    /// <summary>Fraction of the FIRE target withdrawn per year (the classic 4% rule default).</summary>
+    public decimal SafeWithdrawalRate { get; set; } = 0.04m;
+
+    /// <summary>Real (inflation-adjusted) annual return assumed for the FIRE projection.</summary>
+    public decimal RealAnnualReturn { get; set; } = 0.05m;
 }

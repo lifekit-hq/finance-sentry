@@ -27,5 +27,7 @@ public class GetProfileQueryHandler(UserManager<ApplicationUser> userManager)
             user.LowBalanceAlerts,
             user.LowBalanceThreshold,
             user.SyncFailureAlerts,
-            user.TwoFactorEnabled);
+            user.TwoFactorEnabled,
+            user.SafeWithdrawalRate,
+            user.RealAnnualReturn);
 }
