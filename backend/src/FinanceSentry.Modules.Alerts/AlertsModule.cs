@@ -10,6 +10,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 public static class AlertsModule
 {
@@ -25,6 +26,8 @@ public static class AlertsModule
         {
             sp.GetRequiredService<IRecurringJobManager>()
                 .AddOrUpdate<AlertPurgeJob>("alert-purge", job => job.ExecuteAsync(CancellationToken.None), Cron.Monthly());
+            sp.GetRequiredService<IRecurringJobManager>()
+                .AddOrUpdate<AlertExpiryJob>("alert-expiry", job => job.ExecuteAsync(CancellationToken.None), Cron.Daily());
         }
     }
 
@@ -38,6 +41,8 @@ public static class AlertsModule
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
         services.AddScoped<IMaterialAlertReader, Infrastructure.Persistence.MaterialAlertReader>();
         services.AddScoped<AlertPurgeJob>();
+        services.AddScoped<AlertExpiryJob>();
+        services.TryAddSingleton(TimeProvider.System);
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 
