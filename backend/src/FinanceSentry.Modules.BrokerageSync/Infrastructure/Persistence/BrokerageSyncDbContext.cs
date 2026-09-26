@@ -12,6 +12,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
     public DbSet<IBKRCredential> IBKRCredentials => Set<IBKRCredential>();
     public DbSet<BrokerageHolding> BrokerageHoldings => Set<BrokerageHolding>();
+    public DbSet<BrokerageInstrument> BrokerageInstruments => Set<BrokerageInstrument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,6 +55,24 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.Provider).IsRequired().HasMaxLength(20).HasDefaultValue("ibkr");
             entity.Property(e => e.AverageCostUsd).HasPrecision(20, 8);
             entity.Property(e => e.CostBasisUsd).HasPrecision(20, 4);
+            entity.HasOne<BrokerageInstrument>()
+                .WithMany()
+                .HasForeignKey(e => e.InstrumentId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BrokerageInstrument>(entity =>
+        {
+            entity.ToTable("BrokerageInstruments");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.Provider, e.Conid }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Isin).HasMaxLength(12);
+            entity.Property(e => e.Symbol).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.InstrumentType).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Classification).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
         });
     }
 }

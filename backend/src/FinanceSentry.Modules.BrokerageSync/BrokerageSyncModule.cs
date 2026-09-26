@@ -60,6 +60,7 @@ public static class BrokerageSyncModule
         // #493: this module's credential store joins key rotation.
         services.AddScoped<ICredentialRotationTarget, IBKRCredentialRotationTarget>();
         services.AddScoped<IBrokerageHoldingRepository, BrokerageHoldingRepository>();
+        services.AddScoped<IBrokerageInstrumentRepository, BrokerageInstrumentRepository>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         services.AddScoped<IBKRSyncJob>();
 

@@ -51,7 +51,8 @@ public sealed class IbkrOAuthAdapter(
                 InstrumentType: p.AssetClass,
                 Quantity: p.Position,
                 UsdValue: p.MktValue,
-                AverageCostUsd: p.AvgPrice ?? p.AvgCost))
+                AverageCostUsd: p.AvgPrice ?? p.AvgCost,
+                Conid: p.Conid))
             .ToList();
 
         result.AddRange(await GetCashPositionsAsync(credentials, accountId, ct));

@@ -74,7 +74,10 @@ public class SyncIBKRHoldingsReconcileTests
         holdingRepo.Setup(r => r.RemoveRange(It.IsAny<IEnumerable<BrokerageHolding>>()))
             .Callback<IEnumerable<BrokerageHolding>>(h => removed = h.ToList());
 
-        var handler = new SyncIBKRHoldingsCommandHandler(credentialRepo.Object, holdingRepo.Object, adapter.Object);
+        var instrumentRepo = new Mock<IBrokerageInstrumentRepository>(MockBehavior.Loose);
+
+        var handler = new SyncIBKRHoldingsCommandHandler(
+            credentialRepo.Object, holdingRepo.Object, instrumentRepo.Object, adapter.Object);
 
         var result = await handler.Handle(new SyncIBKRHoldingsCommand(UserId), CancellationToken.None);
 

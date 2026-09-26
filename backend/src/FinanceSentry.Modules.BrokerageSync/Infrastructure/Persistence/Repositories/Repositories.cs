@@ -75,7 +75,7 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 
             if (existing is not null)
             {
-                existing.Update(holding.Quantity, holding.UsdValue);
+                existing.Update(holding.Quantity, holding.UsdValue, holding.InstrumentId);
                 _context.BrokerageHoldings.Update(existing);
             }
             else
@@ -102,6 +102,53 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
         await _context.BrokerageHoldings
             .Where(h => h.UserId == userId)
             .ExecuteDeleteAsync(ct);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        await _context.SaveChangesAsync(ct);
+    }
+}
+
+public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentRepository
+{
+    private readonly BrokerageSyncDbContext _context;
+
+    public BrokerageInstrumentRepository(BrokerageSyncDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<BrokerageInstrument?> GetByConidAsync(
+        Guid userId, string provider, long conid, CancellationToken ct = default)
+    {
+        return await _context.BrokerageInstruments
+            .FirstOrDefaultAsync(
+                i => i.UserId == userId && i.Provider == provider && i.Conid == conid,
+                ct);
+    }
+
+    public async Task<BrokerageInstrument?> GetByIdAsync(Guid userId, Guid id, CancellationToken ct = default)
+    {
+        return await _context.BrokerageInstruments
+            .FirstOrDefaultAsync(i => i.UserId == userId && i.Id == id, ct);
+    }
+
+    public async Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.BrokerageInstruments
+            .Where(i => i.UserId == userId)
+            .ToListAsync(ct);
+    }
+
+    public async Task AddAsync(BrokerageInstrument instrument, CancellationToken ct = default)
+    {
+        await _context.BrokerageInstruments.AddAsync(instrument, ct);
+    }
+
+    public void Update(BrokerageInstrument instrument)
+    {
+        _context.BrokerageInstruments.Update(instrument);
     }
 
     public async Task SaveChangesAsync(CancellationToken ct = default)
