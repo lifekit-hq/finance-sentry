@@ -394,6 +394,25 @@ public interface IAlertGeneratorService
         int year,
         int month,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert that a monthly budget is on track to overshoot its limit at its
+    /// current pace (<see cref="FinanceSentry.Core.Utils.BudgetPace"/>) — a distinct signal from
+    /// <see cref="GenerateBudgetNearLimitAlertAsync"/>/<see cref="GenerateBudgetExceededAlertAsync"/>,
+    /// which only compare month-to-date spend against the limit and so cannot tell a budget burned
+    /// early from one on schedule. Deduped per (<paramref name="budgetId"/>, <paramref name="year"/>,
+    /// <paramref name="month"/>) the same way — once raised, never raised again for that month.
+    /// </summary>
+    Task GenerateBudgetPaceAlertAsync(
+        Guid userId,
+        Guid budgetId,
+        string category,
+        decimal spentUsd,
+        decimal limitUsd,
+        decimal projectedMonthEndSpendUsd,
+        int year,
+        int month,
+        CancellationToken ct = default);
 }
 
 /// <summary>

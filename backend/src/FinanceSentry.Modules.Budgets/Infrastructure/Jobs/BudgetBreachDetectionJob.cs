@@ -9,7 +9,9 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Daily hygiene sentinel (C2, ledger-heartbeat design): fires a BudgetBreach alert when a monthly
-/// budget's month-to-date spend reaches 90% or 100% of its limit. Reads budgets.budgets
+/// budget's month-to-date spend reaches 90% or 100% of its limit, or when its pace
+/// (<see cref="BudgetPace"/>) projects it to overshoot the limit by day 7 through day 21 of the
+/// month. Reads budgets.budgets
 /// (<see cref="IBudgetRepository"/>) and month-to-date category spend, already converted to USD at
 /// the read boundary (<see cref="IMerchantSpendingReader"/> — never a native amount is summed). The
 /// budget's own limit is converted the same way via <see cref="CurrencyConverter.ToUsd"/>, mirroring
@@ -47,6 +49,21 @@ public sealed class BudgetBreachDetectionJob(
 {
     private const decimal NearLimitThreshold = 0.90m;
     private const decimal ExceededThreshold = 1.0m;
+
+    /// <summary>
+    /// Pace fires only mid-month: before day 7 the elapsed-fraction denominator is small enough
+    /// that one large charge invents a crisis, and after day 21 the exceeded/near-limit thresholds
+    /// are the better signal — a pace alert that late would be a second notification about the
+    /// same thing.
+    /// </summary>
+    private const int PaceWindowStartDay = 7;
+    private const int PaceWindowEndDay = 21;
+
+    /// <summary>
+    /// 15% slack over the plain projection so ordinary lumpiness (a monthly shop, an annual
+    /// renewal) does not fire — a budget is not a schedule.
+    /// </summary>
+    private const decimal PaceTolerance = 1.15m;
 
     /// <summary>The daily UTC slot this job is scheduled for (see <c>BudgetsModule</c>).</summary>
     public static readonly TimeOnly ScheduledSlotUtc = new(23, 55);
@@ -89,12 +106,12 @@ public sealed class BudgetBreachDetectionJob(
 
         foreach (var group in all.GroupBy(b => b.UserId))
         {
-            await ProcessUserAsync(group.Key, group.ToList(), monthStart, ct);
+            await ProcessUserAsync(group.Key, group.ToList(), monthStart, slot, ct);
         }
     }
 
     private async Task ProcessUserAsync(
-        Guid userId, IReadOnlyList<Budget> userBudgets, DateOnly monthStart, CancellationToken ct)
+        Guid userId, IReadOnlyList<Budget> userBudgets, DateOnly monthStart, DateTime asOf, CancellationToken ct)
     {
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
         IReadOnlyDictionary<string, decimal> rawSpending;
@@ -119,7 +136,7 @@ public sealed class BudgetBreachDetectionJob(
         {
             try
             {
-                await EvaluateAsync(budget, spentByCategory, monthStart.Year, monthStart.Month, ct);
+                await EvaluateAsync(budget, spentByCategory, monthStart.Year, monthStart.Month, asOf, ct);
             }
             catch (Exception ex)
             {
@@ -132,7 +149,7 @@ public sealed class BudgetBreachDetectionJob(
 
     private async Task EvaluateAsync(
         Budget budget, IReadOnlyDictionary<string, decimal> spentByCategory, int year, int month,
-        CancellationToken ct)
+        DateTime asOf, CancellationToken ct)
     {
         var limitUsd = CurrencyConverter.ToUsd(budget.MonthlyLimit, budget.Currency);
         if (limitUsd <= 0m)
@@ -153,6 +170,17 @@ public sealed class BudgetBreachDetectionJob(
         {
             await alerts.GenerateBudgetExceededAlertAsync(
                 budget.UserId, budget.Id, budget.Category, spentUsd, limitUsd, year, month, ct);
+        }
+
+        if (asOf.Day >= PaceWindowStartDay && asOf.Day <= PaceWindowEndDay)
+        {
+            var pace = BudgetPace.Calculate(spentUsd, limitUsd, asOf);
+            if (pace.PaceRatio >= PaceTolerance)
+            {
+                await alerts.GenerateBudgetPaceAlertAsync(
+                    budget.UserId, budget.Id, budget.Category, spentUsd, limitUsd,
+                    pace.ProjectedMonthEndSpend, year, month, ct);
+            }
         }
     }
 }

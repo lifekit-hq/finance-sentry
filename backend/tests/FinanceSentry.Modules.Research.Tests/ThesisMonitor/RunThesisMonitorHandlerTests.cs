@@ -418,6 +418,11 @@ public class RunThesisMonitorHandlerTests
             CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateBudgetPaceAlertAsync(
+            Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd,
+            decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task ResolveOpportunityAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 
