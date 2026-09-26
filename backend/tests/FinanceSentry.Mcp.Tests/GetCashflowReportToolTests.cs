@@ -163,6 +163,42 @@ public sealed class GetCashflowReportToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_MatchesMoneyFlowStatistics_ForSameFixtureAndWindow()
+    {
+        // Parity check for #675: the same MonthlyFlow rows the dashboard's money-flow
+        // statistics query would produce for this user/window must roll up to the same
+        // monthly inflow/outflow/net the tool reports — computed here independently of
+        // the tool's own grouping code, by aggregating the fixture rows directly.
+        var flows = new[]
+        {
+            Flow("2024-04", "USD", inflowUsd: 4000m, outflowUsd: 1500m),
+            Flow("2024-04", "UAH", inflowUsd: 200m, outflowUsd: 300m),
+            Flow("2024-05", "USD", inflowUsd: 5000m, outflowUsd: 2000m, familySupportOutflowUsd: 100m),
+        };
+        SetupHandler(flows);
+
+        var expected = flows
+            .GroupBy(f => f.Month)
+            .ToDictionary(
+                g => g.Key,
+                g => (Inflow: g.Sum(f => f.InflowUsd), Outflow: g.Sum(f => f.OutflowUsd)));
+
+        var result = await CreateSut().ExecuteAsync(
+            UserId,
+            fromDate: new DateOnly(2024, 4, 1),
+            toDate: new DateOnly(2024, 5, 31));
+
+        result.Should().HaveCount(expected.Count);
+        foreach (var entry in result)
+        {
+            var (expectedInflow, expectedOutflow) = expected[entry.Period];
+            entry.Inflow.Should().Be(expectedInflow);
+            entry.Outflow.Should().Be(expectedOutflow);
+            entry.Net.Should().Be(expectedInflow - expectedOutflow);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DefaultsToLastSixMonths_WhenNoDatesProvided()
     {
         GetMoneyFlowStatisticsQuery? captured = null;
