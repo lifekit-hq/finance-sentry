@@ -88,7 +88,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         var detail = errorCode is null ? string.Empty : $" (error: {errorCode})";
 
         return EmitAsync(userId, new AlertDraft(
-            AlertType.SyncFailure, AlertSeverity.Error, accountId, accountName,
+            AlertType.SyncFailure, AlertSeverity.Error, SyncFailureReferenceId(provider, accountId), accountName,
             $"Sync failed for {label}",
             $"We couldn't sync your {provider} account{detail}. Please reconnect or check your credentials."),
             ct);
@@ -96,7 +96,7 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
 
     public Task ResolveSyncFailureAlertAsync(
         Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
-        => ResolveAsync(userId, AlertType.SyncFailure, accountId, ct);
+        => ResolveAsync(userId, AlertType.SyncFailure, SyncFailureReferenceId(provider, accountId), ct);
 
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
         => _alerts.DeleteByReferenceIdAsync(accountId, ct);
@@ -426,6 +426,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ReferenceLabel = draft.ReferenceLabel,
         }, ct);
     }
+
+    /// <summary>Account-level failures keep the account id; provider-level ones (no account) key on the provider.</summary>
+    private static Guid SyncFailureReferenceId(string provider, Guid? accountId)
+        => accountId ?? DerivedReferenceId($"sync-failure:{provider.ToUpperInvariant()}");
 
     private async Task ResolveAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct)
     {
