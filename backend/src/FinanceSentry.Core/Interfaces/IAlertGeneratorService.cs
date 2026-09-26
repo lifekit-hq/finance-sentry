@@ -120,6 +120,12 @@ public interface IAlertGeneratorService
         string reason,
         CancellationToken ct = default);
 
+    /// <summary>Resolves the Opportunity alert for a candidate once it expires or is closed.</summary>
+    Task ResolveOpportunityAlertAsync(
+        Guid userId,
+        Guid referenceId,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Raises a heads-up Alert that a bank connection's consent is about to expire, so the user can
     /// reconnect proactively instead of after data goes stale. <paramref name="referenceId"/> is the
@@ -130,6 +136,12 @@ public interface IAlertGeneratorService
         Guid referenceId,
         string providerName,
         DateTime expiresAt,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the consent-expiring Alert once the connection is re-authenticated or unlinked.</summary>
+    Task ResolveConsentExpiringAlertAsync(
+        Guid userId,
+        Guid referenceId,
         CancellationToken ct = default);
 
     /// <summary>
@@ -146,6 +158,18 @@ public interface IAlertGeneratorService
         string jobName,
         int consecutiveCount,
         string? lastError,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the job-failure Alert once the job's next run succeeds.</summary>
+    Task ResolveJobFailureAlertAsync(
+        Guid userId,
+        Guid referenceId,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the market-structure freshness Alert once the Radar feed catches back up.</summary>
+    Task ResolveMarketStructureFreshnessAlertAsync(
+        Guid userId,
+        Guid referenceId,
         CancellationToken ct = default);
 
     /// <summary>
@@ -191,6 +215,12 @@ public interface IAlertGeneratorService
         string currency,
         CancellationToken ct = default);
 
+    /// <summary>Resolves the price-hike Alert once the charge falls back to (or below) baseline.</summary>
+    Task ResolvePriceHikeAlertAsync(
+        Guid userId,
+        Guid subscriptionId,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Raises a Warning alert when the same merchant charges the same amount multiple times within
     /// the detection window on the same account (044/US2). Deduped per
@@ -216,6 +246,12 @@ public interface IAlertGeneratorService
         string category,
         decimal currentMonthSpend,
         decimal baselineSpend,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the category-spike Alert once month-to-date spend falls back under baseline.</summary>
+    Task ResolveCategorySpikeAlertAsync(
+        Guid userId,
+        string category,
         CancellationToken ct = default);
 
     /// <summary>
@@ -245,6 +281,11 @@ public interface IAlertGeneratorService
         string orderSummary,
         CancellationToken ct = default);
 
+    /// <summary>Resolves the open rebalance-proposal Alert once drift no longer needs rebalancing.</summary>
+    Task ResolveRebalanceProposalAlertAsync(
+        Guid userId,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Raises a Warning alert proposing deployment of idle cash that exceeds the configured buffer
     /// (432 US2). <paramref name="excessUsd"/> is the dollar amount above the min-cash-buffer threshold.
@@ -255,6 +296,11 @@ public interface IAlertGeneratorService
         decimal idleCashUsd,
         decimal minBufferUsd,
         decimal excessUsd,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the open cash-sweep-proposal Alert once idle cash no longer exceeds the buffer.</summary>
+    Task ResolveCashSweepProposalAlertAsync(
+        Guid userId,
         CancellationToken ct = default);
 
     /// <summary>
@@ -270,6 +316,18 @@ public interface IAlertGeneratorService
         string eventType,
         DateOnly eventDate,
         bool isEstimate,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves the earnings-ahead Alert for one exact (ticker, event type, event date) once that date
+    /// is in the past — the reference is deterministic, so this recomputes the same id the generator
+    /// used and resolves it directly, no threshold guesswork needed.
+    /// </summary>
+    Task ResolveEarningsAheadAlertAsync(
+        Guid userId,
+        string ticker,
+        string eventType,
+        DateOnly eventDate,
         CancellationToken ct = default);
 
     /// <summary>

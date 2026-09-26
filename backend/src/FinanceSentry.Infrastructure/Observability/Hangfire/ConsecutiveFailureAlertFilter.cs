@@ -55,6 +55,8 @@ public sealed class ConsecutiveFailureAlertFilter(
         if (succeeded)
         {
             var current = _store.Get(jobName);
+            if (current.Alerted)
+                TryResolveAlert(jobName);
             if (current.Count != 0 || current.Alerted)
                 _store.Set(jobName, JobFailureStreak.Empty);
             return;
@@ -100,6 +102,28 @@ public sealed class ConsecutiveFailureAlertFilter(
         {
             // Fire-and-forget: alerting must never break job processing.
             return false;
+        }
+    }
+
+    // Fire-and-forget, same discipline as TryRaiseAlert: a resolve failure must never break job processing.
+    private void TryResolveAlert(string jobName)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var users = scope.ServiceProvider.GetRequiredService<IBankingTotalsReader>();
+            var generator = scope.ServiceProvider.GetRequiredService<IAlertGeneratorService>();
+
+            var referenceId = JobReferenceId(jobName);
+            var userIds = users.GetActiveUserIdsAsync().GetAwaiter().GetResult();
+            foreach (var userId in userIds)
+            {
+                generator.ResolveJobFailureAlertAsync(userId, referenceId).GetAwaiter().GetResult();
+            }
+        }
+        catch
+        {
+            // Fire-and-forget: alerting must never break job processing.
         }
     }
 

@@ -42,7 +42,11 @@ public sealed class PriceHikeDetectionJob(
             if (baseline <= 0) continue;
 
             var hikeFraction = (sub.LastKnownAmount - baseline) / baseline;
-            if (hikeFraction <= threshold) continue;
+            if (hikeFraction <= threshold)
+            {
+                await alerts.ResolvePriceHikeAlertAsync(sub.UserId, sub.Id, ct);
+                continue;
+            }
 
             try
             {

@@ -26,6 +26,12 @@ public sealed class EarningsAheadJob(
     private const string EquityInstrumentType = "STK";
     private const int LookaheadDays = 3;
 
+    /// <summary>
+    /// How far back to look for events whose date has just passed, so the deterministic
+    /// (ticker, event type, event date) reference can be recomputed and resolved directly.
+    /// </summary>
+    private const int ResolveLookbackDays = 5;
+
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var userIds = await banking.GetActiveUserIdsAsync(ct);
@@ -90,18 +96,28 @@ public sealed class EarningsAheadJob(
         {
             await RaiseAsync(userId, evt, ct);
         }
+
+        IReadOnlyList<EarningsEvent> pastEvents;
+        try
+        {
+            pastEvents = await earningsCalendar.GetForTickersAsync(
+                tickers, today.AddDays(-ResolveLookbackDays), today.AddDays(-1), null, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "EarningsAhead: earnings-calendar resolve fetch failed for user {UserId}", userId);
+            return;
+        }
+
+        foreach (var evt in pastEvents)
+        {
+            await ResolveAsync(userId, evt, ct);
+        }
     }
 
     private Task RaiseAsync(Guid userId, EarningsEvent evt, CancellationToken ct)
     {
-        var alertEventType = evt.EventType switch
-        {
-            EarningsEventType.Earnings => EarningsAheadEventType.Earnings,
-            EarningsEventType.ExDividend => EarningsAheadEventType.ExDividend,
-            // Dividend-payment dates (as opposed to ex-dividend) are not part of this signal.
-            _ => (string?)null,
-        };
-
+        var alertEventType = MapEventType(evt.EventType);
         if (alertEventType is null)
         {
             return Task.CompletedTask;
@@ -110,4 +126,23 @@ public sealed class EarningsAheadJob(
         return alerts.GenerateEarningsAheadAlertAsync(
             userId, evt.Ticker, alertEventType, evt.EventDate, evt.IsEstimate, ct);
     }
+
+    private Task ResolveAsync(Guid userId, EarningsEvent evt, CancellationToken ct)
+    {
+        var alertEventType = MapEventType(evt.EventType);
+        if (alertEventType is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return alerts.ResolveEarningsAheadAlertAsync(userId, evt.Ticker, alertEventType, evt.EventDate, ct);
+    }
+
+    private static string? MapEventType(string eventType) => eventType switch
+    {
+        EarningsEventType.Earnings => EarningsAheadEventType.Earnings,
+        EarningsEventType.ExDividend => EarningsAheadEventType.ExDividend,
+        // Dividend-payment dates (as opposed to ex-dividend) are not part of this signal.
+        _ => null,
+    };
 }

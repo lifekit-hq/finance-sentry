@@ -159,7 +159,7 @@ public sealed class PromoteRejectExpireHandlerTests
         });
 
         var events = new RecordingThesisEventRecorder();
-        var handler = new ExpireCandidatesCommandHandler(candidates, scores, events);
+        var handler = new ExpireCandidatesCommandHandler(candidates, scores, events, new FakeOpportunityAlertGenerator());
 
         var result = await handler.Handle(
             new ExpireCandidatesCommand(DateTimeOffset.UtcNow), CancellationToken.None);

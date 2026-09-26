@@ -201,6 +201,43 @@ public class PriceHikeDetectionJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Resolves_WhenHikeBackBelowThreshold()
+    {
+        var userId = Guid.NewGuid();
+        var subId = Guid.NewGuid();
+        var sub = new SubscriptionHygieneSummary(
+            subId, userId, "Spotify", AverageAmount: 10m, LastKnownAmount: 10.5m,
+            Currency: "EUR", OccurrenceCount: 5);
+
+        _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([sub]);
+
+        await MakeJob().ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolvePriceHikeAlertAsync(userId, subId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoResolve_WhenStillHiked()
+    {
+        var userId = Guid.NewGuid();
+        var subId = Guid.NewGuid();
+        var sub = new SubscriptionHygieneSummary(
+            subId, userId, "Netflix", AverageAmount: 10m, LastKnownAmount: 12m,
+            Currency: "EUR", OccurrenceCount: 5);
+
+        _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([sub]);
+
+        await MakeJob().ExecuteAsync();
+
+        _alerts.Verify(a => a.ResolvePriceHikeAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_NoSubscriptions_RaisesNothing()
     {
         _reader.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))

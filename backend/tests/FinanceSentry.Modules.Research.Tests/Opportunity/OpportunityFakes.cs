@@ -238,10 +238,18 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
 {
     public int OpportunityAlertCalls { get; private set; }
 
+    public List<(Guid UserId, Guid ReferenceId)> ResolvedOpportunityAlerts { get; } = [];
+
     public Task GenerateOpportunityAlertAsync(
         Guid userId, Guid referenceId, string ticker, string reason, CancellationToken ct = default)
     {
         OpportunityAlertCalls++;
+        return Task.CompletedTask;
+    }
+
+    public Task ResolveOpportunityAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
+    {
+        ResolvedOpportunityAlerts.Add((userId, referenceId));
         return Task.CompletedTask;
     }
 
@@ -272,6 +280,14 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateNewsClusterAlertAsync(Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetNearLimitAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateBudgetExceededAlertAsync(Guid userId, Guid budgetId, string category, decimal spentUsd, decimal limitUsd, int year, int month, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveConsentExpiringAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolvePriceHikeAlertAsync(Guid userId, Guid subscriptionId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveCategorySpikeAlertAsync(Guid userId, string category, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveEarningsAheadAlertAsync(Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default) => Task.CompletedTask;
 }
 
 internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyGate

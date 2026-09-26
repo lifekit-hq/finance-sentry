@@ -170,6 +170,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"{ticker} scored top-tier on conviction scoring: {reason}"),
             ct);
 
+    public Task ResolveOpportunityAlertAsync(
+        Guid userId, Guid referenceId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.Opportunity, referenceId, ct);
+
     public Task GenerateConsentExpiringAlertAsync(
         Guid userId, Guid referenceId, string providerName, DateTime expiresAt, CancellationToken ct = default)
     {
@@ -182,6 +186,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"Your {providerName} open-banking consent expires {window} ({expiresAt:yyyy-MM-dd}). Reconnect it to keep balances and transactions syncing."),
             ct);
     }
+
+    public Task ResolveConsentExpiringAlertAsync(
+        Guid userId, Guid referenceId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.ConsentExpiring, referenceId, ct);
 
     public Task GenerateJobFailureAlertAsync(
         Guid userId, Guid referenceId, string jobName, int consecutiveCount, string? lastError,
@@ -203,6 +211,14 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         },
             ct);
     }
+
+    public Task ResolveJobFailureAlertAsync(
+        Guid userId, Guid referenceId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.JobFailure, referenceId, ct);
+
+    public Task ResolveMarketStructureFreshnessAlertAsync(
+        Guid userId, Guid referenceId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.MarketStructure, referenceId, ct);
 
     public Task GeneratePerformanceBriefAlertAsync(
         Guid userId, string headline, string body, CancellationToken ct = default)
@@ -242,6 +258,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ct);
     }
 
+    public Task ResolvePriceHikeAlertAsync(
+        Guid userId, Guid subscriptionId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.PriceHike, subscriptionId, ct);
+
     public Task GenerateDuplicateChargeAlertAsync(
         Guid userId, Guid accountId, string merchantKey, string merchantName,
         decimal chargeAmount, string currency, int chargeCount, CancellationToken ct = default)
@@ -269,6 +289,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             ct);
     }
 
+    public Task ResolveCategorySpikeAlertAsync(
+        Guid userId, string category, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.CategorySpike, CategorySpikeReferenceId(userId, category), ct);
+
     public Task GenerateFxSpreadAlertAsync(
         Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency,
         decimal impliedRate, decimal marketRate, CancellationToken ct = default)
@@ -293,6 +317,9 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"Rebalance proposal: {orderCount} order(s)", orderSummary),
             ct);
 
+    public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.RebalanceProposal, RebalancePortfolioReferenceId(userId), ct);
+
     public Task GenerateCashSweepProposalAlertAsync(
         Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
@@ -301,6 +328,9 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             $"Idle cash exceeds buffer: deploy ≈ ${excessUsd:N0}",
             $"Idle cash ${idleCashUsd:N0} exceeds your minimum buffer ${minBufferUsd:N0}. Consider deploying the ≈ ${excessUsd:N0} excess into your IPS sleeves."),
             ct);
+
+    public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.CashSweepProposal, CashSweepReferenceId(userId), ct);
 
     public Task GenerateEarningsAheadAlertAsync(
         Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate,
@@ -330,6 +360,10 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             EarningsAheadReferenceId(ticker, eventType, eventDate), ticker, title, message!),
             ct);
     }
+
+    public Task ResolveEarningsAheadAlertAsync(
+        Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.EarningsAhead, EarningsAheadReferenceId(ticker, eventType, eventDate), ct);
 
     public Task GenerateFilingLandedAlertAsync(
         Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl,
