@@ -41,6 +41,7 @@ public sealed class ToolNameContractTests
         "get_risk_rules",
         "get_sync_health",
         "get_tax_lots",
+        "get_thesis_evaluability",
         "get_thesis_performance",
         "get_notification_mode",
         "get_pending_companion_events",

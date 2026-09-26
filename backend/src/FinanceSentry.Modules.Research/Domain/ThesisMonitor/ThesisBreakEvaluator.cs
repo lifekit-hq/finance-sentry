@@ -27,9 +27,9 @@ public static class ThesisBreakEvaluator
         IReadOnlyList<DailyClose> dailyCloses,
         decimal? entryPrice = null)
     {
-        if (!ThesisMetric.Contains(trigger.Metric))
+        if (!ThesisTriggerEvaluability.IsStructurallyEvaluable(trigger, out var reason))
         {
-            return new TriggerVerdict.NonEvaluable(NonEvaluableReason.UnsupportedMetric);
+            return new TriggerVerdict.NonEvaluable(reason!);
         }
 
         return ThesisMetric.IsPriceMetric(trigger.Metric)
@@ -239,8 +239,8 @@ public static class ThesisBreakEvaluator
 
     private static bool Breaches(decimal value, string direction, decimal threshold) => direction switch
     {
-        "lessThan" => value < threshold,
-        "greaterThan" => value > threshold,
+        ThesisTriggerDirection.LessThan => value < threshold,
+        ThesisTriggerDirection.GreaterThan => value > threshold,
         _ => false,
     };
 

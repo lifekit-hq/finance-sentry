@@ -70,6 +70,29 @@ public class ThesisBreakEvaluatorNonEvaluableTests
     }
 
     [Fact]
+    public void UnknownDirection_IsNonEvaluableInvalidDirection()
+    {
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.Revenue, "declines", 100m);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be(NonEvaluableReason.InvalidDirection);
+    }
+
+    [Fact]
+    public void NonPositiveConsecutivePeriods_IsNonEvaluableInvalidConsecutivePeriods()
+    {
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.Revenue, "lessThan", 100m, ConsecutivePeriods: 0);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be(NonEvaluableReason.InvalidConsecutivePeriods);
+    }
+
+    [Fact]
     public void NoPriceHistory_IsNonEvaluableNoPriceHistory()
     {
         var trigger = new ThesisInvalidationTrigger(ThesisMetric.PriceDrawdown, "greaterThan", 0.3m);
