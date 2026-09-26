@@ -29,6 +29,13 @@ public static class ThesisTriggerEvaluability
             return false;
         }
 
+        if (ThesisMetric.IsRelativeMetric(trigger.Metric) &&
+            (string.IsNullOrWhiteSpace(trigger.BenchmarkTicker) || trigger.WindowDays is null or < 1))
+        {
+            reason = NonEvaluableReason.MissingBenchmarkConfiguration;
+            return false;
+        }
+
         reason = null;
         return true;
     }

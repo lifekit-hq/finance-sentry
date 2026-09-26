@@ -193,4 +193,83 @@ public class ThesisBreakEvaluatorTests
 
         verdict.Should().BeOfType<TriggerVerdict.Held>();
     }
+
+    // ── relative_return (#697): sustained benchmark-relative underperformance ───────────────────
+
+    [Fact]
+    public void RelativeReturn_BreachesWhenSubjectSustainsUnderperformanceVsBenchmark()
+    {
+        var subjectCloses = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 1), 100m),
+            new(new DateOnly(2026, 1, 2), 90m),
+            new(new DateOnly(2026, 1, 3), 80m),
+            new(new DateOnly(2026, 1, 4), 70m),
+        };
+        var benchmarkCloses = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 1), 100m),
+            new(new DateOnly(2026, 1, 2), 100m),
+            new(new DateOnly(2026, 1, 3), 100m),
+            new(new DateOnly(2026, 1, 4), 100m),
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.RelativeReturn, "lessThan", -0.05m,
+            ConsecutivePeriods: 2, BenchmarkTicker: "SPY", WindowDays: 1);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], subjectCloses, benchmarkCloses: benchmarkCloses);
+
+        var breached = verdict.Should().BeOfType<TriggerVerdict.Breached>().Subject;
+        breached.Metric.Should().Be(ThesisMetric.RelativeReturn);
+        breached.ObservedValues.Should().HaveCount(2);
+        breached.ObservedValues[0].Should().BeApproximately(-0.1111m, 0.001m);
+        breached.ObservedValues[1].Should().BeApproximately(-0.125m, 0.001m);
+    }
+
+    [Fact]
+    public void RelativeReturn_HoldsWhenSubjectTracksBenchmark()
+    {
+        var subjectCloses = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 1), 100m),
+            new(new DateOnly(2026, 1, 2), 90m),
+            new(new DateOnly(2026, 1, 3), 80m),
+            new(new DateOnly(2026, 1, 4), 70m),
+        };
+        var benchmarkCloses = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 1), 100m),
+            new(new DateOnly(2026, 1, 2), 90m),
+            new(new DateOnly(2026, 1, 3), 80m),
+            new(new DateOnly(2026, 1, 4), 70m),
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.RelativeReturn, "lessThan", -0.05m,
+            ConsecutivePeriods: 2, BenchmarkTicker: "SPY", WindowDays: 1);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], subjectCloses, benchmarkCloses: benchmarkCloses);
+
+        verdict.Should().BeOfType<TriggerVerdict.Held>();
+    }
+
+    [Fact]
+    public void RelativeReturn_MissingBenchmarkHistory_IsNonEvaluable()
+    {
+        var subjectCloses = new List<DailyClose>
+        {
+            new(new DateOnly(2026, 1, 1), 100m),
+            new(new DateOnly(2026, 1, 2), 90m),
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.RelativeReturn, "lessThan", -0.05m,
+            ConsecutivePeriods: 1, BenchmarkTicker: "SPY", WindowDays: 1);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], subjectCloses, benchmarkCloses: []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be(NonEvaluableReason.NoBenchmarkHistory);
+    }
 }

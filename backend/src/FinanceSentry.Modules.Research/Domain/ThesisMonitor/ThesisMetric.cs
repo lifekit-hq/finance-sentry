@@ -19,6 +19,9 @@ public static class ThesisMetric
     public const string PriceDrawdown = "price_drawdown";
     public const string PriceReturn = "price_return";
 
+    /// <summary>Subject return minus a named benchmark's return over the same trailing window (#697).</summary>
+    public const string RelativeReturn = "relative_return";
+
     private static readonly IReadOnlySet<string> FundamentalsMetrics = new HashSet<string>(StringComparer.Ordinal)
     {
         GrossMargin,
@@ -39,10 +42,17 @@ public static class ThesisMetric
         PriceReturn,
     };
 
+    private static readonly IReadOnlySet<string> RelativeMetrics = new HashSet<string>(StringComparer.Ordinal)
+    {
+        RelativeReturn,
+    };
+
     private static readonly IReadOnlySet<string> AllMetrics = new HashSet<string>(
-        FundamentalsMetrics.Concat(PriceMetrics), StringComparer.Ordinal);
+        FundamentalsMetrics.Concat(PriceMetrics).Concat(RelativeMetrics), StringComparer.Ordinal);
 
     public static bool Contains(string metric) => AllMetrics.Contains(metric);
 
     public static bool IsPriceMetric(string metric) => PriceMetrics.Contains(metric);
+
+    public static bool IsRelativeMetric(string metric) => RelativeMetrics.Contains(metric);
 }

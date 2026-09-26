@@ -76,7 +76,8 @@ public sealed class ToolParityTests
     private static ServiceProvider BuildProvider(
         string dbKey,
         IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>>? edgarFactsByTicker = null,
-        IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null)
+        IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null,
+        IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null)
     {
         var services = new ServiceCollection();
 
@@ -136,7 +137,7 @@ public sealed class ToolParityTests
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
         services.AddSingleton<ISecEdgarService>(
             new FakeSecEdgarService(edgarFactsByTicker ?? new Dictionary<string, IReadOnlyList<FundamentalFact>>()));
-        services.AddSingleton<IMarketDataService>(new FakeMarketDataService(quotesByTicker));
+        services.AddSingleton<IMarketDataService>(new FakeMarketDataService(quotesByTicker, closesByTicker));
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
@@ -895,6 +896,71 @@ public sealed class ToolParityTests
         var thesisBreak = breaks.Single();
         thesisBreak.Ticker.Should().Be("MU");
         thesisBreak.Metric.Should().Be(FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMetric.GrossMargin);
+        thesisBreak.Reason.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task RunThesisMonitor_RelativeReturnTrigger_SavedViaTool_BreaksOnSustainedUnderperformance()
+    {
+        var userId = Guid.NewGuid();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var day0 = today.AddDays(-3);
+        var day1 = today.AddDays(-2);
+        var day2 = today.AddDays(-1);
+        var day3 = today;
+
+        var closesByTicker = new Dictionary<string, IReadOnlyList<DailyClose>>
+        {
+            ["GRAB"] =
+            [
+                new(day0, 100m),
+                new(day1, 90m),
+                new(day2, 80m),
+                new(day3, 70m),
+            ],
+            ["SPY"] =
+            [
+                new(day0, 100m),
+                new(day1, 100m),
+                new(day2, 100m),
+                new(day3, 100m),
+            ],
+        };
+
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), closesByTicker: closesByTicker);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var saveTool = svc.GetRequiredService<SaveThesisTool>();
+        var saved = await saveTool.ExecuteAsync(
+            "GRAB",
+            "Relative-strength thesis vs. the S&P 500",
+            [],
+            [],
+            [
+                new ThesisInvalidationTrigger(
+                    FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMetric.RelativeReturn,
+                    "lessThan", -0.05m, BenchmarkTicker: "SPY", WindowDays: 1, ConsecutivePeriods: 2),
+            ],
+            userId: userId);
+
+        saved.Should().NotBeNull();
+
+        var runTool = svc.GetRequiredService<RunThesisMonitorTool>();
+        var result = await runTool.ExecuteAsync(userId);
+
+        result.Should().NotBeNull();
+        result!.Summary.BreaksRaised.Should().Be(1);
+        result.Breaks.Should().ContainSingle(b => b.Ticker == "GRAB");
+
+        var listTool = svc.GetRequiredService<ListThesisBreaksTool>();
+        var breaks = await listTool.ExecuteAsync(userId);
+
+        breaks.Should().ContainSingle();
+        var thesisBreak = breaks.Single();
+        thesisBreak.Ticker.Should().Be("GRAB");
+        thesisBreak.Metric.Should().Be(FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMetric.RelativeReturn);
         thesisBreak.Reason.Should().NotBeNullOrEmpty();
     }
 
