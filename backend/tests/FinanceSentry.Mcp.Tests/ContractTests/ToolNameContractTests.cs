@@ -20,6 +20,7 @@ public sealed class ToolNameContractTests
         "get_cashflow_report",
         "get_crypto_pnl_detail",
         "get_analyst_actions",
+        "get_daily_event_outcomes",
         "get_earnings_calendar",
         "get_event_calendar",
         "get_family_clearing_statement",

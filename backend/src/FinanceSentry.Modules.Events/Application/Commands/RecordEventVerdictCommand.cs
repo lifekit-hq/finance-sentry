@@ -6,10 +6,12 @@ using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Events.Domain.Repositories;
 
 /// <summary>
-/// Records the reader's judgement on one fired event (feature 049, US3). Returns true when written.
-/// A foreign or unknown event id, an event not captured from an alert, or a blank / over-long
-/// verdict writes nothing and returns false - the reader is told, never thrown at. The alert id is
-/// persisted alongside so the verdict outlives the companion row.
+/// Records the reader's judgement on one fired event (feature 049, US3; widened to every companion
+/// event kind by feature 687 so a non-alert event, e.g. <c>AnalystAction</c>, can carry a verdict too
+/// - a fresh session cannot dedupe on its own memory, only a recorded verdict does. Returns true when
+/// written. A foreign or unknown event id, or a blank / over-long verdict writes nothing and returns
+/// false - the reader is told, never thrown at. The alert id, when the event has one, is persisted
+/// alongside so the verdict outlives the companion row.
 /// </summary>
 public sealed record RecordEventVerdictCommand(
     Guid UserId,
@@ -31,7 +33,7 @@ public sealed class RecordEventVerdictCommandHandler(
         }
 
         var evt = await delivery.FindAsync(command.UserId, command.EventId, ct);
-        if (evt?.AlertId is null)
+        if (evt is null)
         {
             return false;
         }
@@ -40,7 +42,7 @@ public sealed class RecordEventVerdictCommandHandler(
         {
             UserId = command.UserId,
             CompanionEventId = command.EventId,
-            AlertId = evt.AlertId.Value,
+            AlertId = evt.AlertId,
             Verdict = text,
             Notified = command.Notified,
             RecordedAt = DateTimeOffset.UtcNow,

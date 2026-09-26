@@ -45,7 +45,7 @@ public sealed class GetFiredEventsQueryHandler(
 
         var verdictByAlert = alertIds.Count == 0
             ? new Dictionary<Guid, EventVerdict>()
-            : (await verdicts.ListByAlertIdsAsync(query.UserId, alertIds, ct)).ToDictionary(v => v.AlertId);
+            : (await verdicts.ListByAlertIdsAsync(query.UserId, alertIds, ct)).ToDictionary(v => v.AlertId!.Value);
 
         var items = fired.Items.Select(a =>
         {

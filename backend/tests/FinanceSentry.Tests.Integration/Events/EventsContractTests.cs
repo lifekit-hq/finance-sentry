@@ -123,7 +123,7 @@ public class EventsContractTests(EventsApiFactory factory) : IClassFixture<Event
             ], 1));
         _factory.DeliveryMock
             .Setup(d => d.ListForAlertsAsync(_factory.TestUserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new EventDeliveryRecord(eventId, alertId, "NewsCluster", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow)]);
+            .ReturnsAsync([new EventDeliveryRecord(eventId, alertId, "NewsCluster", "MU", "Delivered", DateTimeOffset.UtcNow, null, DateTimeOffset.UtcNow)]);
 
         var response = await _client.GetAsync("/api/v1/events/fired");
 

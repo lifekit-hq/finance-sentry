@@ -13,12 +13,18 @@ public interface IEventDeliveryReader
 
     /// <summary>The outbox row with this id, only when it belongs to the user.</summary>
     Task<EventDeliveryRecord?> FindAsync(Guid userId, Guid eventId, CancellationToken ct = default);
+
+    /// <summary>Every outbox row for the user that occurred on the given UTC day, any kind or
+    /// disposition (feature 687: the per-day outcome view).</summary>
+    Task<IReadOnlyList<EventDeliveryRecord>> ListForDateAsync(
+        Guid userId, DateOnly date, CancellationToken ct = default);
 }
 
 public sealed record EventDeliveryRecord(
     Guid EventId,
     Guid? AlertId,
     string Kind,
+    string Subject,
     string Disposition,
     DateTimeOffset OccurredAt,
     DateTimeOffset? DispatchedAt,
