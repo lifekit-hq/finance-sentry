@@ -21,6 +21,8 @@ public class UpdateProfileCommandHandler(UserManager<ApplicationUser> userManage
         user.LowBalanceAlerts = command.LowBalanceAlerts;
         user.LowBalanceThreshold = command.LowBalanceThreshold;
         user.SyncFailureAlerts = command.SyncFailureAlerts;
+        user.SafeWithdrawalRate = command.SafeWithdrawalRate;
+        user.RealAnnualReturn = command.RealAnnualReturn;
 
         await userManager.UpdateAsync(user);
 

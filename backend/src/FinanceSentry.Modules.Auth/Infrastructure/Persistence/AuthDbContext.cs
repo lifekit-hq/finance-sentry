@@ -42,5 +42,11 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : IdentityDb
             entity.Property(t => t.UserId).IsRequired();
             entity.Property(t => t.Label).HasMaxLength(200).IsRequired();
         });
+
+        builder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(u => u.SafeWithdrawalRate).HasDefaultValue(0.04m);
+            entity.Property(u => u.RealAnnualReturn).HasDefaultValue(0.05m);
+        });
     }
 }

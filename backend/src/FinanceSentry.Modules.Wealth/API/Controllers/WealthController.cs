@@ -9,10 +9,12 @@ using Microsoft.AspNetCore.Mvc;
 [Route("wealth")]
 public class WealthController(
     IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> wealthSummaryHandler,
-    IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler) : ControllerBase
+    IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
+    IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler) : ControllerBase
 {
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
     private readonly IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> _txSummaryHandler = txSummaryHandler ?? throw new ArgumentNullException(nameof(txSummaryHandler));
+    private readonly IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> _fireProjectionHandler = fireProjectionHandler ?? throw new ArgumentNullException(nameof(fireProjectionHandler));
 
     private static readonly HashSet<string> AllowedCategories =
         new(StringComparer.OrdinalIgnoreCase) { "banking", "crypto", "brokerage", "other" };
@@ -53,6 +55,13 @@ public class WealthController(
 
         var result = await _txSummaryHandler.Handle(
             new GetTransactionSummaryQuery(User.RequireUserId(), fromDate, toDate, category, provider), ct);
+        return Ok(result);
+    }
+
+    [HttpGet("fire")]
+    public async Task<IActionResult> GetFireProjection(CancellationToken ct)
+    {
+        var result = await _fireProjectionHandler.Handle(new GetFireProjectionQuery(User.RequireUserId()), ct);
         return Ok(result);
     }
 }

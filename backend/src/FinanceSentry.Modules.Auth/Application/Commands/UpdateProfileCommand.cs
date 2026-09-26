@@ -11,7 +11,9 @@ public record UpdateProfileCommand(
     bool EmailAlerts,
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
-    bool SyncFailureAlerts) : ICommand<UserProfileDto>;
+    bool SyncFailureAlerts,
+    decimal SafeWithdrawalRate,
+    decimal RealAnnualReturn) : ICommand<UserProfileDto>;
 
 public record UpdateProfileRequest(
     string FirstName,
@@ -21,4 +23,6 @@ public record UpdateProfileRequest(
     bool EmailAlerts,
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
-    bool SyncFailureAlerts);
+    bool SyncFailureAlerts,
+    decimal SafeWithdrawalRate,
+    decimal RealAnnualReturn);
