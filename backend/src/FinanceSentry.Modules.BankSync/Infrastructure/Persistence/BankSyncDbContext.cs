@@ -89,6 +89,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options) : Db
         tb.Property(t => t.ArchivedReason).HasMaxLength(50).IsRequired(false);
         tb.HasQueryFilter(t => t.IsActive);
         tb.HasIndex(t => new { t.AccountId, t.IsActive }).HasDatabaseName("idx_transaction_account_active");
+        tb.HasIndex(t => new { t.UserId, t.IsActive, t.PostedDate }).HasDatabaseName("idx_transaction_user_active_posted_date");
         tb.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         var cab = modelBuilder.Entity<Category>();

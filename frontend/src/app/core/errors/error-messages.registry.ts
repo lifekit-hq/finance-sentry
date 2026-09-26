@@ -35,6 +35,11 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   BUDGET_INVALID_PERIOD: 'Invalid budget period.',
   SUBSCRIPTION_NOT_FOUND: 'Subscription not found.',
   LEDGER_READ_UNAVAILABLE: 'Ledger could not produce a read right now. Try again shortly.',
+  INVALID_DATE_RANGE: 'Invalid date range. Check the from/to dates and try again.',
+  INVALID_AMOUNT_RANGE: 'Invalid amount range. Check the min/max amounts and try again.',
+  INVALID_CATEGORY: 'One of the selected categories is not recognized.',
+  INVALID_TRANSACTION_TYPE: 'Invalid transaction type. Use debit or credit.',
+  INVALID_SEARCH: 'Search text is too long.',
   // Feature 040 agent error codes are lowercase snake_case by contract (chat-endpoint.md).
   /* eslint-disable @typescript-eslint/naming-convention */
   agent_not_configured:

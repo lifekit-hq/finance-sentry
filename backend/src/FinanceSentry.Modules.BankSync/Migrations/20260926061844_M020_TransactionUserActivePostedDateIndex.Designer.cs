@@ -3,6 +3,7 @@ using System;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.BankSync.Migrations
 {
     [DbContext(typeof(BankSyncDbContext))]
-    partial class BankSyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926061844_M020_TransactionUserActivePostedDateIndex")]
+    partial class M020_TransactionUserActivePostedDateIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

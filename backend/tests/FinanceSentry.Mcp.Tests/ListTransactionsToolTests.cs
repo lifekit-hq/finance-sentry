@@ -35,6 +35,7 @@ public sealed class ListTransactionsToolTests
             "Test description",
             "debit",
             category,
+            null,
             false,
             DateTime.UtcNow);
 
