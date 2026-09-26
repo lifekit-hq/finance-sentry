@@ -18,6 +18,8 @@ public sealed record ConnectIBKRRequest(
 
 public sealed record SetInstrumentClassificationRequest(InstrumentClassification? Classification);
 
+public sealed record ConnectIbkrFlexRequest(string Token, string QueryId);
+
 [ApiController]
 [Route("brokerage")]
 public sealed class BrokerageController(
@@ -25,7 +27,9 @@ public sealed class BrokerageController(
     ICommandHandler<DisconnectIBKRCommand, Unit> disconnectHandler,
     IQueryHandler<GetBrokerageHoldingsQuery, BrokerageHoldingsResponse> holdingsHandler,
     IQueryHandler<GetBrokerageInstrumentsQuery, BrokerageInstrumentsResponse> instrumentsHandler,
-    ICommandHandler<SetInstrumentClassificationCommand, Unit> setClassificationHandler) : ControllerBase
+    ICommandHandler<SetInstrumentClassificationCommand, Unit> setClassificationHandler,
+    IIbkrFlexConnector flexConnector,
+    ICommandHandler<DisconnectIbkrFlexCommand, Unit> disconnectFlexHandler) : ControllerBase
 {
     /// <summary>
     /// Persists the user's IBKR OAuth 1.0a artifacts (encrypting the secret
@@ -64,6 +68,28 @@ public sealed class BrokerageController(
     public async Task<IActionResult> Disconnect(CancellationToken ct)
     {
         await disconnectHandler.Handle(new DisconnectIBKRCommand(User.RequireUserId()), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Sets or replaces the caller's IBKR Flex Web Service credential (token + Activity Flex
+    /// Query id), encrypting the token at rest. This is a second, separate broker credential
+    /// from the OAuth connection above — used only for historical statement pulls, never for
+    /// live positions — and never conflicts: connecting again replaces the stored artifacts.
+    /// </summary>
+    [HttpPost("ibkr/flex/connect")]
+    public async Task<IActionResult> ConnectFlex([FromBody] ConnectIbkrFlexRequest request, CancellationToken ct)
+    {
+        await flexConnector.ConnectAsync(
+            User.RequireUserId(), new ConnectIbkrFlexArtifacts(request.Token, request.QueryId), ct);
+        return NoContent();
+    }
+
+    /// <summary>Clears the caller's IBKR Flex credential. 404s if none is active.</summary>
+    [HttpDelete("ibkr/flex/disconnect")]
+    public async Task<IActionResult> DisconnectFlex(CancellationToken ct)
+    {
+        await disconnectFlexHandler.Handle(new DisconnectIbkrFlexCommand(User.RequireUserId()), ct);
         return NoContent();
     }
 

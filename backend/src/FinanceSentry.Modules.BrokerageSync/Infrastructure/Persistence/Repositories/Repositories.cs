@@ -53,6 +53,44 @@ public sealed class IBKRCredentialRepository : IIBKRCredentialRepository
     }
 }
 
+public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
+{
+    private readonly BrokerageSyncDbContext _context;
+
+    public IBKRFlexCredentialRepository(BrokerageSyncDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task AddAsync(IBKRFlexCredential credential, CancellationToken ct = default)
+    {
+        await _context.IBKRFlexCredentials.AddAsync(credential, ct);
+    }
+
+    public async Task<IBKRFlexCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.IBKRFlexCredentials
+            .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+    }
+
+    public async Task<IReadOnlyList<IBKRFlexCredential>> GetAllActiveAsync(CancellationToken ct = default)
+    {
+        return await _context.IBKRFlexCredentials
+            .Where(c => c.IsActive)
+            .ToListAsync(ct);
+    }
+
+    public void Update(IBKRFlexCredential credential)
+    {
+        _context.IBKRFlexCredentials.Update(credential);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        await _context.SaveChangesAsync(ct);
+    }
+}
+
 public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 {
     private readonly BrokerageSyncDbContext _context;

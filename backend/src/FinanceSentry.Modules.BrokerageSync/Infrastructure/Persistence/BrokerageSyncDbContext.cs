@@ -11,6 +11,7 @@ public sealed class BrokerageSyncDbContext : DbContext
     }
 
     public DbSet<IBKRCredential> IBKRCredentials => Set<IBKRCredential>();
+    public DbSet<IBKRFlexCredential> IBKRFlexCredentials => Set<IBKRFlexCredential>();
     public DbSet<BrokerageHolding> BrokerageHoldings => Set<BrokerageHolding>();
     public DbSet<BrokerageInstrument> BrokerageInstruments => Set<BrokerageInstrument>();
 
@@ -40,6 +41,21 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.EncryptedEncryptionKey).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.EncryptionKeyIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.EncryptionKeyAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
+        });
+
+        modelBuilder.Entity<IBKRFlexCredential>(entity =>
+        {
+            entity.ToTable("IBKRFlexCredentials");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.Property(e => e.IsActive).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.LastError).HasMaxLength(1000);
+            entity.Property(e => e.QueryId).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.EncryptedToken).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.TokenIv).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.TokenAuthTag).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
         });
 
