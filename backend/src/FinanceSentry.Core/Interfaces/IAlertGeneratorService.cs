@@ -346,12 +346,14 @@ public interface IAlertGeneratorService
 
     /// <summary>
     /// Raises a Warning alert that a held name or thesis keyword clustered in the news (N1,
-    /// ledger-heartbeat design): two or more distinct sources within a 2h window, a thesis-attached
-    /// source hit, or a material-class keyword (guidance, downgrade, investigation, M&amp;A, halted,
-    /// recall, acquisition). Deduped per (ticker, <paramref name="day"/>) — article-level ContentHash
-    /// dedup already collapses re-ingested items at the news layer, so a feed that returns the same
-    /// items every 30 minutes produces one alert here, not 48. The loudest signal in the design
-    /// (~0.3-1 fires/day); noise controls are the feature, not a refinement.
+    /// ledger-heartbeat design): two or more distinct sources reporting two or more distinct stories
+    /// within a 2h window, a thesis-attached source hit, or a hit on a configurable material-class
+    /// keyword (<c>IMaterialityTermRepository</c>, #693 — data, not a hardcoded list). Deduped per
+    /// (ticker, <paramref name="day"/>) — article-level ContentHash dedup already collapses
+    /// re-ingested items at the news layer, so a feed that returns the same items every 30 minutes
+    /// produces one alert here, not 48. The loudest signal in the design (~0.3-1 fires/day); noise
+    /// controls (including the retrievable-article and distinct-story gates added for #693) are the
+    /// feature, not a refinement.
     /// </summary>
     Task GenerateNewsClusterAlertAsync(
         Guid userId,

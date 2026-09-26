@@ -16,10 +16,14 @@ using Xunit;
 /// </summary>
 public sealed class NewsMaterialityJobTests
 {
+    private static readonly string[] DefaultTerms =
+        ["guidance", "downgrade", "investigation", "M&A", "halted", "recall", "acquisition"];
+
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IThesisRepository> _theses = new();
     private readonly Mock<INewsRepository> _news = new();
+    private readonly Mock<IMaterialityTermRepository> _materialityTerms = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
     private readonly NewsMaterialityJob _job;
 
@@ -34,10 +38,12 @@ public sealed class NewsMaterialityJobTests
             _brokerage.Object,
             _theses.Object,
             _news.Object,
+            _materialityTerms.Object,
             _alerts.Object,
             NullLogger<NewsMaterialityJob>.Instance);
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
+        _materialityTerms.Setup(m => m.ListEnabledTermsAsync(default)).ReturnsAsync(DefaultTerms);
         _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
@@ -48,12 +54,12 @@ public sealed class NewsMaterialityJobTests
             .ReturnsAsync([]);
     }
 
-    private static NewsArticle Article(string source, string title, string? summary = null)
+    private static NewsArticle Article(string source, string title, string? summary = null, string? url = null)
         => new()
         {
             Source = source,
             Title = title,
-            Url = $"https://example.test/{Guid.NewGuid()}",
+            Url = url ?? $"https://example.test/{Guid.NewGuid()}",
             Summary = summary,
             Tickers = ["AAPL"],
             ThesisIds = [],
@@ -322,5 +328,68 @@ public sealed class NewsMaterialityJobTests
 
         _news.Verify(n => n.GetForTickerAsync(
             It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default), Times.Never);
+    }
+
+    /// <summary>
+    /// #693: the same wire story reprinted verbatim under a second distributor's source tag is not
+    /// independent corroboration — two "sources" reporting one headline must not fire the multi-source
+    /// rule, only a genuine second story does.
+    /// </summary>
+    [Fact]
+    public async Task Execute_TwoSourcesSameHeadline_DoesNotFire()
+    {
+        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([
+                Article("src:Reuters", "AAPL launches new product"),
+                Article("src:WireSyndicate", "  AAPL launches new product  "),
+            ]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    /// <summary>#693: a cluster with no article a reader could actually open is suppressed, not emitted.</summary>
+    [Fact]
+    public async Task Execute_NoRetrievableArticles_DoesNotFire()
+    {
+        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([
+                Article("src:Reuters", "AAPL guidance cut announced", url: string.Empty),
+            ]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    /// <summary>#693: the keyword list is read from configuration, not the hardcoded array.</summary>
+    [Fact]
+    public async Task Execute_ConfiguredMaterialityTerm_Fires()
+    {
+        _materialityTerms.Setup(m => m.ListEnabledTermsAsync(default)).ReturnsAsync(["restructuring"]);
+        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([Article("src:Reuters", "AAPL restructuring announced")]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", It.Is<string>(r => r.Contains("restructuring")), _today, default), Times.Once);
+    }
+
+    /// <summary>#693: a term disabled/removed from configuration no longer fires, without a deploy.</summary>
+    [Fact]
+    public async Task Execute_TermNotInConfiguration_DoesNotFire()
+    {
+        _materialityTerms.Setup(m => m.ListEnabledTermsAsync(default)).ReturnsAsync([]);
+        _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync([Article("src:Reuters", "AAPL guidance cut announced")]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
     }
 }
