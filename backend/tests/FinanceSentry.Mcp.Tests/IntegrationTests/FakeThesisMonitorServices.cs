@@ -27,7 +27,8 @@ public sealed class FakeSecEdgarService(IReadOnlyDictionary<string, IReadOnlyLis
 /// (020 track-record parity tests) when <paramref name="quotesByTicker"/> is supplied.
 /// </summary>
 public sealed class FakeMarketDataService(
-    IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null) : IMarketDataService
+    IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null,
+    IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null) : IMarketDataService
 {
     public Task<IReadOnlyDictionary<string, QuoteCacheEntry>> GetQuotesAsync(
         IReadOnlyCollection<string> tickers, CancellationToken ct = default)
@@ -46,5 +47,8 @@ public sealed class FakeMarketDataService(
 
     public Task<IReadOnlyList<DailyClose>> GetDailyClosesAsync(
         string ticker, DateOnly since, CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<DailyClose>>([]);
+        => Task.FromResult<IReadOnlyList<DailyClose>>(
+            closesByTicker is not null && closesByTicker.TryGetValue(ticker, out var closes)
+                ? closes.Where(c => c.Date >= since).ToList()
+                : []);
 }

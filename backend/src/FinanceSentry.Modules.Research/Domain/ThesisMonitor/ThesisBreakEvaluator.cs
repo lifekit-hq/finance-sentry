@@ -25,11 +25,17 @@ public static class ThesisBreakEvaluator
         DateTimeOffset thesisCreatedAt,
         IReadOnlyList<FundamentalFact> fundamentals,
         IReadOnlyList<DailyClose> dailyCloses,
-        decimal? entryPrice = null)
+        decimal? entryPrice = null,
+        IReadOnlyList<DailyClose>? benchmarkCloses = null)
     {
         if (!ThesisTriggerEvaluability.IsStructurallyEvaluable(trigger, out var reason))
         {
             return new TriggerVerdict.NonEvaluable(reason!);
+        }
+
+        if (ThesisMetric.IsRelativeMetric(trigger.Metric))
+        {
+            return EvaluateRelativeReturn(trigger, dailyCloses, benchmarkCloses ?? []);
         }
 
         return ThesisMetric.IsPriceMetric(trigger.Metric)
@@ -221,6 +227,62 @@ public static class ThesisBreakEvaluator
             values[i] = trigger.Metric == ThesisMetric.PriceDrawdown
                 ? (baseline - day.Close) / baseline
                 : (day.Close - baseline) / baseline;
+            labels[i] = day.Date.ToString("yyyy-MM-dd");
+        }
+
+        return BuildVerdict(trigger, values, labels);
+    }
+
+    /// <summary>
+    /// relative_return (#697): excess return = subject's trailing <see cref="ThesisInvalidationTrigger.WindowDays"/>
+    /// return minus the benchmark's return over the identical trailing window, sampled once per of
+    /// the last <see cref="ThesisInvalidationTrigger.ConsecutivePeriods"/> trading days — reusing the
+    /// same "sustained" ALL-must-breach rule as price_drawdown/price_return in <see cref="BuildVerdict"/>.
+    /// </summary>
+    private static TriggerVerdict EvaluateRelativeReturn(
+        ThesisInvalidationTrigger trigger,
+        IReadOnlyList<DailyClose> subjectCloses,
+        IReadOnlyList<DailyClose> benchmarkCloses)
+    {
+        var subject = subjectCloses.OrderBy(c => c.Date).ToList();
+        if (subject.Count == 0)
+        {
+            return new TriggerVerdict.NonEvaluable(NonEvaluableReason.NoPriceHistory);
+        }
+
+        if (benchmarkCloses.Count == 0)
+        {
+            return new TriggerVerdict.NonEvaluable(NonEvaluableReason.NoBenchmarkHistory);
+        }
+
+        var benchmarkByDate = benchmarkCloses.ToDictionary(c => c.Date, c => c.Close);
+        var windowDays = trigger.WindowDays!.Value;
+
+        if (subject.Count < windowDays + trigger.ConsecutivePeriods)
+        {
+            return new TriggerVerdict.NonEvaluable(NonEvaluableReason.InsufficientPeriods);
+        }
+
+        var startIndex = subject.Count - trigger.ConsecutivePeriods;
+        var values = new decimal[trigger.ConsecutivePeriods];
+        var labels = new string[trigger.ConsecutivePeriods];
+
+        for (var i = 0; i < trigger.ConsecutivePeriods; i++)
+        {
+            var day = subject[startIndex + i];
+            var past = subject[startIndex + i - windowDays];
+
+            if (past.Close == 0 ||
+                !benchmarkByDate.TryGetValue(day.Date, out var benchNow) ||
+                !benchmarkByDate.TryGetValue(past.Date, out var benchPast) ||
+                benchPast == 0)
+            {
+                return new TriggerVerdict.NonEvaluable(NonEvaluableReason.NoBenchmarkHistory);
+            }
+
+            var subjectReturn = (day.Close - past.Close) / past.Close;
+            var benchmarkReturn = (benchNow - benchPast) / benchPast;
+            values[i] = subjectReturn - benchmarkReturn;
             labels[i] = day.Date.ToString("yyyy-MM-dd");
         }
 
