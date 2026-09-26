@@ -15,6 +15,9 @@ public sealed class BrokerageHolding
     public decimal? CostBasisUsd { get; private set; }
     public DateTime? AcquiredAt { get; private set; }
 
+    /// <summary>Links to the durable <see cref="BrokerageInstrument"/> row, when the broker gave us an instrument id.</summary>
+    public Guid? InstrumentId { get; private set; }
+
     private BrokerageHolding() { }
 
     public BrokerageHolding(
@@ -25,7 +28,8 @@ public sealed class BrokerageHolding
         decimal usdValue,
         string provider,
         decimal? averageCostUsd = null,
-        DateTime? acquiredAt = null)
+        DateTime? acquiredAt = null,
+        Guid? instrumentId = null)
     {
         Id = Guid.NewGuid();
         UserId = userId;
@@ -38,15 +42,18 @@ public sealed class BrokerageHolding
         AverageCostUsd = averageCostUsd;
         CostBasisUsd = averageCostUsd.HasValue ? Math.Round(averageCostUsd.Value * quantity, 4) : null;
         AcquiredAt = acquiredAt;
+        InstrumentId = instrumentId;
     }
 
-    public void Update(decimal quantity, decimal usdValue)
+    public void Update(decimal quantity, decimal usdValue, Guid? instrumentId = null)
     {
         Quantity = quantity;
         UsdValue = usdValue;
         SyncedAt = DateTime.UtcNow;
         if (AverageCostUsd is decimal avg)
             CostBasisUsd = Math.Round(avg * quantity, 4);
+        if (instrumentId.HasValue)
+            InstrumentId = instrumentId;
     }
 
     public void SetCostBasis(decimal? averageCostUsd, DateTime? acquiredAt)

@@ -22,3 +22,16 @@ public interface IBrokerageHoldingRepository
     Task DeleteByUserIdAsync(Guid userId, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
+
+public interface IBrokerageInstrumentRepository
+{
+    Task<BrokerageInstrument?> GetByConidAsync(Guid userId, string provider, long conid, CancellationToken ct = default);
+
+    /// <summary>Scoped to <paramref name="userId"/> so a caller can never resolve — or change — another user's instrument.</summary>
+    Task<BrokerageInstrument?> GetByIdAsync(Guid userId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+    Task AddAsync(BrokerageInstrument instrument, CancellationToken ct = default);
+    void Update(BrokerageInstrument instrument);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}

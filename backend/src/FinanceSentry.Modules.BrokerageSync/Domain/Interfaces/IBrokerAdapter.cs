@@ -20,4 +20,6 @@ public sealed record BrokerPosition(
     string InstrumentType,
     decimal Quantity,
     decimal UsdValue,
-    decimal? AverageCostUsd = null);
+    decimal? AverageCostUsd = null,
+    long? Conid = null,
+    string? Isin = null);

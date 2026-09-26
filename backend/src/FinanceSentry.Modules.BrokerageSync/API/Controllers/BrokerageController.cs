@@ -3,6 +3,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Queries;
+using FinanceSentry.Modules.BrokerageSync.Domain;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceSentry.Modules.BrokerageSync.API.Controllers;
@@ -15,12 +16,16 @@ public sealed record ConnectIBKRRequest(
     string EncryptionKey,
     string DhParam);
 
+public sealed record SetInstrumentClassificationRequest(InstrumentClassification? Classification);
+
 [ApiController]
 [Route("brokerage")]
 public sealed class BrokerageController(
     IIBKRConnector connector,
     ICommandHandler<DisconnectIBKRCommand, Unit> disconnectHandler,
-    IQueryHandler<GetBrokerageHoldingsQuery, BrokerageHoldingsResponse> holdingsHandler) : ControllerBase
+    IQueryHandler<GetBrokerageHoldingsQuery, BrokerageHoldingsResponse> holdingsHandler,
+    IQueryHandler<GetBrokerageInstrumentsQuery, BrokerageInstrumentsResponse> instrumentsHandler,
+    ICommandHandler<SetInstrumentClassificationCommand, Unit> setClassificationHandler) : ControllerBase
 {
     /// <summary>
     /// Persists the user's IBKR OAuth 1.0a artifacts (encrypting the secret
@@ -59,6 +64,27 @@ public sealed class BrokerageController(
     public async Task<IActionResult> Disconnect(CancellationToken ct)
     {
         await disconnectHandler.Handle(new DisconnectIBKRCommand(User.RequireUserId()), ct);
+        return NoContent();
+    }
+
+    /// <summary>Lists the caller's broker instruments with their (possibly null) tax classification.</summary>
+    [HttpGet("instruments")]
+    public async Task<IActionResult> GetInstruments(CancellationToken ct)
+    {
+        var result = await instrumentsHandler.Handle(new GetBrokerageInstrumentsQuery(User.RequireUserId()), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Sets or clears (via <c>classification: null</c>) the human-set tax classification on one
+    /// of the caller's own instruments. 404s if the instrument does not belong to the caller.
+    /// </summary>
+    [HttpPut("instruments/{id:guid}/classification")]
+    public async Task<IActionResult> SetInstrumentClassification(
+        Guid id, [FromBody] SetInstrumentClassificationRequest request, CancellationToken ct)
+    {
+        await setClassificationHandler.Handle(
+            new SetInstrumentClassificationCommand(User.RequireUserId(), id, request.Classification), ct);
         return NoContent();
     }
 }

@@ -3,6 +3,7 @@ using System;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.BrokerageSync.Migrations
 {
     [DbContext(typeof(BrokerageSyncDbContext))]
-    partial class BrokerageSyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926094355_M007_InstrumentMaster")]
+    partial class M007_InstrumentMaster
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
