@@ -118,6 +118,38 @@ public sealed class PromoteRejectExpireHandlerTests
     }
 
     [Fact]
+    public async Task Promote_Paper_PassesIsPaperToGate_AndRecordsNoOverrideWhenAllowed()
+    {
+        var candidates = new FakeCandidateRepository();
+        var userId = Guid.NewGuid();
+        var candidate = SeedActive(candidates, userId, "MSFT");
+
+        // Simulates the real-book MinCashBuffer rule being skipped for a paper promotion: the gate
+        // itself (RiskEvaluationService, see RiskEvaluationServiceTests) is what applies isPaper —
+        // this fake only proves PromoteCandidateCommand.Paper reaches IRiskPolicyGate.CheckProposalAsync.
+        var allowed = new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null, "paper: cash rule skipped");
+        var save = new RecordingSaveThesisHandler();
+        var signals = new RecordingRadarSignalWriter();
+        var gate = new FakeRiskPolicyGate(allowed);
+        var handler = new PromoteCandidateCommandHandler(
+            candidates,
+            new FakeCandidateScoreRepository(),
+            gate,
+            signals,
+            new RecordingThesisEventRecorder(),
+            save,
+            Options.Create(new OpportunityOptions()));
+
+        var result = await handler.Handle(
+            new PromoteCandidateCommand(userId, candidate.Id, ProposedUsd: 9_000m, Paper: true),
+            CancellationToken.None);
+
+        gate.LastIsPaper.Should().BeTrue();
+        result.ThesisId.Should().Be(save.ThesisId);
+        signals.Signals.Should().BeEmpty("no override was needed or recorded for an allowed paper promotion");
+    }
+
+    [Fact]
     public async Task Reject_MarksRejected_WithReason()
     {
         var candidates = new FakeCandidateRepository();

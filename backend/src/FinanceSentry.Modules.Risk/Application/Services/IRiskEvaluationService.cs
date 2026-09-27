@@ -18,5 +18,6 @@ public interface IRiskEvaluationService
         RiskRuleSet? ruleSet,
         string ticker,
         decimal proposedUsd,
-        int turnoverCountThisQuarter);
+        int turnoverCountThisQuarter,
+        bool isPaper = false);
 }

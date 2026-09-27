@@ -40,7 +40,8 @@ public sealed class RiskEvaluationService(ILogger<RiskEvaluationService>? logger
         RiskRuleSet? ruleSet,
         string ticker,
         decimal proposedUsd,
-        int turnoverCountThisQuarter)
+        int turnoverCountThisQuarter,
+        bool isPaper = false)
     {
         if (ruleSet is null)
         {
@@ -111,7 +112,11 @@ public sealed class RiskEvaluationService(ILogger<RiskEvaluationService>? logger
             }
         }
 
-        if (ruleSet.MinCashBufferPct is { } minCash and > 0)
+        // Paper/tracking promotions never draw down real cash (finance-sentry#704) — the
+        // real-book cash-funding rule has no meaning for a position that will never be
+        // funded, so it's the one rule paper proposals skip; concentration/sizing rules
+        // above still apply unconditionally.
+        if (!isPaper && ruleSet.MinCashBufferPct is { } minCash and > 0)
         {
             var projectedCash = book.CashUsd - fundedFromCash;
             var projectedCashPct = projectedCash / projectedTotal;

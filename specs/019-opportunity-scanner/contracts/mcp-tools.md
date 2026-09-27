@@ -20,12 +20,18 @@ repos, scorers) in `ToolParityTests`.
 
 ## `promote_candidate`
 - **Params**: `id: Guid`, `triggers?: ThesisInvalidationTrigger[]` (override the deterministic prefill),
-  `overrideRisk?: bool`, `userId?`
+  `overrideRisk?: bool`, `proposedUsd?: decimal`, `decisionNote?: string`, `userId?`, `paper?: bool`
+  (finance-sentry#704, default `false`)
 - **Returns**: `{ thesisId?, gate: RiskGateVerdict }`. Runs `IRiskPolicyGate.CheckProposalAsync`
   (FR-011b): `Refused` (and no `overrideRisk`) → returns the verdict with the named rule + max compliant
   size, NO thesis created. Otherwise creates the `InvestmentThesis` via `SaveThesisCommand` with prefilled
   triggers (validated by `ThesisTriggerVocabulary`), links the candidate (`PromotedThesisId`, status
   `Promoted`), records a `Promoted` candidate event (020). An override is recorded as a signal (FR-007).
+- **`paper` (finance-sentry#704)**: a paper/tracking-only promotion never draws down real cash, so the
+  real-book cash-funding rule (`MinCashBuffer`) has no meaning for it and is skipped when `paper: true`.
+  Concentration/sizing rules (`MaxPositionWeight`, `MaxNewPosition`, `Turnover`) still apply unchanged —
+  only the cash-funding rule is the mismatch (per the issue's option (b)). `paper: false` (the default)
+  keeps today's full real-book rule set, unchanged.
 - **Acceptance (SC-004)**: the promoted thesis is immediately valid for the 017 monitor.
 
 ## `reject_candidate`

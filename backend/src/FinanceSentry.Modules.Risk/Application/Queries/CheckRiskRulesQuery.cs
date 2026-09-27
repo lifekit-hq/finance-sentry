@@ -8,7 +8,7 @@ using FinanceSentry.Modules.Risk.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using Microsoft.Extensions.Options;
 
-public sealed record RiskProposal(string Ticker, decimal ProposedUsd, bool Override = false);
+public sealed record RiskProposal(string Ticker, decimal ProposedUsd, bool Override = false, bool IsPaper = false);
 
 /// <summary>FR-001d portfolio-context facts attached to the no-arg compliance report.</summary>
 public sealed record PortfolioContext(
@@ -59,7 +59,7 @@ public sealed class CheckRiskRulesQueryHandler(
         var turnoverCount = turnoverTracker.CountDiscretionaryTradesInRollingQuarter(history, now);
 
         var verdict = evaluationService.EvaluateProposal(
-            book, ruleSet, query.Proposal.Ticker, query.Proposal.ProposedUsd, turnoverCount);
+            book, ruleSet, query.Proposal.Ticker, query.Proposal.ProposedUsd, turnoverCount, query.Proposal.IsPaper);
         return new CheckRiskRulesResult(null, verdict, ruleSet is not null);
     }
 
