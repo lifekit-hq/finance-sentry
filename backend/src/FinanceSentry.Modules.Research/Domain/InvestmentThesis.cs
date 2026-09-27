@@ -27,7 +27,11 @@ public record ThesisInvalidationTrigger(
     decimal Threshold,
     string? ProxyTicker = null,
     int ConsecutivePeriods = 1,
-    ThesisPeriodType PeriodType = ThesisPeriodType.Quarter);
+    ThesisPeriodType PeriodType = ThesisPeriodType.Quarter,
+    // relative_return only (#697): the benchmark ticker (e.g. "SPY") and trailing trading-day
+    // window the subject's return is measured against.
+    string? BenchmarkTicker = null,
+    int? WindowDays = null);
 
 public enum ThesisPeriodType
 {

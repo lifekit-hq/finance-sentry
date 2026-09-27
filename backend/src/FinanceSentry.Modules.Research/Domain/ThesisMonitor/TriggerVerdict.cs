@@ -31,4 +31,6 @@ public static class NonEvaluableReason
     public const string UnsupportedMetric = "unsupported_metric";
     public const string InvalidDirection = "invalid_direction";
     public const string InvalidConsecutivePeriods = "invalid_consecutive_periods";
+    public const string MissingBenchmarkConfiguration = "missing_benchmark_configuration";
+    public const string NoBenchmarkHistory = "no_benchmark_history";
 }

@@ -27,6 +27,11 @@ public class RunThesisMonitorCommandHandler(
 {
     private const int MaxFundamentalsPerConcept = 8;
 
+    // Calendar-day padding over a trading-day count so weekends/holidays don't starve the window
+    // (same 1.5x heuristic Radar's StructureQueryService.LookbackSince uses).
+    private const decimal RelativeReturnLookbackPaddingFactor = 1.5m;
+    private const int RelativeReturnLookbackPaddingDays = 10;
+
     public async Task<ThesisMonitorRunSummary> Handle(RunThesisMonitorCommand cmd, CancellationToken ct)
     {
         var theses = await thesisRepo.ListAsync(cmd.UserId, ct);
@@ -135,6 +140,23 @@ public class RunThesisMonitorCommandHandler(
     {
         var targetTicker = trigger.ProxyTicker ?? thesis.Ticker;
 
+        if (ThesisMetric.IsRelativeMetric(trigger.Metric))
+        {
+            // Needs windowDays + consecutivePeriods of trailing trading-day history, which can
+            // reach further back than the thesis itself — unlike price_return/drawdown, this isn't
+            // measured "since entry".
+            var since = RelativeReturnLookbackSince(trigger);
+            var subjectCloses = await GetClosesAsync(
+                targetTicker, since, closesCache, ct, cacheKey: $"{targetTicker}::relative_return");
+
+            var benchmarkTicker = trigger.BenchmarkTicker!;
+            var benchmarkCloses = await GetClosesAsync(
+                benchmarkTicker, since, closesCache, ct, cacheKey: $"{benchmarkTicker}::relative_return");
+
+            return ThesisBreakEvaluator.Evaluate(
+                trigger, thesis.CreatedAt, [], subjectCloses, thesis.EntryPrice, benchmarkCloses);
+        }
+
         if (ThesisMetric.IsPriceMetric(trigger.Metric))
         {
             var closes = await GetClosesAsync(targetTicker, thesis.CreatedAt, closesCache, ct);
@@ -143,6 +165,14 @@ public class RunThesisMonitorCommandHandler(
 
         var facts = await GetFundamentalsAsync(targetTicker, fundamentalsCache, ct);
         return ThesisBreakEvaluator.Evaluate(trigger, thesis.CreatedAt, facts, []);
+    }
+
+    private static DateTimeOffset RelativeReturnLookbackSince(ThesisInvalidationTrigger trigger)
+    {
+        var tradingDays = trigger.WindowDays!.Value + trigger.ConsecutivePeriods;
+        var calendarDays = (int)Math.Ceiling(tradingDays * RelativeReturnLookbackPaddingFactor)
+            + RelativeReturnLookbackPaddingDays;
+        return DateTimeOffset.UtcNow.AddDays(-calendarDays);
     }
 
     private async Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
@@ -164,16 +194,18 @@ public class RunThesisMonitorCommandHandler(
         string ticker,
         DateTimeOffset since,
         Dictionary<string, IReadOnlyList<DailyClose>> cache,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? cacheKey = null)
     {
-        if (cache.TryGetValue(ticker, out var cached))
+        var key = cacheKey ?? ticker;
+        if (cache.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
         var closes = await marketData.GetDailyClosesAsync(
             ticker, DateOnly.FromDateTime(since.UtcDateTime), ct);
-        cache[ticker] = closes;
+        cache[key] = closes;
         return closes;
     }
 

@@ -29,9 +29,12 @@ public class RunThesisMonitorHandlerTests
     };
 
     private static RunThesisMonitorCommandHandler BuildHandler(
-        FakeThesisRepository repo, FakeSecEdgarService secEdgar, FakeAlertGeneratorService alerts)
+        FakeThesisRepository repo,
+        FakeSecEdgarService secEdgar,
+        FakeAlertGeneratorService alerts,
+        FakeMarketDataService? marketData = null)
         => new(
-            repo, secEdgar, new FakeMarketDataService(), alerts, new FakeThesisEventRecorder(),
+            repo, secEdgar, marketData ?? new FakeMarketDataService(), alerts, new FakeThesisEventRecorder(),
             NullLogger<RunThesisMonitorCommandHandler>.Instance);
 
     [Fact]
@@ -226,6 +229,51 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenAt.Should().BeNull();
     }
 
+    [Fact]
+    public async Task RelativeReturn_SustainedUnderperformanceVsBenchmark_BreaksThesis()
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var day0 = today.AddDays(-3);
+        var day1 = today.AddDays(-2);
+        var day2 = today.AddDays(-1);
+        var day3 = today;
+
+        var subjectCloses = new List<DailyClose>
+        {
+            new(day0, 100m),
+            new(day1, 90m),
+            new(day2, 80m),
+            new(day3, 70m),
+        };
+        var benchmarkCloses = new List<DailyClose>
+        {
+            new(day0, 100m),
+            new(day1, 100m),
+            new(day2, 100m),
+            new(day3, 100m),
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.RelativeReturn, "lessThan", -0.05m, BenchmarkTicker: "SPY", WindowDays: 1, ConsecutivePeriods: 2);
+        var thesis = Thesis([trigger]);
+
+        var repo = new FakeThesisRepository([thesis]);
+        var alerts = new FakeAlertGeneratorService();
+        var marketData = new FakeMarketDataService(new Dictionary<string, IReadOnlyList<DailyClose>>
+        {
+            ["MU"] = subjectCloses,
+            ["SPY"] = benchmarkCloses,
+        });
+        var handler = BuildHandler(repo, new FakeSecEdgarService([]), alerts, marketData);
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.BreaksRaised.Should().Be(1);
+        alerts.GenerateCalls.Should().Be(1);
+        thesis.BrokenAt.Should().NotBeNull();
+        thesis.BrokenReason.Should().Contain(ThesisMetric.RelativeReturn);
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeThesisRepository(IReadOnlyList<InvestmentThesis> theses) : IThesisRepository
@@ -267,7 +315,8 @@ public class RunThesisMonitorHandlerTests
         }
     }
 
-    private sealed class FakeMarketDataService : IMarketDataService
+    private sealed class FakeMarketDataService(
+        IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null) : IMarketDataService
     {
         public Task<IReadOnlyDictionary<string, QuoteCacheEntry>> GetQuotesAsync(
             IReadOnlyCollection<string> tickers, CancellationToken ct = default)
@@ -276,7 +325,10 @@ public class RunThesisMonitorHandlerTests
 
         public Task<IReadOnlyList<DailyClose>> GetDailyClosesAsync(
             string ticker, DateOnly since, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<DailyClose>>([]);
+            => Task.FromResult<IReadOnlyList<DailyClose>>(
+                closesByTicker is not null && closesByTicker.TryGetValue(ticker, out var closes)
+                    ? closes.Where(c => c.Date >= since).ToList()
+                    : []);
     }
 
     private sealed class FakeThesisEventRecorder : IThesisEventRecorder

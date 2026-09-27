@@ -50,6 +50,45 @@ public class ThesisTriggerVocabularyTests
     }
 
     [Fact]
+    public void Validate_Accepts_RelativeReturn_WithBenchmarkAndWindow()
+    {
+        var triggers = new List<ThesisInvalidationTrigger>
+        {
+            new("relative_return", "lessThan", -0.05m, BenchmarkTicker: "SPY", WindowDays: 63),
+        };
+
+        var act = () => ThesisTriggerVocabulary.Validate(triggers);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Rejects_RelativeReturn_MissingBenchmarkTicker()
+    {
+        var triggers = new List<ThesisInvalidationTrigger>
+        {
+            new("relative_return", "lessThan", -0.05m, WindowDays: 63),
+        };
+
+        var act = () => ThesisTriggerVocabulary.Validate(triggers);
+
+        act.Should().Throw<InvalidThesisTriggerScaffoldingException>();
+    }
+
+    [Fact]
+    public void Validate_Rejects_RelativeReturn_MissingWindowDays()
+    {
+        var triggers = new List<ThesisInvalidationTrigger>
+        {
+            new("relative_return", "lessThan", -0.05m, BenchmarkTicker: "SPY"),
+        };
+
+        var act = () => ThesisTriggerVocabulary.Validate(triggers);
+
+        act.Should().Throw<InvalidThesisTriggerScaffoldingException>();
+    }
+
+    [Fact]
     public void Validate_Rejects_NonPositiveConsecutivePeriods()
     {
         var triggers = new List<ThesisInvalidationTrigger>

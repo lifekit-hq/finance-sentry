@@ -103,12 +103,36 @@ public class ThesisBreakEvaluatorNonEvaluableTests
         nonEvaluable.Reason.Should().Be(NonEvaluableReason.NoPriceHistory);
     }
 
+    [Fact]
+    public void RelativeReturn_MissingBenchmarkTicker_IsNonEvaluableMissingBenchmarkConfiguration()
+    {
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.RelativeReturn, "lessThan", -0.05m, WindowDays: 63);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be(NonEvaluableReason.MissingBenchmarkConfiguration);
+    }
+
+    [Fact]
+    public void RelativeReturn_MissingWindowDays_IsNonEvaluableMissingBenchmarkConfiguration()
+    {
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.RelativeReturn, "lessThan", -0.05m, BenchmarkTicker: "SPY");
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, [], []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be(NonEvaluableReason.MissingBenchmarkConfiguration);
+    }
+
     [Theory]
     [InlineData(NonEvaluableReason.NoFundamentals)]
     [InlineData(NonEvaluableReason.InsufficientPeriods)]
     [InlineData(NonEvaluableReason.DivideByZero)]
     [InlineData(NonEvaluableReason.UnsupportedMetric)]
     [InlineData(NonEvaluableReason.NoPriceHistory)]
+    [InlineData(NonEvaluableReason.MissingBenchmarkConfiguration)]
+    [InlineData(NonEvaluableReason.NoBenchmarkHistory)]
     public void NonEvaluableVerdicts_AreNeverBreached(string reason)
     {
         TriggerVerdict verdict = new TriggerVerdict.NonEvaluable(reason);
