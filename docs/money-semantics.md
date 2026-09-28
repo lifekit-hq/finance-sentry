@@ -201,7 +201,8 @@ keeps the raw positive value ("you owe X"), matching how banks present credit ca
   the two rows coexist indefinitely. A reader that sums both double-counts the purchase; a
   reader that divides one leg by another measures a rate nobody was charged. **A reader that
   judges a figure per row therefore filters `!IsPending`** — `DuplicateChargeDetectionJob`,
-  `CategorySpikeDetectionJob`, `SubscriptionDetectionJob` and `FxSpreadDetectionJob` all do.
+  `CategorySpikeDetectionJob`, `SubscriptionDetectionJob`, `FxSpreadDetectionJob` and
+  `BackfillNetWorthHistoryCommandHandler` (§8) all do.
   Monthly flow (§5) deliberately counts pending money and so does *not* filter it, and
   therefore double-counts such a purchase. (Not the FX conversion above: both its legs carry
   transfer categories and §5 excludes them either way.) Not yet addressed — what flow should
