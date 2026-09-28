@@ -43,6 +43,32 @@ public class BackfillNetWorthHistoryCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ExcludesPendingTransactionsFromTheWalk()
+    {
+        // A pending debit dated "today" reflects an unsettled hold, not part of the
+        // provider-stored CurrentBalance the walk anchors on. If it were included, the
+        // reconstructed balance for every earlier day would be silently wrong.
+        var anchor = new NetWorthSnapshot { SnapshotDate = AnchorDate };
+        var account = new AccountBalanceSnapshot(
+            CheckingAccountId, "Test Bank", "checking", "1234", "USD", CurrentBalance: 1000m);
+        var transactions = new[]
+        {
+            // Establishes an earlier floor so the anchor day is included in the output.
+            new BankingTransactionSummary(
+                CheckingAccountId, "monobank", "debit", 0m, "USD", 0m,
+                AnchorDate.AddDays(-10).ToDateTime(TimeOnly.MinValue), IsPending: false),
+            new BankingTransactionSummary(
+                CheckingAccountId, "monobank", "debit", 200m, "USD", 200m,
+                AnchorDate.ToDateTime(TimeOnly.MinValue), IsPending: true),
+        };
+
+        var rows = await CaptureInsertedRows(anchor, [account], transactions);
+
+        var anchorMinusOne = rows.Should().ContainSingle(r => r.SnapshotDate == AnchorDate.AddDays(-1)).Subject;
+        anchorMinusOne.BankingTotal.Should().Be(1000m);
+    }
+
+    [Fact]
     public async Task Handle_ConvertsNativeCurrencyToUsdAtEachDay()
     {
         // EUR account, current balance 100 EUR, no transactions in the walked window — every
