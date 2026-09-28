@@ -57,6 +57,9 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
         // active-alert check first. 7 days covers a manual dismiss without re-alerting the same
         // cluster before it ages out of the 2h window on its own.
         [AlertType.NewsCluster] = TimeSpan.FromDays(7),
+        // 27 days: shorter than the shortest calendar month, so a manual dismiss still lets next
+        // month's statement through, but a same-month rerun of the cron never double-alerts.
+        [AlertType.FamilyStatement] = TimeSpan.FromDays(27),
     };
 
     /// <summary>
@@ -226,6 +229,16 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
             AlertType.PerformanceBrief, AlertSeverity.Info, null, "weekly", headline, body)
         {
             // Every week's brief is its own row — an unread one must not swallow the next.
+            Dedup = AlertDedup.SilenceOnly,
+        },
+            ct);
+
+    public Task GenerateFamilyStatementAlertAsync(
+        Guid userId, string headline, string body, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.FamilyStatement, AlertSeverity.Info, null, "monthly", headline, body)
+        {
+            // Every month's statement is its own row — an unread one must not swallow the next.
             Dedup = AlertDedup.SilenceOnly,
         },
             ct);

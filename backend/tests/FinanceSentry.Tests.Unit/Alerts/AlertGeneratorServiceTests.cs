@@ -255,6 +255,38 @@ public class AlertGeneratorServiceTests
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
     }
 
+    [Fact]
+    public async Task GenerateFamilyStatement_NoRecent_AddsInfoAlert()
+    {
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.FamilyStatement, null, "monthly", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateFamilyStatementAlertAsync(
+            _userId, "Family statement — 2026-08: $500 in, $1200 out", "Mom: recv $500, sent $1200\nTotal: $500 in, $1200 out");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.FamilyStatement &&
+            a.Severity == AlertSeverity.Info &&
+            a.UserId == _userId &&
+            a.ReferenceId == null &&
+            a.ReferenceLabel == "monthly" &&
+            a.Title.Contains("Family statement")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateFamilyStatement_WithinTwentySevenDaySilenceWindow_SkipsCreation()
+    {
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.FamilyStatement, null, "monthly", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(true);
+
+        await _service.GenerateFamilyStatementAlertAsync(
+            _userId, "Family statement — 2026-08: $500 in, $1200 out", "Mom: recv $500, sent $1200\nTotal: $500 in, $1200 out");
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
+    }
+
     /// <summary>
     /// A second failure streak for the same job while the first JobFailure alert is still open must
     /// supersede it (resolve the old, insert the new) rather than collide with idx_alert_dedup and

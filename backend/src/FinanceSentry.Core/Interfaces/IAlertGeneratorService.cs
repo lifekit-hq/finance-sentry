@@ -415,6 +415,17 @@ public interface IAlertGeneratorService
         int year,
         int month,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a monthly family-clearing-statement Info alert (434 S5) summarising per-counterparty
+    /// received/sent and rent confirmation for one calendar month. Silenced so the monthly cron
+    /// doesn't repeat on a re-run within the same month.
+    /// </summary>
+    Task GenerateFamilyStatementAlertAsync(
+        Guid userId,
+        string headline,
+        string body,
+        CancellationToken ct = default);
 }
 
 /// <summary>

@@ -29,4 +29,5 @@ public enum CompanionEventKind
     FilingLanded,
     NewsCluster,
     BudgetBreach,
+    FamilyStatement,
 }

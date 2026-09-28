@@ -475,6 +475,10 @@ public class RunThesisMonitorHandlerTests
             decimal projectedMonthEndSpendUsd, int year, int month, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateFamilyStatementAlertAsync(
+            Guid userId, string headline, string body, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task ResolveOpportunityAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 
