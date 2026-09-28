@@ -18,7 +18,7 @@ public sealed class GetNetWorthHistoryTool(
     private readonly ILogger<GetNetWorthHistoryTool> _logger = logger;
 
     [McpServerTool(Name = "get_net_worth_history")]
-    [Description("Returns historical net worth snapshots (banking + brokerage + crypto totals per day), optionally bounded by from/to dates. Defaults to the authenticated MCP identity when userId is omitted. staleSleeves lists any sleeves whose value was carried forward from a prior day because that provider's feed was stale/disconnected/failed — treat a day with staleSleeves as a partially estimated net worth, not real movement.")]
+    [Description("Returns historical net worth snapshots (banking + brokerage + crypto totals per day), optionally bounded by from/to dates. Defaults to the authenticated MCP identity when userId is omitted. staleSleeves lists any sleeves whose value was carried forward from a prior day because that provider's feed was stale/disconnected/failed — treat a day with staleSleeves as a partially estimated net worth, not real movement. isApproximate marks a reconstructed, banking-only day (brokerage/crypto forced to 0, current-not-historical FX rate) rather than a real measured snapshot.")]
     public async Task<IReadOnlyList<NetWorthHistoryEntry>> ExecuteAsync(
         [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Optional inclusive start date (e.g. 2024-01-01).")] DateOnly? fromDate = null,
@@ -50,7 +50,8 @@ public sealed class GetNetWorthHistoryTool(
                 s.CryptoTotal,
                 s.TotalNetWorth,
                 s.Currency,
-                s.StaleSleeves))
+                s.StaleSleeves,
+                s.IsApproximate))
             .ToList();
     }
 }
@@ -62,4 +63,5 @@ public sealed record NetWorthHistoryEntry(
     decimal CryptoTotal,
     decimal TotalNetWorth,
     string Currency,
-    string? StaleSleeves);
+    string? StaleSleeves,
+    bool IsApproximate);
