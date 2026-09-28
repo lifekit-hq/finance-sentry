@@ -20,4 +20,13 @@ public sealed class NetWorthSnapshot
     /// treating carried-forward or $0 sync-failure days as real movement.
     /// </summary>
     public string? StaleSleeves { get; init; }
+
+    /// <summary>
+    /// True for a row reconstructed by the pre-history backfill (banking sleeve only,
+    /// walked backward from transaction deltas) rather than measured by the daily
+    /// snapshot job. Approximate rows use today's FX rate table, not the rate on the
+    /// snapshot date, and carry BrokerageTotal = CryptoTotal = 0 because those sleeves
+    /// cannot be reconstructed from transaction history.
+    /// </summary>
+    public bool IsApproximate { get; init; }
 }

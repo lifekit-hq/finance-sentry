@@ -24,6 +24,7 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options) : DbCont
         e.Property(s => s.Currency).IsRequired().HasMaxLength(3);
         e.Property(s => s.TakenAt).HasDefaultValueSql("now()");
         e.Property(s => s.StaleSleeves).HasColumnName("stale_sleeves").HasMaxLength(64);
+        e.Property(s => s.IsApproximate).HasColumnName("is_approximate").HasDefaultValue(false).IsRequired();
 
         e.HasIndex(s => new { s.UserId, s.SnapshotDate })
             .IsDescending(false, true)

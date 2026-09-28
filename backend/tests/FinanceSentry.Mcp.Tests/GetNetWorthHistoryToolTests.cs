@@ -44,8 +44,8 @@ public sealed class GetNetWorthHistoryToolTests
     [Fact]
     public async Task ExecuteAsync_MapsSnapshots_PreservingOrder()
     {
-        var snap1 = new NetWorthSnapshotDto(new DateOnly(2024, 1, 31), 1000m, 500m, 200m, 1700m, "USD", null);
-        var snap2 = new NetWorthSnapshotDto(new DateOnly(2024, 2, 29), 1100m, 600m, 250m, 1950m, "USD", "brokerage");
+        var snap1 = new NetWorthSnapshotDto(new DateOnly(2024, 1, 31), 1000m, 500m, 200m, 1700m, "USD", null, false);
+        var snap2 = new NetWorthSnapshotDto(new DateOnly(2024, 2, 29), 1100m, 600m, 250m, 1950m, "USD", "brokerage", false);
 
         _handler
             .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))

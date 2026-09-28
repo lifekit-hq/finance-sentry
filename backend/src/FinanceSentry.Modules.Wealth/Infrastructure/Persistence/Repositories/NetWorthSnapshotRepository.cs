@@ -54,4 +54,31 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
 
         return await query.OrderBy(s => s.SnapshotDate).ToListAsync(ct);
     }
+
+    public Task<NetWorthSnapshot?> GetEarliestByUserIdAsync(Guid userId, CancellationToken ct = default)
+        => _db.NetWorthSnapshots
+            .Where(s => s.UserId == userId)
+            .OrderBy(s => s.SnapshotDate)
+            .ThenBy(s => s.TakenAt)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<int> InsertMissingAsync(IReadOnlyCollection<NetWorthSnapshot> snapshots, CancellationToken ct = default)
+    {
+        if (snapshots.Count == 0)
+            return 0;
+
+        var userId = snapshots.First().UserId;
+        var existingDates = await _db.NetWorthSnapshots
+            .Where(s => s.UserId == userId)
+            .Select(s => s.SnapshotDate)
+            .ToHashSetAsync(ct);
+
+        var toInsert = snapshots.Where(s => !existingDates.Contains(s.SnapshotDate)).ToList();
+        if (toInsert.Count == 0)
+            return 0;
+
+        _db.NetWorthSnapshots.AddRange(toInsert);
+        await _db.SaveChangesAsync(ct);
+        return toInsert.Count;
+    }
 }

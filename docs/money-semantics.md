@@ -522,6 +522,21 @@ comparison; the bars are closed periods.
   snapshot date, so a same-day refresh never carries forward from itself.
 - **Backfill** (`NetWorthSnapshotBackfillService`, on boot): fills missed days with
   *current* balances — a downtime gap renders as a flat line, not real history.
+- **Historical reconstruction** (`BackfillNetWorthHistoryCommand`, admin-triggered, one-off):
+  distinct from the boot backfill above — reconstructs banking-only net worth for the gap
+  *before* a user's earliest real snapshot, by walking each active bank account's current
+  balance backward one day at a time through its own synced transactions
+  (`balance_on(d-1) = balance_on(d) - ownEffect(d)`), converting each day's native balance
+  to USD via `CurrencyConverter.ToUsd`'s **current** rate table (§3) — not the historical
+  rate on the reconstructed date. `ownEffect` flips sign for a `credit` (liability) account,
+  since a debit there grows the amount owed instead of shrinking a balance (§2). Every
+  inserted row has `BrokerageTotal = CryptoTotal = 0` (brokerage/crypto leave no ledger to
+  walk) and `IsApproximate = true`, distinguishing it from a real or upserted snapshot. A
+  row is only ever inserted for a date strictly before the earliest real snapshot and into a
+  `(UserId, SnapshotDate)` slot not already occupied (`InsertMissingAsync`) — idempotent,
+  never overwrites an existing row. Each account's reconstructable range is bounded by its
+  own earliest synced transaction, so an account connected partway through the gap
+  contributes only from that date onward.
 
 ## 9. Known approximations (accepted)
 
@@ -533,6 +548,9 @@ comparison; the bars are closed periods.
   authorized with produces a new posted row; the stale pending twin is only retired if
   the amount+description reconciler key still matches.
 - Backfilled snapshot days are not historical truth (§8).
+- Historically reconstructed net worth (`IsApproximate` rows, §8) is banking-only —
+  brokerage and crypto are always $0 on those rows — and uses today's FX rate for every
+  reconstructed day, not the rate on that day.
 - Revolut X fills quoted in a non-USD fiat are converted at the current FX rate, not the
   fill-date rate (§1 "Crypto venues").
 - A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
