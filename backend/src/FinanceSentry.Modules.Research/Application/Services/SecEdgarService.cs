@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using Microsoft.Extensions.Logging;
 
 // Live SEC EDGAR access (data.sec.gov) — filings + XBRL fundamentals. Free and key-less, but SEC

@@ -5,6 +5,7 @@ using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Interfaces;
+using FinanceSentry.Modules.BrokerageSync.Domain.Ports;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
@@ -88,6 +89,8 @@ public static class BrokerageSyncModule
         services.AddScoped<IIbkrFlexTradeSyncService, IbkrFlexTradeSyncService>();
         services.AddSingleton<BrokerageCostBasisReconciler>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
+        // #673: published read port - the Integration adapter reaches tax lots only through it.
+        services.AddScoped<ITaxLotReader, TaxLotReader>();
         // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();

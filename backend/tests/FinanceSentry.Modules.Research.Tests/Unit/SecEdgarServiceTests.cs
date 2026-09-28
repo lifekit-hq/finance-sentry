@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Tests.Unit;
 using System.Net;
 using System.Text;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;

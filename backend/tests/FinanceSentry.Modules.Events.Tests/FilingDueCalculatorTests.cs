@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Events.Tests;
 
 using FinanceSentry.Modules.Events.Domain;
+using FinanceSentry.Modules.Events.Domain.Ports;
 using FluentAssertions;
 using Xunit;
 

@@ -2,17 +2,22 @@ namespace FinanceSentry.Tests.Integration.CrossModulePorts;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Integration;
-using FinanceSentry.Modules.Events.Domain.Exceptions;
+using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
 
-/// <summary>049: the Research-facing adapters translate without filtering by date - that is the handler's job.</summary>
+/// <summary>
+/// 049: the Research-facing adapters translate without filtering by date - that is the handler's job.
+/// #673: each adapter is composed over Research's published read port, so these pin the adapter and
+/// the port impl together against the same Research internals as before.
+/// </summary>
 public sealed class EventsResearchAdapterTests
 {
     private static readonly Guid User = Guid.NewGuid();
@@ -25,7 +30,7 @@ public sealed class EventsResearchAdapterTests
         var theses = new Mock<IThesisRepository>();
         theses.Setup(t => t.ListAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync([live, broken]);
 
-        var rows = await new EventsThesisCatalystAdapter(theses.Object).ListActiveAsync(User);
+        var rows = await new EventsThesisCatalystAdapter(new ActiveThesisCatalystReader(theses.Object)).ListActiveAsync(User);
 
         var row = rows.Should().ContainSingle().Subject;
         row.ThesisId.Should().Be(live.Id);
@@ -44,7 +49,7 @@ public sealed class EventsResearchAdapterTests
                 new EdgarFiling("MU", "10-K", new DateOnly(2025, 10, 10), null, "k", "0001-25-1", "https://sec/2", true),
             ]);
 
-        var rows = await new EventsPeriodicFilingAdapter(edgar.Object).GetRecentAsync("MU");
+        var rows = await new EventsPeriodicFilingAdapter(new EdgarFilingReader(edgar.Object)).GetRecentAsync("MU");
 
         var row = rows.Should().ContainSingle().Subject;
         row.Form.Should().Be("10-Q");
@@ -58,7 +63,7 @@ public sealed class EventsResearchAdapterTests
         edgar.Setup(e => e.GetRecentFilingsAsync("MU", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), true))
             .ThrowsAsync(new EdgarProviderException("EDGAR down"));
 
-        var act = () => new EventsPeriodicFilingAdapter(edgar.Object).GetRecentAsync("MU");
+        var act = () => new EventsPeriodicFilingAdapter(new EdgarFilingReader(edgar.Object)).GetRecentAsync("MU");
 
         await act.Should().ThrowAsync<FilingReadFailedException>();
     }
@@ -72,7 +77,7 @@ public sealed class EventsResearchAdapterTests
             .Callback<GetEarningsCalendarQuery, CancellationToken>((q, _) => captured = q)
             .ReturnsAsync([new EarningsEventDto("MU", "earnings", new DateOnly(2026, 9, 24), true, "yahoo")]);
 
-        var rows = await new EventsCorporateCalendarAdapter(handler.Object)
+        var rows = await new EventsCorporateCalendarAdapter(new EarningsCalendarReader(handler.Object))
             .GetForTickersAsync(["MU"], new DateOnly(2026, 9, 22), new DateOnly(2026, 10, 22));
 
         captured!.Tickers.Should().BeEquivalentTo(["MU"]);
@@ -88,7 +93,7 @@ public sealed class EventsResearchAdapterTests
         handler.Setup(h => h.Handle(It.IsAny<GetEarningsCalendarQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new EarningsCalendarProviderException("yahoo down"));
 
-        var act = () => new EventsCorporateCalendarAdapter(handler.Object)
+        var act = () => new EventsCorporateCalendarAdapter(new EarningsCalendarReader(handler.Object))
             .GetForTickersAsync(["MU"], new DateOnly(2026, 9, 22), new DateOnly(2026, 10, 22));
 
         await act.Should().ThrowAsync<EarningsCalendarProviderException>();
@@ -99,7 +104,7 @@ public sealed class EventsResearchAdapterTests
     {
         var handler = new Mock<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>();
 
-        var rows = await new EventsCorporateCalendarAdapter(handler.Object)
+        var rows = await new EventsCorporateCalendarAdapter(new EarningsCalendarReader(handler.Object))
             .GetForTickersAsync([], new DateOnly(2026, 9, 22), new DateOnly(2026, 10, 22));
 
         rows.Should().BeEmpty();
