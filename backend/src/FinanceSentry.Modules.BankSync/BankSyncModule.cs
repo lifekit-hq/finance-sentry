@@ -105,6 +105,13 @@ public static class BankSyncModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily());
 
+            // First of the month, after the FX refresh and daily sentinels have run, so the
+            // statement's USD totals use that day's rates (#434 S5).
+            mgr.AddOrUpdate<FamilyClearingStatementJob>(
+                "family-clearing-statement",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "0 9 1 * *");
+
             // Startup sweep: any job still "running"/account still "syncing" after a restart was
             // orphaned mid-sync and would otherwise deadlock the scheduler — reap them all first,
             // then (re)schedule the active accounts.
@@ -203,6 +210,7 @@ public static class BankSyncModule
         services.AddScoped<DuplicateChargeDetectionJob>();
         services.AddScoped<CategorySpikeDetectionJob>();
         services.AddScoped<FxSpreadDetectionJob>();
+        services.AddScoped<FamilyClearingStatementJob>();
 
         services.AddSingleton<IFeatureFlagService, FeatureFlagService>();
         services.AddSingleton<IAuditLogService, AuditLogService>();

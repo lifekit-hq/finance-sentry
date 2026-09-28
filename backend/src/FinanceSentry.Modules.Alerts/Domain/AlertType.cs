@@ -27,4 +27,5 @@ public static class AlertType
     public const string FilingLanded = "FilingLanded";
     public const string NewsCluster = "NewsCluster";
     public const string BudgetBreach = "BudgetBreach";
+    public const string FamilyStatement = "FamilyStatement";
 }
