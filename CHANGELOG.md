@@ -5,6 +5,19 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.12.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.11.0...v1.12.0) (2026-09-28)
+
+
+### Features
+
+* **research:** add benchmark-relative thesis invalidation metric ([#729](https://github.com/lifekit-hq/finance-sentry/issues/729)) ([fb4ea04](https://github.com/lifekit-hq/finance-sentry/commit/fb4ea0467c23c6f3704d806c2ed657f388ec9453))
+* **wealth:** backfill approximate net-worth history before first snapshot ([#734](https://github.com/lifekit-hq/finance-sentry/issues/734)) ([d9285e6](https://github.com/lifekit-hq/finance-sentry/commit/d9285e6724905f6d83bde2749bba4623fbfff866))
+
+
+### Bug Fixes
+
+* **risk:** let paper-sleeve promotions skip the real-book cash floor ([#728](https://github.com/lifekit-hq/finance-sentry/issues/728)) ([ef8b715](https://github.com/lifekit-hq/finance-sentry/commit/ef8b7157fe6244e7e06b47c0820b410ceb789714)), closes [#704](https://github.com/lifekit-hq/finance-sentry/issues/704)
+
 ## [1.11.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.10.0...v1.11.0) (2026-09-26)
 
 
