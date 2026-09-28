@@ -64,11 +64,13 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
         var transactions = await _transactionReader.GetTransactionsAsync(
             command.UserId, DateOnly.MinValue, today, cancellationToken);
 
-        var byAccountDay = transactions
+        var settledTransactions = transactions.Where(t => !t.IsPending).ToList();
+
+        var byAccountDay = settledTransactions
             .GroupBy(t => (t.AccountId, Date: DateOnly.FromDateTime(t.EffectiveDate)))
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var earliestTxDateByAccount = transactions
+        var earliestTxDateByAccount = settledTransactions
             .GroupBy(t => t.AccountId)
             .ToDictionary(g => g.Key, g => g.Min(t => DateOnly.FromDateTime(t.EffectiveDate)));
 
