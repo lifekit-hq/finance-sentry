@@ -32,8 +32,7 @@ Not covered by that script, run by hand when the change touches them:
 
 - **Frontend CI** — `npm ci && npm run lint && npm run format:check && npm run build
   && npm run test:ci && npx playwright test` in `frontend/`. Needs
-  `NODE_AUTH_TOKEN` (read:packages) for `@lifekit-hq/*`; without it, follow the
-  tarball route in AGENTS.md. Also needs `libXfixes.so.3` copied to `/tmp`.
+  `NODE_AUTH_TOKEN` (read:packages) for `@lifekit-hq/*` — see `frontend/.npmrc`.
 - **Postgres-backed tests** — CI provides a `postgres:14-alpine` service; locally
   they skip (`[DockerRequiredFact]`, or a connection failure). A skip is not a pass:
   a change to EF mappings or migrations is only proven by the Postgres-backed test,

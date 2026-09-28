@@ -12,53 +12,22 @@ dotnet build FinanceSentry.sln --no-restore -c Release
 dotnet test FinanceSentry.sln --no-build -c Release
 ```
 
-### Frontend Playwright e2e (required when touching app-surface UI)
+### Frontend (lint, build, e2e — required when touching app-surface UI)
 
 ```bash
-# Requires NODE_AUTH_TOKEN (read:packages) for @lifekit-hq/* install and Angular build.
-# Also requires libXfixes.so.3 — see the "Frontend test environment gotcha" section below.
+# @lifekit-hq/* installs from GitHub Packages: export NODE_AUTH_TOKEN=$(gh auth token)
+# (token needs read:packages). See frontend/.npmrc.
 cd frontend
 npm ci
+npm run lint
 npm run build
-LD_LIBRARY_PATH=/tmp:$LD_LIBRARY_PATH npx playwright test --reporter=json
+npx playwright test --reporter=json
 ```
 
-Sandbox shortcut (no NODE_AUTH_TOKEN): build @lifekit-hq/* from lifekit-common source, install
-from tarballs, build the Angular app, then run Playwright. `libXfixes.so.3` is on the system
-at `/usr/lib/aarch64-linux-gnu/libXfixes.so.3` — copy it to `/tmp/` once per session:
-
-```bash
-# One-time per session
-cp /usr/lib/aarch64-linux-gnu/libXfixes.so.3 /tmp/
-
-# Build @lifekit-hq/* from source and install as tarballs (no GitHub Packages auth needed)
-cd /tmp && git clone --depth 1 https://github.com/lifekit-hq/lifekit-common.git
-cd /tmp/lifekit-common && NODE_OPTIONS="--max-old-space-size=2048" npm install --no-fund --no-audit
-npx ng build @lifekit-hq/charts-core @lifekit-hq/core @lifekit-hq/ui
-# Pack each dist and the source-only packages
-cd dist/lifekit-hq/charts-core && npm pack --pack-destination /tmp/
-cd /tmp/lifekit-common/dist/lifekit-hq/core && npm pack --pack-destination /tmp/
-cd /tmp/lifekit-common/dist/lifekit-hq/ui && npm pack --pack-destination /tmp/
-cd /tmp/lifekit-common/projects/tokens && npm pack --pack-destination /tmp/
-cd /tmp/lifekit-common/projects/config && npm pack --pack-destination /tmp/
-
-# Strip @lifekit-hq/charts-core dep from UI package.json (it's inlined in the bundle)
-# then install all tarballs in finance-sentry frontend
-cd /workspace/frontend
-NODE_OPTIONS="--max-old-space-size=2048" npm install \
-  /tmp/lifekit-hq-tokens-*.tgz /tmp/lifekit-hq-core-*.tgz \
-  /tmp/lifekit-hq-charts-core-*.tgz /tmp/lifekit-hq-ui-*.tgz \
-  /tmp/lifekit-hq-config-*.tgz --legacy-peer-deps --prefer-offline
-node scripts/patch-lifekit-ui.js   # npm install does not reliably fire the postinstall
-
-# Build the Angular app, then run Playwright
-NODE_OPTIONS="--max-old-space-size=2048" npx ng build --configuration=production
-mkdir -p playwright-report
-PLAYWRIGHT_JSON_OUTPUT_NAME=/workspace/frontend/playwright-report/results.json \
-PLAYWRIGHT_BROWSERS_PATH=/home/agent/.cache/ms-playwright \
-LD_LIBRARY_PATH=/tmp:$LD_LIBRARY_PATH \
-/workspace/frontend/node_modules/.bin/playwright test --reporter=json
-```
+Commit hook rule: `.husky/pre-commit` (wired by `frontend`'s `prepare` script) runs lint-staged,
+the full frontend lint and the Prettier check only when `frontend/src/**` is staged (about 50 s),
+and never runs `npm ci` — it assumes `frontend/node_modules` exists and is the repo's commit gate,
+not something to bypass.
 
 ## Project layout
 
@@ -130,7 +99,7 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 ## MCP Verification
 
 Verified 2026-09-03 via `dotnet test FinanceSentry.sln --no-build -c Release -m:1` (no filter;
-`-m:1` keeps the run inside a 2-CPU / 4 GB sandbox — the default parallel run gets OOM-killed).
+`-m:1` serialises the test projects — the default parallel run needs more than 4 GB of RAM).
 
 | Project | Passed | Skipped | Failed |
 |---|---|---|---|
@@ -153,29 +122,6 @@ needing a live Postgres or a live external page.
 
 Full tool catalogue (input parameters, return schemas, real/stub): [`docs/mcp.md`](docs/mcp.md).
 Canonical list: `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`.
-
-## Frontend UI primitives — ng-zorro-antd
-
-`ng-zorro-antd` **21.2.2** is a real, installed runtime dependency (`frontend/package.json` line 52; resolved entry in `frontend/package-lock.json`). It serves as the low-level widget primitive layer for `@dsdevq-common/ui` — library components wrap `nz-*` elements rather than building raw HTML widgets from scratch.
-
-**Reference usage:** `SelectComponent` (`frontend/projects/dsdevq-common/ui/src/lib/components/select/select.component.ts`) imports `NzSelectModule` from `ng-zorro-antd/select` and renders `<nz-select>` / `<nz-option>` in its template. This component has a passing Vitest spec that proves the dependency resolves and renders end-to-end in the test environment.
-
-Architecture direction: new `cmn-*` library components that need a complex interactive primitive (date-picker, tree-select, cascader, etc.) should prefer an `nz-*` base over hand-rolling the behaviour. Design token coexistence (`@dsdevq-common/config` Tailwind tokens vs `ng-zorro-antd` CSS vars) is a separate, deferred slice — do not resolve it implicitly when adding new components.
-
-## Frontend test environment gotcha
-
-`libXfixes.so.3` is installed at `/usr/lib/aarch64-linux-gnu/libXfixes.so.3` in the sandbox. Copy
-it to `/tmp/` so Chromium can find it:
-
-```bash
-cp /usr/lib/aarch64-linux-gnu/libXfixes.so.3 /tmp/
-# Then run Playwright with LD_LIBRARY_PATH=/tmp:$LD_LIBRARY_PATH
-```
-
-The husky pre-commit hook runs lint-staged + `npm run lint` + `npm run format:check` — it does
-**not** run `npm ci`, so it passes without `--no-verify` once `frontend/node_modules` exists. It
-fails with `eslint … ENOENT` (not a lint error) when frontend files are staged and
-`frontend/node_modules` is absent.
 
 ## Frontend attribute ordering
 
