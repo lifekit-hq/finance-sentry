@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Application.Services;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using Microsoft.Extensions.Logging;
 
 // Live earnings/ex-dividend fetch from Yahoo Finance's quoteSummary "calendarEvents" module.

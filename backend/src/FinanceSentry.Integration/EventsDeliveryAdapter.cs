@@ -1,47 +1,35 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Modules.Companion.Application.Services;
-using FinanceSentry.Modules.Companion.Domain;
-using FinanceSentry.Modules.Companion.Domain.Repositories;
+using FinanceSentry.Modules.Companion.Domain.Ports;
 using FinanceSentry.Modules.Events.Domain.Ports;
 
 /// <summary>
-/// Feature 049 - <see cref="IEventDeliveryReader"/> over the Companion outbox. An alert's outbox row
-/// is found by the dedup key the capture wrote (<see cref="IMaterialityPolicy.AlertDedupKey"/>), and
-/// the alert id is read back from the same key. Dispositions cross as their enum names.
+/// Feature 049 - <see cref="IEventDeliveryReader"/> over the Companion module's published
+/// <see cref="IOutboxDeliveryReader"/> port (#673). Companion owns the dedup-key lookup and reads
+/// the alert id back from the same key; kinds and dispositions cross as their enum names.
 /// </summary>
-public sealed class EventsDeliveryAdapter(
-    ICompanionEventRepository events,
-    IMaterialityPolicy policy) : IEventDeliveryReader
+public sealed class EventsDeliveryAdapter(IOutboxDeliveryReader outbox) : IEventDeliveryReader
 {
     public async Task<IReadOnlyList<EventDeliveryRecord>> ListForAlertsAsync(
         Guid userId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
     {
-        if (alertIds.Count == 0)
-        {
-            return [];
-        }
-
-        var keys = alertIds.Distinct().Select(policy.AlertDedupKey).ToList();
-        var rows = await events.ListByDedupKeysAsync(userId, keys, ct);
+        var rows = await outbox.ListForAlertsAsync(userId, alertIds, ct);
         return rows.Select(ToRecord).ToList();
     }
 
     public async Task<EventDeliveryRecord?> FindAsync(Guid userId, Guid eventId, CancellationToken ct = default)
     {
-        var evt = await events.GetAsync(eventId, ct);
-        return evt is null || evt.UserId != userId ? null : ToRecord(evt);
+        var row = await outbox.FindAsync(userId, eventId, ct);
+        return row is null ? null : ToRecord(row);
     }
 
     public async Task<IReadOnlyList<EventDeliveryRecord>> ListForDateAsync(
         Guid userId, DateOnly date, CancellationToken ct = default)
     {
-        var from = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var to = from.AddDays(1);
-        var rows = await events.ListByOccurredRangeAsync(userId, from, to, ct);
+        var rows = await outbox.ListForDateAsync(userId, date, ct);
         return rows.Select(ToRecord).ToList();
     }
 
-    private EventDeliveryRecord ToRecord(CompanionEvent e)
-        => new(e.Id, policy.AlertIdFromDedupKey(e.DedupKey), e.Kind.ToString(), e.Subject, e.Disposition.ToString(), e.OccurredAt, e.DispatchedAt, e.DeliveredAt);
+    private static EventDeliveryRecord ToRecord(OutboxDeliveryRecord r)
+        => new(r.EventId, r.AlertId, r.Kind, r.Subject, r.Disposition, r.OccurredAt, r.DispatchedAt, r.DeliveredAt);
 }

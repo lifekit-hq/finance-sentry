@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Alerts;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Alerts.Application.Services;
+using FinanceSentry.Modules.Alerts.Domain.Ports;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using FinanceSentry.Modules.Alerts.Infrastructure.Jobs;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
@@ -40,6 +41,8 @@ public static class AlertsModule
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
         services.AddScoped<IMaterialAlertReader, Infrastructure.Persistence.MaterialAlertReader>();
+        // #673: published read port - the Integration adapter reaches Alerts only through it.
+        services.AddScoped<IAlertsByTypeReader, AlertsByTypeReader>();
         services.AddScoped<AlertPurgeJob>();
         services.AddScoped<AlertExpiryJob>();
         services.TryAddSingleton(TimeProvider.System);

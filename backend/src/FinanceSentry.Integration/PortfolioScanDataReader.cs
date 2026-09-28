@@ -1,27 +1,24 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Domain.Ports;
-using FinanceSentry.Modules.Research.API.Responses;
-using FinanceSentry.Modules.Research.Application.Queries;
-using FinanceSentry.Modules.Research.Domain.Repositories;
-using FinanceSentry.Modules.Risk.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Risk.Domain.Ports;
 
 /// <summary>
 /// Feature 043 — implements the Radar module's <see cref="IPortfolioScanDataReader"/> by
-/// reading the canonical book (IBookFiguresService), allocation drift (GetAllocationDriftQuery),
-/// and risk rules (IRiskRuleSetRepository). Lives in the Integration layer so Modules.Radar
-/// never references Modules.Research or Modules.Risk directly.
+/// reading the canonical book (IBookFiguresService), allocation drift (Research's published
+/// IAllocationDriftReader port), and risk limits (Risk's published IRiskLimitsReader port, #673).
+/// Lives in the Integration layer so Modules.Radar never references Modules.Research or
+/// Modules.Risk directly.
 /// </summary>
 public sealed class PortfolioScanDataReader(
     IBookFiguresService bookFigures,
-    IQueryHandler<GetAllocationDriftQuery, AllocationDriftDto> driftQuery,
-    IRiskRuleSetRepository riskRules,
-    IIpsRepository ipsRepo) : IPortfolioScanDataReader
+    IAllocationDriftReader allocationDrift,
+    IRiskLimitsReader riskLimits) : IPortfolioScanDataReader
 {
     /// <summary>
-    /// Risk rule limits are stored as fractions in (0,1] (<c>SaveRiskRuleSetCommand.ValidateFractionalRange</c>)
+    /// Risk rule limits are stored as fractions in (0,1] (<see cref="RiskLimits"/>)
     /// despite the <c>Pct</c> suffix, while <see cref="PortfolioScanData"/> is contractually percentage
     /// points (0–100). This adapter is the single place the two units meet, so it converts here.
     /// </summary>
@@ -29,17 +26,17 @@ public sealed class PortfolioScanDataReader(
 
     public async Task<IReadOnlyList<Guid>> GetScanUserIdsAsync(CancellationToken ct = default)
     {
-        var withRules = await riskRules.GetUserIdsWithRuleSetsAsync(ct);
-        var withIps = await ipsRepo.GetUserIdsWithCurrentIpsAsync(ct);
+        var withRules = await riskLimits.ListUserIdsWithRuleSetsAsync(ct);
+        var withIps = await allocationDrift.ListUserIdsWithCurrentIpsAsync(ct);
         return withRules.Union(withIps).Distinct().ToList();
     }
 
     public async Task<PortfolioScanData?> ReadAsync(Guid userId, CancellationToken ct = default)
     {
-        // Read book and drift in parallel; risk rules are a cheap single-row read.
+        // Read book and drift in parallel; risk limits are a cheap single-row read.
         var bookTask = bookFigures.ReadAsync(userId, ct);
-        var driftTask = driftQuery.Handle(new GetAllocationDriftQuery(userId), ct);
-        var rulesTask = riskRules.GetCurrentAsync(userId, ct);
+        var driftTask = allocationDrift.GetAsync(userId, ct);
+        var rulesTask = riskLimits.GetCurrentAsync(userId, ct);
 
         await Task.WhenAll(bookTask, driftTask, rulesTask);
 

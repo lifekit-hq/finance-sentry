@@ -4,6 +4,7 @@ using FinanceSentry.Integration;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FluentAssertions;
 using Xunit;
@@ -12,6 +13,7 @@ using Xunit;
 /// 039 (US2/SC-002): the allocation port translates the IPS (single home of target allocation) into
 /// the fraction target + symmetric drift band the Risk drift comparator consumes. A band that was
 /// migrated from the Risk side (encoded as min/max = target ± band) must round-trip exactly.
+/// #673: composed over Research's published <c>IIpsAllocationReader</c> port.
 /// </summary>
 public sealed class IpsAllocationPolicySourceTests
 {
@@ -25,7 +27,7 @@ public sealed class IpsAllocationPolicySourceTests
         targets, RebalancingRule.Default, null, null, 90, [], "annual", null,
         DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
 
-    private static IpsAllocationPolicySource Source(IpsDto? dto) => new(new StubGetIps(dto));
+    private static IpsAllocationPolicySource Source(IpsDto? dto) => new(new IpsAllocationReader(new StubGetIps(dto)));
 
     [Fact]
     public async Task Translates_MigratedMinMaxBand_ToExactFractionTargetAndBand()

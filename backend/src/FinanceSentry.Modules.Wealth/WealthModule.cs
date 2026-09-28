@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Wealth;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Application.Services;
+using FinanceSentry.Modules.Wealth.Domain.Ports;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FinanceSentry.Modules.Wealth.Domain.Services;
 using FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
@@ -50,6 +51,8 @@ public static class WealthModule
                 b => b.MigrationsHistoryTable("__ef_migrations_history_wealth", "public")));
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
+        // #673: published read port - the Integration adapter reaches the snapshots only through it.
+        services.AddScoped<IBrokerageValueHistoryReader, BrokerageValueHistoryReader>();
         services.AddScoped<INetWorthSnapshotService, NetWorthSnapshotService>();
         services.AddScoped<NetWorthSnapshotBackfillService>();
         services.AddScoped<INetWorthSnapshotJobScheduler, NetWorthSnapshotJobScheduler>();

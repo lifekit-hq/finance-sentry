@@ -3,6 +3,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
+using FinanceSentry.Modules.Alerts.Domain.Ports;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence.Repositories;
@@ -14,6 +15,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Ports;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence.Repositories;
@@ -26,6 +28,7 @@ using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
@@ -39,18 +42,22 @@ using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Integration;
+using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Domain;
+using FinanceSentry.Modules.Wealth.Domain.Ports;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FinanceSentry.Modules.Wealth.Infrastructure.Persistence;
 using FinanceSentry.Modules.Wealth.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
+using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Core.Services;
 using FinanceSentry.Modules.Risk.Application.Services;
 using FinanceSentry.Modules.Risk.Domain;
+using FinanceSentry.Modules.Risk.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence.Repositories;
@@ -180,6 +187,21 @@ public sealed class ToolParityTests
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();
         services.AddScoped<ITurnoverTracker, TurnoverTracker>();
         services.Configure<RiskOptions>(_ => { });
+
+        // #673: the owning modules' published read ports the cross-module adapters below reach
+        // through, mirroring each module's registrar (Companion is not part of this graph).
+        services.AddScoped<IRiskLimitsReader, RiskLimitsReader>();
+        services.AddScoped<IIpsAllocationReader, IpsAllocationReader>();
+        services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
+        services.AddScoped<ITrackRecordReader, TrackRecordReader>();
+        services.AddScoped<IActiveThesisCatalystReader, ActiveThesisCatalystReader>();
+        services.AddScoped<IEarningsCalendarReader, EarningsCalendarReader>();
+        services.AddScoped<IEdgarFilingReader, EdgarFilingReader>();
+        services.AddScoped<IMacroCalendarReader, MacroCalendarReader>();
+        services.AddScoped<ISubjectSignalReader, SubjectSignalReader>();
+        services.AddScoped<IAlertsByTypeReader, AlertsByTypeReader>();
+        services.AddScoped<ITaxLotReader, TaxLotReader>();
+        services.AddScoped<IBrokerageValueHistoryReader, BrokerageValueHistoryReader>();
 
         // 039: cross-module read-port adapters (IPS↔Risk) from the shared composition lib, matching the
         // host graph so risk/allocation tools resolve IAllocationPolicySource / IPositionCapSource.

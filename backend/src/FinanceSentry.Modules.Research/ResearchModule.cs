@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -153,6 +154,16 @@ public static class ResearchModule
         services.AddScoped<IWatchlistReader, WatchlistReader>();
         services.AddScoped<IThesisRepository, ThesisRepository>();
         services.AddScoped<IBrokenThesisReader, BrokenThesisReader>();
+
+        // #673: published read ports - the Integration adapters reach Research only through these.
+        services.AddScoped<IEarningsCalendarReader, EarningsCalendarReader>();
+        services.AddScoped<IMacroCalendarReader, MacroCalendarReader>();
+        services.AddScoped<IEdgarFilingReader, EdgarFilingReader>();
+        services.AddScoped<IActiveThesisCatalystReader, ActiveThesisCatalystReader>();
+        services.AddScoped<IIpsAllocationReader, IpsAllocationReader>();
+        services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
+        services.AddScoped<ITrackRecordReader, TrackRecordReader>();
+
         services.AddScoped<IQuoteCacheRepository, QuoteCacheRepository>();
         services.AddScoped<INewsRepository, NewsRepository>();
         services.AddScoped<IMacroCalendarRepository, MacroCalendarRepository>();

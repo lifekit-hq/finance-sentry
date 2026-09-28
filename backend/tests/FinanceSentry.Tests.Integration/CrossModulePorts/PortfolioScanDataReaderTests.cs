@@ -5,8 +5,10 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Integration;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Risk.Application.Services;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using FluentAssertions;
@@ -17,6 +19,7 @@ using Xunit;
 /// fraction in (0,1]) meets <c>PortfolioScanData</c> (contractually percentage points, 0–100).
 /// Passing the fraction through made every cash-buffer check pass and every concentration check
 /// fail, so the weekly brief printed an action line with no breach behind it.
+/// #673: composed over Research's <c>IAllocationDriftReader</c> and Risk's <c>IRiskLimitsReader</c> ports.
 /// </summary>
 public sealed class PortfolioScanDataReaderTests
 {
@@ -77,16 +80,17 @@ public sealed class PortfolioScanDataReaderTests
                 Positions: [new BookFigurePosition("NVDA", "Equity", 100m, null, 30_000m, "IBKR")],
                 IsStale: false,
                 StaleSources: [])),
-            new StubDrift(new AllocationDriftDto(
-                HasIps: false,
-                TotalValueUsd: 100_000m,
-                CashUsd: 2_000m,
-                InvestedValueUsd: 98_000m,
-                NeedsRebalance: false,
-                Sleeves: [],
-                RebalancingCadence: "Quarterly")),
-            new StubRiskRules(rules),
-            new StubIps());
+            new AllocationDriftReader(
+                new StubDrift(new AllocationDriftDto(
+                    HasIps: false,
+                    TotalValueUsd: 100_000m,
+                    CashUsd: 2_000m,
+                    InvestedValueUsd: 98_000m,
+                    NeedsRebalance: false,
+                    Sleeves: [],
+                    RebalancingCadence: "Quarterly")),
+                new StubIps()),
+            new RiskLimitsReader(new StubRiskRules(rules)));
 
     [Fact]
     public async Task ConvertsRiskRuleFractionsToPercentagePoints()

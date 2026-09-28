@@ -145,47 +145,11 @@ public class NamespaceBoundaryTests
 
     // ---- Rule 3: Integration reaches other modules only through their Domain.Ports namespace ----
     //
-    // Reality check (see the PR body): most of today's adapters in FinanceSentry.Integration also
-    // reach a module's Application query handlers, API response DTOs, or Domain.Repositories —
-    // not just its Domain.Ports interfaces. Narrowing every one of those to a dedicated port is
-    // real module restructuring, explicitly out of scope here. The rule stays at its intended
-    // strength (Domain.Ports only) with one named exception per adapter class and a single
-    // follow-up issue (finance-sentry#673) to burn the list down, rather than being loosened to
-    // match what exists.
-    private static readonly (string Type, string Reason)[] IntegrationPortPinningExceptions =
-    [
-        ("FinanceSentry.Integration.AssetSignalAdapter",
-            "reads Radar's query handler and a Radar Domain.MarketStructure type directly; no " +
-            "Domain.Ports read surface exists yet for asset-signal reads."),
-        ("FinanceSentry.Integration.EventsCorporateCalendarAdapter",
-            "reads Research's query handler and API response DTOs directly instead of a port."),
-        ("FinanceSentry.Integration.EventsDeliveryAdapter",
-            "reads Companion's Application service and Domain/Domain.Repositories types directly " +
-            "instead of a port."),
-        ("FinanceSentry.Integration.EventsFiredAlertAdapter",
-            "reads Alerts' query handler directly instead of a port."),
-        ("FinanceSentry.Integration.EventsMacroEventAdapter",
-            "depends on Research's concrete Application service interface instead of a port."),
-        ("FinanceSentry.Integration.EventsPeriodicFilingAdapter",
-            "depends on Research's concrete Application service interface, and on a domain helper " +
-            "type from Events' own Domain root, instead of a port."),
-        ("FinanceSentry.Integration.EventsThesisCatalystAdapter",
-            "depends on Research's Domain.Repositories interface directly instead of a port."),
-        ("FinanceSentry.Integration.HoldingTaxLotsAdapter",
-            "reads BrokerageSync's query handler directly instead of a port."),
-        ("FinanceSentry.Integration.IpsAllocationPolicySource",
-            "reads Research's query handler and API response DTOs directly instead of a port."),
-        ("FinanceSentry.Integration.PortfolioScanDataReader",
-            "reads Research's and Risk's query handlers, API response DTOs, and Domain.Repositories " +
-            "interfaces directly instead of a port."),
-        ("FinanceSentry.Integration.RadarPortfolioValueSource",
-            "depends on Wealth's Domain.Repositories interface directly instead of a port."),
-        ("FinanceSentry.Integration.ResearchTrackRecordSource",
-            "reads Research's query handler and API response DTOs directly instead of a port."),
-        ("FinanceSentry.Integration.RiskPositionCapSource",
-            "reads Risk's query handler directly instead of a port."),
-    ];
-
+    // finance-sentry#673 burned the original named-exception list down to zero: every adapter now
+    // depends on a narrow read port the owning module publishes in its Domain.Ports namespace
+    // (implemented inside that module over its own query handlers / repositories), so the rule
+    // holds with no carve-outs. A new "reach past the port" dependency fails here; the fix is a
+    // port, not an exception.
     [Fact]
     public void Integration_ReachesModulesOnlyThroughDomainPorts()
     {
@@ -196,53 +160,48 @@ public class NamespaceBoundaryTests
         foreach (var moduleName in moduleNames)
         {
             var moduleNamespace = $"{ModulePrefix}{moduleName}";
-            var portsNamespace = $"{moduleNamespace}.Domain.Ports";
-            var moduleAssembly = LoadAssembly(moduleNamespace);
+            var domainNamespace = $"{moduleNamespace}.Domain";
+            var portsNamespace = $"{domainNamespace}.Ports";
+            var moduleTypes = LoadAssembly(moduleNamespace).GetTypes();
 
             // Every distinct namespace the module actually has types in, minus the allowed
             // Domain.Ports subtree, minus the module's own bare root and bare Domain root (both
             // are namespace-tree ancestors of Domain.Ports and would shadow it as a false match
             // if included — see NetArchTest's prefix-matching namespace tree).
-            var moduleNonPortsNamespaces = moduleAssembly.GetTypes()
+            var moduleNonPortsNamespaces = moduleTypes
                 .Select(t => t.Namespace)
                 .Where(ns => ns is not null && (ns == moduleNamespace || ns.StartsWith(moduleNamespace + ".", StringComparison.Ordinal)))
                 .Distinct()
                 .Where(ns => ns != moduleNamespace
-                    && ns != $"{moduleNamespace}.Domain"
+                    && ns != domainNamespace
                     && ns != portsNamespace
                     && !ns!.StartsWith(portsNamespace + ".", StringComparison.Ordinal));
 
             disallowed.AddRange(moduleNonPortsNamespaces!);
+
+            // The two excluded ancestors still hold real types (the module's DI entry point, pure
+            // Domain helpers and records). Name those types individually so the exclusion above
+            // cannot hide a dependency on them.
+            var bareRootTypes = moduleTypes
+                .Where(t => (t.Namespace == moduleNamespace || t.Namespace == domainNamespace)
+                    && !t.IsNested
+                    && !t.Name.Contains('<', StringComparison.Ordinal))
+                .Select(t => t.FullName!);
+
+            disallowed.AddRange(bareRootTypes);
         }
 
         var integrationAssembly = LoadAssembly("FinanceSentry.Integration");
-        var exceptions = IntegrationPortPinningExceptions.ToDictionary(e => e.Type, e => e.Reason);
-        var seenExceptions = new HashSet<string>();
-
-        var violations = new List<string>();
-        var flagged = Types.InAssembly(integrationAssembly)
+        var violations = Types.InAssembly(integrationAssembly)
             .That().HaveDependencyOnAny(disallowed.ToArray())
-            .GetTypes();
-
-        foreach (var type in flagged)
-        {
-            if (exceptions.ContainsKey(type.FullName!))
-            {
-                seenExceptions.Add(type.FullName!);
-                continue;
-            }
-
-            violations.Add(type.FullName!);
-        }
+            .GetTypes()
+            .Select(t => t.FullName!)
+            .ToList();
 
         violations.Should().BeEmpty(
             "Integration should reach another module only through its Domain.Ports read-port interfaces, " +
-            "the seam the 039 pattern was built around; add a named exception with a reason if this is a " +
-            "deliberate, tracked carve-out: {0}", string.Join(", ", violations));
-
-        exceptions.Keys.Except(seenExceptions).Should().BeEmpty(
-            "these named exceptions no longer have a matching violation — the underlying code moved, so the " +
-            "exception is stale and should be deleted: {0}", string.Join(", ", exceptions.Keys.Except(seenExceptions)));
+            "the seam the 039 pattern was built around; publish a narrow read port in the owning module's " +
+            "Domain.Ports namespace instead of reaching past it: {0}", string.Join(", ", violations));
     }
 
     private static string[] ModuleNames()

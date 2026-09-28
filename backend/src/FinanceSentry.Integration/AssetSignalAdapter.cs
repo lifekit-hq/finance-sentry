@@ -1,17 +1,14 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Modules.Radar.Application.Queries;
-using FinanceSentry.Modules.Radar.Domain.MarketStructure;
+using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Ports;
 
 /// <summary>
-/// Feature 421 — implements <see cref="IAssetSignalReader"/> by delegating to the Radar module's
-/// <see cref="ListSignalsQuery"/>. Lives in Integration so Modules.Research never references
-/// Modules.Radar directly.
+/// Feature 421 - implements <see cref="IAssetSignalReader"/> over the Radar module's published
+/// <see cref="ISubjectSignalReader"/> port (#673). Lives in Integration so Modules.Research never
+/// references Modules.Radar directly.
 /// </summary>
-public sealed class AssetSignalAdapter(
-    IQueryHandler<ListSignalsQuery, IReadOnlyList<RadarSignalDto>> listSignals) : IAssetSignalReader
+public sealed class AssetSignalAdapter(ISubjectSignalReader signals) : IAssetSignalReader
 {
     private static readonly int LookbackDays = 30;
 
@@ -20,11 +17,9 @@ public sealed class AssetSignalAdapter(
     {
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-LookbackDays));
 
-        var signals = await listSignals.Handle(
-            new ListSignalsQuery(since, null, null, symbol, null),
-            ct);
+        var recent = await signals.ListSinceAsync(symbol, since, ct);
 
-        return signals
+        return recent
             .OrderByDescending(s => s.Timestamp)
             .Take(limit)
             .Select(s => new DossierSignalItem(

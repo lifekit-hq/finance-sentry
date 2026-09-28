@@ -12,6 +12,7 @@ using Xunit;
 /// <summary>
 /// 049: the delivery port finds an alert's outbox row by the dedup key capture wrote, reads the alert
 /// id back from it, and never returns another user's row.
+/// #673: the adapter is composed over Companion's published <c>IOutboxDeliveryReader</c> port.
 /// </summary>
 public sealed class EventsDeliveryAdapterTests : IDisposable
 {
@@ -24,7 +25,7 @@ public sealed class EventsDeliveryAdapterTests : IDisposable
     {
         _db = new CompanionDbContext(new DbContextOptionsBuilder<CompanionDbContext>()
             .UseInMemoryDatabase($"companion-{Guid.NewGuid():N}").Options);
-        _adapter = new EventsDeliveryAdapter(new CompanionEventRepository(_db), _policy);
+        _adapter = new EventsDeliveryAdapter(new OutboxDeliveryReader(new CompanionEventRepository(_db), _policy));
     }
 
     private async Task<CompanionEvent> Captured(Guid userId, Guid alertId, EventDisposition disposition, string? dedupKey = null)

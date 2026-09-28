@@ -1,17 +1,15 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Radar.Domain.Ports;
-using FinanceSentry.Modules.Research.API.Responses;
-using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Domain.Ports;
 
 /// <summary>
 /// Feature 414 (US4) — implements the Radar module's <see cref="ITrackRecordSource"/> by reading
-/// Research's <see cref="GetTrackRecordQuery"/>. Lives in the Integration layer so Modules.Radar
+/// Research's published <see cref="ITrackRecordReader"/> port (#673). Lives in the Integration layer so Modules.Radar
 /// never references Modules.Research directly (the 039/043 port precedent).
 /// </summary>
 public sealed class ResearchTrackRecordSource(
-    IQueryHandler<GetTrackRecordQuery, TrackRecordSummaryDto> trackRecord) : ITrackRecordSource
+    ITrackRecordReader trackRecord) : ITrackRecordSource
 {
     private const string StatusActive = "Active";
     private const string StatusBroken = "Broken";
@@ -19,7 +17,7 @@ public sealed class ResearchTrackRecordSource(
 
     public async Task<TrackRecordDelta?> GetDeltaAsync(Guid userId, CancellationToken ct = default)
     {
-        var summary = await trackRecord.Handle(new GetTrackRecordQuery(userId, Source: null, Status: null), ct);
+        var summary = await trackRecord.GetAsync(userId, ct);
 
         // Terminal records are the honest scorecard; fall back to open ones only when nothing has
         // closed yet. The two are never averaged together (feature 020 R4).
@@ -48,7 +46,7 @@ public sealed class ResearchTrackRecordSource(
     }
 
     /// <summary>Count-weighted mean across status slices — the top-level average blends terminal with active.</summary>
-    private static decimal? WeightedAverageExcess(TrackRecordSummaryDto summary, string[] statuses)
+    private static decimal? WeightedAverageExcess(TrackRecordReading summary, string[] statuses)
     {
         var weighted = 0m;
         var total = 0;
@@ -68,7 +66,7 @@ public sealed class ResearchTrackRecordSource(
         return total > 0 ? weighted / total : null;
     }
 
-    private static TrackRecordSliceDto? Slice(TrackRecordSummaryDto summary, string status)
+    private static TrackRecordSliceReading? Slice(TrackRecordReading summary, string status)
         => summary.ByStatus.GetValueOrDefault(status);
 
     private static decimal? Rounded(decimal? value)

@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Risk;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Risk.Application.Services;
+using FinanceSentry.Modules.Risk.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using FinanceSentry.Modules.Risk.Infrastructure.Jobs;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
@@ -44,6 +45,8 @@ public static class RiskModule
                 b => b.MigrationsHistoryTable("__ef_migrations_history_risk", "public")));
 
         services.AddScoped<IRiskRuleSetRepository, RiskRuleSetRepository>();
+        // #673: published read port - the Integration adapters reach the rule set only through it.
+        services.AddScoped<IRiskLimitsReader, RiskLimitsReader>();
         services.AddScoped<IPolicyViolationAckRepository, PolicyViolationAckRepository>();
         services.AddScoped<IHoldingSnapshotRepository, HoldingSnapshotRepository>();
 

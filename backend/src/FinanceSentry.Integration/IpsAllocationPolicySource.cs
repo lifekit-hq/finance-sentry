@@ -1,18 +1,16 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Core.Cqrs;
-using FinanceSentry.Modules.Research.API.Responses;
-using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Ports;
 
 /// <summary>
-/// 039: implements the Risk module's <see cref="IAllocationPolicySource"/> by reading the IPS — the
-/// single home of target allocation — through Research's <see cref="GetIpsQuery"/>. Translates the
-/// IPS whole-percent target plus min/max band (or the RebalancingRule 5/25 default) into the
-/// fraction target + symmetric drift band the Risk drift comparator consumes. Lives in the host so
-/// neither module references the other.
+/// 039: implements the Risk module's <see cref="IAllocationPolicySource"/> by reading the IPS - the
+/// single home of target allocation - through Research's published <see cref="IIpsAllocationReader"/>
+/// port (#673). Translates the IPS whole-percent target plus min/max band (or the RebalancingRule
+/// 5/25 default) into the fraction target + symmetric drift band the Risk drift comparator
+/// consumes. Lives in the host so neither module references the other.
 /// </summary>
-public sealed class IpsAllocationPolicySource(IQueryHandler<GetIpsQuery, IpsDto?> getIps)
+public sealed class IpsAllocationPolicySource(IIpsAllocationReader ipsAllocation)
     : IAllocationPolicySource
 {
     private const decimal PercentToFraction = 100m;
@@ -22,15 +20,14 @@ public sealed class IpsAllocationPolicySource(IQueryHandler<GetIpsQuery, IpsDto?
     public async Task<IReadOnlyList<AllocationDriftTarget>> GetAllocationTargetsAsync(
         Guid userId, CancellationToken ct)
     {
-        var ips = await getIps.Handle(new GetIpsQuery(userId), ct);
-        if (ips is null || ips.AllocationTargets.Count == 0)
+        var ips = await ipsAllocation.GetCurrentAsync(userId, ct);
+        if (ips is null || ips.Sleeves.Count == 0)
         {
             return [];
         }
 
-        var rule = ips.RebalancingRule;
-        var result = new List<AllocationDriftTarget>(ips.AllocationTargets.Count);
-        foreach (var target in ips.AllocationTargets)
+        var result = new List<AllocationDriftTarget>(ips.Sleeves.Count);
+        foreach (var target in ips.Sleeves)
         {
             var targetFraction = target.TargetPct / PercentToFraction;
 
@@ -46,7 +43,7 @@ public sealed class IpsAllocationPolicySource(IQueryHandler<GetIpsQuery, IpsDto?
             else
             {
                 var bandPercent = Math.Max(
-                    rule.AbsoluteBandPct, target.TargetPct * rule.RelativeBandPct / RelativeBandDivisor);
+                    ips.AbsoluteBandPct, target.TargetPct * ips.RelativeBandPct / RelativeBandDivisor);
                 bandFraction = bandPercent / PercentToFraction;
             }
 

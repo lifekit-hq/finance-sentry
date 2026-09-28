@@ -4,6 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Integration;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Application.Services;
 using FluentAssertions;
 using Xunit;
 
@@ -11,6 +12,7 @@ using Xunit;
 /// 414 (US4): the track-record port feeds the weekly brief. It must never blend terminal and
 /// active records (feature 020 R4) — the top-level average in the summary DTO does exactly that,
 /// so the adapter derives the number from the per-status slices instead.
+/// #673: composed over Research's published <c>ITrackRecordReader</c> port.
 /// </summary>
 public sealed class ResearchTrackRecordSourceTests
 {
@@ -48,7 +50,7 @@ public sealed class ResearchTrackRecordSourceTests
             },
             LowSampleCaveat: lowSample);
 
-    private static ResearchTrackRecordSource Source(TrackRecordSummaryDto dto) => new(new StubTrackRecord(dto));
+    private static ResearchTrackRecordSource Source(TrackRecordSummaryDto dto) => new(new TrackRecordReader(new StubTrackRecord(dto)));
 
     [Fact]
     public async Task ReportsTerminalRecords_WeightingClosedAndBrokenByCount()

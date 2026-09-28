@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Radar;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Services;
+using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using FinanceSentry.Modules.Radar.Infrastructure.Jobs;
 using FinanceSentry.Modules.Radar.Infrastructure.MarketData;
@@ -83,6 +84,8 @@ public static class RadarModule
         services.AddScoped<IStructureQueryService, StructureQueryService>();
         services.AddScoped<IRadarSignalWriter, RadarSignalWriter>();
         services.AddScoped<IRadarSignalReader, RadarSignalReader>();
+        // #673: published read port - the Integration adapter reaches Radar signals only through it.
+        services.AddScoped<ISubjectSignalReader, SubjectSignalReader>();
         services.AddScoped<IMarketStructureReader, MarketStructureReader>();
 
         services.AddScoped<IBookPerformanceService, BookPerformanceService>();

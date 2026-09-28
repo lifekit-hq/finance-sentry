@@ -1,7 +1,6 @@
 namespace FinanceSentry.Modules.Events.Domain;
 
-/// <summary>A periodic SEC filing (10-K or 10-Q) with the period it covers.</summary>
-public sealed record PeriodicFiling(string Form, DateOnly FilingDate, DateOnly ReportDate);
+using FinanceSentry.Modules.Events.Domain.Ports;
 
 /// <summary>The next periodic filing a ticker owes: its form, the period it will cover, when it is due.</summary>
 public sealed record FilingDue(string Form, DateOnly PeriodEnd, DateOnly DueDate);
@@ -18,8 +17,8 @@ public sealed record FilingDue(string Form, DateOnly PeriodEnd, DateOnly DueDate
 /// </summary>
 public static class FilingDueCalculator
 {
-    public const string AnnualForm = "10-K";
-    public const string QuarterlyForm = "10-Q";
+    public const string AnnualForm = PeriodicFilingForms.Annual;
+    public const string QuarterlyForm = PeriodicFilingForms.Quarterly;
     public const int AnnualDeadlineDays = 60;
     public const int QuarterlyDeadlineDays = 40;
     private const int MonthsPerQuarter = 3;

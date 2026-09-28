@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
+using FinanceSentry.Modules.Companion.Domain.Ports;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
@@ -55,6 +56,8 @@ public static class CompanionModule
 
         services.AddSingleton<IMaterialityPolicy, MaterialityPolicy>();
         services.AddScoped<ICompanionEventCapture, CompanionEventCapture>();
+        // #673: published read port - the Integration adapter reaches the outbox only through it.
+        services.AddScoped<IOutboxDeliveryReader, OutboxDeliveryReader>();
         services.AddScoped<IAgentWakeDispatcher, WebhookAgentWakeDispatcher>();
 
         services.AddHttpClient(WebhookAgentWakeDispatcher.HttpClientName, client =>
