@@ -13,6 +13,10 @@ on:
   # Dispatched by weekly-release.yml against the release-please branch (see backend-ci.yml).
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint-build-test:
     runs-on: ubuntu-latest
@@ -62,9 +66,11 @@ jobs:
       # mkdir first: the redirect target's directory is gitignored, so it does
       # not exist in a fresh checkout and the redirect fails before Playwright
       # even starts.
+      env:
+        PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
       run: |
         mkdir -p playwright-report
-        npx playwright test --reporter=json > playwright-report/results.json
+        npx playwright test --reporter=list,json
       working-directory: frontend
 
     - name: Upload Playwright report

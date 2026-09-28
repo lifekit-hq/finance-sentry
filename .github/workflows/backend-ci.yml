@@ -15,6 +15,10 @@ on:
   # GITHUB_TOKEN, which fires no workflows, so the required checks must be run explicitly.
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -69,8 +73,8 @@ jobs:
     # that lifts the number. Constitution §II's 80% stays the destination.
     - name: Enforce coverage ratchet floor
       run: |
-        dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.* 2>/dev/null || true
-        ~/.dotnet/tools/reportgenerator \
+        dotnet tool restore
+        dotnet reportgenerator \
           -reports:"TestResults/**/coverage.opencover.xml" \
           -targetdir:"TestResults/CoverageReport" \
           -reporttypes:"TextSummary;Cobertura" \

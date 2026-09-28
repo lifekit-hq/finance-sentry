@@ -14,6 +14,10 @@ on:
   # Dispatched by weekly-release.yml against the release-please branch (see backend-ci.yml).
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-backend-image:
     runs-on: ubuntu-latest
@@ -33,7 +37,7 @@ jobs:
         push: false
         tags: finance-sentry-api:latest
         cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
         outputs: type=docker,dest=/tmp/image.tar
 
     - name: Load image for testing
@@ -55,8 +59,7 @@ jobs:
 
     - name: Test health endpoint
       run: |
-        docker run -d --name finance-sentry-test -p 8080:8080 finance-sentry-api:latest
+        docker run -d --name finance-sentry-test -p 5000:5000 finance-sentry-api:latest
         sleep 5
-        curl -f http://localhost:8080/api/v1/health || exit 1
+        curl -f http://localhost:5000/api/v1/health || exit 1
         docker stop finance-sentry-test
-      continue-on-error: true
