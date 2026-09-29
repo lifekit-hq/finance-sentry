@@ -23,7 +23,7 @@
 2. Common causes:
    - DB connection pool exhausted: increase `Max Pool Size` in connection string.
    - Provider API down: check TrueLayer / Monobank status pages. Affected syncs will fail until resolved.
-   - Memory pressure: restart the API container (`docker-compose restart api`).
+   - Memory pressure: restart the API container (`docker-compose restart api`). Prod containers carry `mem_limit` caps (values and 7-day-peak rationale live beside each service in `docker/docker-compose.prod.yml`); a container that keeps restarting with `OOMKilled=true` (`docker inspect <name> --format '{{.State.OOMKilled}}'`) has hit its cap — raise the cap there rather than restarting repeatedly.
 3. If DB migration pending: run `dotnet ef database update`.
 
 ## 3. Slow Queries (> 100ms)
