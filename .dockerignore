@@ -14,8 +14,8 @@ coverage
 .nyc_output
 dist
 build
-bin
-obj
+**/bin
+**/obj
 __pycache__
 .pytest_cache
 .venv

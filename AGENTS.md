@@ -95,6 +95,9 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 - In-memory DB per test class: each `WebApplicationFactory` subclass uses a unique GUID database name to avoid cross-test state bleed.
 - `MockBehavior.Loose` is used in factory mocks; setup only what the specific test path needs.
 - `[Trait("Category","Integration")]` is the convention for skipping DB-live tests — don't change it.
+- `.dockerignore`'s bare `bin`/`obj` patterns do NOT exclude nested `backend/**/bin`/`backend/**/obj` in this BuildKit version (needs `**/bin`/`**/obj`). Only bites local `docker build` from a dirty worktree — CI always builds from a fresh checkout — but a stray local `obj/` can get copied over a freshly-restored one and produce a confusing NETSDK1064 "package not found" error that has nothing to do with the actual restore.
+- `docker/Dockerfile`'s restore stage sets `ENV NUGET_PACKAGES=/src/.nuget/packages` and restores straight into the build layer instead of a `--mount=type=cache` — a cache mount's contents aren't guaranteed to persist across the image's later `RUN` steps under BuildKit GC/concurrent-build pressure, which was silently dropping packages between restore and publish.
+- `dotnet tool restore` (used for `reportgenerator` in Backend CI) needs its manifest at `.config/dotnet-tools.json` at the **repo root**, not under `backend/` — CI steps run from repo root and `dotnet tool restore` only walks up from CWD.
 
 ## MCP Verification
 

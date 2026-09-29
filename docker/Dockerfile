@@ -6,22 +6,29 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
+# Restore into the layer filesystem (not a cache mount): a cache mount's contents are
+# non-persistent under BuildKit GC/concurrent-build pressure, so a later RUN (publish)
+# reading packages restored by an earlier RUN can find them missing (MSB3030/NETSDK1152).
+ENV NUGET_PACKAGES=/src/.nuget/packages
+
+COPY backend/*.sln backend/Directory.*.props backend/
+COPY --parents backend/**/*.csproj ./
+
+WORKDIR /src/backend
+RUN dotnet restore FinanceSentry.sln
+
+WORKDIR /src
 COPY backend/ backend/
 # 040: the versioned Ledger persona lives at the repo root (outside backend/); the API project links
 # these files into its publish output so PersonaComposer can compose the system prompt at runtime.
 COPY agent/ agent/
 
 WORKDIR /src/backend
-RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
-    dotnet restore FinanceSentry.sln
+RUN dotnet build FinanceSentry.sln -c Release --no-restore
 
-RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
-    dotnet build FinanceSentry.sln -c Release
-
-RUN dotnet test tests/FinanceSentry.Tests.Unit/FinanceSentry.Tests.Unit.csproj -c Release --no-build --nologo --verbosity minimal
-
-RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
-    dotnet publish src/FinanceSentry.API/FinanceSentry.API.csproj -c Release -o /app/publish --no-build
+# Backend CI already runs the unit tests with coverage; running them again here just
+# duplicates the run and lets test flakiness fail the image build too.
+RUN dotnet publish src/FinanceSentry.API/FinanceSentry.API.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime

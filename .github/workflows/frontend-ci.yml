@@ -13,6 +13,10 @@ on:
   # Dispatched by weekly-release.yml against the release-please branch (see backend-ci.yml).
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint-build-test:
     runs-on: ubuntu-latest
@@ -54,7 +58,10 @@ jobs:
     # Coverage thresholds live in angular.json (test → configurations → ci) as ratchet
     # floors set just under measured coverage — raise them as coverage grows.
     # Constitution §II's ≥80% target is not yet met by the app project (41% today).
+    # Fail-fast backstop: the browser-mode runner can deadlock or get OOM-killed
+    # (exit 137); a healthy run finishes in well under a minute.
     - name: Run unit tests with coverage gate
+      timeout-minutes: 10
       run: npm run test:ci
       working-directory: frontend
 
@@ -62,9 +69,11 @@ jobs:
       # mkdir first: the redirect target's directory is gitignored, so it does
       # not exist in a fresh checkout and the redirect fails before Playwright
       # even starts.
+      env:
+        PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
       run: |
         mkdir -p playwright-report
-        npx playwright test --reporter=json > playwright-report/results.json
+        npx playwright test --reporter=list,json
       working-directory: frontend
 
     - name: Upload Playwright report
