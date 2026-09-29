@@ -121,6 +121,7 @@
             "ci": {
               "watch": false,
               "headless": true,
+              "runnerConfig": "vitest.config.ts",
               "coverage": true,
               "coverageThresholds": {
                 "statements": 38,

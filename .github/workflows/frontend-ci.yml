@@ -58,7 +58,10 @@ jobs:
     # Coverage thresholds live in angular.json (test → configurations → ci) as ratchet
     # floors set just under measured coverage — raise them as coverage grows.
     # Constitution §II's ≥80% target is not yet met by the app project (41% today).
+    # Fail-fast backstop: the browser-mode runner can deadlock or get OOM-killed
+    # (exit 137); a healthy run finishes in well under a minute.
     - name: Run unit tests with coverage gate
+      timeout-minutes: 10
       run: npm run test:ci
       working-directory: frontend
 
