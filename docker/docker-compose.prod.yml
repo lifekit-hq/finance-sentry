@@ -22,6 +22,7 @@ services:
     image: finance-sentry/api:local
     container_name: finance-sentry-api
     restart: unless-stopped
+    mem_limit: 1g           # 1.3 budget: 7-day peak 616 MiB
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "5000"
@@ -126,6 +127,7 @@ services:
     image: finance-sentry/mcp:local
     container_name: finance-sentry-mcp
     restart: unless-stopped
+    mem_limit: 384m         # 1.3 budget: 7-day peak 208 MiB
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "5100"
@@ -164,6 +166,7 @@ services:
     image: finance-sentry/frontend:local
     container_name: finance-sentry-frontend
     restart: unless-stopped
+    mem_limit: 64m          # 1.3 budget: 7-day peak 13 MiB
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "4200"
@@ -205,6 +208,7 @@ services:
     image: finance-sentry/gateway:local
     container_name: finance-sentry-gateway
     restart: unless-stopped
+    mem_limit: 192m         # 1.3 budget: 7-day peak 89 MiB
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "8080"
@@ -246,6 +250,7 @@ services:
     image: postgres:14-alpine
     container_name: finance-sentry-postgres
     restart: unless-stopped
+    mem_limit: 512m         # 1.3 budget: 7-day peak 287 MiB
     labels:
       lifekit.contract: "none"   # datastore, not a product
     environment:
