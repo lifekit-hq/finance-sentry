@@ -5,6 +5,20 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.13.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.12.0...v1.13.0) (2026-09-29)
+
+
+### Features
+
+* **banksync:** monthly family clearing statement job and Telegram delivery ([#735](https://github.com/lifekit-hq/finance-sentry/issues/735)) ([b84da85](https://github.com/lifekit-hq/finance-sentry/commit/b84da85ff1bc86dc25ab3f0ce8ab3745bc0a868a))
+* **docker:** add memory caps to every prod compose service ([#741](https://github.com/lifekit-hq/finance-sentry/issues/741)) ([a47a0f2](https://github.com/lifekit-hq/finance-sentry/commit/a47a0f284e3a650b0fc2385e4d2a59dd45ee65a9))
+
+
+### Refactoring
+
+* **docker:** move finance-sentry to lifekit-shared network ([#742](https://github.com/lifekit-hq/finance-sentry/issues/742)) ([3353bc6](https://github.com/lifekit-hq/finance-sentry/commit/3353bc6d9c0e772be8b2c6871667bdf93440e2e8))
+* **integration:** narrow cross-module adapters to Domain.Ports read ports ([#673](https://github.com/lifekit-hq/finance-sentry/issues/673)) ([#737](https://github.com/lifekit-hq/finance-sentry/issues/737)) ([ba04abf](https://github.com/lifekit-hq/finance-sentry/commit/ba04abfa015ba0aa5dd9d521b1c929ae31bccd5e))
+
 ## [1.12.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.11.0...v1.12.0) (2026-09-28)
 
 
