@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using Microsoft.Extensions.Configuration;
@@ -10,7 +11,6 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Services;
 
 public class JwtTokenService(IConfiguration configuration) : ITokenService
 {
-    public const string McpAudience = "mcp";
     private const string McpScope = "mcp.full_access";
     private const string McpServiceScope = "mcp.service";
     private const int McpAccessTokenLifetimeMinutes = 15;
@@ -36,6 +36,7 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
         ];
 
         var token = new JwtSecurityToken(
+            audience: AuthAudiences.App,
             claims: claims,
             notBefore: now,
             expires: expiresAt,
@@ -57,7 +58,7 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new Claim(JwtRegisteredClaimNames.Aud, McpAudience),
+            new Claim(JwtRegisteredClaimNames.Aud, AuthAudiences.Mcp),
             new Claim("scope", McpScope),
             new Claim(ClaimTypes.NameIdentifier, user.Id),
         };
@@ -86,7 +87,7 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Jti, jti.ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new Claim(JwtRegisteredClaimNames.Aud, McpAudience),
+            new Claim(JwtRegisteredClaimNames.Aud, AuthAudiences.Mcp),
             new Claim("scope", McpServiceScope),
             new Claim(ClaimTypes.NameIdentifier, user.Id),
         };

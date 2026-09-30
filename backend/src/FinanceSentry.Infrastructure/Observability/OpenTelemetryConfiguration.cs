@@ -74,9 +74,6 @@ public static class OpenTelemetryConfiguration
     }
 
     /// <summary>Serves Prometheus exposition at <c>/metrics</c> (the exporter's default path).</summary>
-    public static IEndpointRouteBuilder MapObservabilityMetricsEndpoint(this IEndpointRouteBuilder endpoints)
-    {
+    public static IEndpointConventionBuilder MapObservabilityMetricsEndpoint(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPrometheusScrapingEndpoint();
-        return endpoints;
-    }
 }

@@ -25,7 +25,7 @@ Content-Type: application/json
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
 | email | string | yes | Valid email format; must be unique |
-| password | string | yes | Min 8 chars; ≥1 uppercase, ≥1 lowercase, ≥1 digit |
+| password | string | yes | Min 8 chars; must not be a common password (no composition rules) |
 
 ### Response — 201 Created
 

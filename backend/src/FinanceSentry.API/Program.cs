@@ -1,5 +1,6 @@
 using Serilog;
 using FinanceSentry.API.Adapters;
+using FinanceSentry.API.Authentication;
 using FinanceSentry.API.Commands;
 using FinanceSentry.API.Conventions;
 using FinanceSentry.Integration;
@@ -11,6 +12,7 @@ using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Infrastructure.Observability.HealthChecks;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.API.Middleware;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Domain.Ports;
@@ -62,6 +64,10 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddAllModules(builder.Configuration);
+
+// After AddAllModules: Identity (Auth module) registers its cookie scheme as the default; the API authenticates
+// with JwtBearer and requires an authenticated user on every endpoint not marked [AllowAnonymous].
+builder.Services.AddApiAuthentication();
 
 // 039: cross-module read ports (adapters live in the host — neither module references the other).
 builder.Services.AddCrossModulePorts();
@@ -154,7 +160,7 @@ app.UseSerilogRequestLogging();
 app.UseCors("Frontend");
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseMiddleware<JwtAuthenticationMiddleware>();
+app.UseAuthentication();
 app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
@@ -163,30 +169,27 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Hangfire dashboard (FR-004): permissive locally; owner-only (AuthPolicies.RequireOwner) in every other
-// environment, backed by durable Postgres storage so history/schedule survive restarts.
-var isDevelopment = app.Environment.IsDevelopment();
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = isDevelopment ? [new DevDashboardAuthorizationFilter()] : [],
-    AsyncAuthorization = isDevelopment ? [] : [new OwnerDashboardAuthorizationFilter()],
-    DisplayStorageConnectionString = false,
-    DashboardTitle = "Finance Sentry · Hangfire",
-});
-
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
-// Prometheus exposition (FR-001) — scrape-only / not on the public funnel (FR-006).
-app.MapObservabilityMetricsEndpoint();
+// Hangfire dashboard (FR-004): owner-only (AuthPolicies.RequireOwner) in every environment, backed by
+// durable Postgres storage so history/schedule survive restarts.
+app.MapHangfireDashboardWithAuthorizationPolicy(AuthPolicies.RequireOwner, "/hangfire", new DashboardOptions
+{
+    DisplayStorageConnectionString = false,
+    DashboardTitle = "Finance Sentry · Hangfire",
+});
 
-// Readiness (SC-003): overall + per-dependency status; JWT-exempt via /api/v1/health prefix.
+// Prometheus exposition (FR-001) — scrape-only / not on the public funnel (FR-006).
+app.MapObservabilityMetricsEndpoint().AllowAnonymous();
+
+// Readiness (SC-003): overall + per-dependency status.
 app.MapHealthChecks("/api/v1/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
     ResponseWriter = ReadinessResponseWriter.WriteAsync,
-});
+}).AllowAnonymous();
 
 // Record per-job outcome + duration metrics as jobs reach terminal states (FR-002).
 GlobalJobFilters.Filters.Add(

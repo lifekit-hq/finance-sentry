@@ -150,7 +150,7 @@ public sealed class AgentChatContractTests
     [Fact]
     public void Chat_Unauthenticated_IsRejectedBeforeStreaming()
     {
-        // JwtAuthenticationMiddleware issues the 401; at the controller boundary an unauthenticated
+        // The API's fallback authorization policy issues the 401; at the controller boundary an unauthenticated
         // principal has no user id, so RequireUserId throws rather than leaking a stream.
         var harness = BuildHarness(ConfiguredOptions(), new FakeLlmClient());
         var body = new MemoryStream();

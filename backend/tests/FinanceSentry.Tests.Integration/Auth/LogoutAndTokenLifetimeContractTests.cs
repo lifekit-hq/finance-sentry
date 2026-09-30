@@ -10,7 +10,7 @@ using Xunit;
 /// Regression coverage for two independently-shipped bugs found during the guard-2 edge
 /// identity review:
 /// - Logout must revoke the refresh token identified by the request's own refresh cookie
-///   (POST /api/v1/auth is exempt from JwtAuthenticationMiddleware, so `User` is never
+///   (POST /api/v1/auth/logout allows anonymous access, so `User` is not relied on
 ///   populated there).
 /// - The access token lifetime must come from Jwt:ExpiryMinutes rather than a hardcoded 60.
 /// </summary>

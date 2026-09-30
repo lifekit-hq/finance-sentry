@@ -12,6 +12,7 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Hangfire;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
@@ -319,7 +320,7 @@ public class BankSyncController(
     // ── GET /api/v1/accounts/truelayer/callback?code=&state=&error= ──────────
     //
     // Public endpoint hit by TrueLayer after the user consents at their bank.
-    // Exempt from JWT auth; identifies the connection by the 'state' parameter and
+    // Allows anonymous access; identifies the connection by the 'state' parameter and
     // finalizes only when the browser presents the state cookie set when that same
     // user started the flow (the correlation-cookie pattern of ASP.NET Core's OAuth
     // handlers). The auth cookies are SameSite=Strict and never ride the bank's
@@ -328,6 +329,7 @@ public class BankSyncController(
     private const string TrueLayerStateCookie = "fs_truelayer_state";
     private static readonly TimeSpan TrueLayerStateCookieLifetime = TimeSpan.FromMinutes(15);
 
+    [AllowAnonymous]
     [HttpGet("truelayer/callback")]
     public async Task<IActionResult> TrueLayerCallback(
         [FromQuery] string? code,

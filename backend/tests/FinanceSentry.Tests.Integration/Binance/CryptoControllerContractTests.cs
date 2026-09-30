@@ -16,6 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 using Moq;
 using System.IdentityModel.Tokens.Jwt;
 using Xunit;
+using FinanceSentry.Tests.Integration.Shared;
 
 namespace FinanceSentry.Tests.Integration.Binance;
 
@@ -438,6 +439,7 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateAuthenticatedClient()
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        TestUsers.EnsureExists(Services, TestUserId);
         client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(TestUserId)}");
         return client;
     }

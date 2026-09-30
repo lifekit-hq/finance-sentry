@@ -1,11 +1,13 @@
 namespace FinanceSentry.API.Controllers;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
 /// Health check endpoint for monitoring and liveness probes.
 /// </summary>
 [ApiController]
+[AllowAnonymous]
 [Route("[controller]")]
 public class HealthController : ControllerBase
 {

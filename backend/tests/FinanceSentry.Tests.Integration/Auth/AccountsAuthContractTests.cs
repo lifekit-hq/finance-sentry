@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.IdentityModel.Tokens;
@@ -31,7 +32,9 @@ public class AccountsAuthContractTests : IClassFixture<AuthApiFactory>
         {
             AllowAutoRedirect = false
         });
-        _authenticatedClient.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt()}");
+        var userId = Guid.NewGuid();
+        TestUsers.EnsureExists(factory.Services, userId);
+        _authenticatedClient.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(userId)}");
     }
 
     [Fact]
@@ -58,14 +61,14 @@ public class AccountsAuthContractTests : IClassFixture<AuthApiFactory>
         response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
     }
 
-    private static string GenerateTestJwt()
+    private static string GenerateTestJwt(Guid userId)
     {
         const string secret = "test-jwt-secret-key-for-integration-tests-minimum-32-chars";
         var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret));
         var handler = new JwtSecurityTokenHandler();
         var token = handler.CreateToken(new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity([new Claim("sub", Guid.NewGuid().ToString())]),
+            Subject = new ClaimsIdentity([new Claim("sub", userId.ToString())]),
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         });

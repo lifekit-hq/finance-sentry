@@ -15,6 +15,7 @@ using System.IdentityModel.Tokens.Jwt;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
 using FinanceSentry.Modules.Budgets.Domain;
 using Xunit;
+using FinanceSentry.Tests.Integration.Shared;
 
 public class BudgetsContractTests(BudgetsApiFactory factory) : IClassFixture<BudgetsApiFactory>
 {
@@ -290,6 +291,7 @@ public class BudgetsApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateAuthenticatedClient()
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        TestUsers.EnsureExists(Services, TestUserId);
         client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(TestUserId)}");
         return client;
     }

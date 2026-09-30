@@ -2,6 +2,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,7 @@ public class AuthController(
     private const string RefreshTokenCookie = "fs_refresh_token";
     private const string AccessTokenCookie = "fs_access_token";
 
+    [AllowAnonymous]
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
@@ -48,6 +50,7 @@ public class AuthController(
         }
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] AuthRequest request)
     {
@@ -57,6 +60,7 @@ public class AuthController(
         return Ok(result.Response);
     }
 
+    [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] AuthRequest request)
     {
@@ -66,6 +70,7 @@ public class AuthController(
         return Created(string.Empty, result.Response);
     }
 
+    [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
@@ -87,6 +92,7 @@ public class AuthController(
         }
     }
 
+    [AllowAnonymous]
     [HttpPost("google/verify")]
     public async Task<IActionResult> GoogleVerify([FromBody] VerifyGoogleCredentialRequest request)
     {
@@ -96,6 +102,7 @@ public class AuthController(
         return Ok(result.Response);
     }
 
+    [AllowAnonymous]
     [HttpGet("mcp/authorize")]
     public async Task<IActionResult> AuthorizeMcp([FromQuery] string redirectUri, [FromQuery] string? state = null)
     {
@@ -109,6 +116,7 @@ public class AuthController(
         return Redirect(result.RedirectUrl);
     }
 
+    [AllowAnonymous]
     [HttpPost("mcp/token")]
     public async Task<IActionResult> ExchangeMcpToken([FromBody] McpTokenRequest request)
     {
@@ -118,6 +126,7 @@ public class AuthController(
         return Ok(response);
     }
 
+    [AllowAnonymous]
     [HttpPost("mcp/revoke")]
     public async Task<IActionResult> RevokeMcpToken([FromBody] McpRevokeRequest request)
     {
@@ -127,6 +136,7 @@ public class AuthController(
 
     // Mints a long-lived, revocable service token for headless first-party MCP clients
     // (e.g. the OpenClaw gateway) that cannot perform the interactive OAuth refresh flow.
+    [Authorize]
     [HttpPost("mcp/service-token")]
     public async Task<IActionResult> IssueMcpServiceToken([FromBody] McpServiceTokenRequest request)
     {
@@ -140,6 +150,7 @@ public class AuthController(
         return Ok(result);
     }
 
+    [Authorize]
     [HttpPost("mcp/service-token/revoke")]
     public async Task<IActionResult> RevokeMcpServiceToken([FromBody] McpServiceTokenRevokeRequest request)
     {
@@ -153,6 +164,7 @@ public class AuthController(
         return NoContent();
     }
 
+    [AllowAnonymous]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {

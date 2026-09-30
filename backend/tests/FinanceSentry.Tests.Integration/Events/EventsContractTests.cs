@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
 using Xunit;
+using FinanceSentry.Tests.Integration.Shared;
 
 // ── Contract tests: GET /api/v1/events/upcoming and GET /api/v1/events/fired (feature 049) ──
 //
@@ -250,6 +251,7 @@ public class EventsApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateAuthenticatedClient()
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        TestUsers.EnsureExists(Services, TestUserId);
         client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(TestUserId)}");
         return client;
     }

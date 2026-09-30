@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,6 +46,9 @@ public class VerifyGoogleCredentialCommandHandler(
 
             await PublishUserRegisteredAsync(user.Id, cancellationToken);
         }
+
+        if (await userManager.IsLockedOutAsync(user))
+            throw new InvalidCredentialsException();
 
         var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
 
