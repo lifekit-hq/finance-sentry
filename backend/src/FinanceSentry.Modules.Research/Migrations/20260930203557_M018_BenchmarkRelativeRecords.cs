@@ -5,7 +5,7 @@
 namespace FinanceSentry.Modules.Research.Migrations
 {
     /// <inheritdoc />
-    public partial class M017_BenchmarkRelativeRecords : Migration
+    public partial class M018_BenchmarkRelativeRecords : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

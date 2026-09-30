@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.Research.Migrations
 {
     [DbContext(typeof(ResearchDbContext))]
-    [Migration("20260930203557_M017_BenchmarkRelativeRecords")]
-    partial class M017_BenchmarkRelativeRecords
+    [Migration("20260930203557_M018_BenchmarkRelativeRecords")]
+    partial class M018_BenchmarkRelativeRecords
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -707,6 +707,62 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasDatabaseName("idx_opportunity_candidates_user_ticker");
 
                     b.ToTable("opportunity_candidates", "research");
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.PolicyReviews.PolicyReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Adjustments")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DaysOverdue")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PolicyStatementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PolicyStatementVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReviewCadence")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Sleeves")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("TotalValueUsd")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("WasMissed")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CompletedAt")
+                        .HasDatabaseName("idx_policy_reviews_user_completed");
+
+                    b.ToTable("policy_reviews", "research");
                 });
 
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.QuoteCacheEntry", b =>
