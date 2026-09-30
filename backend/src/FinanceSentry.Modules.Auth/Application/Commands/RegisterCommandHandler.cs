@@ -28,7 +28,7 @@ public class RegisterCommandHandler(
 
         await PublishUserRegisteredAsync(user.Id, cancellationToken);
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, []);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 

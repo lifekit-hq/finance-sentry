@@ -4,7 +4,11 @@ namespace FinanceSentry.Modules.Auth.Application.Interfaces;
 
 public interface ITokenService
 {
-    (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user);
+    /// <summary>
+    /// Issues the app access token. <paramref name="roles"/> (the user's Identity roles) become <c>role</c>
+    /// claims, so policies evaluate them from the principal; a role change applies from the next token.
+    /// </summary>
+    (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user, IEnumerable<string> roles);
     (string Token, DateTime ExpiresAt) GenerateMcpAccessToken(ApplicationUser user);
 
     /// <summary>

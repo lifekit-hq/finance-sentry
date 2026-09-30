@@ -15,7 +15,6 @@ using FinanceSentry.Modules.BankSync.API.Middleware;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using Hangfire;
-using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -28,16 +27,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog(SerilogConfiguration.Configure);
 
 // Edge gateway (025, FR-006): honor X-Forwarded-* set by the reverse proxy so the real client IP
-// and scheme reach Serilog request logs and any IP-based logic — instead of the gateway's bridge
-// address. KnownIPNetworks/KnownProxies are cleared because the only hop in front of the API is the
-// trusted in-network gateway (itself fronted by Tailscale Serve).
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
+// and scheme reach Serilog request logs — instead of the gateway's bridge address. Only the hops named
+// in ForwardedHeaders:KnownProxies / ForwardedHeaders:KnownNetworks are trusted (prod: the gateway's
+// fixed address on the edge network); unset trusts loopback only, even where
+// ASPNETCORE_FORWARDEDHEADERS_ENABLED=true (the Docker image) would otherwise trust every sender.
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((options, config) =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
         | ForwardedHeaders.XForwardedProto
         | ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    TrustedForwarders.Apply(options, config);
 });
 
 builder.Services.AddCors(options =>
@@ -164,15 +163,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Hangfire dashboard (FR-004): permissive locally; loopback/Tailscale-only in every other environment,
-// backed by durable Postgres storage so history/schedule survive restarts.
-IDashboardAuthorizationFilter dashboardFilter = app.Environment.IsDevelopment()
-    ? new DevDashboardAuthorizationFilter()
-    : new DashboardObservability.DashboardAuthorizationFilter();
-
+// Hangfire dashboard (FR-004): permissive locally; owner-only (AuthPolicies.RequireOwner) in every other
+// environment, backed by durable Postgres storage so history/schedule survive restarts.
+var isDevelopment = app.Environment.IsDevelopment();
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
-    Authorization = [dashboardFilter],
+    Authorization = isDevelopment ? [new DevDashboardAuthorizationFilter()] : [],
+    AsyncAuthorization = isDevelopment ? [] : [new OwnerDashboardAuthorizationFilter()],
     DisplayStorageConnectionString = false,
     DashboardTitle = "Finance Sentry · Hangfire",
 });

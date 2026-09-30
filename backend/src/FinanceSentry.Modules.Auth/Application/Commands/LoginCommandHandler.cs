@@ -23,7 +23,7 @@ public class LoginCommandHandler(
         if (!await userManager.CheckPasswordAsync(user, request.Password))
             throw new InvalidCredentialsException();
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 

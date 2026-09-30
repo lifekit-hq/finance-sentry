@@ -10,9 +10,11 @@ using Microsoft.IdentityModel.Tokens;
 
 /// <summary>
 /// Middleware that validates Bearer JWT tokens on every request.
-/// Exempt paths: /health, /swagger, /hangfire, /api/v1/auth, the TrueLayer callback.
+/// Exempt paths: /health, /swagger, /api/v1/auth, the TrueLayer callback.
 /// Attaches ClaimsPrincipal (including user ID) to HttpContext.User on success.
 /// Returns 401 for missing/invalid/expired tokens on protected paths.
+/// Optional-identity paths (/hangfire) get HttpContext.User from a valid token but are never
+/// rejected here — the Hangfire dashboard's own authorization filter decides access.
 /// </summary>
 public class JwtAuthenticationMiddleware
 {
@@ -26,9 +28,13 @@ public class JwtAuthenticationMiddleware
         "/api/v1/health",
         "/metrics",
         "/swagger",
-        "/hangfire",
         "/api/v1/auth",
         "/api/v1/accounts/truelayer/callback"
+    ];
+
+    private static readonly string[] _optionalIdentityPrefixes =
+    [
+        "/hangfire"
     ];
 
     public JwtAuthenticationMiddleware(
@@ -56,8 +62,15 @@ public class JwtAuthenticationMiddleware
     {
         var path = context.Request.Path.Value ?? string.Empty;
 
-        if (IsExempt(path))
+        if (MatchesAny(_exemptPrefixes, path))
         {
+            await _next(context);
+            return;
+        }
+
+        if (MatchesAny(_optionalIdentityPrefixes, path))
+        {
+            AttachUserIfTokenValid(context);
             await _next(context);
             return;
         }
@@ -91,9 +104,25 @@ public class JwtAuthenticationMiddleware
         }
     }
 
-    private static bool IsExempt(string path)
+    private void AttachUserIfTokenValid(HttpContext context)
     {
-        foreach (var prefix in _exemptPrefixes)
+        var token = context.Request.Cookies["fs_access_token"];
+        if (string.IsNullOrWhiteSpace(token))
+            return;
+
+        try
+        {
+            context.User = new JwtSecurityTokenHandler().ValidateToken(token, _validationParams, out _);
+        }
+        catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
+        {
+            _logger.LogWarning("Invalid JWT token on an optional-identity path: {Message}", ex.Message);
+        }
+    }
+
+    private static bool MatchesAny(string[] prefixes, string path)
+    {
+        foreach (var prefix in prefixes)
             if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 return true;
         return false;

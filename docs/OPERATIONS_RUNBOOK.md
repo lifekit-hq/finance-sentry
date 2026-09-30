@@ -42,8 +42,22 @@
 
 **Symptoms:** Recurring jobs not appearing in Hangfire Dashboard
 
+**Dashboard access:** outside Development the dashboard serves only a signed-in account holding the
+`Owner` Identity role (policy `RequireOwner`); anyone else gets 401 (not signed in) or 403 (signed in,
+not the owner) — there is no read-only view. To open it, sign in to the app, then go to `/hangfire` on
+the same origin (`https://finance-sentry.<tailnet>.ts.net:4200/hangfire` or `:5001/hangfire`) — the
+access-token cookie is sent with the navigation. On a 401 after a long break, reload the app once to
+refresh the token and retry.
+
+Who holds the role: at startup the API grants `Owner` to the account named by `Auth__OwnerEmail`
+(prod: `AUTH_OWNER_EMAIL` in the deploy env; not a secret). With it unset, the role goes to the only
+registered account, and only while nobody holds it — so once a second account exists, set
+`AUTH_OWNER_EMAIL` explicitly. The seed only ever adds the role; to take it away, delete the row from
+`auth."AspNetUserRoles"`. The role rides in the access token, so a change applies on the next sign-in
+or token refresh (≤ `Jwt__ExpiryMinutes`).
+
 **Steps:**
-1. Navigate to `/hangfire` in browser.
+1. Navigate to `/hangfire` in browser (see *Dashboard access* above).
 2. Check server list — if empty, Hangfire worker is not running. Restart API.
 3. Check `SyncScheduler.ScheduleAllActiveAccounts()` was called at startup (logged at startup).
 4. Re-register recurring jobs: restart the API (scheduler runs on startup).

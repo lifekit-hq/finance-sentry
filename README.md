@@ -144,7 +144,8 @@ Loki sink, and the dashboards below.
   answers *is it healthy now, did last night's jobs run?* at a glance; the availability panel turns red
   within ~60s of an API outage.
 - **Jobs** — Hangfire storage moved to PostgreSQL (`hangfire` schema) so job history/schedule survive
-  restarts. The Hangfire dashboard at `/hangfire` is loopback/Tailscale-only outside Development.
+  restarts. Outside Development the Hangfire dashboard at `/hangfire` is served only to a signed-in
+  account holding the `Owner` role (access path: [runbook §4](docs/OPERATIONS_RUNBOOK.md)).
 
 ```bash
 # bring the stack up (adds loki, prometheus, grafana)
@@ -156,8 +157,8 @@ curl -s http://localhost:5001/api/v1/health/ready                 # {"status":"H
 ```
 
 **Production notes** — Grafana + Hangfire dashboards are reachable only over Tailscale serve (not the
-public funnel); `/metrics` is scrape-only. `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` /
-`GRAFANA_ROOT_URL` now belong to **lifekit-stack's** env file, not this repo's `.env.sops`;
+public funnel), and Hangfire additionally requires the owner's sign-in; `/metrics` is scrape-only.
+`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` / `GRAFANA_ROOT_URL` now belong to **lifekit-stack's** env file, not this repo's `.env.sops`;
 `Observability__Loki__Url` stays here (it defaults to `http://loki:3100`, which still resolves — the api
 is on the shared `lifekit-shared` network where lifekit-stack's Loki lives). `Observability__Otlp__Endpoint`
 likewise stays here; api and gateway both join `lifekit-shared` to reach lifekit-stack's OTLP collector. Alert rules are no longer deferred

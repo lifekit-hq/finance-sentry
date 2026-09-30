@@ -14,23 +14,26 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
     private const string McpScope = "mcp.full_access";
     private const string McpServiceScope = "mcp.service";
     private const int McpAccessTokenLifetimeMinutes = 15;
+    // Short JWT name; inbound validation maps it to ClaimTypes.Role, which IsInRole/RequireRole read.
+    private const string RoleClaimType = "role";
 
     private readonly string _secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
     private readonly int _expiryMinutes = int.TryParse(configuration["Jwt:ExpiryMinutes"], out var minutes) ? minutes : 60;
 
-    public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user)
+    public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user, IEnumerable<string> roles)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var now = DateTime.UtcNow;
         var expiresAt = now.AddMinutes(_expiryMinutes);
 
-        var claims = new[]
-        {
+        Claim[] claims =
+        [
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-        };
+            new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            .. roles.Select(role => new Claim(RoleClaimType, role)),
+        ];
 
         var token = new JwtSecurityToken(
             claims: claims,

@@ -143,7 +143,7 @@ rules:
 
   - id: BE-005
     category: [backend, security]
-    text: "Auth enforced on all endpoints except: /health, /api/v1/health, /swagger, /api/webhook, /hangfire"
+    text: "Auth enforced on all endpoints except: /health, /api/v1/health, /swagger, /api/webhook (/hangfire: dashboard filter enforces the RequireOwner policy)"
     source_file: rules/backend.md
     added: "2026-04-18"
     enabled: true

@@ -15,7 +15,7 @@
 | Check | Status | Evidence |
 |-------|--------|----------|
 | JWT validation on all endpoints | ✅ | `JwtAuthenticationMiddleware` validates signature + expiry |
-| JWT exempt paths audited | ✅ | Only `/health`, `/swagger`, `/hangfire`, `/api/v1/auth`, TrueLayer callback |
+| JWT exempt paths audited | ✅ | Only `/health`, `/swagger`, `/api/v1/auth`, TrueLayer callback (`/hangfire` enforces its own owner policy) |
 | TrueLayer callback bound to initiating browser | ✅ | `BankSyncController.TrueLayerCallback` finalizes only when the `fs_truelayer_state` cookie (HttpOnly, SameSite=Lax, 15 min, set by the connect endpoint) equals the OAuth `state`; otherwise redirects with `TRUELAYER_STATE_MISMATCH` |
 | FR-009 user scoping | ✅ | All data endpoints verify `account.UserId == requestingUserId` |
 | Webhook HMAC-SHA256 | ✅ | `WebhookSignatureValidator` constant-time comparison |
@@ -56,7 +56,7 @@
 
 | Risk | Mitigation |
 |------|------------|
-| Hangfire dashboard access | Protected by JWT middleware; restrict to admin role in production |
+| Hangfire dashboard access | Outside Development: signed-in `Owner` role only (`RequireOwner` policy via `OwnerDashboardAuthorizationFilter`) |
 
 ## Next Review Date
 

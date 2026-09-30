@@ -114,13 +114,21 @@ services:
       # Trace spine (spec 023 amendment, 2026-09-13): OTLP/HTTP exporter. The collector lives in
       # lifekit-stack's compose project on the shared `lifekit-shared` network, same as Loki above.
       Observability__Otlp__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://otel-collector:4318}
+      # X-Forwarded-* is honoured only from the gateway's fixed address on finance-sentry-edge;
+      # from any other sender the API keeps the socket address.
+      ForwardedHeaders__KnownProxies__0: 10.231.77.2
+      # Account granted the Owner role at startup (Hangfire dashboard, owner-only features). Empty =
+      # promote the sole registered user while nobody holds the role. Not a secret. See the runbook §4.
+      Auth__OwnerEmail: ${AUTH_OWNER_EMAIL:-}
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - finance-sentry
-      - lifekit-shared     # agents on the shared network reach the API directly; Loki/OTLP by name
+      finance-sentry: {}
+      lifekit-shared: {}   # agents on the shared network reach the API directly; Loki/OTLP by name
+      finance-sentry-edge:
+        aliases: [api-edge]   # the gateway's upstream — see finance-sentry-edge below
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
       interval: 30s
@@ -273,6 +281,11 @@ services:
       # Trace spine (spec 023 amendment, 2026-09-13): OTLP/HTTP exporter, reachable over `lifekit-shared`
       # below (same network api's Loki/OTLP traffic already crosses).
       Observability__Otlp__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://otel-collector:4318}
+      # Proxy to the API over finance-sentry-edge so the API sees the gateway's fixed address.
+      ReverseProxy__Clusters__api__Destinations__api-1__Address: http://api-edge:5000/
+      # Tailscale Serve's loopback traffic to the published port arrives from the edge bridge address;
+      # only that hop may set X-Forwarded-*.
+      ForwardedHeaders__KnownProxies__0: 10.231.77.1
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
       # ACME cutover: uncomment to publish the public TLS ports (requires GATEWAY_DOMAIN + DNS).
@@ -284,8 +297,11 @@ services:
       api:
         condition: service_started
     networks:
-      - finance-sentry
-      - lifekit-shared     # reaches the OTLP collector on the shared network
+      finance-sentry-edge:
+        priority: 1000        # published-port traffic enters here, so its source is the edge bridge
+        ipv4_address: 10.231.77.2
+      finance-sentry: {}
+      lifekit-shared: {}   # reaches the OTLP collector on the shared network
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -352,6 +368,16 @@ networks:
     name: finance-sentry
   lifekit-shared:
     external: true              # owned by lifekit-stack; must exist before deploy
+  # Gateway <-> API hop with pinned addresses: forwarded-header trust on both hosts names these
+  # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender. ip_range
+  # keeps dynamic allocation (the API) on .4-.7 so it can never take the gateway's pinned .2.
+  finance-sentry-edge:
+    name: finance-sentry-edge
+    ipam:
+      config:
+        - subnet: 10.231.77.0/29
+          ip_range: 10.231.77.4/30
+          gateway: 10.231.77.1
 
 # GitHub Packages token for @lifekit-hq/* installs (BuildKit secret — not in layers).
 # Locally: export NODE_AUTH_TOKEN=$(gh auth token)  (needs read:packages scope).
