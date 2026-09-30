@@ -1,33 +1,40 @@
 # Per-repo no-mistakes overrides (honored from the default-branch copy).
 #
-# Pin the gate's Lint and Test steps to the commands CI already runs, so
-# validation is declared here instead of decided per run by the test agent.
-# Sources of truth (keep in step; the workflows win on divergence):
+# Pin the gate's Lint and Test steps so validation is declared here instead of
+# decided per run by the test agent. Lint mirrors the commands CI runs; Test is
+# a fast pre-check, not a replay of CI. Sources of truth (keep in step; the
+# workflows win on divergence):
 #   .github/workflows/frontend-ci.yml  job `lint-build-test`
 #   .github/workflows/backend-ci.yml   job `build-and-test`
 #
 # Lint = the frontend workflow's "Lint code" + "Format check" steps. The
 # backend has no separate lint step: C# style is enforced at build time via
 # EnforceCodeStyleInBuild (backend/Directory.Build.props), so it lives under
-# `test` with the build. Both npm-based commands self-provision `node_modules`
+# `test` with the build.
+#
+# Test = a pre-check scoped to what the branch changed. It diffs against the
+# merge-base with origin/main: the backend half (restore, build, then every
+# test project except Tests.Integration) runs when `backend/` or a root
+# `Directory.*.props` changed, the frontend half (`npm ci`, build, `test:ci`)
+# when `frontend/` changed. If the merge-base or the diff fails, the diff is
+# empty, or any other path changed, both halves run. Playwright, the e2e suite
+# and the Integration suite are not run here: GitHub CI runs them on every PR
+# and the pipeline's CI step waits for that result. `test.instructions` below
+# scales the agent's own evidence to the change the same way. Both npm-based commands self-provision `node_modules`
 # with `npm ci` the way CI does; `@lifekit-hq/*` resolves from GitHub Packages,
 # so NODE_AUTH_TOKEN (a token with read:packages) must be in the environment
-# (CI passes secrets.GITHUB_TOKEN). `.NET 10 SDK` and Docker (Testcontainers
-# for the integration suites) are host prerequisites.
+# (CI passes secrets.GITHUB_TOKEN). `.NET 10 SDK` or Docker is a host prerequisite.
 #
 # The dotnet steps (one shell string so restore state survives) run: directly when `dotnet`
 # is on the PATH (a CI-like runner), otherwise inside the
-# mcr.microsoft.com/dotnet/sdk:10.0 image with the repo mounted, host networking
-# and the Docker socket passed through so the Testcontainers suites still run
-# (they skip on their own when no daemon is reachable). The container is
-# capped with --memory 2g; --memory-swap is left unset so Docker's default
+# mcr.microsoft.com/dotnet/sdk:10.0 image with the repo mounted and host
+# networking. The container is capped with --memory 2g; --memory-swap is left unset so Docker's default
 # applies (swap equal to the memory limit), meaning a runaway run slows down
 # on swap instead of getting the host's other processes OOM-killed. Memory
 # is kept in check by: build without the resident Roslyn server
 # (-p:UseSharedCompilation=false + `dotnet build-server shutdown`), test
 # hosts limited to two (-m:2; unset it starts one per logical CPU), and
 # workstation GC (DOTNET_gcServer=0).
-# Testcontainers-started containers are not covered by that cap.
 #
 # Not declared: the backend coverage ratchet step (a reportgenerator summary
 # gate over the test run, not a test; it stays a CI-only check) and the
@@ -39,23 +46,51 @@ commands:
     && npm ci
     && npm run lint
     && npm run format:check
-  test: >-
-    dn='dotnet restore backend/FinanceSentry.sln
-    && dotnet build backend/FinanceSentry.sln --configuration Release --no-restore -m:1
-    -p:UseSharedCompilation=false
-    && dotnet build-server shutdown
-    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build -m:2 --verbosity normal'
-    && if command -v dotnet >/dev/null 2>&1; then sh -c "$dn"; else
-    docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)"
-    --group-add "$(stat -c %g /var/run/docker.sock)"
-    -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1
-    -e DOTNET_gcServer=0
-    -v /var/run/docker.sock:/var/run/docker.sock
-    -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 sh -c "$dn"; fi
-    && cd frontend
-    && npm ci
-    && npm run build
-    && npx playwright install --with-deps chromium
-    && npm run test:ci
-    && mkdir -p playwright-report
-    && npx playwright test --reporter=json > playwright-report/results.json
+  test: |-
+    set -e
+    be=0
+    fe=0
+    if base=$(git merge-base HEAD origin/main 2>/dev/null) && files=$(git diff --name-only "$base" 2>/dev/null) && [ -n "$files" ]; then
+      set -f
+      for f in $files; do
+        case "$f" in
+          backend/*|Directory.*.props) be=1 ;;
+          frontend/*) fe=1 ;;
+          *) be=1; fe=1 ;;
+        esac
+      done
+      set +f
+    else
+      be=1
+      fe=1
+    fi
+    if [ "$be" = 1 ]; then
+      dn='set -e
+      dotnet restore backend/FinanceSentry.sln
+      dotnet build backend/FinanceSentry.sln --configuration Release --no-restore -m:1 -p:UseSharedCompilation=false
+      dotnet build-server shutdown
+      for p in backend/tests/*/*.csproj; do
+        case "$p" in *Tests.Integration*) continue ;; esac
+        dotnet test "$p" --configuration Release --no-build -m:2 --verbosity normal
+      done'
+      if command -v dotnet >/dev/null 2>&1; then
+        sh -c "$dn"
+      else
+        docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)" \
+          -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1 -e DOTNET_gcServer=0 \
+          -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 sh -c "$dn"
+      fi
+    fi
+    if [ "$fe" = 1 ]; then
+      (cd frontend && npm ci && npm run build && npm run test:ci)
+    fi
+
+# Scale the test agent's own evidence to the change. Suites GitHub CI already
+# runs stay out of the gate: the test command above is the local pre-check.
+test:
+  instructions: |
+    Scale evidence to what the change touches; do not re-run suites GitHub CI already runs (the unit, module and Integration suites, the frontend lint/build/test jobs, and Playwright e2e).
+    For a backend-only change, gather API-level evidence: start the local stack with `cd docker && docker compose -f docker-compose.dev.yml up -d --build postgres api`, then exercise the affected endpoints against http://localhost:5001/api/v1 using the QA test user from docs/claude/qa.md, and report the requests and responses.
+    Gather UI evidence only when files under `frontend/` changed, and only for the affected screens.
+    Changes that touch neither `backend/` nor `frontend/` (docs, workflows, tooling) need no scenario run; the pre-check command is enough.
+    Run scenarios only against the locally started stack and its throwaway database; never drive them against production data or a deployed environment.
