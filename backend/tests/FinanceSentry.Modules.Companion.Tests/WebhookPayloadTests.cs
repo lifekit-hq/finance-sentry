@@ -170,7 +170,11 @@ public sealed class WebhookPayloadTests
         result.Should().Be(WakeResult.Sent);
         handler.Last!.Authorization.Should().Be($"Bearer {PlaceholderToken}");
         handler.Last.IdempotencyKey.Should().BeNull();
-        handler.Last.Body.Should().Contain("Digest");
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Last.Body!);
+        body.RootElement.GetProperty("kind").GetString().Should().Be("Digest");
+        body.RootElement.GetProperty("includeHeldForDigest").GetBoolean().Should().BeTrue();
+        body.RootElement.GetProperty("heldOverrideReason").GetString()
+            .Should().Be(WebhookAgentWakeDispatcher.DigestHeldOverrideReason);
     }
 
     [Fact]

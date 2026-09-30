@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Companion.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -126,6 +127,50 @@ public sealed class DigestConsolidationTests
         (await handler.Handle(
             new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default)).Events.Should().BeEmpty();
         (await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default)).Events.Should().BeEmpty();
+        (await events.ListHeldForDigestAsync(User)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Refused_override_is_distinguishable_from_no_events()
+    {
+        await using var db = NewDb();
+        db.Events.Add(Held(User, "a"));
+        await db.SaveChangesAsync();
+        var handler = NewHandler(new CompanionEventRepository(db));
+
+        var refused = await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, true), default);
+        var plain = await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default);
+        var honoured = await handler.Handle(
+            new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default);
+
+        refused.Events.Should().BeEmpty();
+        refused.Note.Should().Be(GetPendingCompanionEventsQueryHandler.HeldWithheldNote);
+        plain.Note.Should().BeNull();
+        honoured.Note.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Digest_wake_pull_with_the_wake_reason_delivers_held_events_once()
+    {
+        await using var db = NewDb();
+        db.Events.AddRange(Held(User, "a"), Held(User, "b"));
+        await db.SaveChangesAsync();
+        var events = new CompanionEventRepository(db);
+        var handler = NewHandler(events);
+
+        var digest = await handler.Handle(
+            new GetPendingCompanionEventsQuery(
+                User, 25, true, WebhookAgentWakeDispatcher.DigestHeldOverrideReason), default);
+
+        digest.Events.Should().HaveCount(2);
+        digest.Note.Should().BeNull();
+        await new AcknowledgeCompanionEventsCommandHandler(events)
+            .Handle(new AcknowledgeCompanionEventsCommand(User, [.. digest.Events.Select(e => e.Id)]), default);
+
+        var repeat = await handler.Handle(
+            new GetPendingCompanionEventsQuery(
+                User, 25, true, WebhookAgentWakeDispatcher.DigestHeldOverrideReason), default);
+        repeat.Events.Should().BeEmpty();
         (await events.ListHeldForDigestAsync(User)).Should().BeEmpty();
     }
 

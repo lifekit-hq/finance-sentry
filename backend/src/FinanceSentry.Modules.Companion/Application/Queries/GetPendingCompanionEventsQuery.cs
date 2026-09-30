@@ -22,6 +22,9 @@ public class GetPendingCompanionEventsQueryHandler(
     ILogger<GetPendingCompanionEventsQueryHandler> logger)
     : IQueryHandler<GetPendingCompanionEventsQuery, CompanionEventsResult>
 {
+    public const string HeldWithheldNote =
+        "Held-for-digest events were withheld: includeHeldForDigest requires a non-blank heldOverrideReason. An empty list here does not mean there are none.";
+
     private static readonly EventDisposition[] Undelivered =
         [EventDisposition.Pending, EventDisposition.Dispatched,
          EventDisposition.DeferredQuietHours, EventDisposition.SuppressedByRateLimit];
@@ -30,12 +33,13 @@ public class GetPendingCompanionEventsQueryHandler(
     {
         var reason = query.HeldOverrideReason?.Trim();
         var includeHeld = query.IncludeHeldForDigest && !string.IsNullOrEmpty(reason);
+        var refused = query.IncludeHeldForDigest && !includeHeld;
         if (includeHeld)
         {
             logger.LogWarning(
                 "Held-for-digest override for {User}: reason \"{Reason}\"", query.UserId, reason);
         }
-        else if (query.IncludeHeldForDigest)
+        else if (refused)
         {
             logger.LogWarning(
                 "Held-for-digest events requested by {User} without an override reason; excluded", query.UserId);
@@ -54,6 +58,6 @@ public class GetPendingCompanionEventsQueryHandler(
                 e.ReferenceId, e.Disposition.ToString(), e.OccurredAt))
             .ToList();
 
-        return new CompanionEventsResult(dtos, mode.ToString(), DateTimeOffset.UtcNow);
+        return new CompanionEventsResult(dtos, mode.ToString(), DateTimeOffset.UtcNow, refused ? HeldWithheldNote : null);
     }
 }

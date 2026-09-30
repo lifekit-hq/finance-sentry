@@ -14,4 +14,5 @@ public record CompanionEventDto(
 public record CompanionEventsResult(
     IReadOnlyList<CompanionEventDto> Events,
     string Mode,
-    DateTimeOffset RetrievedAt);
+    DateTimeOffset RetrievedAt,
+    string? Note = null);

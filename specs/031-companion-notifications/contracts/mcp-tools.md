@@ -33,7 +33,8 @@ Returns the effective settings (defaults if no row yet). `mode` ∈ `quiet|diges
 | Param | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | int | no | default 25, max 100 |
-| `includeHeldForDigest` | bool | no | default false; the digest job uses true |
+| `includeHeldForDigest` | bool | no | default false; only a Digest wake sets true, and it is honoured only with `heldOverrideReason` |
+| `heldOverrideReason` | string | with `includeHeldForDigest` | why held events are pulled (the Digest wake payload supplies `"daily digest"`); logged. Without it held events stay excluded and the result carries a `note` |
 
 **Response**: events the agent has not yet delivered (disposition `Pending`/`Dispatched`, plus `HeldForDigest` when requested), newest first:
 ```json

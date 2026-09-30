@@ -24,7 +24,7 @@ Backend + MCP only. Run against the Docker stack.
 
 ## US3 — daily digest
 1. Set mode `digest`. Trigger several material events → all written `HeldForDigest`; none dispatched immediately.
-2. Run `companion-digest` (or wait for the daily hour) → `get_pending_companion_events {"includeHeldForDigest":true}` returns the day's set once; after the agent delivers + acks, they are `Delivered` and don't repeat next day (SC-006).
+2. Run `companion-digest` (or wait for the daily hour) → `get_pending_companion_events {"includeHeldForDigest":true,"heldOverrideReason":"daily digest"}` (the Digest wake payload carries both fields; without the reason held events stay excluded) returns the day's set once; after the agent delivers + acks, they are `Delivered` and don't repeat next day (SC-006).
 3. A digest run with no held events → no forced empty message.
 
 ## Boundary check
