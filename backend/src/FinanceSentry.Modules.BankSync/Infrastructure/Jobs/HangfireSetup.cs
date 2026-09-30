@@ -20,6 +20,17 @@ public static class HangfireSetup
         IConfiguration config,
         IHostEnvironment environment)
     {
+        // Registered so consumers (startup job registration) derive their lock-wait budget from the
+        // effective DistributedLockTimeout instead of repeating its value.
+        var storageOptions = new PostgreSqlStorageOptions
+        {
+            SchemaName = HangfireSchema,
+            PrepareSchemaIfNecessary = true,
+            QueuePollInterval = TimeSpan.FromSeconds(15),
+        };
+        if (!environment.IsEnvironment("Testing"))
+            services.AddSingleton(storageOptions);
+
         services.AddHangfire(cfg =>
         {
             // FR-004 (feature 024): Hangfire auto-expires succeeded jobs after ~1 day by default, so the
@@ -45,12 +56,7 @@ public static class HangfireSetup
 
             cfg.UsePostgreSqlStorage(
                 options => options.UseNpgsqlConnection(connectionString),
-                new PostgreSqlStorageOptions
-                {
-                    SchemaName = HangfireSchema,
-                    PrepareSchemaIfNecessary = true,
-                    QueuePollInterval = TimeSpan.FromSeconds(15),
-                });
+                storageOptions);
         });
 
         services.AddHangfireServer(options =>

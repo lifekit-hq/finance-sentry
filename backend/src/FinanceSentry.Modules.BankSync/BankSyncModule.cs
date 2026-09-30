@@ -52,7 +52,6 @@ public static class BankSyncModule
         public void RegisterJobs(IServiceProvider sp)
         {
             var mgr = sp.GetRequiredService<IRecurringJobManager>();
-            var jobs = sp.GetRequiredService<IBackgroundJobClient>();
 
             mgr.AddOrUpdate<SyncScheduler>(
                 "bank-account-sync-scheduler",
@@ -111,10 +110,20 @@ public static class BankSyncModule
                 "family-clearing-statement",
                 job => job.ExecuteAsync(CancellationToken.None),
                 "0 9 1 * *");
+        }
+    }
 
-            // Startup sweep: any job still "running"/account still "syncing" after a restart was
-            // orphaned mid-sync and would otherwise deadlock the scheduler — reap them all first,
-            // then (re)schedule the active accounts.
+    /// <summary>
+    /// Startup sweep: any job still "running"/account still "syncing" after a restart was orphaned
+    /// mid-sync and would otherwise deadlock the scheduler — reap them all first, then (re)schedule
+    /// the active accounts.
+    /// </summary>
+    private sealed class StartupSweep : IStartupSweep
+    {
+        public void Enqueue(IServiceProvider sp)
+        {
+            var jobs = sp.GetRequiredService<IBackgroundJobClient>();
+
             jobs.Enqueue<StaleSyncReaperJob>(
                 job => job.ExecuteAsync(true, CancellationToken.None));
 
@@ -217,6 +226,7 @@ public static class BankSyncModule
         services.AddScoped<EFQueryLoggerInterceptor>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
+        services.AddSingleton<IStartupSweep, StartupSweep>();
 
         return services;
     }

@@ -7,9 +7,14 @@ public static class JobRegistrationExtensions
 {
     public static WebApplication RegisterAllModuleJobs(this WebApplication app)
     {
-        foreach (var registrar in app.Services.GetServices<IJobRegistrar>())
-            registrar.RegisterJobs(app.Services);
+        RegisterAllModuleJobs(app.Services);
 
         return app;
+    }
+
+    public static void RegisterAllModuleJobs(IServiceProvider services)
+    {
+        foreach (var registrar in services.GetServices<IJobRegistrar>())
+            registrar.RegisterJobs(services);
     }
 }
