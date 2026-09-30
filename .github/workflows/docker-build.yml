@@ -7,8 +7,8 @@ on:
       - 'backend/**'
       - 'docker/Dockerfile'
       - '.github/workflows/docker-build.yml'
-  # No paths filter on PRs — build-backend-image is a required status check on main
-  # (see backend-ci.yml for the rationale).
+  # No `paths:` filter on PRs: the required check must always report. Path filtering
+  # happens inside the workflow instead (changes job + aggregate job below).
   pull_request:
     branches: [ main ]
   # Dispatched by weekly-release.yml against the release-please branch (see backend-ci.yml).
@@ -19,7 +19,29 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-backend-image:
+  # Always runs so the required check below always reports; classifies the PR diff so
+  # the heavy job only runs when its area changed (see .github/scripts/changed-areas.sh).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.areas.outputs.backend }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      docker: ${{ steps.areas.outputs.docker }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 2
+
+    - name: Classify changed files
+      id: areas
+      run: .github/scripts/changed-areas.sh docker-build.yml
+
+  backend-image:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -56,3 +78,21 @@ jobs:
         exit-code: '1'
         severity: CRITICAL,HIGH
         ignore-unfixed: true
+
+  # Required status check (branch protection) — keep this job name. Passes when the
+  # heavy job succeeded or was skipped by the path filter; fails if anything failed or
+  # was cancelled, including the changes job itself.
+  build-backend-image:
+    needs: [changes, backend-image]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+    - name: Require the image build to have passed or been skipped
+      env:
+        RESULTS: ${{ needs.changes.result }} ${{ needs.backend-image.result }}
+      run: |
+        echo "needs results: $RESULTS"
+        case " $RESULTS " in
+          *" failure "*|*" cancelled "*) exit 1 ;;
+        esac

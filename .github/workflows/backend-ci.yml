@@ -6,9 +6,8 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
-  # No paths filter on PRs: build-and-test is a required status check on main, and a
-  # path-filtered workflow that skips never reports, which would block the merge.
-  # Running on every PR also guarantees CI covered the exact head commit being merged.
+  # No `paths:` filter on PRs: the required check must always report. Path filtering
+  # happens inside the workflow instead (changes job + aggregate job below).
   pull_request:
     branches: [ main ]
   # Dispatched by weekly-release.yml against the release-please branch: its pushes use
@@ -20,7 +19,29 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-and-test:
+  # Always runs so the required check below always reports; classifies the PR diff so
+  # the heavy job only runs when its area changed (see .github/scripts/changed-areas.sh).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.areas.outputs.backend }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      docker: ${{ steps.areas.outputs.docker }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 2
+
+    - name: Classify changed files
+      id: areas
+      run: .github/scripts/changed-areas.sh backend-ci.yml
+
+  backend-tests:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -105,3 +126,21 @@ jobs:
       with:
         name: coverage-report-backend
         path: TestResults/CoverageReport/
+
+  # Required status check (branch protection) — keep this job name. Passes when the
+  # heavy job succeeded or was skipped by the path filter; fails if anything failed or
+  # was cancelled, including the changes job itself.
+  build-and-test:
+    needs: [changes, backend-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+    - name: Require the backend tests to have passed or been skipped
+      env:
+        RESULTS: ${{ needs.changes.result }} ${{ needs.backend-tests.result }}
+      run: |
+        echo "needs results: $RESULTS"
+        case " $RESULTS " in
+          *" failure "*|*" cancelled "*) exit 1 ;;
+        esac
