@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Auth;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
@@ -37,6 +38,11 @@ public static class AuthModule
             })
             .AddEntityFrameworkStores<AuthDbContext>()
             .AddDefaultTokenProviders();
+
+        services.AddAuthorizationBuilder()
+            .AddPolicy(AuthPolicies.RequireOwner, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireRole(AuthRoles.Owner));
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();

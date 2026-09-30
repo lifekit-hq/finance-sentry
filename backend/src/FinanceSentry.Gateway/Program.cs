@@ -49,16 +49,16 @@ builder.Services
     .AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-// FR-006: trust the single in-network hop so the real client IP/scheme reach the rate limiter and
-// are propagated onward to backends. KnownNetworks/KnownProxies are cleared because the only hop in
-// front of the gateway is Tailscale Serve / the container bridge, not an untrusted public proxy.
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
+// FR-006: trust the hop in front of the gateway so the real client IP/scheme reach the rate limiter
+// and are propagated onward to backends. Only the hops named in ForwardedHeaders:KnownProxies /
+// ForwardedHeaders:KnownNetworks are trusted (prod: the edge network's bridge address, where Tailscale
+// Serve's loopback-published traffic arrives); unset keeps the framework default of loopback only.
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((options, config) =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
         | ForwardedHeaders.XForwardedProto
         | ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    TrustedForwarders.Apply(options, config);
 });
 
 // FR-004 / US3: per-client (real IP) fixed-window limits on abuse-prone routes. Limits are

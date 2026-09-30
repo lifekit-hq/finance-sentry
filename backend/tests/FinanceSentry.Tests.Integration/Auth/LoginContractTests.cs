@@ -178,7 +178,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
         }
     }
 
-    private static void ReplaceWithInMemory<TContext>(
+    protected static void ReplaceWithInMemory<TContext>(
         IServiceCollection services,
         string dbName,
         InMemoryDatabaseRoot root)

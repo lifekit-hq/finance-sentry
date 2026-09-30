@@ -7,7 +7,7 @@ namespace FinanceSentry.API.Hangfire;
 /// Allows every request — Docker port forwarding makes the host's IP look remote
 /// to Hangfire's default <c>LocalRequestsOnlyAuthorizationFilter</c>, which would
 /// otherwise return 403 when accessing the dashboard via <c>http://localhost</c>.
-/// Replace with a role-based filter (admin claim check) before enabling in production.
+/// Every other environment uses <see cref="OwnerDashboardAuthorizationFilter"/>.
 /// </summary>
 public sealed class DevDashboardAuthorizationFilter : IDashboardAuthorizationFilter
 {

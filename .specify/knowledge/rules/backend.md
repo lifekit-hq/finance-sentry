@@ -63,7 +63,9 @@ All API communication must be TLS-only. No plaintext financial data in logs or D
 
 Authentication is handled by `JwtAuthenticationMiddleware`. Every endpoint is protected
 unless explicitly added to the exempt list:
-`/health`, `/api/v1/health`, `/swagger`, `/api/webhook`, `/hangfire`
+`/health`, `/api/v1/health`, `/swagger`, `/api/webhook`. `/hangfire` gets the caller's identity
+attached when a valid token is present but is never rejected by the middleware — the dashboard's own
+filter enforces the `RequireOwner` policy.
 
 ---
 

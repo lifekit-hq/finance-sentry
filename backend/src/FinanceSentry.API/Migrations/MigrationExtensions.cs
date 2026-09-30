@@ -1,5 +1,7 @@
 namespace FinanceSentry.API.Migrations;
 
+using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -17,6 +19,7 @@ using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.Retention.Infrastructure.Persistence;
 using FinanceSentry.Modules.Agent.Infrastructure;
 using FinanceSentry.Modules.Events.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -62,8 +65,29 @@ public static class MigrationExtensions
         MigrateContext<EventsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
+        SeedOwnerRole(sp, app.Logger, status);
 
         return app;
+    }
+
+    private static void SeedOwnerRole(IServiceProvider sp, ILogger logger, StartupMigrationStatus status)
+    {
+        // An unreachable database was already reported by MigrateContext; seeding would only fail again.
+        if (status.SkippedContexts.Contains(typeof(AuthDbContext)))
+            return;
+
+        try
+        {
+            OwnerRoleSeeder.SeedAsync(
+                sp.GetRequiredService<RoleManager<IdentityRole>>(),
+                sp.GetRequiredService<UserManager<ApplicationUser>>(),
+                sp.GetRequiredService<IConfiguration>(),
+                logger).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Owner role seeding failed. Startup will continue.");
+        }
     }
 
     private static void SeedBankSyncCategories(IServiceProvider sp, ILogger logger)

@@ -46,7 +46,7 @@ public class VerifyGoogleCredentialCommandHandler(
             await PublishUserRegisteredAsync(user.Id, cancellationToken);
         }
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
