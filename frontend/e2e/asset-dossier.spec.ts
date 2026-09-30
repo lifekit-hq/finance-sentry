@@ -43,7 +43,7 @@ const WEALTH_SUMMARY = {
 };
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com'},
+  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner']},
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
@@ -537,5 +537,67 @@ test.describe("Ledger's read", () => {
     await expect(page.getByTestId('ledger-read-error')).toContainText(
       'Ledger could not produce a read right now.'
     );
+  });
+});
+
+test.describe('Owner-only agent surfaces', () => {
+  const NON_OWNER_AUTH = {...AUTH_RESPONSE, user: {...AUTH_RESPONSE.user, roles: []}};
+
+  async function signInWithoutOwnerRole(page: Page): Promise<void> {
+    for (const endpoint of ['auth/me', 'auth/refresh']) {
+      await page.route(`${API}/${endpoint}`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(NON_OWNER_AUTH),
+        })
+      );
+    }
+  }
+
+  test.beforeEach(async ({page}) => {
+    await mockApis(page);
+  });
+
+  test('a user without the owner role sees the read as unavailable and never requests it', async ({
+    page,
+  }) => {
+    await signInWithoutOwnerRole(page);
+    const narrativeRequests: string[] = [];
+    page.on('request', req => {
+      if (req.url().includes('/narrative')) narrativeRequests.push(req.method());
+    });
+
+    await page.goto('/assets/AAPL');
+
+    await expect(page.getByTestId('ledger-read-unavailable')).toBeVisible();
+    await expect(page.getByTestId('ledger-read-card')).toHaveCount(0);
+    await expect(page.getByTestId('ledger-read-generate')).toHaveCount(0);
+    expect(narrativeRequests).toEqual([]);
+  });
+
+  test('a user without the owner role gets no chat widget, no Ledger nav item, and /ledger redirects', async ({
+    page,
+  }) => {
+    await signInWithoutOwnerRole(page);
+
+    await page.goto('/assets/AAPL');
+    await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
+    await expect(page.locator('fns-chat-widget')).toHaveCount(0);
+    await expect(page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})).toHaveCount(0);
+
+    await page.goto('/ledger');
+    await expect(page).toHaveURL(/\/dashboard/);
+  });
+
+  test('the owner keeps the chat widget, the Ledger nav item and the generate button', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+
+    await expect(page.getByTestId('ledger-read-generate')).toBeVisible();
+    await expect(page.getByTestId('ledger-read-unavailable')).toHaveCount(0);
+    await expect(page.locator('fns-chat-widget')).toHaveCount(1);
+    await expect(page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})).toHaveCount(1);
   });
 });

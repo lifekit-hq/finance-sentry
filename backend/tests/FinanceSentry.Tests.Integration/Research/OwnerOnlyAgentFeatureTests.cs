@@ -28,6 +28,18 @@ public class OwnerOnlyAgentFeatureTests(AssetDossierApiFactory factory) : IClass
         factory.AgentConversationMock.Invocations.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Chat_ForOwner_PassesTheGateAndStreamsAReply()
+    {
+        using var client = factory.CreateAuthenticatedClient(owner: true);
+
+        var response = await client.PostAsync("/api/v1/agent/chat", ChatBody);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("event: error");
+    }
+
     [Theory]
     [InlineData("GET", "/api/v1/agent/conversations")]
     [InlineData("DELETE", "/api/v1/agent/conversations/00000000-0000-0000-0000-000000000001")]

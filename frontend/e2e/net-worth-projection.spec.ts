@@ -5,7 +5,7 @@ import {expect, type Page, test} from '@playwright/test';
 const API = '**/api/v1';
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com'},
+  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner']},
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
