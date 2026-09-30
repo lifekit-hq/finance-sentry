@@ -1,28 +1,80 @@
 name: Deploy to VPS
 
+# Deploys the images Docker Build published for one commit, by that commit's SHA — never :main.
 on:
-  push:
+  # A main push deploys once Docker Build has published its images: only a successful run for a
+  # push to main, so a failed or partial publish never deploys.
+  workflow_run:
+    workflows: [Docker Build]
+    types: [completed]
     branches: [main]
+  # Manual deploy / rollback: `sha` names the commit whose images to deploy.
   workflow_dispatch:
+    inputs:
+      sha:
+        description: Full commit SHA to deploy (rollback). Empty = the head of the selected branch.
+        required: false
+        type: string
 
+# One production stack: deploys queue, never overlap.
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: build + deploy on lifekit-vps
+    name: pull + deploy by commit SHA
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: [self-hosted, lifekit-vps, finance-sentry]
     timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
     steps:
+      # workflow_run: the commit Docker Build published. Dispatch: the `sha` input, else the
+      # dispatched ref's head. Exported as IMAGE_TAG, which the prod compose file tags images with.
+      - name: Resolve the commit to deploy
+        id: target
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          REF_SHA: ${{ github.sha }}
+        run: |
+          sha="${INPUT_SHA:-${RUN_SHA:-$REF_SHA}}"
+          sha="$(tr -d '[:space:]' <<< "$sha" | tr 'A-F' 'a-f')"
+          if ! [[ $sha =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the commit to deploy must be a full 40-character SHA"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=$sha" >> "$GITHUB_ENV"
+          echo "deploying $sha"
+
+      # The deployed commit's own compose file, deploy script and smoke tests, so config and
+      # images always come from the same commit (a rollback rolls both back).
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.sha }}
 
+      - name: Log in to ghcr
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A commit from before deploy-by-SHA has a compose file that builds its images instead, so
+      # it cannot be deployed this way.
       - name: Deploy
-        env:
-          # @lifekit-hq/* npm installs inside the frontend image build
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./docker/deploy.sh
+        run: |
+          if ! grep -q 'IMAGE_TAG' docker/docker-compose.prod.yml; then
+            echo "::error::$IMAGE_TAG predates deploying by commit SHA; pick a later commit"
+            exit 1
+          fi
+          ./docker/deploy.sh
 
       # Read-only Playwright smoke against the stack just deployed (real login, no
       # mocks). Runs in the Playwright image on the host network so it can reach the
