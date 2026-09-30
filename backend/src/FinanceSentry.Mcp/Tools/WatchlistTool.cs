@@ -27,10 +27,9 @@ public sealed class WatchlistTool(
         [Description("Optional exchange code for action=add, e.g. NASDAQ, NYSE.")] string? exchange = null,
         [Description("Optional free-form note for action=add.")] string? note = null,
         [Description("Watchlist item id to remove (from list/add). Required for action=remove.")] Guid? itemId = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

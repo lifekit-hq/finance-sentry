@@ -21,10 +21,9 @@ public sealed class RunThesisMonitorTool(
         + "resulting breaks in the same call. For a read-only view that does NOT re-evaluate or fire "
         + "alerts, use list_thesis_breaks instead.")]
     public async Task<ThesisMonitorResult?> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

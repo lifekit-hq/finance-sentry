@@ -16,10 +16,9 @@ public sealed class ListThesisEventsTool(
     [Description("Lists the caller's price-stamped thesis/candidate lifecycle events (Created, Broken, Unbroken, Closed, Promoted, Rejected, Expired, Snapshot), optionally filtered to one subject.")]
     public async Task<IReadOnlyList<ThesisEventDto>> ExecuteAsync(
         [Description("Optional thesis/candidate id to filter to a single subject's event trail.")] Guid? subjectId = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return [];

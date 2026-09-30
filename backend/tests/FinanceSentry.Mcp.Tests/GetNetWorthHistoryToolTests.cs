@@ -15,7 +15,7 @@ public sealed class GetNetWorthHistoryToolTests
     private readonly Mock<IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse>> _handler = new();
 
     private GetNetWorthHistoryTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver(), NullLogger<GetNetWorthHistoryTool>.Instance);
+        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetNetWorthHistoryTool>.Instance);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenHandlerThrows()
@@ -24,7 +24,7 @@ public sealed class GetNetWorthHistoryToolTests
             .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -36,7 +36,7 @@ public sealed class GetNetWorthHistoryToolTests
             .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new NetWorthHistoryResponse([], false));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -51,7 +51,7 @@ public sealed class GetNetWorthHistoryToolTests
             .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new NetWorthHistoryResponse([snap1, snap2], true));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(2);
         result[0].SnapshotDate.Should().Be(snap1.SnapshotDate);
@@ -79,7 +79,7 @@ public sealed class GetNetWorthHistoryToolTests
             .Callback<GetNetWorthHistoryQuery, CancellationToken>((q, _) => captured = q)
             .ReturnsAsync(new NetWorthHistoryResponse([], false));
 
-        await CreateSut().ExecuteAsync(UserId, from, to);
+        await CreateSut().ExecuteAsync(from, to);
 
         captured.Should().NotBeNull();
         captured!.UserId.Should().Be(UserId);

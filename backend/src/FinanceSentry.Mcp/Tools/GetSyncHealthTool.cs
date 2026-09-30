@@ -25,12 +25,11 @@ public sealed class GetSyncHealthTool(
     private readonly ILogger<GetSyncHealthTool> _logger = logger;
 
     [McpServerTool(Name = "get_sync_health")]
-    [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, Revolut X, IBKR). Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, Revolut X, IBKR).")]
     public async Task<IReadOnlyList<SyncHealthEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
         var userIdVal = effective.Value;
 

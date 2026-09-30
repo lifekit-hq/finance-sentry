@@ -16,10 +16,9 @@ public sealed class RejectCandidateTool(
     public async Task<RejectCandidateResult?> ExecuteAsync(
         [Description("Candidate id to reject.")] Guid id,
         [Description("Why the candidate is being rejected.")] string reason,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

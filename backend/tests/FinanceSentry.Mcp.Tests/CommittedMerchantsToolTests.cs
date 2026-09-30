@@ -40,7 +40,7 @@ public sealed class CommittedMerchantsToolTests
                 It.IsAny<CancellationToken>()))
              .ReturnsAsync([Dto("anytime fitness", "Anytime Fitness")]);
 
-        var result = await CreateSut().ExecuteAsync("list", userId: UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("list");
 
         result!.Action.Should().Be("list");
         result.Pins.Should().ContainSingle().Which.DisplayName.Should().Be("Anytime Fitness");
@@ -53,7 +53,7 @@ public sealed class CommittedMerchantsToolTests
         _list.Setup(h => h.Handle(It.IsAny<ListCommittedMerchantPinsQuery>(), It.IsAny<CancellationToken>()))
              .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync("  LIST ", userId: UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("  LIST ");
 
         result!.Action.Should().Be("list");
         result.Pins.Should().BeEmpty();
@@ -70,7 +70,7 @@ public sealed class CommittedMerchantsToolTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PinCommittedMerchantResult(dto, AlreadyPinned: false));
 
-        var result = await CreateSut().ExecuteAsync("pin", "Mario Scalas", UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("pin", "Mario Scalas");
 
         result!.Action.Should().Be("pin");
         result.Pin!.MerchantKey.Should().Be("mario scalas");
@@ -83,7 +83,7 @@ public sealed class CommittedMerchantsToolTests
         _pin.Setup(h => h.Handle(It.IsAny<PinCommittedMerchantCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PinCommittedMerchantResult(Dto("netflix", "Netflix"), AlreadyPinned: true));
 
-        var result = await CreateSut().ExecuteAsync("pin", "NETFLIX.COM", UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("pin", "NETFLIX.COM");
 
         result!.AlreadyPinned.Should().BeTrue();
         result.Error.Should().BeNull();
@@ -99,7 +99,7 @@ public sealed class CommittedMerchantsToolTests
                 It.IsAny<CancellationToken>()))
               .ReturnsAsync(removed);
 
-        var result = await CreateSut().ExecuteAsync("unpin", "Netflix", UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("unpin", "Netflix");
 
         result!.Action.Should().Be("unpin");
         result.Unpinned.Should().Be(removed);
@@ -112,7 +112,7 @@ public sealed class CommittedMerchantsToolTests
     [InlineData("unpin")]
     public async Task ExecuteAsync_MutationWithoutAMerchant_IsReportedNotAttempted(string action)
     {
-        var result = await CreateSut().ExecuteAsync(action, merchant: "  ", userId: UserId);
+        var result = await CreateSut(UserId).ExecuteAsync(action, merchant: "  ");
 
         result!.Error.Should().Contain("requires a merchant");
         _pin.VerifyNoOtherCalls();
@@ -122,7 +122,7 @@ public sealed class CommittedMerchantsToolTests
     [Fact]
     public async Task ExecuteAsync_UnknownAction_IsReportedWithTheAllowedSet()
     {
-        var result = await CreateSut().ExecuteAsync("delete", "Netflix", UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("delete", "Netflix");
 
         result!.Error.Should().Contain("list, pin, unpin");
         _list.VerifyNoOtherCalls();
@@ -137,7 +137,7 @@ public sealed class CommittedMerchantsToolTests
         _pin.Setup(h => h.Handle(It.IsAny<PinCommittedMerchantCommand>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new UnpinnableMerchantException());
 
-        var result = await CreateSut().ExecuteAsync("pin", "***", UserId);
+        var result = await CreateSut(UserId).ExecuteAsync("pin", "***");
 
         result!.Error.Should().Contain("recognisable merchant name");
     }

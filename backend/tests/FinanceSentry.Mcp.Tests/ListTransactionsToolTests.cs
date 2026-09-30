@@ -17,7 +17,7 @@ public sealed class ListTransactionsToolTests
     private readonly Mock<IBankingAccountsReader> _accountsReader = new();
 
     private ListTransactionsTool CreateSut() =>
-        new(_queryHandler.Object, _accountsReader.Object, new FakeIdentityResolver(), NullLogger<ListTransactionsTool>.Instance);
+        new(_queryHandler.Object, _accountsReader.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<ListTransactionsTool>.Instance);
 
     private static GlobalTransactionDto MakeTransaction(
         Guid? accountId = null,
@@ -52,7 +52,7 @@ public sealed class ListTransactionsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAllTransactionsQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -67,7 +67,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -87,7 +87,7 @@ public sealed class ListTransactionsToolTests
                 new BankingAccountSummary(accountId, "TestBank", "checking", "1234", "truelayer", "EUR", 1000m, null, "active", null)
             ]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         var entry = result[0];
@@ -110,7 +110,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("reader down"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result[0].Currency.Should().Be("unknown");
@@ -133,7 +133,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId, accountId: accountA.ToString());
+        var result = await CreateSut().ExecuteAsync(accountId: accountA.ToString());
 
         result.Should().HaveCount(1);
         result[0].AccountId.Should().Be(accountA.ToString());
@@ -148,7 +148,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId, accountId: "not-a-guid");
+        var result = await CreateSut().ExecuteAsync(accountId: "not-a-guid");
 
         result.Should().BeEmpty();
         _queryHandler.Verify(
@@ -170,7 +170,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId, category: "food_and_drink");
+        var result = await CreateSut().ExecuteAsync(category: "food_and_drink");
 
         result.Should().HaveCount(1);
         result[0].Category.Should().Be("FOOD_AND_DRINK");
@@ -196,9 +196,9 @@ public sealed class ListTransactionsToolTests
             .ReturnsAsync([]);
 
         var sut = CreateSut();
-        var page1 = await sut.ExecuteAsync(UserId, page: 1, pageSize: 2);
-        var page2 = await sut.ExecuteAsync(UserId, page: 2, pageSize: 2);
-        var page3 = await sut.ExecuteAsync(UserId, page: 3, pageSize: 2);
+        var page1 = await sut.ExecuteAsync(page: 1, pageSize: 2);
+        var page2 = await sut.ExecuteAsync(page: 2, pageSize: 2);
+        var page3 = await sut.ExecuteAsync(page: 3, pageSize: 2);
 
         page1.Should().HaveCount(2);
         page2.Should().HaveCount(2);
@@ -220,7 +220,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        await CreateSut().ExecuteAsync(UserId, fromDate: from, toDate: to);
+        await CreateSut().ExecuteAsync(fromDate: from, toDate: to);
 
         captured.Should().NotBeNull();
         captured!.From.Should().Be(from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
@@ -239,7 +239,7 @@ public sealed class ListTransactionsToolTests
             .Setup(r => r.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        await CreateSut().ExecuteAsync(UserId, search: "coffee");
+        await CreateSut().ExecuteAsync(search: "coffee");
 
         captured.Should().NotBeNull();
         captured!.Search.Should().Be("coffee");
@@ -258,7 +258,7 @@ public sealed class ListTransactionsToolTests
             .ReturnsAsync([]);
 
         // page=0 should be treated as page=1
-        var result = await CreateSut().ExecuteAsync(UserId, page: 0, pageSize: 10);
+        var result = await CreateSut().ExecuteAsync(page: 0, pageSize: 10);
 
         result.Should().HaveCount(1);
     }

@@ -42,19 +42,4 @@ public sealed class RecordEventVerdictToolTests
         captured.Verdict.Should().Be("Priced in; no action.");
         captured.Notified.Should().BeFalse();
     }
-
-    [Fact]
-    public async Task ExecuteAsync_ExplicitUserId_OverridesTheIdentity()
-    {
-        var other = Guid.NewGuid();
-        RecordEventVerdictCommand? captured = null;
-        _handler.Setup(h => h.Handle(It.IsAny<RecordEventVerdictCommand>(), It.IsAny<CancellationToken>()))
-            .Callback<RecordEventVerdictCommand, CancellationToken>((c, _) => captured = c)
-            .ReturnsAsync(false);
-
-        var result = await CreateTool(UserId).ExecuteAsync(Guid.NewGuid(), "x", true, userId: other);
-
-        result.Recorded.Should().BeFalse();
-        captured!.UserId.Should().Be(other);
-    }
 }

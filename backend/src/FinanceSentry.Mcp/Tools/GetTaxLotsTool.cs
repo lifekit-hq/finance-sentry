@@ -18,12 +18,11 @@ public sealed class GetTaxLotsTool(
     private readonly ILogger<GetTaxLotsTool> _logger = logger;
 
     [McpServerTool(Name = "get_tax_lots")]
-    [Description("Returns brokerage tax lots — one lot per current position. basisState is \"Verified\", \"Unverified\" or \"Unknown\" (fs-688): cost basis is independently recomputed from persisted fills and reconciled against the stored figure. Whenever basisState is not \"Verified\" — no fill history covers the full held quantity, or the recomputed cost basis disagrees with the stored one — averageCostUsd, costBasisUsd, unrealizedPnlUsd and unrealizedPnlPercent are null. Do not state or infer gain/loss for a lot whose basisState is not \"Verified\". Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns brokerage tax lots — one lot per current position. basisState is \"Verified\", \"Unverified\" or \"Unknown\" (fs-688): cost basis is independently recomputed from persisted fills and reconciled against the stored figure. Whenever basisState is not \"Verified\" — no fill history covers the full held quantity, or the recomputed cost basis disagrees with the stored one — averageCostUsd, costBasisUsd, unrealizedPnlUsd and unrealizedPnlPercent are null. Do not state or infer gain/loss for a lot whose basisState is not \"Verified\".")]
     public async Task<IReadOnlyList<TaxLotEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
         var userIdVal = effective.Value;
 

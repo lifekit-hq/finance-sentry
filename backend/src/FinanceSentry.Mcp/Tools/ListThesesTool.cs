@@ -15,10 +15,9 @@ public sealed class ListThesesTool(
     [McpServerTool(Name = "list_theses")]
     [Description("Lists the caller's investment theses, including key data points, catalysts, and invalidation triggers.")]
     public async Task<IReadOnlyList<ThesisDto>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return [];

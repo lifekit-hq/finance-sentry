@@ -61,10 +61,16 @@ using FinanceSentry.Modules.Risk.Domain.Ports;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence.Repositories;
+using System.Text.Json;
+using FinanceSentry.Mcp.Middleware;
+using FinanceSentry.Modules.Research.API.Responses;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Xunit;
 
 namespace FinanceSentry.Mcp.Tests.IntegrationTests;
@@ -84,7 +90,8 @@ public sealed class ToolParityTests
         string dbKey,
         IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>>? edgarFactsByTicker = null,
         IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null,
-        IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null)
+        IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null,
+        Guid? actingUserId = null)
     {
         var services = new ServiceCollection();
 
@@ -125,6 +132,7 @@ public sealed class ToolParityTests
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         services.AddScoped<IThesisRepository, ThesisRepository>();
+        services.AddScoped<INewsSourceRepository, NewsSourceRepository>();
         services.AddScoped<IIpsRepository, IpsRepository>();
 
         // Radar: repositories + read service + options (log-only default).
@@ -237,7 +245,8 @@ public sealed class ToolParityTests
             typeof(FinanceSentry.Modules.Radar.RadarModule).Assembly,
             typeof(FinanceSentry.Modules.Risk.RiskModule).Assembly);
 
-        services.AddSingleton<FinanceSentry.Mcp.Abstractions.IIdentityResolver>(new FakeIdentityResolver());
+        services.AddSingleton<FinanceSentry.Mcp.Abstractions.IIdentityResolver>(
+            new FakeIdentityResolver { ResolvedUserId = actingUserId });
         services.AddScoped<GetAccountSummaryTool>();
         services.AddScoped<ListTransactionsTool>();
         services.AddScoped<GetBudgetStatusTool>();
@@ -281,7 +290,7 @@ public sealed class ToolParityTests
     public async Task GetAccountSummary_ReturnsNonEmpty_WhenBankAndCryptoSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -299,7 +308,7 @@ public sealed class ToolParityTests
         await cryptoDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetAccountSummaryTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Should().HaveCountGreaterThanOrEqualTo(2);
@@ -317,7 +326,7 @@ public sealed class ToolParityTests
     public async Task ListTransactions_ReturnsNonEmpty_WhenTransactionSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -335,7 +344,7 @@ public sealed class ToolParityTests
         await bankDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<ListTransactionsTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Should().NotBeEmpty();
@@ -354,7 +363,7 @@ public sealed class ToolParityTests
     public async Task GetBudgetStatus_ReturnsNonEmpty_WhenBudgetSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -367,7 +376,7 @@ public sealed class ToolParityTests
         await budgetDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetBudgetStatusTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Should().NotBeEmpty();
@@ -387,7 +396,7 @@ public sealed class ToolParityTests
     public async Task ListActiveAlerts_ReturnsNonEmpty_WhenUnreadAlertSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -406,7 +415,7 @@ public sealed class ToolParityTests
         await alertsDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<ListActiveAlertsTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Should().NotBeEmpty();
@@ -425,7 +434,7 @@ public sealed class ToolParityTests
     public async Task GetPortfolioSnapshot_ReturnsNonEmpty_WhenBrokerageAndCryptoHoldingsSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -438,7 +447,7 @@ public sealed class ToolParityTests
         await brokerageDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetPortfolioSnapshotTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Positions.Should().HaveCountGreaterThanOrEqualTo(2);
@@ -463,7 +472,7 @@ public sealed class ToolParityTests
     public async Task GetPortfolioSnapshot_BucketsIdleBrokerageCashAsCash_NotAsPosition()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -474,7 +483,7 @@ public sealed class ToolParityTests
         await brokerageDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetPortfolioSnapshotTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Positions.Should().ContainSingle(e => e.Symbol == "AAPL");
         result.Positions.Should().NotContain(e => e.Symbol == "EUR");
@@ -496,7 +505,7 @@ public sealed class ToolParityTests
     public async Task BookFigures_AllThreeSurfaces_AgreeOnCashInvestedAndTotal()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -529,14 +538,14 @@ public sealed class ToolParityTests
 
         // Surface 1: GetPortfolioSnapshot
         var snapshotTool = svc.GetRequiredService<GetPortfolioSnapshotTool>();
-        var snapshot = await snapshotTool.ExecuteAsync(userId);
+        var snapshot = await snapshotTool.ExecuteAsync();
         snapshot.CashUsd.Should().Be(expectedCashUsd, "portfolio snapshot cash must match canonical figures");
         snapshot.InvestedValueUsd.Should().Be(expectedInvestedUsd, "portfolio snapshot invested must match canonical figures");
         snapshot.TotalValueUsd.Should().Be(expectedTotalUsd, "portfolio snapshot total must match canonical figures");
 
         // Surface 2: GetAllocationVsTarget — with no IPS the handler returns total via TotalValueUsd.
         var allocationTool = svc.GetRequiredService<GetAllocationVsTargetTool>();
-        var drift = await allocationTool.ExecuteAsync(userId);
+        var drift = await allocationTool.ExecuteAsync();
         drift.Should().NotBeNull();
         drift!.CashUsd.Should().Be(expectedCashUsd, "allocation drift cash must match canonical figures");
         drift.InvestedValueUsd.Should().Be(expectedInvestedUsd, "allocation drift invested must match canonical figures");
@@ -555,7 +564,7 @@ public sealed class ToolParityTests
     public async Task ListSubscriptions_ReturnsNonEmpty_WhenActiveSubscriptionSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -576,7 +585,7 @@ public sealed class ToolParityTests
         await subsDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<ListSubscriptionsTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result.Should().NotBeEmpty();
@@ -593,7 +602,7 @@ public sealed class ToolParityTests
     public async Task GetSyncHealth_ReturnsFourProviders_WithCorrectStatusWhenSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -622,7 +631,7 @@ public sealed class ToolParityTests
         await cryptoDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetSyncHealthTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         // Every provider is always returned.
         result.Should().HaveCount(5);
@@ -651,7 +660,7 @@ public sealed class ToolParityTests
     public async Task GetTaxLots_ReturnsCostBasisAndPnl_WhenBrokerageHoldingSeededWithAvgCost()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -696,7 +705,7 @@ public sealed class ToolParityTests
         await brokerageDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetTaxLotsTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().HaveCount(2);
 
@@ -720,7 +729,7 @@ public sealed class ToolParityTests
     public async Task GetCryptoPnlDetail_ReturnsCostBasisAndUnrealizedPnl_WhenHoldingSeededWithCostBasis()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -740,7 +749,7 @@ public sealed class ToolParityTests
         await cryptoDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetCryptoPnlDetailTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().HaveCount(2);
 
@@ -761,7 +770,7 @@ public sealed class ToolParityTests
     public async Task GetNetWorthHistory_ReturnsSeededSnapshots()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -794,7 +803,7 @@ public sealed class ToolParityTests
         await wealthDb.SaveChangesAsync();
 
         var tool = svc.GetRequiredService<GetNetWorthHistoryTool>();
-        var result = await tool.ExecuteAsync(userId);
+        var result = await tool.ExecuteAsync();
 
         result.Should().HaveCount(2);
         result.Should().AllSatisfy(e =>
@@ -810,7 +819,7 @@ public sealed class ToolParityTests
     public async Task GetCashflowReport_AggregatesTransactionsByMonth_AndExcludesInternalTransfers()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -851,7 +860,6 @@ public sealed class ToolParityTests
 
         var tool = svc.GetRequiredService<GetCashflowReportTool>();
         var result = await tool.ExecuteAsync(
-            userId,
             fromDate: DateOnly.FromDateTime(lastMonthStart),
             toDate: DateOnly.FromDateTime(today));
 
@@ -883,7 +891,7 @@ public sealed class ToolParityTests
         };
         var factsByTicker = new Dictionary<string, IReadOnlyList<FundamentalFact>> { ["MU"] = breachingFacts };
 
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), factsByTicker);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), factsByTicker, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -903,7 +911,7 @@ public sealed class ToolParityTests
         await researchDb.SaveChangesAsync();
 
         var runTool = svc.GetRequiredService<RunThesisMonitorTool>();
-        var result = await runTool.ExecuteAsync(userId);
+        var result = await runTool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result!.Summary.ThesesEvaluated.Should().Be(1);
@@ -912,7 +920,7 @@ public sealed class ToolParityTests
         result.Breaks.Should().ContainSingle(b => b.Ticker == "MU");
 
         var listTool = svc.GetRequiredService<ListThesisBreaksTool>();
-        var breaks = await listTool.ExecuteAsync(userId);
+        var breaks = await listTool.ExecuteAsync();
 
         breaks.Should().ContainSingle();
         var thesisBreak = breaks.Single();
@@ -950,7 +958,7 @@ public sealed class ToolParityTests
             ],
         };
 
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), closesByTicker: closesByTicker);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), closesByTicker: closesByTicker, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -964,20 +972,19 @@ public sealed class ToolParityTests
                 new ThesisInvalidationTrigger(
                     FinanceSentry.Modules.Research.Domain.ThesisMonitor.ThesisMetric.RelativeReturn,
                     "lessThan", -0.05m, BenchmarkTicker: "SPY", WindowDays: 1, ConsecutivePeriods: 2),
-            ],
-            userId: userId);
+            ]);
 
         saved.Should().NotBeNull();
 
         var runTool = svc.GetRequiredService<RunThesisMonitorTool>();
-        var result = await runTool.ExecuteAsync(userId);
+        var result = await runTool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result!.Summary.BreaksRaised.Should().Be(1);
         result.Breaks.Should().ContainSingle(b => b.Ticker == "GRAB");
 
         var listTool = svc.GetRequiredService<ListThesisBreaksTool>();
-        var breaks = await listTool.ExecuteAsync(userId);
+        var breaks = await listTool.ExecuteAsync();
 
         breaks.Should().ContainSingle();
         var thesisBreak = breaks.Single();
@@ -990,12 +997,12 @@ public sealed class ToolParityTests
     public async Task ListThesisBreaks_ReturnsEmpty_WhenNoThesesAreBroken()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var listTool = svc.GetRequiredService<ListThesisBreaksTool>();
-        var breaks = await listTool.ExecuteAsync(userId);
+        var breaks = await listTool.ExecuteAsync();
 
         breaks.Should().NotBeNull();
         breaks.Should().BeEmpty();
@@ -1010,7 +1017,7 @@ public sealed class ToolParityTests
             ["MU"] = new() { Ticker = "MU", Price = 100m },
             ["SPY"] = new() { Ticker = "SPY", Price = 500m },
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1024,7 +1031,7 @@ public sealed class ToolParityTests
             CancellationToken.None);
 
         var listTool = svc.GetRequiredService<ListThesisEventsTool>();
-        var events = await listTool.ExecuteAsync(subjectId: thesis.Id, userId: userId);
+        var events = await listTool.ExecuteAsync(subjectId: thesis.Id);
 
         events.Should().ContainSingle();
         var created = events.Single();
@@ -1038,7 +1045,7 @@ public sealed class ToolParityTests
     public async Task SaveThesis_AcceptsLongNarrativeThesisText()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
         var thesisText = string.Join(
@@ -1051,8 +1058,7 @@ public sealed class ToolParityTests
             thesisText: thesisText,
             keyDataPoints: [],
             catalysts: [],
-            invalidationTriggers: [],
-            userId: userId);
+            invalidationTriggers: []);
 
         thesis.Should().NotBeNull();
         thesis!.ThesisText.Should().Be(thesisText);
@@ -1068,7 +1074,7 @@ public sealed class ToolParityTests
             ["MU"] = new() { Ticker = "MU", Price = 100m },
             ["SPY"] = new() { Ticker = "SPY", Price = 500m },
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: creationQuotes);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: creationQuotes, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1081,7 +1087,7 @@ public sealed class ToolParityTests
             CancellationToken.None);
 
         var perfTool = svc.GetRequiredService<GetThesisPerformanceTool>();
-        var result = await perfTool.ExecuteAsync(ticker: "MU", userId: userId);
+        var result = await perfTool.ExecuteAsync(ticker: "MU");
 
         result.Should().NotBeNull();
         result!.IsEvaluable.Should().BeTrue();
@@ -1100,7 +1106,7 @@ public sealed class ToolParityTests
             ["MU"] = new() { Ticker = "MU", Price = 100m },
             ["SPY"] = new() { Ticker = "SPY", Price = 500m },
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1113,7 +1119,7 @@ public sealed class ToolParityTests
             CancellationToken.None);
 
         var trackRecordTool = svc.GetRequiredService<GetTrackRecordTool>();
-        var summary = await trackRecordTool.ExecuteAsync(userId: userId);
+        var summary = await trackRecordTool.ExecuteAsync();
 
         summary.Should().NotBeNull();
         summary!.TotalCount.Should().Be(1);
@@ -1125,13 +1131,13 @@ public sealed class ToolParityTests
     public async Task GetPostmortemPacket_ReturnsEmpty_WhenNoTerminalEventsInPeriod()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var tool = svc.GetRequiredService<GetPostmortemPacketTool>();
         var packet = await tool.ExecuteAsync(
-            periodStart: new DateOnly(2026, 1, 1), periodEnd: new DateOnly(2026, 12, 31), userId: userId);
+            periodStart: new DateOnly(2026, 1, 1), periodEnd: new DateOnly(2026, 12, 31));
 
         packet.Should().NotBeNull();
         packet!.Entries.Should().BeEmpty();
@@ -1267,7 +1273,7 @@ public sealed class ToolParityTests
     public async Task ListSignals_ReturnsPortfolioScannerSignal_WhenSeeded()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1290,8 +1296,7 @@ public sealed class ToolParityTests
 
         var tool = svc.GetRequiredService<ListSignalsTool>();
         var result = await tool.ExecuteAsync(
-            scanner: FinanceSentry.Modules.Radar.Domain.RadarScanners.Portfolio,
-            userId: userId);
+            scanner: FinanceSentry.Modules.Radar.Domain.RadarScanners.Portfolio);
 
         result.Should().NotBeNull();
         result.Should().ContainSingle(s =>
@@ -1320,19 +1325,19 @@ public sealed class ToolParityTests
     public async Task SaveRiskRules_ThenGetRiskRules_RoundTripsCurrentVersion()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var saveTool = svc.GetRequiredService<SaveRiskRulesTool>();
-        var saved = await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m, userId: userId);
+        var saved = await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m);
 
         saved.Should().NotBeNull();
         saved!.Version.Should().Be(1);
         saved.MaxPositionWeightPct.Should().Be(0.25m);
 
         var getTool = svc.GetRequiredService<GetRiskRulesTool>();
-        var current = await getTool.ExecuteAsync(userId);
+        var current = await getTool.ExecuteAsync();
 
         current.Should().NotBeNull();
         current!.MaxPositionWeightPct.Should().Be(0.25m);
@@ -1342,7 +1347,7 @@ public sealed class ToolParityTests
     public async Task CheckRiskRules_NoProposal_ReturnsComplianceReport_WithConcentrationViolation()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1352,10 +1357,10 @@ public sealed class ToolParityTests
         await brokerageDb.SaveChangesAsync();
 
         var saveTool = svc.GetRequiredService<SaveRiskRulesTool>();
-        await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m, userId: userId);
+        await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m);
 
         var checkTool = svc.GetRequiredService<CheckRiskRulesTool>();
-        var result = await checkTool.ExecuteAsync(userId: userId);
+        var result = await checkTool.ExecuteAsync();
 
         result.Should().NotBeNull();
         result!.HasRuleSet.Should().BeTrue();
@@ -1367,7 +1372,7 @@ public sealed class ToolParityTests
     public async Task CheckRiskRules_Proposal_ReturnsRefusedVerdict_WhenBreachingConcentration()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1380,10 +1385,10 @@ public sealed class ToolParityTests
         await bankDb.SaveChangesAsync();
 
         var saveTool = svc.GetRequiredService<SaveRiskRulesTool>();
-        await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m, userId: userId);
+        await saveTool.ExecuteAsync(maxPositionWeightPct: 0.25m);
 
         var checkTool = svc.GetRequiredService<CheckRiskRulesTool>();
-        var verdict = await checkTool.ExecuteAsync(ticker: "NVDA", proposedUsd: 5_000m, userId: userId);
+        var verdict = await checkTool.ExecuteAsync(ticker: "NVDA", proposedUsd: 5_000m);
 
         verdict.Should().NotBeNull();
         verdict!.Decision.Should().Be(RiskDecision.Refused);
@@ -1395,7 +1400,7 @@ public sealed class ToolParityTests
     public async Task CheckRiskRules_Proposal_UsesCurrentValueBook_ForMinCashBuffer()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1414,12 +1419,12 @@ public sealed class ToolParityTests
         await cryptoDb.SaveChangesAsync();
 
         var saveTool = svc.GetRequiredService<SaveRiskRulesTool>();
-        await saveTool.ExecuteAsync(minCashBufferPct: 0.10m, userId: userId);
+        await saveTool.ExecuteAsync(minCashBufferPct: 0.10m);
 
         var checkTool = svc.GetRequiredService<CheckRiskRulesTool>();
 
         // $800 fits within the 10% buffer against the $14,500 market-value book: Allowed.
-        var verdict = await checkTool.ExecuteAsync(ticker: "MHPC", proposedUsd: 800m, userId: userId);
+        var verdict = await checkTool.ExecuteAsync(ticker: "MHPC", proposedUsd: 800m);
         verdict.Should().NotBeNull();
         verdict!.Decision.Should().Be(RiskDecision.Allowed);
         verdict.RuleKey.Should().NotBe(RiskRuleKeys.MinCashBuffer);
@@ -1427,7 +1432,7 @@ public sealed class ToolParityTests
         // Headroom = cash − (10% × totalBook) = $2,446 − $1,450 = $996.
         // A proposal just above headroom must Refuse and expose the ≈$996 figure,
         // proving the denominator is current market value, not phantom cost basis.
-        var refused = await checkTool.ExecuteAsync(ticker: "MHPC", proposedUsd: 997m, userId: userId);
+        var refused = await checkTool.ExecuteAsync(ticker: "MHPC", proposedUsd: 997m);
         refused.Should().NotBeNull();
         refused!.Decision.Should().Be(RiskDecision.Refused);
         refused.RuleKey.Should().Be(RiskRuleKeys.MinCashBuffer);
@@ -1449,12 +1454,12 @@ public sealed class ToolParityTests
                 new("MSFT", "GrossProfit", "GrossProfit", "USD", 70m, new DateOnly(2026, 3, 31), "Q3", 2026, "10-Q"),
             ],
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), facts);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), facts, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var tool = svc.GetRequiredService<ScoreCandidateTool>();
-        var result = await tool.ExecuteAsync("MSFT", userId: userId);
+        var result = await tool.ExecuteAsync("MSFT");
 
         result.Should().NotBeNull();
         result!.Ticker.Should().Be("MSFT");
@@ -1468,15 +1473,15 @@ public sealed class ToolParityTests
     public async Task ListCandidates_ReturnsScoredCandidate_AfterScoring()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var scoreTool = svc.GetRequiredService<ScoreCandidateTool>();
-        await scoreTool.ExecuteAsync("NVDA", userId: userId);
+        await scoreTool.ExecuteAsync("NVDA");
 
         var listTool = svc.GetRequiredService<ListCandidatesTool>();
-        var result = await listTool.ExecuteAsync(userId: userId);
+        var result = await listTool.ExecuteAsync();
 
         result.Should().ContainSingle(c => c.Ticker == "NVDA" && c.Status == CandidateStatus.Active);
     }
@@ -1490,16 +1495,16 @@ public sealed class ToolParityTests
             ["AMD"] = new() { Ticker = "AMD", Price = 100m },
             ["SPY"] = new() { Ticker = "SPY", Price = 500m },
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes);
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var scoreTool = svc.GetRequiredService<ScoreCandidateTool>();
-        var scored = await scoreTool.ExecuteAsync("AMD", userId: userId);
+        var scored = await scoreTool.ExecuteAsync("AMD");
 
         var promoteTool = svc.GetRequiredService<PromoteCandidateTool>();
         // No rule set on file → gate Allowed → thesis created.
-        var result = await promoteTool.ExecuteAsync(id: scored!.CandidateId, userId: userId);
+        var result = await promoteTool.ExecuteAsync(id: scored!.CandidateId);
 
         result.Should().NotBeNull();
         result!.Gate.Decision.Should().Be(RiskGateDecision.Allowed);
@@ -1519,11 +1524,10 @@ public sealed class ToolParityTests
             ["AMD"] = new() { Ticker = "AMD", Price = 100m },
             ["INTC"] = new() { Ticker = "INTC", Price = 50m },
         };
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes);
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), quotesByTicker: quotes, actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
-
-        var userId = Guid.NewGuid();
 
         // Real book: mostly invested, cash sits well below a 10% floor ($200 cash / $10,000 book).
         var bankDb = svc.GetRequiredService<BankSyncDbContext>();
@@ -1540,17 +1544,17 @@ public sealed class ToolParityTests
         await cryptoDb.SaveChangesAsync();
 
         var saveRiskRules = svc.GetRequiredService<SaveRiskRulesTool>();
-        await saveRiskRules.ExecuteAsync(minCashBufferPct: 0.10m, userId: userId);
+        await saveRiskRules.ExecuteAsync(minCashBufferPct: 0.10m);
 
         var scoreTool = svc.GetRequiredService<ScoreCandidateTool>();
-        var scoredPaper = await scoreTool.ExecuteAsync("AMD", userId: userId);
-        var scoredReal = await scoreTool.ExecuteAsync("INTC", userId: userId);
+        var scoredPaper = await scoreTool.ExecuteAsync("AMD");
+        var scoredReal = await scoreTool.ExecuteAsync("INTC");
 
         var promoteTool = svc.GetRequiredService<PromoteCandidateTool>();
 
         // Paper/tracking promotion: MinCashBuffer must not block it — no override needed.
         var paperResult = await promoteTool.ExecuteAsync(
-            id: scoredPaper!.CandidateId, proposedUsd: 100m, userId: userId, paper: true);
+            id: scoredPaper!.CandidateId, proposedUsd: 100m, paper: true);
 
         paperResult.Should().NotBeNull();
         paperResult!.Gate.Decision.Should().Be(RiskGateDecision.Allowed);
@@ -1558,7 +1562,7 @@ public sealed class ToolParityTests
 
         // Same book, same size, paper=false (default): today's real-book rule set still refuses.
         var realResult = await promoteTool.ExecuteAsync(
-            id: scoredReal!.CandidateId, proposedUsd: 100m, userId: userId);
+            id: scoredReal!.CandidateId, proposedUsd: 100m);
 
         realResult.Should().NotBeNull();
         realResult!.Gate.Decision.Should().Be(RiskGateDecision.Refused);
@@ -1570,23 +1574,119 @@ public sealed class ToolParityTests
     public async Task RejectCandidate_MarksRejected_WithReason()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"));
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
         var scoreTool = svc.GetRequiredService<ScoreCandidateTool>();
-        var scored = await scoreTool.ExecuteAsync("INTC", userId: userId);
+        var scored = await scoreTool.ExecuteAsync("INTC");
 
         var rejectTool = svc.GetRequiredService<RejectCandidateTool>();
-        var result = await rejectTool.ExecuteAsync(id: scored!.CandidateId, reason: "valuation too rich", userId: userId);
+        var result = await rejectTool.ExecuteAsync(id: scored!.CandidateId, reason: "valuation too rich");
 
         result.Should().NotBeNull();
         result!.CandidateFound.Should().BeTrue();
         result.Status.Should().Be(CandidateStatus.Rejected);
 
         var listTool = svc.GetRequiredService<ListCandidatesTool>();
-        var listed = await listTool.ExecuteAsync(status: CandidateStatus.Rejected, userId: userId);
+        var listed = await listTool.ExecuteAsync(status: CandidateStatus.Rejected);
         listed.Should().ContainSingle(c => c.Ticker == "INTC" && c.RejectedReason == "valuation too rich");
+    }
+
+    // ── Caller scoping ───────────────────────────────────────────────────────
+    // An MCP client controls every key of a tool call's arguments. These facts drive the SDK's own
+    // tool invocation with raw JSON arguments that name another user's id, while authenticated as
+    // the caller, and assert the call only ever reaches the caller's own data.
+
+    private static readonly Lazy<IReadOnlyList<McpServerTool>> RegisteredTools = new(() =>
+    {
+        var services = new ServiceCollection();
+        services.AddMcpServer().WithFinanceSentryTools(McpServiceRegistration.McpAssembly);
+        return [.. services.BuildServiceProvider()
+            .GetRequiredService<IOptions<McpServerOptions>>()
+            .Value.ToolCollection!];
+    });
+
+    private static async Task<string> CallToolAsync(IServiceProvider services, string toolName, object arguments)
+    {
+        var tool = RegisteredTools.Value.Single(t => t.ProtocolTool.Name == toolName);
+        var json = JsonSerializer.SerializeToElement(arguments);
+        var context = TestRequestContext.ForToolCall(
+            toolName,
+            services,
+            json.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()));
+
+        var result = await tool.InvokeAsync(context);
+
+        result.IsError.Should().NotBe(true);
+        return string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
+    }
+
+    // Seeds or inspects another user's data by constructing the tool for that user directly.
+    private static T ActingAs<T>(IServiceProvider services, Guid userId)
+        where T : notnull
+        => ActivatorUtilities.CreateInstance<T>(services, new FakeIdentityResolver { ResolvedUserId = userId });
+
+    private static Task<ThesisDto?> SeedThesisAsync(IServiceProvider services, Guid ownerId, string ticker)
+        => ActingAs<SaveThesisTool>(services, ownerId).ExecuteAsync(
+            ticker: ticker,
+            thesisText: $"{ticker} thesis",
+            keyDataPoints: [],
+            catalysts: [],
+            invalidationTriggers: []);
+
+    [Fact]
+    public async Task ListTheses_WithAnotherUsersIdInArguments_ReturnsOnlyTheCallersTheses()
+    {
+        var callerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: callerId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        await SeedThesisAsync(svc, callerId, "CALLR");
+        await SeedThesisAsync(svc, otherUserId, "OTHER");
+
+        var text = await CallToolAsync(svc, "list_theses", new { userId = otherUserId });
+
+        text.Should().Contain("CALLR");
+        text.Should().NotContain("OTHER");
+    }
+
+    [Fact]
+    public async Task SaveRiskRules_WithAnotherUsersIdInArguments_WritesOnlyTheCallersRules()
+    {
+        var callerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: callerId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        await CallToolAsync(svc, "save_risk_rules", new { maxPositionWeightPct = 0.25m, userId = otherUserId });
+
+        (await ActingAs<GetRiskRulesTool>(svc, otherUserId).ExecuteAsync()).Should().BeNull();
+        var callerRules = await ActingAs<GetRiskRulesTool>(svc, callerId).ExecuteAsync();
+        callerRules.Should().NotBeNull();
+        callerRules!.MaxPositionWeightPct.Should().Be(0.25m);
+    }
+
+    [Fact]
+    public async Task DeleteThesis_WithAnotherUsersIdInArguments_LeavesTheirThesisInPlace()
+    {
+        var callerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: callerId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var otherThesis = await SeedThesisAsync(svc, otherUserId, "OTHER");
+        otherThesis.Should().NotBeNull();
+
+        var text = await CallToolAsync(svc, "delete_thesis", new { id = otherThesis!.Id, userId = otherUserId });
+
+        text.Should().Be("false");
+        (await ActingAs<ListThesesTool>(svc, otherUserId).ExecuteAsync())
+            .Should().ContainSingle(t => t.Id == otherThesis.Id);
     }
 
     // ── Research retrieval (036) ─────────────────────────────────────────────

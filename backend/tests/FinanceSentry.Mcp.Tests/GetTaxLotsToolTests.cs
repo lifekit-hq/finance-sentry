@@ -15,7 +15,7 @@ public sealed class GetTaxLotsToolTests
     private readonly Mock<IQueryHandler<GetTaxLotsQuery, TaxLotsResponse>> _handler = new();
 
     private GetTaxLotsTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver(), NullLogger<GetTaxLotsTool>.Instance);
+        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetTaxLotsTool>.Instance);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenHandlerThrows()
@@ -24,7 +24,7 @@ public sealed class GetTaxLotsToolTests
             .Setup(h => h.Handle(It.IsAny<GetTaxLotsQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db down"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -55,7 +55,7 @@ public sealed class GetTaxLotsToolTests
                 TotalCostBasisUsd: 1_500m,
                 TotalUnrealizedPnlUsd: 400m));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         var aapl = result[0];
@@ -84,7 +84,7 @@ public sealed class GetTaxLotsToolTests
                 TotalCostBasisUsd: 0m,
                 TotalUnrealizedPnlUsd: 0m));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result[0].AverageCostUsd.Should().BeNull();

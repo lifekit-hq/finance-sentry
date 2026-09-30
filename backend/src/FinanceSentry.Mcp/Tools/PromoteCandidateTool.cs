@@ -20,11 +20,10 @@ public sealed class PromoteCandidateTool(
         [Description("Set true to promote despite a Refused risk verdict (records an explicit override signal).")] bool overrideRisk = false,
         [Description("Proposed position size in USD for the risk gate's concentration/sizing check. Defaults to 0 (no sizing).")] decimal proposedUsd = 0m,
         [Description("Optional contemporaneous reasoning captured at promotion time.")] string? decisionNote = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Set true for a paper/tracking-only promotion: the risk gate skips the real-book cash-funding rule (MinCashBuffer) but still enforces concentration/sizing rules. Defaults to false (real-book rule set unchanged).")] bool paper = false,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

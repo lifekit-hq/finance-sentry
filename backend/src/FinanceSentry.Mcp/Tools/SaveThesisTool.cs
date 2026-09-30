@@ -24,10 +24,9 @@ public sealed class SaveThesisTool(
         [Description("Entry price per share (the price you paid, not the asset's historical peak). Required for price_drawdown triggers to be anchored to entry.")] decimal? entryPrice = null,
         [Description("Thesis id when updating; null to create.")] Guid? id = null,
         [Description("Optional contemporaneous reasoning captured at creation time (FR-008b decision journal). Only applied on create.")] string? decisionNote = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

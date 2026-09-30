@@ -15,7 +15,7 @@ public sealed class GetCryptoPnlDetailToolTests
     private readonly Mock<IQueryHandler<GetCryptoPnlDetailQuery, CryptoPnlDetailResponse>> _handler = new();
 
     private GetCryptoPnlDetailTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver(), NullLogger<GetCryptoPnlDetailTool>.Instance);
+        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetCryptoPnlDetailTool>.Instance);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsEmpty_WhenHandlerThrows()
@@ -24,7 +24,7 @@ public sealed class GetCryptoPnlDetailToolTests
             .Setup(h => h.Handle(It.IsAny<GetCryptoPnlDetailQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -54,7 +54,7 @@ public sealed class GetCryptoPnlDetailToolTests
                 TotalUnrealizedPnlUsd: 7_000m,
                 TotalRealizedPnlUsd: 500m));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         var btc = result[0];
@@ -82,7 +82,7 @@ public sealed class GetCryptoPnlDetailToolTests
                 TotalUnrealizedPnlUsd: 0m,
                 TotalRealizedPnlUsd: 0m));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result[0].CostBasisUsd.Should().BeNull();
