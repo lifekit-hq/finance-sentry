@@ -204,6 +204,11 @@ GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter())
 // instead of re-parenting it onto a possibly day-old request trace (#616 follow-up).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireManualRequeueDetectionFilter());
 
+// Invariant: the startup sweeps (a reap-all of sync state) run once, here, before the host serves and
+// before the Hangfire server starts. They must never run after the API is serving — a reap-all then
+// would fail live syncs.
+StartupSweeps.Enqueue(app.Services);
+
 app.Run();
 
 public partial class Program { }

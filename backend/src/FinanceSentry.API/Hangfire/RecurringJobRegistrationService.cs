@@ -13,7 +13,8 @@ using global::Hangfire.PostgreSql;
 /// default) passes, so a registration that throws on it cannot succeed by retrying for seconds — and
 /// doing it before <c>app.Run()</c> turned that window into a crash loop (2026-09-30). Here the API
 /// serves immediately and registration retries with capped backoff for longer than the lock can live.
-/// Registration is idempotent (<c>AddOrUpdate</c>), so the whole pass is safe to repeat.
+/// Registration is idempotent (<c>AddOrUpdate</c> only), so the whole pass is safe to repeat; the one-shot
+/// startup enqueues live in <see cref="StartupSweeps"/> and never ride this retry loop.
 /// When the budget is spent: Error log and <see cref="RecurringJobRegistrationState.Failed"/>, which the
 /// <c>job-registration</c> readiness check reports. Any other exception is not handled here: it leaves
 /// <c>ExecuteAsync</c>, and the host stops as for any unhandled background-service failure — the same
@@ -88,15 +89,11 @@ public sealed class RecurringJobRegistrationService(
     {
         JobRegistrationExtensions.RegisterAllModuleJobs(services);
 
-        // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
-        // fallback table behind as soon as the app is up.
+        // Live FX rates: refresh daily.
         services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<ExchangeRateRefreshJob>(
             ExchangeRateJobId,
             job => job.RunAsync(CancellationToken.None),
             Cron.Daily());
-
-        services.GetRequiredService<IBackgroundJobClient>()
-            .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
     }
 
     private async Task WaitForHostStartedAsync(CancellationToken stoppingToken)

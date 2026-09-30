@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.JobRegistration;
 
 using FinanceSentry.API.Hangfire;
 using FinanceSentry.API.Migrations;
+using FinanceSentry.Modules.BankSync;
 using FinanceSentry.Modules.Companion;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
@@ -10,6 +11,7 @@ using global::Hangfire.PostgreSql;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -47,7 +49,11 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
     {
         var connectionString = _postgres!.GetConnectionString();
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = connectionString })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = connectionString,
+                ["Deduplication:MasterKeyBase64"] = Convert.ToBase64String(new byte[32]),
+            })
             .Build();
 
         return Host.CreateDefaultBuilder()
@@ -56,6 +62,7 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
                 services.AddHangfire(cfg => cfg.UsePostgreSqlStorage(
                     o => o.UseNpgsqlConnection(connectionString),
                     new PostgreSqlStorageOptions { SchemaName = "hangfire", PrepareSchemaIfNecessary = true }));
+                services.AddBankSyncModule(config);
                 services.AddCompanionModule(config);
                 services.AddSingleton<StartupMigrationStatus>();
                 services.AddSingleton<RecurringJobRegistrationStatus>();
@@ -63,6 +70,16 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
                 services.AddHostedService<RecurringJobRegistrationService>();
             })
             .Build();
+    }
+
+    private async Task<long> CountEnqueuedAsync(string jobTypeName)
+    {
+        await using var connection = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "select count(*) from hangfire.job where invocationdata->>'Type' like @type", connection);
+        command.Parameters.AddWithValue("type", $"%.{jobTypeName},%");
+        return (long)(await command.ExecuteScalarAsync())!;
     }
 
     private static async Task<bool> WaitFor(Func<bool> condition)
@@ -87,6 +104,9 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
         var holder = storage.GetConnection();
         var heldLock = holder.AcquireDistributedLock(CaptureJobLock, TimeSpan.FromSeconds(5));
 
+        // Same lifecycle point as Program.cs: once, before the host starts serving.
+        StartupSweeps.Enqueue(host.Services);
+
         // Registration blocks on the held lock (15s per attempt) — the host must still start.
         await host.StartAsync().WaitAsync(Timeout);
         status.State.Should().Be(RecurringJobRegistrationState.Pending);
@@ -100,7 +120,12 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
 
         (await WaitFor(() => status.State == RecurringJobRegistrationState.Registered)).Should().BeTrue();
         using var read = storage.GetConnection();
-        read.GetAllItemsFromSet("recurring-jobs").Should().Contain("companion-capture");
+        read.GetAllItemsFromSet("recurring-jobs").Should().Contain(["companion-capture", "bank-account-sync-scheduler"]);
+
+        // The sweeps are not registration: several retried passes must not have re-enqueued them.
+        (await CountEnqueuedAsync("StaleSyncReaperJob")).Should().Be(1);
+        (await CountEnqueuedAsync("SyncScheduler")).Should().Be(1);
+        (await CountEnqueuedAsync("ExchangeRateRefreshJob")).Should().Be(1);
         await host.StopAsync();
     }
 
