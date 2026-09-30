@@ -33,14 +33,14 @@ fi
 backend=false frontend=false docker=false
 while IFS= read -r f; do
   case "$f" in
-    # Files that no CI area builds or tests.
-    docs/*|specs/*|.specify/*|.claude/*|.qwen/*|.devclaw/*|.vscode/*|.husky/*|*.md|LICENSE) ;;
-    .github/workflows/"$own_workflow") backend=true frontend=true docker=true ;;
-    .github/scripts/*) backend=true frontend=true docker=true ;;
-    .github/*) ;;
+    # Area inputs first: markdown under them (e.g. agent/ledger/*.md) is still an input.
     frontend/*) frontend=true ;;
     backend/*|agent/*|global.json|.config/*) backend=true docker=true ;;
     docker/Dockerfile|.dockerignore) docker=true ;;
+    .github/workflows/"$own_workflow") backend=true frontend=true docker=true ;;
+    .github/scripts/*) backend=true frontend=true docker=true ;;
+    # Files that no CI area builds or tests.
+    docs/*|specs/*|.specify/*|.claude/*|.qwen/*|.devclaw/*|.vscode/*|.husky/*|.github/*|*.md|LICENSE) ;;
     *) echo "unclassified path '$f': running everything"; backend=true frontend=true docker=true ;;
   esac
 done <<< "$files"
