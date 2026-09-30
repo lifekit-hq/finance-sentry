@@ -1,6 +1,6 @@
 # MCP Tool Contracts: Surface Refinement (before → after)
 
-All tools continue to resolve the caller via `IIdentityResolver`; `userId` stays an optional override everywhere.
+All tools continue to resolve the caller via `IIdentityResolver`. (Superseded: the optional `userId` override described below has since been removed from every tool — see `docs/mcp.md` § Identity.)
 
 ## Merged: `watchlist` (replaces 3 tools)
 

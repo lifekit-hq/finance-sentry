@@ -14,6 +14,7 @@
 - `stdio` transport uses locally stored MCP OAuth credentials obtained via `dotnet FinanceSentry.Mcp.dll auth login`.
 - `http` transport requires per-request authentication via `Authorization: Bearer <mcp access token>` — except the anonymous platform probes `/health`, `/ready` and `/metrics` (exact paths, `McpJwtAuthenticationMiddleware.AnonymousPaths`), which serve nothing user-scoped.
 - For HTTP, the MCP server resolves identity from the authenticated request user, not from a boot-time server token.
+- Every tool acts only for the authenticated user: no tool takes a `userId` argument, and a regression contract test (`ToolCallerScopeContractTests`) guards that.
 - `stdio` refresh is automatic through the MCP token endpoint and locally stored refresh token.
 - HTTP clients refresh through the MCP token endpoint using dedicated MCP refresh tokens.
 - The browser-based `auth login` flow is intended for a host-run `stdio` MCP process. Containerized clients should prefer HTTP MCP.
