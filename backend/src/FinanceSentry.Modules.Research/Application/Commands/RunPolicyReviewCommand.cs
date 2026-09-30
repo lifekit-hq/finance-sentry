@@ -19,6 +19,9 @@ public enum PolicyReviewRunOutcome
     /// <summary>The recorded cadence has not come round yet.</summary>
     NotDue,
 
+    /// <summary>The book was empty or stale, so nothing was recorded and the next run retries.</summary>
+    Deferred,
+
     /// <summary>A review ran, was recorded and was presented to the operator.</summary>
     Completed,
 }
@@ -34,7 +37,8 @@ public sealed record PolicyReviewRunResult(
 /// measures current positioning against the statement's bands, proposes adjustments with their
 /// rationale, records the review (which stamps the statement's last-reviewed timestamp) and presents
 /// the proposal through the alert → companion path. A review opened past the grace period also
-/// reports the missed one. Recommend-only: nothing here places, stages or routes an order.
+/// reports the missed one. An empty or stale book defers the review, unrecorded, to the next run.
+/// Recommend-only: nothing here places, stages or routes an order.
 /// </summary>
 public class RunPolicyReviewCommandHandler(
     IIpsRepository ipsRepo,
@@ -66,6 +70,14 @@ public class RunPolicyReviewCommandHandler(
             await ReportMissedAsync(cmd.UserId, schedule, ct);
 
         var drift = await driftHandler.Handle(new GetAllocationDriftQuery(cmd.UserId), ct);
+        if (drift.IsStale || drift.TotalValueUsd <= 0)
+        {
+            logger.LogWarning(
+                "Policy review for user {UserId} deferred: book is {State}; it will be retried on the next run",
+                cmd.UserId, drift.IsStale ? "stale" : "empty");
+            return new PolicyReviewRunResult(PolicyReviewRunOutcome.Deferred, schedule, null, 0);
+        }
+
         var proposal = PolicyReviewProposer.Propose(ips, drift, schedule);
 
         var review = new PolicyReview

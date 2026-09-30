@@ -139,6 +139,53 @@ public class RunPolicyReviewCommandHandlerTests
     }
 
     [Fact]
+    public async Task Empty_book_defers_the_review_without_recording_or_presenting_it()
+    {
+        GivenVersions(Current());
+        GivenDrift(new AllocationDriftDto(true, 0m, 0m, 0m, false, [], "annual"));
+
+        var result = await Handler(QuarterlyDue.AddHours(5)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        result.Outcome.Should().Be(PolicyReviewRunOutcome.Deferred);
+        result.ReviewId.Should().BeNull();
+        _recorded.Should().BeEmpty("a review built on no data must not advance the schedule");
+        _alerts.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Stale_book_defers_the_review_without_recording_or_presenting_it()
+    {
+        GivenVersions(Current());
+        GivenDrift(new AllocationDriftDto(
+            true, 100_000m, 0m, 100_000m, true,
+            [new AllocationSleeveDrift("Equity", 60, 55, 65, 70, 70_000, 10, "OverBand")],
+            "annual", IsStale: true));
+
+        var result = await Handler(QuarterlyDue.AddHours(5)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        result.Outcome.Should().Be(PolicyReviewRunOutcome.Deferred);
+        _recorded.Should().BeEmpty();
+        _alerts.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Deferral_past_the_grace_period_still_reports_the_missed_review()
+    {
+        GivenVersions(Current());
+        GivenDrift(new AllocationDriftDto(true, 0m, 0m, 0m, false, [], "annual"));
+
+        var result = await Handler(QuarterlyDue.AddDays(12)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        result.Outcome.Should().Be(PolicyReviewRunOutcome.Deferred);
+        _recorded.Should().BeEmpty();
+        _alerts.Verify(a => a.GeneratePolicyReviewMissedAlertAsync(
+            _userId, QuarterlyDue, 12, "quarterly", It.IsAny<CancellationToken>()), Times.Once);
+        _alerts.Verify(a => a.GeneratePolicyReviewAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Long_rationale_is_clipped_to_the_alert_message_limit_but_kept_whole_on_the_review()
     {
         GivenVersions(Current());
@@ -194,6 +241,9 @@ public class RunPolicyReviewCommandHandlerTests
         _alerts.Object,
         new FixedTimeProvider(now),
         NullLogger<RunPolicyReviewCommandHandler>.Instance);
+
+    private void GivenDrift(AllocationDriftDto dto)
+        => _drift.Setup(d => d.Handle(It.IsAny<GetAllocationDriftQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(dto);
 
     private void GivenVersions(params InvestmentPolicyStatement[] versions)
         => _ipsRepo.Setup(r => r.ListVersionsAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(versions);
