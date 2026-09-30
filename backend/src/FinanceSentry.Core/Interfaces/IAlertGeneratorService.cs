@@ -307,6 +307,31 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Presents a completed scheduled policy review (#696) to the operator: its headline and the
+    /// proposal summary. <paramref name="reviewId"/> is the recorded review, so each review alerts
+    /// once and the reader can fetch the full structured proposal by it. Warning when adjustments are
+    /// proposed, Info when every sleeve sits within its band. Recommend-only — nothing is ordered.
+    /// </summary>
+    Task GeneratePolicyReviewAlertAsync(
+        Guid userId,
+        Guid reviewId,
+        int adjustmentCount,
+        string summary,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Reports that a scheduled policy review (#696) was missed — it is still unopened past the grace
+    /// period after <paramref name="dueAt"/>. Deduped per (userId, due date): one report per lapsed
+    /// cycle, raised whether or not the catch-up review then succeeds.
+    /// </summary>
+    Task GeneratePolicyReviewMissedAlertAsync(
+        Guid userId,
+        DateTimeOffset dueAt,
+        int daysOverdue,
+        string cadence,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Raises a Warning alert proposing deployment of idle cash that exceeds the configured buffer
     /// (432 US2). <paramref name="excessUsd"/> is the dollar amount above the min-cash-buffer threshold.
     /// Silenced 24 hours so the daily job doesn't re-propose while a prior one is open.

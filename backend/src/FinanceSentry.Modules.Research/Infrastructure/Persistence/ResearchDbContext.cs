@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Persistence;
 
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -45,6 +46,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
     public DbSet<AssetLedgerRead> AssetLedgerReads { get; set; } = null!;
 
     public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
+
+    public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -193,6 +196,28 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
                 v => JsonSerializer.Deserialize<ContributionPlan>(v, jsonOptions));
         ib.HasIndex(x => new { x.UserId, x.IsCurrent }).HasDatabaseName("idx_ips_user_current");
         ib.HasIndex(x => new { x.UserId, x.Version }).IsUnique().HasDatabaseName("idx_ips_user_version");
+
+        var prb = modelBuilder.Entity<PolicyReview>();
+        prb.ToTable("policy_reviews");
+        prb.HasKey(x => x.Id);
+        prb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+        prb.Property(x => x.UserId).IsRequired();
+        prb.Property(x => x.PolicyStatementId).IsRequired();
+        prb.Property(x => x.PolicyStatementVersion).IsRequired();
+        prb.Property(x => x.ReviewCadence).IsRequired().HasMaxLength(20);
+        prb.Property(x => x.TotalValueUsd).HasColumnType("numeric(18,2)");
+        prb.Property(x => x.Rationale).IsRequired();
+        prb.Property(x => x.Sleeves)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<List<PolicyReviewSleeve>>(v, jsonOptions) ?? new());
+        prb.Property(x => x.Adjustments)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<List<PolicyReviewAdjustment>>(v, jsonOptions) ?? new());
+        prb.HasIndex(x => new { x.UserId, x.CompletedAt }).HasDatabaseName("idx_policy_reviews_user_completed");
 
         var teb = modelBuilder.Entity<ThesisEvent>();
         teb.ToTable("thesis_events");

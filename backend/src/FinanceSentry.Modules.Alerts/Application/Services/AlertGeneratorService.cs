@@ -353,6 +353,29 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.RebalanceProposal, RebalancePortfolioReferenceId(userId), ct);
 
+    public Task GeneratePolicyReviewAlertAsync(
+        Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.PolicyReview,
+            adjustmentCount > 0 ? AlertSeverity.Warning : AlertSeverity.Info,
+            reviewId, "policy-review",
+            adjustmentCount > 0
+                ? $"Policy review: {adjustmentCount} adjustment(s) proposed"
+                : "Policy review: allocation within policy bands",
+            summary)
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
+    public Task GeneratePolicyReviewMissedAlertAsync(
+        Guid userId, DateTimeOffset dueAt, int daysOverdue, string cadence, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.PolicyReviewMissed, AlertSeverity.Warning,
+            PolicyReviewMissedReferenceId(userId, dueAt), "policy-review",
+            "Scheduled policy review missed",
+            $"Your {cadence} policy review was due {dueAt:yyyy-MM-dd} and is {daysOverdue} day(s) overdue.")
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
     public Task GenerateCashSweepProposalAlertAsync(
         Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
@@ -556,6 +579,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-detector synthetic GUID — one open detector-silent alert per detector.</summary>
     private static Guid DetectorSilentReferenceId(string detectorName)
         => DerivedReferenceId($"detector-silent:{detectorName}");
+
+    /// <summary>Stable per-(user, due date) synthetic GUID — one missed-review report per lapsed cycle.</summary>
+    private static Guid PolicyReviewMissedReferenceId(Guid userId, DateTimeOffset dueAt)
+        => DerivedReferenceId($"policy-review-missed:{userId:N}:{dueAt.UtcDateTime:yyyy-MM-dd}");
 
     /// <summary>Stable per-(ticker, event type, event date) synthetic GUID — never emit twice for the same event.</summary>
     private static Guid EarningsAheadReferenceId(string ticker, string eventType, DateOnly eventDate)

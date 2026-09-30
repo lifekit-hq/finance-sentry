@@ -275,6 +275,8 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateFxSpreadAlertAsync(Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency, decimal impliedRate, decimal marketRate, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateRebalanceProposalAlertAsync(Guid userId, int orderCount, string orderSummary, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GeneratePolicyReviewAlertAsync(Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GeneratePolicyReviewMissedAlertAsync(Guid userId, DateTimeOffset dueAt, int daysOverdue, string cadence, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateEarningsAheadAlertAsync(Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateFilingLandedAlertAsync(Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl, CancellationToken ct = default) => Task.CompletedTask;
     public Task GenerateNewsClusterAlertAsync(Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default) => Task.CompletedTask;

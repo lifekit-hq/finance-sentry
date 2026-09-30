@@ -446,6 +446,12 @@ public class RunThesisMonitorHandlerTests
         public Task GenerateCashSweepProposalAlertAsync(Guid userId, decimal idleCashUsd, decimal minBufferUsd, decimal excessUsd, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GeneratePolicyReviewAlertAsync(Guid userId, Guid reviewId, int adjustmentCount, string summary, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task GeneratePolicyReviewMissedAlertAsync(Guid userId, DateTimeOffset dueAt, int daysOverdue, string cadence, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task GenerateEarningsAheadAlertAsync(
             Guid userId, string ticker, string eventType, DateOnly eventDate, bool isEstimate,
             CancellationToken ct = default)

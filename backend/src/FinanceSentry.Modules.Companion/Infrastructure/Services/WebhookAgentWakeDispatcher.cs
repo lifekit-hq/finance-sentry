@@ -36,6 +36,7 @@ public sealed class WebhookAgentWakeDispatcher(
     [
         CompanionEventKind.RebalanceProposal,
         CompanionEventKind.CashSweepProposal,
+        CompanionEventKind.PolicyReview,
     ];
 
     public async Task<WakeResult> WakeAsync(CompanionEvent evt, CancellationToken ct = default)
