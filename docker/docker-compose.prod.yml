@@ -369,12 +369,14 @@ networks:
   lifekit-shared:
     external: true              # owned by lifekit-stack; must exist before deploy
   # Gateway <-> API hop with pinned addresses: forwarded-header trust on both hosts names these
-  # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender.
+  # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender. ip_range
+  # keeps dynamic allocation (the API) on .4-.7 so it can never take the gateway's pinned .2.
   finance-sentry-edge:
     name: finance-sentry-edge
     ipam:
       config:
         - subnet: 10.231.77.0/29
+          ip_range: 10.231.77.4/30
           gateway: 10.231.77.1
 
 # GitHub Packages token for @lifekit-hq/* installs (BuildKit secret — not in layers).
