@@ -343,6 +343,39 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  # --- Uptime probe (issue #511) ------------------------------------------------------------------
+  # Synthetic monitoring in its own container, so an api/gateway outage is still reported (the in-app
+  # 023 alerting path can't report its own outage). Probes the gateway over the compose network every
+  # 5 min; after 2 consecutive failures sends one Telegram alert, one more on recovery. Creds are the
+  # UPTIME_TELEGRAM_* pair in docker/.env; unset = the probe idles. Deliberately no depends_on: it must
+  # keep running when the things it watches are down.
+  uptime-probe:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.uptime-probe
+      platforms: [linux/arm64]
+    image: finance-sentry/uptime-probe:local
+    container_name: finance-sentry-uptime-probe
+    restart: unless-stopped
+    mem_limit: 32m
+    pids_limit: 32
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    labels:
+      lifekit.contract: "none"   # monitor, serves no traffic
+    environment:
+      UPTIME_TELEGRAM_BOT_TOKEN: ${UPTIME_TELEGRAM_BOT_TOKEN:-}
+      UPTIME_TELEGRAM_CHAT_ID: ${UPTIME_TELEGRAM_CHAT_ID:-}
+      UPTIME_TARGET: http://gateway:8080/api/v1/health
+    volumes:
+      - uptime_probe_state:/var/lib/uptime-probe
+    networks:
+      - finance-sentry
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
   # --- Observability ------------------------------------------------------------------------------
   # The loki / prometheus / grafana trio MOVED to lifekit-stack's compose project
   # on 2026-09-06 (lifekit-hq/lifekit-stack#133). It was box infrastructure living
@@ -361,6 +394,7 @@ services:
 volumes:
   postgres_data:
   api_logs:
+  uptime_probe_state:   # consecutive-failure count + alerted flag, survives container restarts
   gateway_keys:   # data-protection key cache for the non-root gateway (025) — only used when TLS/ACME is enabled
 
 networks:

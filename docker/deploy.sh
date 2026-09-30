@@ -95,7 +95,7 @@ echo "[deploy] ok — api reachable via gateway on 127.0.0.1:8080"
 # `scraped` item reads Prometheus' LAST scrape of each target, and a container
 # recreated seconds ago is still `down` there until its next 15s scrape. Four
 # attempts a scrape interval apart; the last failure exits 1 at the end of the
-# script (after the uptime probe refresh) — the containers stay up (post-deploy
+# script — the containers stay up (post-deploy
 # assertion model), the job goes red.
 CONTRACT_PROJECT="$("${COMPOSE[@]}" config --format json | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])')"
 echo "[deploy] platform contract: running containers (project $CONTRACT_PROJECT)"
@@ -114,30 +114,19 @@ for ((attempt = 1; attempt <= contract_attempts; attempt++)); do
 done
 
 # --- Uptime probe (issue #511) -------------------------------------------------
-# Host-level cron so outage alerts don't depend on the stack being up. Telegram
-# creds: prefer UPTIME_TELEGRAM_* from the decrypted docker/.env.
-echo "[deploy] install uptime probe (cron every 5 min)"
-PROBE_DIR="$HOME/.fs-uptime"
-mkdir -p "$PROBE_DIR"
-cp docker/uptime-probe.sh "$PROBE_DIR/uptime-probe.sh"
-chmod 700 "$PROBE_DIR/uptime-probe.sh"
-
-if grep -qE '^UPTIME_TELEGRAM_BOT_TOKEN=' docker/.env 2>/dev/null; then
-  grep -E '^UPTIME_TELEGRAM_(BOT_TOKEN|CHAT_ID)=' docker/.env > "$PROBE_DIR/probe.env"
-else
-  echo "[deploy] warn: no Telegram creds for uptime probe — probe will no-op" >&2
-fi
-if [[ -f "$PROBE_DIR/probe.env" ]]; then
-  chmod 600 "$PROBE_DIR/probe.env"
-fi
-
+# The probe is the `uptime-probe` compose service (started by `up` above). Earlier deploys
+# installed it into the operator's crontab and ~/.fs-uptime; remove that cron line so the
+# two probes don't double-alert. Only the fs-uptime line is filtered out; the ~/.fs-uptime
+# directory is left for the operator to delete.
 # grep exits 1 on an empty/absent crontab — the `|| true` keeps errexit+pipefail from
 # killing the list mid-pipe and clobbering the crontab with empty input (broke deploy once).
-{
-  crontab -l 2>/dev/null | grep -v 'fs-uptime' || true
-  echo "*/5 * * * * $PROBE_DIR/uptime-probe.sh >> $PROBE_DIR/probe.log 2>&1"
-} | crontab -
-echo "[deploy] uptime probe installed"
+# Best-effort: no crontab binary, or nothing to remove, must never fail a deploy.
+if command -v crontab >/dev/null 2>&1 && crontab -l 2>/dev/null | grep -q 'fs-uptime'; then
+  echo "[deploy] remove legacy uptime-probe cron line"
+  {
+    crontab -l 2>/dev/null | grep -v 'fs-uptime' || true
+  } | crontab - || echo "[deploy] warn: could not rewrite crontab" >&2
+fi
 
 if [[ $contract_ok != true ]]; then
   echo "error: platform contract failed after $contract_attempts attempts (table above)" >&2
