@@ -6,14 +6,26 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
+# Restore into the layer filesystem (not a cache mount): a cache mount's contents are
+# non-persistent under BuildKit GC/concurrent-build pressure, so a later RUN (publish)
+# reading packages restored by an earlier RUN can find them missing (MSB3030/NETSDK1152).
+ENV NUGET_PACKAGES=/src/.nuget/packages
+
+# Project files first so the restore layer only rebuilds when a dependency changes. Restoring the
+# MCP project (not the whole solution) pulls in just its own project graph.
+COPY backend/Directory.*.props backend/
+COPY --parents backend/src/**/*.csproj ./
+
+WORKDIR /src/backend
+RUN dotnet restore src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj
+
+WORKDIR /src
 COPY backend/ backend/
 
 WORKDIR /src/backend
-RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
-    dotnet restore FinanceSentry.sln
+RUN dotnet build src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj -c Release --no-restore
 
-RUN --mount=type=cache,sharing=locked,target=/root/.nuget/packages \
-    dotnet publish src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj -c Release -o /app/publish
+RUN dotnet publish src/FinanceSentry.Mcp/FinanceSentry.Mcp.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime

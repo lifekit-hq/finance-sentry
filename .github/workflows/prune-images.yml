@@ -1,0 +1,33 @@
+name: Prune Images
+
+on:
+  schedule:
+    # Mondays 06:00 UTC, ahead of the weekly release.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: prune (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, mcp, gateway, frontend]
+    steps:
+    # Every main push adds one image version (plus one layer-cache version), so the newest 30
+    # cover the recent commits and the current :main / :buildcache tags.
+    - name: Delete old image versions
+      uses: actions/delete-package-versions@v5
+      with:
+        owner: lifekit-hq
+        package-name: finance-sentry-${{ matrix.service }}
+        package-type: container
+        min-versions-to-keep: 30
+        token: ${{ secrets.GITHUB_TOKEN }}

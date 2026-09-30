@@ -1,0 +1,77 @@
+name: Build image
+description: >-
+  Build one service image natively, scan the built image with Trivy, and optionally push it.
+  Expects the repository to be checked out. The caller's job permissions decide whether pushing
+  is possible at all.
+
+inputs:
+  service:
+    description: Service name; the image is ghcr.io/lifekit-hq/finance-sentry-<service>
+    required: true
+  dockerfile:
+    description: Dockerfile path, relative to the repository root (the build context)
+    required: true
+  token:
+    description: Token for the ghcr login and the frontend image's npm registry secret
+    required: true
+  push:
+    description: Push the scanned image (:<sha> and :main) and write the layer cache
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to ghcr
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    # One build per image: it is loaded into the local daemon, scanned, and only then pushed, so
+    # the scanned image is the one that ships. The :buildcache registry cache is read by every
+    # build and written only when pushing. provenance is off so a push stays a single manifest.
+    - name: Build image
+      uses: docker/build-push-action@v7
+      with:
+        context: ./
+        file: ${{ inputs.dockerfile }}
+        load: true
+        push: false
+        provenance: false
+        tags: |
+          ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}:${{ github.sha }}
+          ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}:main
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        secrets: |
+          npm_token=${{ inputs.token }}
+        cache-from: type=registry,ref=ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}:buildcache
+        cache-to: ${{ inputs.push == 'true' && format('type=registry,ref=ghcr.io/lifekit-hq/finance-sentry-{0}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true', inputs.service) || '' }}
+
+    # 510: gate on known fixable HIGH/CRITICAL vulnerabilities in the built image
+    # (OS packages + app deps). --ignore-unfixed keeps base-image CVEs without an
+    # available patch from blocking every PR.
+    - name: Scan image for vulnerabilities (Trivy)
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        image-ref: ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: CRITICAL,HIGH
+        ignore-unfixed: true
+
+    - name: Push image
+      if: inputs.push == 'true'
+      shell: bash
+      env:
+        IMAGE: ghcr.io/lifekit-hq/finance-sentry-${{ inputs.service }}
+        SHA: ${{ github.sha }}
+      run: |
+        docker push "$IMAGE:$SHA"
+        docker push "$IMAGE:main"
