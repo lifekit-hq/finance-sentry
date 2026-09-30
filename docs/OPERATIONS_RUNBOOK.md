@@ -47,6 +47,7 @@
 2. Check server list — if empty, Hangfire worker is not running. Restart API.
 3. Check `SyncScheduler.ScheduleAllActiveAccounts()` was called at startup (logged at startup).
 4. Re-register recurring jobs: restart the API (scheduler runs on startup).
+5. If the API log shows `Startup job registration gave up after 5 attempts on a Hangfire lock timeout`: registration hit `PostgreSqlDistributedLockException` on a `hangfire:lock:recurring-job:<id>` lock (held by an overlapping instance or a running worker) and the bounded retry (2s/5s/10s/20s backoff) was exhausted. The API stays up with the jobs already in storage, but this build's schedule changes are not applied — restart the API once the other holder is gone. `Startup job registration hit a Hangfire lock timeout (attempt n/5)` warnings alone are a retry in progress and need no action.
 
 ## 5. Audit Log Table Growing Too Large
 
