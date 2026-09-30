@@ -69,7 +69,7 @@ public sealed class FamilyClearingStatementDeliveryTests : IAsyncLifetime
 
         await using var ctx = CreateContext();
         var job = new FamilyClearingStatementJob(
-            users.Object, query.Object, new AlertGeneratorService(new AlertRepository(ctx)),
+            users.Object, query.Object, new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object),
             NullLogger<FamilyClearingStatementJob>.Instance);
         await job.ExecuteAsync();
     }

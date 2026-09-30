@@ -12,13 +12,14 @@ using Xunit;
 public class AlertGeneratorServiceTests
 {
     private readonly Mock<IAlertRepository> _repo = new();
+    private readonly Mock<IPolicyAckReader> _acks = new();
     private readonly AlertGeneratorService _service;
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Guid _accountId = Guid.NewGuid();
 
     public AlertGeneratorServiceTests()
     {
-        _service = new AlertGeneratorService(_repo.Object);
+        _service = new AlertGeneratorService(_repo.Object, _acks.Object);
     }
 
     [Fact]

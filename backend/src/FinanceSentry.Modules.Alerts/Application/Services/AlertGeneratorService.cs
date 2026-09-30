@@ -4,10 +4,11 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 
-public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorService
+public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader policyAcks) : IAlertGeneratorService
 {
     /// <summary>
     /// The backstop silence window per alert type: how long after the last alert of that type on the
@@ -452,6 +453,14 @@ public class AlertGeneratorService(IAlertRepository alerts) : IAlertGeneratorSer
     /// </summary>
     private async Task EmitAsync(Guid userId, AlertDraft draft, CancellationToken ct)
     {
+        // #691: an acknowledgement on a policy silences every alert class derived from it, whichever
+        // module emits it — the mapping lives in PolicyAlertMap.
+        if (PolicyAlertMap.TryGetPolicyKey(draft.Type, out var policyKey)
+            && await policyAcks.IsPolicyAcknowledgedAsync(userId, policyKey, ct))
+        {
+            return;
+        }
+
         if (draft.Dedup == AlertDedup.OncePerReference)
         {
             if (await _alerts.ExistsAsync(userId, draft.Type, draft.ReferenceId, ct)) return;

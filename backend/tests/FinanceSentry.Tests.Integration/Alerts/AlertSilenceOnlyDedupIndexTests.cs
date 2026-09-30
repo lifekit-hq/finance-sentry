@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Integration.Alerts;
 
 using FinanceSentry.Core.Interfaces;
+using Moq;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
@@ -70,7 +71,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
 
         await using (var ctx = CreateContext())
         {
-            var generator = new AlertGeneratorService(new AlertRepository(ctx));
+            var generator = new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object);
             await generator.GenerateMarketStructureAlertAsync(
                 userId, referenceId, "INTC", "moved 12.2% intraday", dedup: AlertDedup.SilenceOnly);
         }
@@ -113,7 +114,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
 
         await using (var ctx = CreateContext())
         {
-            var generator = new AlertGeneratorService(new AlertRepository(ctx));
+            var generator = new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object);
             await generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
         }
 
