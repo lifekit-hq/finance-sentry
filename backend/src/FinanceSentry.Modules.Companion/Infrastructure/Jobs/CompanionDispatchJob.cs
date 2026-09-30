@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Realtime dispatch relay (feature 031, US2). Wakes the agent for pending events belonging to users
-/// in <c>realtime</c> mode, honoring quiet-hours + rate-limit (deferred, never dropped) and retrying
+/// in <c>realtime</c> mode and owned by the owner account (other users' events are suppressed), honoring quiet-hours + rate-limit (deferred, never dropped) and retrying
 /// failures up to the cap. Scan-mode pending events are left for the agent to pull. Overlap-protected.
 /// </summary>
 [DisableConcurrentExecution(timeoutInSeconds: 120)]
@@ -17,6 +18,7 @@ public sealed class CompanionDispatchJob(
     ICompanionEventRepository events,
     INotificationSettingRepository settings,
     IAgentWakeDispatcher dispatcher,
+    IOwnerAccountReader owners,
     IOptions<CompanionOptions> options,
     ILogger<CompanionDispatchJob> logger)
 {
@@ -29,9 +31,22 @@ public sealed class CompanionDispatchJob(
     {
         var pending = await events.ListRealtimePendingAsync(BatchLimit, ct);
         var now = DateTimeOffset.UtcNow;
+        var ownerByUser = new Dictionary<Guid, bool>();
 
         foreach (var evt in pending)
         {
+            if (!ownerByUser.TryGetValue(evt.UserId, out var isOwner))
+            {
+                isOwner = await owners.IsOwnerAsync(evt.UserId, ct);
+                ownerByUser[evt.UserId] = isOwner;
+            }
+
+            if (!isOwner)
+            {
+                await SetDispositionAsync(evt, EventDisposition.SuppressedNonOwner, ct);
+                continue;
+            }
+
             var setting = await settings.GetOrDefaultAsync(evt.UserId, ct);
             if (setting.Mode != NotificationMode.Realtime)
             {

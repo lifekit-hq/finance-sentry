@@ -17,7 +17,7 @@ public static class EventOutcome
 
     private static readonly IReadOnlySet<string> NotDeliveredDispositions = new HashSet<string>(StringComparer.Ordinal)
     {
-        "SuppressedByMode", "SuppressedByRateLimit", "SuppressedByDedup", "Failed",
+        "SuppressedByMode", "SuppressedByRateLimit", "SuppressedByDedup", "SuppressedNonOwner", "Failed",
     };
 
     private const string DeliveredDisposition = "Delivered";

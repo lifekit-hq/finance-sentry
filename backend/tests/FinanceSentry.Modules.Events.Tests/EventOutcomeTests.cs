@@ -16,6 +16,7 @@ public sealed class EventOutcomeTests
     [InlineData("SuppressedByMode", "not_delivered")]
     [InlineData("SuppressedByRateLimit", "not_delivered")]
     [InlineData("SuppressedByDedup", "not_delivered")]
+    [InlineData("SuppressedNonOwner", "not_delivered")]
     [InlineData("Failed", "not_delivered")]
     [InlineData(null, "awaiting")]
     public void Without_a_verdict_the_disposition_decides(string? disposition, string expected)
