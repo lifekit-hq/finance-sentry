@@ -16,6 +16,7 @@
 |-------|--------|----------|
 | JWT validation on all endpoints | ✅ | `JwtAuthenticationMiddleware` validates signature + expiry |
 | JWT exempt paths audited | ✅ | Only `/health`, `/swagger`, `/hangfire`, `/api/v1/auth`, TrueLayer callback |
+| TrueLayer callback bound to initiating browser | ✅ | `BankSyncController.TrueLayerCallback` finalizes only when the `fs_truelayer_state` cookie (HttpOnly, SameSite=Lax, 15 min, set by the connect endpoint) equals the OAuth `state`; otherwise redirects with `TRUELAYER_STATE_MISMATCH` |
 | FR-009 user scoping | ✅ | All data endpoints verify `account.UserId == requestingUserId` |
 | Webhook HMAC-SHA256 | ✅ | `WebhookSignatureValidator` constant-time comparison |
 

@@ -18,6 +18,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -190,7 +191,8 @@ public class ConnectMonobankContractTests
             _backgroundJobs.Object,
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
-            new Mock<IAlertGeneratorService>().Object);
+            new Mock<IAlertGeneratorService>().Object,
+            new Mock<IHostEnvironment>().Object);
 
         var identity = new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test");

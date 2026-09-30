@@ -12,7 +12,9 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Hangfire;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 [ApiController]
@@ -32,7 +34,8 @@ public class BankSyncController(
     IBackgroundJobClient backgroundJobs,
     ISyncJobRepository syncJobs,
     ITransactionSyncCoordinator coordinator,
-    FinanceSentry.Core.Interfaces.IAlertGeneratorService alerts) : ControllerBase
+    FinanceSentry.Core.Interfaces.IAlertGeneratorService alerts,
+    IHostEnvironment environment) : ControllerBase
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ITransactionRepository _transactions = transactions;
@@ -308,13 +311,22 @@ public class BankSyncController(
         var result = await beginTrueLayerConnectHandler.Handle(
             new BeginTrueLayerConnectCommand(
                 User.RequireUserId(), request.ProviderId, request.ProviderName), ct);
+        Response.Cookies.Append(TrueLayerStateCookie, result.Reference, TrueLayerStateCookieOptions(
+            DateTimeOffset.UtcNow.Add(TrueLayerStateCookieLifetime)));
         return Ok(result);
     }
 
     // ── GET /api/v1/accounts/truelayer/callback?code=&state=&error= ──────────
     //
     // Public endpoint hit by TrueLayer after the user consents at their bank.
-    // Exempt from JWT auth; identifies the connection by the 'state' parameter.
+    // Exempt from JWT auth; identifies the connection by the 'state' parameter and
+    // finalizes only when the browser presents the state cookie set when that same
+    // user started the flow (the correlation-cookie pattern of ASP.NET Core's OAuth
+    // handlers). The auth cookies are SameSite=Strict and never ride the bank's
+    // cross-site redirect, so the state cookie is SameSite=Lax.
+
+    private const string TrueLayerStateCookie = "fs_truelayer_state";
+    private static readonly TimeSpan TrueLayerStateCookieLifetime = TimeSpan.FromMinutes(15);
 
     [HttpGet("truelayer/callback")]
     public async Task<IActionResult> TrueLayerCallback(
@@ -326,11 +338,20 @@ public class BankSyncController(
         var frontendBase = (configuration["TrueLayer:FrontendRedirectBase"]
             ?? "http://localhost:4200").TrimEnd('/');
 
+        var boundState = Request.Cookies[TrueLayerStateCookie];
+        Response.Cookies.Delete(TrueLayerStateCookie, TrueLayerStateCookieOptions(expires: null));
+
         if (!string.IsNullOrEmpty(error))
             return Redirect($"{frontendBase}/accounts/list?connectError={Uri.EscapeDataString(error)}");
 
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
             return Redirect($"{frontendBase}/accounts/list?connectError=MISSING_CODE_OR_STATE");
+
+        if (!string.Equals(boundState, state, StringComparison.Ordinal))
+        {
+            logger.LogWarning("TrueLayer callback state does not match the connect flow started in this browser.");
+            return Redirect($"{frontendBase}/accounts/list?connectError=TRUELAYER_STATE_MISMATCH");
+        }
 
         try
         {
@@ -345,4 +366,13 @@ public class BankSyncController(
             return Redirect($"{frontendBase}/accounts/list?connectError={Uri.EscapeDataString(ex.ErrorCode)}");
         }
     }
+
+    private CookieOptions TrueLayerStateCookieOptions(DateTimeOffset? expires) => new()
+    {
+        HttpOnly = true,
+        Secure = environment.IsProduction(),
+        SameSite = SameSiteMode.Lax,
+        Expires = expires,
+        Path = "/"
+    };
 }
