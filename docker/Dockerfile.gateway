@@ -27,6 +27,11 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
+# Run as the image's non-root `app` user. Data Protection keys (used in ACME mode) live under its
+# home; the directory is created here so the compose volume mounted on it starts out owned by `app`.
+RUN mkdir -p /home/app/.aspnet/DataProtection-Keys && chown -R $APP_UID:$APP_UID /home/app/.aspnet
+USER $APP_UID
+
 # Container-level liveness for the single-point-of-failure gateway (spec edge case).
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD wget -q -O /dev/null http://localhost:8080/gateway/health || exit 1

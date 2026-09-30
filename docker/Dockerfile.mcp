@@ -28,4 +28,7 @@ COPY --from=build /app/publish .
 
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 
+# Run as the image's non-root `app` user.
+USER $APP_UID
+
 ENTRYPOINT ["dotnet", "FinanceSentry.Mcp.dll"]

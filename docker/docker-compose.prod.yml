@@ -12,6 +12,11 @@
 # /srv/lifekit-stack/scripts/platform-contract.py). deploy.sh runs that checker as a static gate
 # on this file before `up` and as a runtime gate on the containers afterwards; a failing label set
 # never deploys, a failing probe turns the deploy red. Datastores are `none`. No waivers.
+#
+# Container hardening: every service runs as a non-root user, drops all Linux capabilities (postgres
+# adds back only the ones its entrypoint needs to hand its data directory to the `postgres` user),
+# sets no-new-privileges and a pids limit, and mounts its root filesystem read-only with tmpfs for
+# the paths it writes at runtime. Named volumes stay writable.
 
 services:
   api:
@@ -23,6 +28,15 @@ services:
     container_name: finance-sentry-api
     restart: unless-stopped
     mem_limit: 1g           # 1.3 budget: 7-day peak 616 MiB
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      # .NET diagnostics sockets, plus the backup and restore-verify jobs' transient plain dump and
+      # its encrypted copy (~35 MB each today). Capped at 256m: tmpfs counts against mem_limit, so an
+      # oversized dump fails the job with ENOSPC instead of OOM-killing the api. Logs go to the api_logs volume.
+      - /tmp:size=256m
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "5000"
@@ -128,6 +142,12 @@ services:
     container_name: finance-sentry-mcp
     restart: unless-stopped
     mem_limit: 384m         # 1.3 budget: 7-day peak 208 MiB
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp                # .NET diagnostics sockets
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "5100"
@@ -153,6 +173,12 @@ services:
     networks:
       - finance-sentry
       - lifekit-shared     # ledger agent reaches the MCP container by name on this network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -167,6 +193,12 @@ services:
     container_name: finance-sentry-frontend
     restart: unless-stopped
     mem_limit: 64m          # 1.3 budget: 7-day peak 13 MiB
+    pids_limit: 100
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp                # nginx-unprivileged keeps its pid file and client/proxy temp dirs here
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "4200"
@@ -188,6 +220,12 @@ services:
     networks:
       - finance-sentry
       - lifekit-shared     # so lifekit-stack's Prometheus can scrape /metrics (spec 048)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4200/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -209,6 +247,12 @@ services:
     container_name: finance-sentry-gateway
     restart: unless-stopped
     mem_limit: 192m         # 1.3 budget: 7-day peak 89 MiB
+    pids_limit: 100
+    cap_drop: [ALL]         # ACME mode's 80/443 still bind: Docker allows unprivileged ports from 0 in a container
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp                # .NET diagnostics sockets
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "8080"
@@ -235,7 +279,7 @@ services:
       # - "80:80"
       # - "443:443"
     volumes:
-      - gateway_acme:/root/.aspnet/DataProtection-Keys
+      - gateway_keys:/home/app/.aspnet/DataProtection-Keys
     depends_on:
       api:
         condition: service_started
@@ -251,6 +295,16 @@ services:
     container_name: finance-sentry-postgres
     restart: unless-stopped
     mem_limit: 512m         # 1.3 budget: 7-day peak 287 MiB
+    pids_limit: 300         # one backend process per connection: max_connections=200 plus background workers
+    # The image's entrypoint starts as root to own the data and socket directories, then runs the
+    # server as `postgres` (uid 70); these are the capabilities that step needs.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql # unix socket + lock file
+      - /tmp
     labels:
       lifekit.contract: "none"   # datastore, not a product
     environment:
@@ -291,7 +345,7 @@ services:
 volumes:
   postgres_data:
   api_logs:
-  gateway_acme:   # ACME cert + data-protection key cache (025) — only used when TLS/ACME is enabled
+  gateway_keys:   # data-protection key cache for the non-root gateway (025) — only used when TLS/ACME is enabled
 
 networks:
   finance-sentry:

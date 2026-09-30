@@ -2,7 +2,8 @@
 #   1. build: node:22-alpine installs deps (incl. @lifekit-hq/* from GitHub
 #      Packages — needs the npm_token build secret) and builds the Angular app
 #      in production mode.
-#   2. serve: nginx:alpine serves the SPA with proper history-mode fallback.
+#   2. serve: nginx-unprivileged:alpine serves the SPA with proper history-mode fallback. Every
+#      nginx process runs as the non-root `nginx` user (uid 101); pid and temp files go to /tmp.
 #
 # Build context: repository root.
 
@@ -21,11 +22,14 @@ RUN --mount=type=secret,id=npm_token \
 RUN npm run build:prod
 
 # ─── Stage 2: serve ────────────────────────────────────────────────────────────
-FROM nginx:alpine AS serve
+FROM nginxinc/nginx-unprivileged:alpine AS serve
+
+# The base image ends as uid 101; the config edits below need root, and the last line drops back.
+USER root
 
 # Platform contract (guardrail 1, spec 048), applied to the image's own nginx.conf:
-#   - load the njs module (ships with nginx:alpine) for the /metrics handler — `load_module` is only
-#     valid in the main context, which conf.d files never reach;
+#   - load the njs module (ships with nginx-unprivileged:alpine) for the /metrics handler —
+#     `load_module` is only valid in the main context, which conf.d files never reach;
 #   - raise error_log to warn so the `[notice] start worker process` lines stay off stderr — the
 #     contract wants ≥90% JSON on stdout+stderr seconds after a recreate, when a container has
 #     written only a handful of lines;
@@ -49,3 +53,5 @@ COPY docker/nginx.frontend.conf /etc/nginx/conf.d/finance-sentry.conf
 COPY --from=build /app/dist/finance-sentry/browser /usr/share/nginx/html
 
 EXPOSE 4200
+
+USER 101
