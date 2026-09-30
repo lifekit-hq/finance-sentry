@@ -73,7 +73,6 @@ public sealed class SqlGuardTests
     [InlineData("SELECT CAST(amount AS numeric(12,2)), COALESCE(category, 'none') FROM analytics.v_transactions")]
     [InlineData("SELECT g.n FROM generate_series(1, 5) AS g(n)")] // alias column list, not a call
     [InlineData("WITH totals(category, total) AS (SELECT category, SUM(amount) FROM analytics.v_transactions GROUP BY category) SELECT * FROM totals")]
-    [InlineData("SELECT pg_catalog.lower(merchant) FROM analytics.v_transactions")]
     [InlineData("SELECT * FROM analytics.v_transactions WHERE category IN (SELECT category FROM analytics.v_budgets)")]
     [InlineData("SELECT $$set_config('x', 'y', true)$$ AS note")] // function name only inside a dollar-quoted literal
     public void Validate_AllowsAllowlistedFunctionsAndSyntax(string sql)
@@ -91,7 +90,8 @@ public sealed class SqlGuardTests
     [InlineData("SELECT pg_sleep(10)")]
     [InlineData("SELECT pg_read_file('/etc/hostname')")]
     [InlineData("SELECT pg_terminate_backend(1)")]
-    [InlineData("SELECT public.lower(merchant) FROM analytics.v_transactions")] // allowlisted name outside pg_catalog
+    [InlineData("SELECT public.lower(merchant) FROM analytics.v_transactions")] // schema-qualified calls are never allowed
+    [InlineData("SELECT pg_catalog.lower(merchant) FROM analytics.v_transactions")]
     public void Validate_RejectsSettingAndAdminFunctions(string sql)
     {
         var result = _guard.Validate(sql);
@@ -104,6 +104,8 @@ public sealed class SqlGuardTests
     [InlineData("SELECT $q$'$q$, set_config('app.current_user_id', 'x', true) FROM analytics.v_transactions")] // tagged dollar quote
     [InlineData("SELECT E'\\'', set_config('app.current_user_id', 'x', true) FROM analytics.v_transactions --'")] // backslash-escaped quote
     [InlineData("SELECT 1 /* /* */ ' */, set_config('app.current_user_id', 'x', true) -- '")] // nested block comment
+    [InlineData("SELECT amount FROM analytics.v_transactions WHERE (SELECT --\r set_config('app.current_user_id', 'x', true)) IS NOT NULL")] // line comment ends at CR
+    [InlineData("SELECT amount FROM analytics.v_transactions WHERE (SELECT --\r\n set_config('app.current_user_id', 'x', true)) IS NOT NULL")] // line comment ends at CRLF
     public void Validate_RejectsFunctionCallsHiddenBehindLiteralSyntax(string sql)
     {
         _guard.Validate(sql).IsValid.Should().BeFalse();

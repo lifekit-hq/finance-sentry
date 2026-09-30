@@ -17,8 +17,6 @@ public sealed partial class SqlGuard : ISqlGuard
     private const string RejectReason =
         "only a single read-only SELECT over the curated analytics views is allowed";
 
-    private const string CatalogSchema = "pg_catalog";
-
     // Anything that writes, changes schema, controls transactions, or otherwise isn't a pure read.
     private static readonly IReadOnlySet<string> ForbiddenKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -124,8 +122,8 @@ public sealed partial class SqlGuard : ISqlGuard
     /// Returns the name of the first function call that is not allowlisted, or <c>null</c>. A call is
     /// any identifier followed by <c>(</c>, except a syntax keyword, a type modifier or alias column
     /// list (<c>::numeric(10,2)</c>, <c>AS t(a, b)</c>) and a first CTE's column list
-    /// (<c>WITH t(a) AS</c>). Schema-qualified calls are allowed only into <c>pg_catalog</c>, so an
-    /// allowlisted name can't resolve to a same-named function elsewhere. Unrecognised shapes (including
+    /// (<c>WITH t(a) AS</c>). Schema-qualified calls are always rejected, so an allowlisted name can't
+    /// resolve to a same-named function elsewhere. Unrecognised shapes (including
     /// a double-quoted function name, which sanitizes to a placeholder) fail closed.
     /// </summary>
     private static string? FindDisallowedFunctionCall(string sanitized)
@@ -154,9 +152,7 @@ public sealed partial class SqlGuard : ISqlGuard
                 continue;
             }
 
-            var qualifiedOutsideCatalog = previous == "."
-                && (i < 2 || !tokens[i - 2].Equals(CatalogSchema, StringComparison.OrdinalIgnoreCase));
-            if (qualifiedOutsideCatalog || !AllowedFunctions.Contains(name))
+            if (previous == "." || !AllowedFunctions.Contains(name))
             {
                 return name;
             }
@@ -182,7 +178,7 @@ public sealed partial class SqlGuard : ISqlGuard
             // Line comment.
             if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
             {
-                while (i < sql.Length && sql[i] != '\n')
+                while (i < sql.Length && sql[i] != '\n' && sql[i] != '\r')
                 {
                     i++;
                 }
