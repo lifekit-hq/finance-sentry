@@ -561,3 +561,4 @@ comparison; the bars are closed periods.
   days. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
   is directionally right rather than exact. A true same-day-last-month comparison would
   need day-level cumulative flow from the backend, which is not built.
+
