@@ -5,6 +5,7 @@ import {pipe, switchMap, tap} from 'rxjs';
 
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
+import {AuthStore} from '../../auth/store/auth.store';
 import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 
@@ -68,13 +69,16 @@ export function dossierEffects(store: StoreMethods) {
 
 export function dossierHooks(store: ReturnType<typeof dossierEffects>) {
   const route = inject(ActivatedRoute);
+  const authStore = inject(AuthStore);
 
   return {
     onInit: () => {
       const symbol = route.snapshot.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM) ?? '';
       if (symbol) {
         store.loadDossier(symbol);
-        store.loadLedgerRead(symbol);
+        if (authStore.isOwner()) {
+          store.loadLedgerRead(symbol);
+        }
       }
     },
   };

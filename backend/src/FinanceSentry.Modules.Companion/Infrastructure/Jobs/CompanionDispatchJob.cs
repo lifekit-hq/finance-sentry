@@ -56,6 +56,7 @@ public sealed class CompanionDispatchJob(
             switch (result)
             {
                 case WakeResult.NotConfigured:
+                case WakeResult.Skipped:
                     continue; // leave Pending for the pull path
                 case WakeResult.Sent:
                     evt.Disposition = EventDisposition.Dispatched;

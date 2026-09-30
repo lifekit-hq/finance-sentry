@@ -17,6 +17,7 @@ using FinanceSentry.Modules.BankSync.API.Middleware;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using Hangfire;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;

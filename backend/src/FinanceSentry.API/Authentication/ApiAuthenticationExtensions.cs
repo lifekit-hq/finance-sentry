@@ -1,5 +1,6 @@
 namespace FinanceSentry.API.Authentication;
 
+using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.API.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 public static class ApiAuthenticationExtensions
 {
     public const string AccessTokenCookie = "fs_access_token";
+    public const string ForbiddenCode = "FORBIDDEN";
 
     /// <summary>Registers authentication and the fallback policy. Call after <c>AddAllModules</c>
     /// (Identity registers its own cookie scheme as the default; this replaces that default).</summary>
@@ -19,6 +21,7 @@ public static class ApiAuthenticationExtensions
         services.AddAccessTokenAuthentication(AuthAudiences.App, options =>
         {
             options.Events.OnMessageReceived = ReadAccessTokenCookie;
+            options.Events.OnForbidden = WriteForbiddenBodyAsync;
             // Rollout: access tokens issued before the "app" audience existed carry no aud claim.
             // Accept those until they expire (one Jwt:ExpiryMinutes lifetime after deploy), then
             // delete this validator so ValidAudience alone applies. Any other audience is rejected.
@@ -33,4 +36,9 @@ public static class ApiAuthenticationExtensions
             context.Token = cookie;
         return Task.CompletedTask;
     }
+
+    // Signed in but not permitted (e.g. a non-owner on an owner-only feature): 403 with the API's JSON error body.
+    private static Task WriteForbiddenBodyAsync(ForbiddenContext context) =>
+        context.Response.WriteAsJsonAsync(
+            new ApiErrorBody("This feature is not available for your account.", ForbiddenCode));
 }

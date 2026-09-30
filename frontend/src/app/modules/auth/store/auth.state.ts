@@ -8,6 +8,7 @@ export interface FlashMessage {
 export interface AuthState {
   userId: Nullable<string>;
   email: Nullable<string>;
+  roles: string[];
   status: AsyncStatus;
   errorCode: Nullable<string>;
   flow: AuthFlow;
@@ -18,6 +19,7 @@ export interface AuthState {
 export const initialAuthState: AuthState = {
   userId: null,
   email: null,
+  roles: [],
   status: 'idle',
   errorCode: null,
   flow: null,

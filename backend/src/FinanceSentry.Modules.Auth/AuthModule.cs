@@ -65,6 +65,7 @@ public static class AuthModule
 
         services.AddScoped<IUserAlertPreferencesReader, UserAlertPreferencesReader>();
         services.AddScoped<IUserBaseCurrencyReader, UserBaseCurrencyReader>();
+        services.AddScoped<IOwnerAccountReader, OwnerAccountReader>();
         services.AddScoped<IUserFireAssumptionsReader, UserFireAssumptionsReader>();
 
         return services;
