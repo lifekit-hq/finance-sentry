@@ -1,5 +1,8 @@
 namespace FinanceSentry.Modules.Research.Domain.PolicyReviews;
 
+using System.Security.Cryptography;
+using System.Text;
+
 /// <summary>
 /// One completed scheduled review of the investment policy statement (#696): current positioning
 /// measured against the statement's bands, the adjustments it suggests and why. Recommend-only —
@@ -8,6 +11,13 @@ namespace FinanceSentry.Modules.Research.Domain.PolicyReviews;
 public class PolicyReview
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Stable identity for the review due at <paramref name="dueAt"/> on a statement, so a retried run
+    /// reuses the id its alert was emitted under and the alert's once-per-reference dedup holds.
+    /// </summary>
+    public static Guid DeriveId(Guid userId, Guid policyStatementId, DateTimeOffset dueAt)
+        => new(MD5.HashData(Encoding.UTF8.GetBytes($"policy-review:{userId:N}:{policyStatementId:N}:{dueAt.UtcTicks}")));
 
     public Guid UserId { get; set; }
 

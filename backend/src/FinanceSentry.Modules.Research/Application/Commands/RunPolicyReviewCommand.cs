@@ -82,6 +82,7 @@ public class RunPolicyReviewCommandHandler(
 
         var review = new PolicyReview
         {
+            Id = PolicyReview.DeriveId(cmd.UserId, ips.Id, schedule.DueAt),
             UserId = cmd.UserId,
             PolicyStatementId = ips.Id,
             PolicyStatementVersion = ips.Version,
@@ -96,10 +97,10 @@ public class RunPolicyReviewCommandHandler(
             Rationale = proposal.Rationale,
         };
 
-        await reviewRepo.RecordAsync(review, ct);
-
         await alertGenerator.GeneratePolicyReviewAlertAsync(
             cmd.UserId, review.Id, proposal.Adjustments.Count, AlertSummary(proposal.Rationale), ct);
+
+        await reviewRepo.RecordAsync(review, ct);
 
         logger.LogInformation(
             "Policy review {ReviewId} completed for user {UserId} against statement v{Version}: {Adjustments} adjustment(s), missed={Missed}",

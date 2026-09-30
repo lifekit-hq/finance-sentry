@@ -186,6 +186,50 @@ public class RunPolicyReviewCommandHandlerTests
     }
 
     [Fact]
+    public async Task Alert_failure_leaves_the_review_unrecorded_and_the_next_run_retries()
+    {
+        GivenVersions(Current());
+        var now = QuarterlyDue.AddHours(5);
+        var calls = 0;
+        _alerts.Setup(a => a.GeneratePolicyReviewAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ++calls == 1 ? Task.FromException(new InvalidOperationException("alert store down")) : Task.CompletedTask);
+
+        var first = () => Handler(now).Handle(new RunPolicyReviewCommand(_userId), default);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        _recorded.Should().BeEmpty("the clock must not advance when the proposal was never presented");
+
+        var retry = await Handler(now.AddDays(1)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        retry.Outcome.Should().Be(PolicyReviewRunOutcome.Completed);
+        _recorded.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Retry_after_a_record_failure_emits_the_alert_under_the_same_review_id()
+    {
+        GivenVersions(Current());
+        var now = QuarterlyDue.AddHours(5);
+        var alertedIds = new List<Guid>();
+        _alerts.Setup(a => a.GeneratePolicyReviewAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, Guid, int, string, CancellationToken>((_, id, _, _, _) => alertedIds.Add(id))
+            .Returns(Task.CompletedTask);
+        var recordCalls = 0;
+        _reviewRepo.Setup(r => r.RecordAsync(It.IsAny<PolicyReview>(), It.IsAny<CancellationToken>()))
+            .Callback<PolicyReview, CancellationToken>((r, _) => _recorded.Add(r))
+            .Returns(() => ++recordCalls == 1 ? Task.FromException(new InvalidOperationException("db down")) : Task.CompletedTask);
+
+        var first = () => Handler(now).Handle(new RunPolicyReviewCommand(_userId), default);
+        await first.Should().ThrowAsync<InvalidOperationException>();
+        await Handler(now.AddDays(1)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        alertedIds.Should().HaveCount(2);
+        alertedIds.Distinct().Should().ContainSingle("the alert's once-per-reference dedup keys on the review id");
+        _recorded.Last().Id.Should().Be(alertedIds[0]);
+    }
+
+    [Fact]
     public async Task Long_rationale_is_clipped_to_the_alert_message_limit_but_kept_whole_on_the_review()
     {
         GivenVersions(Current());
