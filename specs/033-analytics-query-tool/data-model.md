@@ -22,8 +22,8 @@ Notes:
 ## `fs_readonly` role + RLS
 
 - Role `fs_readonly`: `NOLOGIN`-parent granted to a login role used by the read-only connection; `GRANT USAGE ON SCHEMA analytics` + `GRANT SELECT` on the curated views **only**. No grants on base tables, no write privileges anywhere.
-- The executor, per query: `BEGIN; SET LOCAL app.current_user_id = @caller; SET LOCAL statement_timeout = @ms; <validated SELECT>; ROLLBACK;` (read-only txn).
-- RLS/security-barrier ensures `current_setting` scoping cannot be bypassed by the agent's SQL.
+- The executor, per query: `SET TRANSACTION READ ONLY; SELECT set_config('app.current_user_id', @caller, true), set_config('statement_timeout', @ms, true);` as the app login, then `SET LOCAL ROLE fs_readonly`, runs the validated SELECT, and `ROLLBACK`s.
+- `current_setting` scoping cannot be bypassed by the agent's SQL: `SqlGuard` rejects any non-allowlisted function call (incl. `set_config`/`current_setting`), and migration M002 revokes `EXECUTE` on `pg_catalog.set_config` from PUBLIC, granting it only to the migration login (the app login that runs the executor's setup statement; the revoke is skipped with a warning when that login is not a superuser).
 
 ## Entity: `QueryAuditRecord` (table `analytics.query_audit`)
 

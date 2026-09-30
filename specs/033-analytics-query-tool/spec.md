@@ -76,7 +76,7 @@ Each executed query is recorded (who, when, the SQL, row count, duration) so Den
 - **FR-002**: Execution MUST be read-only enforced at the database level (a `SELECT`-only role/connection) — not solely by validation. Writes and DDL MUST be impossible even if validation is bypassed.
 - **FR-003**: Only a curated set of **per-user views** MUST be queryable; raw internal tables MUST NOT be reachable through this tool.
 - **FR-004**: Every query MUST be scoped to the authenticated caller's data; it MUST be impossible to return another user's rows. Calls without a valid identity MUST be rejected.
-- **FR-005**: The system MUST accept only a single `SELECT` statement; multiple statements, writes, and DDL MUST be rejected before execution.
+- **FR-005**: The system MUST accept only a single `SELECT` statement; multiple statements, writes, and DDL MUST be rejected before execution. A query MUST call only allowlisted functions (aggregate, window, math, date/time, text, array); any other call — `set_config`, `current_setting`, `pg_*`, schema-qualified — MUST be rejected, so submitted SQL cannot re-point its own owner scope.
 - **FR-006**: The system MUST bound each query with a statement timeout and a maximum row count, returning a clear "too large — narrow it" outcome rather than hanging or dumping unbounded rows.
 - **FR-007**: The agent MUST be able to discover the queryable surface (the curated views, their columns/types, and a one-line purpose each).
 - **FR-008**: Each executed or rejected query MUST be recorded for audit (caller, timestamp, SQL, outcome, row count, duration).
