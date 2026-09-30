@@ -488,6 +488,13 @@ public class RunThesisMonitorHandlerTests
         public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateDetectorSilentAlertAsync(
+            Guid userId, string detectorName, int silentDays, int inputCount, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveDetectorSilentAlertAsync(Guid userId, string detectorName, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 

@@ -10,6 +10,9 @@ using FinanceSentry.Modules.Alerts.Domain.Repositories;
 
 public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader policyAcks) : IAlertGeneratorService
 {
+    /// <summary>How long a dismissed detector-silent alert stays quiet while the silence persists.</summary>
+    private static readonly TimeSpan DetectorSilentDismissQuiet = TimeSpan.FromDays(7);
+
     /// <summary>
     /// The backstop silence window per alert type: how long after the last alert of that type on the
     /// same reference a fresh one stays quiet. Every generator reads its window from here, so adding
@@ -219,6 +222,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveJobFailureAlertAsync(
         Guid userId, Guid referenceId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.JobFailure, referenceId, ct);
+
+    public Task GenerateDetectorSilentAlertAsync(
+        Guid userId, string detectorName, int silentDays, int inputCount, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.JobFailure, AlertSeverity.Warning, DetectorSilentReferenceId(detectorName), detectorName,
+            $"Detector silent: {detectorName}",
+            $"Scheduled detector '{detectorName}' has raised no alert in {silentDays} days while watching {inputCount} ticker(s). It is running, so check its provider feed and filters.")
+        {
+            // The open alert absorbs every daily re-check; after a dismissal, stay quiet for a week.
+            SilenceWindow = DetectorSilentDismissQuiet,
+        },
+            ct);
+
+    public Task ResolveDetectorSilentAlertAsync(
+        Guid userId, string detectorName, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.JobFailure, DetectorSilentReferenceId(detectorName), ct);
 
     public Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId, Guid referenceId, CancellationToken ct = default)
@@ -533,6 +552,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-user synthetic GUID for cash-sweep dedup.</summary>
     private static Guid CashSweepReferenceId(Guid userId)
         => DerivedReferenceId($"cash:sweep:{userId}");
+
+    /// <summary>Stable per-detector synthetic GUID — one open detector-silent alert per detector.</summary>
+    private static Guid DetectorSilentReferenceId(string detectorName)
+        => DerivedReferenceId($"detector-silent:{detectorName}");
 
     /// <summary>Stable per-(ticker, event type, event date) synthetic GUID — never emit twice for the same event.</summary>
     private static Guid EarningsAheadReferenceId(string ticker, string eventType, DateOnly eventDate)

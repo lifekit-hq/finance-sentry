@@ -3,14 +3,15 @@ namespace FinanceSentry.Modules.Research.Tests.Jobs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
 /// <summary>
-/// T3 (ledger-heartbeat design): earnings/ex-dividend within the lookahead window on a holding or
-/// watchlist ticker. Yahoo quoteSummary has no contract, so a missing field, a null date, or a failed
+/// T3 (ledger-heartbeat design): earnings/ex-dividend within the lookahead window on a holding,
+/// watchlist or thesis ticker. Yahoo quoteSummary has no contract, so a missing field, a null date, or a failed
 /// fetch must produce silence, never an alert storm or a thrown exception.
 /// </summary>
 public sealed class EarningsAheadJobTests
@@ -18,6 +19,8 @@ public sealed class EarningsAheadJobTests
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IWatchlistReader> _watchlist = new();
+    private readonly Mock<IThesisRepository> _theses = new();
+    private readonly Mock<ICryptoHoldingsReader> _crypto = new();
     private readonly Mock<IEarningsCalendarService> _earningsCalendar = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
     private readonly EarningsAheadJob _job;
@@ -28,8 +31,7 @@ public sealed class EarningsAheadJobTests
     {
         _job = new EarningsAheadJob(
             _banking.Object,
-            _brokerage.Object,
-            _watchlist.Object,
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
             _earningsCalendar.Object,
             _alerts.Object,
             NullLogger<EarningsAheadJob>.Instance);
@@ -37,6 +39,52 @@ public sealed class EarningsAheadJobTests
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync([]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
+        _crypto.Setup(c => c.GetHoldingsAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
+    }
+
+    [Fact]
+    public async Task Execute_ThesisTickerReportingInTheWindow_Emits()
+    {
+        // #698: the real miss — a thesis name (not held, not watchlisted) reporting on 2026-10-01 was
+        // inside the 3-day window on the 2026-09-28 run but was never looked up.
+        var now = new DateTime(2026, 9, 28, 6, 0, 0, DateTimeKind.Utc);
+        var eventDate = new DateOnly(2026, 10, 1);
+        _theses.Setup(t => t.ListAsync(_userId, default))
+            .ReturnsAsync([new InvestmentThesis { UserId = _userId, Ticker = "ACN" }]);
+        _earningsCalendar.Setup(e => e.GetForTickersAsync(
+                It.Is<IReadOnlyCollection<string>>(t => t.Contains("ACN")),
+                new DateOnly(2026, 9, 28), eventDate, null, default))
+            .ReturnsAsync([new EarningsEvent("ACN", EarningsEventType.Earnings, eventDate, false, "yahoo")]);
+
+        await _job.ExecuteAsync(now);
+
+        _alerts.Verify(a => a.GenerateEarningsAheadAlertAsync(
+            _userId, "ACN", EarningsAheadEventType.Earnings, eventDate, false, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ThesisTickerNamingAHeldCryptoAsset_IsNotLookedUp()
+    {
+        // A bare crypto symbol resolves to an unrelated listed name on the calendar feed.
+        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+            new InvestmentThesis { UserId = _userId, Ticker = "SOL" },
+            new InvestmentThesis { UserId = _userId, Ticker = "ACN" },
+        ]);
+        _crypto.Setup(c => c.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new CryptoHoldingSummary("SOL", 10m, 0m, 1500m, DateTime.UtcNow, "Binance")]);
+        _earningsCalendar.Setup(e => e.GetForTickersAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), null, default))
+            .ReturnsAsync([]);
+
+        await _job.ExecuteAsync();
+
+        _earningsCalendar.Verify(e => e.GetForTickersAsync(
+            It.Is<IReadOnlyCollection<string>>(t => t.Contains("ACN") && !t.Contains("SOL")),
+            It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), null, default), Times.AtLeastOnce);
+        _earningsCalendar.Verify(e => e.GetForTickersAsync(
+            It.Is<IReadOnlyCollection<string>>(t => t.Contains("SOL")),
+            It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<string?>(), default), Times.Never);
     }
 
     [Fact]

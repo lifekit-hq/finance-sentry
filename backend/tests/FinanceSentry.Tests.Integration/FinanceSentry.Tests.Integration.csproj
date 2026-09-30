@@ -25,6 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Captured real provider responses the #698 look-ahead replay harness serves. -->
+    <None Include="Research\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\FinanceSentry.Core\FinanceSentry.Core.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.BankSync\FinanceSentry.Modules.BankSync.csproj" />
     <ProjectReference Include="..\..\src\FinanceSentry.Infrastructure\FinanceSentry.Infrastructure.csproj" />

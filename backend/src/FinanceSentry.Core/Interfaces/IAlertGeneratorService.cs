@@ -166,6 +166,26 @@ public interface IAlertGeneratorService
         Guid referenceId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Raises a Warning operational alert (surfaced like a job failure) that a scheduled detector has
+    /// raised nothing for <paramref name="silentDays"/> days although it watched
+    /// <paramref name="inputCount"/> inputs the whole time (#698): a detector that runs green but never
+    /// fires is indistinguishable from a quiet week without it. One open alert per detector; a
+    /// dismissal quiets it for a week while the silence persists.
+    /// </summary>
+    Task GenerateDetectorSilentAlertAsync(
+        Guid userId,
+        string detectorName,
+        int silentDays,
+        int inputCount,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the detector-silent Alert once the detector fires again or has no inputs.</summary>
+    Task ResolveDetectorSilentAlertAsync(
+        Guid userId,
+        string detectorName,
+        CancellationToken ct = default);
+
     /// <summary>Resolves the market-structure freshness Alert once the Radar feed catches back up.</summary>
     Task ResolveMarketStructureFreshnessAlertAsync(
         Guid userId,
@@ -331,7 +351,8 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Raises an Info alert that a 10-K, 10-Q or 8-K has landed on a holding or thesis-proxy ticker.
+    /// Raises an Info alert that a 10-K, 10-Q or 8-K (or a foreign private issuer's 6-K, 20-F or 40-F)
+    /// has landed on a holding, thesis or thesis-proxy ticker.
     /// Deduped per (ticker, EDGAR accession number) — that pair is unique forever, so the same filing
     /// never alerts twice however many times the hourly detector re-reads the submissions feed.
     /// </summary>

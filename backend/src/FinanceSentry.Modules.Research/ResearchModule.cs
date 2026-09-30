@@ -101,15 +101,21 @@ public static class ResearchModule
 
             // Earnings-ahead detector (ledger-heartbeat T3), 06:00 UTC.
             mgr.AddOrUpdate<EarningsAheadJob>(
-                "earnings-ahead",
+                EarningsAheadJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(6));
 
             // Filing-landed detector (ledger-heartbeat T2), hourly.
             mgr.AddOrUpdate<FilingWatchJob>(
-                "filing-watch",
+                FilingWatchJob.RecurringJobId,
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Hourly());
+
+            // Zero-fire monitor over both look-ahead detectors (#698), 07:00 UTC after earnings-ahead.
+            mgr.AddOrUpdate<LookaheadSilenceMonitorJob>(
+                "lookahead-silence-monitor",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(7));
 
             // News-cluster detector (ledger-heartbeat N1), every 30 min offset 5 min after the
             // */30 news ingestion sweep so a freshly ingested batch is visible to this run.
@@ -361,8 +367,11 @@ public static class ResearchModule
         services.AddScoped<OpportunityScanJob>();
         services.AddScoped<ResearchIndexingJob>();
         services.AddScoped<ActionTicketsGeneratorJob>();
+        services.AddScoped<LookaheadUniverse>();
+        services.AddSingleton<IRecurringJobAgeReader, HangfireRecurringJobAgeReader>();
         services.AddScoped<EarningsAheadJob>();
         services.AddScoped<FilingWatchJob>();
+        services.AddScoped<LookaheadSilenceMonitorJob>();
         services.AddScoped<NewsMaterialityJob>();
         services.AddScoped<GeopoliticsSourceSeedJob>();
         services.AddScoped<ThesisSourceRetirementJob>();

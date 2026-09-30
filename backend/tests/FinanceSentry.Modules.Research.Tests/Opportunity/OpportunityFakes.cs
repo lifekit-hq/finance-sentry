@@ -284,6 +284,8 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task GenerateFamilyStatementAlertAsync(Guid userId, string headline, string body, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveConsentExpiringAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateDetectorSilentAlertAsync(Guid userId, string detectorName, int silentDays, int inputCount, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveDetectorSilentAlertAsync(Guid userId, string detectorName, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveMarketStructureFreshnessAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolvePriceHikeAlertAsync(Guid userId, Guid subscriptionId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCategorySpikeAlertAsync(Guid userId, string category, CancellationToken ct = default) => Task.CompletedTask;
