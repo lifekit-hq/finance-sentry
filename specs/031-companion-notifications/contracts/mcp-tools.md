@@ -57,10 +57,12 @@ Read-only — does NOT mark delivered (explicit ack keeps at-least-once). Empty 
 
 For `realtime` mode the dispatch relay POSTs to `Companion:AgentTriggerUrl` (if configured):
 ```json
-{ "eventId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…" }
+{ "eventId": "…", "userId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…" }
 ```
 Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configuration, omitted when empty) and `Idempotency-Key: <eventId>` so the receiver dedups the relay's retries (up to `MaxDispatchAttempts`). The digest wake (`{ "kind": "Digest", "userId": "…", "count": n }`) carries the bearer header only.
 
 No secrets, no full detail — the agent resolves specifics via the tools above using its own authenticated identity (FR-016). A missing URL ⇒ no push; the agent pulls instead.
+
+Owner-only: the agent runtime serves the owner account (Identity `Owner` role, see `IOwnerAccountReader`) only. Events (and digest wakes) for any other user are never posted — the dispatch job marks those events `SuppressedNonOwner` (terminal) so they leave the realtime batch.
 
 Materiality note: `SyncFailure` is held for the digest in every mode except quiet unless the referenced bank account has had no successful sync for more than 24h (`MaterialityPolicy.SyncFailureEscalationAge`), in which case the mode disposition applies. Provider-level sync failures with no account reference are always held.
