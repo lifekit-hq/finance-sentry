@@ -74,6 +74,9 @@ builder.Services.AddExchangeRates(builder.Configuration);
 
 builder.Services.AddHangfireServices(builder.Configuration, builder.Environment);
 
+// Job registration runs after the host is listening (see RecurringJobRegistrationService).
+builder.Services.AddRecurringJobRegistration();
+
 // OpenTelemetry metrics (FR-001/002) — ASP.NET Core + runtime + custom job meter, exposed at /metrics —
 // plus the HTTP trace spine (spec 023 amendment, 2026-09-13): ASP.NET Core + HttpClient + Npgsql spans via OTLP/HTTP.
 builder.Services.AddObservabilityMetrics(builder.Configuration);
@@ -93,6 +96,9 @@ builder.Services.AddHealthChecks()
         tags: ["ready"])
     .AddCheck<StartupMigrationsHealthCheck>(
         StartupMigrationsHealthCheck.Name,
+        tags: ["ready"])
+    .AddCheck<RecurringJobRegistrationHealthCheck>(
+        RecurringJobRegistrationHealthCheck.Name,
         tags: ["ready"]);
 
 builder.Services.AddRateLimiter(options =>
@@ -197,42 +203,6 @@ GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter())
 // Mark a manual dashboard Requeue so HangfireTracingFilter links it like an automatic retry
 // instead of re-parenting it onto a possibly day-old request trace (#616 follow-up).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireManualRequeueDetectionFilter());
-
-// Registering jobs writes to Hangfire's storage, which outside the Testing environment is the same
-// PostgreSQL database MigrateAllModules just found unreachable — an AddOrUpdate against it throws
-// and would end the process before it serves a request, turning the documented non-fatal
-// "database unreachable at startup" path into a crash. Skip registration on that path: the API comes
-// up, the "migrations" readiness check names the skipped migrations, and the restart it prescribes
-// registers this build's jobs as well. Recurring jobs registered by earlier starts persist in storage.
-if (app.Services.GetRequiredService<StartupMigrationStatus>().MigrationsSkipped)
-{
-    app.Logger.LogError(
-        "Skipping startup job registration: the database was unreachable when migrations ran, and " +
-        "registering jobs writes to Hangfire's storage in that database. Restart the API once the " +
-        "database is reachable so the skipped migrations run and this build's jobs are registered.");
-}
-else
-{
-    // One retry boundary for every startup registration (module jobs + the FX job): a lock timeout
-    // held by an overlapping instance must not end the process (see StartupJobRegistration).
-    StartupJobRegistration.RegisterWithRetry(
-        () =>
-        {
-            app.RegisterAllModuleJobs();
-
-            // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
-            // fallback table behind as soon as the app is up.
-            var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
-            recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
-                "exchange-rate-refresh",
-                job => job.RunAsync(CancellationToken.None),
-                Cron.Daily());
-        },
-        app.Logger);
-
-    app.Services.GetRequiredService<IBackgroundJobClient>()
-        .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
-}
 
 app.Run();
 
