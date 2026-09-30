@@ -283,7 +283,7 @@ public sealed partial class SqlGuard : ISqlGuard
         return sb.ToString();
     }
 
-    private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
+    private static bool IsIdentifierChar(char c) => c >= '\u0080' || char.IsAsciiLetterOrDigit(c) || c == '_' || c == '$';
 
     [GeneratedRegex(@"[A-Za-z_][A-Za-z0-9_]*")]
     private static partial Regex FirstWordRegex();
@@ -292,13 +292,13 @@ public sealed partial class SqlGuard : ISqlGuard
     private static partial Regex WordRegex();
 
     // PostgreSQL identifiers: a letter (any script) or underscore, then letters, digits, _ or $.
-    [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_$]*$")]
+    [GeneratedRegex(@"^[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*$")]
     private static partial Regex IdentifierRegex();
 
     // Identifiers, bare numbers, the :: cast operator, or any other single non-space character.
-    [GeneratedRegex(@"[\p{L}_][\p{L}\p{N}_$]*|\p{N}+|::|\S")]
+    [GeneratedRegex(@"[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*|[0-9]+|::|\S")]
     private static partial Regex TokenRegex();
 
-    [GeneratedRegex(@"\$([\p{L}_][\p{L}\p{N}_]*)?\$")]
+    [GeneratedRegex(@"\$([A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$")]
     private static partial Regex DollarQuoteTagRegex();
 }

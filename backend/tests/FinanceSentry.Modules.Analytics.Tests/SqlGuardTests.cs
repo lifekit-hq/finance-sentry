@@ -104,6 +104,8 @@ public sealed class SqlGuardTests
     [InlineData("SELECT $q$'$q$, set_config('app.current_user_id', 'x', true) FROM analytics.v_transactions")] // tagged dollar quote
     [InlineData("SELECT E'\\'', set_config('app.current_user_id', 'x', true) FROM analytics.v_transactions --'")] // backslash-escaped quote
     [InlineData("SELECT 1 /* /* */ ' */, set_config('app.current_user_id', 'x', true) -- '")] // nested block comment
+    [InlineData("SELECT $€$'$€$, set_config('app.current_user_id', 'x', true), ''")] // non-ASCII dollar-quote tag
+    [InlineData("SELECT 1 AS €$$, set_config('app.current_user_id', 'x', true) AS a, $$ $$ AS b")] // non-ASCII identifier char before $$
     [InlineData("SELECT amount FROM analytics.v_transactions WHERE (SELECT --\r set_config('app.current_user_id', 'x', true)) IS NOT NULL")] // line comment ends at CR
     [InlineData("SELECT amount FROM analytics.v_transactions WHERE (SELECT --\r\n set_config('app.current_user_id', 'x', true)) IS NOT NULL")] // line comment ends at CRLF
     public void Validate_RejectsFunctionCallsHiddenBehindLiteralSyntax(string sql)
