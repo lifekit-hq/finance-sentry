@@ -4,16 +4,22 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Companion.API.Responses;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// The user's undelivered companion events for the agent to deliver (feature 031, US2). Read-only —
-/// does NOT mark delivered; the agent acks explicitly after delivering.
+/// does NOT mark delivered; the agent acks explicitly after delivering. Held-for-digest events are
+/// demoted on purpose and belong to the digest: they are returned only when the caller both asks for
+/// them and supplies a non-blank <paramref name="HeldOverrideReason"/>; the override is logged.
 /// </summary>
 public record GetPendingCompanionEventsQuery(
-    Guid UserId, int Limit, bool IncludeHeldForDigest) : IQuery<CompanionEventsResult>;
+    Guid UserId, int Limit, bool IncludeHeldForDigest, string? HeldOverrideReason = null)
+    : IQuery<CompanionEventsResult>;
 
 public class GetPendingCompanionEventsQueryHandler(
-    ICompanionEventRepository events, INotificationSettingRepository settings)
+    ICompanionEventRepository events,
+    INotificationSettingRepository settings,
+    ILogger<GetPendingCompanionEventsQueryHandler> logger)
     : IQueryHandler<GetPendingCompanionEventsQuery, CompanionEventsResult>
 {
     private static readonly EventDisposition[] Undelivered =
@@ -22,7 +28,20 @@ public class GetPendingCompanionEventsQueryHandler(
 
     public async Task<CompanionEventsResult> Handle(GetPendingCompanionEventsQuery query, CancellationToken ct)
     {
-        var dispositions = query.IncludeHeldForDigest
+        var reason = query.HeldOverrideReason?.Trim();
+        var includeHeld = query.IncludeHeldForDigest && !string.IsNullOrEmpty(reason);
+        if (includeHeld)
+        {
+            logger.LogWarning(
+                "Held-for-digest override for {User}: reason \"{Reason}\"", query.UserId, reason);
+        }
+        else if (query.IncludeHeldForDigest)
+        {
+            logger.LogWarning(
+                "Held-for-digest events requested by {User} without an override reason; excluded", query.UserId);
+        }
+
+        var dispositions = includeHeld
             ? [.. Undelivered, EventDisposition.HeldForDigest]
             : Undelivered;
 
