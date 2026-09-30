@@ -6,7 +6,7 @@ New context: **`CompanionDbContext`** — schema `companion`, history table `__e
 
 - **`NotificationMode`**: `Quiet | Digest | Scan | Realtime`. Default `Scan`.
 - **`CompanionEventKind`**: `RiskViolation | SyncFailure | UnusualSpend | Opportunity | ThesisBreak | AnalystAction`.
-- **`EventDisposition`**: `Pending | Dispatched | HeldForDigest | Delivered | SuppressedByMode | SuppressedByDedup | SuppressedByRateLimit | DeferredQuietHours | Failed | Expired`.
+- **`EventDisposition`**: `Pending | Dispatched | HeldForDigest | Delivered | SuppressedByMode | SuppressedByDedup | SuppressedByRateLimit | SuppressedNonOwner | DeferredQuietHours | Failed | Expired`.
 
 ## Entity: `CompanionNotificationSetting` (table `companion_notification_settings`)
 
@@ -64,6 +64,7 @@ capture ──► Pending ───────────(realtime relay)─�
         ├─► SuppressedByMode        (quiet — terminal)
         ├─► SuppressedByDedup       (terminal; never actually inserted — the unique key rejects it)
         ├─► SuppressedByRateLimit / DeferredQuietHours  (realtime, re-evaluated next tick)
+        ├─► SuppressedNonOwner      (realtime relay, user is not the Owner — terminal)
         └─► Failed                  (retry-exhausted; visible, re-drivable)
 ```
 Every captured event is recorded with a disposition — none lost (FR-007 / SC-005).

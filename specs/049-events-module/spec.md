@@ -152,7 +152,7 @@ below; `record_event_verdict` on a companion event id owned by the user makes th
 | any | present, `notified = false` | `judged_immaterial` |
 | `Delivered` | none | `silent` |
 | `Pending`, `Dispatched`, `HeldForDigest`, `DeferredQuietHours` | none | `awaiting` |
-| `SuppressedByMode`, `SuppressedByRateLimit`, `SuppressedByDedup`, `Failed` | none | `not_delivered` |
+| `SuppressedByMode`, `SuppressedByRateLimit`, `SuppressedByDedup`, `SuppressedNonOwner`, `Failed` | none | `not_delivered` |
 | no companion row yet | none | `awaiting` |
 
 **Acceptance Scenarios**:
