@@ -144,7 +144,7 @@ Loki sink, and the dashboards below.
   answers *is it healthy now, did last night's jobs run?* at a glance; the availability panel turns red
   within ~60s of an API outage.
 - **Jobs** — Hangfire storage moved to PostgreSQL (`hangfire` schema) so job history/schedule survive
-  restarts. Outside Development the Hangfire dashboard at `/hangfire` is served only to a signed-in
+  restarts. The Hangfire dashboard at `/hangfire` is served, in every environment, only to a signed-in
   account holding the `Owner` role (access path: [runbook §4](docs/OPERATIONS_RUNBOOK.md)).
 
 ```bash
