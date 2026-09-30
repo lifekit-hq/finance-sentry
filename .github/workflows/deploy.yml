@@ -54,8 +54,13 @@ jobs:
           # finishing late never rolls prod back. Manual deploys and rollbacks skip this check.
           if [[ $EVENT_NAME == workflow_run ]]; then
             auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-            head="$(git -c "http.extraHeader=Authorization: Basic $auth" \
-              ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/main | cut -f1)"
+            refs="$(git -c "http.extraHeader=Authorization: Basic $auth" \
+              ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/main)"
+            head="$(cut -f1 <<< "$refs")"
+            if ! [[ $head =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::could not read the head of main (got '$head')"
+              exit 1
+            fi
             if [[ $head != "$sha" ]]; then
               echo "$sha is no longer the head of main ($head); skipping its deploy"
               echo "stale=true" >> "$GITHUB_OUTPUT"
