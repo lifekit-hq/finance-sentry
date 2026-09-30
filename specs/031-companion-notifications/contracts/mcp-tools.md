@@ -33,7 +33,8 @@ Returns the effective settings (defaults if no row yet). `mode` ∈ `quiet|diges
 | Param | Type | Required | Notes |
 |---|---|---|---|
 | `limit` | int | no | default 25, max 100 |
-| `includeHeldForDigest` | bool | no | default false; the digest job uses true |
+| `includeHeldForDigest` | bool | no | default false; only a Digest wake sets true, and it is honoured only with `heldOverrideReason` |
+| `heldOverrideReason` | string | with `includeHeldForDigest` | why held events are pulled (the Digest wake payload supplies `"daily digest"`); logged. Without it held events stay excluded and the result carries a `note` |
 
 **Response**: events the agent has not yet delivered (disposition `Pending`/`Dispatched`, plus `HeldForDigest` when requested), newest first:
 ```json
@@ -43,10 +44,11 @@ Returns the effective settings (defaults if no row yet). `mode` ∈ `quiet|diges
       "summary": "DRAM weight 47% exceeds 30% cap", "referenceId": "…", "occurredAt": "…", "disposition": "Pending" }
   ],
   "mode": "realtime",
-  "retrievedAt": "…"
+  "retrievedAt": "…",
+  "note": null
 }
 ```
-Read-only — does NOT mark delivered (explicit ack keeps at-least-once). Empty list is honest emptiness, never fabricated.
+`note` is set only when `includeHeldForDigest` was requested without a `heldOverrideReason` (held events withheld; an empty list then does not mean none exist). Read-only — does NOT mark delivered (explicit ack keeps at-least-once). Empty list is honest emptiness, never fabricated.
 
 ## `acknowledge_companion_events` (new)
 
@@ -59,7 +61,7 @@ For `realtime` mode the dispatch relay POSTs to `Companion:AgentTriggerUrl` (if 
 ```json
 { "eventId": "…", "userId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…" }
 ```
-Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configuration, omitted when empty) and `Idempotency-Key: <eventId>` so the receiver dedups the relay's retries (up to `MaxDispatchAttempts`). The digest wake (`{ "kind": "Digest", "userId": "…", "count": n }`) carries the bearer header only.
+Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configuration, omitted when empty) and `Idempotency-Key: <eventId>` so the receiver dedups the relay's retries (up to `MaxDispatchAttempts`). The digest wake (`{ "kind": "Digest", "userId": "…", "count": n, "includeHeldForDigest": true, "heldOverrideReason": "daily digest" }`) carries the bearer header only.
 
 No secrets, no full detail — the agent resolves specifics via the tools above using its own authenticated identity (FR-016). A missing URL ⇒ no push; the agent pulls instead.
 

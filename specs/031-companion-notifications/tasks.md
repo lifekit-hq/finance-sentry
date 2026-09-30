@@ -109,7 +109,7 @@ description: "Task list for Companion Notification Modes + Event-Driven Push"
 **Independent Test**: digest mode → events `HeldForDigest`, none dispatched immediately; digest run surfaces the day's set once; empty day → no forced message.
 
 - [X] T036 [P] [US3] Unit test for digest consolidation (collects `HeldForDigest` for the user, one batch, no repeat after delivery/ack; empty → nothing) in `.../DigestConsolidationTests.cs`
-- [X] T037 [US3] Create `CompanionDigestJob` (`[DisableConcurrentExecution]`, daily at `DigestHourLocal`): for `digest`-mode users, expose the day's `HeldForDigest` events for the agent to pull via `get_pending_companion_events {includeHeldForDigest:true}`; mark surfaced set so it isn't repeated in `Infrastructure/Jobs/CompanionDigestJob.cs`
+- [X] T037 [US3] Create `CompanionDigestJob` (`[DisableConcurrentExecution]`, daily at `DigestHourLocal`): for `digest`-mode users, expose the day's `HeldForDigest` events for the agent to pull via `get_pending_companion_events {includeHeldForDigest:true, heldOverrideReason:"daily digest"}` (the Digest wake payload carries both); mark surfaced set so it isn't repeated in `Infrastructure/Jobs/CompanionDigestJob.cs`
 - [X] T038 [US3] Register `companion-digest` recurring job (daily) in `CompanionModule.cs`
 
 **Checkpoint**: All three stories functional.

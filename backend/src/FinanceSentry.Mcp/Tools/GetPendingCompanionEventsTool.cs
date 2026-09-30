@@ -19,7 +19,8 @@ public sealed class GetPendingCompanionEventsTool(
     [Description("Pulls the material events Finance Sentry has captured for this user that you have NOT yet delivered — risk-rule violations, sync failures, unusual spend, opportunities, thesis breaks, market-structure signals, and analyst actions on held names. Each carries a kind, subject, severity, a short summary, and a reference id you can resolve via the other tools. Use this on your periodic scan (scan mode) or when woken (realtime), and for the daily roll-up (digest). Read-only — after you deliver them to Denys, call acknowledge_companion_events so they don't resurface. Empty is honest emptiness, never fabricate. The wake-up contract: every event this call returns gets exactly one record_event_verdict call before you finish the run, notified or not — an empty list still ends the run cleanly with nothing to record and no message sent.")]
     public async Task<CompanionEventsResult?> ExecuteAsync(
         [Description("Max results, default 25, max 100.")] int limit = DefaultLimit,
-        [Description("Include events held for the daily digest (use true when composing the digest).")] bool includeHeldForDigest = false,
+        [Description("Include events held for the daily digest. Honoured ONLY together with heldOverrideReason; realtime and scan pulls must leave this false — held events are delivered by the digest alone. A Digest wake is the one case that sets this true, with the heldOverrideReason from the wake payload.")] bool includeHeldForDigest = false,
+        [Description("Required with includeHeldForDigest: why held events are being pulled (on a Digest wake, pass the heldOverrideReason from the wake payload). Logged. Without it held events stay excluded and the result carries a note saying so.")] string? heldOverrideReason = null,
         CancellationToken cancellationToken = default)
     {
         var effective = identity.GetUserId();
@@ -30,6 +31,6 @@ public sealed class GetPendingCompanionEventsTool(
 
         var cappedLimit = limit <= 0 ? DefaultLimit : Math.Min(limit, MaxLimit);
         return await handler.Handle(
-            new GetPendingCompanionEventsQuery(effective.Value, cappedLimit, includeHeldForDigest), cancellationToken);
+            new GetPendingCompanionEventsQuery(effective.Value, cappedLimit, includeHeldForDigest, heldOverrideReason), cancellationToken);
     }
 }

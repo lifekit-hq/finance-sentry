@@ -26,6 +26,8 @@ public sealed class WebhookAgentWakeDispatcher(
 
     public const string IdempotencyKeyHeader = "Idempotency-Key";
 
+    public const string DigestHeldOverrideReason = "daily digest";
+
     private const string BearerScheme = "Bearer";
 
     private readonly CompanionOptions _options = options.Value;
@@ -78,7 +80,14 @@ public sealed class WebhookAgentWakeDispatcher(
             return WakeResult.Skipped;
         }
 
-        var payload = new { kind = "Digest", userId, count = heldCount };
+        var payload = new
+        {
+            kind = "Digest",
+            userId,
+            count = heldCount,
+            includeHeldForDigest = true,
+            heldOverrideReason = DigestHeldOverrideReason,
+        };
         return await PostAsync(payload, $"digest for {userId}", idempotencyKey: null, ct);
     }
 
