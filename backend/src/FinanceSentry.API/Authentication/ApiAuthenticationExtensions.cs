@@ -1,7 +1,7 @@
 namespace FinanceSentry.API.Authentication;
 
 using FinanceSentry.Core.Auth;
-using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 /// <summary>

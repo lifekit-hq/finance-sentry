@@ -1,4 +1,4 @@
-namespace FinanceSentry.Modules.Auth.Infrastructure.Authentication;
+namespace FinanceSentry.Modules.Auth.API.Authentication;
 
 using System.Text;
 using FinanceSentry.Core.Api;

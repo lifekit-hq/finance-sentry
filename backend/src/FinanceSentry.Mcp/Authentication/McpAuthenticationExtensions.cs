@@ -1,7 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
-using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 
