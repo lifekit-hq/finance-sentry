@@ -114,11 +114,8 @@ echo "[deploy] build unpublished images: ${LOCAL_BUILD[*]}"
 echo "[deploy] docker compose up (no build)"
 "${COMPOSE[@]}" up -d --no-build --remove-orphans
 
-# Images pulled by SHA stay tagged, so the dangling-only prune never frees them: also drop this
-# repo's CI-built images that no container uses any more (a rollback pulls them again).
-echo "[deploy] prune unused images (free disk on the VPS)"
+echo "[deploy] prune dangling images (free disk on the VPS)"
 docker image prune -f >/dev/null
-docker image prune -af --filter "label=org.opencontainers.image.source=https://github.com/lifekit-hq/finance-sentry" >/dev/null
 
 echo "[deploy] wait for api health (via gateway — direct api port closed in 025 cutover)"
 deadline=$((SECONDS + 120))
