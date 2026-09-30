@@ -55,6 +55,7 @@ public static class RiskModule
         services.AddScoped<ITurnoverTracker, TurnoverTracker>();
         services.AddScoped<IAddToBrokenThesisDetector, AddToBrokenThesisDetector>();
         services.AddScoped<IRiskPolicyGate, RiskPolicyGate>();
+        services.AddScoped<IPolicyAckReader, PolicyAckReader>();
 
         services.AddScoped<RiskCheckJob>();
 

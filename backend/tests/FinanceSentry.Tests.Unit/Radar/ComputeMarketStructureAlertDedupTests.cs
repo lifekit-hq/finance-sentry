@@ -60,7 +60,7 @@ public sealed class ComputeMarketStructureAlertDedupTests
             signals.Object,
             banking.Object,
             brokerage.Object,
-            new AlertGeneratorService(_alertRepo.Object),
+            new AlertGeneratorService(_alertRepo.Object, new Mock<IPolicyAckReader>().Object),
             Mock.Of<IDailyBarRepository>(),
             Mock.Of<IRadarUniverseRepository>(),
             Options.Create(new RadarOptions { ScannerMode = ScannerMode.Alerting }));

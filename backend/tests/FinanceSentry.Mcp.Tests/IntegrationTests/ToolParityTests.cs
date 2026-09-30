@@ -194,6 +194,7 @@ public sealed class ToolParityTests
         services.AddScoped<IBookSnapshotReader, BookSnapshotReader>();
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();
         services.AddScoped<ITurnoverTracker, TurnoverTracker>();
+        services.AddScoped<IPolicyAckReader, PolicyAckReader>();
         services.Configure<RiskOptions>(_ => { });
 
         // #673: the owning modules' published read ports the cross-module adapters below reach

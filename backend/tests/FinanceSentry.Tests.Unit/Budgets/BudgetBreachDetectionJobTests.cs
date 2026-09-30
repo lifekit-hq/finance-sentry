@@ -55,7 +55,7 @@ public sealed class BudgetBreachDetectionJobTests
         repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), It.IsAny<CancellationToken>()))
             .Callback<Alert, CancellationToken>((a, _) => ledger.Add(a))
             .Returns(Task.CompletedTask);
-        return (ledger, new AlertGeneratorService(repo.Object));
+        return (ledger, new AlertGeneratorService(repo.Object, new Mock<IPolicyAckReader>().Object));
     }
 
     private BudgetBreachDetectionJob MakeJob(IAlertGeneratorService generator, TimeProvider clock) =>
