@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Options;
 
 /// <summary>
 /// Realtime dispatch relay (feature 031, US2). Wakes the agent for pending events belonging to users
-/// in <c>realtime</c> mode and owned by the owner account (other users' events are suppressed), honoring quiet-hours + rate-limit (deferred, never dropped) and retrying
+/// in <c>realtime</c> mode whose account passes <see cref="AuthPolicies.RequireAiUse"/> (other users' events are suppressed), honoring quiet-hours + rate-limit (deferred, never dropped) and retrying
 /// failures up to the cap. Scan-mode pending events are left for the agent to pull. Overlap-protected.
 /// </summary>
 [DisableConcurrentExecution(timeoutInSeconds: 120)]
@@ -18,7 +19,7 @@ public sealed class CompanionDispatchJob(
     ICompanionEventRepository events,
     INotificationSettingRepository settings,
     IAgentWakeDispatcher dispatcher,
-    IOwnerAccountReader owners,
+    IUserAuthorizationChecker authorization,
     IOptions<CompanionOptions> options,
     ILogger<CompanionDispatchJob> logger)
 {
@@ -31,17 +32,17 @@ public sealed class CompanionDispatchJob(
     {
         var pending = await events.ListRealtimePendingAsync(BatchLimit, ct);
         var now = DateTimeOffset.UtcNow;
-        var ownerByUser = new Dictionary<Guid, bool>();
+        var aiUseByUser = new Dictionary<Guid, bool>();
 
         foreach (var evt in pending)
         {
-            if (!ownerByUser.TryGetValue(evt.UserId, out var isOwner))
+            if (!aiUseByUser.TryGetValue(evt.UserId, out var mayUseAi))
             {
-                isOwner = await owners.IsOwnerAsync(evt.UserId, ct);
-                ownerByUser[evt.UserId] = isOwner;
+                mayUseAi = await authorization.IsAuthorizedAsync(evt.UserId, AuthPolicies.RequireAiUse, ct);
+                aiUseByUser[evt.UserId] = mayUseAi;
             }
 
-            if (!isOwner)
+            if (!mayUseAi)
             {
                 await SetDispositionAsync(evt, EventDisposition.SuppressedNonOwner, ct);
                 continue;

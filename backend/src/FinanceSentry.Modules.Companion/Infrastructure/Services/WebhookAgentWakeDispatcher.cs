@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion.Infrastructure.Services;
 
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
@@ -11,15 +12,15 @@ using Microsoft.Extensions.Options;
 /// <summary>
 /// Posts a minimal wake payload to the configured agent-trigger URL (feature 031). When no URL is
 /// configured the event stays pending for the agent to pull (no realtime push). Payload carries only
-/// ids/refs — never secrets or full detail (FR-016). The agent runtime serves the
-/// owner account only, so wakes for any other user's events are skipped (<see cref="WakeResult.Skipped"/>).
+/// ids/refs — never secrets or full detail (FR-016). Waking the agent is an AI feature, so wakes for a
+/// user whose account fails <see cref="AuthPolicies.RequireAiUse"/> are skipped (<see cref="WakeResult.Skipped"/>).
 /// Authenticates with the configured bearer token and stamps each event wake with <c>Idempotency-Key: &lt;eventId&gt;</c>, so the receiver can dedup
 /// the relay's retries (the dispatch job re-posts a failed wake up to <see cref="CompanionOptions.MaxDispatchAttempts"/>).
 /// </summary>
 public sealed class WebhookAgentWakeDispatcher(
     IHttpClientFactory httpFactory,
     IOptions<CompanionOptions> options,
-    IOwnerAccountReader owners,
+    IUserAuthorizationChecker authorization,
     ILogger<WebhookAgentWakeDispatcher> logger) : IAgentWakeDispatcher
 {
     public const string HttpClientName = "companion-wake";
@@ -46,7 +47,7 @@ public sealed class WebhookAgentWakeDispatcher(
             return WakeResult.NotConfigured;
         }
 
-        if (!await owners.IsOwnerAsync(evt.UserId, ct))
+        if (!await authorization.IsAuthorizedAsync(evt.UserId, AuthPolicies.RequireAiUse, ct))
         {
             return WakeResult.Skipped;
         }
@@ -76,7 +77,7 @@ public sealed class WebhookAgentWakeDispatcher(
             return WakeResult.NotConfigured;
         }
 
-        if (!await owners.IsOwnerAsync(userId, ct))
+        if (!await authorization.IsAuthorizedAsync(userId, AuthPolicies.RequireAiUse, ct))
         {
             return WakeResult.Skipped;
         }

@@ -9,7 +9,8 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 public class GetMeQueryHandler(
     IRefreshTokenService refreshTokenService,
     ITokenService tokenService,
-    UserManager<ApplicationUser> userManager) : IQueryHandler<GetMeQuery, GetMeResult>
+    UserManager<ApplicationUser> userManager,
+    IUserAccessService userAccess) : IQueryHandler<GetMeQuery, GetMeResult>
 {
     public async Task<GetMeResult> Handle(GetMeQuery request, CancellationToken cancellationToken)
     {
@@ -21,10 +22,10 @@ public class GetMeQueryHandler(
         if (await userManager.IsLockedOutAsync(user))
             throw new InvalidRefreshTokenException();
 
-        var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
+        var access = await userAccess.GetAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
         var profile = GetProfileQueryHandler.ToDto(user);
 
-        return new GetMeResult(new MeResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt, profile), accessToken);
+        return new GetMeResult(new MeResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt, profile), accessToken);
     }
 }

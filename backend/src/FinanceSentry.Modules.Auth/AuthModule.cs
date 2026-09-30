@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure;
 using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
+using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Identity;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.Auth.Infrastructure.Services;
@@ -46,13 +47,16 @@ public static class AuthModule
             .AddDefaultTokenProviders()
             .AddPasswordValidator<CommonPasswordValidator>();
 
-        services.AddMemoryCache();
         services.AddScoped<IAccessTokenPrincipalLoader, AccessTokenPrincipalLoader>();
 
-        services.AddAuthorizationBuilder()
-            .AddPolicy(AuthPolicies.RequireOwner, policy => policy
+        // One policy per permission: an authenticated user whose principal carries that permission claim.
+        var authorization = services.AddAuthorizationBuilder();
+        foreach (var (policyName, permission) in AuthPolicies.PermissionByPolicy)
+        {
+            authorization.AddPolicy(policyName, policy => policy
                 .RequireAuthenticatedUser()
-                .RequireRole(AuthRoles.Owner));
+                .RequireClaim(Permissions.ClaimType, permission));
+        }
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
@@ -65,7 +69,8 @@ public static class AuthModule
 
         services.AddScoped<IUserAlertPreferencesReader, UserAlertPreferencesReader>();
         services.AddScoped<IUserBaseCurrencyReader, UserBaseCurrencyReader>();
-        services.AddScoped<IOwnerAccountReader, OwnerAccountReader>();
+        services.AddScoped<IUserAuthorizationChecker, UserAuthorizationChecker>();
+        services.AddScoped<IUserAccessService, UserAccessService>();
         services.AddScoped<IUserFireAssumptionsReader, UserFireAssumptionsReader>();
 
         return services;

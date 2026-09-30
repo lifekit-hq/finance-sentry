@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -15,8 +16,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// Hangfire dashboard access outside Development (FR-004): only a signed-in user holding the
-/// <see cref="AuthRoles.Owner"/> role is served, whatever client address the request carries.
+/// Hangfire dashboard access outside Development (FR-004): only a signed-in user holding the ops.admin
+/// permission (the <see cref="AuthRoles.Owner"/> role) is served, whatever client address the request carries.
 /// </summary>
 [Collection(HangfireDashboardCollection.Name)]
 public class HangfireDashboardAuthorizationTests(HangfireDashboardApiFactory factory) : IClassFixture<HangfireDashboardApiFactory>
@@ -68,13 +69,8 @@ public class HangfireDashboardAuthorizationTests(HangfireDashboardApiFactory fac
         if (owner)
         {
             using var scope = factory.Services.CreateScope();
-            var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            if (!await roles.RoleExistsAsync(AuthRoles.Owner))
-                await roles.CreateAsync(new IdentityRole(AuthRoles.Owner));
-            var user = await users.FindByEmailAsync(email);
-            if (!await users.IsInRoleAsync(user!, AuthRoles.Owner))
-                await users.AddToRoleAsync(user!, AuthRoles.Owner);
+            var user = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync(email);
+            TestUsers.GrantRole(scope.ServiceProvider, user!.Id, AuthRoles.Owner);
         }
 
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
@@ -96,7 +92,7 @@ public class HangfireDashboardAuthorizationTests(HangfireDashboardApiFactory fac
 }
 
 /// <summary>
-/// <see cref="AuthApiFactory"/> with an Auth database of its own: every host seeds the Owner role at
+/// <see cref="AuthApiFactory"/> with an Auth database of its own: every host seeds the roles at
 /// startup, and the in-memory provider has no unique index to stop parallel hosts sharing one database
 /// from each inserting it.
 /// </summary>

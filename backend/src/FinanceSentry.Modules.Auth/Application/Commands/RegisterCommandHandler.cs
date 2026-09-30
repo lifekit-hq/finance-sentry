@@ -10,6 +10,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 
 public class RegisterCommandHandler(
     UserManager<ApplicationUser> userManager,
+    IUserAccessService userAccess,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService,
     IEventBus eventBus) : ICommandHandler<RegisterCommand, AuthResult>
@@ -26,13 +27,15 @@ public class RegisterCommandHandler(
             throw new ValidationException(
                 result.Errors.Select(e => new ValidationFailure(nameof(request.Password), e.Description)));
 
+        await userAccess.GrantDefaultRoleAsync(user);
         await PublishUserRegisteredAsync(user.Id, cancellationToken);
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, []);
+        var access = await userAccess.GetAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
-        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, []), expiresAt), rawRefreshToken, accessToken);
+        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt), rawRefreshToken, accessToken);
     }
 
     /// <summary>

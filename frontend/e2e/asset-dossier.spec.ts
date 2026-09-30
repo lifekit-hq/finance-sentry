@@ -43,7 +43,19 @@ const WEALTH_SUMMARY = {
 };
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner']},
+  user: {
+    id: 'test-user-id',
+    email: 'test@gmail.com',
+    roles: ['Owner'],
+    permissions: [
+      'connections.manage',
+      'ai.use',
+      'mcp.connect',
+      'mcp.service',
+      'ops.admin',
+      'users.manage',
+    ],
+  },
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
@@ -540,10 +552,13 @@ test.describe("Ledger's read", () => {
   });
 });
 
-test.describe('Owner-only agent surfaces', () => {
-  const NON_OWNER_AUTH = {...AUTH_RESPONSE, user: {...AUTH_RESPONSE.user, roles: []}};
+test.describe('AI surfaces gated by the ai.use permission', () => {
+  const NON_OWNER_AUTH = {
+    ...AUTH_RESPONSE,
+    user: {...AUTH_RESPONSE.user, roles: ['Member'], permissions: ['connections.manage']},
+  };
 
-  async function signInWithoutOwnerRole(page: Page): Promise<void> {
+  async function signInAsMember(page: Page): Promise<void> {
     for (const endpoint of ['auth/me', 'auth/refresh']) {
       await page.route(`${API}/${endpoint}`, route =>
         route.fulfill({
@@ -559,13 +574,15 @@ test.describe('Owner-only agent surfaces', () => {
     await mockApis(page);
   });
 
-  test('a user without the owner role sees the read as unavailable and never requests it', async ({
+  test('a Member without ai.use sees the read as unavailable and never requests it', async ({
     page,
   }) => {
-    await signInWithoutOwnerRole(page);
+    await signInAsMember(page);
     const narrativeRequests: string[] = [];
     page.on('request', req => {
-      if (req.url().includes('/narrative')) narrativeRequests.push(req.method());
+      if (req.url().includes('/narrative')) {
+        narrativeRequests.push(req.method());
+      }
     });
 
     await page.goto('/assets/AAPL');
@@ -576,15 +593,17 @@ test.describe('Owner-only agent surfaces', () => {
     expect(narrativeRequests).toEqual([]);
   });
 
-  test('a user without the owner role gets no chat widget, no Ledger nav item, and /ledger redirects', async ({
+  test('a Member without ai.use gets no chat widget, no Ledger nav item, and /ledger redirects', async ({
     page,
   }) => {
-    await signInWithoutOwnerRole(page);
+    await signInAsMember(page);
 
     await page.goto('/assets/AAPL');
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
     await expect(page.locator('fns-chat-widget')).toHaveCount(0);
-    await expect(page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})).toHaveCount(0);
+    await expect(
+      page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})
+    ).toHaveCount(0);
 
     await page.goto('/ledger');
     await expect(page).toHaveURL(/\/dashboard/);
@@ -598,6 +617,8 @@ test.describe('Owner-only agent surfaces', () => {
     await expect(page.getByTestId('ledger-read-generate')).toBeVisible();
     await expect(page.getByTestId('ledger-read-unavailable')).toHaveCount(0);
     await expect(page.locator('fns-chat-widget')).toHaveCount(1);
-    await expect(page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})).toHaveCount(1);
+    await expect(
+      page.getByRole('navigation').getByRole('button', {name: 'Ledger', exact: true})
+    ).toHaveCount(1);
   });
 });

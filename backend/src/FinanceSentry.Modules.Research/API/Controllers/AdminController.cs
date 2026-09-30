@@ -1,10 +1,13 @@
 namespace FinanceSentry.Modules.Research.API.Controllers;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 
 [ApiController]
+[Authorize(Policy = AuthPolicies.RequireOwner)]
 [Route("research/admin")]
 public class AdminController(
     NewsIngestionJob newsJob,

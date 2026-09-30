@@ -13,7 +13,7 @@ function build(
     status: AsyncStatus;
     errorCode: Nullable<string>;
     flow: AuthFlow;
-    roles: string[];
+    permissions: string[];
   }> = {}
 ) {
   return {
@@ -21,7 +21,7 @@ function build(
     status: signal<AsyncStatus>(overrides.status ?? 'idle'),
     errorCode: signal<Nullable<string>>(overrides.errorCode ?? null),
     flow: signal<AuthFlow>(overrides.flow ?? null),
-    roles: signal<string[]>(overrides.roles ?? []),
+    permissions: signal<string[]>(overrides.permissions ?? []),
   };
 }
 
@@ -64,18 +64,18 @@ describe('authComputed', () => {
     });
   });
 
-  describe('isOwner', () => {
-    it('is true when the Owner role is held', () => {
-      const store = build({roles: ['Owner']});
+  describe('canUseAi', () => {
+    it('is true when the ai.use permission is held', () => {
+      const store = build({permissions: ['connections.manage', 'ai.use']});
       TestBed.runInInjectionContext(() => {
-        expect(authComputed(store).isOwner()).toBe(true);
+        expect(authComputed(store).canUseAi()).toBe(true);
       });
     });
 
-    it('is false without the Owner role', () => {
-      const store = build({roles: []});
+    it('is false without the ai.use permission', () => {
+      const store = build({permissions: ['connections.manage']});
       TestBed.runInInjectionContext(() => {
-        expect(authComputed(store).isOwner()).toBe(false);
+        expect(authComputed(store).canUseAi()).toBe(false);
       });
     });
   });

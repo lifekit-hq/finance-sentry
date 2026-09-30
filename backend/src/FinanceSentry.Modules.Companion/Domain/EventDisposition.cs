@@ -18,7 +18,10 @@ public enum EventDisposition
     DeferredQuietHours,
     Failed,
 
-    /// <summary>Terminal: the event's user is not the owner account, so it is never woken for and leaves the realtime batch.</summary>
+    /// <summary>
+    /// Terminal: the event's user may not use AI features (<c>ai.use</c>), so it is never woken for and leaves the
+    /// realtime batch. The name predates permissions and is persisted, so it stays.
+    /// </summary>
     SuppressedNonOwner,
 
     /// <summary>

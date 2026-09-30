@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Risk.API.Responses;
 using FinanceSentry.Modules.Risk.Application.Commands;
 using FinanceSentry.Modules.Risk.Application.Queries;
 using FinanceSentry.Modules.Risk.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 /// scoped to the authenticated user. Rule VALUES are the user's decisions — nothing is defaulted.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("risk")]
 public class RiskController(
     IQueryHandler<GetRiskRuleSetQuery, RiskRuleSetDto?> getRules,

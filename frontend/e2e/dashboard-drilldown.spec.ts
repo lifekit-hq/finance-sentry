@@ -4,11 +4,17 @@ import {expect, type Page, test} from '@playwright/test';
 // Both formats are used: dashboard uses compact notation, ledger uses decimal pipe.
 function extractAmount(cardText: string): number {
   const match = cardText.match(/\$[\d,.]+[KkMmBb]?/);
-  if (!match) throw new Error(`No dollar amount found in: ${cardText}`);
+  if (!match) {
+    throw new Error(`No dollar amount found in: ${cardText}`);
+  }
   const cleaned = match[0].replace(/[$,\s]/g, '');
   const upper = cleaned.toUpperCase();
-  if (upper.endsWith('K')) return parseFloat(upper.slice(0, -1)) * 1_000;
-  if (upper.endsWith('M')) return parseFloat(upper.slice(0, -1)) * 1_000_000;
+  if (upper.endsWith('K')) {
+    return parseFloat(upper.slice(0, -1)) * 1_000;
+  }
+  if (upper.endsWith('M')) {
+    return parseFloat(upper.slice(0, -1)) * 1_000_000;
+  }
   return parseFloat(cleaned);
 }
 
@@ -21,7 +27,19 @@ function extractAmount(cardText: string): number {
 const API = '**/api/v1';
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner']},
+  user: {
+    id: 'test-user-id',
+    email: 'test@gmail.com',
+    roles: ['Owner'],
+    permissions: [
+      'connections.manage',
+      'ai.use',
+      'mcp.connect',
+      'mcp.service',
+      'ops.admin',
+      'users.manage',
+    ],
+  },
   expiresAt: '2027-01-01T00:00:00Z',
 };
 

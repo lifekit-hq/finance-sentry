@@ -7,12 +7,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 /// <summary>
 /// The API host's authentication: the shared JwtBearer registration (<see cref="AccessTokenAuthenticationExtensions"/>)
-/// for <see cref="AuthAudiences.App"/> tokens, reading the app's access token from the <see cref="AccessTokenCookie"/>
-/// cookie (the Authorization header still works), plus the fallback policy that requires an authenticated user.
+/// for <see cref="AuthAudiences.App"/> tokens, reading the app's access token from the
+/// <see cref="AuthCookies.AccessToken"/> cookie (<c>__Host-</c>-prefixed in production, see <see cref="AuthCookies"/>;
+/// the Authorization header still works), plus the default-deny fallback policy.
 /// </summary>
 public static class ApiAuthenticationExtensions
 {
-    public const string AccessTokenCookie = "fs_access_token";
     public const string ForbiddenCode = "FORBIDDEN";
 
     /// <summary>Registers authentication and the fallback policy. Call after <c>AddAllModules</c>
@@ -31,13 +31,14 @@ public static class ApiAuthenticationExtensions
 
     private static Task ReadAccessTokenCookie(MessageReceivedContext context)
     {
-        var cookie = context.Request.Cookies[AccessTokenCookie];
+        var secure = context.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsProduction();
+        var cookie = AuthCookies.Read(context.Request.Cookies, AuthCookies.AccessToken, secure);
         if (!string.IsNullOrWhiteSpace(cookie))
             context.Token = cookie;
         return Task.CompletedTask;
     }
 
-    // Signed in but not permitted (e.g. a non-owner on an owner-only feature): 403 with the API's JSON error body.
+    // Signed in but not permitted (the account lacks the endpoint's permission): 403 with the API's JSON error body.
     private static Task WriteForbiddenBodyAsync(ForbiddenContext context) =>
         context.Response.WriteAsJsonAsync(
             new ApiErrorBody("This feature is not available for your account.", ForbiddenCode));

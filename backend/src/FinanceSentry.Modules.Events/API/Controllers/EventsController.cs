@@ -4,9 +4,11 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Events.API.Responses;
 using FinanceSentry.Modules.Events.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("events")]
 public class EventsController(
     IQueryHandler<GetUpcomingEventsQuery, UpcomingEventsResult> upcoming,

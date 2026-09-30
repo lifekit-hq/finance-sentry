@@ -9,6 +9,8 @@ export interface UserDto {
   id: string;
   email: string;
   roles: string[];
+  /** Effective permission claims (see `Permission`); UX gating only, the API enforces them. */
+  permissions: string[];
 }
 
 export interface AuthResponse {

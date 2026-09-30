@@ -4,9 +4,11 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("research/earnings-calendar")]
 public class EarningsCalendarController(
     IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>> handler) : ControllerBase

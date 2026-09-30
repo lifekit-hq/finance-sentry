@@ -3,30 +3,36 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.CryptoSync.Application.Commands;
 using FinanceSentry.Modules.CryptoSync.Application.Queries;
 using FinanceSentry.Modules.CryptoSync.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceSentry.Modules.CryptoSync.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("crypto")]
 public sealed class CryptoController(
     ICommandHandler<ConnectExchangeCommand, ConnectExchangeResult> connectHandler,
     ICommandHandler<DisconnectExchangeCommand, Unit> disconnectHandler,
     IQueryHandler<GetCryptoHoldingsQuery, CryptoHoldingsResponse> holdingsHandler) : ControllerBase
 {
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("binance/connect")]
     public Task<IActionResult> ConnectBinance([FromBody] ConnectBinanceRequest request, CancellationToken ct) =>
         ConnectAsync(CryptoExchangeProvider.Binance, request.ApiKey, request.ApiSecret, ct);
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("binance/disconnect")]
     public Task<IActionResult> DisconnectBinance(CancellationToken ct) =>
         DisconnectAsync(CryptoExchangeProvider.Binance, ct);
 
     /// <summary>Connects Revolut X with a read-only API key and its Ed25519 private key (PEM).</summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("revolut-x/connect")]
     public Task<IActionResult> ConnectRevolutX([FromBody] ConnectRevolutXRequest request, CancellationToken ct) =>
         ConnectAsync(CryptoExchangeProvider.RevolutX, request.ApiKey, request.PrivateKey, ct);
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("revolut-x/disconnect")]
     public Task<IActionResult> DisconnectRevolutX(CancellationToken ct) =>
         DisconnectAsync(CryptoExchangeProvider.RevolutX, ct);

@@ -5,9 +5,11 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Subscriptions.API.Responses;
 using FinanceSentry.Modules.Subscriptions.Application.Commands;
 using FinanceSentry.Modules.Subscriptions.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("subscriptions")]
 public class SubscriptionsController(
     IQueryHandler<GetSubscriptionsQuery, SubscriptionsListResponse> getSubscriptions,

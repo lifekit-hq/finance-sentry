@@ -8,6 +8,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 
 public class LoginCommandHandler(
     UserManager<ApplicationUser> userManager,
+    IUserAccessService userAccess,
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService) : ICommandHandler<LoginCommand, AuthResult>
@@ -26,11 +27,11 @@ public class LoginCommandHandler(
         if (!signIn.Succeeded)
             throw new InvalidCredentialsException();
 
-        var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
+        var access = await userAccess.GetAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
-        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt), rawRefreshToken, accessToken);
+        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt), rawRefreshToken, accessToken);
     }
 }

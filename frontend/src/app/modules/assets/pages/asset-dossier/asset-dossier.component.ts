@@ -39,7 +39,7 @@ const SPARKLINE_MIN_POINTS = 2;
 })
 export class AssetDossierComponent {
   private readonly router = inject(Router);
-  public readonly isOwner = inject(AuthStore).isOwner;
+  public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';

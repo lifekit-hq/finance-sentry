@@ -3,8 +3,9 @@ import {Router, type Routes} from '@angular/router';
 
 import {authGuard} from './modules/auth/guards/auth.guard';
 import {guestGuard} from './modules/auth/guards/guest.guard';
-import {ownerGuard} from './modules/auth/guards/owner.guard';
+import {permissionGuard} from './modules/auth/guards/permission.guard';
 import {AppRoute, ASSET_DOSSIER_SYMBOL_PARAM} from './shared/enums/app-route/app-route.enum';
+import {Permission} from './shared/enums/permission/permission.enum';
 
 export const APP_ROUTES: Routes = [
   {
@@ -95,7 +96,7 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: AppRoute.Ledger.slice(1),
-        canActivate: [ownerGuard],
+        canMatch: [permissionGuard(Permission.AiUse)],
         loadComponent: () =>
           import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
             m => m.LedgerChatComponent

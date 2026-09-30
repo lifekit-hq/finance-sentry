@@ -1,6 +1,10 @@
 namespace FinanceSentry.Modules.Auth.Application.Commands;
 
-public record UserDto(string Id, string Email, IReadOnlyList<string> Roles);
+/// <summary>
+/// The signed-in user. <see cref="Permissions"/> is the effective permission set (role plus per-person
+/// grants); the frontend uses it to hide navigation and guard routes, while the API enforces it per request.
+/// </summary>
+public record UserDto(string Id, string Email, IReadOnlyList<string> Roles, IReadOnlyList<string> Permissions);
 
 public record AuthResponse(UserDto User, DateTime ExpiresAt);
 

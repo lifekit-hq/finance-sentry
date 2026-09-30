@@ -1,6 +1,7 @@
 namespace FinanceSentry.API.Controllers;
 
 using FinanceSentry.Infrastructure.Fx;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 /// as it actually stood on a past date rather than at today's rate.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("exchange-rates")]
 public sealed class ExchangeRatesController(IHistoricalExchangeRateService rates) : ControllerBase
 {

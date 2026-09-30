@@ -2,6 +2,7 @@
 
 using System.Net;
 using System.Net.Http.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
@@ -9,6 +10,7 @@ using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using Moq;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -112,7 +114,8 @@ public class LoginContractTests : IClassFixture<AuthApiFactory>
 public class AuthApiFactory : WebApplicationFactory<Program>
 {
     private static readonly InMemoryDatabaseRoot _bankSyncDbRoot = new();
-    private static readonly InMemoryDatabaseRoot _authDbRoot = new();
+    // Per factory: each host seeds roles at startup, and hosts sharing one store would race to create them.
+    private readonly InMemoryDatabaseRoot _authDbRoot = new();
     private static readonly InMemoryDatabaseRoot _companionDbRoot = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -175,6 +178,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
             if (!result.Succeeded)
                 throw new InvalidOperationException(
                     $"Failed to seed test user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            TestUsers.GrantRole(scope.ServiceProvider, user.Id, AuthRoles.Member);
         }
     }
 
