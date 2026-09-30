@@ -17,10 +17,9 @@ public sealed class GetTrackRecordTool(
     public async Task<TrackRecordSummaryDto?> ExecuteAsync(
         [Description("Optional filter: 'User' or 'Scan' (Scan is empty until 019 ships).")] string? source = null,
         [Description("Optional filter: 'Active', 'Broken', 'Closed', 'Promoted', 'Rejected', or 'Expired'.")] string? status = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

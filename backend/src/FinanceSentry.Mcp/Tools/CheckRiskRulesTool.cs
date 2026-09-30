@@ -21,10 +21,9 @@ public sealed class CheckRiskRulesTool(
         [Description("Ticker of a proposed position. Omit for the no-arg compliance report.")] string? ticker = null,
         [Description("Proposed USD size to add to the position. Required when ticker is set.")] decimal? proposedUsd = null,
         [Description("If true and the verdict would be Refused, proceed anyway; the override is recorded as a signal and Alert, never silently applied.")] bool overrideRefusal = false,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

@@ -19,10 +19,9 @@ public sealed class ListSignalsTool(
         [Description("Filter by scanner key, e.g. market_structure.")] string? scanner = null,
         [Description("Filter by signal type, e.g. unusual_move.")] string? type = null,
         [Description("Filter by subject, e.g. a ticker or sector key.")] string? subject = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         return await handler.Handle(
             new ListSignalsQuery(since, scanner, type, subject, effective), cancellationToken);
     }

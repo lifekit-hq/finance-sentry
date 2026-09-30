@@ -23,10 +23,9 @@ public sealed class RunAnalyticsQueryTool(
         + "worth, risk verdicts, holdings totals) — those come from their dedicated tools.")]
     public async Task<AnalyticsQueryResponse?> ExecuteAsync(
         [Description("A single read-only SELECT over the analytics.v_* curated views.")] string sql,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

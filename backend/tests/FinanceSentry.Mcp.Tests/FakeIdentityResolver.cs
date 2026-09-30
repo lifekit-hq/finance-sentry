@@ -3,8 +3,8 @@ using FinanceSentry.Mcp.Abstractions;
 namespace FinanceSentry.Mcp.Tests;
 
 /// <summary>
-/// Test double — tests always pass an explicit userId, so the resolver never fires.
-/// Returns null by default; set <see cref="ResolvedUserId"/> to assert defaulting behaviour.
+/// Test double for the authenticated MCP identity every tool scopes its data to.
+/// Returns null by default; set <see cref="ResolvedUserId"/> to act as a user.
 /// </summary>
 public sealed class FakeIdentityResolver : IIdentityResolver
 {

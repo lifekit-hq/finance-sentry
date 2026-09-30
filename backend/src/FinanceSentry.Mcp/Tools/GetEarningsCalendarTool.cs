@@ -21,10 +21,9 @@ public sealed class GetEarningsCalendarTool(
         [Description("Start date (inclusive). Defaults to today.")] DateOnly? from = null,
         [Description("End date (inclusive). Defaults to today+90.")] DateOnly? to = null,
         [Description("Optional filter: earnings, ex_dividend, or dividend.")] string? eventType = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         var hasExplicitTickers = tickers is { Count: > 0 };
         if (effective is null && !hasExplicitTickers)
         {

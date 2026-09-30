@@ -14,10 +14,9 @@ public sealed class GetRiskRulesTool(
     [McpServerTool(Name = "get_risk_rules")]
     [Description("Returns the user's current versioned RiskRuleSet — maxPositionWeightPct, maxSleeveWeightPct, minCashBufferPct, maxLossPerThesisPct, maxNewPositionPct, turnoverBudgetPerQuarter, allocationTargets. Returns null when no rule set exists yet; rule VALUES are Denys's decisions, never inferred or defaulted. Defaults to the authenticated MCP identity.")]
     public async Task<RiskRuleSetDto?> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

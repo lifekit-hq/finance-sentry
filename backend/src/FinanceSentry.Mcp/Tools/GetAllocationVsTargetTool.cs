@@ -15,10 +15,9 @@ public sealed class GetAllocationVsTargetTool(
     [McpServerTool(Name = "get_allocation_vs_target")]
     [Description("Compares the user's ACTUAL portfolio allocation (brokerage + crypto + cash, in USD, bucketed by asset class) against their IPS target allocation, applying the IPS rebalancing bands (the 5/25 rule by default). Returns per-asset-class drift with a status of Within / OverBand (trim) / UnderBand (add) / Unplanned (held but not in policy) plus a needsRebalance flag — the data behind the rebalancing ceremony. When the user has no IPS yet, HasIps is false and only the current allocation is returned. Defaults to the authenticated MCP identity.")]
     public async Task<AllocationDriftDto?> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

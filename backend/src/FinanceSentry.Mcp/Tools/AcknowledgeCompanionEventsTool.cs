@@ -15,10 +15,9 @@ public sealed class AcknowledgeCompanionEventsTool(
     [Description("Marks companion events as delivered AFTER you have actually told Denys about them, so they don't resurface in the next pull, scan, or digest. Call this with the ids from get_pending_companion_events once you've delivered them. Only acknowledge what you actually delivered — unacked events will be shown again (at-least-once).")]
     public async Task<int> ExecuteAsync(
         [Description("The event ids you have delivered.")] Guid[] eventIds,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return 0;

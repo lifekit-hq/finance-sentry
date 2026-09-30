@@ -17,10 +17,9 @@ public sealed class GetThesisEvaluabilityTool(
         + "unsupported metric or missing direction/period scaffolding. Use this to find a thesis that appears "
         + "monitored but whose falsifiers never run.")]
     public async Task<IReadOnlyList<ThesisEvaluabilityReport>?> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

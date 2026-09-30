@@ -29,10 +29,9 @@ public sealed class CommittedMerchantsTool(
     public async Task<CommittedMerchantsToolResult?> ExecuteAsync(
         [Description("What to do: list | pin | unpin.")] string action,
         [Description("Merchant as it appears on the statement, e.g. 'Mario Scalas', 'Anytime Fitness'. Required for pin and unpin.")] string? merchant = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

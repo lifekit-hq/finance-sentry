@@ -35,10 +35,9 @@ public sealed class GetEventCalendarTool(
         [Description("Days back to include for fired events. Default 7, max 366.")] int daysBack = DefaultDaysBack,
         [Description("Optional upcoming kinds filter: earnings, ex_dividend, filing_due, macro, thesis_catalyst. Default all.")] IReadOnlyList<string>? kinds = null,
         [Description("Maximum fired events returned, newest first. Default 50, max 100.")] int limit = DefaultFiredLimit,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Protocol;
@@ -13,7 +14,10 @@ namespace FinanceSentry.Mcp.Tests;
 /// </summary>
 internal static class TestRequestContext
 {
-    public static RequestContext<CallToolRequestParams> ForToolCall(string toolName, IServiceProvider services)
+    public static RequestContext<CallToolRequestParams> ForToolCall(
+        string toolName,
+        IServiceProvider services,
+        IDictionary<string, JsonElement>? arguments = null)
     {
         var server = McpServer.Create(
             new SilentTransport(),
@@ -24,7 +28,7 @@ internal static class TestRequestContext
         return new RequestContext<CallToolRequestParams>(
             server,
             new JsonRpcRequest { Method = RequestMethods.ToolsCall, Id = new RequestId(1) },
-            new CallToolRequestParams { Name = toolName })
+            new CallToolRequestParams { Name = toolName, Arguments = arguments })
         {
             Services = services,
         };

@@ -22,9 +22,8 @@ public sealed class ListTransactionsTool(
     private readonly ILogger<ListTransactionsTool> _logger = logger;
 
     [McpServerTool(Name = "list_transactions")]
-    [Description("Returns a paginated list of bank transactions, optionally filtered by account, date range, merchant category, or free-text search. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns a paginated list of bank transactions, optionally filtered by account, date range, merchant category, or free-text search.")]
     public async Task<IReadOnlyList<TransactionEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Optional account ID (GUID string) to scope results to a single account.")] string? accountId = null,
         [Description("Optional inclusive start date (e.g. 2024-01-01) for filtering transactions.")] DateOnly? fromDate = null,
         [Description("Optional inclusive end date (e.g. 2024-12-31) for filtering transactions.")] DateOnly? toDate = null,
@@ -34,7 +33,7 @@ public sealed class ListTransactionsTool(
         [Description("Number of transactions per page. Defaults to 50.")] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
         var userIdVal = effective.Value;
 
@@ -66,7 +65,7 @@ public sealed class ListTransactionsTool(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "BankSync transaction query unavailable for user {UserId}; returning empty list.", userId);
+            _logger.LogWarning(ex, "BankSync transaction query unavailable for user {UserId}; returning empty list.", userIdVal);
             return [];
         }
 
@@ -78,7 +77,7 @@ public sealed class ListTransactionsTool(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Account metadata unavailable for user {UserId}; currency and provider will be 'unknown'.", userId);
+            _logger.LogWarning(ex, "Account metadata unavailable for user {UserId}; currency and provider will be 'unknown'.", userIdVal);
             accountMeta = [];
         }
 

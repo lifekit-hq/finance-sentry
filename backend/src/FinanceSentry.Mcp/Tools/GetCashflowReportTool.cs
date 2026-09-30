@@ -22,14 +22,13 @@ public sealed class GetCashflowReportTool(
     private readonly ILogger<GetCashflowReportTool> _logger = logger;
 
     [McpServerTool(Name = "get_cashflow_report")]
-    [Description("Returns a monthly cashflow report (inflow, outflow, net) from the classified money-flow statistics — internal transfers between the user's own accounts are excluded. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns a monthly cashflow report (inflow, outflow, net) from the classified money-flow statistics — internal transfers between the user's own accounts are excluded.")]
     public async Task<IReadOnlyList<CashflowReportEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Optional inclusive start date. Defaults to 6 months ago.")] DateOnly? fromDate = null,
         [Description("Optional inclusive end date. Defaults to today.")] DateOnly? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
         var userIdVal = effective.Value;
 

@@ -22,7 +22,7 @@ public sealed class GetFamilyClearingStatementToolTests
         ExcludedRoutingLegs: 1);
 
     private GetFamilyClearingStatementTool CreateSut(FakeIdentityResolver? identity = null) =>
-        new(_handler.Object, identity ?? new FakeIdentityResolver(), NullLogger<GetFamilyClearingStatementTool>.Instance);
+        new(_handler.Object, identity ?? new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetFamilyClearingStatementTool>.Instance);
 
     [Fact]
     public async Task ExecuteAsync_ReturnsEmptyStatement_WhenHandlerThrows()
@@ -31,7 +31,7 @@ public sealed class GetFamilyClearingStatementToolTests
             .Setup(h => h.Handle(It.IsAny<GetFamilyClearingStatementQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("classification unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Counterparties.Should().BeEmpty();
         result.SupportTotalUsd.Should().Be(0m);
@@ -40,9 +40,9 @@ public sealed class GetFamilyClearingStatementToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ReturnsEmptyStatement_WhenNoUserIdAndNoAuthenticatedIdentity()
+    public async Task ExecuteAsync_ReturnsEmptyStatement_WhenNoAuthenticatedIdentity()
     {
-        var result = await CreateSut(new FakeIdentityResolver { ResolvedUserId = null }).ExecuteAsync(null);
+        var result = await CreateSut(new FakeIdentityResolver { ResolvedUserId = null }).ExecuteAsync();
 
         result.Counterparties.Should().BeEmpty();
         _handler.Verify(
@@ -51,7 +51,7 @@ public sealed class GetFamilyClearingStatementToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_DefaultsUserId_ToAuthenticatedIdentity_WhenOmitted()
+    public async Task ExecuteAsync_ScopesToAuthenticatedIdentity()
     {
         GetFamilyClearingStatementQuery? captured = null;
         _handler
@@ -60,7 +60,7 @@ public sealed class GetFamilyClearingStatementToolTests
             .ReturnsAsync(SampleStatement);
 
         var identity = new FakeIdentityResolver { ResolvedUserId = UserId };
-        var result = await CreateSut(identity).ExecuteAsync(null);
+        var result = await CreateSut(identity).ExecuteAsync();
 
         captured.Should().NotBeNull();
         captured!.UserId.Should().Be(UserId);
@@ -76,7 +76,7 @@ public sealed class GetFamilyClearingStatementToolTests
             .Callback<GetFamilyClearingStatementQuery, CancellationToken>((q, _) => captured = q)
             .ReturnsAsync(SampleStatement);
 
-        await CreateSut().ExecuteAsync(UserId, month: "2024-03", months: 12);
+        await CreateSut().ExecuteAsync(month: "2024-03", months: 12);
 
         captured.Should().NotBeNull();
         captured!.UserId.Should().Be(UserId);
@@ -91,7 +91,7 @@ public sealed class GetFamilyClearingStatementToolTests
             .Setup(h => h.Handle(It.IsAny<GetFamilyClearingStatementQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SampleStatement);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().Be(SampleStatement);
     }

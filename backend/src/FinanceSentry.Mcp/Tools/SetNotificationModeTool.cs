@@ -16,10 +16,9 @@ public sealed class SetNotificationModeTool(
     [Description("Sets how proactive you should be, on the user's request — use this when Denys says things like 'go quiet', 'just a daily digest', or 'ping me in real time'. Mode is one of: quiet | digest | scan | realtime. Takes effect immediately (no redeploy). Only changes proactive outreach — you still answer whenever he messages you. This is the user's preference; do not change it on your own initiative.")]
     public async Task<NotificationModeDto?> ExecuteAsync(
         [Description("New mode: quiet | digest | scan | realtime.")] string mode,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

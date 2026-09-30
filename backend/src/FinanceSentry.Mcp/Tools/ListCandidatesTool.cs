@@ -17,10 +17,9 @@ public sealed class ListCandidatesTool(
     public async Task<IReadOnlyList<CandidateListItem>> ExecuteAsync(
         [Description("Optional status filter: Active, Promoted, Rejected, or Expired.")] CandidateStatus? status = null,
         [Description("Optional source filter: User or Scan.")] CandidateSource? source = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return [];

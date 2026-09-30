@@ -19,10 +19,9 @@ public sealed class RecordEventVerdictTool(
         [Description("The companion event id you judged.")] Guid eventId,
         [Description("Your verdict in plain text: what happened and what it means. For an asserted fact, phrase as claim / data (value + retrieval time) / source / confidence. Max 2000 characters.")] string verdict,
         [Description("true if you told the user about it, false if you judged it immaterial and stayed quiet.")] bool notified,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return new RecordEventVerdictResult(false);

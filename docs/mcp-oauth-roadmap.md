@@ -107,7 +107,6 @@ The next engineering step should be:
 
 1. Add a device-code or comparable headless login flow for containerized/local MCP processes
 2. Introduce explicit MCP client registration metadata for first-party clients
-3. Tighten authorization so authenticated HTTP MCP tools no longer accept arbitrary `userId` overrides
 
 ## Non-Goals For Now
 

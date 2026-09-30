@@ -20,10 +20,9 @@ public sealed class GetPendingCompanionEventsTool(
     public async Task<CompanionEventsResult?> ExecuteAsync(
         [Description("Max results, default 25, max 100.")] int limit = DefaultLimit,
         [Description("Include events held for the daily digest (use true when composing the digest).")] bool includeHeldForDigest = false,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

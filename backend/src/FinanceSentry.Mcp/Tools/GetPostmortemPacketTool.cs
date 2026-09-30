@@ -17,10 +17,9 @@ public sealed class GetPostmortemPacketTool(
     public async Task<PostmortemPacketDto?> ExecuteAsync(
         [Description("Period start date (inclusive).")] DateOnly periodStart,
         [Description("Period end date (inclusive).")] DateOnly periodEnd,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

@@ -16,7 +16,7 @@ public sealed class GetCashflowReportToolTests
     private readonly Mock<IQueryHandler<GetMoneyFlowStatisticsQuery, IReadOnlyList<MonthlyFlow>>> _handler = new();
 
     private GetCashflowReportTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver(), NullLogger<GetCashflowReportTool>.Instance);
+        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<GetCashflowReportTool>.Instance);
 
     private static MonthlyFlow Flow(
         string month,
@@ -51,7 +51,7 @@ public sealed class GetCashflowReportToolTests
             .Setup(h => h.Handle(It.IsAny<GetMoneyFlowStatisticsQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db unavailable"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -61,7 +61,7 @@ public sealed class GetCashflowReportToolTests
     {
         SetupHandler();
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -70,7 +70,6 @@ public sealed class GetCashflowReportToolTests
     public async Task ExecuteAsync_ReturnsEmpty_WhenFromIsAfterTo()
     {
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 6, 1),
             toDate: new DateOnly(2024, 1, 1));
 
@@ -92,7 +91,6 @@ public sealed class GetCashflowReportToolTests
             Flow("2024-02", "USD", inflowUsd: 3000m, outflowUsd: 1000m));
 
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 1, 1),
             toDate: new DateOnly(2024, 2, 29));
 
@@ -120,7 +118,6 @@ public sealed class GetCashflowReportToolTests
         SetupHandler(Flow("2024-03", "USD", inflowUsd: 5000m, outflowUsd: 1200m));
 
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 3, 1),
             toDate: new DateOnly(2024, 3, 31));
 
@@ -139,7 +136,6 @@ public sealed class GetCashflowReportToolTests
             Flow("2024-03", "USD", inflowUsd: 300m, outflowUsd: 30m));
 
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 2, 1),
             toDate: new DateOnly(2024, 2, 29));
 
@@ -155,7 +151,6 @@ public sealed class GetCashflowReportToolTests
             Flow("2024-02", "USD", inflowUsd: 100m, outflowUsd: 0m));
 
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 1, 1),
             toDate: new DateOnly(2024, 3, 31));
 
@@ -184,7 +179,6 @@ public sealed class GetCashflowReportToolTests
                 g => (Inflow: g.Sum(f => f.InflowUsd), Outflow: g.Sum(f => f.OutflowUsd)));
 
         var result = await CreateSut().ExecuteAsync(
-            UserId,
             fromDate: new DateOnly(2024, 4, 1),
             toDate: new DateOnly(2024, 5, 31));
 
@@ -207,7 +201,7 @@ public sealed class GetCashflowReportToolTests
             .Callback<GetMoneyFlowStatisticsQuery, CancellationToken>((q, _) => captured = q)
             .ReturnsAsync((IReadOnlyList<MonthlyFlow>)[]);
 
-        await CreateSut().ExecuteAsync(UserId);
+        await CreateSut().ExecuteAsync();
 
         captured.Should().NotBeNull();
         captured!.Months.Should().Be(6);

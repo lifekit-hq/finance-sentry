@@ -29,10 +29,9 @@ public sealed class SaveIpsTool(
         [Description("Free-form sell discipline — the rules for when to trim or exit.")] string? sellDiscipline = null,
         [Description("Mandatory cooling-off period in days before any allocation/fund change. Defaults to 90.")] int? coolingOffDays = null,
         [Description("Review cadence (e.g. annual). Defaults to annual.")] string? reviewCadence = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

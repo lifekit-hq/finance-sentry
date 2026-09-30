@@ -19,12 +19,11 @@ public sealed class ListActiveAlertsTool(
     private readonly ILogger<ListActiveAlertsTool> _logger = logger;
 
     [McpServerTool(Name = "list_active_alerts")]
-    [Description("Returns unread, unresolved alerts (Fired). Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns unread, unresolved alerts (Fired).")]
     public async Task<IReadOnlyList<ActiveAlertEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
         var userIdVal = effective.Value;
 

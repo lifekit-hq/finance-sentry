@@ -18,14 +18,13 @@ public sealed class GetFamilyClearingStatementTool(
     private readonly ILogger<GetFamilyClearingStatementTool> _logger = logger;
 
     [McpServerTool(Name = "get_family_clearing_statement")]
-    [Description("Returns the family clearing statement for one calendar month: per-counterparty gross received/sent with a presentational net, native per-currency subtotals, and the month's family-support total. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns the family clearing statement for one calendar month: per-counterparty gross received/sent with a presentational net, native per-currency subtotals, and the month's family-support total.")]
     public async Task<FamilyClearingStatement> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         [Description("Calendar month in yyyy-MM format. Defaults to the last complete calendar month.")] string? month = null,
         [Description("How many trailing months of classification to draw on. Defaults to 6.")] int months = 6,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return EmptyStatement(month);
         var userIdVal = effective.Value;
 

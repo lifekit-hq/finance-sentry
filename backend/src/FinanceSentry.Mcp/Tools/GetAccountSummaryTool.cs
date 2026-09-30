@@ -21,14 +21,12 @@ public sealed class GetAccountSummaryTool(
     private readonly ILogger<GetAccountSummaryTool> _logger = logger;
 
     [McpServerTool(Name = "get_account_summary")]
-    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers.")]
     public async Task<IReadOnlyList<AccountSummaryEntry>> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? _identity.GetUserId();
+        var effective = _identity.GetUserId();
         if (effective is null) return [];
-        userId = effective;
         var userIdVal = effective.Value;
 
         var results = new List<AccountSummaryEntry>();
@@ -46,7 +44,7 @@ public sealed class GetAccountSummaryTool(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "BankSync provider unavailable for user {UserId}; contributing empty list.", userId);
+            _logger.LogWarning(ex, "BankSync provider unavailable for user {UserId}; contributing empty list.", userIdVal);
         }
 
         // Crypto holdings — each asset is one entry denominated in USD.
@@ -62,7 +60,7 @@ public sealed class GetAccountSummaryTool(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "CryptoSync provider unavailable for user {UserId}; contributing empty list.", userId);
+            _logger.LogWarning(ex, "CryptoSync provider unavailable for user {UserId}; contributing empty list.", userIdVal);
         }
 
         // Brokerage positions — each position is one entry denominated in USD.
@@ -78,7 +76,7 @@ public sealed class GetAccountSummaryTool(
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "BrokerageSync provider unavailable for user {UserId}; contributing empty list.", userId);
+            _logger.LogWarning(ex, "BrokerageSync provider unavailable for user {UserId}; contributing empty list.", userIdVal);
         }
 
         return results;

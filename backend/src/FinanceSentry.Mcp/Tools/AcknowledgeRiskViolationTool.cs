@@ -19,10 +19,9 @@ public sealed class AcknowledgeRiskViolationTool(
         [Description("Contemporaneous remediation note — the plan to resolve the violation.")] string remediationNote,
         [Description("Observed value at acknowledgement time (e.g. 0.46 for a 46% weight).")] decimal observedAtAck,
         [Description("Worsening step past which a re-alert fires, e.g. 0.05 to re-alert if it worsens by 5pp.")] decimal worseningStepPct,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return false;

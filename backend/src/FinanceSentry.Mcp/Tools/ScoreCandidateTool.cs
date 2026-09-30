@@ -18,10 +18,9 @@ public sealed class ScoreCandidateTool(
         [Description("Ticker symbol to score, e.g. MSFT.")] string ticker,
         [Description("Optional contemporaneous reasoning captured at nomination time (decision journal).")] string? decisionNote = null,
         [Description("Optional candidate source: User (default) or Ledger (Ledger's own nomination). Scan is reserved for the machine scanner.")] string? source = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;

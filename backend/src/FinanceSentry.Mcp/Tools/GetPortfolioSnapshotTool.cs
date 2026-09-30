@@ -11,12 +11,11 @@ public sealed class GetPortfolioSnapshotTool(
     IIdentityResolver identity)
 {
     [McpServerTool(Name = "get_portfolio_snapshot")]
-    [Description("Unified portfolio snapshot: IBKR brokerage positions + crypto holdings (Binance, Revolut X), each with unrealized P&L (USD and %) when cost basis is known, PLUS total cash (USD). cashUsd counts banking balances AND idle brokerage cash (uninvested currency balances) AND fiat held on crypto venues (e.g. EUR on Revolut X) — the same definition the allocation-drift tool uses; bankingCashUsd/brokerageCashUsd/venueCashUsd give the split. Idle brokerage cash and venue fiat are NOT listed under positions or investedValueUsd. Returns per-position rows and book-level totals (invested value, cash, total value, total cost basis, total unrealized P&L). unrealizedPnlUsd/Pct are null when cost basis is unavailable. Defaults to the authenticated MCP identity when userId is omitted.")]
+    [Description("Unified portfolio snapshot: IBKR brokerage positions + crypto holdings (Binance, Revolut X), each with unrealized P&L (USD and %) when cost basis is known, PLUS total cash (USD). cashUsd counts banking balances AND idle brokerage cash (uninvested currency balances) AND fiat held on crypto venues (e.g. EUR on Revolut X) — the same definition the allocation-drift tool uses; bankingCashUsd/brokerageCashUsd/venueCashUsd give the split. Idle brokerage cash and venue fiat are NOT listed under positions or investedValueUsd. Returns per-position rows and book-level totals (invested value, cash, total value, total cost basis, total unrealized P&L). unrealizedPnlUsd/Pct are null when cost basis is unavailable.")]
     public async Task<PortfolioSnapshot> ExecuteAsync(
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return PortfolioSnapshot.Empty;

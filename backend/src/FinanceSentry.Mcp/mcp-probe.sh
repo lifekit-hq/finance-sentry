@@ -7,8 +7,8 @@
 #
 # Examples:
 #   ./mcp-probe.sh
-#   ./mcp-probe.sh get_sync_health '{"userId":"b41c01b0-42ad-4e0a-b804-f5a97e290f7e"}'
-#   ./mcp-probe.sh get_crypto_pnl_detail '{"userId":"<guid>"}'
+#   ./mcp-probe.sh get_sync_health '{}'
+#   ./mcp-probe.sh list_transactions '{"pageSize":5}'
 #
 # Requires the finance-sentry-mcp container to be running.
 

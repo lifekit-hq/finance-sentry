@@ -30,7 +30,7 @@ public sealed class GetBookPerformanceToolTests
                 default))
             .ReturnsAsync(expected);
 
-        var result = await CreateSut().ExecuteAsync(periods: null, userId: UserId);
+        var result = await CreateSut().ExecuteAsync(periods: null);
 
         result.Periods.Should().HaveCount(1);
         result.Periods[0].Verdict.Should().Be("outperform");
@@ -50,7 +50,7 @@ public sealed class GetBookPerformanceToolTests
                 default))
             .ReturnsAsync(expected);
 
-        var result = await CreateSut().ExecuteAsync(periods: requested, userId: UserId);
+        var result = await CreateSut().ExecuteAsync(periods: requested);
 
         result.Periods.Should().HaveCount(1);
         result.Periods[0].Period.Should().Be(BookPerformancePeriod.OneMonth);
@@ -63,21 +63,21 @@ public sealed class GetBookPerformanceToolTests
             _performance.Object,
             new FakeIdentityResolver { ResolvedUserId = null });
 
-        var result = await sut.ExecuteAsync(userId: null);
+        var result = await sut.ExecuteAsync();
 
         result.Periods.Should().BeEmpty();
         _performance.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task ExecuteAsync_UsesAuthenticatedIdentity_WhenUserIdOmitted()
+    public async Task ExecuteAsync_UsesAuthenticatedIdentity()
     {
         var expected = BookPerformanceResult.Empty(Today);
 
         _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
             .ReturnsAsync(expected);
 
-        var result = await CreateSut().ExecuteAsync(periods: null, userId: null);
+        var result = await CreateSut().ExecuteAsync(periods: null);
 
         result.Should().Be(expected);
         _performance.Verify(

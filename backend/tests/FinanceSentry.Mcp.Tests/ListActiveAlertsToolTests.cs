@@ -16,7 +16,7 @@ public sealed class ListActiveAlertsToolTests
     private readonly Mock<IQueryHandler<GetAlertsQuery, AlertsPageResponse>> _handler = new();
 
     private ListActiveAlertsTool CreateSut() =>
-        new(_handler.Object, new FakeIdentityResolver(), NullLogger<ListActiveAlertsTool>.Instance);
+        new(_handler.Object, new FakeIdentityResolver { ResolvedUserId = UserId }, NullLogger<ListActiveAlertsTool>.Instance);
 
     private static AlertDto MakeDto(
         bool isRead = false,
@@ -48,7 +48,7 @@ public sealed class ListActiveAlertsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("db down"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -60,7 +60,7 @@ public sealed class ListActiveAlertsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PageOf());
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -75,7 +75,7 @@ public sealed class ListActiveAlertsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PageOf(fired, resolved));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result[0].AlertId.Should().Be(fired.Id.ToString());
@@ -91,7 +91,7 @@ public sealed class ListActiveAlertsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PageOf(dto));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         var entry = result[0];
@@ -113,7 +113,7 @@ public sealed class ListActiveAlertsToolTests
             .Callback<GetAlertsQuery, CancellationToken>((q, _) => captured = q)
             .ReturnsAsync(PageOf());
 
-        await CreateSut().ExecuteAsync(UserId);
+        await CreateSut().ExecuteAsync();
 
         captured.Should().NotBeNull();
         captured!.UserId.Should().Be(UserId);
@@ -134,7 +134,7 @@ public sealed class ListActiveAlertsToolTests
             .Setup(h => h.Handle(It.IsAny<GetAlertsQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PageOf(active1, resolved1, active2, resolved2));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(2);
         result.Select(e => e.Type).Should().BeEquivalentTo(["LowBalance", "SyncFailure"]);

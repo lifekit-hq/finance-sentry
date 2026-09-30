@@ -17,7 +17,7 @@ public sealed class GetAccountSummaryToolTests
 
     private GetAccountSummaryTool CreateSut() =>
         new(_bankingReader.Object, _cryptoReader.Object, _brokerageReader.Object,
-            new FakeIdentityResolver(),
+            new FakeIdentityResolver { ResolvedUserId = UserId },
             NullLogger<GetAccountSummaryTool>.Instance);
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class GetAccountSummaryToolTests
                 new BrokerageHoldingSummary("AAPL", "stock", 10m, 1800m, DateTime.UtcNow, "ibkr")
             ]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(3);
 
@@ -71,7 +71,7 @@ public sealed class GetAccountSummaryToolTests
         _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -90,7 +90,7 @@ public sealed class GetAccountSummaryToolTests
         _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result.Single().Provider.Should().Be("binance");
@@ -112,7 +112,7 @@ public sealed class GetAccountSummaryToolTests
         _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
             .ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().HaveCount(1);
         result.Single().Provider.Should().Be("monobank");
@@ -130,7 +130,7 @@ public sealed class GetAccountSummaryToolTests
         _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
             .ThrowsAsync(new TimeoutException("ibkr timeout"));
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Should().BeEmpty();
     }
@@ -148,7 +148,7 @@ public sealed class GetAccountSummaryToolTests
         _cryptoReader.Setup(r => r.GetHoldingsAsync(UserId, default)).ReturnsAsync([]);
         _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default)).ReturnsAsync([]);
 
-        var result = await CreateSut().ExecuteAsync(UserId);
+        var result = await CreateSut().ExecuteAsync();
 
         result.Single().Balance.Should().Be(0m);
         result.Single().Currency.Should().Be("EUR");

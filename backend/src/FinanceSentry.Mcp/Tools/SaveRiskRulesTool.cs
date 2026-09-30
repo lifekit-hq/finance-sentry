@@ -21,10 +21,9 @@ public sealed class SaveRiskRulesTool(
         [Description("Max loss (0,1] from entry before a thesis's price_drawdown trigger fires by default.")] decimal? maxLossPerThesisPct = null,
         [Description("Max weight (0,1] any single NEW position may be sized to.")] decimal? maxNewPositionPct = null,
         [Description("Max discretionary trades per rolling quarter, non-negative.")] int? turnoverBudgetPerQuarter = null,
-        [Description("Optional user GUID. Defaults to the authenticated MCP identity.")] Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var effective = userId ?? identity.GetUserId();
+        var effective = identity.GetUserId();
         if (effective is null)
         {
             return null;
