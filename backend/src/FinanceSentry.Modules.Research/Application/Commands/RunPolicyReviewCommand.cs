@@ -80,6 +80,11 @@ public class RunPolicyReviewCommandHandler(
 
         var proposal = PolicyReviewProposer.Propose(ips, drift, schedule);
 
+        // The risk re-measurement rides this review (#700): the request is part of the same proposal and
+        // the same alert, not a second notification. Recording the answer is what clears it.
+        var remeasurement = RiskMeasurementSchedule.RequestText(RiskMeasurementSchedule.Evaluate(ips, now), schedule.Cadence);
+        var rationale = remeasurement is null ? proposal.Rationale : $"{proposal.Rationale}\n\n{remeasurement}";
+
         var review = new PolicyReview
         {
             Id = PolicyReview.DeriveId(cmd.UserId, ips.Id, schedule.DueAt),
@@ -94,11 +99,12 @@ public class RunPolicyReviewCommandHandler(
             TotalValueUsd = drift.TotalValueUsd,
             Sleeves = [.. proposal.Sleeves],
             Adjustments = [.. proposal.Adjustments],
-            Rationale = proposal.Rationale,
+            Rationale = rationale,
         };
 
         await alertGenerator.GeneratePolicyReviewAlertAsync(
-            cmd.UserId, review.Id, proposal.Adjustments.Count, AlertSummary(proposal.Rationale), ct);
+            cmd.UserId, review.Id, proposal.Adjustments.Count,
+            AlertSummary(remeasurement is null ? proposal.Rationale : $"{remeasurement} {proposal.Rationale}"), ct);
 
         await reviewRepo.RecordAsync(review, ct);
 

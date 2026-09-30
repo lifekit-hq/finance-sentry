@@ -13,6 +13,12 @@ public sealed class RiskOptions
     /// <summary>Rolling window (days) for turnover counting and add-to-broken-thesis history lookback.</summary>
     public int RollingQuarterDays { get; set; } = 90;
 
+    /// <summary>
+    /// Window (days) of holding snapshots the book's drawdown is measured over (#700): the peak is the
+    /// highest point inside it, so a decline older than the window no longer counts against the tolerance.
+    /// </summary>
+    public int DrawdownLookbackDays { get; set; } = 365;
+
     /// <summary>Hour of day (UTC) the daily <see cref="Infrastructure.Jobs.RiskCheckJob"/> runs (post-sync).</summary>
     public int RiskCheckHourUtc { get; set; } = 7;
 }

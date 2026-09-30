@@ -12,6 +12,7 @@ public record IpsDto(
     int RiskTolerance,
     int? RiskCapacity,
     decimal? MaxDrawdownTolerancePct,
+    DateTimeOffset? RiskMeasuredAt,
     IReadOnlyList<AllocationTarget> AllocationTargets,
     RebalancingRule RebalancingRule,
     ContributionPlan? ContributionPlan,

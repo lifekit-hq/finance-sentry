@@ -52,6 +52,7 @@ public static class RiskModule
 
         services.AddScoped<IBookSnapshotReader, BookSnapshotReader>();
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();
+        services.AddScoped<IDrawdownCheckProvider, DrawdownCheckProvider>();
         services.AddScoped<ITurnoverTracker, TurnoverTracker>();
         services.AddScoped<IAddToBrokenThesisDetector, AddToBrokenThesisDetector>();
         services.AddScoped<IRiskPolicyGate, RiskPolicyGate>();

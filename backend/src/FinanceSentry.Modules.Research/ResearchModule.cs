@@ -174,6 +174,7 @@ public static class ResearchModule
         services.AddScoped<IEdgarFilingReader, EdgarFilingReader>();
         services.AddScoped<IActiveThesisCatalystReader, ActiveThesisCatalystReader>();
         services.AddScoped<IIpsAllocationReader, IpsAllocationReader>();
+        services.AddScoped<IRiskToleranceReader, RiskToleranceReader>();
         services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
         services.AddScoped<ITrackRecordReader, TrackRecordReader>();
 

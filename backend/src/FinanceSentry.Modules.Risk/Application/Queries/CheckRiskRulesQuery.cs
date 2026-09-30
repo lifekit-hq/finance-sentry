@@ -30,6 +30,7 @@ public sealed class CheckRiskRulesQueryHandler(
     IHoldingSnapshotRepository snapshotRepo,
     IRiskEvaluationService evaluationService,
     IAllocationPolicySource allocationPolicySource,
+    IDrawdownCheckProvider drawdownProvider,
     ITurnoverTracker turnoverTracker,
     IMarketStructureReader structureReader,
     IOptions<RiskOptions> options)
@@ -44,17 +45,18 @@ public sealed class CheckRiskRulesQueryHandler(
     {
         var book = await bookReader.ReadAsync(query.UserId, ct);
         var ruleSet = await ruleSetRepo.GetCurrentAsync(query.UserId, ct);
+        var now = DateTimeOffset.UtcNow;
 
         if (query.Proposal is null)
         {
             var acks = await ackRepo.ListActiveAsync(query.UserId, ct);
             var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(query.UserId, ct);
-            var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks);
+            var drawdown = await drawdownProvider.GetAsync(query.UserId, book, now, ct);
+            var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now, drawdown);
             var context = await BuildPortfolioContextAsync(book, ct);
             return new CheckRiskRulesResult(report, null, ruleSet is not null, context);
         }
 
-        var now = DateTimeOffset.UtcNow;
         var history = await snapshotRepo.ListSinceAsync(query.UserId, now - TimeSpan.FromDays(_rollingQuarterDays), ct);
         var turnoverCount = turnoverTracker.CountDiscretionaryTradesInRollingQuarter(history, now);
 

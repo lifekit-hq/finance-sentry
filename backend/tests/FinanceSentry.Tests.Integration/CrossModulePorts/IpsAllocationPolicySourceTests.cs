@@ -23,7 +23,7 @@ public sealed class IpsAllocationPolicySourceTests
     }
 
     private static IpsDto IpsWith(params AllocationTarget[] targets) => new(
-        Guid.NewGuid(), 1, true, [], 10, null, 3, null, null,
+        Guid.NewGuid(), 1, true, [], 10, null, 3, null, null, null,
         targets, RebalancingRule.Default, null, null, 90, [], "annual", null,
         DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
 

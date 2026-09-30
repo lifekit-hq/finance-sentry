@@ -19,10 +19,13 @@ public class GetPolicyReviewStatusQueryHandler(
         var latest = await reviewRepo.GetLatestAsync(query.UserId, ct);
         var latestDto = latest is null ? null : ToDto(latest);
 
-        if (!versions.Any(v => v.IsCurrent))
+        var current = versions.FirstOrDefault(v => v.IsCurrent);
+        if (current is null)
             return new PolicyReviewStatusDto(false, null, false, null, null, false, false, 0, latestDto);
 
-        var schedule = PolicyReviewSchedule.Evaluate(versions, timeProvider.GetUtcNow());
+        var now = timeProvider.GetUtcNow();
+        var schedule = PolicyReviewSchedule.Evaluate(versions, now);
+        var risk = RiskMeasurementSchedule.Evaluate(current, now);
         return new PolicyReviewStatusDto(
             true,
             schedule.Cadence,
@@ -32,7 +35,10 @@ public class GetPolicyReviewStatusQueryHandler(
             schedule.IsDue,
             schedule.IsMissed,
             schedule.DaysOverdue,
-            latestDto);
+            latestDto,
+            risk.MeasuredAt,
+            risk.DrawdownToleranceSet,
+            risk.IsDue);
     }
 
     private static PolicyReviewDto ToDto(PolicyReview r) => new(

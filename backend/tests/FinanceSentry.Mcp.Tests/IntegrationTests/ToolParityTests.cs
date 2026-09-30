@@ -200,12 +200,14 @@ public sealed class ToolParityTests
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();
         services.AddScoped<ITurnoverTracker, TurnoverTracker>();
         services.AddScoped<IPolicyAckReader, PolicyAckReader>();
+        services.AddScoped<IDrawdownCheckProvider, DrawdownCheckProvider>();
         services.Configure<RiskOptions>(_ => { });
 
         // #673: the owning modules' published read ports the cross-module adapters below reach
         // through, mirroring each module's registrar (Companion is not part of this graph).
         services.AddScoped<IRiskLimitsReader, RiskLimitsReader>();
         services.AddScoped<IIpsAllocationReader, IpsAllocationReader>();
+        services.AddScoped<IRiskToleranceReader, RiskToleranceReader>();
         services.AddScoped<IAllocationDriftReader, AllocationDriftReader>();
         services.AddScoped<ITrackRecordReader, TrackRecordReader>();
         services.AddScoped<IActiveThesisCatalystReader, ActiveThesisCatalystReader>();

@@ -18,7 +18,7 @@ public class GetIpsQueryHandler(IIpsRepository repo) : IQueryHandler<GetIpsQuery
 
         return new IpsDto(
             ips.Id, ips.Version, ips.IsCurrent, ips.Goals, ips.PrimaryHorizonYears,
-            ips.EmergencyCushionUsd, ips.RiskTolerance, ips.RiskCapacity, ips.MaxDrawdownTolerancePct,
+            ips.EmergencyCushionUsd, ips.RiskTolerance, ips.RiskCapacity, ips.MaxDrawdownTolerancePct, ips.RiskMeasuredAt,
             ips.AllocationTargets, ips.RebalancingRule, ips.ContributionPlan, ips.SellDiscipline,
             ips.CoolingOffDays, ips.Exclusions, ips.ReviewCadence,
             ips.LastReviewedAt, ips.CreatedAt, ips.UpdatedAt);

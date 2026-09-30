@@ -20,8 +20,10 @@ public class PolicyAckReaderTests
     private readonly Mock<IRiskRuleSetRepository> _ruleSets = new();
     private readonly Mock<IAllocationPolicySource> _allocations = new();
 
+    private readonly Mock<IDrawdownCheckProvider> _drawdown = new();
+
     private PolicyAckReader Reader() => new(
-        _acks.Object, _book.Object, _ruleSets.Object, _allocations.Object, new RiskEvaluationService());
+        _acks.Object, _book.Object, _ruleSets.Object, _allocations.Object, _drawdown.Object, new RiskEvaluationService());
 
     private void GivenMinCashAck()
     {

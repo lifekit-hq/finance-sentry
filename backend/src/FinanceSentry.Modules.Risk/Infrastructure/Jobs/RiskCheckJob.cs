@@ -21,6 +21,7 @@ public sealed class RiskCheckJob(
     IHoldingSnapshotRepository snapshotRepo,
     IRiskEvaluationService evaluationService,
     IAllocationPolicySource allocationPolicySource,
+    IDrawdownCheckProvider drawdownProvider,
     ITurnoverTracker turnoverTracker,
     IAddToBrokenThesisDetector brokenThesisDetector,
     IBrokenThesisReader brokenThesisReader,
@@ -62,7 +63,8 @@ public sealed class RiskCheckJob(
         var ruleSet = await ruleSetRepo.GetCurrentAsync(userId, ct);
         var acks = await ackRepo.ListActiveAsync(userId, ct);
         var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(userId, ct);
-        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now);
+        var drawdown = await drawdownProvider.GetAsync(userId, book, now, ct);
+        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now, drawdown);
 
         await EmitComplianceSignalsAsync(userId, report, ct);
         await ResolveClearedViolationsAsync(userId, book, report, ct);
@@ -110,6 +112,14 @@ public sealed class RiskCheckJob(
         {
             await alertGenerator.ResolvePolicyViolationAlertAsync(
                 userId, RiskRuleKeys.MinCashBuffer, "CASH", ct);
+        }
+
+        // #700: a book that has recovered inside its tolerance (or whose tolerance was loosened at a
+        // re-measurement) clears the drawdown alert the same way.
+        if (!violated.Contains((RiskRuleKeys.MaxDrawdown, RiskRuleKeys.BookSubject)))
+        {
+            await alertGenerator.ResolvePolicyViolationAlertAsync(
+                userId, RiskRuleKeys.MaxDrawdown, RiskRuleKeys.BookSubject, ct);
         }
     }
 
