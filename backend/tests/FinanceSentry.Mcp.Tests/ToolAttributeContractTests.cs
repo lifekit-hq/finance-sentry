@@ -31,7 +31,7 @@ public sealed class ToolAttributeContractTests
     }
 
     /// <summary>
-    /// Policy coverage for tools: the MCP endpoint requires mcp.connect for every tool, so no tool may opt out
+    /// Policy coverage for tools: the MCP endpoint is gated by the MCP access policy for every tool, so no tool may opt out
     /// with [AllowAnonymous], and any tool-level [Authorize] must name a registered permission policy.
     /// </summary>
     [Fact]

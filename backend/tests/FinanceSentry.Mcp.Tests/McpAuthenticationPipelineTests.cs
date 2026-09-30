@@ -16,7 +16,7 @@ namespace FinanceSentry.Mcp.Tests;
 
 /// <summary>
 /// The MCP HTTP host's authentication pipeline (<see cref="McpHttpHost"/>): stock JwtBearer for
-/// <c>aud=mcp</c> bearer tokens, the MCP endpoint behind the mcp.connect permission, a default-deny fallback
+/// <c>aud=mcp</c> bearer tokens, the MCP endpoint behind mcp.connect for personal tokens and mcp.service for service tokens, a default-deny fallback
 /// policy, the platform probes as the only anonymous endpoints, and service tokens honoured only while active
 /// and while their account holds mcp.service. Permissions are read per request, so removing one takes effect
 /// on the next request without a new token.
@@ -65,7 +65,7 @@ public sealed class McpAuthenticationPipelineTests(McpHttpHostFixture host) : IC
     }
 
     [Fact]
-    public void EveryMcpEndpoint_RequiresTheMcpConnectPermission()
+    public void EveryMcpEndpoint_RequiresTheMcpAccessPolicy()
     {
         var endpoints = host.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
             .Where(e => e.Metadata.GetMetadata<IAllowAnonymous>() is null)
@@ -73,7 +73,7 @@ public sealed class McpAuthenticationPipelineTests(McpHttpHostFixture host) : IC
 
         endpoints.Should().NotBeEmpty();
         endpoints.Should().OnlyContain(e =>
-            e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == AuthPolicies.RequireMcpConnect));
+            e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == AuthPolicies.RequireMcpAccess));
     }
 
     [Fact]
@@ -122,6 +122,28 @@ public sealed class McpAuthenticationPipelineTests(McpHttpHostFixture host) : IC
         var response = await ListToolsAsync(token.Token);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task McpRequest_WithServiceTokenOfMemberGrantedOnlyMcpService_Returns200()
+    {
+        var user = await host.CreateUserAsync(AuthRoles.Member, Permissions.McpService);
+        var token = await host.IssueServiceTokenAsync(user);
+
+        var response = await ListToolsAsync(token.Token);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task McpRequest_WithPersonalTokenOfMemberGrantedOnlyMcpService_Returns403()
+    {
+        var user = await host.CreateUserAsync(AuthRoles.Member, Permissions.McpService);
+        var (token, _) = host.Tokens(tokens => tokens.GenerateMcpAccessToken(user));
+
+        var response = await ListToolsAsync(token);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]

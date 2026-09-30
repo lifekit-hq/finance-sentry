@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
@@ -14,18 +15,27 @@ namespace FinanceSentry.Mcp.Authentication;
 /// <c>Authorization: Bearer</c>, plus the default-deny fallback policy. Long-lived service tokens
 /// (<c>scope=mcp.service</c>) must also still be active in <see cref="IMcpServiceTokenStore"/>, and their
 /// account must still pass <see cref="AuthPolicies.RequireMcpService"/>, so revoking the token or the
-/// permission takes effect on its next request; short-lived OAuth access tokens skip both checks.
+/// permission takes effect on its next request; short-lived OAuth access tokens skip both checks. The endpoint
+/// policy (<see cref="AuthPolicies.RequireMcpAccess"/>) gates each token kind by its own permission: personal
+/// tokens by <c>mcp.connect</c>, service tokens by <c>mcp.service</c> alone.
 /// </summary>
 public static class McpAuthenticationExtensions
 {
     private const string ScopeClaim = "scope";
     private const string ServiceTokenScope = "mcp.service";
 
-    /// <summary>Registers authentication and the default-deny fallback policy. Call after
+    /// <summary>Registers authentication, the default-deny fallback policy and the MCP endpoint policy. Call after
     /// <see cref="McpServiceRegistration.RegisterShared"/> (Identity registers its own cookie scheme as the
     /// default; this replaces that default).</summary>
-    public static IServiceCollection AddMcpAuthentication(this IServiceCollection services) =>
-        services.AddAccessTokenAuthentication(AuthAudiences.Mcp, options =>
+    public static IServiceCollection AddMcpAuthentication(this IServiceCollection services)
+    {
+        services.AddAuthorizationBuilder().AddPolicy(AuthPolicies.RequireMcpAccess, policy => policy
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => context.User.HasClaim(
+                Permissions.ClaimType,
+                context.User.HasClaim(ScopeClaim, ServiceTokenScope) ? Permissions.McpService : Permissions.McpConnect)));
+
+        return services.AddAccessTokenAuthentication(AuthAudiences.Mcp, options =>
         {
             // Keep the token's claim names (scope, jti) as issued; the request principal is rebuilt from the
             // local account either way.
@@ -40,8 +50,13 @@ public static class McpAuthenticationExtensions
                 }
 
                 await AccessTokenAuthenticationExtensions.LoadAccountPrincipalAsync(context);
+                if (!isServiceToken || context.Result is not null)
+                    return;
 
-                if (isServiceToken && context.Result is null && !await MayUseServiceTokensAsync(context))
+                // The principal is rebuilt from the account and drops the token's scope; keep the service marker
+                // for the endpoint policy.
+                ((ClaimsIdentity)context.Principal!.Identity!).AddClaim(new Claim(ScopeClaim, ServiceTokenScope));
+                if (!await MayUseServiceTokensAsync(context))
                     context.Fail("The service token's account no longer holds the mcp.service permission.");
             };
             options.Events.OnChallenge = context =>
@@ -50,6 +65,7 @@ public static class McpAuthenticationExtensions
                 return AccessTokenAuthenticationExtensions.WriteUnauthorizedBodyAsync(context);
             };
         });
+    }
 
     private static bool IsServiceToken(TokenValidatedContext context)
     {

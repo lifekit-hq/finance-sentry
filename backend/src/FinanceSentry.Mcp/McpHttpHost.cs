@@ -9,8 +9,9 @@ namespace FinanceSentry.Mcp;
 
 /// <summary>
 /// The Streamable HTTP transport's services and request pipeline. Extracted from <c>Program.cs</c> so tests
-/// run the exact endpoints and authentication the host serves. The MCP endpoint requires the
-/// <c>mcp.connect</c> permission (<see cref="AuthPolicies.RequireMcpConnect"/>); the platform probes are mapped
+/// run the exact endpoints and authentication the host serves. The MCP endpoint requires
+/// <see cref="AuthPolicies.RequireMcpAccess"/> (<c>mcp.connect</c> for a personal token, <c>mcp.service</c> for a
+/// service token); the platform probes are mapped
 /// <see cref="Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute"/>; anything else hits the
 /// default-deny fallback policy.
 /// </summary>
@@ -41,6 +42,6 @@ public static class McpHttpHost
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapMcpPlatformEndpoints();
-        app.MapMcp().RequireAuthorization(AuthPolicies.RequireMcpConnect);
+        app.MapMcp().RequireAuthorization(AuthPolicies.RequireMcpAccess);
     }
 }

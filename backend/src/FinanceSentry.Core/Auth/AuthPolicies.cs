@@ -11,6 +11,13 @@ public static class AuthPolicies
     public const string RequireMcpConnect = "RequireMcpConnect";
     public const string RequireMcpService = "RequireMcpService";
 
+    /// <summary>
+    /// The MCP endpoint's gate, registered by the MCP host only and not one-to-one with a permission: a
+    /// personal token needs <see cref="Permissions.McpConnect"/>, a service token needs
+    /// <see cref="Permissions.McpService"/>, each independently of the other.
+    /// </summary>
+    public const string RequireMcpAccess = "RequireMcpAccess";
+
     /// <summary>Operations access (<see cref="Permissions.OpsAdmin"/>); the name predates permissions.</summary>
     public const string RequireOwner = "RequireOwner";
 
