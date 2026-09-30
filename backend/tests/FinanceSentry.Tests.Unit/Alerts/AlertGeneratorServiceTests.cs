@@ -699,6 +699,72 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GenerateDetectorSilent_NoExisting_AddsWarningOperationalAlert()
+    {
+        AllowAlert(AlertType.JobFailure);
+
+        await _service.GenerateDetectorSilentAlertAsync(_userId, "filing-watch", 85, 9);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.JobFailure &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceLabel == "filing-watch" &&
+            a.ReferenceId != null &&
+            a.Title.Contains("filing-watch") &&
+            a.Message.Contains("85 days") &&
+            a.Message.Contains("9 ticker")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateDetectorSilent_ExistingActive_BumpsInsteadOfAdding()
+    {
+        SuppressByActiveAlert(AlertType.JobFailure);
+
+        await _service.GenerateDetectorSilentAlertAsync(_userId, "earnings-ahead", 90, 4);
+
+        VerifyNothingAdded();
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateDetectorSilent_RecentlyDismissed_StaysQuietForAWeek()
+    {
+        DateTimeOffset? quietSince = null;
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync((Alert?)null);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.JobFailure, It.IsAny<Guid?>(), "earnings-ahead", It.IsAny<DateTimeOffset>(), default))
+            .Callback<Guid, string, Guid?, string?, DateTimeOffset, CancellationToken>((_, _, _, _, since, _) => quietSince = since)
+            .ReturnsAsync(true);
+
+        await _service.GenerateDetectorSilentAlertAsync(_userId, "earnings-ahead", 90, 4);
+
+        VerifyNothingAdded();
+        Assert.NotNull(quietSince);
+        Assert.InRange(DateTimeOffset.UtcNow - quietSince!.Value, TimeSpan.FromDays(6.9), TimeSpan.FromDays(7.1));
+    }
+
+    [Fact]
+    public async Task ResolveDetectorSilent_ResolvesTheSameReferenceItWasRaisedOn()
+    {
+        var written = new List<Alert>();
+        AllowAlert(AlertType.JobFailure);
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
+            .Callback<Alert, CancellationToken>((a, _) => written.Add(a))
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateDetectorSilentAlertAsync(_userId, "filing-watch", 85, 9);
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, written.Single().ReferenceId, default))
+            .ReturnsAsync(open);
+
+        await _service.ResolveDetectorSilentAlertAsync(_userId, "filing-watch");
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+    }
+
+    [Fact]
     public async Task GenerateNewsCluster_NoExisting_AddsWarningAlert()
     {
         var day = DateOnly.FromDateTime(DateTime.UtcNow);

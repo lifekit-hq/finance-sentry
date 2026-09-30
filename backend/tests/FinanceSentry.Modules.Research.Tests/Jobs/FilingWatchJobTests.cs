@@ -10,7 +10,8 @@ using Moq;
 using Xunit;
 
 /// <summary>
-/// T2 (ledger-heartbeat design): a 10-K/10-Q/8-K on a holding or thesis-proxy ticker. EDGAR has no
+/// T2 (ledger-heartbeat design): a 10-K/10-Q/8-K (or a foreign issuer's 6-K/20-F/40-F) on a holding,
+/// thesis or thesis-proxy ticker, dated within the last few days. EDGAR has no
 /// contract, so a missing field, an empty submissions list or a failed fetch must produce silence,
 /// never an alert storm or a thrown exception. Dedup by accession number is the whole design — an
 /// hourly job re-reads the same submissions repeatedly.
@@ -20,6 +21,8 @@ public sealed class FilingWatchJobTests
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IThesisRepository> _theses = new();
+    private readonly Mock<IWatchlistReader> _watchlist = new();
+    private readonly Mock<ICryptoHoldingsReader> _crypto = new();
     private readonly Mock<ISecEdgarService> _secEdgar = new();
     private readonly Mock<IAlertGeneratorService> _alerts = new();
     private readonly FilingWatchJob _job;
@@ -34,8 +37,7 @@ public sealed class FilingWatchJobTests
     {
         _job = new FilingWatchJob(
             _banking.Object,
-            _brokerage.Object,
-            _theses.Object,
+            new LookaheadUniverse(_brokerage.Object, _watchlist.Object, _theses.Object, _crypto.Object),
             _secEdgar.Object,
             _alerts.Object,
             NullLogger<FilingWatchJob>.Instance);
@@ -135,7 +137,8 @@ public sealed class FilingWatchJobTests
     {
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        // Form filtering is delegated to ISecEdgarService — the job only has to ask for 10-K/10-Q/8-K.
+        // Form filtering is delegated to ISecEdgarService — the job only has to ask for the covered
+        // domestic and foreign-private-issuer forms.
         _secEdgar.Setup(e => e.GetRecentFilingsAsync(
                 "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
             .ReturnsAsync([]);
@@ -144,24 +147,75 @@ public sealed class FilingWatchJobTests
 
         _secEdgar.Verify(e => e.GetRecentFilingsAsync(
             "AAPL",
-            It.Is<IReadOnlyCollection<string>>(f => f.SequenceEqual(new[] { "10-K", "10-Q", "8-K" })),
+            It.Is<IReadOnlyCollection<string>>(f => f.SequenceEqual(new[] { "10-K", "10-Q", "8-K", "6-K", "20-F", "40-F" })),
             It.IsAny<int>(), default), Times.Once);
     }
 
     [Fact]
-    public async Task Execute_FilingDatedBeforeToday_IsNotAlertedOn()
+    public async Task Execute_FilingDatedOlderThanTheLookback_IsNotAlertedOn()
     {
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _secEdgar.Setup(e => e.GetRecentFilingsAsync(
                 "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
-            .ReturnsAsync([Filing("AAPL", "10-Q", _today.AddDays(-3))]);
+            .ReturnsAsync([Filing("AAPL", "10-Q", _today.AddDays(-4))]);
 
         await _job.ExecuteAsync(_nowUtc);
 
         _alerts.Verify(a => a.GenerateFilingLandedAlertAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(),
             It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_FridayFilingOnMondayRun_IsStillAlertedOn()
+    {
+        // #698: a same-day-only window lost any filing whose day missed the remaining hourly runs
+        // (a restart, a weekend). Monday's run still sees Friday's filing.
+        var friday = _today.AddDays(-3);
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        _secEdgar.Setup(e => e.GetRecentFilingsAsync(
+                "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
+            .ReturnsAsync([Filing("AAPL", "8-K", friday)]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateFilingLandedAlertAsync(
+            _userId, "AAPL", "8-K", friday, "0001-25-000123", It.IsAny<string>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_FilingDatedAfterToday_IsNotAlertedOn()
+    {
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
+        _secEdgar.Setup(e => e.GetRecentFilingsAsync(
+                "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
+            .ReturnsAsync([Filing("AAPL", "8-K", _today.AddDays(1))]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateFilingLandedAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_ForeignIssuer6KOnHolding_EmitsOnce()
+    {
+        // #698: a foreign private issuer reports on 6-K, never 10-Q/8-K — without the form a
+        // foreign-listed holding could never alert.
+        _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
+            .ReturnsAsync([new BrokerageHoldingSummary("GRAB", "STK", 100m, 500m, DateTime.UtcNow, "IBKR")]);
+        _secEdgar.Setup(e => e.GetRecentFilingsAsync(
+                "GRAB", It.Is<IReadOnlyCollection<string>>(f => f.Contains("6-K")), It.IsAny<int>(), default))
+            .ReturnsAsync([Filing("GRAB", "6-K", _today, "0001855612-26-000138")]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateFilingLandedAlertAsync(
+            _userId, "GRAB", "6-K", _today, "0001855612-26-000138", It.IsAny<string>(), default), Times.Once);
     }
 
     [Fact]

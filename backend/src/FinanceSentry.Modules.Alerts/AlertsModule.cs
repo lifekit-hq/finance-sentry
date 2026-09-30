@@ -41,6 +41,7 @@ public static class AlertsModule
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
         services.AddScoped<IMaterialAlertReader, Infrastructure.Persistence.MaterialAlertReader>();
+        services.AddScoped<IAlertFireHistoryReader, AlertFireHistoryReader>();
         // #673: published read port - the Integration adapter reaches Alerts only through it.
         services.AddScoped<IAlertsByTypeReader, AlertsByTypeReader>();
         services.AddScoped<AlertPurgeJob>();

@@ -6,9 +6,11 @@ using FinanceSentry.Modules.Research.Domain;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Daily Hangfire job (T3, ledger-heartbeat design): raises an EarningsAhead alert for a book or
-/// watchlist ticker with earnings landing within <see cref="LookaheadDays"/> days, or an ex-dividend
-/// date in the same window. Yahoo quoteSummary is an external dependency with no contract — a
+/// Daily Hangfire job (T3, ledger-heartbeat design): raises an EarningsAhead alert for a book,
+/// watchlist or thesis ticker (<see cref="LookaheadUniverse.EarningsTickersAsync"/>) with earnings
+/// landing within <see cref="LookaheadDays"/> days, or an ex-dividend date in the same window. Thesis
+/// tickers are in scope because a thesis is the strongest statement that a name's report matters
+/// (#698: a thesis name reporting in the window was never looked up while it sat outside the book). Yahoo quoteSummary is an external dependency with no contract — a
 /// missing field, a null date, or a failed fetch already come back as an empty result from
 /// <see cref="IEarningsCalendarService"/>, so a provider hiccup here means no alert this run, never a
 /// job failure. <see cref="IAlertGeneratorService.GenerateEarningsAheadAlertAsync"/> dedups per
@@ -17,13 +19,14 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public sealed class EarningsAheadJob(
     IBankingTotalsReader banking,
-    IBrokerageHoldingsReader brokerage,
-    IWatchlistReader watchlist,
+    LookaheadUniverse universe,
     IEarningsCalendarService earningsCalendar,
     IAlertGeneratorService alerts,
     ILogger<EarningsAheadJob> logger)
 {
-    private const string EquityInstrumentType = "STK";
+    /// <summary>The Hangfire recurring-job id this detector is scheduled under.</summary>
+    public const string RecurringJobId = "earnings-ahead";
+
     private const int LookaheadDays = 3;
 
     /// <summary>
@@ -32,7 +35,10 @@ public sealed class EarningsAheadJob(
     /// </summary>
     private const int ResolveLookbackDays = 5;
 
-    public async Task ExecuteAsync(CancellationToken ct = default)
+    public Task ExecuteAsync(CancellationToken ct = default) => ExecuteAsync(DateTime.UtcNow, ct);
+
+    /// <summary>Overload taking the reference instant explicitly, so tests aren't at the mercy of the day they run on.</summary>
+    public async Task ExecuteAsync(DateTime nowUtc, CancellationToken ct = default)
     {
         var userIds = await banking.GetActiveUserIdsAsync(ct);
         if (userIds.Count == 0)
@@ -41,7 +47,7 @@ public sealed class EarningsAheadJob(
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(nowUtc);
         var horizon = today.AddDays(LookaheadDays);
 
         foreach (var userId in userIds)
@@ -59,21 +65,7 @@ public sealed class EarningsAheadJob(
 
     private async Task ProcessUserAsync(Guid userId, DateOnly today, DateOnly horizon, CancellationToken ct)
     {
-        var tickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var holding in await brokerage.GetHoldingsAsync(userId, ct))
-        {
-            if (string.Equals(holding.InstrumentType, EquityInstrumentType, StringComparison.OrdinalIgnoreCase))
-            {
-                tickers.Add(holding.Symbol);
-            }
-        }
-
-        foreach (var ticker in await watchlist.ListTickersAsync(userId, ct))
-        {
-            tickers.Add(ticker);
-        }
-
+        var tickers = await universe.EarningsTickersAsync(userId, ct);
         if (tickers.Count == 0)
         {
             return;
