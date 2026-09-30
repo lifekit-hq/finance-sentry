@@ -121,7 +121,9 @@ Loki sink, and the dashboards below.
 - **Logs** — every .NET host (api, gateway, mcp) writes one compact JSON object per stdout line with
   `TraceId`/`SpanId` (platform contract, spec 048); the api also ships to Loki (fire-and-forget; a
   shipping outage never affects requests). EF Core SQL is suppressed to `Warning` by default (raise via
-  `Serilog:MinimumLevel:Override` in config). Retention ~14d, size-capped.
+  `Serilog:MinimumLevel:Override` in config). An unhandled exception that kills the api process is logged
+  at `Fatal` and the sinks are flushed before exit (`FatalErrorHook`), so a crash reaches the log file.
+  Retention ~14d, size-capped.
 - **Traces** — a gateway → api → Npgsql trace spine: gateway and API export OpenTelemetry traces over
   OTLP/HTTP to `Observability__Otlp__Endpoint` (default `http://otel-collector:4318`; empty disables the
   exporter, which is how the dev compose runs — there is no collector in dev). API log lines carry

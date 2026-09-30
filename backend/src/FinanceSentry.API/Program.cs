@@ -4,6 +4,7 @@ using FinanceSentry.API.Commands;
 using FinanceSentry.API.Conventions;
 using FinanceSentry.Integration;
 using FinanceSentry.API.Hangfire;
+using FinanceSentry.API.Logging;
 using FinanceSentry.API.Migrations;
 using FinanceSentry.API.Modules;
 using FinanceSentry.Infrastructure.Fx;
@@ -121,6 +122,9 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+// The static Serilog logger exists from here; last-chance hook so a crash is flushed to the log file.
+FatalErrorHook.Register();
 
 app.MigrateAllModules();
 
