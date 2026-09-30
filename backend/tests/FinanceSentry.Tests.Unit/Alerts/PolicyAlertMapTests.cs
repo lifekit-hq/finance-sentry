@@ -43,6 +43,7 @@ public class PolicyAlertMapTests
         AlertType.FamilyStatement,
         AlertType.PolicyReview, // measured against the policy statement's bands, not a Risk rule
         AlertType.PolicyReviewMissed,
+        AlertType.RelativeUnderperformance,
     };
 
     private static readonly string[] AllAlertTypes = typeof(AlertType)

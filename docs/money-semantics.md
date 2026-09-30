@@ -549,6 +549,8 @@ comparison; the bars are closed periods.
   authorized with produces a new posted row; the stale pending twin is only retired if
   the amount+description reconciler key still matches.
 - Backfilled snapshot days are not historical truth (§8).
+- Book and sleeve benchmark-relative figures are equal-weighted across theses, not weighted
+  by position size (§10).
 - Historically reconstructed net worth (`IsApproximate` rows, §8) is banking-only —
   brokerage and crypto are always $0 on those rows — and uses today's FX rate for every
   reconstructed day, not the rate on that day.
@@ -561,3 +563,57 @@ comparison; the bars are closed periods.
   days. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
   is directionally right rather than exact. A true same-day-last-month comparison would
   need day-level cumulative flow from the backend, which is not built.
+
+## 10. Benchmark-relative track record
+
+Whether the book, a sleeve or a thesis is beating the S&P 500 (fs-699). The figures are
+return percentages, not money, but they sit next to cost basis, so their rules are here.
+
+- **Source.** Only the persisted paired thesis event series is read: each `ThesisEvent`
+  carries the subject price and the SPY price captured at the same moment (`Created`,
+  `Snapshot`, `Closed`, …). No quote is fetched to compute a row. Points still
+  `PricesPending`, missing a price, or paired with a benchmark other than SPY are skipped.
+- **Materialized, not ad hoc.** The weekly `ThesisTrackRecordSnapshotJob` computes one run
+  per user after appending that week's snapshots and stores it in
+  `research.benchmark_relative_records` (one run per UTC day, replaced if the job runs twice).
+  `GET /api/v1/research/theses/track-record` and the `get_benchmark_track_record` agent tool
+  read the latest stored run and never recompute it. Nothing is backfilled: rows start with
+  the first weekly run after deploy.
+- **Returns.** Per thesis and window: subject return and SPY return between an opening and a
+  closing point of the series, and excess = subject − SPY in percentage points. The math is
+  `ThesisPerformanceCalculator`'s, so these figures agree with `get_thesis_performance`.
+  Every thesis with a series counts, including closed and deleted ones, so the record has no
+  survivorship bias. A closed thesis's closing point is its `Closed` event.
+- **Windows.** `1M`, `3M`, `1Y`, and since inception. The closing point is the latest point.
+  A thesis that ended inside a trailing window contributes the part of the window it was live
+  (window-start anchor to its `Closed` event, the benchmark over the same span), and its stored
+  `FromTimestamp` / `ToTimestamp` show that actual span; dropping it would reintroduce survivorship
+  bias. A thesis that ended before the window start is uncovered for that window.
+  The opening point for a trailing window is the latest point at or before
+  *window start + 3 days*. Snapshots are weekly, so this grace keeps a window within a few
+  days of its nominal length. Since inception opens on the first point. If no point
+  qualifies, the row is stored with `covered = false` and null returns. It is never
+  stretched or zero-filled.
+- **Book and sleeves.** Both are the **equal-weighted** mean over the covered theses in scope,
+  each thesis counting once. They measure thesis selection against SPY. They are not a
+  money-weighted return of the portfolio. A thesis's sleeve is the asset class of its
+  largest held position in the canonical book figures. A thesis whose ticker is not held
+  goes to the `Unheld` sleeve. If the brokerage or crypto holdings are stale, the whole run is
+  skipped, because sleeves would be misfiled.
+- **Net-of-cost gate (#688).** `netExcessReturnPct` subtracts the configured round-trip cost
+  and tax (`ThesisTrackRecord:Friction`), so it is stored only when the thesis ticker is a held
+  brokerage position whose cost basis the reconciliation marks `Verified`. Otherwise it is
+  null and `netGate` gives the reason: `Unverified` (held but not verified), `NotHeld`, or, on
+  a book or sleeve row, `Incomplete` (at least one covered constituent is not verified).
+  Gross excess is always stored.
+- **Sustained underperformance.** A row underperforms on a run when its excess is at or below
+  −`ThresholdPct` (default **5** pts). `underperformingRuns` counts consecutive weekly runs
+  that underperform, and it resets on any run that does not, including an uncovered one.
+  When the count reaches `SustainedRuns` (default **4** runs, about a month) the row is
+  flagged `sustainedUnderperformance`. For book and sleeve rows of the rule window (default
+  **3M**), the flag raises a `RelativeUnderperformance` alert. One alert stays open while the
+  condition holds. It resolves when the row recovers or the sleeve disappears. After it is
+  dismissed or resolved, it does not reopen within 20 days. Thesis rows carry the flag but
+  raise no alert, because a thesis-level relative breach is what a `relative_return`
+  invalidation trigger is for. Settings:
+  `ThesisTrackRecord:RelativePerformance` (`ThresholdPct`, `SustainedRuns`, `Window`).

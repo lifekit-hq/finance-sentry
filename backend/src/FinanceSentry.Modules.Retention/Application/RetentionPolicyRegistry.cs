@@ -54,6 +54,7 @@ public static class RetentionPolicyRegistry
         Purge(Research, "valuation_snapshots", "CapturedAt", 365, "Point-in-time valuation observations."),
         Purge(Research, "macro_events", "EventDate", 365, "Past macro-calendar entries."),
         Purge(Research, "recommendation_trends", "IngestedAt", 365, "Monthly consensus; stale once a ticker stops being covered."),
+        Purge(Research, "benchmark_relative_records", "AsOf", 365, "Weekly benchmark-relative runs; derived from thesis_events, only the latest two are read."),
         Purge(Risk, "holding_snapshots", "CapturedAt", 180, "Risk holding time-series."),
         // Events (049): the reader's verdict on a fired event outlives the 90d companion row it points at.
         Purge(Events, "event_verdicts", "RecordedAt", 365, "Reader verdicts on fired events; the alert they explain purges at 90d."),

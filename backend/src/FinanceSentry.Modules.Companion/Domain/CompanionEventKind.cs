@@ -32,4 +32,5 @@ public enum CompanionEventKind
     FamilyStatement,
     PolicyReview,
     PolicyReviewMissed,
+    RelativeUnderperformance,
 }

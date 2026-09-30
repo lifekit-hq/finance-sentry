@@ -25,6 +25,8 @@ public class ThesisTrackRecordSnapshotJobTests
         };
 
         var eventRepo = new Mock<IThesisEventRepository>();
+        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Guid>)[]);
         eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([pendingEvent]);
         eventRepo.Setup(r => r.ListAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
@@ -49,7 +51,7 @@ public class ThesisTrackRecordSnapshotJobTests
             });
 
         var sut = new ThesisTrackRecordSnapshotJob(
-            eventRepo.Object, thesisRepo.Object, marketData.Object,
+            eventRepo.Object, thesisRepo.Object, marketData.Object, Mock.Of<IBenchmarkTrackRecordMaterializer>(),
             NullLogger<ThesisTrackRecordSnapshotJob>.Instance);
 
         await sut.ExecuteAsync();
@@ -67,6 +69,8 @@ public class ThesisTrackRecordSnapshotJobTests
         var thesis = new InvestmentThesis { UserId = userId, Ticker = "MU" };
 
         var eventRepo = new Mock<IThesisEventRepository>();
+        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Guid>)[]);
         eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
         eventRepo.Setup(r => r.ListAsync(userId, null, It.IsAny<CancellationToken>()))
@@ -102,7 +106,7 @@ public class ThesisTrackRecordSnapshotJobTests
             });
 
         var sut = new ThesisTrackRecordSnapshotJob(
-            eventRepo.Object, thesisRepo.Object, marketData.Object,
+            eventRepo.Object, thesisRepo.Object, marketData.Object, Mock.Of<IBenchmarkTrackRecordMaterializer>(),
             NullLogger<ThesisTrackRecordSnapshotJob>.Instance);
 
         await sut.ExecuteAsync();
@@ -120,6 +124,8 @@ public class ThesisTrackRecordSnapshotJobTests
         var thesis = new InvestmentThesis { UserId = userId, Ticker = "MU" };
 
         var eventRepo = new Mock<IThesisEventRepository>();
+        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Guid>)[]);
         eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
         eventRepo.Setup(r => r.ListAsync(userId, null, It.IsAny<CancellationToken>()))
@@ -143,12 +149,41 @@ public class ThesisTrackRecordSnapshotJobTests
         var marketData = new Mock<IMarketDataService>();
 
         var sut = new ThesisTrackRecordSnapshotJob(
-            eventRepo.Object, thesisRepo.Object, marketData.Object,
+            eventRepo.Object, thesisRepo.Object, marketData.Object, Mock.Of<IBenchmarkTrackRecordMaterializer>(),
             NullLogger<ThesisTrackRecordSnapshotJob>.Instance);
 
         await sut.ExecuteAsync();
 
         eventRepo.Verify(
             r => r.AppendAsync(It.IsAny<ThesisEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MaterializesRelativeTrackRecord_PerUserWithEvents_AndIsolatesFailures()
+    {
+        var failing = Guid.NewGuid();
+        var healthy = Guid.NewGuid();
+
+        var eventRepo = new Mock<IThesisEventRepository>();
+        eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
+        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Guid>)[failing, healthy]);
+
+        var thesisRepo = new Mock<IThesisRepository>();
+        thesisRepo.Setup(r => r.GetUserIdsWithThesesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Guid>)[]);
+
+        var trackRecord = new Mock<IBenchmarkTrackRecordMaterializer>();
+        trackRecord.Setup(t => t.MaterializeAsync(failing, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        var sut = new ThesisTrackRecordSnapshotJob(
+            eventRepo.Object, thesisRepo.Object, Mock.Of<IMarketDataService>(), trackRecord.Object,
+            NullLogger<ThesisTrackRecordSnapshotJob>.Instance);
+
+        await sut.ExecuteAsync();
+
+        trackRecord.Verify(t => t.MaterializeAsync(healthy, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

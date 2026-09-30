@@ -485,6 +485,15 @@ public class RunThesisMonitorHandlerTests
             Guid userId, string headline, string body, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateRelativeUnderperformanceAlertAsync(
+            Guid userId, string scope, string scopeKey, string label, string window, string benchmarkTicker,
+            decimal excessReturnPct, int runs, decimal thresholdPct, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveRelativeUnderperformanceAlertAsync(
+            Guid userId, string scope, string scopeKey, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task ResolveOpportunityAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 

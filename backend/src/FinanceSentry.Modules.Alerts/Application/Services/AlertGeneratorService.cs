@@ -64,6 +64,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         // 27 days: shorter than the shortest calendar month, so a manual dismiss still lets next
         // month's statement through, but a same-month rerun of the cron never double-alerts.
         [AlertType.FamilyStatement] = TimeSpan.FromDays(27),
+        // 20 days: backstop against a manual dismiss re-opening on the next weekly run, yet shorter
+        // than the quickest genuine relapse (a recovering run, then four trailing weekly runs).
+        [AlertType.RelativeUnderperformance] = TimeSpan.FromDays(20),
     };
 
     /// <summary>
@@ -326,6 +329,22 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         Guid userId, string category, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.CategorySpike, CategorySpikeReferenceId(userId, category), ct);
 
+    public Task GenerateRelativeUnderperformanceAlertAsync(
+        Guid userId, string scope, string scopeKey, string label, string window, string benchmarkTicker,
+        decimal excessReturnPct, int runs, decimal thresholdPct, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.RelativeUnderperformance, AlertSeverity.Warning,
+            RelativeUnderperformanceReferenceId(userId, scope, scopeKey), label,
+            $"{label} trailing {benchmarkTicker}",
+            string.Create(CultureInfo.InvariantCulture,
+                $"{label} ({scope.ToLowerInvariant()}) is {excessReturnPct:+0.00;-0.00} pts vs {benchmarkTicker} over {window}, at or below -{thresholdPct:0.##} pts for {runs} consecutive weekly runs.")),
+            ct);
+
+    public Task ResolveRelativeUnderperformanceAlertAsync(
+        Guid userId, string scope, string scopeKey, CancellationToken ct = default)
+        => ResolveAsync(
+            userId, AlertType.RelativeUnderperformance, RelativeUnderperformanceReferenceId(userId, scope, scopeKey), ct);
+
     public Task GenerateFxSpreadAlertAsync(
         Guid userId, Guid debitTransactionId, string fromCurrency, string toCurrency,
         decimal impliedRate, decimal marketRate, CancellationToken ct = default)
@@ -567,6 +586,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
     private static Guid CategorySpikeReferenceId(Guid userId, string category)
         => DerivedReferenceId($"catspike:{userId:N}:{category.ToUpperInvariant()}");
+
+    /// <summary>Stable per-(user, scope, key) synthetic GUID — one open underperformance alert per book or sleeve.</summary>
+    private static Guid RelativeUnderperformanceReferenceId(Guid userId, string scope, string scopeKey)
+        => DerivedReferenceId($"relative-underperformance:{userId:N}:{scope}:{scopeKey.ToUpperInvariant()}");
 
     /// <summary>Stable per-user synthetic GUID for portfolio rebalance dedup (no natural entity reference).</summary>
     private static Guid RebalancePortfolioReferenceId(Guid userId)

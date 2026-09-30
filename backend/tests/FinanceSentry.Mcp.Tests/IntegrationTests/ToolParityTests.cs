@@ -157,6 +157,11 @@ public sealed class ToolParityTests
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
         services.Configure<FrictionConfig>(_ => { });
+        services.AddScoped<IBenchmarkRelativeRecordRepository, BenchmarkRelativeRecordRepository>();
+        services.Configure<RelativePerformanceConfig>(_ => { });
+        services.AddScoped<BenchmarkRelativeCalculator>();
+        services.AddScoped<IBenchmarkTrackRecordMaterializer, BenchmarkTrackRecordMaterializer>();
+        services.AddSingleton(TimeProvider.System);
 
         // Opportunity scanner (019): candidate repos + options + the two Core seams
         // (live impls over the in-memory Radar/Risk graphs already registered below).
@@ -265,6 +270,7 @@ public sealed class ToolParityTests
         services.AddScoped<SaveThesisTool>();
         services.AddScoped<GetThesisPerformanceTool>();
         services.AddScoped<GetTrackRecordTool>();
+        services.AddScoped<GetBenchmarkTrackRecordTool>();
         services.AddScoped<GetPostmortemPacketTool>();
         services.AddScoped<GetMarketStructureTool>();
         services.AddScoped<GetRelativeStrengthTool>();
@@ -1126,6 +1132,51 @@ public sealed class ToolParityTests
         summary!.TotalCount.Should().Be(1);
         summary.LowSampleCaveat.Should().BeTrue();
         summary.ByStatus["Active"].Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetBenchmarkTrackRecord_ReadsTheMaterializedRun()
+    {
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var tool = svc.GetRequiredService<GetBenchmarkTrackRecordTool>();
+        var before = await tool.ExecuteAsync();
+        before!.Rows.Should().BeEmpty();
+        before.Note.Should().Contain("Not materialized yet");
+
+        // Subject +20%, SPY +5% since inception: excess +15 pts, stored by the materializer.
+        var thesisId = Guid.NewGuid();
+        var researchDb = svc.GetRequiredService<ResearchDbContext>();
+        researchDb.ThesisEvents.AddRange(
+            new ThesisEvent
+            {
+                UserId = userId, SubjectType = ThesisSubjectType.Thesis, SubjectId = thesisId, Ticker = "MU",
+                EventType = ThesisEventType.Created, Timestamp = DateTimeOffset.UtcNow.AddDays(-20),
+                SubjectPrice = 100m, BenchmarkPrice = 500m,
+            },
+            new ThesisEvent
+            {
+                UserId = userId, SubjectType = ThesisSubjectType.Thesis, SubjectId = thesisId, Ticker = "MU",
+                EventType = ThesisEventType.Snapshot, Timestamp = DateTimeOffset.UtcNow.AddDays(-1),
+                SubjectPrice = 120m, BenchmarkPrice = 525m,
+            });
+        await researchDb.SaveChangesAsync();
+
+        await svc.GetRequiredService<IBenchmarkTrackRecordMaterializer>().MaterializeAsync(userId);
+
+        var after = await tool.ExecuteAsync(scope: "Book", window: "SinceInception");
+
+        after!.Rows.Should().ContainSingle();
+        var book = after.Rows[0];
+        book.Covered.Should().BeTrue();
+        book.SubjectReturnPct.Should().Be(20m);
+        book.BenchmarkReturnPct.Should().Be(5m);
+        book.ExcessReturnPct.Should().Be(15m);
+        book.NetGate.Should().Be(NetExcessGate.NotHeld);
+        book.NetExcessReturnPct.Should().BeNull();
     }
 
     [Fact]

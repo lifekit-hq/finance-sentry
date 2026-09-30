@@ -48,6 +48,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
     public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
 
     public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
+    public DbSet<BenchmarkRelativeRecord> BenchmarkRelativeRecords { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -338,6 +339,25 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
             .OnDelete(DeleteBehavior.SetNull);
         nsb.HasIndex(x => x.Url).IsUnique().HasDatabaseName("idx_news_sources_url");
         nsb.HasIndex(x => x.ThesisId).HasDatabaseName("idx_news_sources_thesis");
+
+        var brb = modelBuilder.Entity<BenchmarkRelativeRecord>();
+        brb.ToTable("benchmark_relative_records");
+        brb.HasKey(x => x.Id);
+        brb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+        brb.Property(x => x.UserId).IsRequired();
+        brb.Property(x => x.Scope).IsRequired().HasConversion<string>().HasMaxLength(20);
+        brb.Property(x => x.ScopeKey).IsRequired().HasMaxLength(64);
+        brb.Property(x => x.Label).IsRequired().HasMaxLength(40);
+        brb.Property(x => x.Window).IsRequired().HasConversion<string>().HasMaxLength(20);
+        brb.Property(x => x.BenchmarkTicker).IsRequired().HasMaxLength(20);
+        brb.Property(x => x.SubjectReturnPct).HasColumnType("numeric(12,4)");
+        brb.Property(x => x.BenchmarkReturnPct).HasColumnType("numeric(12,4)");
+        brb.Property(x => x.ExcessReturnPct).HasColumnType("numeric(12,4)");
+        brb.Property(x => x.NetExcessReturnPct).HasColumnType("numeric(12,4)");
+        brb.Property(x => x.NetGate).IsRequired().HasMaxLength(20);
+        brb.Property(x => x.ComputedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        brb.HasIndex(x => new { x.UserId, x.AsOf, x.Scope, x.ScopeKey, x.Window })
+            .IsUnique().HasDatabaseName("idx_benchmark_relative_records_run");
 
         var mtb = modelBuilder.Entity<MaterialityTerm>();
         mtb.ToTable("materiality_terms");
