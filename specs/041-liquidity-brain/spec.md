@@ -72,6 +72,7 @@ The `CashShortfall` alert type is a first-class alert type that flows through th
 - **FR-006**: Only subscriptions in the same currency as the account are applied in v1 (cross-currency excluded).
 - **FR-007**: The `CashShortfall` alert MUST carry the account name, projected shortfall date (ISO date), and shortfall amount as part of the message.
 - **FR-008**: The shortfall sentinel MUST use a 24-hour silence window to prevent daily duplicate alerts (active-alert dedup prevents re-creation when an active alert already exists).
+- **FR-009** *(amended #691)*: `CashShortfall` is derived from the `MinCashBuffer` policy (`Core.Utils.PolicyAlertMap`): it MUST NOT be raised while the user has an active Risk acknowledgement on `MinCashBuffer` that has not worsened past its step.
 
 ### Key Entities *(include if feature involves data)*
 
