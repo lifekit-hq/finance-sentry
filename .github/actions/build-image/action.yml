@@ -74,4 +74,9 @@ runs:
         SHA: ${{ github.sha }}
       run: |
         docker push "$IMAGE:$SHA"
-        docker push "$IMAGE:main"
+        head=$(git ls-remote origin refs/heads/main | cut -f1)
+        if [ "$head" = "$SHA" ]; then
+          docker push "$IMAGE:main"
+        else
+          echo "Skipping :main: $SHA is no longer the head of main ($head)"
+        fi
