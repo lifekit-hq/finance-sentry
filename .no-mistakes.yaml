@@ -22,7 +22,11 @@
 # (they skip on their own when no daemon is reachable). The container is
 # capped with --memory 2g; --memory-swap is left unset so Docker's default
 # applies (swap equal to the memory limit), meaning a runaway run slows down
-# on swap instead of getting the host's other processes OOM-killed.
+# on swap instead of getting the host's other processes OOM-killed. Memory
+# is kept in check by: build without the resident Roslyn server
+# (-p:UseSharedCompilation=false + `dotnet build-server shutdown`), test
+# hosts limited to two (-m:2; unset it starts one per logical CPU), and
+# workstation GC (DOTNET_gcServer=0).
 # Testcontainers-started containers are not covered by that cap.
 #
 # Not declared: the backend coverage ratchet step (a reportgenerator summary
@@ -38,11 +42,14 @@ commands:
   test: >-
     dn='dotnet restore backend/FinanceSentry.sln
     && dotnet build backend/FinanceSentry.sln --configuration Release --no-restore -m:1
-    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build --verbosity normal'
+    -p:UseSharedCompilation=false
+    && dotnet build-server shutdown
+    && dotnet test backend/FinanceSentry.sln --configuration Release --no-build -m:2 --verbosity normal'
     && if command -v dotnet >/dev/null 2>&1; then sh -c "$dn"; else
     docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)"
     --group-add "$(stat -c %g /var/run/docker.sock)"
     -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1
+    -e DOTNET_gcServer=0
     -v /var/run/docker.sock:/var/run/docker.sock
     -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 sh -c "$dn"; fi
     && cd frontend
