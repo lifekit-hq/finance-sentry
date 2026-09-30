@@ -456,7 +456,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         // #691: an acknowledgement on a policy silences every alert class derived from it, whichever
         // module emits it — the mapping lives in PolicyAlertMap.
         if (PolicyAlertMap.TryGetPolicyKey(draft.Type, out var policyKey)
-            && await policyAcks.IsPolicyAcknowledgedAsync(userId, policyKey, ct))
+            && await policyAcks.IsPolicySilencedAsync(userId, policyKey, ct))
         {
             return;
         }

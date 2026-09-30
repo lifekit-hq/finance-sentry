@@ -88,7 +88,7 @@ public class PolicyAlertMapTests
         var accountId = Guid.NewGuid();
         var repo = new Mock<IAlertRepository>();
         var acks = new Mock<IPolicyAckReader>();
-        acks.Setup(a => a.IsPolicyAcknowledgedAsync(userId, RiskRuleKeys.MinCashBuffer, default))
+        acks.Setup(a => a.IsPolicySilencedAsync(userId, RiskRuleKeys.MinCashBuffer, default))
             .ReturnsAsync(true);
 
         await new AlertGeneratorService(repo.Object, acks.Object).GenerateCashShortfallAlertAsync(
@@ -104,7 +104,7 @@ public class PolicyAlertMapTests
         var accountId = Guid.NewGuid();
         var repo = new Mock<IAlertRepository>();
         var acks = new Mock<IPolicyAckReader>();
-        acks.Setup(a => a.IsPolicyAcknowledgedAsync(It.IsAny<Guid>(), It.IsAny<string>(), default))
+        acks.Setup(a => a.IsPolicySilencedAsync(It.IsAny<Guid>(), It.IsAny<string>(), default))
             .ReturnsAsync(true);
 
         await new AlertGeneratorService(repo.Object, acks.Object)
