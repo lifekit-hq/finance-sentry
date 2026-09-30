@@ -561,7 +561,7 @@ or out** - peak value against current value would read a withdrawal as a loss.
 Accepted approximations: invested holdings only (cash and banking balances are not positions in the
 snapshots, so the measure is the invested book's decline, not net worth); snapshot cadence bounds how
 fast a fall is seen; a position with no snapshot price at a capture is dropped from that step; the
-split guard is a heuristic. It is checked only when a risk rule set exists, as allocation drift is.
+split guard is a heuristic. The tolerance lives on the IPS, so it is checked whether or not a risk rule set exists.
 
 ## 9. Known approximations (accepted)
 
