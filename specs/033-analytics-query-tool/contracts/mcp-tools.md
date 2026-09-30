@@ -33,10 +33,10 @@ The agent calls this first to learn exactly what it can query. Lists only the cu
   "sql": "SELECT category, SUM(amount) AS total FROM analytics.v_transactions WHERE direction='debit' GROUP BY category ORDER BY total DESC"
 }
 ```
-**Response** (rejected): `{ "error": "rejected", "reason": "only a single SELECT over the curated views is allowed" }`
+**Response** (rejected): `{ "error": "rejected", "reason": "only a single SELECT over the curated views is allowed" }` (a disallowed function call names it: `"function 'set_config' is not allowed — use standard aggregate, window, math, date and text functions only"`)
 **Response** (too large): `{ "error": "too_large", "reason": "query exceeded the time/row budget — narrow it (add filters, a date range, or LIMIT)" }`
 
 Rules:
-- Read-only enforced by the `fs_readonly` role (FR-002); per-user by RLS (FR-004); single-`SELECT` by the validator (FR-005); bounded by timeout + row cap (FR-006).
+- Read-only enforced by the `fs_readonly` role (FR-002); per-user by RLS (FR-004); single-`SELECT` with allowlisted functions only by the validator (FR-005); bounded by timeout + row cap (FR-006).
 - The response ALWAYS echoes the executed `sql` (FR-001) so the agent cites it and Denys can audit.
 - **Tool description states**: this is for exploratory/ad-hoc structured questions; authoritative numbers (net worth, risk verdicts, holdings totals) come from their dedicated tools, not this (FR-009).

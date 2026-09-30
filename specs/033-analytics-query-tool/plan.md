@@ -60,7 +60,7 @@ backend/tests/FinanceSentry.Modules.Analytics.Tests/  # NEW test project
 
 1. **Read-only enforced by a DB role, not validation.** `M001` creates role `fs_readonly` with `GRANT SELECT` on the curated views only — no write grants, no base-table grants. The executor connects as that role. A validator bypass still cannot write.
 2. **Per-user isolation by RLS.** The executor runs `SET LOCAL app.current_user_id = <caller>` in the query transaction; the curated views are security-barrier views filtering on `current_setting('app.current_user_id')` (and/or RLS on base tables). The agent's SQL cannot widen this.
-3. **Validator (defense in depth).** `SqlGuard`: exactly one statement, must be `SELECT`/`WITH…SELECT` (no data-modifying CTE), no `;` chaining, no DDL/DML. Reject before execution.
+3. **Validator (defense in depth).** `SqlGuard`: exactly one statement, must be `SELECT`/`WITH…SELECT` (no data-modifying CTE), no `;` chaining, no DDL/DML, function calls limited to an allowlist (no `set_config`/`current_setting`/`pg_*`). Reject before execution.
 4. **Timeout + row cap.** `SET LOCAL statement_timeout`; enforce `MaxRows`; return a clear "too large — narrow it" outcome.
 5. **Curated views v1** (small, per-user, documented): `v_transactions`, `v_holdings`, `v_analyst_actions`, `v_net_worth_daily`, `v_budgets`. Grown as needed.
 6. **Schema card** = `CuratedSchema` returns view list + columns + one-line purpose; `describe_query_schema` surfaces it; also embedded in the run tool description.
