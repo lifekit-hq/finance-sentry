@@ -52,7 +52,8 @@ builder.Services
 // FR-006: trust the hop in front of the gateway so the real client IP/scheme reach the rate limiter
 // and are propagated onward to backends. Only the hops named in ForwardedHeaders:KnownProxies /
 // ForwardedHeaders:KnownNetworks are trusted (prod: the edge network's bridge address, where Tailscale
-// Serve's loopback-published traffic arrives); unset keeps the framework default of loopback only.
+// Serve's loopback-published traffic arrives); unset trusts loopback only, even where
+// ASPNETCORE_FORWARDEDHEADERS_ENABLED=true (the Docker image) would otherwise trust every sender.
 builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((options, config) =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor

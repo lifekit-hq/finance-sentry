@@ -29,6 +29,15 @@ public sealed class GatewayForwardedHeadersTests(GatewayEndpointContractTests.Ga
     }
 
     [Fact]
+    public async Task ForwardedFor_WithHostingForwardedHeadersEnabledAndNoProxyConfigured_IsIgnoredFromNonLoopbackSender()
+    {
+        await using var scoped = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("FORWARDEDHEADERS_ENABLED", "true"));
+
+        Assert.Equal(EdgeBridge, await ResolveClientAddressAsync(scoped, EdgeBridge));
+    }
+
+    [Fact]
     public async Task ForwardedFor_FromSenderOutsideConfiguredProxies_IsIgnored()
     {
         await using var scoped = WithKnownProxy(EdgeBridge);

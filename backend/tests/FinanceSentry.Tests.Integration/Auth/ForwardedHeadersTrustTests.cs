@@ -31,6 +31,17 @@ public class ForwardedHeadersTrustTests(AuthApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task ForwardedFor_WithHostingForwardedHeadersEnabledAndNoProxyConfigured_IsIgnoredFromNonLoopbackSender()
+    {
+        await using var scoped = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("FORWARDEDHEADERS_ENABLED", "true"));
+
+        var remote = await ResolveClientAddressAsync(scoped, sender: GatewayAddress);
+
+        remote.Should().Be(GatewayAddress);
+    }
+
+    [Fact]
     public async Task ForwardedFor_FromSenderOutsideConfiguredProxies_IsIgnored()
     {
         await using var scoped = WithKnownProxy(GatewayAddress);

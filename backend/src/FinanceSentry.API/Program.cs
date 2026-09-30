@@ -29,7 +29,8 @@ builder.Host.UseSerilog(SerilogConfiguration.Configure);
 // Edge gateway (025, FR-006): honor X-Forwarded-* set by the reverse proxy so the real client IP
 // and scheme reach Serilog request logs — instead of the gateway's bridge address. Only the hops named
 // in ForwardedHeaders:KnownProxies / ForwardedHeaders:KnownNetworks are trusted (prod: the gateway's
-// fixed address on the edge network); unset keeps the framework default of loopback only.
+// fixed address on the edge network); unset trusts loopback only, even where
+// ASPNETCORE_FORWARDEDHEADERS_ENABLED=true (the Docker image) would otherwise trust every sender.
 builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((options, config) =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
