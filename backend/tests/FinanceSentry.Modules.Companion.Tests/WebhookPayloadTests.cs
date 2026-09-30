@@ -88,6 +88,26 @@ public sealed class WebhookPayloadTests
     }
 
     [Fact]
+    public async Task Policy_review_wake_asks_for_acknowledgement_against_the_review_reference()
+    {
+        var handler = new CapturingHandler();
+        var dispatcher = new WebhookAgentWakeDispatcher(
+            new FakeHttpFactory(handler),
+            Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger" }),
+            AlwaysOwner,
+            NullLogger<WebhookAgentWakeDispatcher>.Instance);
+        var reviewId = Guid.NewGuid();
+        var evt = SampleEvent();
+        evt.Kind = CompanionEventKind.PolicyReview;
+        evt.ReferenceId = reviewId;
+
+        await dispatcher.WakeAsync(evt);
+
+        handler.Body.Should().Contain("\"requiresAcknowledgement\":true")
+            .And.Contain(reviewId.ToString());
+    }
+
+    [Fact]
     public async Task Configured_token_is_sent_as_bearer_and_never_in_the_body()
     {
         var handler = new CapturingHandler();

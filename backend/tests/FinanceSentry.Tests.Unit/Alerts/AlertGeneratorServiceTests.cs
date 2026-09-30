@@ -1099,7 +1099,7 @@ public class AlertGeneratorServiceTests
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
         // Deduped once per reference, ever — no silence window applies.
-        var oncePerReference = new[] { AlertType.BudgetBreach };
+        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed };
 
         var declared = (Dictionary<string, TimeSpan>)typeof(AlertGeneratorService)
             .GetField("SilenceWindows", BindingFlags.NonPublic | BindingFlags.Static)!
@@ -1114,6 +1114,62 @@ public class AlertGeneratorServiceTests
 
         Assert.NotEmpty(live);
         Assert.DoesNotContain(live, t => !declared.ContainsKey(t));
+    }
+
+    [Fact]
+    public async Task GeneratePolicyReview_WithAdjustments_AddsWarningKeyedOnTheReview()
+    {
+        var reviewId = Guid.NewGuid();
+        var ledger = TrackAlerts();
+
+        await _service.GeneratePolicyReviewAlertAsync(_userId, reviewId, 2, "Trim Equity; Add Bonds.");
+
+        var alert = Assert.Single(ledger);
+        alert.Type.Should().Be(AlertType.PolicyReview);
+        alert.Severity.Should().Be(AlertSeverity.Warning);
+        alert.ReferenceId.Should().Be(reviewId);
+        alert.Title.Should().Contain("2 adjustment");
+        alert.Message.Should().Be("Trim Equity; Add Bonds.");
+    }
+
+    [Fact]
+    public async Task GeneratePolicyReview_WithinBands_AddsInfoAlert()
+    {
+        var ledger = TrackAlerts();
+
+        await _service.GeneratePolicyReviewAlertAsync(_userId, Guid.NewGuid(), 0, "All sleeves within bands.");
+
+        var alert = Assert.Single(ledger);
+        alert.Severity.Should().Be(AlertSeverity.Info);
+        alert.Title.Should().Contain("within policy bands");
+    }
+
+    [Fact]
+    public async Task GeneratePolicyReview_SameReviewTwice_RaisedOnce()
+    {
+        var reviewId = Guid.NewGuid();
+        var ledger = TrackAlerts();
+
+        await _service.GeneratePolicyReviewAlertAsync(_userId, reviewId, 1, "Trim Equity.");
+        await _service.GeneratePolicyReviewAlertAsync(_userId, reviewId, 1, "Trim Equity.");
+
+        Assert.Single(ledger);
+    }
+
+    [Fact]
+    public async Task GeneratePolicyReviewMissed_OncePerLapsedCycle()
+    {
+        var ledger = TrackAlerts();
+        var dueAt = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await _service.GeneratePolicyReviewMissedAlertAsync(_userId, dueAt, 5, "quarterly");
+        await _service.GeneratePolicyReviewMissedAlertAsync(_userId, dueAt, 6, "quarterly");
+        await _service.GeneratePolicyReviewMissedAlertAsync(_userId, dueAt.AddMonths(3), 4, "quarterly");
+
+        ledger.Should().HaveCount(2, "one report per missed due date, however many runs see it");
+        ledger.Should().OnlyContain(a => a.Type == AlertType.PolicyReviewMissed && a.Severity == AlertSeverity.Warning);
+        ledger[0].Message.Should().Contain("2026-07-01").And.Contain("5 day(s) overdue");
+        Assert.NotEqual(ledger[0].ReferenceId, ledger[1].ReferenceId);
     }
 
     private void AllowAlert(string type)

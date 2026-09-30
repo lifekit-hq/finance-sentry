@@ -21,7 +21,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 63 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 66 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -38,6 +38,7 @@ The current runtime surface contains 63 tools. The canonical list is the `Agreed
 | `get_cashflow_report` | Read | Cashflow | `fromDate?`, `toDate?` | Monthly inflow / outflow / net from the classified money-flow statistics (internal transfers excluded, USD); `TransactionCount` is always 0 — the source query doesn't expose one |
 | `get_family_clearing_statement` | Read | Cashflow | `month?`, `months?` | One calendar month's family clearing house: per-`family_support`-counterparty gross received/sent with a presentational net, native per-currency subtotals, and the month's support/received totals; excluded self-routing legs are counted, not dropped silently |
 | `get_net_worth_history` | Read | Wealth | `fromDate?`, `toDate?` | Historical net worth snapshots |
+| `get_policy_review` | Read | Research | — | Scheduled IPS review state: recorded cadence, last reviewed, next due, due/missed and days overdue, plus the latest review's proposal (per-sleeve drift against the IPS bands, Trim / Add / Review adjustments with rationale). Recommend-only |
 | `get_macro_calendar` | Read | Research | `from?`, `to?`, `regions?`, `minImportance?` | Scheduled macro events |
 | `get_event_calendar` | Read | Events | `daysAhead?`, `daysBack?`, `kinds?`, `limit?` | Upcoming events (earnings, ex-dividend, derived filing due dates, macro, thesis catalysts) plus the fired events with their outcome (`verdict` / `judged_immaterial` / `silent` / `awaiting` / `not_delivered`) and per-source availability |
 | `record_event_verdict` | Write | Events | `eventId`, `verdict`, `notified` | Records the reader's judgement on a fired companion event, alert-sourced or not (e.g. `AnalystAction`); an acknowledged event with no verdict reads as silence; `recorded=false` for a foreign, unknown event or a blank verdict |

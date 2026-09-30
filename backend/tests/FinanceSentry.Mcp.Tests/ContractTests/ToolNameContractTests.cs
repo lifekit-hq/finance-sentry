@@ -26,6 +26,7 @@ public sealed class ToolNameContractTests
         "get_family_clearing_statement",
         "get_fundamentals",
         "get_ips",
+        "get_policy_review",
         "get_macro_calendar",
         "get_market_breadth",
         "get_market_regime",

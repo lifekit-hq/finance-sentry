@@ -30,4 +30,6 @@ public enum CompanionEventKind
     NewsCluster,
     BudgetBreach,
     FamilyStatement,
+    PolicyReview,
+    PolicyReviewMissed,
 }

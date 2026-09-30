@@ -28,4 +28,6 @@ public static class AlertType
     public const string NewsCluster = "NewsCluster";
     public const string BudgetBreach = "BudgetBreach";
     public const string FamilyStatement = "FamilyStatement";
+    public const string PolicyReview = "PolicyReview";
+    public const string PolicyReviewMissed = "PolicyReviewMissed";
 }

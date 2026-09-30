@@ -7,7 +7,8 @@ public record AllocationDriftDto(
     decimal InvestedValueUsd,
     bool NeedsRebalance,
     IReadOnlyList<AllocationSleeveDrift> Sleeves,
-    string RebalancingCadence);
+    string RebalancingCadence,
+    bool IsStale = false);
 
 /// <summary>
 /// One asset-class sleeve: its IPS target and effective bands vs. the actual current weight.

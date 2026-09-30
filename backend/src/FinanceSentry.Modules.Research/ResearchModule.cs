@@ -99,6 +99,13 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(4));
 
+            // Scheduled policy review (#696): a daily sweep after the action tickets (04:00); each
+            // user's review opens only when their policy statement's recorded cadence makes it due.
+            mgr.AddOrUpdate<PolicyReviewJob>(
+                "policy-review",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(5));
+
             // Earnings-ahead detector (ledger-heartbeat T3), 06:00 UTC.
             mgr.AddOrUpdate<EarningsAheadJob>(
                 EarningsAheadJob.RecurringJobId,
@@ -174,6 +181,7 @@ public static class ResearchModule
         services.AddScoped<INewsRepository, NewsRepository>();
         services.AddScoped<IMacroCalendarRepository, MacroCalendarRepository>();
         services.AddScoped<IIpsRepository, IpsRepository>();
+        services.AddScoped<IPolicyReviewRepository, PolicyReviewRepository>();
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
         services.AddScoped<ICandidateRepository, CandidateRepository>();
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();
@@ -367,6 +375,7 @@ public static class ResearchModule
         services.AddScoped<OpportunityScanJob>();
         services.AddScoped<ResearchIndexingJob>();
         services.AddScoped<ActionTicketsGeneratorJob>();
+        services.AddScoped<PolicyReviewJob>();
         services.AddScoped<LookaheadUniverse>();
         services.AddSingleton<IRecurringJobAgeReader, HangfireRecurringJobAgeReader>();
         services.AddScoped<EarningsAheadJob>();
