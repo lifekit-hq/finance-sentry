@@ -23,6 +23,9 @@ public enum WakeResult
     /// <summary>Successfully posted to the agent runtime.</summary>
     Sent,
 
+    /// <summary>The event's user is not the owner account — nothing is sent and the event stays for the pull path.</summary>
+    Skipped,
+
     /// <summary>Post failed — retry on a later tick.</summary>
     Failed,
 }

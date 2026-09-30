@@ -8,6 +8,7 @@ export interface AuthRequest {
 export interface UserDto {
   id: string;
   email: string;
+  roles: string[];
 }
 
 export interface AuthResponse {

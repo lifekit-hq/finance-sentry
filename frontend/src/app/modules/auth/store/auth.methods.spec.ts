@@ -11,7 +11,7 @@ function makeState() {
 }
 
 const SAMPLE_RESPONSE: AuthResponse = {
-  user: {id: 'user-123', email: 'user@test.com'},
+  user: {id: 'user-123', email: 'user@test.com', roles: []},
   expiresAt: '2099-01-01T00:00:00Z',
 };
 

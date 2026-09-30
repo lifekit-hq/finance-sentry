@@ -7,16 +7,18 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Agent.Application.Commands;
 using FinanceSentry.Modules.Agent.Application.Queries;
 using FinanceSentry.Modules.Agent.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
-/// The in-app finance agent (Ledger) surface — feature 040 US2. Authenticated (JWT middleware); every
+/// The in-app finance agent (Ledger) surface — feature 040 US2. Owner-only (<see cref="AuthPolicies.RequireOwner"/>); every
 /// route is scoped to the caller's user, and no user id in the path/body is honored. Chat streams over
 /// Server-Sent Events per <c>contracts/chat-endpoint.md</c>. Keyless ⇒ a single <c>agent_not_configured</c>
 /// error event, no model call.
 /// </summary>
 [ApiController]
+[Authorize(Policy = AuthPolicies.RequireOwner)]
 [Route("agent")]
 public sealed class AgentChatController(
     ICommandHandler<SendAgentMessageCommand, IAsyncEnumerable<AgentStreamEvent>> sendHandler,

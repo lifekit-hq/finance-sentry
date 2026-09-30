@@ -26,10 +26,11 @@ public class LoginCommandHandler(
         if (!signIn.Succeeded)
             throw new InvalidCredentialsException();
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
+        var roles = await userManager.GetRolesAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
-        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!), expiresAt), rawRefreshToken, accessToken);
+        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt), rawRefreshToken, accessToken);
     }
 }

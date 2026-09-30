@@ -89,7 +89,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher,
+            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -126,7 +126,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher,
+            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -154,12 +154,52 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher,
+            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
 
         dispatcher.WakeCalls.Should().Be(1);
         (await events.GetAsync(evt.Id))!.Disposition.Should().Be(EventDisposition.Dispatched);
+    }
+
+    [Fact]
+    public async Task Owner_event_dispatches_behind_more_than_a_full_batch_of_non_owner_events()
+    {
+        const int nonOwnerCount = 150;
+        var otherUser = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var events = NewEventRepository();
+
+        for (var i = 0; i < nonOwnerCount; i++)
+        {
+            var other = PendingEvent(DateTimeOffset.UtcNow.AddHours(-2).AddSeconds(i));
+            other.UserId = otherUser;
+            await events.InsertIfNewAsync(other);
+        }
+
+        var ownerEvent = PendingEvent(DateTimeOffset.UtcNow.AddMinutes(-1));
+        await events.InsertIfNewAsync(ownerEvent);
+
+        var setting = new CompanionNotificationSetting
+        {
+            UserId = User,
+            Mode = NotificationMode.Realtime,
+            TimeZoneId = "UTC",
+            QuietHoursStartLocal = null,
+            QuietHoursEndLocal = null,
+            MaxProactivePerHour = 6,
+        };
+
+        var dispatcher = new RecordingDispatcher();
+        var job = new CompanionDispatchJob(
+            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
+            Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
+
+        await job.ExecuteAsync();
+        await job.ExecuteAsync();
+
+        dispatcher.WakeCalls.Should().Be(1);
+        (await events.GetAsync(ownerEvent.Id))!.Disposition.Should().Be(EventDisposition.Dispatched);
+        (await events.ListRealtimePendingAsync(nonOwnerCount + 1)).Should().BeEmpty();
     }
 }

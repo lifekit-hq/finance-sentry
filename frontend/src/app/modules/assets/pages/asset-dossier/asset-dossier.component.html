@@ -32,70 +32,81 @@
         />
       </cmn-card>
     } @else {
-      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. -->
-      <cmn-card class="block" data-testid="ledger-read-card">
-        <div class="flex flex-wrap items-center justify-between gap-cmn-3">
-          <div>
-            <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Ledger's read</h2>
-            @if (store.ledgerRead()?.generatedAt; as generatedAt) {
-              <p
-                class="mt-cmn-1 text-cmn-xs text-text-secondary"
-                data-testid="ledger-read-generated"
-              >
-                Generated {{ generatedAt | date: 'medium' }}
-              </p>
-            }
+      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. Owner-only. -->
+      @if (!isOwner()) {
+        <cmn-card class="block" data-testid="ledger-read-unavailable">
+          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Ledger's read</h2>
+          <p class="mt-cmn-2 text-cmn-sm text-text-secondary">
+            Ledger's read is not available for your account.
+          </p>
+        </cmn-card>
+      } @else {
+        <cmn-card class="block" data-testid="ledger-read-card">
+          <div class="flex flex-wrap items-center justify-between gap-cmn-3">
+            <div>
+              <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+                Ledger's read
+              </h2>
+              @if (store.ledgerRead()?.generatedAt; as generatedAt) {
+                <p
+                  class="mt-cmn-1 text-cmn-xs text-text-secondary"
+                  data-testid="ledger-read-generated"
+                >
+                  Generated {{ generatedAt | date: 'medium' }}
+                </p>
+              }
+            </div>
+            <div class="flex items-center gap-cmn-2">
+              @if (store.isLedgerReadStale()) {
+                <cmn-tag variant="warning" data-testid="ledger-read-stale">out of date</cmn-tag>
+              }
+              @if (store.ledgerReadNarrative()) {
+                <cmn-button
+                  [disabled]="store.isLedgerReadLoading()"
+                  (clicked)="generateLedgerRead(dossier.symbol, true)"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="ledger-read-regenerate"
+                >
+                  Regenerate
+                </cmn-button>
+              } @else {
+                <cmn-button
+                  [disabled]="store.isLedgerReadLoading()"
+                  (clicked)="generateLedgerRead(dossier.symbol, false)"
+                  variant="primary"
+                  size="sm"
+                  data-testid="ledger-read-generate"
+                >
+                  Generate Ledger's read
+                </cmn-button>
+              }
+            </div>
           </div>
-          <div class="flex items-center gap-cmn-2">
-            @if (store.isLedgerReadStale()) {
-              <cmn-tag variant="warning" data-testid="ledger-read-stale">out of date</cmn-tag>
-            }
-            @if (store.ledgerReadNarrative()) {
-              <cmn-button
-                [disabled]="store.isLedgerReadLoading()"
-                (clicked)="generateLedgerRead(dossier.symbol, true)"
-                variant="secondary"
-                size="sm"
-                data-testid="ledger-read-regenerate"
-              >
-                Regenerate
-              </cmn-button>
-            } @else {
-              <cmn-button
-                [disabled]="store.isLedgerReadLoading()"
-                (clicked)="generateLedgerRead(dossier.symbol, false)"
-                variant="primary"
-                size="sm"
-                data-testid="ledger-read-generate"
-              >
-                Generate Ledger's read
-              </cmn-button>
-            }
-          </div>
-        </div>
 
-        @if (store.isLedgerReadLoading()) {
-          <div
-            class="mt-cmn-4 h-16 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800"
-            data-testid="ledger-read-loading"
-          ></div>
-        } @else if (store.ledgerReadErrorMessage(); as ledgerReadError) {
-          <cmn-alert variant="error" class="mt-cmn-4 block" data-testid="ledger-read-error">
-            {{ ledgerReadError }}
-          </cmn-alert>
-        } @else if (store.ledgerReadNarrative(); as narrative) {
-          <p
-            class="mt-cmn-4 whitespace-pre-line text-cmn-sm leading-relaxed text-text-primary"
-            data-testid="ledger-read-narrative"
-          >
-            {{ narrative }}
-          </p>
-        } @else {
-          <p class="mt-cmn-4 text-cmn-sm text-text-secondary" data-testid="ledger-read-empty">
-            Nothing generated yet — ask Ledger to read everything on this page and summarise it.
-          </p>
-        }
-      </cmn-card>
+          @if (store.isLedgerReadLoading()) {
+            <div
+              class="mt-cmn-4 h-16 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800"
+              data-testid="ledger-read-loading"
+            ></div>
+          } @else if (store.ledgerReadErrorMessage(); as ledgerReadError) {
+            <cmn-alert variant="error" class="mt-cmn-4 block" data-testid="ledger-read-error">
+              {{ ledgerReadError }}
+            </cmn-alert>
+          } @else if (store.ledgerReadNarrative(); as narrative) {
+            <p
+              class="mt-cmn-4 whitespace-pre-line text-cmn-sm leading-relaxed text-text-primary"
+              data-testid="ledger-read-narrative"
+            >
+              {{ narrative }}
+            </p>
+          } @else {
+            <p class="mt-cmn-4 text-cmn-sm text-text-secondary" data-testid="ledger-read-empty">
+              Nothing generated yet — ask Ledger to read everything on this page and summarise it.
+            </p>
+          }
+        </cmn-card>
+      }
 
       <!-- Position & P&L -->
       @if (dossier.position; as position) {

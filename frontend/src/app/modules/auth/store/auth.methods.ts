@@ -9,6 +9,7 @@ export function authMethods(store: WritableStateSource<AuthState>) {
       patchState(store, {
         userId: res.user.id,
         email: res.user.email,
+        roles: res.user.roles,
         status: 'idle',
         errorCode: null,
         flow: null,
@@ -19,6 +20,7 @@ export function authMethods(store: WritableStateSource<AuthState>) {
       patchState(store, {
         userId: null,
         email: null,
+        roles: [],
         status: 'idle',
         errorCode: null,
         flow: null,

@@ -21,9 +21,10 @@ public class GetMeQueryHandler(
         if (await userManager.IsLockedOutAsync(user))
             throw new InvalidRefreshTokenException();
 
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
+        var roles = await userManager.GetRolesAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
         var profile = GetProfileQueryHandler.ToDto(user);
 
-        return new GetMeResult(new MeResponse(new UserDto(user.Id, user.Email!), expiresAt, profile), accessToken);
+        return new GetMeResult(new MeResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt, profile), accessToken);
     }
 }

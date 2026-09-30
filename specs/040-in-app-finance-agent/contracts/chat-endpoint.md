@@ -1,6 +1,6 @@
 # Contract: Agent chat endpoint
 
-Authenticated (JWT). All routes scoped to the caller's user; no user id in the path/body is honored.
+Authenticated (JWT) and **Owner-only** (`RequireOwner` policy; the asset-dossier narrative routes too). All routes scoped to the caller's user; no user id in the path/body is honored.
 
 ## POST `/api/v1/agent/chat` — send a message, stream the reply (SSE)
 
@@ -24,6 +24,7 @@ Authenticated (JWT). All routes scoped to the caller's user; no user id in the p
 - Persists the user message, runs the tool-use loop (compose persona → call model with bridged tools → dispatch `tool_use` in the caller's scope → iterate to a final answer), streaming as it goes; persists the assistant message on `done`.
 - **Keyless** (`Agent__Anthropic__ApiKey` unset) → single `error` event `agent_not_configured`, no model call.
 - **Unauthenticated** → 401 before any streaming/model call.
+- **Signed in but not Owner** → 403 `{ "error": "…", "errorCode": "FORBIDDEN" }` before any streaming/model call; the agent runtime is never invoked.
 - Tier-3: the model has no money/trade/credential tool; such requests yield a drafted answer that escalates, never an action.
 
 ## GET `/api/v1/agent/conversations` — list the caller's conversations

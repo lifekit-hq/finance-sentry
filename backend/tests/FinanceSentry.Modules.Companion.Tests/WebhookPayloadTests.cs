@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
 using System.Net;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Infrastructure.Services;
@@ -17,6 +18,13 @@ public sealed class WebhookPayloadTests
 {
     // Placeholder only — the real token is runtime configuration and never appears in code or tests.
     private const string PlaceholderToken = "unit-test-placeholder-token";
+
+    private sealed class StubOwners(bool isOwner) : IOwnerAccountReader
+    {
+        public Task<bool> IsOwnerAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(isOwner);
+    }
+
+    private static readonly IOwnerAccountReader AlwaysOwner = new StubOwners(true);
 
     private sealed record CapturedRequest(Uri? Uri, string? Body, string? Authorization, string? IdempotencyKey);
 
@@ -51,6 +59,7 @@ public sealed class WebhookPayloadTests
 
     private static CompanionEvent SampleEvent() => new()
     {
+        UserId = Guid.NewGuid(),
         Kind = CompanionEventKind.ThesisBreak,
         Subject = "MU",
         Severity = "critical",
@@ -65,6 +74,7 @@ public sealed class WebhookPayloadTests
         var dispatcher = new WebhookAgentWakeDispatcher(
             new FakeHttpFactory(handler),
             Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger" }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
 
         var evt = SampleEvent();
@@ -88,6 +98,7 @@ public sealed class WebhookPayloadTests
                 AgentTriggerUrl = "http://agent.local/trigger",
                 AgentTriggerToken = PlaceholderToken,
             }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
 
         var evt = SampleEvent();
@@ -106,6 +117,7 @@ public sealed class WebhookPayloadTests
         var dispatcher = new WebhookAgentWakeDispatcher(
             new FakeHttpFactory(handler),
             Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger", AgentTriggerToken = " " }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
 
         await dispatcher.WakeAsync(SampleEvent());
@@ -124,6 +136,7 @@ public sealed class WebhookPayloadTests
                 AgentTriggerUrl = "http://agent.local/trigger",
                 AgentTriggerToken = PlaceholderToken,
             }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
         var evt = SampleEvent();
 
@@ -149,6 +162,7 @@ public sealed class WebhookPayloadTests
                 AgentTriggerUrl = "http://agent.local/trigger",
                 AgentTriggerToken = PlaceholderToken,
             }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
 
         var result = await dispatcher.WakeDigestAsync(Guid.NewGuid(), 3);
@@ -166,11 +180,47 @@ public sealed class WebhookPayloadTests
         var dispatcher = new WebhookAgentWakeDispatcher(
             new FakeHttpFactory(handler),
             Options.Create(new CompanionOptions { AgentTriggerUrl = null }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
 
         var result = await dispatcher.WakeAsync(SampleEvent());
 
         result.Should().Be(WakeResult.NotConfigured);
         handler.Body.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Event_wake_payload_carries_the_user_id()
+    {
+        var handler = new CapturingHandler();
+        var dispatcher = new WebhookAgentWakeDispatcher(
+            new FakeHttpFactory(handler),
+            Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger" }),
+            AlwaysOwner,
+            NullLogger<WebhookAgentWakeDispatcher>.Instance);
+
+        var evt = SampleEvent();
+        var result = await dispatcher.WakeAsync(evt);
+
+        result.Should().Be(WakeResult.Sent);
+        handler.Body.Should().Contain($"\"userId\":\"{evt.UserId}\"");
+    }
+
+    [Fact]
+    public async Task Events_of_a_non_owner_user_are_not_dispatched()
+    {
+        var handler = new CapturingHandler();
+        var dispatcher = new WebhookAgentWakeDispatcher(
+            new FakeHttpFactory(handler),
+            Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger" }),
+            new StubOwners(false),
+            NullLogger<WebhookAgentWakeDispatcher>.Instance);
+
+        var eventResult = await dispatcher.WakeAsync(SampleEvent());
+        var digestResult = await dispatcher.WakeDigestAsync(Guid.NewGuid(), heldCount: 2);
+
+        eventResult.Should().Be(WakeResult.Skipped);
+        digestResult.Should().Be(WakeResult.Skipped);
+        handler.Requests.Should().BeEmpty();
     }
 }

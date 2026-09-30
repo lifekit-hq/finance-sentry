@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion.Infrastructure.Services;
 
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using Microsoft.Extensions.Logging;
@@ -10,13 +11,15 @@ using Microsoft.Extensions.Options;
 /// <summary>
 /// Posts a minimal wake payload to the configured agent-trigger URL (feature 031). When no URL is
 /// configured the event stays pending for the agent to pull (no realtime push). Payload carries only
-/// ids/refs — never secrets or full detail (FR-016). Authenticates with the configured bearer token
-/// and stamps each event wake with <c>Idempotency-Key: &lt;eventId&gt;</c>, so the receiver can dedup
+/// ids/refs — never secrets or full detail (FR-016). The agent runtime serves the
+/// owner account only, so wakes for any other user's events are skipped (<see cref="WakeResult.Skipped"/>).
+/// Authenticates with the configured bearer token and stamps each event wake with <c>Idempotency-Key: &lt;eventId&gt;</c>, so the receiver can dedup
 /// the relay's retries (the dispatch job re-posts a failed wake up to <see cref="CompanionOptions.MaxDispatchAttempts"/>).
 /// </summary>
 public sealed class WebhookAgentWakeDispatcher(
     IHttpClientFactory httpFactory,
     IOptions<CompanionOptions> options,
+    IOwnerAccountReader owners,
     ILogger<WebhookAgentWakeDispatcher> logger) : IAgentWakeDispatcher
 {
     public const string HttpClientName = "companion-wake";
@@ -40,12 +43,18 @@ public sealed class WebhookAgentWakeDispatcher(
             return WakeResult.NotConfigured;
         }
 
+        if (!await owners.IsOwnerAsync(evt.UserId, ct))
+        {
+            return WakeResult.Skipped;
+        }
+
         // Proposal events carry acknowledgement metadata so the bot can render inline-keyboard buttons.
         // referenceId is the stable per-user anchor GUID; the bot calls PATCH /alerts/{referenceId}/acknowledge.
         var isProposal = ProposalKinds.Contains(evt.Kind);
         var payload = new
         {
             eventId = evt.Id,
+            userId = evt.UserId,
             kind = evt.Kind.ToString(),
             subject = evt.Subject,
             severity = evt.Severity,
@@ -62,6 +71,11 @@ public sealed class WebhookAgentWakeDispatcher(
         if (string.IsNullOrWhiteSpace(_options.AgentTriggerUrl))
         {
             return WakeResult.NotConfigured;
+        }
+
+        if (!await owners.IsOwnerAsync(userId, ct))
+        {
+            return WakeResult.Skipped;
         }
 
         var payload = new { kind = "Digest", userId, count = heldCount };

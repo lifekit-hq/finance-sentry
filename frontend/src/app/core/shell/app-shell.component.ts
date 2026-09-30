@@ -20,6 +20,8 @@ import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 
+const LEDGER_ROUTE: string = AppRoute.Ledger;
+
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
   {id: AppRoute.AccountsList, label: 'Accounts', icon: 'Building2', group: 'Pages'},
@@ -52,7 +54,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <cmn-app-layout
-      [navItems]="navItems"
+      [navItems]="navItems()"
       [activeRoute]="activeRoute()"
       [isDark]="isDark()"
       [avatarMenuItems]="avatarMenuItems"
@@ -66,7 +68,9 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       <router-outlet />
     </cmn-app-layout>
 
-    <fns-chat-widget />
+    @if (isOwner()) {
+      <fns-chat-widget />
+    }
   `,
 })
 export class AppShellComponent {
@@ -85,11 +89,7 @@ export class AppShellComponent {
   );
 
   private readonly alertsStore = inject(AlertsStore);
-
-  public readonly themeService = inject(ThemeService);
-  public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
-  public readonly versionLabel = `v${APP_VERSION}`;
-  public readonly navItems: NavItem[] = [
+  private readonly allNavItems: NavItem[] = [
     {label: 'Dashboard', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
     {label: 'Accounts', icon: 'Building2', route: AppRoute.Accounts},
     {label: 'Transactions', icon: 'ArrowLeftRight', route: AppRoute.Transactions},
@@ -105,10 +105,18 @@ export class AppShellComponent {
     {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
     {label: 'Settings', icon: 'Settings2', route: AppRoute.Settings},
   ];
+
+  public readonly isOwner = this.authStore.isOwner;
+  public readonly themeService = inject(ThemeService);
+  public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
+  public readonly versionLabel = `v${APP_VERSION}`;
+  public readonly navItems = computed(() =>
+    this.allNavItems.filter(item => this.authStore.isOwner() || item.route !== LEDGER_ROUTE)
+  );
   public readonly isDark = computed(() => this.theme() === 'dark');
   public readonly activeRoute = computed(() => {
     const url = this.routerUrl();
-    const match = this.navItems.find(item => url.startsWith(item.route));
+    const match = this.navItems().find(item => url.startsWith(item.route));
     return match?.route ?? '';
   });
 
@@ -137,7 +145,9 @@ export class AppShellComponent {
   public openPalette(): void {
     this.dialog
       .open<PaletteResult>(CommandPaletteComponent, {
-        data: PALETTE_ITEMS,
+        data: this.authStore.isOwner()
+          ? PALETTE_ITEMS
+          : PALETTE_ITEMS.filter(item => item.id !== LEDGER_ROUTE),
         container: CmnDialogBareContainerComponent,
         hasBackdrop: false,
         panelClass: [],

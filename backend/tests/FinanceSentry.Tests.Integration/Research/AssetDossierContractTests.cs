@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Agent.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
@@ -290,8 +291,10 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
     public Mock<IBrokerageHoldingsReader> BrokerageHoldingsReaderMock { get; } = new(MockBehavior.Loose);
     public Mock<IValuationHistoryService> ValuationHistoryMock { get; } = new(MockBehavior.Loose);
     public Mock<ILedgerNarrator> NarratorMock { get; } = new(MockBehavior.Loose);
+    public Mock<IAgentConversationService> AgentConversationMock { get; } = new(MockBehavior.Loose);
 
     public Guid TestUserId { get; } = Guid.NewGuid();
+    public Guid NonOwnerUserId { get; } = Guid.NewGuid();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -306,6 +309,7 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             ReplaceService(services, EarningsCalendarMock.Object);
             ReplaceService(services, BrokerageHoldingsReaderMock.Object);
             ReplaceService(services, NarratorMock.Object);
+            ReplaceService(services, AgentConversationMock.Object);
 
             // Default stubs: return empty/null so tests that don't set up mocks still get 200.
             BookFiguresMock
@@ -367,11 +371,13 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("IBKR:GatewayBaseUrl", "http://localhost:9999");
     }
 
-    public HttpClient CreateAuthenticatedClient()
+    /// <summary>A signed-in client; holds the Owner role unless <paramref name="owner"/> is false.</summary>
+    public HttpClient CreateAuthenticatedClient(bool owner = true)
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        TestUsers.EnsureExists(Services, TestUserId);
-        client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(TestUserId)}");
+        var userId = owner ? TestUserId : NonOwnerUserId;
+        TestUsers.EnsureExists(Services, userId, owner);
+        client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(userId)}");
         return client;
     }
 

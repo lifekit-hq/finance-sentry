@@ -34,6 +34,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   BUDGET_INVALID_LIMIT: 'Budget limit must be greater than zero.',
   BUDGET_INVALID_PERIOD: 'Invalid budget period.',
   SUBSCRIPTION_NOT_FOUND: 'Subscription not found.',
+  FORBIDDEN: 'This feature is not available for your account.',
   LEDGER_READ_UNAVAILABLE: 'Ledger could not produce a read right now. Try again shortly.',
   INVALID_DATE_RANGE: 'Invalid date range. Check the from/to dates and try again.',
   INVALID_AMOUNT_RANGE: 'Invalid amount range. Check the min/max amounts and try again.',
