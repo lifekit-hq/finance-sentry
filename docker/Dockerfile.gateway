@@ -6,14 +6,27 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
+# Restore into the layer filesystem (not a cache mount): a cache mount's contents are
+# non-persistent under BuildKit GC/concurrent-build pressure, so a later RUN (publish)
+# reading packages restored by an earlier RUN can find them missing (MSB3030/NETSDK1152).
+ENV NUGET_PACKAGES=/src/.nuget/packages
+
+# Project files first so the restore layer only rebuilds when a dependency changes. The gateway's
+# project graph is just itself plus Core (the shared TraceEnricher).
+COPY backend/Directory.*.props backend/
+COPY backend/src/FinanceSentry.Core/FinanceSentry.Core.csproj backend/src/FinanceSentry.Core/
+COPY backend/src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj backend/src/FinanceSentry.Gateway/
+
+WORKDIR /src/backend
+RUN dotnet restore src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj
+
+WORKDIR /src
 COPY backend/ backend/
 
 WORKDIR /src/backend
-RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet restore src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj
+RUN dotnet build src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Release --no-restore
 
-RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet publish src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Release -o /app/publish
+RUN dotnet publish src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj -c Release -o /app/publish --no-build
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime

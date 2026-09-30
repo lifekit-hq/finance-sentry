@@ -1,12 +1,10 @@
 name: Docker Build
 
 on:
+  # Every push to main builds and publishes all four images: they are deployed by commit SHA,
+  # so each main commit needs its own set regardless of which files it touched.
   push:
-    branches: [ main, 001-bank-account-sync ]
-    paths:
-      - 'backend/**'
-      - 'docker/Dockerfile'
-      - '.github/workflows/docker-build.yml'
+    branches: [ main ]
   # No `paths:` filter on PRs: the required check must always report. Path filtering
   # happens inside the workflow instead (changes job + aggregate job below).
   pull_request:
@@ -15,20 +13,19 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Always runs so the required check below always reports; classifies the PR diff so
-  # the heavy job only runs when its area changed (see .github/scripts/changed-areas.sh).
+  # the image jobs only run for the images whose inputs changed (see
+  # .github/scripts/changed-areas.sh). Outputs the matrix of images to build.
   changes:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      backend: ${{ steps.areas.outputs.backend }}
-      frontend: ${{ steps.areas.outputs.frontend }}
-      docker: ${{ steps.areas.outputs.docker }}
+      images: ${{ steps.matrix.outputs.images }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v7
@@ -39,58 +36,88 @@ jobs:
       id: areas
       run: .github/scripts/changed-areas.sh docker-build.yml
 
-  backend-image:
-    needs: changes
-    if: needs.changes.outputs.docker == 'true'
-    runs-on: ubuntu-latest
+    - name: Select images to build
+      id: matrix
+      env:
+        DOTNET: ${{ steps.areas.outputs.docker }}
+        FRONTEND: ${{ steps.areas.outputs.docker_frontend }}
+      run: |
+        images='[]'
+        add() { images=$(jq -c --arg s "$1" --arg f "$2" '. + [{service: $s, dockerfile: $f}]' <<< "$images"); }
+        if [ "$DOTNET" = true ]; then
+          add api docker/Dockerfile
+          add mcp docker/Dockerfile.mcp
+          add gateway docker/Dockerfile.gateway
+        fi
+        if [ "$FRONTEND" = true ]; then
+          add frontend docker/Dockerfile.frontend.prod
+        fi
+        echo "images=$images" >> "$GITHUB_OUTPUT"
+        echo "images: $images"
 
+  # PRs (and dispatches): build and scan each image, never push. Read-only token, so a PR
+  # build cannot publish even by mistake; the layer cache is read from ghcr but not written.
+  image:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.images != '[]'
+    name: image (${{ matrix.service }})
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.images) }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v7
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
-    - name: Build Docker image
-      uses: docker/build-push-action@v7
+    - name: Build and scan
+      uses: ./.github/actions/build-image
       with:
-        context: ./
-        file: ./docker/Dockerfile
-        push: false
-        tags: finance-sentry-api:latest
-        cache-from: type=gha
-        cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
-        outputs: type=docker,dest=/tmp/image.tar
+        service: ${{ matrix.service }}
+        dockerfile: ${{ matrix.dockerfile }}
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Load image for testing
-      run: |
-        docker load --input /tmp/image.tar
-        docker images
+  # Pushes to main: build, scan, then publish ghcr.io/lifekit-hq/finance-sentry-<service>
+  # as :<sha> and :main, and refresh the :buildcache layer cache. The only job with write access.
+  publish:
+    needs: changes
+    if: github.event_name == 'push'
+    name: publish (${{ matrix.service }})
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
 
-    # 510: gate on known fixable HIGH/CRITICAL vulnerabilities in the built image
-    # (OS packages + .NET deps). --ignore-unfixed keeps base-image CVEs without an
-    # available patch from blocking every PR.
-    - name: Scan image for vulnerabilities (Trivy)
-      uses: aquasecurity/trivy-action@v0.36.0
+    - name: Build, scan and push
+      uses: ./.github/actions/build-image
       with:
-        image-ref: finance-sentry-api:latest
-        format: table
-        exit-code: '1'
-        severity: CRITICAL,HIGH
-        ignore-unfixed: true
+        service: ${{ matrix.service }}
+        dockerfile: ${{ matrix.dockerfile }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        push: 'true'
 
   # Required status check (branch protection) — keep this job name. Passes when the
-  # heavy job succeeded or was skipped by the path filter; fails if anything failed or
+  # image jobs succeeded or were skipped by the path filter; fails if anything failed or
   # was cancelled, including the changes job itself.
   build-backend-image:
-    needs: [changes, backend-image]
+    needs: [changes, image, publish]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-    - name: Require the image build to have passed or been skipped
+    - name: Require the image builds to have passed or been skipped
       env:
-        RESULTS: ${{ needs.changes.result }} ${{ needs.backend-image.result }}
+        RESULTS: ${{ needs.changes.result }} ${{ needs.image.result }} ${{ needs.publish.result }}
       run: |
         echo "needs results: $RESULTS"
         case " $RESULTS " in
