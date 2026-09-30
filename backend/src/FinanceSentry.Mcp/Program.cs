@@ -68,27 +68,14 @@ internal static class Program
             // (platform contract, spec 048), tagged app=finance-sentry-mcp.
             builder.Host.UseSerilog(SerilogConfiguration.For(McpPlatformEndpoints.ServiceName));
 
-            McpServiceRegistration.RegisterShared(builder.Services, builder.Configuration);
-            builder.Services.AddMcpPlatformEndpoints(builder.Configuration);
-
-            builder.Services
-                .AddMcpServer()
-                // Stateless: each tool-call POST is handled inline within its HTTP request, so the
-                // authenticated HttpContext (and thus per-request identity) flows to the tool. With
-                // stateful sessions the tool runs on a background loop where HttpContext is null.
-                .WithHttpTransport(o => o.Stateless = true)
-                .WithFinanceSentryTools(mcpAssembly);
+            McpHttpHost.AddServices(builder.Services, builder.Configuration);
 
             var port = int.TryParse(Environment.GetEnvironmentVariable("MCP_HTTP_PORT"), out var p) ? p : 5100;
             builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
             var app = builder.Build();
             app.UseSerilogRequestLogging();
-            // The middleware itself exempts /health, /ready and /metrics (AnonymousPaths); every other
-            // path keeps the bearer-token gate.
-            app.UseMiddleware<McpJwtAuthenticationMiddleware>();
-            app.MapMcpPlatformEndpoints();
-            app.MapMcp();
+            McpHttpHost.UsePipeline(app);
             await app.RunAsync();
         }
         else

@@ -3,7 +3,7 @@ namespace FinanceSentry.Modules.Auth.Domain.Entities;
 /// <summary>
 /// A long-lived, revocable MCP service credential for first-party headless clients
 /// (e.g. the OpenClaw gateway) that cannot perform the interactive OAuth refresh flow.
-/// The row's Id is the token's jti; the MCP HTTP middleware checks it on every request
+/// The row's Id is the token's jti; the MCP HTTP host checks it on every request
 /// so the token can be revoked without rotating the signing secret.
 /// </summary>
 public class McpServiceToken
