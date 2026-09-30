@@ -30,6 +30,8 @@ public class SaveIpsCommandHandler(IIpsRepository repo, TimeProvider timeProvide
     {
         var nextVersion = await repo.GetMaxVersionAsync(cmd.UserId, ct) + 1;
         var previous = await repo.GetCurrentAsync(cmd.UserId, ct);
+        var riskCapacity = cmd.RiskCapacity ?? previous?.RiskCapacity;
+        var maxDrawdownTolerancePct = cmd.MaxDrawdownTolerancePct ?? previous?.MaxDrawdownTolerancePct;
 
         var ips = new InvestmentPolicyStatement
         {
@@ -40,9 +42,9 @@ public class SaveIpsCommandHandler(IIpsRepository repo, TimeProvider timeProvide
             PrimaryHorizonYears = cmd.PrimaryHorizonYears,
             EmergencyCushionUsd = cmd.EmergencyCushionUsd,
             RiskTolerance = cmd.RiskTolerance,
-            RiskCapacity = cmd.RiskCapacity,
-            MaxDrawdownTolerancePct = cmd.MaxDrawdownTolerancePct,
-            RiskMeasuredAt = RiskMeasuredAtFor(cmd, previous),
+            RiskCapacity = riskCapacity,
+            MaxDrawdownTolerancePct = maxDrawdownTolerancePct,
+            RiskMeasuredAt = RiskMeasuredAtFor(cmd, previous, riskCapacity, maxDrawdownTolerancePct),
             AllocationTargets = cmd.AllocationTargets.ToList(),
             RebalancingRule = cmd.RebalancingRule ?? Domain.RebalancingRule.Default,
             ContributionPlan = cmd.ContributionPlan,
@@ -69,16 +71,19 @@ public class SaveIpsCommandHandler(IIpsRepository repo, TimeProvider timeProvide
     }
 
     /// <summary>
-    /// A save stamps a fresh measurement when it is the first statement, says so explicitly, or
-    /// changed tolerance, capacity or drawdown tolerance; otherwise the prior measurement carries
-    /// forward untouched, so a version written for another reason never passes for a re-measurement.
+    /// A save that omits capacity or drawdown tolerance keeps the recorded values (an amendment for
+    /// another reason must not silently drop an enforced threshold). It stamps a fresh measurement
+    /// when it is the first statement, says so explicitly, or changed tolerance, capacity or drawdown
+    /// tolerance; otherwise the prior measurement carries forward untouched, so a version written for
+    /// another reason never passes for a re-measurement.
     /// </summary>
-    private DateTimeOffset? RiskMeasuredAtFor(SaveIpsCommand cmd, InvestmentPolicyStatement? previous)
+    private DateTimeOffset? RiskMeasuredAtFor(
+        SaveIpsCommand cmd, InvestmentPolicyStatement? previous, int? riskCapacity, decimal? maxDrawdownTolerancePct)
     {
         var riskChanged = previous is null
             || previous.RiskTolerance != cmd.RiskTolerance
-            || previous.RiskCapacity != cmd.RiskCapacity
-            || previous.MaxDrawdownTolerancePct != cmd.MaxDrawdownTolerancePct;
+            || previous.RiskCapacity != riskCapacity
+            || previous.MaxDrawdownTolerancePct != maxDrawdownTolerancePct;
 
         return cmd.RiskRemeasured || riskChanged ? timeProvider.GetUtcNow() : previous?.RiskMeasuredAt;
     }

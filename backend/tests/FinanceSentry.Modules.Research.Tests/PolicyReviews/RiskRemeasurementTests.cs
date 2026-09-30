@@ -134,6 +134,21 @@ public class RiskRemeasurementTests
     }
 
     [Fact]
+    public async Task An_amendment_omitting_capacity_and_drawdown_keeps_the_recorded_figures()
+    {
+        var measured = Now.AddDays(-200);
+        _repo.Seed(Ips(drawdown: 25m, measuredAt: measured, tolerance: 3, capacity: 4));
+
+        var saved = await new SaveIpsCommandHandler(_repo, new FixedTimeProvider(Now)).Handle(
+            new SaveIpsCommand(_userId, [], 10, null, 3, null, null, [], null, null, "a new sell rule", null, [], "quarterly"),
+            default);
+
+        saved.MaxDrawdownTolerancePct.Should().Be(25m);
+        saved.RiskCapacity.Should().Be(4);
+        saved.RiskMeasuredAt.Should().Be(measured);
+    }
+
+    [Fact]
     public async Task A_changed_risk_figure_in_an_ordinary_save_stamps_the_measurement()
     {
         _repo.Seed(Ips(drawdown: 25m, measuredAt: Now.AddDays(-200), tolerance: 3, capacity: 3));

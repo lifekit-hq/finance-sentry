@@ -54,10 +54,22 @@ public sealed class DrawdownEnforcementTests
     }
 
     [Fact]
-    public void Evaluate_NoRuleSet_RaisesNothingEvenPastTolerance()
+    public void Evaluate_NoRuleSet_StillEnforcesTheRecordedTolerance()
     {
         var report = _service.Evaluate(Book, null, [], [], Now, new DrawdownCheck(0.20m, 0.50m));
 
+        report.HasRuleSet.Should().BeFalse();
+        var v = report.Violations.Should().ContainSingle().Subject;
+        v.RuleKey.Should().Be(RiskRuleKeys.MaxDrawdown);
+        v.Reportable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Evaluate_NoRuleSetAndWithinTolerance_RaisesNothing()
+    {
+        var report = _service.Evaluate(Book, null, [], [], Now, new DrawdownCheck(0.20m, 0.10m));
+
+        report.HasRuleSet.Should().BeFalse();
         report.Violations.Should().BeEmpty();
     }
 
