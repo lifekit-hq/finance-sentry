@@ -94,6 +94,7 @@ public sealed class WebhookPayloadTests
         var dispatcher = new WebhookAgentWakeDispatcher(
             new FakeHttpFactory(handler),
             Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger" }),
+            AlwaysOwner,
             NullLogger<WebhookAgentWakeDispatcher>.Instance);
         var reviewId = Guid.NewGuid();
         var evt = SampleEvent();
