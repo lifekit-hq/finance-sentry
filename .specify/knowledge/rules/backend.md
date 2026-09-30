@@ -61,11 +61,10 @@ All API communication must be TLS-only. No plaintext financial data in logs or D
 **Source**: constitution § V
 **Added**: 2026-04-18
 
-Authentication is handled by `JwtAuthenticationMiddleware`. Every endpoint is protected
-unless explicitly added to the exempt list:
-`/health`, `/api/v1/health`, `/swagger`, `/api/webhook`. `/hangfire` gets the caller's identity
-attached when a valid token is present but is never rejected by the middleware — the dashboard's own
-filter enforces the `RequireOwner` policy.
+Authentication is the stock JwtBearer handler plus a fallback policy that requires an authenticated
+user, so every endpoint is protected unless it carries `[AllowAnonymous]` (health, metrics, the auth
+sign-in endpoints, the TrueLayer callback). `ApiAuthenticationPipelineTests` pins that anonymous list;
+adding to it is a reviewed change. `/hangfire` is mapped with the `RequireOwner` policy.
 
 ---
 

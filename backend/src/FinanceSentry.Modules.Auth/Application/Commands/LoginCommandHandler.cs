@@ -8,6 +8,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 
 public class LoginCommandHandler(
     UserManager<ApplicationUser> userManager,
+    SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService) : ICommandHandler<LoginCommand, AuthResult>
 {
@@ -20,7 +21,9 @@ public class LoginCommandHandler(
         if (user.PasswordHash is null)
             throw new GoogleAccountOnlyException();
 
-        if (!await userManager.CheckPasswordAsync(user, request.Password))
+        // Counts failures towards Identity lockout; a locked-out account gets the same generic error.
+        var signIn = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+        if (!signIn.Succeeded)
             throw new InvalidCredentialsException();
 
         var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));

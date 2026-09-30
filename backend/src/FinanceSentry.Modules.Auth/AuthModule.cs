@@ -5,6 +5,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure;
+using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
+using FinanceSentry.Modules.Auth.Infrastructure.Identity;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.Auth.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
@@ -29,15 +31,23 @@ public static class AuthModule
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
+                // Length plus a common-password check (CommonPasswordValidator), no composition rules.
                 options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
                 options.Password.RequireNonAlphanumeric = false;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+                options.Lockout.AllowedForNewUsers = true;
                 options.User.RequireUniqueEmail = true;
             })
             .AddEntityFrameworkStores<AuthDbContext>()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddPasswordValidator<CommonPasswordValidator>();
+
+        services.AddMemoryCache();
+        services.AddScoped<IAccessTokenPrincipalLoader, AccessTokenPrincipalLoader>();
 
         services.AddAuthorizationBuilder()
             .AddPolicy(AuthPolicies.RequireOwner, policy => policy

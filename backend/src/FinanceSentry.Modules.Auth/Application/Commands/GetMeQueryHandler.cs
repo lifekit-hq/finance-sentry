@@ -18,6 +18,8 @@ public class GetMeQueryHandler(
 
         var user = await userManager.FindByIdAsync(existing.UserId)
             ?? throw new InvalidRefreshTokenException();
+        if (await userManager.IsLockedOutAsync(user))
+            throw new InvalidRefreshTokenException();
 
         var (accessToken, expiresAt) = tokenService.GenerateToken(user, await userManager.GetRolesAsync(user));
         var profile = GetProfileQueryHandler.ToDto(user);

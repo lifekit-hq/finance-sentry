@@ -10,11 +10,11 @@ backend/
   src/
     FinanceSentry.API/
       Program.cs                          # DI registrations, middleware pipeline
+      Authentication/
+        ApiAuthenticationExtensions.cs    # JwtBearer (fs_access_token cookie, aud=app) + fallback policy; public endpoints use [AllowAnonymous]; /hangfire maps with RequireOwner
     FinanceSentry.Modules.BankSync/
       API/
         Controllers/                      # REST controllers
-        Middleware/
-          JwtAuthenticationMiddleware.cs  # JWT validation; exempt: /health, /api/v1/health, /swagger, /api/webhook; /hangfire: identity attached, dashboard enforces RequireOwner
       Application/                        # CQRS commands/queries (MediatR)
       Domain/                             # Entities, interfaces, repositories
       Infrastructure/                     # EF Core, provider HTTP clients, encryption
