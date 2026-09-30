@@ -33,9 +33,10 @@ services:
     security_opt: ["no-new-privileges:true"]
     read_only: true
     tmpfs:
-      # .NET diagnostics sockets, plus the backup and restore-verify jobs' transient dump file
-      # (~35 MB; tmpfs counts against mem_limit). Logs go to the api_logs volume.
-      - /tmp
+      # .NET diagnostics sockets, plus the backup and restore-verify jobs' transient plain dump and
+      # its encrypted copy (~35 MB each today). Capped at 256m: tmpfs counts against mem_limit, so an
+      # oversized dump fails the job with ENOSPC instead of OOM-killing the api. Logs go to the api_logs volume.
+      - /tmp:size=256m
     labels:
       lifekit.contract: "v1"
       lifekit.contract.port: "5000"
