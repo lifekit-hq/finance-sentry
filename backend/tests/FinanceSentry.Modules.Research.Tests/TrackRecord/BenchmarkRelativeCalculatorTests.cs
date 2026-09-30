@@ -92,6 +92,26 @@ public class BenchmarkRelativeCalculatorTests
     }
 
     [Fact]
+    public void ClosedThesis_CountsOverTheLivePartOfAWindow_AndIsUncoveredOnceTheCloseIsBeforeTheWindowStart()
+    {
+        var closedAt = new TrackRecordPricePoint(ThesisEventType.Closed, Now.AddDays(-60), 110m, 510m);
+        var mu = Subject(
+            "MU", "Equities", NetExcessGate.NotHeld,
+            Point(120, 100m, 500m), Point(91, 100m, 500m), Point(75, 105m, 505m), closedAt);
+
+        var rows = Compute(mu);
+
+        var threeMonths = Row(rows, TrackRecordScope.Thesis, mu.ThesisId.ToString("N"), TrackRecordWindow.ThreeMonths);
+        threeMonths.Covered.Should().BeTrue();
+        threeMonths.FromTimestamp.Should().Be(Now.AddDays(-91));
+        threeMonths.ToTimestamp.Should().Be(closedAt.Timestamp);
+        threeMonths.SubjectReturnPct.Should().Be(10m);
+        threeMonths.BenchmarkReturnPct.Should().Be(2m);
+
+        Row(rows, TrackRecordScope.Thesis, mu.ThesisId.ToString("N"), TrackRecordWindow.OneMonth).Covered.Should().BeFalse();
+    }
+
+    [Fact]
     public void SinglePoint_LeavesEveryWindowUncovered()
     {
         var mu = Subject("MU", "Equities", NetExcessGate.NotHeld, Point(5, 100m, 500m));

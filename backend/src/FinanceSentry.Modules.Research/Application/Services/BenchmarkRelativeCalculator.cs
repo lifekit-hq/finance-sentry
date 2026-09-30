@@ -118,6 +118,8 @@ public sealed class BenchmarkRelativeCalculator(IThesisPerformanceCalculator per
         }
     }
 
+    // A thesis that ended inside a trailing window is measured over the part it was live (the stored
+    // From/To timestamps show the span); one that ended before the window start is uncovered.
     private Measured? Measure(
         TrackRecordSubject subject, TrackRecordWindow window, DateTimeOffset now, FrictionConfig friction)
     {

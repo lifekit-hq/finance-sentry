@@ -585,6 +585,10 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   Every thesis with a series counts, including closed and deleted ones, so the record has no
   survivorship bias. A closed thesis's closing point is its `Closed` event.
 - **Windows.** `1M`, `3M`, `1Y`, and since inception. The closing point is the latest point.
+  A thesis that ended inside a trailing window contributes the part of the window it was live
+  (window-start anchor to its `Closed` event, the benchmark over the same span), and its stored
+  `FromTimestamp` / `ToTimestamp` show that actual span; dropping it would reintroduce survivorship
+  bias. A thesis that ended before the window start is uncovered for that window.
   The opening point for a trailing window is the latest point at or before
   *window start + 3 days*. Snapshots are weekly, so this grace keeps a window within a few
   days of its nominal length. Since inception opens on the first point. If no point
