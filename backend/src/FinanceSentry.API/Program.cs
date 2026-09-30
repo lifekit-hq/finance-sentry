@@ -213,15 +213,23 @@ if (app.Services.GetRequiredService<StartupMigrationStatus>().MigrationsSkipped)
 }
 else
 {
-    app.RegisterAllModuleJobs();
+    // One retry boundary for every startup registration (module jobs + the FX job): a lock timeout
+    // held by an overlapping instance must not end the process (see StartupJobRegistration).
+    StartupJobRegistration.RegisterWithRetry(
+        () =>
+        {
+            app.RegisterAllModuleJobs();
 
-    // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
-    // fallback table behind as soon as the app is up.
-    var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
-    recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
-        "exchange-rate-refresh",
-        job => job.RunAsync(CancellationToken.None),
-        Cron.Daily());
+            // Live FX rates: refresh daily, and once immediately so we leave the hardcoded
+            // fallback table behind as soon as the app is up.
+            var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+            recurringJobs.AddOrUpdate<ExchangeRateRefreshJob>(
+                "exchange-rate-refresh",
+                job => job.RunAsync(CancellationToken.None),
+                Cron.Daily());
+        },
+        app.Logger);
+
     app.Services.GetRequiredService<IBackgroundJobClient>()
         .Enqueue<ExchangeRateRefreshJob>(job => job.RunAsync(CancellationToken.None));
 }
