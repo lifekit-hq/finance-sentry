@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.Research.Migrations
 {
     [DbContext(typeof(ResearchDbContext))]
-    [Migration("20261001090000_M018_IpsRiskMeasuredAt")]
-    partial class M018_IpsRiskMeasuredAt
+    [Migration("20261001090000_M019_IpsRiskMeasuredAt")]
+    partial class M019_IpsRiskMeasuredAt
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

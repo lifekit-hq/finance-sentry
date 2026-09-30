@@ -5,7 +5,7 @@
 namespace FinanceSentry.Modules.Research.Migrations
 {
     /// <inheritdoc />
-    public partial class M018_IpsRiskMeasuredAt : Migration
+    public partial class M019_IpsRiskMeasuredAt : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
