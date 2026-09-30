@@ -10,12 +10,15 @@ using Microsoft.Extensions.Logging;
 /// Weekly job (R5): (1) backfills any <see cref="ThesisEvent"/> rows still marked
 /// <see cref="ThesisEvent.PricesPending"/>, and (2) appends a <see cref="ThesisEventType.Snapshot"/>
 /// event for every thesis with no terminal event yet, so history plots have a regular cadence
-/// independent of lifecycle event density (User Story 3, Acceptance Scenario 3).
+/// independent of lifecycle event density (User Story 3, Acceptance Scenario 3), then (3) stores
+/// the benchmark-relative track record read off that series (fs-699), so the API and the agent read
+/// persisted figures instead of recomputing them per request.
 /// </summary>
 public sealed class ThesisTrackRecordSnapshotJob(
     IThesisEventRepository eventRepo,
     IThesisRepository thesisRepo,
     IMarketDataService marketData,
+    IBenchmarkTrackRecordMaterializer trackRecord,
     ILogger<ThesisTrackRecordSnapshotJob> logger)
 {
     private static readonly ThesisEventType[] TerminalEventTypes =
@@ -30,6 +33,25 @@ public sealed class ThesisTrackRecordSnapshotJob(
     {
         await BackfillPendingAsync(ct);
         await SnapshotActiveThesesAsync(ct);
+        await MaterializeRelativeTrackRecordAsync(ct);
+    }
+
+    private async Task MaterializeRelativeTrackRecordAsync(CancellationToken ct)
+    {
+        var userIds = await eventRepo.GetUserIdsWithEventsAsync(ct);
+
+        foreach (var userId in userIds)
+        {
+            try
+            {
+                await trackRecord.MaterializeAsync(userId, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(
+                    ex, "ThesisTrackRecordSnapshotJob: relative track record failed for user {UserId}", userId);
+            }
+        }
     }
 
     private async Task BackfillPendingAsync(CancellationToken ct)

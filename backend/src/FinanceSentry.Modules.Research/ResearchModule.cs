@@ -183,6 +183,7 @@ public static class ResearchModule
         services.AddScoped<IIpsRepository, IpsRepository>();
         services.AddScoped<IPolicyReviewRepository, PolicyReviewRepository>();
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
+        services.AddScoped<IBenchmarkRelativeRecordRepository, BenchmarkRelativeRecordRepository>();
         services.AddScoped<ICandidateRepository, CandidateRepository>();
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();
         services.AddScoped<IAnalystActionRepository, AnalystActionRepository>();
@@ -297,6 +298,9 @@ public static class ResearchModule
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();
         services.AddScoped<IThesisPerformanceCalculator, ThesisPerformanceCalculator>();
         services.Configure<FrictionConfig>(config.GetSection(FrictionConfig.SectionName));
+        services.Configure<RelativePerformanceConfig>(config.GetSection(RelativePerformanceConfig.SectionName));
+        services.AddScoped<BenchmarkRelativeCalculator>();
+        services.AddScoped<IBenchmarkTrackRecordMaterializer, BenchmarkTrackRecordMaterializer>();
 
         // Singleton: holds the cached Yahoo crumb + per-ticker event cache across requests.
         services.AddSingleton<IEarningsCalendarService, YahooEarningsCalendarService>();

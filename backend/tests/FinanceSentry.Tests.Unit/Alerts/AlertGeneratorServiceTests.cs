@@ -499,6 +499,58 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GenerateRelativeUnderperformance_NoExisting_AddsWarningAlert()
+    {
+        AllowAlert(AlertType.RelativeUnderperformance);
+
+        await _service.GenerateRelativeUnderperformanceAlertAsync(
+            _userId, "Sleeve", "Equities", "Equities", "ThreeMonths", "SPY", -7.25m, 4, 5m);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.RelativeUnderperformance &&
+            a.Severity == AlertSeverity.Warning &&
+            a.UserId == _userId &&
+            a.ReferenceId != null &&
+            a.ReferenceLabel == "Equities" &&
+            a.Title == "Equities trailing SPY" &&
+            a.Message.Contains("-7.25 pts vs SPY over ThreeMonths") &&
+            a.Message.Contains("4 consecutive weekly runs")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateRelativeUnderperformance_ExistingActive_SkipsCreation()
+    {
+        SuppressByActiveAlert(AlertType.RelativeUnderperformance);
+
+        await _service.GenerateRelativeUnderperformanceAlertAsync(
+            _userId, "Book", "book", "Book", "ThreeMonths", "SPY", -6m, 5, 5m);
+
+        VerifyNothingAdded();
+        VerifyNoSilenceWindowLookup();
+    }
+
+    [Fact]
+    public async Task ResolveRelativeUnderperformance_ResolvesTheAlertGenerateRaisedForTheSameScope()
+    {
+        AllowAlert(AlertType.RelativeUnderperformance);
+        Guid? raisedReference = null;
+        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), It.IsAny<CancellationToken>()))
+            .Callback<Alert, CancellationToken>((a, _) => raisedReference = a.ReferenceId)
+            .Returns(Task.CompletedTask);
+
+        await _service.GenerateRelativeUnderperformanceAlertAsync(
+            _userId, "Sleeve", "Equities", "Equities", "ThreeMonths", "SPY", -7m, 4, 5m);
+
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.RelativeUnderperformance, raisedReference, default))
+            .ReturnsAsync(open);
+
+        await _service.ResolveRelativeUnderperformanceAlertAsync(_userId, "Sleeve", "equities");
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+    }
+
+    [Fact]
     public async Task GenerateFxSpread_NoExisting_AddsWarningAlertKeyedOnTheDebitLeg()
     {
         var debitTransactionId = Guid.NewGuid();

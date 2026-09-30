@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 /// (<see cref="AlertPurgeJob"/>) unchanged. It resolves, never deletes.
 ///
 /// Types not in <see cref="Ttls"/> never expire — they either have a working resolve-on-cleared-condition
-/// path (§3.1: <c>CashShortfall</c>, <c>LowBalance</c>, <c>ThesisBroken</c>, <c>PolicyViolation</c>) or are
+/// path (§3.1: <c>CashShortfall</c>, <c>LowBalance</c>, <c>ThesisBroken</c>, <c>PolicyViolation</c>,
+/// <c>RelativeUnderperformance</c>) or are
 /// Error-severity operational alerts that must be cleared by the condition or the user, never by age
 /// (<c>SyncFailure</c>, <c>JobFailure</c>, the freshness flavour of <c>MarketStructure</c>).
 /// </summary>

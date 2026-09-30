@@ -472,6 +472,31 @@ public interface IAlertGeneratorService
         string headline,
         string body,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a Warning alert that the book or a sleeve (<paramref name="scope"/>/<paramref name="scopeKey"/>)
+    /// has trailed its benchmark by at least <paramref name="thresholdPct"/> points over
+    /// <paramref name="window"/> for <paramref name="runs"/> consecutive weekly track-record runs
+    /// (fs-699). One open alert per (scope, key): later runs bump it rather than stacking.
+    /// </summary>
+    Task GenerateRelativeUnderperformanceAlertAsync(
+        Guid userId,
+        string scope,
+        string scopeKey,
+        string label,
+        string window,
+        string benchmarkTicker,
+        decimal excessReturnPct,
+        int runs,
+        decimal thresholdPct,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the relative-underperformance Alert once the scope stops trailing its benchmark.</summary>
+    Task ResolveRelativeUnderperformanceAlertAsync(
+        Guid userId,
+        string scope,
+        string scopeKey,
+        CancellationToken ct = default);
 }
 
 /// <summary>

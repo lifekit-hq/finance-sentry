@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 public class ThesesController(
     IQueryHandler<GetThesesQuery, IReadOnlyList<ThesisDto>> getTheses,
     IQueryHandler<GetThesisEvaluabilityQuery, IReadOnlyList<ThesisEvaluabilityReport>> getEvaluability,
+    IQueryHandler<GetBenchmarkTrackRecordQuery, BenchmarkTrackRecordDto> getBenchmarkTrackRecord,
     ICommandHandler<SaveThesisCommand, ThesisDto> saveThesis,
     ICommandHandler<DeleteThesisCommand, bool> deleteThesis) : ControllerBase
 {
@@ -29,6 +30,19 @@ public class ThesesController(
     {
         var report = await getEvaluability.Handle(new GetThesisEvaluabilityQuery(User.RequireUserId()), ct);
         return Ok(report);
+    }
+
+    /// <summary>
+    /// Stored benchmark-relative track record (fs-699) at book, sleeve and thesis level over
+    /// 1M / 3M / 1Y / since-inception windows — read from the weekly materialized run, never recomputed.
+    /// </summary>
+    [HttpGet("track-record")]
+    public async Task<IActionResult> BenchmarkTrackRecord(
+        [FromQuery] string? scope, [FromQuery] string? window, [FromQuery] string? ticker, CancellationToken ct)
+    {
+        var result = await getBenchmarkTrackRecord.Handle(
+            new GetBenchmarkTrackRecordQuery(User.RequireUserId(), scope, window, ticker), ct);
+        return Ok(result);
     }
 
     [HttpPost]
