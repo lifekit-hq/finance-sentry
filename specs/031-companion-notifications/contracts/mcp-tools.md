@@ -65,6 +65,6 @@ Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configur
 
 No secrets, no full detail — the agent resolves specifics via the tools above using its own authenticated identity (FR-016). A missing URL ⇒ no push; the agent pulls instead.
 
-Owner-only: the agent runtime serves the owner account (Identity `Owner` role, see `IOwnerAccountReader`) only. Events (and digest wakes) for any other user are never posted — the dispatch job marks those events `SuppressedNonOwner` (terminal) so they leave the realtime batch.
+AI-permission-gated: the agent runtime serves only accounts holding `ai.use` (Owner role or a per-person grant; checked via `IUserAuthorizationChecker`). Events (and digest wakes) for any other user are never posted — the dispatch job marks those events `SuppressedNonOwner` (terminal) so they leave the realtime batch.
 
 Materiality note: `SyncFailure` is held for the digest in every mode except quiet unless the referenced bank account has had no successful sync for more than 24h (`MaterialityPolicy.SyncFailureEscalationAge`), in which case the mode disposition applies. Provider-level sync failures with no account reference are always held.

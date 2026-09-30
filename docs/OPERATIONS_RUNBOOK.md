@@ -43,8 +43,8 @@
 **Symptoms:** Recurring jobs not appearing in Hangfire Dashboard
 
 **Dashboard access:** in every environment (Development included) the dashboard serves only a signed-in account holding the
-`Owner` Identity role (policy `RequireOwner`); anyone else gets 401 (not signed in) or 403 (signed in,
-not the owner) — there is no read-only view. To open it, sign in to the app, then go to `/hangfire` on
+`ops.admin` permission (Owner role; policy `RequireOwner`); anyone else gets 401 (not signed in) or 403 (signed in,
+without it) — there is no read-only view. To open it, sign in to the app, then go to `/hangfire` on
 the same origin (`https://finance-sentry.<tailnet>.ts.net:4200/hangfire` or `:5001/hangfire`) — the
 access-token cookie is sent with the navigation. On a 401 after a long break, reload the app once to
 refresh the token and retry.

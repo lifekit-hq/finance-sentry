@@ -78,7 +78,7 @@ public sealed class AgentChatController(
             : Ok(conversation);
     }
 
-    /// <summary>Delete a conversation (cascade messages). Owner-only.</summary>
+    /// <summary>Delete a conversation (cascade messages). Requires <c>ai.use</c>.</summary>
     [HttpDelete("conversations/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
