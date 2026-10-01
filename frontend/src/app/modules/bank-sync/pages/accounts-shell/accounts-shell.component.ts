@@ -34,8 +34,9 @@ interface AccountsTab {
           <a
             [routerLink]="tab.route"
             [routerLinkActiveOptions]="{exact: false}"
-            routerLinkActive="text-text-primary border-accent-default"
-            class="border-b-2 border-transparent px-cmn-4 py-cmn-2 text-cmn-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
+            routerLinkActive
+            ariaCurrentWhenActive="page"
+            class="border-b-2 border-transparent px-cmn-4 py-cmn-2 text-cmn-sm font-medium text-text-secondary transition-colors hover:text-text-primary aria-[current=page]:border-accent-default aria-[current=page]:text-text-primary"
             role="tab"
           >
             {{ tab.label }}
