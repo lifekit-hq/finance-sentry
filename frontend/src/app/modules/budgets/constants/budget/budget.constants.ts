@@ -1,3 +1,2 @@
-const MONTHS_IN_YEAR = 12;
-
-export const BUDGETS_MONTHS_IN_YEAR = MONTHS_IN_YEAR;
+export const BUDGET_NEAR_LIMIT_PCT = 80;
+export const MIN_BUDGET_LIMIT = 0.01;

@@ -21,9 +21,11 @@ export function budgetsComputed(store: StateSignals) {
       const spent = store.summaryItems().reduce((s, b) => s + b.spent, 0);
       return total > 0 ? Math.min((spent / total) * PCT_MAX, PCT_MAX) : 0;
     }),
-    periodLabel: computed(() => {
-      const date = new Date(store.selectedYear(), store.selectedMonth() - 1, 1);
-      return date.toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
-    }),
+    selectedMonthDate: computed(() => new Date(store.selectedYear(), store.selectedMonth() - 1, 1)),
+    monthName: computed(() =>
+      new Date(store.selectedYear(), store.selectedMonth() - 1, 1).toLocaleDateString('en-US', {
+        month: 'long',
+      })
+    ),
   };
 }

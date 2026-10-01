@@ -1,0 +1,23 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-3">
+  <div>
+    <label
+      for="budget-category"
+      class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Category
+    </label>
+    <cmn-select
+      [options]="categoryOptions()"
+      formControlName="category"
+      id="budget-category"
+      placeholder="Select category…"
+    />
+  </div>
+  <cmn-form-field [control]="form.controls.monthlyLimit" label="Monthly limit">
+    <cmn-input formControlName="monthlyLimit" type="number" placeholder="0.00" />
+  </cmn-form-field>
+  <cmn-dialog-actions align="end">
+    <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+    <cmn-button type="submit" variant="primary">Add budget</cmn-button>
+  </cmn-dialog-actions>
+</form>
