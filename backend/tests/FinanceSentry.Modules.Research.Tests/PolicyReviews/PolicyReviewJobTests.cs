@@ -18,7 +18,7 @@ public class PolicyReviewJobTests
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([a, b]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([a, b]);
         _handler.Setup(h => h.Handle(It.IsAny<RunPolicyReviewCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PolicyReviewRunResult(PolicyReviewRunOutcome.NotDue, null, null, 0));
 
@@ -33,7 +33,7 @@ public class PolicyReviewJobTests
     {
         var failing = Guid.NewGuid();
         var next = Guid.NewGuid();
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([failing, next]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([failing, next]);
         _handler.Setup(h => h.Handle(new RunPolicyReviewCommand(failing), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
         _handler.Setup(h => h.Handle(new RunPolicyReviewCommand(next), It.IsAny<CancellationToken>()))
@@ -47,7 +47,7 @@ public class PolicyReviewJobTests
     [Fact]
     public async Task No_policy_statements_means_no_reviews()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         await Job().ExecuteAsync();
 

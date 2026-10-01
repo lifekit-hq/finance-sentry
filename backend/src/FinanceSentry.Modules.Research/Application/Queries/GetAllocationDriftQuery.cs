@@ -24,7 +24,7 @@ public class GetAllocationDriftQueryHandler(
 
     public async Task<AllocationDriftDto> Handle(GetAllocationDriftQuery query, CancellationToken ct)
     {
-        var ips = await ipsRepo.GetCurrentAsync(query.UserId, ct);
+        var ips = await ipsRepo.GetCurrentUnscopedAsync(query.UserId, ct);
         var book = await bookFigures.ReadAsync(query.UserId, ct);
 
         var byClass = new Dictionary<string, decimal>(StringComparer.Ordinal);

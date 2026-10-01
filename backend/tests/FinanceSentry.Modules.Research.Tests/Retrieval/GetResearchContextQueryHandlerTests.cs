@@ -159,7 +159,10 @@ internal sealed class FakeThesisRepository : IThesisRepository
     public Task<IReadOnlyList<InvestmentThesis>> ListAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<InvestmentThesis>>(Theses.Where(t => t.UserId == userId).ToList());
 
-    public Task<IReadOnlyList<Guid>> GetUserIdsWithThesesAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<InvestmentThesis>> ListUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => ListAsync(userId, ct);
+
+    public Task<IReadOnlyList<Guid>> GetUserIdsWithThesesUnscopedAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Guid>>(Theses.Select(t => t.UserId).Distinct().ToList());
 
     public Task<InvestmentThesis?> FindAsync(Guid userId, Guid id, CancellationToken ct = default)

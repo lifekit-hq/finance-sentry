@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -27,6 +28,6 @@ public class ResearchDbContextFactory : IDesignTimeDbContextFactory<ResearchDbCo
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history_research", "public");
             });
 
-        return new ResearchDbContext(optionsBuilder.Options);
+        return new ResearchDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

@@ -1,14 +1,19 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence;
 
 using System.Text.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : DbContext(options)
+public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no
+    // per-user row.
+    private Guid? CurrentUserId => currentUser.UserId;
+
     public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
 
     public DbSet<InvestmentThesis> Theses { get; set; } = null!;
@@ -60,6 +65,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var wb = modelBuilder.Entity<WatchlistItem>();
         wb.ToTable("watchlist_items");
         wb.HasKey(x => x.Id);
+        wb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         wb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         wb.Property(x => x.UserId).IsRequired();
         wb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
@@ -71,6 +77,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var tb = modelBuilder.Entity<InvestmentThesis>();
         tb.ToTable("theses");
         tb.HasKey(x => x.Id);
+        tb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         tb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         tb.Property(x => x.UserId).IsRequired();
         tb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
@@ -157,6 +164,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var ib = modelBuilder.Entity<InvestmentPolicyStatement>();
         ib.ToTable("investment_policy_statements");
         ib.HasKey(x => x.Id);
+        ib.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         ib.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ib.Property(x => x.UserId).IsRequired();
         ib.Property(x => x.Version).IsRequired();
@@ -201,6 +209,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var prb = modelBuilder.Entity<PolicyReview>();
         prb.ToTable("policy_reviews");
         prb.HasKey(x => x.Id);
+        prb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         prb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         prb.Property(x => x.UserId).IsRequired();
         prb.Property(x => x.PolicyStatementId).IsRequired();
@@ -223,6 +232,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var teb = modelBuilder.Entity<ThesisEvent>();
         teb.ToTable("thesis_events");
         teb.HasKey(x => x.Id);
+        teb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         teb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         teb.Property(x => x.UserId).IsRequired();
         teb.Property(x => x.SubjectType).IsRequired().HasConversion<string>().HasMaxLength(20);
@@ -245,6 +255,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var ocb = modelBuilder.Entity<OpportunityCandidate>();
         ocb.ToTable("opportunity_candidates");
         ocb.HasKey(x => x.Id);
+        ocb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         ocb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ocb.Property(x => x.UserId).IsRequired();
         ocb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
@@ -343,6 +354,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var brb = modelBuilder.Entity<BenchmarkRelativeRecord>();
         brb.ToTable("benchmark_relative_records");
         brb.HasKey(x => x.Id);
+        brb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         brb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         brb.Property(x => x.UserId).IsRequired();
         brb.Property(x => x.Scope).IsRequired().HasConversion<string>().HasMaxLength(20);
@@ -402,6 +414,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var rdb = modelBuilder.Entity<ResearchDocument>();
         rdb.ToTable("research_documents");
         rdb.HasKey(x => x.Id);
+        // A null UserId is the shared corpus (news), readable by every person; an owned document only by its owner.
+        rdb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == null || x.UserId == CurrentUserId);
         rdb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         rdb.Property(x => x.SourceType).IsRequired().HasConversion<string>().HasMaxLength(40);
         rdb.Property(x => x.SourceId).IsRequired().HasMaxLength(80);
@@ -459,6 +473,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options) : Db
         var alr = modelBuilder.Entity<AssetLedgerRead>();
         alr.ToTable("asset_ledger_reads");
         alr.HasKey(x => x.Id);
+        alr.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         alr.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         alr.Property(x => x.UserId).IsRequired();
         alr.Property(x => x.Symbol).IsRequired().HasMaxLength(20);

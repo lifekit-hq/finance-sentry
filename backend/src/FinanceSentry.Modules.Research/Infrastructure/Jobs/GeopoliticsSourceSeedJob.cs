@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
@@ -41,6 +42,7 @@ public sealed class GeopoliticsSourceSeedJob(
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var theses = await research.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(t => new { t.Id, t.Ticker, t.ThesisText })
             .ToListAsync(ct);
 

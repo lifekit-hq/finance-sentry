@@ -25,7 +25,7 @@ public class BenchmarkTrackRecordMaterializerTests
 
     public BenchmarkTrackRecordMaterializerTests()
     {
-        events.Setup(r => r.ListAsync(UserId, null, It.IsAny<CancellationToken>())).ReturnsAsync(() => series);
+        events.Setup(r => r.ListUnscopedAsync(UserId, null, It.IsAny<CancellationToken>())).ReturnsAsync(() => series);
         bookFigures.Setup(b => b.ReadAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(Figures());
         brokerage.Setup(b => b.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
     }
@@ -237,7 +237,7 @@ public class BenchmarkTrackRecordMaterializerTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<BenchmarkRelativeRecord>> ListPreviousRunAsync(
+        public Task<IReadOnlyList<BenchmarkRelativeRecord>> ListPreviousRunUnscopedAsync(
             Guid userId, DateTimeOffset asOf, CancellationToken ct = default)
             => Task.FromResult(Runs.LastOrDefault(r => r.Key < asOf).Value ?? []);
 

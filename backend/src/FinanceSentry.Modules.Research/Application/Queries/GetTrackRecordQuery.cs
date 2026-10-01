@@ -35,8 +35,8 @@ public class GetTrackRecordQueryHandler(
 
     public async Task<TrackRecordSummaryDto> Handle(GetTrackRecordQuery query, CancellationToken ct)
     {
-        var theses = await thesisRepo.ListAsync(query.UserId, ct);
-        var allEvents = await eventRepo.ListAsync(query.UserId, subjectId: null, ct);
+        var theses = await thesisRepo.ListUnscopedAsync(query.UserId, ct);
+        var allEvents = await eventRepo.ListUnscopedAsync(query.UserId, subjectId: null, ct);
         var eventsBySubject = allEvents
             .GroupBy(e => e.SubjectId)
             .ToDictionary(g => g.Key, g => g.ToList());

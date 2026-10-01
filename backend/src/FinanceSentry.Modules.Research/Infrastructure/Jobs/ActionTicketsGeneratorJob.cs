@@ -25,7 +25,7 @@ public sealed class ActionTicketsGeneratorJob(
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var userIds = await ipsRepo.GetUserIdsWithCurrentIpsAsync(ct);
+        var userIds = await ipsRepo.GetUserIdsWithCurrentIpsUnscopedAsync(ct);
 
         if (userIds.Count == 0)
         {

@@ -26,5 +26,5 @@ public sealed class AllocationDriftReader(
     }
 
     public Task<IReadOnlyList<Guid>> ListUserIdsWithCurrentIpsAsync(CancellationToken ct = default)
-        => ipsRepo.GetUserIdsWithCurrentIpsAsync(ct);
+        => ipsRepo.GetUserIdsWithCurrentIpsUnscopedAsync(ct);
 }

@@ -84,7 +84,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
         _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
         _crypto.Setup(c => c.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
         _analystActions.Setup(a => a.GetNewSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<int>(), default))
             .ReturnsAsync([]);
@@ -101,7 +101,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     [DockerRequiredFact]
     public async Task AcnEarnings_ThesisName_RunsFromDetectorToRecordedVerdict()
     {
-        _theses.Setup(t => t.ListAsync(_userId, default))
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default))
             .ReturnsAsync([new InvestmentThesis { UserId = _userId, Ticker = "ACN" }]);
 
         await RunEarningsAheadAsync(AcnWindowRunUtc);

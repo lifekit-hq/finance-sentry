@@ -43,7 +43,7 @@ public sealed class LookaheadSilenceMonitorJobTests
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("RDDT", "STK", 10m, 1500m, DateTime.UtcNow, "IBKR")]);
         _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
         _crypto.Setup(c => c.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
 
         // Both detectors scheduled well over a threshold ago.
@@ -138,7 +138,7 @@ public sealed class LookaheadSilenceMonitorJobTests
     public async Task Execute_CountsEachDetectorsOwnInputs()
     {
         // Thesis names feed both detectors; a proxy ticker feeds only the filing detector.
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis
             {
                 UserId = _userId,

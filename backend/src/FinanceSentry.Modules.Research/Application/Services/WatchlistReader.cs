@@ -8,7 +8,7 @@ public sealed class WatchlistReader(IWatchlistRepository watchlist) : IWatchlist
 {
     public async Task<IReadOnlyList<string>> ListTickersAsync(Guid userId, CancellationToken ct = default)
     {
-        var items = await watchlist.ListAsync(userId, ct);
+        var items = await watchlist.ListUnscopedAsync(userId, ct);
         return items
             .Select(i => i.Ticker.Trim().ToUpperInvariant())
             .Where(t => t.Length > 0)

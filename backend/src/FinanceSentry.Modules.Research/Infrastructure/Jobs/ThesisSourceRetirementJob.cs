@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -59,6 +60,7 @@ public sealed class ThesisSourceRetirementJob(
 
         var thesisIds = candidates.Select(s => s.ThesisId!.Value).Distinct().ToList();
         var expectedUrls = await research.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(t => thesisIds.Contains(t.Id))
             .Select(t => new { t.Id, t.Ticker, t.ThesisText })
             .ToDictionaryAsync(

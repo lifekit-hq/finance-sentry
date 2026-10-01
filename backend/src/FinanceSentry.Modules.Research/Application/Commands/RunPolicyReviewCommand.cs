@@ -54,7 +54,7 @@ public class RunPolicyReviewCommandHandler(
 
     public async Task<PolicyReviewRunResult> Handle(RunPolicyReviewCommand cmd, CancellationToken ct)
     {
-        var versions = await ipsRepo.ListVersionsAsync(cmd.UserId, ct);
+        var versions = await ipsRepo.ListVersionsUnscopedAsync(cmd.UserId, ct);
         var ips = versions.FirstOrDefault(v => v.IsCurrent);
         if (ips is null)
             return new PolicyReviewRunResult(PolicyReviewRunOutcome.NoPolicy, null, null, 0);

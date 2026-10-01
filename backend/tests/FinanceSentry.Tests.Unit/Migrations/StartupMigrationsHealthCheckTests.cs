@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Migrations;
 
 using FinanceSentry.API.Migrations;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 using FluentAssertions;
@@ -65,6 +66,7 @@ public sealed class StartupMigrationsHealthCheckTests
     private static IServiceScopeFactory BuildScopeFactory()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<ICurrentUser>(NoCurrentUser.Instance);
         services.AddDbContext<ResearchDbContext>(o => o.UseNpgsql(UnreachableDatabase));
         services.AddDbContext<RiskDbContext>(o => o.UseNpgsql(UnreachableDatabase));
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();

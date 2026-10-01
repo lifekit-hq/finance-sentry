@@ -8,12 +8,13 @@ using Microsoft.Extensions.Options;
 
 internal static class RetrievalTestContext
 {
-    public static ResearchDbContext CreateDb()
+    /// <summary>A throwaway in-memory context acting as <paramref name="actingUser"/> (null: no person, as a job).</summary>
+    public static ResearchDbContext CreateDb(Guid? actingUser = null)
     {
         var options = new DbContextOptionsBuilder<ResearchDbContext>()
             .UseInMemoryDatabase($"retrieval-{Guid.NewGuid():N}")
             .Options;
-        return new ResearchDbContext(options);
+        return new ResearchDbContext(options, new FixedCurrentUser(actingUser));
     }
 
     public static IOptions<ResearchRetrievalOptions> CreateOptions(

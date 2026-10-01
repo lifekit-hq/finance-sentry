@@ -294,7 +294,13 @@ public class RiskRemeasurementTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<Guid>> GetUserIdsWithCurrentIpsAsync(CancellationToken ct = default)
+        public Task<InvestmentPolicyStatement?> GetCurrentUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetCurrentAsync(userId, ct);
+
+        public Task<IReadOnlyList<InvestmentPolicyStatement>> ListVersionsUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => ListVersionsAsync(userId, ct);
+
+        public Task<IReadOnlyList<Guid>> GetUserIdsWithCurrentIpsUnscopedAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Guid>>(Versions.Where(v => v.IsCurrent).Select(v => v.UserId).Distinct().ToList());
     }
 }

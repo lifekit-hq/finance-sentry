@@ -18,7 +18,7 @@ public sealed class ThesisMonitorJob(
     [AutomaticRetry(Attempts = 2)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var userIds = await thesisRepo.GetUserIdsWithThesesAsync(ct);
+        var userIds = await thesisRepo.GetUserIdsWithThesesUnscopedAsync(ct);
 
         foreach (var userId in userIds)
         {

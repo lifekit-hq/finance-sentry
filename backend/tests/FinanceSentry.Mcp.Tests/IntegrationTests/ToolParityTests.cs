@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Tools;
@@ -1677,7 +1678,8 @@ public sealed class ToolParityTests
         return string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
     }
 
-    // Seeds or inspects another user's data by constructing the tool for that user directly.
+    // Seeds another user's data by constructing the tool for that user directly. Reads stay scoped to the
+    // provider's acting user, because the ResearchDbContext is filtered to it.
     private static T ActingAs<T>(IServiceProvider services, Guid userId)
         where T : notnull
         => ActivatorUtilities.CreateInstance<T>(services, new FakeIdentityResolver { ResolvedUserId = userId });
@@ -1740,8 +1742,12 @@ public sealed class ToolParityTests
         var text = await CallToolAsync(svc, "delete_thesis", new { id = otherThesis!.Id, userId = otherUserId });
 
         text.Should().Be("false");
-        (await ActingAs<ListThesesTool>(svc, otherUserId).ExecuteAsync())
-            .Should().ContainSingle(t => t.Id == otherThesis.Id);
+        // The scope's ResearchDbContext acts for the caller, so the Owner filter hides the other
+        // user's rows from any tool here; read past it to prove the row survived.
+        (await svc.GetRequiredService<ResearchDbContext>().Theses
+                .IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .AnyAsync(t => t.Id == otherThesis.Id))
+            .Should().BeTrue();
     }
 
     // ── Research retrieval (036) ─────────────────────────────────────────────

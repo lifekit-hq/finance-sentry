@@ -29,9 +29,7 @@ public sealed class ThesisTextColumnLimitTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .Build();
+        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _postgres.StartAsync();
     }
 
@@ -41,10 +39,11 @@ public sealed class ThesisTextColumnLimitTests : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 
-    private ResearchDbContext CreateContext() =>
+    // Null acting user is no person in scope, as in a job.
+    private ResearchDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<ResearchDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options);
+            .Options, new FixedCurrentUser(actingUser));
 
     [DockerRequiredFact]
     public async Task ThesisText_At4000CharLimit_RoundTripsWithoutTruncation()
@@ -64,7 +63,7 @@ public sealed class ThesisTextColumnLimitTests : IAsyncLifetime
         ctx.Theses.Add(thesis);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = CreateContext();
+        await using var readCtx = CreateContext(userId);
         var loaded = await readCtx.Theses
             .AsNoTracking()
             .SingleAsync(t => t.Id == thesis.Id);
@@ -94,7 +93,7 @@ public sealed class ThesisTextColumnLimitTests : IAsyncLifetime
         ctx.Theses.Add(thesis);
         await ctx.SaveChangesAsync();
 
-        await using var readCtx = CreateContext();
+        await using var readCtx = CreateContext(userId);
         var loaded = await readCtx.Theses
             .AsNoTracking()
             .SingleAsync(t => t.Id == thesis.Id);

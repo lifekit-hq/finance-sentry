@@ -8,7 +8,7 @@ public sealed class BrokenThesisReader(IThesisRepository theses) : IBrokenThesis
 {
     public async Task<IReadOnlyList<BrokenThesisSummary>> ListBrokenAsync(Guid userId, CancellationToken ct = default)
     {
-        var all = await theses.ListAsync(userId, ct);
+        var all = await theses.ListUnscopedAsync(userId, ct);
         return all
             .Where(t => t.BrokenAt is not null)
             .Select(t => new BrokenThesisSummary(t.Id, t.Ticker.Trim().ToUpperInvariant(), t.BrokenAt!.Value))

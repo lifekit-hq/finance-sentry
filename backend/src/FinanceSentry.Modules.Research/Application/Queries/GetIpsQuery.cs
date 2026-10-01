@@ -10,7 +10,7 @@ public class GetIpsQueryHandler(IIpsRepository repo) : IQueryHandler<GetIpsQuery
 {
     public async Task<IpsDto?> Handle(GetIpsQuery query, CancellationToken ct)
     {
-        var ips = await repo.GetCurrentAsync(query.UserId, ct);
+        var ips = await repo.GetCurrentUnscopedAsync(query.UserId, ct);
         if (ips is null)
         {
             return null;

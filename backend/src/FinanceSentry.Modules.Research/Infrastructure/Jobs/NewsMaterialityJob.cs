@@ -87,7 +87,7 @@ public sealed class NewsMaterialityJob(
             }
         }
 
-        foreach (var thesis in await theses.ListAsync(userId, ct))
+        foreach (var thesis in await theses.ListUnscopedAsync(userId, ct))
         {
             AddThesisTicker(tickerThesisIds, thesis.Ticker, thesis.Id);
             foreach (var trigger in thesis.InvalidationTriggers)

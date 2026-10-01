@@ -105,7 +105,7 @@ public class ResearchRetrieverTests
     [Fact]
     public async Task Search_ReturnsOwnPrivateDocuments_ToOwner()
     {
-        using var db = RetrievalTestContext.CreateDb();
+        using var db = RetrievalTestContext.CreateDb(UserA);
         var privateNote = RetrievalTestContext.CreateDocument(
             "MU private thesis note", "My private conviction notes about memory pricing.",
             userId: UserA, sourceType: ResearchDocumentSourceType.InvestmentThesis);

@@ -33,7 +33,7 @@ public sealed class LookaheadUniverse(
             .Select(h => h.Asset)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var thesis in await theses.ListAsync(userId, ct))
+        foreach (var thesis in await theses.ListUnscopedAsync(userId, ct))
         {
             if (!string.IsNullOrWhiteSpace(thesis.Ticker) && !cryptoAssets.Contains(thesis.Ticker))
             {
@@ -49,7 +49,7 @@ public sealed class LookaheadUniverse(
     {
         var tickers = await EquityHoldingsAsync(userId, ct);
 
-        foreach (var thesis in await theses.ListAsync(userId, ct))
+        foreach (var thesis in await theses.ListUnscopedAsync(userId, ct))
         {
             if (!string.IsNullOrWhiteSpace(thesis.Ticker))
             {

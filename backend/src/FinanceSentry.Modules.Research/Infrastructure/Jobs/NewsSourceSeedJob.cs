@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -127,6 +128,7 @@ public sealed class NewsSourceSeedJob(
     private async Task<Guid?> FindDramThesisIdAsync(CancellationToken ct)
     {
         var byTicker = await research.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(t => t.Ticker == "DRAM")
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync(ct);
@@ -137,6 +139,7 @@ public sealed class NewsSourceSeedJob(
 
         // Fall back to a text match (theses are few) so a DRAM thesis filed under a proxy ticker still binds.
         var candidates = await research.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(t => new { t.Id, t.ThesisText })
             .ToListAsync(ct);
         return candidates

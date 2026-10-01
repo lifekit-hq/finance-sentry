@@ -25,9 +25,7 @@ public sealed class BenchmarkRelativeRecordRepositoryTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .Build();
+        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _postgres.StartAsync();
     }
 
@@ -37,10 +35,11 @@ public sealed class BenchmarkRelativeRecordRepositoryTests : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 
-    private ResearchDbContext CreateContext() =>
+    // Null acting user is no person in scope, as in a job.
+    private ResearchDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<ResearchDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options);
+            .Options, new FixedCurrentUser(actingUser));
 
     private static BenchmarkRelativeRecord Book(Guid userId, DateTimeOffset asOf, decimal excess) => new()
     {
@@ -78,14 +77,14 @@ public sealed class BenchmarkRelativeRecordRepositoryTests : IAsyncLifetime
             await repo.ReplaceRunAsync(userId, NextMonday, [Book(userId, NextMonday, -8.1234m)]);
         }
 
-        await using (var ctx = CreateContext())
+        await using (var ctx = CreateContext(userId))
         {
             var repo = new BenchmarkRelativeRecordRepository(ctx);
 
             var latest = await repo.ListLatestRunAsync(userId);
             latest.Should().ContainSingle().Which.ExcessReturnPct.Should().Be(-8.1234m);
 
-            var previous = await repo.ListPreviousRunAsync(userId, NextMonday);
+            var previous = await repo.ListPreviousRunUnscopedAsync(userId, NextMonday);
             previous.Should().ContainSingle().Which.AsOf.Should().Be(Monday);
 
             (await repo.ListLatestRunAsync(Guid.NewGuid())).Should().BeEmpty();

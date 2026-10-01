@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Tests.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
@@ -61,15 +62,16 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
         return fixture;
     }
 
-    public ThesisOnlySqliteContext CreateContext() =>
+    /// <summary>A context acting as <paramref name="actingUser"/>; null is no person in scope, as in a job.</summary>
+    public ThesisOnlySqliteContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<ResearchDbContext>()
             .UseSqlite(this.connection)
-            .Options);
+            .Options, new FixedCurrentUser(actingUser));
 
     public async ValueTask DisposeAsync() => await this.connection.DisposeAsync();
 
-    public sealed class ThesisOnlySqliteContext(DbContextOptions<ResearchDbContext> options)
-        : ResearchDbContext(options)
+    public sealed class ThesisOnlySqliteContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser)
+        : ResearchDbContext(options, currentUser)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

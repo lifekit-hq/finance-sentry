@@ -39,7 +39,7 @@ public sealed class EarningsAheadJobTests
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _watchlist.Setup(w => w.ListTickersAsync(_userId, default)).ReturnsAsync([]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
         _crypto.Setup(c => c.GetHoldingsAsync(It.IsAny<Guid>(), default)).ReturnsAsync([]);
     }
 
@@ -50,7 +50,7 @@ public sealed class EarningsAheadJobTests
         // inside the 3-day window on the 2026-09-28 run but was never looked up.
         var now = new DateTime(2026, 9, 28, 6, 0, 0, DateTimeKind.Utc);
         var eventDate = new DateOnly(2026, 10, 1);
-        _theses.Setup(t => t.ListAsync(_userId, default))
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default))
             .ReturnsAsync([new InvestmentThesis { UserId = _userId, Ticker = "ACN" }]);
         _earningsCalendar.Setup(e => e.GetForTickersAsync(
                 It.Is<IReadOnlyCollection<string>>(t => t.Contains("ACN")),
@@ -67,7 +67,7 @@ public sealed class EarningsAheadJobTests
     public async Task Execute_ThesisTickerNamingAHeldCryptoAsset_IsNotLookedUp()
     {
         // A bare crypto symbol resolves to an unrelated listed name on the calendar feed.
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis { UserId = _userId, Ticker = "SOL" },
             new InvestmentThesis { UserId = _userId, Ticker = "ACN" },
         ]);

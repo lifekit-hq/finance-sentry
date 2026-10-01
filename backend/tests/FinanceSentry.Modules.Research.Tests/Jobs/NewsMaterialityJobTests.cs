@@ -44,7 +44,7 @@ public sealed class NewsMaterialityJobTests
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _materialityTerms.Setup(m => m.ListEnabledTermsAsync(default)).ReturnsAsync(DefaultTerms);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
         _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
@@ -131,7 +131,7 @@ public sealed class NewsMaterialityJobTests
     private Guid SetupThesis(string ticker)
     {
         var thesisId = Guid.NewGuid();
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis { Id = thesisId, UserId = _userId, Ticker = ticker },
         ]);
         return thesisId;
@@ -173,7 +173,7 @@ public sealed class NewsMaterialityJobTests
     {
         var thesisId = Guid.NewGuid();
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis
             {
                 Id = thesisId,
@@ -248,7 +248,7 @@ public sealed class NewsMaterialityJobTests
     {
         var thesisId = Guid.NewGuid();
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis
             {
                 Id = thesisId,
@@ -308,7 +308,7 @@ public sealed class NewsMaterialityJobTests
             .ThrowsAsync(new InvalidOperationException("simulated error"));
         _brokerage.Setup(b => b.GetHoldingsAsync(userId2, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        _theses.Setup(t => t.ListAsync(userId2, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(userId2, default)).ReturnsAsync([]);
         _news.Setup(n => n.GetForTickerAsync("AAPL", It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
             .ReturnsAsync([Article("src:Reuters", "AAPL headline one"), Article("src:Bloomberg", "AAPL headline two")]);
 

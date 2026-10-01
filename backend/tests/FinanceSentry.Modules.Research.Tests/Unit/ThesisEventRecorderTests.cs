@@ -14,8 +14,8 @@ public class ThesisEventRecorderTests
     public async Task RecordAsync_NeverThrows_AndMarksPricesPending_WhenMarketDataServiceThrows()
     {
         var repo = new Mock<IThesisEventRepository>();
-        repo.Setup(r => r.GetLatestForSubjectAsync(
-                It.IsAny<ThesisSubjectType>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLatestForSubjectUnscopedAsync(
+                It.IsAny<Guid>(), It.IsAny<ThesisSubjectType>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ThesisEvent?)null);
 
         ThesisEvent? appended = null;
@@ -45,8 +45,8 @@ public class ThesisEventRecorderTests
     public async Task RecordAsync_MarksPricesPending_WhenQuoteIsMissingFromResult()
     {
         var repo = new Mock<IThesisEventRepository>();
-        repo.Setup(r => r.GetLatestForSubjectAsync(
-                It.IsAny<ThesisSubjectType>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLatestForSubjectUnscopedAsync(
+                It.IsAny<Guid>(), It.IsAny<ThesisSubjectType>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ThesisEvent?)null);
 
         ThesisEvent? appended = null;
@@ -74,8 +74,8 @@ public class ThesisEventRecorderTests
         ThesisEvent? existingCreated = null;
 
         var repo = new Mock<IThesisEventRepository>();
-        repo.Setup(r => r.GetLatestForSubjectAsync(
-                ThesisSubjectType.Thesis, subjectId, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetLatestForSubjectUnscopedAsync(
+                It.IsAny<Guid>(), ThesisSubjectType.Thesis, subjectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => existingCreated);
 
         var appendCount = 0;
