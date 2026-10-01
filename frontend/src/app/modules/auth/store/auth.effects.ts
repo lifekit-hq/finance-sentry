@@ -5,7 +5,11 @@ import {catchError, EMPTY, filter, pipe, startWith, switchMap, tap} from 'rxjs';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {ErrorUtils} from '../../../shared/utils/error.utils';
-import {type AuthRequest, type AuthResponse} from '../models/auth/auth.model';
+import {
+  type AcceptInviteRequest,
+  type AuthRequest,
+  type AuthResponse,
+} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {type AuthFlow, type FlashMessage} from './auth.state';
 
@@ -49,14 +53,14 @@ export function authEffects(store: EffectsStore) {
         )
       )
     ),
-    register: rxMethod<AuthRequest>(
+    acceptInvite: rxMethod<AcceptInviteRequest>(
       pipe(
-        tap(() => store.setLoading('register')),
+        tap(() => store.setLoading('acceptInvite')),
         switchMap(req =>
-          authService.register(req).pipe(
+          authService.acceptInvite(req).pipe(
             tap(res => store.applyAuthResponse(res)),
             catchError((err: unknown) => {
-              store.setError(ErrorUtils.extractCode(err), 'register');
+              store.setError(ErrorUtils.extractCode(err), 'acceptInvite');
               return EMPTY;
             })
           )
@@ -107,8 +111,8 @@ export function authHooks(store: EffectsStore): void {
       const target = store.returnUrl() ?? AppRoute.Accounts;
       const currentPath = router.url.split('?')[0];
       const loginPath: string = AppRoute.Login;
-      const registerPath: string = AppRoute.Register;
-      if (currentPath === loginPath || currentPath === registerPath) {
+      const acceptInvitePath: string = AppRoute.AcceptInvite;
+      if (currentPath === loginPath || currentPath === acceptInvitePath) {
         void router.navigateByUrl(target);
       }
     });

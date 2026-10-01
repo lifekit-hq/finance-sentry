@@ -146,6 +146,12 @@ public class AuthApiFactory : WebApplicationFactory<Program>
                 .Setup(v => v.VerifyAsync("link-credential"))
                 .ReturnsAsync(new GoogleUserInfo("google-sub-link", "link@test.com", "Link User"));
             mockVerifier
+                .Setup(v => v.VerifyAsync("invited-credential"))
+                .ReturnsAsync(new GoogleUserInfo("google-sub-invited", "invited-google@test.com", "Invited User"));
+            mockVerifier
+                .Setup(v => v.VerifyAsync("revoked-credential"))
+                .ReturnsAsync(new GoogleUserInfo("google-sub-revoked", "revoked-google@test.com", "Revoked User"));
+            mockVerifier
                 .Setup(v => v.VerifyAsync("invalid-credential"))
                 .ThrowsAsync(new InvalidGoogleCredentialException());
             services.RemoveAll<IGoogleCredentialVerifier>();
@@ -180,6 +186,56 @@ public class AuthApiFactory : WebApplicationFactory<Program>
                     $"Failed to seed test user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
             TestUsers.GrantRole(scope.ServiceProvider, user.Id, AuthRoles.Member);
         }
+    }
+
+    /// <summary>
+    /// A pending invite as the People page creates it: a Member account with no password, and the one-time
+    /// password-reset token that serves as the invite.
+    /// </summary>
+    public async Task<(string UserId, string Token)> CreatePendingInviteAsync(string email)
+    {
+        using var scope = Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            user = new ApplicationUser { UserName = email, Email = email };
+            var result = await userManager.CreateAsync(user);
+            if (!result.Succeeded)
+                throw new InvalidOperationException(
+                    $"Failed to seed invited user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            TestUsers.GrantRole(scope.ServiceProvider, user.Id, AuthRoles.Member);
+        }
+
+        return (user.Id, await userManager.GeneratePasswordResetTokenAsync(user));
+    }
+
+    /// <summary>Signs in with a password and returns the access-token cookie value.</summary>
+    public async Task<string> SignInAsync(string email, string password)
+    {
+        using var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
+        if (login.StatusCode != HttpStatusCode.OK)
+            throw new InvalidOperationException($"Sign-in for {email} failed with {(int)login.StatusCode}.");
+
+        return CookieValue(login, "fs_access_token");
+    }
+
+    /// <summary>A client that sends the given cookies and keeps none of its own.</summary>
+    public HttpClient CookieClient(params (string Name, string Value)[] cookies)
+    {
+        var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        if (cookies.Length > 0)
+            client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}")));
+        return client;
+    }
+
+    public static string CookieValue(HttpResponseMessage response, string name)
+    {
+        var prefix = name + "=";
+        var cookie = response.Headers.GetValues("Set-Cookie").First(c => c.StartsWith(prefix, StringComparison.Ordinal));
+        return cookie[prefix.Length..].Split(';')[0];
     }
 
     protected static void ReplaceWithInMemory<TContext>(

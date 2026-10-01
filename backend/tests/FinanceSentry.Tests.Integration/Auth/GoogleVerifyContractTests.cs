@@ -10,8 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// REST API contract tests for POST /api/v1/auth/google/verify (T022).
-/// Validates response shapes and status codes per contracts/google-oauth.md.
+/// REST API contract tests for POST /api/v1/auth/google/verify: Google sign-in works for existing accounts only,
+/// resolved and linked through Identity's external-login table; it never creates an account.
 /// </summary>
 public class GoogleVerifyContractTests : IClassFixture<AuthApiFactory>
 {
@@ -30,6 +30,8 @@ public class GoogleVerifyContractTests : IClassFixture<AuthApiFactory>
     [Fact]
     public async Task GoogleVerify_ValidCredential_Returns200WithAuthResponseSchema()
     {
+        await _factory.EnsureUserExistsAsync("google@test.com", "TestPass123!");
+
         var response = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
             new { credential = "valid-test-credential" });
 
@@ -73,34 +75,33 @@ public class GoogleVerifyContractTests : IClassFixture<AuthApiFactory>
     }
 
     [Fact]
-    public async Task GoogleVerify_NewUser_Returns200AndCreatesUserInDb()
+    public async Task GoogleVerify_UnknownEmail_Returns403AndCreatesNoAccount()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
             new { credential = "new-user-credential" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadFromJsonAsync<AuthResponseShape>();
-        body.Should().NotBeNull();
-        body!.User.Id.Should().NotBeNullOrWhiteSpace();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
+        body!.ErrorCode.Should().Be("ACCOUNT_NOT_INVITED");
 
         using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var user = await userManager.FindByEmailAsync("newgoogle@test.com");
-        user.Should().NotBeNull("new user must be created in DB");
-        user!.GoogleId.Should().Be("google-sub-new");
+        (await userManager.FindByEmailAsync("newgoogle@test.com")).Should().BeNull("Google sign-in must not create accounts");
+        (await userManager.FindByLoginAsync("Google", "google-sub-new")).Should().BeNull();
     }
 
     [Fact]
     public async Task GoogleVerify_ExistingGoogleUser_Returns200WithSameUserId()
     {
-        // First call creates the user
+        await _factory.EnsureUserExistsAsync("google@test.com", "TestPass123!");
+
+        // First call links the Google account to the existing one
         var first = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
             new { credential = "valid-test-credential" });
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         var firstBody = await first.Content.ReadFromJsonAsync<AuthResponseShape>();
 
-        // Second call returns same user
+        // Second call resolves through the external login
         var second = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
             new { credential = "valid-test-credential" });
         second.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -110,7 +111,7 @@ public class GoogleVerifyContractTests : IClassFixture<AuthApiFactory>
     }
 
     [Fact]
-    public async Task GoogleVerify_EmailMatchesExistingAccount_Returns200AndLinksGoogleId()
+    public async Task GoogleVerify_EmailMatchesExistingAccount_Returns200AndLinksExternalLogin()
     {
         await _factory.EnsureUserExistsAsync("link@test.com", "TestPass123!");
 
@@ -122,8 +123,42 @@ public class GoogleVerifyContractTests : IClassFixture<AuthApiFactory>
         using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByEmailAsync("link@test.com");
-        user.Should().NotBeNull();
-        user!.GoogleId.Should().Be("google-sub-link", "GoogleId must be linked to existing account");
+        var linked = await userManager.FindByLoginAsync("Google", "google-sub-link");
+        linked.Should().NotBeNull("the Google account must be linked in the external-login table");
+        linked!.Id.Should().Be(user!.Id);
+        user.GoogleId.Should().BeNull("the legacy column is no longer written");
+    }
+
+    [Fact]
+    public async Task GoogleVerify_PendingInvite_Returns200AndActivatesTheInvitedAccount()
+    {
+        var (userId, _) = await _factory.CreatePendingInviteAsync("invited-google@test.com");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
+            new { credential = "invited-credential" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<AuthResponseShape>())!.User.Id.Should().Be(userId);
+    }
+
+    [Fact]
+    public async Task GoogleVerify_LockedOutAccount_Returns401AndLinksNothing()
+    {
+        await _factory.EnsureUserExistsAsync("revoked-google@test.com", "TestPass123!");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync("revoked-google@test.com");
+            await users.SetLockoutEndDateAsync(user!, DateTimeOffset.UtcNow.AddHours(1));
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/google/verify",
+            new { credential = "revoked-credential" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var check = _factory.Services.CreateScope();
+        (await check.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>()
+            .FindByLoginAsync("Google", "google-sub-revoked")).Should().BeNull();
     }
 
     private record UserShape(string Id, string Email);

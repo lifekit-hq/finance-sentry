@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Integration.Auth;
 using System.Security.Claims;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Domain.People;
 using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
@@ -17,7 +18,7 @@ using Xunit;
 /// The startup role seed (<see cref="RoleSeeder"/>): each role exists with exactly the permissions
 /// <see cref="Permissions.ByRole"/> gives it; the <see cref="AuthRoles.Owner"/> role goes to the account named
 /// by <c>Auth:OwnerEmail</c>, else the sole user while nobody holds it, never more; every other account
-/// without a role becomes a <see cref="AuthRoles.Member"/>; per-person grants are left alone.
+/// without a role becomes a <see cref="AuthRoles.Member"/>, except a revoked one; per-person grants are left alone.
 /// </summary>
 public sealed class RoleSeederTests : IAsyncDisposable
 {
@@ -129,6 +130,24 @@ public sealed class RoleSeederTests : IAsyncDisposable
 
         (await OwnersAsync()).Should().Equal("owner@test.com");
         (await MembersAsync()).Should().BeEquivalentTo("second@test.com", "third@test.com");
+    }
+
+    [Fact]
+    public async Task Seed_LeavesARevokedAccountWithoutARole()
+    {
+        await CreateUserAsync("owner@test.com");
+        await CreateUserAsync("revoked@test.com");
+        using (var scope = _services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync("revoked@test.com");
+            await users.SetLockoutEnabledAsync(user!, true);
+            await users.SetLockoutEndDateAsync(user!, PersonStatus.RevokedLockoutEnd);
+        }
+
+        await SeedAsync(ownerEmail: "owner@test.com");
+
+        (await MembersAsync()).Should().BeEmpty("a revoke removes the roles on purpose and a restart must not restore them");
     }
 
     [Fact]

@@ -1,0 +1,63 @@
+<div class="flex items-center justify-center min-h-screen bg-surface-bg p-cmn-4">
+  <div
+    class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[440px]"
+  >
+    <div class="mb-cmn-8">
+      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">
+        Accept your invite
+      </h1>
+      <p class="text-cmn-sm text-text-secondary">
+        Choose a password to finish setting up your account.
+      </p>
+    </div>
+
+    @if (!linkComplete) {
+      <cmn-alert variant="error" title="This invite link is incomplete" class="block mb-cmn-6">
+        Open the full link you were sent, or ask the account owner for a new one.
+      </cmn-alert>
+    } @else {
+      @if (errorMessage()) {
+        <cmn-alert variant="error" class="block mb-cmn-4">{{ errorMessage() }}</cmn-alert>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()">
+        <cmn-form-field
+          [control]="form.get('password')"
+          label="Password"
+          hint="At least 8 characters."
+          formControlName="password"
+          class="block mb-cmn-5"
+        >
+          <cmn-input type="password" autocomplete="new-password" />
+        </cmn-form-field>
+
+        <cmn-form-field
+          [control]="form.get('confirmPassword')"
+          label="Confirm password"
+          formControlName="confirmPassword"
+          class="block mb-cmn-6"
+        >
+          <cmn-input type="password" autocomplete="new-password" />
+        </cmn-form-field>
+
+        <cmn-button
+          [disabled]="loading() || form.invalid"
+          [loading]="loading()"
+          type="submit"
+          variant="primary"
+          class="block w-full mb-cmn-6"
+          >Set password</cmn-button
+        >
+      </form>
+    }
+
+    <p class="text-center text-cmn-sm text-text-secondary">
+      Already set up?
+      <a
+        [routerLink]="loginRoute"
+        class="text-accent-default no-underline font-medium hover:underline"
+        >Sign in</a
+      >
+    </p>
+  </div>
+</div>

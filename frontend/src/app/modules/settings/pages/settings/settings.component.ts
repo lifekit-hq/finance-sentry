@@ -1,5 +1,6 @@
 import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
 import {FormsModule} from '@angular/forms';
+import {Router} from '@angular/router';
 import {
   ButtonComponent,
   CmnDialogService,
@@ -13,6 +14,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -51,12 +53,14 @@ const MIN_PASSWORD_LENGTH = 8;
 export class SettingsComponent {
   private readonly authStore = inject(AuthStore);
   private readonly dialog = inject(CmnDialogService);
+  private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(SettingsStore);
   public readonly currencyOptions = CURRENCY_OPTIONS;
   public readonly themeOptions = THEME_OPTIONS;
+  public readonly canManageUsers = this.authStore.canManageUsers;
 
   public readonly pwCurrent = signal('');
   public readonly pwNext = signal('');
@@ -101,6 +105,10 @@ export class SettingsComponent {
     this.pwNext.set('');
     this.pwConfirm.set('');
     this.toast.show('Password updated', 'success');
+  }
+
+  public openPeople(): void {
+    void this.router.navigateByUrl(AppRoute.SettingsPeople);
   }
 
   public signOut(): void {

@@ -5,6 +5,13 @@ export interface AuthRequest {
   password: string;
 }
 
+/** Body of `auth/invite/accept`: the user id and one-time token from the invite link, plus the chosen password. */
+export interface AcceptInviteRequest {
+  userId: string;
+  token: string;
+  password: string;
+}
+
 export interface UserDto {
   id: string;
   email: string;

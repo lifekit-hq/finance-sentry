@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {NavigationEnd, Router} from '@angular/router';
@@ -30,7 +31,7 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
 function buildService() {
   return {
     login: vi.fn(),
-    register: vi.fn(),
+    acceptInvite: vi.fn(),
     verifyGoogleCredential: vi.fn(),
     logout: vi.fn().mockReturnValue(of(null)),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
@@ -110,19 +111,37 @@ describe('authEffects', () => {
     });
   });
 
-  describe('register', () => {
-    it('tags the flow as register on success and failure', () => {
+  describe('acceptInvite', () => {
+    const request = {userId: 'u-1', token: 'one-time-token', password: 'quiet lantern orchard'};
+
+    it('tags the flow and applies the response on success', () => {
       const store = buildStore();
       const service = buildService();
-      service.register.mockReturnValue(of(SAMPLE_RESPONSE));
+      service.acceptInvite.mockReturnValue(of(SAMPLE_RESPONSE));
       configure(service, buildRouter());
 
       TestBed.runInInjectionContext(() => {
-        authEffects(store).register({email: 'a@b.c', password: 'pw12345678'});
+        authEffects(store).acceptInvite(request);
       });
 
-      expect(store.setLoading).toHaveBeenCalledWith('register');
+      expect(service.acceptInvite).toHaveBeenCalledWith(request);
+      expect(store.setLoading).toHaveBeenCalledWith('acceptInvite');
       expect(store.applyAuthResponse).toHaveBeenCalledWith(SAMPLE_RESPONSE);
+    });
+
+    it('records the error code under the acceptInvite flow on failure', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.acceptInvite.mockReturnValue(
+        throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'INVALID_INVITE'}}))
+      );
+      configure(service, buildRouter());
+
+      TestBed.runInInjectionContext(() => {
+        authEffects(store).acceptInvite(request);
+      });
+
+      expect(store.setError).toHaveBeenCalledWith('INVALID_INVITE', 'acceptInvite');
     });
   });
 
@@ -248,6 +267,19 @@ describe('authHooks', () => {
   it('falls back to /accounts when returnUrl is null', () => {
     const store = buildStore({isAuthenticated: false, returnUrl: null});
     const router = buildRouter('/login');
+    configure(buildService(), router);
+
+    TestBed.runInInjectionContext(() => authHooks(store));
+
+    store.isAuthenticated.set(true);
+    TestBed.flushEffects();
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith(AppRoute.Accounts);
+  });
+
+  it('navigates away from the accept-invite page once signed in', () => {
+    const store = buildStore({isAuthenticated: false, returnUrl: null});
+    const router = buildRouter(`${AppRoute.AcceptInvite}?user=u-1&token=t`);
     configure(buildService(), router);
 
     TestBed.runInInjectionContext(() => authHooks(store));

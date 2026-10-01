@@ -80,6 +80,22 @@ describe('authComputed', () => {
     });
   });
 
+  describe('canManageUsers', () => {
+    it('is true when the users.manage permission is held', () => {
+      const store = build({permissions: ['users.manage']});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).canManageUsers()).toBe(true);
+      });
+    });
+
+    it('is false without the users.manage permission', () => {
+      const store = build({permissions: ['ai.use']});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).canManageUsers()).toBe(false);
+      });
+    });
+  });
+
   describe('errorMessage', () => {
     it('maps GOOGLE_ACCOUNT_ONLY to the google prompt', () => {
       const store = build({errorCode: 'GOOGLE_ACCOUNT_ONLY', flow: 'login'});
@@ -88,10 +104,19 @@ describe('authComputed', () => {
       });
     });
 
-    it('maps DUPLICATE_EMAIL regardless of flow', () => {
-      const store = build({errorCode: 'DUPLICATE_EMAIL', flow: 'register'});
+    it('maps INVALID_INVITE through the registry', () => {
+      const store = build({errorCode: 'INVALID_INVITE', flow: 'acceptInvite'});
       TestBed.runInInjectionContext(() => {
-        expect(authComputed(store).errorMessage()).toBe('Email is already registered.');
+        expect(authComputed(store).errorMessage()).toContain(
+          'invite link is invalid or has expired'
+        );
+      });
+    });
+
+    it('maps ACCOUNT_NOT_INVITED on the google flow', () => {
+      const store = build({errorCode: 'ACCOUNT_NOT_INVITED', flow: 'google'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).errorMessage()).toContain('Ask the owner for an invite');
       });
     });
 
@@ -102,8 +127,15 @@ describe('authComputed', () => {
       });
     });
 
-    it('returns empty string for unknown code on register flow', () => {
-      const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'register'});
+    it('returns the accept-invite fallback for unknown code on acceptInvite flow', () => {
+      const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'acceptInvite'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).errorMessage()).toContain('Could not set your password');
+      });
+    });
+
+    it('returns empty string for unknown code on google flow', () => {
+      const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'google'});
       TestBed.runInInjectionContext(() => {
         expect(authComputed(store).errorMessage()).toBe('');
       });

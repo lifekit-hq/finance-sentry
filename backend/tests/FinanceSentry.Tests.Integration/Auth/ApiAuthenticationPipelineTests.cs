@@ -42,12 +42,12 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         "GET /api/v1/auth/mcp/authorize",
         "GET /api/v1/auth/me",
         "POST /api/v1/auth/google/verify",
+        "POST /api/v1/auth/invite/accept",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/logout",
         "POST /api/v1/auth/mcp/revoke",
         "POST /api/v1/auth/mcp/token",
         "POST /api/v1/auth/refresh",
-        "POST /api/v1/auth/register",
     ];
 
     [Fact]
@@ -232,10 +232,12 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task Register_WithCommonPassword_Returns400()
+    public async Task AcceptInvite_WithCommonPassword_Returns400()
     {
-        var response = await Client().PostAsJsonAsync("/api/v1/auth/register",
-            new { email = "pipeline-common-password@test.com", password = "Password1" });
+        var (userId, token) = await factory.CreatePendingInviteAsync("pipeline-common-password@test.com");
+
+        var response = await Client().PostAsJsonAsync("/api/v1/auth/invite/accept",
+            new { userId, token, password = "Password1" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
@@ -244,12 +246,14 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task Register_WithLongPasswordWithoutCompositionRules_Succeeds()
+    public async Task AcceptInvite_WithLongPasswordWithoutCompositionRules_Succeeds()
     {
-        var response = await Client().PostAsJsonAsync("/api/v1/auth/register",
-            new { email = "pipeline-passphrase@test.com", password = "quiet lantern orchard" });
+        var (userId, token) = await factory.CreatePendingInviteAsync("pipeline-passphrase@test.com");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var response = await Client().PostAsJsonAsync("/api/v1/auth/invite/accept",
+            new { userId, token, password = "quiet lantern orchard" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private static IEnumerable<string> Describe(RouteEndpoint endpoint)

@@ -53,8 +53,8 @@ Who holds the role: at startup the API grants `Owner` to the account named by `A
 (prod: `AUTH_OWNER_EMAIL` in the deploy env; not a secret). With it unset, the role goes to the only
 registered account, and only while nobody holds it — so once a second account exists, set
 `AUTH_OWNER_EMAIL` explicitly. The seed only ever adds the role; to take it away, delete the row from
-`auth."AspNetUserRoles"`. The API host builds the principal from the account's current roles behind a 60 s cache
-(`AccessTokenPrincipalLoader`), so a role change (or lockout) reaches a live session within about a minute.
+`auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
+(`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).

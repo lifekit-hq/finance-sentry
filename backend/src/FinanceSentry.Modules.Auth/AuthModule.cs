@@ -17,6 +17,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 public static class AuthModule
 {
+    /// <summary>How long an invite link (a password-reset token) stays valid.</summary>
+    public static readonly TimeSpan InviteLifespan = TimeSpan.FromDays(7);
+
     internal sealed class ModuleRegistrar : IModuleRegistrar
     {
         public void Register(IServiceCollection services, IConfiguration config)
@@ -46,6 +49,9 @@ public static class AuthModule
             .AddEntityFrameworkStores<AuthDbContext>()
             .AddDefaultTokenProviders()
             .AddPasswordValidator<CommonPasswordValidator>();
+
+        // Reset tokens are only issued as invites (there is no self-service reset), so their lifespan is the invite's.
+        services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = InviteLifespan);
 
         services.AddScoped<IAccessTokenPrincipalLoader, AccessTokenPrincipalLoader>();
 

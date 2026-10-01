@@ -16,6 +16,8 @@ public class GoogleCredentialVerifier(IOptions<GoogleOAuthOptions> options) : IG
             var payload = await GoogleJsonWebSignature.ValidateAsync(
                 credential,
                 new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { clientId } });
+            if (!payload.EmailVerified)
+                throw new InvalidGoogleCredentialException();
             return new GoogleUserInfo(payload.Subject, payload.Email, payload.Name);
         }
         catch (Exception)

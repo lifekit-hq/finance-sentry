@@ -1,4 +1,4 @@
-export type AuthFlow = 'login' | 'register' | 'google' | null;
+export type AuthFlow = 'login' | 'acceptInvite' | 'google' | null;
 
 export interface FlashMessage {
   kind: 'info' | 'error';

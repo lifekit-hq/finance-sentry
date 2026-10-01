@@ -3,15 +3,12 @@ using FluentValidation;
 
 namespace FinanceSentry.Modules.Auth.Application.Validators;
 
-public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
+public sealed class CreateInviteCommandValidator : AbstractValidator<CreateInviteCommand>
 {
-    public RegisterCommandValidator()
+    public CreateInviteCommandValidator()
     {
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Email must be a valid email address.");
-
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.");
     }
 }

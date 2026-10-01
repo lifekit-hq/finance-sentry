@@ -30,6 +30,21 @@ public sealed class PersistedMcpServiceTokenStore(AuthDbContext db) : IMcpServic
         return true;
     }
 
+    public async Task<int> RevokeAllAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var unrevoked = await db.McpServiceTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in unrevoked)
+        {
+            token.Revoke();
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return unrevoked.Count;
+    }
+
     public async Task<IReadOnlyList<McpServiceToken>> ListAsync(string userId, CancellationToken cancellationToken = default)
         => await db.McpServiceTokens.AsNoTracking()
             .Where(t => t.UserId == userId)

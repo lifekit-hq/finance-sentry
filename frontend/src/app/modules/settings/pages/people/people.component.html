@@ -1,0 +1,105 @@
+<div class="p-cmn-4 sm:p-cmn-6">
+  <div class="mx-auto max-w-[900px] space-y-cmn-8">
+    <cmn-page-header
+      title="People"
+      subtitle="Invite people to this account and manage who can sign in."
+    />
+
+    <!-- ── Invite ── -->
+    <cmn-card>
+      <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Invite someone</h2>
+      <p class="mt-1 mb-cmn-4 text-cmn-xs text-text-secondary leading-relaxed">
+        Creates a member account and a one-time link they use to set a password. Send the link to
+        them yourself.
+      </p>
+
+      @if (store.inviteErrorMessage()) {
+        <cmn-alert variant="error" class="block mb-cmn-4">{{
+          store.inviteErrorMessage()
+        }}</cmn-alert>
+      }
+
+      <form
+        [formGroup]="inviteForm"
+        (ngSubmit)="createInvite()"
+        class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-[1fr_auto] sm:items-start"
+      >
+        <cmn-form-field [control]="inviteForm.get('email')" label="Email" formControlName="email">
+          <cmn-input type="email" placeholder="name@example.com" autocomplete="off" />
+        </cmn-form-field>
+        <cmn-button
+          [disabled]="store.isInviting() || inviteForm.invalid"
+          [loading]="store.isInviting()"
+          type="submit"
+          icon="UserPlus"
+          class="sm:mt-cmn-6"
+          >Create invite</cmn-button
+        >
+      </form>
+
+      @if (store.lastInvite(); as invite) {
+        @if (store.inviteLink(); as link) {
+          <cmn-alert variant="success" title="Invite created" class="block mt-cmn-5">
+            <p class="mb-cmn-3">
+              Send this link to {{ invite.email }}. It works once and expires on
+              {{ invite.expiresAt | date: 'medium' }}. It is not shown again.
+            </p>
+            <div class="grid grid-cols-1 gap-cmn-2 sm:grid-cols-[1fr_auto]">
+              <cmn-input [ngModel]="link" [readonly]="true" aria-label="Invite link" />
+              <cmn-button (clicked)="copyInviteLink(link)" variant="secondary" icon="Copy"
+                >Copy link</cmn-button
+              >
+            </div>
+          </cmn-alert>
+        }
+      }
+    </cmn-card>
+
+    <!-- ── People ── -->
+    <section class="space-y-cmn-3">
+      <h2 class="font-label text-cmn-sm font-semibold text-text-primary">People with access</h2>
+
+      @if (store.revokeErrorMessage()) {
+        <cmn-alert variant="error">{{ store.revokeErrorMessage() }}</cmn-alert>
+      }
+
+      @if (store.loadErrorMessage()) {
+        <cmn-alert variant="error">{{ store.loadErrorMessage() }}</cmn-alert>
+      } @else if (store.isLoading()) {
+        <cmn-card padding="none">
+          @for (row of skeletonRows; track row) {
+            <div class="p-cmn-4 space-y-cmn-2">
+              <cmn-skeleton width="40%" height="14px" />
+              <cmn-skeleton width="20%" height="12px" />
+            </div>
+          }
+        </cmn-card>
+      } @else if (store.rows().length === 0) {
+        <cmn-empty-state message="No one here yet" subMessage="Invite someone to get started." />
+      } @else {
+        <cmn-card padding="none">
+          @for (person of store.rows(); track person.id) {
+            <cmn-list-item-row
+              [label]="person.email"
+              [sublabel]="person.rolesLabel"
+              [dimmed]="person.status === 'Revoked'"
+            >
+              <cmn-tag [variant]="statusVariant[person.status]" meta>{{ person.status }}</cmn-tag>
+              @if (person.canRevoke) {
+                <cmn-button
+                  [loading]="store.revokingId() === person.id"
+                  [disabled]="store.revokingId() !== null"
+                  (clicked)="requestRevoke(person)"
+                  actions
+                  variant="secondary"
+                  size="sm"
+                  >Revoke</cmn-button
+                >
+              }
+            </cmn-list-item-row>
+          }
+        </cmn-card>
+      }
+    </section>
+  </div>
+</div>

@@ -19,8 +19,11 @@ public class LoginCommandHandler(
         if (user is null)
             throw new InvalidCredentialsException();
 
+        // No password: a Google-only account, or an invite that has not been accepted yet.
         if (user.PasswordHash is null)
-            throw new GoogleAccountOnlyException();
+            throw (await userManager.GetLoginsAsync(user)).Count > 0
+                ? new GoogleAccountOnlyException()
+                : new InvalidCredentialsException();
 
         // Counts failures towards Identity lockout; a locked-out account gets the same generic error.
         var signIn = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
