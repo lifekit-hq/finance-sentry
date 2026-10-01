@@ -16,6 +16,14 @@ body {
   color: var(--color-text-primary);
 }
 
+/* viewport-fit=cover lets the installed PWA draw edge to edge; keep the shell
+   clear of the notch, rounded corners and home indicator. Insets are 0 in a
+   regular browser tab, so this is a no-op there. */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
 * {
   box-sizing: border-box;
 }

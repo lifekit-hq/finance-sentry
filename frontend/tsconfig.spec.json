@@ -4,6 +4,7 @@
     "outDir": "./out-tsc/spec",
     "types": ["vitest/globals", "google.accounts"],
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "emitDecoratorMetadata": true
   },
   "include": [
