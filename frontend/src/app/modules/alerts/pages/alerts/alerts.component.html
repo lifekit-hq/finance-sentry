@@ -1,13 +1,13 @@
-<div class="mx-auto flex h-full w-full max-w-[860px] flex-col p-cmn-6">
+<div class="mx-auto flex h-full w-full max-w-[860px] flex-col p-cmn-4 sm:p-cmn-6">
   <cmn-page-header
     [subtitle]="alertsSubtitle()"
-    [actionLabel]="store.unreadCount() > 0 ? 'Mark all read' : null"
-    (actionClick)="markAllRead()"
+    [secondaryActionLabel]="store.unreadCount() > 0 ? 'Mark all read' : null"
+    (secondaryClick)="markAllRead()"
     title="Alerts"
-    actionIcon="CheckCheck"
+    secondaryActionIcon="CheckCheck"
   />
 
-  <div class="mt-cmn-5 flex flex-wrap gap-cmn-2">
+  <div class="mt-cmn-4 flex gap-cmn-2 overflow-x-auto">
     @for (opt of filterOptions; track opt.id) {
       <cmn-chip [selected]="store.filter() === opt.id" (clicked)="store.setFilter(opt.id)">
         {{ opt.label() }}
@@ -25,26 +25,28 @@
       />
     </div>
   } @else {
-    <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
+    <div class="mt-cmn-3 min-h-0 flex-1 overflow-auto">
       @for (alert of filtered(); track alert.id) {
-        <button
+        <div
           (click)="openAlert(alert)"
-          class="block w-full text-left rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          type="button"
+          (keydown.enter)="openAlert(alert)"
+          class="rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          role="button"
+          tabindex="0"
         >
           <cmn-alert-item
             [title]="alert.title"
-            [message]="alert.message"
+            [message]="alert.message | alertMessage"
             [severity]="severityFor(alert.severity)"
             [icon]="iconFor(alert.type)"
             [badgeLabel]="typeLabel(alert.type)"
-            [description]="typeDescription(alert.type)"
             [referenceLabel]="alert.referenceLabel"
             [timestamp]="alert.createdAt"
             [isRead]="alert.isRead"
             (dismissed)="dismiss(alert.id)"
+            density="flat"
           />
-        </button>
+        </div>
       }
     </div>
   }
