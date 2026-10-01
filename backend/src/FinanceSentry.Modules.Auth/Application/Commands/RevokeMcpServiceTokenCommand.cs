@@ -12,7 +12,7 @@ public sealed class RevokeMcpServiceTokenCommandHandler(
 {
     public async Task<Unit> Handle(RevokeMcpServiceTokenCommand request, CancellationToken cancellationToken)
     {
-        _ = await refreshTokenService.ValidateAsync(request.RawRefreshToken, cancellationToken)
+        _ = await refreshTokenService.ValidateUnscopedAsync(request.RawRefreshToken, cancellationToken)
             ?? throw new InvalidRefreshTokenException("No session found.");
 
         await serviceTokenStore.RevokeAsync(request.Jti, cancellationToken);

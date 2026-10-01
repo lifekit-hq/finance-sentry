@@ -28,6 +28,7 @@ public sealed class RoleSeederTests : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddLogging();
         var databaseName = $"role-seed-{Guid.NewGuid()}";
+        services.AddSingleton<ICurrentUser>(NoCurrentUser.Instance);
         services.AddDbContext<AuthDbContext>(o => o.UseInMemoryDatabase(databaseName));
         services.AddIdentityCore<ApplicationUser>()
             .AddRoles<IdentityRole>()

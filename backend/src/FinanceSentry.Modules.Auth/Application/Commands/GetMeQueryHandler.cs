@@ -14,7 +14,7 @@ public class GetMeQueryHandler(
 {
     public async Task<GetMeResult> Handle(GetMeQuery request, CancellationToken cancellationToken)
     {
-        var existing = await refreshTokenService.ValidateAsync(request.RawRefreshToken, cancellationToken)
+        var existing = await refreshTokenService.ValidateUnscopedAsync(request.RawRefreshToken, cancellationToken)
             ?? throw new InvalidRefreshTokenException();
 
         var user = await userManager.FindByIdAsync(existing.UserId)

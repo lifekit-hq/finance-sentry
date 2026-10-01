@@ -14,7 +14,7 @@ public class RefreshCommandHandler(
 {
     public async Task<AuthResult> Handle(RefreshCommand request, CancellationToken cancellationToken)
     {
-        var existing = await refreshTokenService.ValidateAsync(request.RawRefreshToken, cancellationToken) ?? throw new InvalidRefreshTokenException();
+        var existing = await refreshTokenService.ValidateUnscopedAsync(request.RawRefreshToken, cancellationToken) ?? throw new InvalidRefreshTokenException();
 
         var user = await userManager.FindByIdAsync(existing.UserId) ?? throw new InvalidRefreshTokenException();
         if (await userManager.IsLockedOutAsync(user))

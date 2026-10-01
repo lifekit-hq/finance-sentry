@@ -16,7 +16,7 @@ public sealed class McpOAuthService(
 
     public async Task<McpOAuthTokenResponse> ExchangeAuthorizationCodeAsync(string code, string redirectUri, CancellationToken cancellationToken = default)
     {
-        var payload = await codeStore.ConsumeAsync(code, redirectUri, cancellationToken)
+        var payload = await codeStore.ConsumeUnscopedAsync(code, redirectUri, cancellationToken)
             ?? throw new InvalidRefreshTokenException("Invalid MCP authorization code.");
 
         var user = await userManager.FindByIdAsync(payload.UserId)
@@ -38,7 +38,7 @@ public sealed class McpOAuthService(
 
     public async Task<McpOAuthTokenResponse> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        var existing = await refreshTokenService.ValidateAsync(refreshToken, cancellationToken)
+        var existing = await refreshTokenService.ValidateUnscopedAsync(refreshToken, cancellationToken)
             ?? throw new InvalidRefreshTokenException();
 
         var user = await userManager.FindByIdAsync(existing.UserId)
@@ -59,5 +59,5 @@ public sealed class McpOAuthService(
     }
 
     public Task RevokeAsync(string refreshToken, CancellationToken cancellationToken = default)
-        => refreshTokenService.RevokeTokenAsync(refreshToken, cancellationToken);
+        => refreshTokenService.RevokeTokenUnscopedAsync(refreshToken, cancellationToken);
 }

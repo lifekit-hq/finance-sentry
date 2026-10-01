@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -9,6 +10,6 @@ public class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
     {
         var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
         optionsBuilder.UseNpgsql("Host=localhost;Database=finance_sentry;Username=finance_user;Password=finance_password");
-        return new AuthDbContext(optionsBuilder.Options);
+        return new AuthDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }
