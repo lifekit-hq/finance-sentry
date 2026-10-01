@@ -1,4 +1,4 @@
-import {Config, Filesystem, Generator} from '@angular/service-worker/config';
+import {type Config, type Filesystem, Generator} from '@angular/service-worker/config';
 
 import ngswConfig from '../../../../ngsw-config.json';
 
@@ -58,7 +58,9 @@ describe('ngsw-config.json', () => {
   let generated: GeneratedControlFile;
 
   beforeAll(async () => {
-    generated = (await new Generator(new InMemoryFilesystem(), '/').process(ngswConfig as Config)) as GeneratedControlFile;
+    generated = (await new Generator(new InMemoryFilesystem(), '/').process(
+      ngswConfig as Config
+    )) as GeneratedControlFile;
   });
 
   it('caches the app shell only — no data groups, so no financial data lands on the device', () => {
@@ -76,11 +78,14 @@ describe('ngsw-config.json', () => {
     'passes backend path %s through to the network instead of the index.html fallback',
     url => {
       expect(isNavigationFallback(generated.navigationUrls, url)).toBe(false);
-    },
+    }
   );
 
-  it.each(['/', '/dashboard', '/accounts/42'])('serves app route %s from the index.html fallback', url => {
-    expect(generated.index).toBe('/index.html');
-    expect(isNavigationFallback(generated.navigationUrls, url)).toBe(true);
-  });
+  it.each(['/', '/dashboard', '/accounts/42'])(
+    'serves app route %s from the index.html fallback',
+    url => {
+      expect(generated.index).toBe('/index.html');
+      expect(isNavigationFallback(generated.navigationUrls, url)).toBe(true);
+    }
+  );
 });
