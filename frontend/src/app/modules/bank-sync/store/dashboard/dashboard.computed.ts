@@ -49,6 +49,14 @@ const NO_INCOME_LABEL = 'No income yet this month';
 // odd month without reaching back to spending habits that no longer apply.
 const PACE_BASELINE_MONTHS = 3;
 
+// Spending is only paced once this many days of the month have elapsed: on day 2 the
+// prorated baseline is a few percent of a month, so one rent payment reads as four-digit
+// "over pace". Before that the chip stays neutral.
+const MIN_PACE_DAYS = 7;
+
+// Displayed pace magnitudes are capped here and worded ">200%" beyond it.
+const MAX_PACE_PERCENT = 200;
+
 // A month-to-date savings rate is only meaningful once the month's income has actually
 // landed. Salary posts once, often on the last day, so before then the month holds a full
 // run of spending against stray small credits and the rate reads in the hundreds of
@@ -120,8 +128,12 @@ function elapsedMonthFraction(now = new Date()): number {
  * Signed percentage difference of a month-to-date actual against the prorated average of
  * the trailing complete months. Null when there is no baseline to speak of — a first-ever
  * month has nothing to be ahead or behind of, and inventing a delta there would be noise.
+ * Also null during the first days of the month, where proration amplifies a single posting.
  */
 function paceDelta(actual: number, baselines: number[]): number | null {
+  if (new Date().getUTCDate() < MIN_PACE_DAYS) {
+    return null;
+  }
   const usable = baselines.slice(-PACE_BASELINE_MONTHS).filter(v => v > 0);
   if (usable.length === 0) {
     return null;
@@ -189,12 +201,14 @@ function paceChip(
   if (deltaPercent === null) {
     return {delta: null, label: ''};
   }
-  const magnitude = Math.round(Math.abs(deltaPercent));
+  const rounded = Math.round(Math.abs(deltaPercent));
+  const magnitude = Math.min(rounded, MAX_PACE_PERCENT);
+  const shown = rounded > MAX_PACE_PERCENT ? `>${MAX_PACE_PERCENT}%` : `${magnitude}%`;
   const isAbove = deltaPercent >= 0;
   const isGood = isAbove === goodWhenAbove;
   return {
     delta: isGood ? magnitude : -magnitude,
-    label: `${magnitude}% ${isAbove ? above : below}`,
+    label: `${shown} ${isAbove ? above : below}`,
   };
 }
 
@@ -240,13 +254,6 @@ export function dashboardComputed(store: StateSignals) {
 
   const monthToDate = computed(() => currentMonth(store.data()?.monthlyFlow ?? []));
 
-  const inflowPace = computed(() =>
-    paceDelta(
-      monthToDate()?.inflow ?? 0,
-      completeMonths().map(([, v]) => v.inflow)
-    )
-  );
-
   const outflowPace = computed(() =>
     paceDelta(
       monthToDate()?.outflow ?? 0,
@@ -269,11 +276,14 @@ export function dashboardComputed(store: StateSignals) {
     return mtd.inflow >= normalInflow * INCOME_LANDED_FRACTION ? savingsRateOf(mtd) : null;
   });
 
-  const inflowChip = computed(() => {
-    if (inflowPace() !== null && (monthToDate()?.inflow ?? 0) <= 0) {
+  // Income is lumpy (salary posts once), so prorating it is wrong at any point in the
+  // month: no pace delta, only the neutral "nothing yet" note once there is history.
+  const inflowChip = computed((): {delta: number | null; label: string} => {
+    const hasBaseline = completeMonths().some(([, v]) => v.inflow > 0);
+    if (hasBaseline && (monthToDate()?.inflow ?? 0) <= 0) {
       return {delta: 0, label: NO_INCOME_LABEL};
     }
-    return paceChip(inflowPace(), true, 'above pace', 'below pace');
+    return {delta: null, label: ''};
   });
   const spendingChip = computed(() => paceChip(outflowPace(), false, 'over pace', 'under pace'));
   const savingsChip = computed(() => savingsRateChip(savingsRateMonthToDate(), completeMonths()));

@@ -499,9 +499,15 @@ inflow, for the same divide-by-near-zero reason.
 **The "This month" card carries the in-progress month** — one card with Income, Spending
 and Savings columns, month-to-date by construction:
 
-- *Income* / *Spending*: current-month totals, compared against the average of
-  the trailing 3 complete months **prorated by day-of-month elapsed** — without proration
-  a figure two days into the month always reads as a collapse.
+- *Income*: current-month total, **no pace delta** — income is lumpy (salary posts once,
+  often on the last day), so prorating it against a baseline is wrong at any point in the
+  month. The only chip is the neutral "No income yet this month" once there is history.
+- *Spending*: current-month total, compared against the average of the trailing 3 complete
+  months **prorated by day-of-month elapsed** — without proration a figure two days into the
+  month always reads as a collapse. The pace is **null (no chip) before day 7** of the month
+  (UTC), where the prorated baseline is a few percent of a month and one rent payment reads as
+  four-digit "over pace". The displayed magnitude is **capped at 200%** and worded `>200%`
+  beyond it (the colour/sign delta is capped the same way).
 - *Savings*: month-to-date savings rate, withheld (shows `—`) until month-to-date inflow reaches
   `INCOME_LANDED_FRACTION` (50%) of a normal month's income. Below that the raw rate is
   technically correct and completely misleading. Compared in **percentage points** against
@@ -592,8 +598,9 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
 - A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
   balance read is seen by the balance first, so the ledger books it as unpriced quantity and
   that holding's cost basis stays null until the position is next closed.
-- The month-to-date pace baseline (§7) prorates a monthly average linearly by elapsed
-  days. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
+- The month-to-date spending pace baseline (§7) prorates a monthly average linearly by elapsed
+  days, and is withheld before day 7 and capped at `>200%` for display; income is not paced
+  at all. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
   is directionally right rather than exact. A true same-day-last-month comparison would
   need day-level cumulative flow from the backend, which is not built.
 

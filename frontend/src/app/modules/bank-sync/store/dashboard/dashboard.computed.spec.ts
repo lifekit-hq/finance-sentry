@@ -173,14 +173,41 @@ describe('dashboardComputed', () => {
       expect(c.spendingPaceDelta()).toBeGreaterThan(0);
     });
 
-    it('colours income above pace green and below pace red', () => {
-      const ahead = computedFor(steadyHistory(4000 * ELAPSED_FRACTION * 1.2, 0));
-      expect(ahead.inflowPaceLabel()).toBe('20% above pace');
-      expect(ahead.inflowPaceDelta()).toBeGreaterThan(0);
+    it('never paces income: it is lumpy, so no delta at any point in the month', () => {
+      const c = computedFor(steadyHistory(4000 * ELAPSED_FRACTION * 1.2, 0));
 
-      const behind = computedFor(steadyHistory(4000 * ELAPSED_FRACTION * 0.7, 0));
-      expect(behind.inflowPaceLabel()).toBe('30% below pace');
-      expect(behind.inflowPaceDelta()).toBeLessThan(0);
+      expect(c.inflowPaceDelta()).toBeNull();
+      expect(c.inflowPaceLabel()).toBe('');
+    });
+
+    it('caps a huge spending overshoot instead of printing four digits', () => {
+      const c = computedFor(steadyHistory(4000, 2000 * ELAPSED_FRACTION * 12));
+
+      expect(c.spendingPaceLabel()).toBe('>200% over pace');
+      expect(c.spendingPaceDelta()).toBe(-200);
+    });
+
+    describe.each([
+      {day: 1, paced: false},
+      {day: 2, paced: false},
+      {day: 6, paced: false},
+      {day: 7, paced: true},
+      {day: 15, paced: true},
+    ])('spending pace on day $day', ({day, paced}) => {
+      it(paced ? 'shows a pace chip' : 'stays neutral', () => {
+        vi.setSystemTime(new Date(Date.UTC(2026, 7, day)));
+        // Rent-sized outflow already posted against a 2000/month baseline.
+        const c = computedFor(steadyHistory(4580, 1312));
+
+        if (paced) {
+          expect(c.spendingPaceDelta()).not.toBeNull();
+          expect(c.spendingPaceLabel()).toMatch(/over pace$/);
+        } else {
+          expect(c.spendingPaceDelta()).toBeNull();
+          expect(c.spendingPaceLabel()).toBe('');
+        }
+        expect(c.inflowPaceDelta()).toBeNull();
+      });
     });
 
     it('reads a month with no income yet as neutral rather than a red shortfall', () => {
