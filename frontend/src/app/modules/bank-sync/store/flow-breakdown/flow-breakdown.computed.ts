@@ -1,6 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
   type FlowBreakdown,
   type FlowBreakdownItem,
@@ -70,14 +71,12 @@ const BUCKET_META: {bucket: FlowBucket; label: string; counted: boolean; note: s
   },
 ];
 
-const CENTS = 2;
-
 function sumUsd(items: FlowBreakdownItem[]): number {
   return items.reduce((sum, i) => sum + i.amountUsd, 0);
 }
 
 function wholeUsd(value: number): string {
-  return `$${value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: CENTS})}`;
+  return MoneyUtils.format(value, 'USD', {minFractionDigits: 0});
 }
 
 export function flowBreakdownComputed(store: StateSignals) {

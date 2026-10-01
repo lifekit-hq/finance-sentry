@@ -1,4 +1,4 @@
-import {DatePipe, DecimalPipe} from '@angular/common';
+import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router} from '@angular/router';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@lifekit-hq/ui';
 
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {MonthKeyUtils} from '../../utils/month-key.utils';
 
@@ -25,10 +26,10 @@ const SKELETON_ROWS = 8;
     ButtonComponent,
     CardComponent,
     DatePipe,
-    DecimalPipe,
     EmptyStateComponent,
     IconComponent,
     MerchantCategoryPipe,
+    MoneyPipe,
     SkeletonComponent,
     StatCardComponent,
     TagComponent,

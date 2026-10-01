@@ -9,11 +9,12 @@ import {
   DataTableComponent,
   DonutChartComponent,
   InstitutionAvatarComponent,
+  SkeletonComponent,
 } from '@lifekit-hq/ui';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
-import {CurrencyAmountPipe} from '../../pipes/currency-amount.pipe';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {HoldingsStore} from '../../store/holdings.store';
 
 @Component({
@@ -24,9 +25,10 @@ import {HoldingsStore} from '../../store/holdings.store';
     CardComponent,
     CmnCellDirective,
     CmnColumnComponent,
-    CurrencyAmountPipe,
     DataTableComponent,
     DecimalPipe,
+    MoneyPipe,
+    SkeletonComponent,
     DonutChartComponent,
     InstitutionAvatarComponent,
   ],

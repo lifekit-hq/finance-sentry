@@ -20,39 +20,31 @@
     @let summary = store.summary();
     <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
       <cmn-stat-card
-        [value]="
-          summary ? ((summary.combined.monthly | appCurrency: summary.currency) ?? '—') : '—'
-        "
+        [value]="summary ? ((summary.combined.monthly | money: summary.currency) ?? '—') : '—'"
         label="Monthly Total"
         icon="Zap"
       />
       <cmn-stat-card
-        [value]="
-          summary ? ((summary.combined.next12Months | appCurrency: summary.currency) ?? '—') : '—'
-        "
+        [value]="summary ? ((summary.combined.next12Months | money: summary.currency) ?? '—') : '—'"
         label="Next 12 Months"
         icon="TrendingUp"
       />
       <cmn-stat-card
         [value]="
           summary
-            ? ((summary.installments.remainingCommitment | appCurrency: summary.currency) ?? '—')
+            ? ((summary.installments.remainingCommitment | money: summary.currency) ?? '—')
             : '—'
         "
         label="Left On Plans"
         icon="Wallet"
       />
       <cmn-stat-card
-        [value]="
-          summary ? ((summary.subscriptions.monthly | appCurrency: summary.currency) ?? '—') : '—'
-        "
+        [value]="summary ? ((summary.subscriptions.monthly | money: summary.currency) ?? '—') : '—'"
         [label]="'Subscriptions · ' + (summary?.subscriptions?.activeCount ?? 0)"
         icon="Repeat"
       />
       <cmn-stat-card
-        [value]="
-          summary ? ((summary.installments.monthly | appCurrency: summary.currency) ?? '—') : '—'
-        "
+        [value]="summary ? ((summary.installments.monthly | money: summary.currency) ?? '—') : '—'"
         [label]="'Installments · ' + (summary?.installments?.activeCount ?? 0)"
         icon="CreditCard"
       />
@@ -84,7 +76,7 @@
             class="font-mono text-cmn-sm font-semibold"
           >
             {{ fx.changeAmountTotal > 0 ? '+' : ''
-            }}{{ fx.changeAmountTotal | appCurrency: fx.baseCurrency }}/mo ({{
+            }}{{ fx.changeAmountTotal | money: fx.baseCurrency }}/mo ({{
               fx.changePercentTotal > 0 ? '+' : ''
             }}{{ fx.changePercentTotal }}%)
           </span>
@@ -92,8 +84,8 @@
 
         <p class="mb-cmn-3 text-cmn-xs text-text-secondary">
           These payments are fixed in their own currency. What has changed is what they cost you:
-          {{ fx.baselineCostTotal | appCurrency: fx.baseCurrency }} at the start versus
-          {{ fx.currentCostTotal | appCurrency: fx.baseCurrency }} today.
+          {{ fx.baselineCostTotal | money: fx.baseCurrency }} at the start versus
+          {{ fx.currentCostTotal | money: fx.baseCurrency }} today.
         </p>
 
         <cmn-line-chart
@@ -117,8 +109,8 @@
                 }
               </span>
               <span class="font-mono text-cmn-xs text-text-secondary">
-                {{ plan.baselineCost | appCurrency: fx.baseCurrency }} →
-                {{ plan.currentCost | appCurrency: fx.baseCurrency }}
+                {{ plan.baselineCost | money: fx.baseCurrency }} →
+                {{ plan.currentCost | money: fx.baseCurrency }}
                 <span
                   [class.text-status-success]="plan.changeAmount < 0"
                   [class.text-status-error]="plan.changeAmount > 0"
@@ -159,10 +151,18 @@
             (ngSubmit)="submitSubscription()"
             class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2"
           >
-            <cmn-input formControlName="merchant" placeholder="Merchant (e.g. Claude)" />
-            <cmn-input formControlName="monthlyAmount" type="number" placeholder="Monthly amount" />
-            <cmn-input formControlName="currency" placeholder="Currency (e.g. EUR)" />
-            <cmn-input formControlName="startDate" placeholder="Start date (YYYY-MM-DD)" />
+            <cmn-form-field label="Merchant">
+              <cmn-input formControlName="merchant" placeholder="e.g. Claude" />
+            </cmn-form-field>
+            <cmn-form-field label="Monthly amount">
+              <cmn-input formControlName="monthlyAmount" type="number" placeholder="0.00" />
+            </cmn-form-field>
+            <cmn-form-field label="Currency">
+              <cmn-input formControlName="currency" placeholder="e.g. EUR" />
+            </cmn-form-field>
+            <cmn-form-field label="Start date">
+              <cmn-input formControlName="startDate" placeholder="YYYY-MM-DD" />
+            </cmn-form-field>
             <div class="flex items-center">
               <cmn-button (clicked)="submitSubscription()" variant="primary" size="sm"
                 >Add</cmn-button
@@ -204,7 +204,7 @@
             <div amount class="min-w-[72px] text-right">
               <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
               <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                {{ sub.monthlyEquivalent | appCurrency: sub.currency }}
+                {{ sub.monthlyEquivalent | money: sub.currency }}
               </div>
               <div class="text-[10px] text-text-disabled">/ mo</div>
             </div>
@@ -241,15 +241,21 @@
             (ngSubmit)="submitAdd()"
             class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2"
           >
-            <cmn-input formControlName="merchant" placeholder="Merchant (e.g. Pandora)" />
-            <cmn-input formControlName="monthlyAmount" type="number" placeholder="Monthly amount" />
-            <cmn-input formControlName="currency" placeholder="Currency (e.g. UAH)" />
-            <cmn-input formControlName="startDate" placeholder="Start date (YYYY-MM-DD)" />
-            <cmn-input
-              formControlName="termCount"
-              type="number"
-              placeholder="Total payments (optional)"
-            />
+            <cmn-form-field label="Merchant">
+              <cmn-input formControlName="merchant" placeholder="e.g. Pandora" />
+            </cmn-form-field>
+            <cmn-form-field label="Monthly amount">
+              <cmn-input formControlName="monthlyAmount" type="number" placeholder="0.00" />
+            </cmn-form-field>
+            <cmn-form-field label="Currency">
+              <cmn-input formControlName="currency" placeholder="e.g. UAH" />
+            </cmn-form-field>
+            <cmn-form-field label="Start date">
+              <cmn-input formControlName="startDate" placeholder="YYYY-MM-DD" />
+            </cmn-form-field>
+            <cmn-form-field label="Total payments" hint="Optional">
+              <cmn-input formControlName="termCount" type="number" placeholder="e.g. 12" />
+            </cmn-form-field>
             <div class="flex items-center">
               <cmn-button (clicked)="submitAdd()" variant="primary" size="sm">Add</cmn-button>
             </div>
@@ -296,7 +302,7 @@
               </div>
               <div amount class="min-w-[72px] text-right">
                 <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                  {{ item.monthlyEquivalent | appCurrency: item.currency }}
+                  {{ item.monthlyEquivalent | money: item.currency }}
                 </div>
                 <div class="text-[10px] text-text-disabled">/ mo</div>
               </div>
@@ -340,7 +346,7 @@
                 </div>
                 <div amount class="min-w-[72px] text-right">
                   <div class="font-mono text-cmn-sm font-semibold text-text-secondary">
-                    {{ item.monthlyEquivalent | appCurrency: item.currency }}
+                    {{ item.monthlyEquivalent | money: item.currency }}
                   </div>
                   <div class="text-[10px] text-text-disabled">/ mo</div>
                 </div>
@@ -381,7 +387,7 @@
               </div>
               <div amount class="min-w-[72px] text-right">
                 <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                  {{ sub.monthlyEquivalent | appCurrency: sub.currency }}
+                  {{ sub.monthlyEquivalent | money: sub.currency }}
                 </div>
                 <div class="text-[10px] text-text-disabled">/ mo</div>
               </div>

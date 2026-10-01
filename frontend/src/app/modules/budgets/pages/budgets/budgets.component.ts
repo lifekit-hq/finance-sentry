@@ -3,15 +3,18 @@ import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
+  ButtonComponent,
   CardComponent,
+  FormFieldComponent,
+  InputComponent,
   PageHeaderComponent,
   SelectComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
 
-import {AppCurrencyPipe} from '../../../../core/pipes/app-currency.pipe';
 import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {CATEGORY_COLOR_FALLBACK} from '../../../../shared/store/categories/categories.computed';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {BUDGETS_MONTHS_IN_YEAR} from '../../constants/budget/budget.constants';
@@ -24,10 +27,13 @@ const PCT_WARNING_THRESHOLD = 80;
   selector: 'fns-budgets',
   imports: [
     AlertComponent,
-    AppCurrencyPipe,
     AppDecimalPipe,
+    ButtonComponent,
     CardComponent,
+    FormFieldComponent,
     FormsModule,
+    InputComponent,
+    MoneyPipe,
     PageHeaderComponent,
     SelectComponent,
     TagComponent,
@@ -76,6 +82,10 @@ export class BudgetsComponent {
   }
 
   public saveEdit(id: string): void {
+    // Enter/Escape clear the editing state and the input's removal fires focusout; ignore that late save.
+    if (this.store.editingId() !== id) {
+      return;
+    }
     const val = parseFloat(this.editValue());
     if (!isNaN(val) && val > 0) {
       this.store.update({id, monthlyLimit: val});

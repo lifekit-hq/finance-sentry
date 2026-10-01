@@ -1,6 +1,6 @@
 <div class="space-y-cmn-5">
   @if (store.isPositionsLoading()) {
-    <div class="h-64 bg-neutral-100 dark:bg-neutral-800 rounded-xl animate-pulse"></div>
+    <cmn-skeleton height="16rem" width="100%" />
   } @else if (store.positionsErrorMessage()) {
     <cmn-alert variant="error">{{ store.positionsErrorMessage() }}</cmn-alert>
   } @else if (store.positionsByAssetClass().length === 0) {
@@ -17,7 +17,7 @@
             Total position value
           </p>
           <p class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary">
-            {{ store.totalPositionsValue() | currencyAmount }}
+            {{ store.totalPositionsValue() | money }}
           </p>
           <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
             {{ store.positions().length }} position{{
@@ -39,7 +39,7 @@
                   >{{ row.percent | number: '1.0-0' }}%</span
                 >
                 <span class="ml-auto font-mono text-cmn-sm tabular-nums text-text-primary">
-                  {{ row.value | currencyAmount }}
+                  {{ row.value | money }}
                 </span>
               </div>
             }
@@ -64,7 +64,7 @@
             {{ group.label }}
           </h2>
           <span class="font-mono tabular-nums text-cmn-sm text-text-secondary">
-            {{ group.totalValue | currencyAmount }}
+            {{ group.totalValue | money }}
           </span>
         </div>
 
@@ -99,14 +99,14 @@
               @if (row.currentPrice === null) {
                 <span class="font-mono tabular-nums text-text-secondary">—</span>
               } @else {
-                <span class="font-mono tabular-nums">{{ row.currentPrice | currencyAmount }}</span>
+                <span class="font-mono tabular-nums">{{ row.currentPrice | money }}</span>
               }
             </ng-template>
           </cmn-column>
           <cmn-column key="value" header="Value" align="right">
             <ng-template let-row cmnCell>
               <span class="font-mono tabular-nums font-semibold">{{
-                row.currentValue | currencyAmount
+                row.currentValue | money
               }}</span>
             </ng-template>
           </cmn-column>

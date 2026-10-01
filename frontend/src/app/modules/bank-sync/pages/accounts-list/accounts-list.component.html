@@ -10,7 +10,7 @@
       <div class="min-w-0">
         <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
         <p class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary">
-          {{ store.baseCurrency() }} {{ store.totalNetWorth() | number: '1.2-2' }}
+          {{ store.totalNetWorth() | money: store.baseCurrency() }}
         </p>
         <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
           {{ store.totalConnections() }} connection{{
@@ -31,7 +31,7 @@
                 >{{ row.percent | number: '1.0-0' }}%</span
               >
               <span class="ml-auto font-mono text-cmn-sm tabular-nums text-text-primary">
-                {{ store.baseCurrency() }} {{ row.value | number: '1.2-2' }}
+                {{ row.value | money: store.baseCurrency() }}
               </span>
             </div>
           }
@@ -42,7 +42,7 @@
     <cmn-card class="block mb-cmn-8">
       <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
       <p class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary">
-        {{ store.baseCurrency() }} {{ store.totalNetWorth() | number: '1.2-2' }}
+        {{ store.totalNetWorth() | money: store.baseCurrency() }}
       </p>
       <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
         {{ store.totalConnections() }} connection{{ store.totalConnections() !== 1 ? 's' : '' }}
@@ -134,8 +134,7 @@
                 <div
                   class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
                 >
-                  {{ store.baseCurrency() }}
-                  {{ inst.totalInBaseCurrency | number: '1.2-2' }}
+                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
                 </div>
                 @if (inst.provider === 'truelayer' && inst.syncStatus === 'reauth_required') {
                   <cmn-button
@@ -179,8 +178,7 @@
                         <td
                           class="py-cmn-2 px-cmn-4 text-right font-mono tabular-nums text-cmn-xs text-text-secondary min-w-[7rem]"
                         >
-                          {{ store.baseCurrency() }}
-                          {{ card.totalInBaseCurrency | number: '1.2-2' }}
+                          {{ card.totalInBaseCurrency | money: store.baseCurrency() }}
                         </td>
                       </tr>
                       @for (account of card.accounts; track account.accountId) {
@@ -276,8 +274,7 @@
                 <div
                   class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
                 >
-                  {{ store.baseCurrency() }}
-                  {{ inst.totalInBaseCurrency | number: '1.2-2' }}
+                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
                 </div>
                 <cmn-button
                   (clicked)="disconnectInstitution(inst); $event.stopPropagation()"
@@ -387,8 +384,7 @@
                 <div
                   class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
                 >
-                  {{ store.baseCurrency() }}
-                  {{ inst.totalInBaseCurrency | number: '1.2-2' }}
+                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
                 </div>
                 <cmn-button
                   (clicked)="disconnectInstitution(inst); $event.stopPropagation()"
@@ -462,9 +458,7 @@
           store.totalConnections() !== 1 ? 's' : ''
         }}</span
       >
-      <span
-        >Net worth: {{ store.baseCurrency() }} {{ store.totalNetWorth() | number: '1.2-2' }}</span
-      >
+      <span>Net worth: {{ store.totalNetWorth() | money: store.baseCurrency() }}</span>
     </div>
   }
 </div>
