@@ -1,56 +1,58 @@
-<div
-  class="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-cmn-4 z-30 flex flex-col items-start gap-cmn-3 md:bottom-cmn-4 md:left-auto md:right-cmn-6 md:items-end"
->
-  @if (isOpen()) {
-    <section
-      class="flex h-[min(560px,80vh)] w-[min(384px,calc(100vw-2rem))] flex-col overflow-hidden rounded-cmn-lg border border-border-default bg-surface-card shadow-2xl"
-    >
-      <header
-        class="flex items-center justify-between gap-cmn-2 border-b border-border-default px-cmn-3 py-cmn-2"
-      >
-        <div class="flex items-center gap-cmn-2 text-text-primary">
-          <cmn-icon [name]="openIcon" size="sm" />
-          <span class="font-medium">Ledger</span>
-        </div>
-        <div class="flex items-center gap-cmn-1">
-          <button
-            (click)="onNewChat()"
-            type="button"
-            aria-label="New chat"
-            class="rounded-cmn-md p-cmn-1 text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-          >
-            <cmn-icon [name]="newChatIcon" size="sm" />
-          </button>
-          <button
-            (click)="toggle()"
-            type="button"
-            aria-label="Close chat"
-            class="rounded-cmn-md p-cmn-1 text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-          >
-            <cmn-icon [name]="closeIcon" size="sm" />
-          </button>
-        </div>
-      </header>
-
-      <div class="min-h-0 flex-1">
-        @for (key of [store.historyKey()]; track key) {
-          <cmn-chat
-            [history]="store.history()"
-            [stream]="chatStream"
-            placeholder="Ask Ledger…"
-            introMessage="Hi, I'm Ledger — your finance agent, grounded in your real book. Ask me anything: allocation drift, risk, the regime, or a position."
-          />
-        }
-      </div>
-    </section>
-  }
-
-  <button
-    [attr.aria-label]="isOpen() ? 'Close Ledger chat' : 'Open Ledger chat'"
-    (click)="toggle()"
-    type="button"
-    class="flex h-14 w-14 items-center justify-center rounded-full bg-accent-default text-text-inverse shadow-lg transition-colors hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-border-focus focus:ring-offset-2"
+@if (!isHidden()) {
+  <div
+    class="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-cmn-4 z-30 flex flex-col items-start gap-cmn-3 md:bottom-cmn-4 md:left-auto md:right-cmn-6 md:items-end"
   >
-    <cmn-icon [name]="isOpen() ? closeIcon : openIcon" size="md" />
-  </button>
-</div>
+    @if (isOpen()) {
+      <section
+        class="flex h-[min(560px,80vh)] w-[min(384px,calc(100vw-2rem))] flex-col overflow-hidden rounded-cmn-lg border border-border-default bg-surface-card shadow-2xl"
+      >
+        <header
+          class="flex items-center justify-between gap-cmn-2 border-b border-border-default px-cmn-3 py-cmn-2"
+        >
+          <div class="flex items-center gap-cmn-2 text-text-primary">
+            <cmn-icon [name]="openIcon" size="sm" />
+            <span class="font-medium">Ledger</span>
+          </div>
+          <div class="flex items-center gap-cmn-1">
+            <button
+              (click)="onNewChat()"
+              type="button"
+              aria-label="New chat"
+              class="rounded-cmn-md p-cmn-1 text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+            >
+              <cmn-icon [name]="newChatIcon" size="sm" />
+            </button>
+            <button
+              (click)="toggle()"
+              type="button"
+              aria-label="Close chat"
+              class="rounded-cmn-md p-cmn-1 text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+            >
+              <cmn-icon [name]="closeIcon" size="sm" />
+            </button>
+          </div>
+        </header>
+
+        <div class="min-h-0 flex-1">
+          @for (key of [store.historyKey()]; track key) {
+            <cmn-chat
+              [history]="store.history()"
+              [stream]="chatStream"
+              placeholder="Ask Ledger…"
+              introMessage="Hi, I'm Ledger — your finance agent, grounded in your real book. Ask me anything: allocation drift, risk, the regime, or a position."
+            />
+          }
+        </div>
+      </section>
+    }
+
+    <button
+      [attr.aria-label]="isOpen() ? 'Close Ledger chat' : 'Open Ledger chat'"
+      (click)="toggle()"
+      type="button"
+      class="flex h-14 w-14 items-center justify-center rounded-full bg-accent-default text-text-inverse shadow-lg transition-colors hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-border-focus focus:ring-offset-2"
+    >
+      <cmn-icon [name]="isOpen() ? closeIcon : openIcon" size="md" />
+    </button>
+  </div>
+}
