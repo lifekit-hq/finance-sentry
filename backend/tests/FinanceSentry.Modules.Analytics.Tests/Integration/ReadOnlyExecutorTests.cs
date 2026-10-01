@@ -152,7 +152,7 @@ public sealed class ReadOnlyExecutorTests(AnalyticsPostgresFixture fixture)
         executed.Error.Should().BeNull();
         rejected.Error.Should().Be("rejected");
 
-        await using var verify = _fx.NewAnalyticsContext();
+        await using var verify = _fx.NewAnalyticsContext(AnalyticsPostgresFixture.UserA);
         var executedRow = await verify.QueryAudit
             .Where(r => r.Sql == executedSql).OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
         var rejectedRow = await verify.QueryAudit
