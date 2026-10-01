@@ -104,8 +104,12 @@ jobs:
       - name: Live e2e smoke (deployed stack)
         if: steps.target.outputs.stale != 'true'
         run: |
-          docker run --rm --network host \
-            -v "$PWD/frontend:/repo:ro" -w /work \
+          # CI=true enables the config's single retry with a trace on that retry; the
+          # trace lands in a host directory so it outlives the --rm container.
+          results="$RUNNER_TEMP/live-smoke-results"
+          rm -rf "$results" && mkdir -p "$results"
+          docker run --rm --network host -e CI=true \
+            -v "$PWD/frontend:/repo:ro" -v "$results:/work/test-results" -w /work \
             mcr.microsoft.com/playwright:v1.62.1-noble \
             bash -c "cp -r /repo/e2e /repo/playwright.live.config.ts . \
               && npm i --no-save --no-audit --no-fund @playwright/test@1.62.1 \
