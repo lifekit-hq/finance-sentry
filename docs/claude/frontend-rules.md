@@ -91,6 +91,12 @@ The `frontend-utils-creation` skill covers the full mechanics; trigger it whenev
 
 ---
 
+## Money Display — always `MoneyUtils` / `money` pipe
+
+Every displayed amount goes through `MoneyUtils.format` (`shared/utils/money.utils.ts`; templates use the thin `money` pipe in `shared/pipes/`) — never `DecimalPipe` + a hand-appended currency code, and no per-module money pipes. Format: symbol-first (`$18,981.48`, `-€1,200.00`); ISO code prefix only where the symbol is ambiguous (`CHF 950.00`); `—` for null/NaN. A base-currency equivalent is shown muted on its own second line via `MoneyUtils.formatEquivalent` (`~ $1,235`). This is display only — conversion and aggregation rules stay in [`money-semantics.md`](../money-semantics.md).
+
+---
+
 ## Custom Providers — always extract
 
 Any provider beyond Angular's built-in `provideX()` helpers (`ErrorHandler`, custom injection tokens, `APP_INITIALIZER`, class-based `HTTP_INTERCEPTORS`, etc.) MUST be extracted to `frontend/src/app/core/providers/<name>.provider.ts`:
