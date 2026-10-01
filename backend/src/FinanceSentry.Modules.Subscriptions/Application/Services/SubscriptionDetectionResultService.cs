@@ -4,6 +4,8 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.Domain;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 
+// Its only caller is the subscription detection job, which has no person in scope, so its reads are unscoped and
+// keyed by the user it is given.
 public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository repository)
     : ISubscriptionDetectionResultService
 {
@@ -16,7 +18,7 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
     {
         foreach (var result in results)
         {
-            var existing = await _repository.FindByUserAndMerchantAsync(
+            var existing = await _repository.FindByUserAndMerchantUnscopedAsync(
                 userId, result.MerchantNameNormalized, ct);
 
             if (existing is null)
@@ -81,7 +83,7 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
         string userId,
         CancellationToken ct = default)
     {
-        var active = await _repository.GetStaleActiveAsync(userId, ct);
+        var active = await _repository.GetStaleActiveUnscopedAsync(userId, ct);
         var now = DateOnly.FromDateTime(DateTime.UtcNow);
 
         foreach (var subscription in active)

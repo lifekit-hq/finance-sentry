@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
@@ -14,14 +15,15 @@ internal static class TestSupport
     /// A fresh in-memory Radar database. Note the provider cannot translate
     /// <c>ExecuteUpdateAsync</c> / <c>ExecuteDeleteAsync</c> — a repository method written that way
     /// (e.g. <c>RadarUniverseRepository.DeactivateAsync</c>) throws here rather than running, so
-    /// prove those paths against a mocked repository or a Postgres-backed test instead.
+    /// prove those paths against a mocked repository or a Postgres-backed test instead. No person is in scope, as
+    /// for the radar jobs: the Owner query filter hides holder-scoped signals from filtered reads.
     /// </summary>
     public static RadarDbContext NewContext()
     {
         var options = new DbContextOptionsBuilder<RadarDbContext>()
             .UseInMemoryDatabase($"radar-tests-{Guid.NewGuid():N}")
             .Options;
-        return new RadarDbContext(options);
+        return new RadarDbContext(options, NoCurrentUser.Instance);
     }
 
     public static IOptions<RadarOptions> Options(RadarOptions? options = null)

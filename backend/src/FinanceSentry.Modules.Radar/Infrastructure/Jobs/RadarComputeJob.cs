@@ -27,7 +27,7 @@ public sealed class RadarComputeJob(
 
         // FR-007 retention: info signals prune past the horizon; notable+ kept indefinitely.
         var cutoff = DateTimeOffset.UtcNow.AddDays(-options.Value.InfoRetentionDays);
-        var pruned = await signals.PruneInfoBeforeAsync(cutoff, ct);
+        var pruned = await signals.PruneInfoBeforeUnscopedAsync(cutoff, ct);
         if (pruned > 0)
         {
             logger.LogInformation(

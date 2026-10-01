@@ -29,7 +29,7 @@ public class ActiveSubscriptionsReaderTests
         params DetectedSubscription[] rows)
     {
         var repo = new Mock<IDetectedSubscriptionRepository>();
-        repo.Setup(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rows);
         return (new ActiveSubscriptionsReader(repo.Object), repo);
     }
@@ -43,7 +43,7 @@ public class ActiveSubscriptionsReaderTests
 
         await reader.GetActiveCommitmentMerchantKeysAsync(UserId);
 
-        repo.Verify(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
         repo.Verify(
             r => r.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -112,7 +112,7 @@ public class ActiveSubscriptionsReaderTests
 
         await reader.GetActiveInstallmentPlansAsync(UserId);
 
-        repo.Verify(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
         repo.Verify(
             r => r.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -154,7 +154,7 @@ public class ActiveSubscriptionsReaderTests
 
         await reader.GetActiveManualCommitmentMerchantNamesAsync(UserId);
 
-        repo.Verify(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()), Times.Once);
         repo.Verify(
             r => r.GetByUserIdAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);

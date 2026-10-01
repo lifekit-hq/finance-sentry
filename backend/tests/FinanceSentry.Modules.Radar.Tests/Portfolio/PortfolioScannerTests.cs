@@ -59,8 +59,8 @@ public sealed class PortfolioScannerTests
     }
 
     private static async Task<IReadOnlyList<RadarSignal>> AllSignalsAsync(RadarDbContext db)
-        => await new RadarSignalRepository(db).ListAsync(
-            new SignalFilter(Scanner: RadarScanners.Portfolio));
+        => await new RadarSignalRepository(db).ListForUserUnscopedAsync(
+            UserId, new SignalFilter(Scanner: RadarScanners.Portfolio));
 
     /// <summary>Payload numbers round-trip through jsonb as <see cref="JsonElement"/>.</summary>
     private static decimal PayloadDecimal(RadarSignal signal, string key)

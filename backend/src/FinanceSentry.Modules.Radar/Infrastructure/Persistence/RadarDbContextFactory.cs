@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class RadarDbContextFactory : IDesignTimeDbContextFactory<RadarDbContext>
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public"));
 
-        return new RadarDbContext(optionsBuilder.Options);
+        return new RadarDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

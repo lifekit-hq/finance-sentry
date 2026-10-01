@@ -1,12 +1,18 @@
 namespace FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> options) : DbContext(options)
+public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<DetectedSubscription> DetectedSubscriptions { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs. DetectedSubscription.UserId is a string
+    // written as Guid.ToString() (lower-case "D" format) by every writer, so the acting person's id is compared in
+    // that same form; null (no person in scope) matches no row.
+    private string? CurrentUserKey => currentUser.UserId?.ToString();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -15,6 +21,7 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
         var sb = modelBuilder.Entity<DetectedSubscription>();
         sb.ToTable("detected_subscriptions");
         sb.HasKey(s => s.Id);
+        sb.HasQueryFilter(OwnerQueryFilter.Name, s => s.UserId == CurrentUserKey);
         sb.Property(s => s.Id).HasDefaultValueSql("gen_random_uuid()");
         sb.Property(s => s.UserId).IsRequired().HasMaxLength(450);
         sb.Property(s => s.MerchantNameNormalized).IsRequired().HasMaxLength(200);

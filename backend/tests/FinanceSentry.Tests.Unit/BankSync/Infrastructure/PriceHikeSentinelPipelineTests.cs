@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -45,7 +46,8 @@ public class PriceHikeSentinelPipelineTests
     {
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
-                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
 
         var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
@@ -198,7 +200,8 @@ public class PriceHikeSentinelPipelineTests
         // — and the spend summaries run ToUsd over that field.
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
-                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
 
@@ -255,7 +258,8 @@ public class PriceHikeSentinelPipelineTests
 
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
-                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
         var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
@@ -278,7 +282,8 @@ public class PriceHikeSentinelPipelineTests
         // against a baseline detection no longer reports.
         await using var db = new SubscriptionsDbContext(
             new DbContextOptionsBuilder<SubscriptionsDbContext>()
-                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
 
         var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
 
