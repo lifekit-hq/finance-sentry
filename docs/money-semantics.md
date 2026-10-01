@@ -111,8 +111,9 @@ zeroing recorded phantom net-worth drops.
 totals, liquidity projections) always sum `SignedForNetTotal(...)`. **Per-account display**
 keeps the raw positive value ("you owe X"), matching how banks present credit cards.
 
-**Presentation** (frontend, display only): a credit account's row reads `Owes €120.00` in the
-error tone (`AccountBalancePipe`), and an institution or card-group total that nets negative
+**Presentation** (frontend, display only): a credit account with a positive balance reads
+`Owes €120.00` in the error tone (`AccountBalancePipe`; zero or negative — an overpaid card — falls
+back to plain money), and an institution or card-group total that nets negative
 reads `Owes $917.82` rather than a bare minus sign (`MoneyUtils.formatNetBalance`). The sign
 convention above is unchanged — only the label differs. Net worth totals stay signed.
 
