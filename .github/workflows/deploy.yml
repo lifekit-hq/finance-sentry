@@ -71,13 +71,12 @@ jobs:
           echo "IMAGE_TAG=$sha" >> "$GITHUB_ENV"
           echo "deploying $sha"
 
-      # The deployed commit's own compose file, deploy script and smoke tests, so config and
-      # images always come from the same commit (a rollback rolls both back).
+      # The workflow's own ref (never the `sha` input): compose file, deploy script and smoke
+      # tests come from the trusted ref, and `sha` only selects which images run. A rollback
+      # redeploys older images under the current config.
       - name: Checkout
         if: steps.target.outputs.stale != 'true'
         uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.target.outputs.sha }}
 
       - name: Log in to ghcr
         if: steps.target.outputs.stale != 'true'
