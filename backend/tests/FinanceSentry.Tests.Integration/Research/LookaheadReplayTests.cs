@@ -179,7 +179,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         await using var alerts = AlertsContext();
         await using var companion = CompanionContext();
         await using var agentCompanion = CompanionContext(_userId);
-        await using var events = EventsContext();
+        await using var events = EventsContext(_userId);
         var outbox = new CompanionEventRepository(agentCompanion);
 
         var capture = new CompanionEventCapture(
@@ -237,8 +237,9 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
             new FixedCurrentUser(actingUser));
 
-    private EventsDbContext EventsContext() =>
-        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    private EventsDbContext EventsContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
     /// <summary>Serves the captured provider responses; anything else is a 404, as an unknown ticker is live.</summary>
     private sealed class FixtureHttpClientFactory : IHttpClientFactory
