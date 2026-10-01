@@ -76,7 +76,7 @@ export function dossierHooks(store: ReturnType<typeof dossierEffects>) {
       const symbol = route.snapshot.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM) ?? '';
       if (symbol) {
         store.loadDossier(symbol);
-        if (authStore.isOwner()) {
+        if (authStore.canUseAi()) {
           store.loadLedgerRead(symbol);
         }
       }

@@ -32,8 +32,8 @@
         />
       </cmn-card>
     } @else {
-      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. Owner-only. -->
-      @if (!isOwner()) {
+      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. Needs ai.use. -->
+      @if (!canUseAi()) {
         <cmn-card class="block" data-testid="ledger-read-unavailable">
           <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Ledger's read</h2>
           <p class="mt-cmn-2 text-cmn-sm text-text-secondary">

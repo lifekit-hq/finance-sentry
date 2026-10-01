@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 public class VerifyGoogleCredentialCommandHandler(
     UserManager<ApplicationUser> userManager,
+    IUserAccessService userAccess,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService,
     IGoogleCredentialVerifier verifier,
@@ -44,18 +45,20 @@ public class VerifyGoogleCredentialCommandHandler(
             if (!result.Succeeded)
                 throw new InvalidOperationException("VALIDATION_ERROR:" + string.Join("|", result.Errors.Select(e => e.Description)));
 
+            await userAccess.GrantDefaultRoleAsync(user);
+
             await PublishUserRegisteredAsync(user.Id, cancellationToken);
         }
 
         if (await userManager.IsLockedOutAsync(user))
             throw new InvalidCredentialsException();
 
-        var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
+        var access = await userAccess.GetAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
 
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
-        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt), rawRefreshToken, accessToken);
+        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt), rawRefreshToken, accessToken);
     }
 
     /// <summary>

@@ -39,6 +39,7 @@ builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
 // -----------------------------------------------------------------------------------------------
 
 const int DefaultAuthPermitPerMinute = 10;
+const int HstsMaxAgeDays = 365;
 const int TooManyRequestsStatusCode = StatusCodes.Status429TooManyRequests;
 
 // Exports (data download) must stream through un-truncated (spec edge case): drop the body-size cap.
@@ -121,11 +122,21 @@ if (tlsEnabled)
     builder.Services.AddLettuceEncrypt();
 }
 
+// HSTS (outside Development): browsers that reached the gateway over HTTPS refuse plain HTTP to this host
+// for the max-age. UseHsts only sends it on HTTPS requests (after UseForwardedHeaders, a request the
+// trusted TLS terminator marked X-Forwarded-Proto: https counts) and never for localhost.
+builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(HstsMaxAgeDays));
+
 var app = builder.Build();
 
-// Order matters: forwarded headers first (so the rate-limiter partition and proxied X-Forwarded-*
-// see the real client), then rate limiting, then the proxy.
+// Order matters: forwarded headers first (so the rate-limiter partition, HSTS and proxied X-Forwarded-*
+// see the real client and scheme), then rate limiting, then the proxy.
 app.UseForwardedHeaders();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
 
 if (tlsEnabled)
 {

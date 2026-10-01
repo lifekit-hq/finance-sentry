@@ -173,7 +173,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
-// Hangfire dashboard (FR-004): owner-only (AuthPolicies.RequireOwner) in every environment, backed by
+// Hangfire dashboard (FR-004): ops.admin only (AuthPolicies.RequireOwner) in every environment, backed by
 // durable Postgres storage so history/schedule survive restarts.
 app.MapHangfireDashboardWithAuthorizationPolicy(AuthPolicies.RequireOwner, "/hangfire", new DashboardOptions
 {

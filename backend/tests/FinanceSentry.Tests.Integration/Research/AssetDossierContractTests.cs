@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Agent.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
@@ -371,12 +372,15 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("IBKR:GatewayBaseUrl", "http://localhost:9999");
     }
 
-    /// <summary>A signed-in client; holds the Owner role unless <paramref name="owner"/> is false.</summary>
+    /// <summary>A signed-in client; holds the Owner role unless <paramref name="owner"/> is false (then Member).</summary>
     public HttpClient CreateAuthenticatedClient(bool owner = true)
+        => CreateAuthenticatedClient(owner ? TestUserId : NonOwnerUserId, owner ? AuthRoles.Owner : AuthRoles.Member);
+
+    /// <summary>A client signed in as <paramref name="userId"/>, whose account holds <paramref name="role"/>.</summary>
+    public HttpClient CreateAuthenticatedClient(Guid userId, string role)
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var userId = owner ? TestUserId : NonOwnerUserId;
-        TestUsers.EnsureExists(Services, userId, owner);
+        TestUsers.EnsureExists(Services, userId, role);
         client.DefaultRequestHeaders.Add("Cookie", $"fs_access_token={GenerateTestJwt(userId)}");
         return client;
     }

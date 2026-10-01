@@ -6,9 +6,11 @@ using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Domain.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("research/watchlist")]
 public class WatchlistController(
     IQueryHandler<GetWatchlistQuery, IReadOnlyList<WatchlistItemDto>> getWatchlist,

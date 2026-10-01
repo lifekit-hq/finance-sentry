@@ -4,7 +4,19 @@ import {expect, type Page, type Request, test} from '@playwright/test';
 const API = '**/api/v1';
 
 const AUTH_RESPONSE = {
-  user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner']},
+  user: {
+    id: 'test-user-id',
+    email: 'test@gmail.com',
+    roles: ['Owner'],
+    permissions: [
+      'connections.manage',
+      'ai.use',
+      'mcp.connect',
+      'mcp.service',
+      'ops.admin',
+      'users.manage',
+    ],
+  },
   expiresAt: '2027-01-01T00:00:00Z',
 };
 

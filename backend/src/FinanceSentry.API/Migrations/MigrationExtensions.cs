@@ -65,12 +65,12 @@ public static class MigrationExtensions
         MigrateContext<EventsDbContext>(sp, app.Logger, status, ref anyContextMigrated);
 
         SeedBankSyncCategories(sp, app.Logger);
-        SeedOwnerRole(sp, app.Logger, status);
+        SeedRoles(sp, app.Logger, status);
 
         return app;
     }
 
-    private static void SeedOwnerRole(IServiceProvider sp, ILogger logger, StartupMigrationStatus status)
+    private static void SeedRoles(IServiceProvider sp, ILogger logger, StartupMigrationStatus status)
     {
         // An unreachable database was already reported by MigrateContext; seeding would only fail again.
         if (status.SkippedContexts.Contains(typeof(AuthDbContext)))
@@ -78,7 +78,7 @@ public static class MigrationExtensions
 
         try
         {
-            OwnerRoleSeeder.SeedAsync(
+            RoleSeeder.SeedAsync(
                 sp.GetRequiredService<RoleManager<IdentityRole>>(),
                 sp.GetRequiredService<UserManager<ApplicationUser>>(),
                 sp.GetRequiredService<IConfiguration>(),
@@ -86,7 +86,7 @@ public static class MigrationExtensions
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Owner role seeding failed. Startup will continue.");
+            logger.LogError(ex, "Role seeding failed. Startup will continue.");
         }
     }
 

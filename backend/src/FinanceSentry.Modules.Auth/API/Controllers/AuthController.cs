@@ -1,4 +1,6 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
@@ -26,14 +28,15 @@ public class AuthController(
     IQueryHandler<GetMeQuery, GetMeResult> getMeHandler,
     IWebHostEnvironment env) : ControllerBase
 {
-    private const string RefreshTokenCookie = "fs_refresh_token";
-    private const string AccessTokenCookie = "fs_access_token";
+    private const int RefreshTokenCookieDays = 30;
+
+    private bool SecureCookies => env.IsProduction();
 
     [AllowAnonymous]
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
         if (string.IsNullOrWhiteSpace(rawToken))
             throw new InvalidRefreshTokenException("No session found.");
 
@@ -74,7 +77,7 @@ public class AuthController(
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
         if (string.IsNullOrWhiteSpace(rawToken))
             throw new InvalidRefreshTokenException("Refresh token missing.");
 
@@ -106,7 +109,7 @@ public class AuthController(
     [HttpGet("mcp/authorize")]
     public async Task<IActionResult> AuthorizeMcp([FromQuery] string redirectUri, [FromQuery] string? state = null)
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
         if (string.IsNullOrWhiteSpace(rawToken))
             throw new InvalidRefreshTokenException("No session found.");
 
@@ -136,11 +139,11 @@ public class AuthController(
 
     // Mints a long-lived, revocable service token for headless first-party MCP clients
     // (e.g. the OpenClaw gateway) that cannot perform the interactive OAuth refresh flow.
-    [Authorize]
+    [Authorize(Policy = AuthPolicies.RequireMcpService)]
     [HttpPost("mcp/service-token")]
     public async Task<IActionResult> IssueMcpServiceToken([FromBody] McpServiceTokenRequest request)
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
         if (string.IsNullOrWhiteSpace(rawToken))
             throw new InvalidRefreshTokenException("No session found.");
 
@@ -150,11 +153,11 @@ public class AuthController(
         return Ok(result);
     }
 
-    [Authorize]
+    [Authorize(Policy = AuthPolicies.RequireMcpService)]
     [HttpPost("mcp/service-token/revoke")]
     public async Task<IActionResult> RevokeMcpServiceToken([FromBody] McpServiceTokenRevokeRequest request)
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
         if (string.IsNullOrWhiteSpace(rawToken))
             throw new InvalidRefreshTokenException("No session found.");
 
@@ -168,7 +171,7 @@ public class AuthController(
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        var rawToken = Request.Cookies[RefreshTokenCookie];
+        var rawToken = ReadRefreshTokenCookie();
 
         if (!string.IsNullOrWhiteSpace(rawToken))
             await logoutHandler.Handle(new LogoutCommand(rawToken), HttpContext.RequestAborted);
@@ -178,49 +181,20 @@ public class AuthController(
         return NoContent();
     }
 
-    private void SetRefreshTokenCookie(string rawToken)
-    {
-        Response.Cookies.Append(RefreshTokenCookie, rawToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = env.IsProduction(),
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(30),
-            Path = "/"
-        });
-    }
+    private string? ReadRefreshTokenCookie() =>
+        AuthCookies.Read(Request.Cookies, AuthCookies.RefreshToken, SecureCookies);
 
-    private void SetAccessTokenCookie(string rawToken, DateTime expiresAt)
-    {
-        Response.Cookies.Append(AccessTokenCookie, rawToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = env.IsProduction(),
-            SameSite = SameSiteMode.Strict,
-            Expires = new DateTimeOffset(expiresAt, TimeSpan.Zero),
-            Path = "/"
-        });
-    }
+    private void SetRefreshTokenCookie(string rawToken) =>
+        AuthCookies.Write(Response, AuthCookies.RefreshToken, rawToken,
+            DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
 
-    private void DeleteRefreshTokenCookie()
-    {
-        Response.Cookies.Delete(RefreshTokenCookie, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = env.IsProduction(),
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        });
-    }
+    private void SetAccessTokenCookie(string rawToken, DateTime expiresAt) =>
+        AuthCookies.Write(Response, AuthCookies.AccessToken, rawToken,
+            new DateTimeOffset(expiresAt, TimeSpan.Zero), SecureCookies);
 
-    private void DeleteAccessTokenCookie()
-    {
-        Response.Cookies.Delete(AccessTokenCookie, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = env.IsProduction(),
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        });
-    }
+    private void DeleteRefreshTokenCookie() =>
+        AuthCookies.Delete(Response, AuthCookies.RefreshToken, SecureCookies);
+
+    private void DeleteAccessTokenCookie() =>
+        AuthCookies.Delete(Response, AuthCookies.AccessToken, SecureCookies);
 }

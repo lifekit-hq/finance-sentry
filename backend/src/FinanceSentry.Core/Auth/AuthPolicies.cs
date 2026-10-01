@@ -1,8 +1,36 @@
 namespace FinanceSentry.Core.Auth;
 
-/// <summary>Named ASP.NET Core authorization policies.</summary>
+/// <summary>
+/// Named ASP.NET Core authorization policies, one per <see cref="Permissions"/> value. Each is satisfied by an
+/// authenticated user whose principal carries that permission claim.
+/// </summary>
 public static class AuthPolicies
 {
-    /// <summary>Satisfied only by an authenticated user holding the <see cref="AuthRoles.Owner"/> role.</summary>
+    public const string RequireConnectionsManage = "RequireConnectionsManage";
+    public const string RequireAiUse = "RequireAiUse";
+    public const string RequireMcpConnect = "RequireMcpConnect";
+    public const string RequireMcpService = "RequireMcpService";
+
+    /// <summary>
+    /// The MCP endpoint's gate, registered by the MCP host only and not one-to-one with a permission: a
+    /// personal token needs <see cref="Permissions.McpConnect"/>, a service token needs
+    /// <see cref="Permissions.McpService"/>, each independently of the other.
+    /// </summary>
+    public const string RequireMcpAccess = "RequireMcpAccess";
+
+    /// <summary>Operations access (<see cref="Permissions.OpsAdmin"/>); the name predates permissions.</summary>
     public const string RequireOwner = "RequireOwner";
+
+    public const string RequireUsersManage = "RequireUsersManage";
+
+    /// <summary>Policy name to the permission claim value it requires.</summary>
+    public static readonly IReadOnlyDictionary<string, string> PermissionByPolicy = new Dictionary<string, string>
+    {
+        [RequireConnectionsManage] = Permissions.ConnectionsManage,
+        [RequireAiUse] = Permissions.AiUse,
+        [RequireMcpConnect] = Permissions.McpConnect,
+        [RequireMcpService] = Permissions.McpService,
+        [RequireOwner] = Permissions.OpsAdmin,
+        [RequireUsersManage] = Permissions.UsersManage,
+    };
 }

@@ -19,6 +19,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 [ApiController]
+[Authorize]
 [Route("accounts")]
 public class BankSyncController(
     ICommandHandler<ConnectMonobankAccountCommand, ConnectMonobankResult> connectMonobankHandler,
@@ -245,6 +246,7 @@ public class BankSyncController(
     // Institution-level disconnect: removes a Monobank credential or TrueLayer
     // connection and cascades to every child sub-account, transaction, and alert.
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("institutions/{provider}/{institutionId:guid}")]
     public async Task<IActionResult> DisconnectInstitution(string provider, Guid institutionId, CancellationToken ct)
     {
@@ -263,6 +265,7 @@ public class BankSyncController(
 
     // ── DELETE /api/accounts/{accountId} ── T309-A ───────────────────────────
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("{accountId:guid}")]
     public async Task<IActionResult> DeleteAccount(Guid accountId, CancellationToken ct)
     {
@@ -281,6 +284,7 @@ public class BankSyncController(
 
     // ── POST /api/accounts/monobank/connect ── T019 ──────────────────────────
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("monobank/connect")]
     public async Task<IActionResult> ConnectMonobank(
         [FromBody] ConnectMonobankRequest request, CancellationToken ct)
@@ -293,6 +297,7 @@ public class BankSyncController(
 
     // ── GET /api/v1/accounts/truelayer/providers?country=ie ──────────────────
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpGet("truelayer/providers")]
     public async Task<IActionResult> ListTrueLayerProviders(
         [FromQuery] string? country = "ie", CancellationToken ct = default)
@@ -305,6 +310,7 @@ public class BankSyncController(
 
     // ── POST /api/v1/accounts/truelayer/connect ──────────────────────────────
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("truelayer/connect")]
     public async Task<IActionResult> BeginTrueLayerConnect(
         [FromBody] BeginTrueLayerConnectRequest request, CancellationToken ct)

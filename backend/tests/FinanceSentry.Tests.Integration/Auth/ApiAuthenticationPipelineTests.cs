@@ -5,9 +5,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using FinanceSentry.Core.Auth;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure.Identity;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -19,8 +22,9 @@ using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 /// <summary>
-/// The API host's authentication pipeline: stock JwtBearer over the access-token cookie, a fallback policy
-/// requiring an authenticated user, and a reviewed set of endpoints that allow anonymous access.
+/// The API host's authentication pipeline: stock JwtBearer over the access-token cookie, a default-deny
+/// fallback policy, every endpoint declaring its authorization (a reviewed set anonymous, the rest signed-in or
+/// behind a known permission policy), and <c>/auth/me</c> reporting the caller's roles and permissions.
 /// </summary>
 public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
@@ -61,14 +65,71 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task FallbackPolicy_RequiresAnAuthenticatedUser()
+    public async Task FallbackPolicy_DeniesEveryone()
     {
         var policies = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
 
         var fallback = await policies.GetFallbackPolicyAsync();
 
-        fallback.Should().NotBeNull();
-        fallback!.Requirements.Should().ContainSingle(r => r is Microsoft.AspNetCore.Authorization.Infrastructure.DenyAnonymousAuthorizationRequirement);
+        fallback.Should().BeSameAs(AccessTokenAuthenticationExtensions.DenyAllPolicy);
+    }
+
+    /// <summary>
+    /// Policy coverage: every endpoint declares its authorization, so none relies on the fallback (which
+    /// would refuse it), and every policy it names is a registered permission policy.
+    /// </summary>
+    [Fact]
+    public async Task EveryEndpoint_DeclaresAnonymousOrAuthorize_WithAKnownPolicy()
+    {
+        var endpoints = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();
+        var policies = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        endpoints.Where(e => e.Metadata.GetMetadata<IAllowAnonymous>() is null
+                          && e.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0)
+            .SelectMany(Describe)
+            .Should().BeEmpty("an endpoint without authorization metadata is refused by the default-deny fallback");
+
+        var named = endpoints
+            .SelectMany(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>())
+            .Select(a => a.Policy)
+            .OfType<string>()
+            .Distinct()
+            .ToList();
+        named.Should().OnlyContain(policy => AuthPolicies.PermissionByPolicy.ContainsKey(policy));
+        foreach (var policy in named)
+            (await policies.GetPolicyAsync(policy)).Should().NotBeNull(policy);
+    }
+
+    [Theory]
+    [InlineData(AuthRoles.Member)]
+    [InlineData(AuthRoles.Owner)]
+    public async Task Me_ReturnsTheCallersRolesAndPermissions(string role)
+    {
+        var email = $"pipeline-me-{role.ToLowerInvariant()}@test.com";
+        var user = await CreateUserAsync(email);
+        await ChangeUserAsync(user.Id, async (users, stored) =>
+            await users.RemoveFromRolesAsync(stored, await users.GetRolesAsync(stored)));
+        using (var scope = factory.Services.CreateScope())
+            TestUsers.GrantRole(scope.ServiceProvider, user.Id, role);
+
+        var me = await MeAsync(email);
+
+        me.Roles.Should().Equal(role);
+        me.Permissions.Should().BeEquivalentTo(Permissions.ByRole[role]);
+    }
+
+    [Fact]
+    public async Task Me_IncludesPermissionsGrantedPerPerson()
+    {
+        const string email = "pipeline-me-grant@test.com";
+        var user = await CreateUserAsync(email);
+        await ChangeUserAsync(user.Id, (users, stored) =>
+            users.AddClaimAsync(stored, new Claim(Permissions.ClaimType, Permissions.McpConnect)));
+
+        var me = await MeAsync(email);
+
+        me.Roles.Should().Equal(AuthRoles.Member);
+        me.Permissions.Should().BeEquivalentTo([Permissions.ConnectionsManage, Permissions.McpConnect]);
     }
 
     [Fact]
@@ -238,6 +299,33 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         });
         return handler.WriteToken(token);
     }
+
+    private async Task ChangeUserAsync(string userId, Func<UserManager<ApplicationUser>, ApplicationUser, Task<IdentityResult>> change)
+    {
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        (await change(users, (await users.FindByIdAsync(userId))!)).Succeeded.Should().BeTrue();
+    }
+
+    /// <summary>Signs in and reads <c>/auth/me</c> with the session's refresh cookie.</summary>
+    private async Task<UserShape> MeAsync(string email)
+    {
+        using var client = Client();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = Password });
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+        const string prefix = "fs_refresh_token=";
+        var refresh = login.Headers.GetValues("Set-Cookie").First(c => c.StartsWith(prefix, StringComparison.Ordinal));
+
+        using var meClient = Client();
+        meClient.DefaultRequestHeaders.Add("Cookie", refresh.Split(';')[0]);
+        var response = await meClient.GetAsync("/api/v1/auth/me");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<MeShape>())!.User;
+    }
+
+    private sealed record MeShape(UserShape User);
+
+    private sealed record UserShape(string Id, string Email, IReadOnlyList<string> Roles, IReadOnlyList<string> Permissions);
 
     private sealed record ErrorResponseShape(string Error, string ErrorCode, IReadOnlyList<string>? Details);
 }

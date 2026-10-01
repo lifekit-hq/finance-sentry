@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
@@ -89,7 +90,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
+            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -126,7 +127,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
+            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -153,18 +154,20 @@ public sealed class CompanionDispatchPolicyTests
         };
 
         var dispatcher = new RecordingDispatcher();
+        var authorization = new StubUserAuthorizationChecker(User);
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
+            events, new FixedSettings(setting), dispatcher, authorization,
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
 
         dispatcher.WakeCalls.Should().Be(1);
         (await events.GetAsync(evt.Id))!.Disposition.Should().Be(EventDisposition.Dispatched);
+        authorization.CheckedPolicies.Should().OnlyContain(p => p == AuthPolicies.RequireAiUse);
     }
 
     [Fact]
-    public async Task Owner_event_dispatches_behind_more_than_a_full_batch_of_non_owner_events()
+    public async Task Ai_user_event_dispatches_behind_more_than_a_full_batch_of_events_from_users_without_ai_use()
     {
         const int nonOwnerCount = 150;
         var otherUser = Guid.Parse("88888888-8888-8888-8888-888888888888");
@@ -192,7 +195,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubOwnerAccountReader(User),
+            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();

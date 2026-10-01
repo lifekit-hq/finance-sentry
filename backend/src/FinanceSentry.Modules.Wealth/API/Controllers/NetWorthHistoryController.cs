@@ -3,9 +3,11 @@ namespace FinanceSentry.Modules.Wealth.API.Controllers;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Wealth.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("net-worth")]
 public class NetWorthHistoryController(IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> handler) : ControllerBase
 {

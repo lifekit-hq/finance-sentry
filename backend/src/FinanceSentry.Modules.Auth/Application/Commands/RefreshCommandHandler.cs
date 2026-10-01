@@ -9,7 +9,8 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 public class RefreshCommandHandler(
     IRefreshTokenService refreshTokenService,
     ITokenService tokenService,
-    UserManager<ApplicationUser> userManager) : ICommandHandler<RefreshCommand, AuthResult>
+    UserManager<ApplicationUser> userManager,
+    IUserAccessService userAccess) : ICommandHandler<RefreshCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(RefreshCommand request, CancellationToken cancellationToken)
     {
@@ -21,9 +22,9 @@ public class RefreshCommandHandler(
 
         var (newRaw, _) = await refreshTokenService.RotateAsync(existing, cancellationToken);
 
-        var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, expiresAt) = tokenService.GenerateToken(user, roles);
+        var access = await userAccess.GetAsync(user);
+        var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
 
-        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, roles.ToList()), expiresAt), newRaw, accessToken);
+        return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt), newRaw, accessToken);
     }
 }

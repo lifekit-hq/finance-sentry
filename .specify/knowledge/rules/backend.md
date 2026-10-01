@@ -61,9 +61,9 @@ All API communication must be TLS-only. No plaintext financial data in logs or D
 **Source**: constitution § V
 **Added**: 2026-04-18
 
-Authentication is the stock JwtBearer handler plus a fallback policy that requires an authenticated
-user, so every endpoint is protected unless it carries `[AllowAnonymous]` (health, metrics, the auth
-sign-in endpoints, the TrueLayer callback). `ApiAuthenticationPipelineTests` pins that anonymous list;
+Authentication is the stock JwtBearer handler plus a default-deny fallback policy, so every endpoint
+declares `[Authorize]` (optionally with an `AuthPolicies` permission policy) or `[AllowAnonymous]`
+(health, metrics, the auth sign-in endpoints, the TrueLayer callback). `ApiAuthenticationPipelineTests` pins that anonymous list;
 adding to it is a reviewed change. `/hangfire` is mapped with the `RequireOwner` policy.
 
 ---

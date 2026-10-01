@@ -1,8 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -15,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -22,7 +25,8 @@ namespace FinanceSentry.Mcp.Tests;
 
 /// <summary>
 /// Boots the MCP HTTP host (<see cref="McpHttpHost"/>) on a test server with the Auth module's store in
-/// memory; every other module keeps an unreachable Postgres, which listing tools never touches.
+/// memory and its roles seeded; every other module keeps an unreachable Postgres, which listing tools never
+/// touches.
 /// </summary>
 public sealed class McpHttpHostFixture : IAsyncLifetime
 {
@@ -57,6 +61,13 @@ public sealed class McpHttpHostFixture : IAsyncLifetime
         McpHttpHost.UsePipeline(_app);
         await _app.StartAsync();
         Client = _app.GetTestClient();
+
+        using var scope = _app.Services.CreateScope();
+        await RoleSeeder.SeedAsync(
+            scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(),
+            scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
+            _app.Configuration,
+            NullLogger.Instance);
     }
 
     public async Task DisposeAsync()
@@ -66,14 +77,17 @@ public sealed class McpHttpHostFixture : IAsyncLifetime
             await _app.DisposeAsync();
     }
 
-    public async Task<ApplicationUser> CreateUserAsync()
+    /// <summary>Creates an account in <paramref name="role"/> holding the per-person <paramref name="grants"/>.</summary>
+    public async Task<ApplicationUser> CreateUserAsync(string role = AuthRoles.Owner, params string[] grants)
     {
         var email = $"{Guid.NewGuid():N}@test.local";
         var user = new ApplicationUser { UserName = email, Email = email };
         await WithUsersAsync(async users =>
         {
-            var result = await users.CreateAsync(user);
-            result.Succeeded.Should().BeTrue();
+            (await users.CreateAsync(user)).Succeeded.Should().BeTrue();
+            (await users.AddToRoleAsync(user, role)).Succeeded.Should().BeTrue();
+            foreach (var permission in grants)
+                (await users.AddClaimAsync(user, new Claim(Permissions.ClaimType, permission))).Succeeded.Should().BeTrue();
         });
         return user;
     }

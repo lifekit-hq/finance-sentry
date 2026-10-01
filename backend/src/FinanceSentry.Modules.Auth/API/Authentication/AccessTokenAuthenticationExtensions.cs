@@ -13,13 +13,19 @@ using Microsoft.IdentityModel.Tokens;
 
 /// <summary>
 /// The authentication every HTTP host shares: the stock JwtBearer handler as the default scheme, validating
-/// tokens signed with <c>Jwt:Secret</c> for one audience (<see cref="AuthAudiences"/>), plus a fallback policy
-/// that requires an authenticated user on every endpoint not marked <see cref="AllowAnonymousAttribute"/>.
-/// The request principal comes from the local account (<see cref="IAccessTokenPrincipalLoader"/>), so a
-/// deleted or locked-out account's token stops working and roles reflect the current database state.
+/// tokens signed with <c>Jwt:Secret</c> for one audience (<see cref="AuthAudiences"/>), plus a default-deny
+/// fallback policy: an endpoint with no authorization metadata is refused, so every endpoint must declare
+/// <see cref="AuthorizeAttribute"/> (optionally with a <see cref="AuthPolicies"/> policy) or
+/// <see cref="AllowAnonymousAttribute"/>. The request principal comes from the local account
+/// (<see cref="IAccessTokenPrincipalLoader"/>) on every request, so a deleted or locked-out account's token
+/// stops working and roles and permissions reflect the current database state.
 /// </summary>
 public static class AccessTokenAuthenticationExtensions
 {
+    /// <summary>The fallback policy: nobody passes it. Anonymous callers get 401, signed-in ones 403.</summary>
+    public static readonly AuthorizationPolicy DenyAllPolicy =
+        new AuthorizationPolicyBuilder().RequireAssertion(_ => false).Build();
+
     /// <summary>
     /// Registers authentication for tokens issued for <paramref name="audience"/> and the fallback policy.
     /// <paramref name="configure"/> runs after the shared options, for host-specific token sources, audience
@@ -70,8 +76,7 @@ public static class AccessTokenAuthenticationExtensions
         if (configure is not null)
             services.Configure(JwtBearerDefaults.AuthenticationScheme, configure);
 
-        services.AddAuthorizationBuilder()
-            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        services.AddAuthorizationBuilder().SetFallbackPolicy(DenyAllPolicy);
 
         return services;
     }

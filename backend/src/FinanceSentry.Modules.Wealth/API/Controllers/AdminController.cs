@@ -3,10 +3,12 @@ namespace FinanceSentry.Modules.Wealth.API.Controllers;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Wealth.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 
 [ApiController]
+[Authorize(Policy = AuthPolicies.RequireOwner)]
 [Route("wealth/admin")]
 public class AdminController(
     ICommandHandler<BackfillNetWorthHistoryCommand, BackfillNetWorthHistoryResult> backfillHandler,

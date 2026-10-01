@@ -4,6 +4,7 @@ using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Queries;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceSentry.Modules.BrokerageSync.API.Controllers;
@@ -21,6 +22,7 @@ public sealed record SetInstrumentClassificationRequest(InstrumentClassification
 public sealed record ConnectIbkrFlexRequest(string Token, string QueryId);
 
 [ApiController]
+[Authorize]
 [Route("brokerage")]
 public sealed class BrokerageController(
     IIBKRConnector connector,
@@ -36,6 +38,7 @@ public sealed class BrokerageController(
     /// material at rest). Live-session-token derivation and the initial holdings
     /// sync run out of band once the consumer key activates on IBKR's side.
     /// </summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("ibkr/connect")]
     public async Task<IActionResult> Connect([FromBody] ConnectIBKRRequest request, CancellationToken ct)
     {
@@ -64,6 +67,7 @@ public sealed class BrokerageController(
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("ibkr/disconnect")]
     public async Task<IActionResult> Disconnect(CancellationToken ct)
     {
@@ -77,6 +81,7 @@ public sealed class BrokerageController(
     /// from the OAuth connection above — used only for historical statement pulls, never for
     /// live positions — and never conflicts: connecting again replaces the stored artifacts.
     /// </summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpPost("ibkr/flex/connect")]
     public async Task<IActionResult> ConnectFlex([FromBody] ConnectIbkrFlexRequest request, CancellationToken ct)
     {
@@ -86,6 +91,7 @@ public sealed class BrokerageController(
     }
 
     /// <summary>Clears the caller's IBKR Flex credential. 404s if none is active.</summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("ibkr/flex/disconnect")]
     public async Task<IActionResult> DisconnectFlex(CancellationToken ct)
     {

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("research/assets")]
 public class AssetDossierController(
     IQueryHandler<GetAssetDossierQuery, AssetDossierResult> handler,
@@ -23,7 +24,7 @@ public class AssetDossierController(
     }
 
     /// <summary>Cached asset narrative — instant, never invokes the agent (feature 421, US3).</summary>
-    [Authorize(Policy = AuthPolicies.RequireOwner)]
+    [Authorize(Policy = AuthPolicies.RequireAiUse)]
     [HttpGet("{symbol}/narrative")]
     public async Task<IActionResult> GetNarrative(string symbol, CancellationToken ct)
     {
@@ -36,7 +37,7 @@ public class AssetDossierController(
     /// Generates the asset narrative through the agent loop and caches it. A fresh cached copy is
     /// returned as-is unless <c>force=true</c>.
     /// </summary>
-    [Authorize(Policy = AuthPolicies.RequireOwner)]
+    [Authorize(Policy = AuthPolicies.RequireAiUse)]
     [HttpPost("{symbol}/narrative")]
     public async Task<IActionResult> GenerateNarrative(
         string symbol, [FromQuery] bool force, CancellationToken ct)

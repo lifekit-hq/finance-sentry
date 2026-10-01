@@ -5,9 +5,11 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Budgets.API.Responses;
 using FinanceSentry.Modules.Budgets.Application.Commands;
 using FinanceSentry.Modules.Budgets.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("budgets")]
 public class BudgetsController(
     IQueryHandler<GetBudgetsQuery, BudgetsListResponse> getBudgets,

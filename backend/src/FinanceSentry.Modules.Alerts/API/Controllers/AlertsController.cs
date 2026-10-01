@@ -6,9 +6,11 @@ using FinanceSentry.Modules.Alerts.API.Responses;
 using FinanceSentry.Modules.Alerts.Application.Commands;
 using FinanceSentry.Modules.Alerts.Application.Queries;
 using FinanceSentry.Modules.Alerts.Domain.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("alerts")]
 public class AlertsController(
     IQueryHandler<GetAlertsQuery, AlertsPageResponse> getAlerts,

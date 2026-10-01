@@ -4,9 +4,11 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("dashboard")]
 public class DashboardController(
     IDashboardQueryService dashboard,

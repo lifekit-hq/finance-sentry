@@ -3,9 +3,11 @@ namespace FinanceSentry.Modules.Research.API.Controllers;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
+[Authorize]
 [Route("research/news")]
 public class NewsController(
     IQueryHandler<SearchMarketNewsQuery, SearchMarketNewsResult> search,

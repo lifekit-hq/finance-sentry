@@ -1,11 +1,13 @@
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceSentry.Modules.Auth.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("profile")]
 public class ProfileController(
     IQueryHandler<GetProfileQuery, UserProfileDto> getProfileHandler,

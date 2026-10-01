@@ -19,8 +19,7 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
-
-const LEDGER_ROUTE: string = AppRoute.Ledger;
+import {CONNECT_ACTION_ID, PERMISSION_BY_ENTRY} from './app-shell.constants';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
@@ -38,7 +37,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Events, label: 'Events', icon: 'CalendarDays', group: 'Pages'},
   {id: AppRoute.Ledger, label: 'Ledger', icon: 'Sparkles', group: 'Pages'},
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
-  {id: '_connect', label: 'Connect Account', icon: 'Link', group: 'Actions'},
+  {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
   {id: '_theme', label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
   {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},
 ];
@@ -68,7 +67,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       <router-outlet />
     </cmn-app-layout>
 
-    @if (isOwner()) {
+    @if (canUseAi()) {
       <fns-chat-widget />
     }
   `,
@@ -106,12 +105,12 @@ export class AppShellComponent {
     {label: 'Settings', icon: 'Settings2', route: AppRoute.Settings},
   ];
 
-  public readonly isOwner = this.authStore.isOwner;
+  public readonly canUseAi = this.authStore.canUseAi;
   public readonly themeService = inject(ThemeService);
   public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
   public readonly versionLabel = `v${APP_VERSION}`;
   public readonly navItems = computed(() =>
-    this.allNavItems.filter(item => this.authStore.isOwner() || item.route !== LEDGER_ROUTE)
+    this.allNavItems.filter(item => this.isPermitted(item.route))
   );
   public readonly isDark = computed(() => this.theme() === 'dark');
   public readonly activeRoute = computed(() => {
@@ -145,9 +144,7 @@ export class AppShellComponent {
   public openPalette(): void {
     this.dialog
       .open<PaletteResult>(CommandPaletteComponent, {
-        data: this.authStore.isOwner()
-          ? PALETTE_ITEMS
-          : PALETTE_ITEMS.filter(item => item.id !== LEDGER_ROUTE),
+        data: PALETTE_ITEMS.filter(item => this.isPermitted(item.id)),
         container: CmnDialogBareContainerComponent,
         hasBackdrop: false,
         panelClass: [],
@@ -167,12 +164,17 @@ export class AppShellComponent {
       });
   }
 
+  private isPermitted(entry: string): boolean {
+    const permission = PERMISSION_BY_ENTRY[entry];
+    return permission === undefined || this.authStore.permissions().includes(permission);
+  }
+
   private handleAction(id: string): void {
     if (id === '_theme') {
       this.themeService.toggle();
     } else if (id === '_logout') {
       this.authStore.logout();
-    } else if (id === '_connect') {
+    } else if (id === CONNECT_ACTION_ID) {
       void this.router.navigateByUrl(AppRoute.AccountsList);
     }
   }

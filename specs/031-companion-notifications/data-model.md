@@ -64,7 +64,7 @@ capture ──► Pending ───────────(realtime relay)─�
         ├─► SuppressedByMode        (quiet — terminal)
         ├─► SuppressedByDedup       (terminal; never actually inserted — the unique key rejects it)
         ├─► SuppressedByRateLimit / DeferredQuietHours  (realtime, re-evaluated next tick)
-        ├─► SuppressedNonOwner      (realtime relay, user is not the Owner — terminal)
+        ├─► SuppressedNonOwner      (realtime relay, user lacks `ai.use` — terminal; name predates permissions)
         └─► Failed                  (retry-exhausted; visible, re-drivable)
 ```
 Every captured event is recorded with a disposition — none lost (FR-007 / SC-005).

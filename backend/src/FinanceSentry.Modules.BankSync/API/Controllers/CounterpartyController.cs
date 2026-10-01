@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BankSync.API.Controllers;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.BankSync.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 /// fields — see docs/money-semantics.md §5.1.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("counterparties")]
 public class CounterpartyController(
     ICommandHandler<SetCounterpartyExpectedInflowCommand, SetCounterpartyExpectedInflowResult> setExpectedInflow)

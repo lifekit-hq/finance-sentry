@@ -56,7 +56,7 @@
 
 | Risk | Mitigation |
 |------|------------|
-| Hangfire dashboard access | Signed-in `Owner` role only, in every environment including Development (`RequireOwner` policy via `MapHangfireDashboardWithAuthorizationPolicy`) |
+| Hangfire dashboard access | Signed-in account holding `ops.admin` (Owner role) only, in every environment including Development (`RequireOwner` policy via `MapHangfireDashboardWithAuthorizationPolicy`) |
 
 ## Next Review Date
 

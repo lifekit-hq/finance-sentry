@@ -5,6 +5,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 /// preference over the whole book, not an operation on a bank account.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("committed-merchants")]
 public class CommittedMerchantsController(
     IQueryHandler<ListCommittedMerchantPinsQuery, IReadOnlyList<CommittedMerchantPinDto>> listPins,

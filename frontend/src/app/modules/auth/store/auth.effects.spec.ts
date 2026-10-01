@@ -10,7 +10,7 @@ import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
 
 const SAMPLE_RESPONSE: AuthResponse = {
-  user: {id: 'u-1', email: 'user@test.com', roles: []},
+  user: {id: 'u-1', email: 'user@test.com', roles: [], permissions: []},
   expiresAt: '2099-01-01T00:00:00Z',
 };
 

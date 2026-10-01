@@ -12,13 +12,13 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
-/// The in-app finance agent (Ledger) surface — feature 040 US2. Owner-only (<see cref="AuthPolicies.RequireOwner"/>); every
+/// The in-app finance agent (Ledger) surface — feature 040 US2. Requires the <c>ai.use</c> permission (<see cref="AuthPolicies.RequireAiUse"/>); every
 /// route is scoped to the caller's user, and no user id in the path/body is honored. Chat streams over
 /// Server-Sent Events per <c>contracts/chat-endpoint.md</c>. Keyless ⇒ a single <c>agent_not_configured</c>
 /// error event, no model call.
 /// </summary>
 [ApiController]
-[Authorize(Policy = AuthPolicies.RequireOwner)]
+[Authorize(Policy = AuthPolicies.RequireAiUse)]
 [Route("agent")]
 public sealed class AgentChatController(
     ICommandHandler<SendAgentMessageCommand, IAsyncEnumerable<AgentStreamEvent>> sendHandler,
@@ -78,7 +78,7 @@ public sealed class AgentChatController(
             : Ok(conversation);
     }
 
-    /// <summary>Delete a conversation (cascade messages). Owner-only.</summary>
+    /// <summary>Delete a conversation (cascade messages). Requires <c>ai.use</c>.</summary>
     [HttpDelete("conversations/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

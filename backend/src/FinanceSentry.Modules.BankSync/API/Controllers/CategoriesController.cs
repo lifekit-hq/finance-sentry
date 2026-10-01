@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.API.Controllers;
 
 using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 /// single source of truth instead of hardcoding them.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("categories")]
 public class CategoriesController(ICategoryReadService categories) : ControllerBase
 {

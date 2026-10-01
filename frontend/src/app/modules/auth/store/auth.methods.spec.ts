@@ -11,13 +11,18 @@ function makeState() {
 }
 
 const SAMPLE_RESPONSE: AuthResponse = {
-  user: {id: 'user-123', email: 'user@test.com', roles: []},
+  user: {
+    id: 'user-123',
+    email: 'user@test.com',
+    roles: ['Member'],
+    permissions: ['connections.manage'],
+  },
   expiresAt: '2099-01-01T00:00:00Z',
 };
 
 describe('authMethods', () => {
   describe('applyAuthResponse', () => {
-    it('patches state with userId/email and resets status/error/flow/flashMessage', () => {
+    it('patches state with userId/email/roles/permissions and resets status/error/flow/flashMessage', () => {
       const {state, methods} = makeState();
       methods.setLoading('login');
       methods.setFlashMessage({kind: 'info', text: 'stale'});
@@ -26,6 +31,8 @@ describe('authMethods', () => {
 
       expect(state.userId()).toBe(SAMPLE_RESPONSE.user.id);
       expect(state.email()).toBe(SAMPLE_RESPONSE.user.email);
+      expect(state.roles()).toEqual(['Member']);
+      expect(state.permissions()).toEqual(['connections.manage']);
       expect(state.status()).toBe('idle');
       expect(state.errorCode()).toBeNull();
       expect(state.flow()).toBeNull();
@@ -34,7 +41,7 @@ describe('authMethods', () => {
   });
 
   describe('clearSession', () => {
-    it('clears userId and email but preserves flashMessage', () => {
+    it('clears userId, email, roles and permissions but preserves flashMessage', () => {
       const {state, methods} = makeState();
       methods.applyAuthResponse(SAMPLE_RESPONSE);
       methods.setFlashMessage({kind: 'error', text: 'keep me'});
@@ -43,6 +50,8 @@ describe('authMethods', () => {
 
       expect(state.userId()).toBeNull();
       expect(state.email()).toBeNull();
+      expect(state.roles()).toEqual([]);
+      expect(state.permissions()).toEqual([]);
       expect(state.status()).toBe('idle');
       expect(state.errorCode()).toBeNull();
       expect(state.flow()).toBeNull();
