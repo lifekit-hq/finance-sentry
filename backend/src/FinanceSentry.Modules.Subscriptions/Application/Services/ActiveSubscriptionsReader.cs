@@ -3,6 +3,8 @@ namespace FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 
+// Its callers include bank syncs and sentinel jobs with no person in scope, so every read is unscoped and keyed by
+// the user it is given.
 public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repository) : IActiveSubscriptionsReader
 {
     private readonly IDetectedSubscriptionRepository _repository = repository;
@@ -10,7 +12,7 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
     public async Task<IReadOnlyList<ActiveSubscriptionSummary>> GetActiveSubscriptionsAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var subscriptions = await _repository.GetActiveByUserIdAsync(userId.ToString(), ct);
+        var subscriptions = await _repository.GetActiveByUserIdUnscopedAsync(userId.ToString(), ct);
 
         return subscriptions
             .Where(s => s.Kind == SubscriptionKinds.Subscription)
@@ -26,7 +28,7 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
     public async Task<IReadOnlySet<string>> GetActiveCommitmentMerchantKeysAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var subscriptions = await _repository.GetActiveByUserIdAsync(userId.ToString(), ct);
+        var subscriptions = await _repository.GetActiveByUserIdUnscopedAsync(userId.ToString(), ct);
 
         return subscriptions
             .Select(s => s.MerchantNameNormalized)
@@ -36,7 +38,7 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
     public async Task<IReadOnlyList<string>> GetActiveManualCommitmentMerchantNamesAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var subscriptions = await _repository.GetActiveByUserIdAsync(userId.ToString(), ct);
+        var subscriptions = await _repository.GetActiveByUserIdUnscopedAsync(userId.ToString(), ct);
 
         return subscriptions
             .Where(s => s.IsManual)
@@ -47,7 +49,7 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
     public async Task<IReadOnlyList<ActiveInstallmentPlan>> GetActiveInstallmentPlansAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var subscriptions = await _repository.GetActiveByUserIdAsync(userId.ToString(), ct);
+        var subscriptions = await _repository.GetActiveByUserIdUnscopedAsync(userId.ToString(), ct);
 
         return subscriptions
             .Where(s => s.Kind == SubscriptionKinds.Installment)

@@ -1,12 +1,17 @@
 namespace FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 
 using System.Text.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Regime;
 using Microsoft.EntityFrameworkCore;
 
-public class RadarDbContext(DbContextOptions<RadarDbContext> options) : DbContext(options)
+public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no
+    // holder-scoped signal.
+    private Guid? CurrentUserId => currentUser.UserId;
+
     public DbSet<DailyBar> DailyBars { get; set; } = null!;
 
     public DbSet<RadarSignal> RadarSignals { get; set; } = null!;
@@ -39,6 +44,9 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options) : DbContex
         var sig = modelBuilder.Entity<RadarSignal>();
         sig.ToTable("radar_signals");
         sig.HasKey(x => x.Id);
+        // A null UserId is a global signal (breadth, rotation), readable by every person; a holder-scoped signal
+        // only by its holder. Bars, universe members and regime readings are market data with no owner.
+        sig.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == null || x.UserId == CurrentUserId);
         sig.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         sig.Property(x => x.Timestamp).IsRequired();
         sig.Property(x => x.Scanner).IsRequired().HasMaxLength(50);

@@ -1,12 +1,19 @@
 namespace FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Subscriptions.Domain;
 using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under SubscriptionsDbContext's Owner query filter. The detection job and the cross-module readers run
+// with no person in scope, so they call the …Unscoped… methods, which opt out of the filter and keep their own
+// UserId predicate. The upsert's existence check opts out too: with no person in scope a filtered check finds
+// nothing and re-adds a row that already exists.
 public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetectedSubscriptionRepository
 {
     private readonly SubscriptionsDbContext _db = db;
+
+    private IQueryable<DetectedSubscription> AllUsers => _db.DetectedSubscriptions.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<IReadOnlyList<DetectedSubscription>> GetByUserIdAsync(
         string userId, bool includeDismissed, CancellationToken ct = default)
@@ -23,14 +30,14 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
     public Task<DetectedSubscription?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => _db.DetectedSubscriptions.FirstOrDefaultAsync(s => s.Id == id, ct);
 
-    public Task<DetectedSubscription?> FindByUserAndMerchantAsync(
+    public Task<DetectedSubscription?> FindByUserAndMerchantUnscopedAsync(
         string userId, string merchantNameNormalized, CancellationToken ct = default)
-        => _db.DetectedSubscriptions
+        => AllUsers
             .FirstOrDefaultAsync(s => s.UserId == userId && s.MerchantNameNormalized == merchantNameNormalized, ct);
 
     public async Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
     {
-        var existing = await _db.DetectedSubscriptions
+        var existing = await AllUsers
             .FirstOrDefaultAsync(s => s.Id == subscription.Id, ct);
 
         if (existing is null)
@@ -45,21 +52,6 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task UpdateStatusAsync(Guid id, string status, CancellationToken ct = default)
-    {
-        var subscription = await _db.DetectedSubscriptions.FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (subscription is null) return;
-
-        if (status == SubscriptionStatus.Dismissed)
-            subscription.MarkDismissed();
-        else if (status == SubscriptionStatus.Active)
-            subscription.Restore();
-        else if (status == SubscriptionStatus.PotentiallyCancelled)
-            subscription.MarkPotentiallyCancelled();
-
-        await _db.SaveChangesAsync(ct);
-    }
-
     public async Task<IReadOnlyList<DetectedSubscription>> GetActiveByUserIdAsync(
         string userId, CancellationToken ct = default)
     {
@@ -68,10 +60,18 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveAsync(
+    public async Task<IReadOnlyList<DetectedSubscription>> GetActiveByUserIdUnscopedAsync(
         string userId, CancellationToken ct = default)
     {
-        return await _db.DetectedSubscriptions
+        return await AllUsers.AsNoTracking()
+            .Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveUnscopedAsync(
+        string userId, CancellationToken ct = default)
+    {
+        return await AllUsers
             .Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active)
             .ToListAsync(ct);
     }

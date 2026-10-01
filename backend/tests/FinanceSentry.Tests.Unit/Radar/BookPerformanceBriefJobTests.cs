@@ -37,7 +37,7 @@ public sealed class BookPerformanceBriefJobTests
     private BookPerformanceBriefJob Job()
     {
         _signals
-            .Setup(s => s.ListAsync(It.IsAny<SignalFilter>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ListForUserUnscopedAsync(It.IsAny<Guid>(), It.IsAny<SignalFilter>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _trackRecord
             .Setup(t => t.GetDeltaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))

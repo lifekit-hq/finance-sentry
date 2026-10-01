@@ -69,12 +69,13 @@ public sealed class BookPerformanceBriefJob(
             }
 
             // Every Notable portfolio signal, not just drift: the suggested action also weighs the
-            // cash floor and the position cap, and the composer partitions by signal type.
-            var portfolioSignals = await signals.ListAsync(
+            // cash floor and the position cap, and the composer partitions by signal type. The job has
+            // no person in scope, so it reads the user's signals unscoped.
+            var portfolioSignals = await signals.ListForUserUnscopedAsync(
+                userId,
                 new SignalFilter(
                     Since: DateTimeOffset.UtcNow - SignalLookback,
                     Scanner: RadarScanners.Portfolio,
-                    UserId: userId,
                     Severity: nameof(SignalSeverity.Notable)),
                 ct);
 

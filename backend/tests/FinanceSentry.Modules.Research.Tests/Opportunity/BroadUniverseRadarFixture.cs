@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Tests.Opportunity;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
@@ -89,7 +90,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
         var dbOptions = new DbContextOptionsBuilder<RadarDbContext>()
             .UseInMemoryDatabase($"broad-universe-{Guid.NewGuid():N}")
             .Options;
-        var db = new RadarDbContext(dbOptions);
+        var db = new RadarDbContext(dbOptions, NoCurrentUser.Instance);
         try
         {
             return await ComposeAsync(db, userId ?? Guid.NewGuid());

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,6 @@ public class SubscriptionsDbContextFactory : IDesignTimeDbContextFactory<Subscri
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history_subscriptions", "public");
             });
 
-        return new SubscriptionsDbContext(optionsBuilder.Options);
+        return new SubscriptionsDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

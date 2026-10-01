@@ -312,7 +312,7 @@ public class CommittedOutflowPolicyTests
             DateOnly.FromDateTime(DateTime.UtcNow), termCount: null, kind: SubscriptionKinds.Subscription);
 
         var repo = new Mock<IDetectedSubscriptionRepository>();
-        repo.Setup(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([manual]);
 
         var reader = new ActiveSubscriptionsReader(repo.Object);
@@ -332,7 +332,7 @@ public class CommittedOutflowPolicyTests
         // debits. GetActiveByUserIdAsync already excludes it, so the repository simply never
         // hands it back — this pins that the policy does not widen the set on its own.
         var repo = new Mock<IDetectedSubscriptionRepository>();
-        repo.Setup(r => r.GetActiveByUserIdAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetActiveByUserIdUnscopedAsync(UserId.ToString(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var reader = new ActiveSubscriptionsReader(repo.Object);

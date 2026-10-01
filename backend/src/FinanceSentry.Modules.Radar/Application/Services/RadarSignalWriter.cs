@@ -27,7 +27,7 @@ public sealed class RadarSignalWriter(
             var since = request.OneTime
                 ? DateTimeOffset.MinValue
                 : DateTimeOffset.UtcNow - TimeSpan.FromHours(_options.SilenceWindowHours);
-            if (await signals.HasRecentAsync(request.DedupKey, since, ct))
+            if (await signals.HasRecentUnscopedAsync(request.DedupKey, since, ct))
             {
                 return false;
             }
