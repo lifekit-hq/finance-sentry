@@ -76,6 +76,12 @@ export interface EventDayGroup {
   items: UpcomingEvent[];
 }
 
+export interface EventWeekSection {
+  id: 'week' | 'later';
+  label: string;
+  groups: EventDayGroup[];
+}
+
 export interface CalendarWindow {
   from: string;
   to: string;

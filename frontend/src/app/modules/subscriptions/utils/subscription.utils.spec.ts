@@ -24,3 +24,58 @@ describe('SubscriptionUtils.getMerchantColor', () => {
     expect(SubscriptionUtils.getMerchantColor('')).toBe('hsl(220, 14%, 50%)');
   });
 });
+
+describe('SubscriptionUtils.daysUntil', () => {
+  const now = new Date('2026-10-01T12:00:00Z').getTime();
+
+  it('rounds a partial day up', () => {
+    expect(SubscriptionUtils.daysUntil('2026-10-04T00:00:00Z', now)).toBe(3);
+  });
+
+  it('is zero on the same instant', () => {
+    expect(SubscriptionUtils.daysUntil('2026-10-01T12:00:00Z', now)).toBe(0);
+  });
+
+  it('is negative for a past date', () => {
+    expect(SubscriptionUtils.daysUntil('2026-09-29T12:00:00Z', now)).toBe(-2);
+  });
+});
+
+describe('SubscriptionUtils.installmentProgress', () => {
+  it('shows paid, term and remaining for a fixed-term plan', () => {
+    expect(
+      SubscriptionUtils.installmentProgress({
+        occurrenceCount: 3,
+        termCount: 12,
+        remainingPayments: 9,
+      })
+    ).toBe('3 / 12 paid · 9 left');
+  });
+
+  it('omits the remainder when it is unknown', () => {
+    expect(
+      SubscriptionUtils.installmentProgress({
+        occurrenceCount: 3,
+        termCount: 12,
+        remainingPayments: null,
+      })
+    ).toBe('3 / 12 paid');
+  });
+
+  it('counts payments when there is no term', () => {
+    expect(
+      SubscriptionUtils.installmentProgress({
+        occurrenceCount: 1,
+        termCount: null,
+        remainingPayments: null,
+      })
+    ).toBe('1 payment');
+    expect(
+      SubscriptionUtils.installmentProgress({
+        occurrenceCount: 4,
+        termCount: null,
+        remainingPayments: null,
+      })
+    ).toBe('4 payments');
+  });
+});

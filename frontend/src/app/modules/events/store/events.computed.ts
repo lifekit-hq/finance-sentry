@@ -1,12 +1,12 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
-import {EVENT_SOURCE_LABELS} from '../constants/event/event.constants';
+import {EVENT_SOURCE_LABELS, THIS_WEEK_DAYS} from '../constants/event/event.constants';
 import {
   type CalendarWindow,
-  type EventDayGroup,
   type EventKind,
   type EventSourceStatusEntry,
+  type EventWeekSection,
   type FiredEvent,
   type UpcomingEvent,
 } from '../models/event/event.model';
@@ -46,7 +46,18 @@ export function eventsComputed(store: StateSignals) {
       }
       return errorMessages.resolve(store.upcomingErrorCode()) ?? DEFAULT_UPCOMING_ERROR;
     }),
-    upcomingByDay: computed((): EventDayGroup[] => EventDayUtils.groupByDay(store.upcoming())),
+    /** Day groups split into "This week" and "Later"; a section with no days is left out. */
+    upcomingSections: computed((): EventWeekSection[] => {
+      const today = EventDayUtils.toIsoDate(new Date());
+      const groups = EventDayUtils.groupByDay(store.upcoming());
+      const isThisWeek = (date: string) => EventDayUtils.daysUntil(date, today) < THIS_WEEK_DAYS;
+      return (
+        [
+          {id: 'week', label: 'This week', groups: groups.filter(g => isThisWeek(g.date))},
+          {id: 'later', label: 'Later', groups: groups.filter(g => !isThisWeek(g.date))},
+        ] satisfies EventWeekSection[]
+      ).filter(section => section.groups.length > 0);
+    }),
     isUpcomingEmpty: computed(
       () => store.upcomingStatus() === 'idle' && store.upcoming().length === 0
     ),
@@ -57,9 +68,10 @@ export function eventsComputed(store: StateSignals) {
         .filter(s => s.status === 'unavailable')
         .map(s => EVENT_SOURCE_LABELS[s.source] ?? s.source)
     ),
+    /** Chips light up only for an explicit pick; an empty selection means every kind. */
     isKindSelected: computed(() => {
       const selected = store.kinds();
-      return (kind: EventKind): boolean => selected.length === 0 || selected.includes(kind);
+      return (kind: EventKind): boolean => selected.includes(kind);
     }),
     isFiredLoading: computed(() => store.firedStatus() === 'loading'),
     firedErrorMessage: computed(() => {

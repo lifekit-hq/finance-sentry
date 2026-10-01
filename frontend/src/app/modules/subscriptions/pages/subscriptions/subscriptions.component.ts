@@ -1,31 +1,35 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
-import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
 import {
   ButtonComponent,
   CardComponent,
   ChipComponent,
   CmnDialogService,
   ConfirmDialogComponent,
-  FormFieldComponent,
-  InputComponent,
-  LineChartComponent,
+  EmptyStateComponent,
+  IconComponent,
   ListItemRowComponent,
+  MenuComponent,
+  type MenuItem,
   PageHeaderComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {AddInstallmentDialogComponent} from '../../components/add-installment-dialog/add-installment-dialog.component';
+import {AddSubscriptionDialogComponent} from '../../components/add-subscription-dialog/add-subscription-dialog.component';
+import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
+import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
 import {
+  type AddInstallmentRequest,
+  type AddSubscriptionRequest,
   type Subscription,
   type SubscriptionSort,
 } from '../../models/subscription/subscription.model';
+import {InstallmentProgressPipe} from '../../pipes/installment-progress.pipe';
 import {MerchantColorPipe} from '../../pipes/merchant-color.pipe';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
-
-const MS_PER_DAY = 86_400_000;
-const MIN_MONTHLY_AMOUNT = 0.01;
 
 const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
   {value: 'date', label: 'Next charge'},
@@ -33,21 +37,27 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
   {value: 'name', label: 'Name'},
 ];
 
+const INSTALLMENT_MENU_ITEMS: MenuItem[] = [
+  {id: 'term', label: 'Set term', icon: 'Pencil'},
+  {id: 'done', label: 'Mark as done', icon: 'Check'},
+  {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
+];
+
 @Component({
   selector: 'fns-subscriptions',
   imports: [
-    FormFieldComponent,
-    MoneyPipe,
     ButtonComponent,
     CardComponent,
     ChipComponent,
     DatePipe,
-    InputComponent,
-    LineChartComponent,
+    EmptyStateComponent,
+    IconComponent,
+    InstallmentProgressPipe,
     ListItemRowComponent,
+    MenuComponent,
     MerchantColorPipe,
+    MoneyPipe,
     PageHeaderComponent,
-    ReactiveFormsModule,
     SlicePipe,
     StatCardComponent,
     UpperCasePipe,
@@ -59,40 +69,56 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
 export class SubscriptionsComponent {
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
-  // One reusable control for the inline "set term" editor per installment row.
-  private readonly termControls = new Map<string, FormControl<number | null>>();
 
   public readonly store = inject(SubscriptionsStore);
   public readonly sortOptions = SORT_OPTIONS;
-
-  public readonly showAddForm = signal(false);
-  public readonly showSubForm = signal(false);
-
-  public readonly subForm = new FormGroup({
-    merchant: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
-    monthlyAmount: new FormControl<number | null>(null, {
-      validators: [Validators.required, Validators.min(MIN_MONTHLY_AMOUNT)],
-    }),
-    currency: new FormControl('EUR', {nonNullable: true, validators: [Validators.required]}),
-    startDate: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
-  });
-
-  public readonly addForm = new FormGroup({
-    merchant: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
-    monthlyAmount: new FormControl<number | null>(null, {
-      validators: [Validators.required, Validators.min(MIN_MONTHLY_AMOUNT)],
-    }),
-    currency: new FormControl('UAH', {nonNullable: true, validators: [Validators.required]}),
-    startDate: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
-    termCount: new FormControl<number | null>(null),
-  });
-
-  public daysUntil(dateStr: string): number {
-    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / MS_PER_DAY);
-  }
+  public readonly cadenceLabels = CADENCE_LABELS;
+  public readonly installmentMenuItems = INSTALLMENT_MENU_ITEMS;
 
   public setSort(sort: SubscriptionSort): void {
     this.store.setSort(sort);
+  }
+
+  public openAddSubscription(): void {
+    this.dialog
+      .open<AddSubscriptionRequest>(AddSubscriptionDialogComponent, {
+        title: 'Add subscription',
+        size: 'md',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(payload => {
+        if (payload) {
+          this.store.addSubscription(payload);
+        }
+      });
+  }
+
+  public openAddInstallment(): void {
+    this.dialog
+      .open<AddInstallmentRequest>(AddInstallmentDialogComponent, {
+        title: 'Add installment',
+        size: 'md',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(payload => {
+        if (payload) {
+          this.store.addInstallment(payload);
+        }
+      });
+  }
+
+  public onInstallmentAction(action: string, item: Subscription): void {
+    if (action === 'term') {
+      this.openSetTerm(item);
+    } else if (action === 'done') {
+      this.store.completeInstallment(item.id);
+    } else if (action === 'delete') {
+      this.deleteInstallment(item);
+    }
   }
 
   public dismiss(sub: Pick<Subscription, 'id' | 'merchantName'>): void {
@@ -121,10 +147,6 @@ export class SubscriptionsComponent {
     this.store.restore(id);
   }
 
-  public markInstallmentDone(id: string): void {
-    this.store.completeInstallment(id);
-  }
-
   public deleteInstallment(sub: Pick<Subscription, 'id' | 'merchantName'>): void {
     const ref = this.dialog.open<boolean>(ConfirmDialogComponent, {
       data: {
@@ -147,65 +169,20 @@ export class SubscriptionsComponent {
       });
   }
 
-  public termControl(sub: Pick<Subscription, 'id' | 'termCount'>): FormControl<number | null> {
-    let control = this.termControls.get(sub.id);
-    if (!control) {
-      control = new FormControl<number | null>(sub.termCount ?? null);
-      this.termControls.set(sub.id, control);
-    }
-    return control;
-  }
-
-  public saveTerm(id: string): void {
-    const control = this.termControls.get(id);
-    const value = control?.value ?? null;
-    this.store.setInstallmentTerm({id, termCount: value && value > 0 ? value : null});
-  }
-
-  public toggleAddForm(): void {
-    this.showAddForm.update(open => !open);
-  }
-
-  public toggleSubForm(): void {
-    this.showSubForm.update(open => !open);
-  }
-
-  public submitSubscription(): void {
-    if (this.subForm.invalid) {
-      this.subForm.markAllAsTouched();
-      return;
-    }
-    const value = this.subForm.getRawValue();
-    this.store.addSubscription({
-      merchant: value.merchant,
-      monthlyAmount: value.monthlyAmount ?? 0,
-      currency: value.currency,
-      startDate: value.startDate,
-    });
-    this.subForm.reset({merchant: '', monthlyAmount: null, currency: 'EUR', startDate: ''});
-    this.showSubForm.set(false);
-  }
-
-  public submitAdd(): void {
-    if (this.addForm.invalid) {
-      this.addForm.markAllAsTouched();
-      return;
-    }
-    const value = this.addForm.getRawValue();
-    this.store.addInstallment({
-      merchant: value.merchant,
-      monthlyAmount: value.monthlyAmount ?? 0,
-      currency: value.currency,
-      startDate: value.startDate,
-      termCount: value.termCount && value.termCount > 0 ? value.termCount : null,
-    });
-    this.addForm.reset({
-      merchant: '',
-      monthlyAmount: null,
-      currency: 'UAH',
-      startDate: '',
-      termCount: null,
-    });
-    this.showAddForm.set(false);
+  private openSetTerm(item: Pick<Subscription, 'id' | 'merchantName' | 'termCount'>): void {
+    this.dialog
+      .open<Nullable<number>>(SetTermDialogComponent, {
+        title: `${item.merchantName} — term`,
+        data: {termCount: item.termCount},
+        size: 'sm',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(termCount => {
+        if (termCount !== undefined) {
+          this.store.setInstallmentTerm({id: item.id, termCount});
+        }
+      });
   }
 }

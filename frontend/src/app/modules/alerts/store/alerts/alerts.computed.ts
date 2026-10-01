@@ -11,9 +11,6 @@ interface StateSignals {
 
 export function alertsComputed(store: StateSignals) {
   return {
-    errorCount: computed(() => store.alerts().filter(a => a.severity === 'Error').length),
-    warningCount: computed(() => store.alerts().filter(a => a.severity === 'Warning').length),
-    infoCount: computed(() => store.alerts().filter(a => a.severity === 'Info').length),
     isLoading: computed(() => store.status() === 'loading'),
     errorMessage: computed(() => (store.status() === 'error' ? 'Failed to load alerts.' : null)),
   };

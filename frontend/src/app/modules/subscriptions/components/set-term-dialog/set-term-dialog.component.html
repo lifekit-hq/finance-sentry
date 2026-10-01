@@ -1,0 +1,13 @@
+<form (ngSubmit)="save()" class="space-y-cmn-3">
+  <cmn-form-field
+    [control]="control"
+    label="Total payments"
+    hint="Leave empty if the plan has no fixed term"
+  >
+    <cmn-input [formControl]="control" type="number" placeholder="e.g. 12" />
+  </cmn-form-field>
+  <cmn-dialog-actions align="end">
+    <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+    <cmn-button type="submit" variant="primary">Save</cmn-button>
+  </cmn-dialog-actions>
+</form>

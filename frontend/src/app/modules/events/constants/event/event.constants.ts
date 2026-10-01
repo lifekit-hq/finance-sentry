@@ -15,7 +15,6 @@ export interface EventKindMeta {
 export interface OutcomeMeta {
   label: string;
   variant: EventTagVariant;
-  description: string;
 }
 
 export interface EventsViewOption {
@@ -30,6 +29,7 @@ const HORIZON_QUARTER = 90;
 export const EVENT_HORIZON_DAYS: readonly number[] = [HORIZON_WEEK, HORIZON_MONTH, HORIZON_QUARTER];
 export const DEFAULT_EVENT_HORIZON_DAYS = HORIZON_MONTH;
 export const FIRED_PAGE_SIZE = 20;
+export const THIS_WEEK_DAYS = 7;
 
 export const EVENTS_VIEW_OPTIONS: readonly EventsViewOption[] = [
   {id: 'calendar', label: 'Calendar'},
@@ -63,28 +63,23 @@ export const FIRED_KIND_META_REGISTRY = {
 export const OUTCOME_META_REGISTRY = {
   ['verdict']: {
     label: 'Verdict',
-    variant: 'success',
-    description: 'The reader judged it and told you.',
+    variant: 'neutral',
   },
   ['judged_immaterial']: {
     label: 'Judged immaterial',
     variant: 'neutral',
-    description: 'The reader judged it and stayed quiet on purpose.',
   },
   ['silent']: {
     label: 'Silent',
     variant: 'neutral',
-    description: 'Acknowledged, nothing recorded - silence is the answer.',
   },
   ['awaiting']: {
     label: 'Awaiting',
-    variant: 'warning',
-    description: 'Not read yet.',
+    variant: 'neutral',
   },
   ['not_delivered']: {
     label: 'Not delivered',
     variant: 'error',
-    description: 'Suppressed or failed before it reached the reader.',
   },
 } satisfies Record<EventOutcome, OutcomeMeta>;
 

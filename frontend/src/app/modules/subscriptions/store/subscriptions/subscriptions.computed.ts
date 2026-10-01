@@ -1,21 +1,19 @@
 import {computed, type Signal} from '@angular/core';
-import {type ChartPoint} from '@lifekit-hq/ui';
 
+import {DUE_THIS_WEEK_DAYS} from '../../constants/subscription/subscription-form.constants';
 import {
-  type InstallmentFxImpactResponse,
   type Subscription,
+  type SubscriptionSection,
   type SubscriptionSort,
   type SubscriptionSummary,
 } from '../../models/subscription/subscription.model';
+import {SubscriptionUtils} from '../../utils/subscription.utils';
 
 interface StateSignals {
   subscriptions: Signal<Subscription[]>;
   sort: Signal<SubscriptionSort>;
   summary: Signal<Nullable<SubscriptionSummary>>;
-  fxImpact: Signal<Nullable<InstallmentFxImpactResponse>>;
 }
-
-const MONTH_LABEL_OPTIONS: Intl.DateTimeFormatOptions = {month: 'short', year: '2-digit'};
 
 function sortBy(items: Subscription[], sort: SubscriptionSort): Subscription[] {
   return [...items].sort((a, b) => {
@@ -29,25 +27,14 @@ function sortBy(items: Subscription[], sort: SubscriptionSort): Subscription[] {
   });
 }
 
+const isDueThisWeek = (s: Subscription): boolean =>
+  SubscriptionUtils.daysUntil(s.nextExpectedDate) <= DUE_THIS_WEEK_DAYS;
+
 const isSubscription = (s: Subscription): boolean => s.kind === 'subscription';
 const isInstallment = (s: Subscription): boolean => s.kind === 'installment';
 
 export function subscriptionsComputed(store: StateSignals) {
   return {
-    // Monthly cost of the foreign-currency plans in the base currency: the payments are
-    // fixed, so every move in this line is the exchange rate, not a change in what's owed.
-    fxCostPoints: computed((): ChartPoint[] =>
-      (store.fxImpact()?.points ?? []).map(p => ({
-        label: new Date(p.date).toLocaleDateString(undefined, MONTH_LABEL_OPTIONS),
-        value: p.monthlyCost,
-      }))
-    ),
-    fxRatePoints: computed((): ChartPoint[] =>
-      (store.fxImpact()?.points ?? []).map(p => ({
-        label: new Date(p.date).toLocaleDateString(undefined, MONTH_LABEL_OPTIONS),
-        value: p.unitsPerBase,
-      }))
-    ),
     activeSubscriptions: computed(() =>
       store.subscriptions().filter(s => s.status === 'active' && isSubscription(s))
     ),
@@ -63,12 +50,19 @@ export function subscriptionsComputed(store: StateSignals) {
     completedInstallments: computed(() =>
       store.subscriptions().filter(s => s.status === 'completed' && isInstallment(s))
     ),
-    sortedActive: computed((): Subscription[] =>
-      sortBy(
+    /** Active subscriptions split into a "Due this week" block and the rest (no label). */
+    activeSections: computed((): SubscriptionSection[] => {
+      const active = sortBy(
         store.subscriptions().filter(s => s.status === 'active' && isSubscription(s)),
         store.sort()
-      )
-    ),
+      );
+      return (
+        [
+          {id: 'due', label: 'Due this week', items: active.filter(isDueThisWeek)},
+          {id: 'later', label: null, items: active.filter(s => !isDueThisWeek(s))},
+        ] satisfies SubscriptionSection[]
+      ).filter(section => section.items.length > 0);
+    }),
     sortedInstallments: computed((): Subscription[] =>
       sortBy(
         store.subscriptions().filter(s => s.status === 'active' && isInstallment(s)),

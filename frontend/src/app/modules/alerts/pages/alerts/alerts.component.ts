@@ -22,6 +22,7 @@ import {
   type AlertSeverity,
   type AlertType,
 } from '../../models/alert/alert.model';
+import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
@@ -37,7 +38,13 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
 
 @Component({
   selector: 'fns-alerts',
-  imports: [AlertItemComponent, ChipComponent, EmptyStateComponent, PageHeaderComponent],
+  imports: [
+    AlertItemComponent,
+    AlertMessagePipe,
+    ChipComponent,
+    EmptyStateComponent,
+    PageHeaderComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block h-full'},
   templateUrl: './alerts.component.html',
@@ -83,10 +90,14 @@ export class AlertsComponent {
   });
 
   public readonly filterOptions: {id: AlertFilter; label: () => string}[] = [
-    {id: 'all', label: () => `All (${this.store.alerts().length})`},
-    {id: 'unread', label: () => `Unread (${this.store.unreadCount()})`},
-    {id: 'error', label: () => `Errors (${this.store.errorCount()})`},
-    {id: 'warning', label: () => `Warnings (${this.store.warningCount()})`},
+    {id: 'all', label: () => 'All'},
+    {
+      id: 'unread',
+      label: () =>
+        this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
+    },
+    {id: 'error', label: () => 'Errors'},
+    {id: 'warning', label: () => 'Warnings'},
     {id: 'info', label: () => 'Info'},
   ];
 
@@ -96,10 +107,6 @@ export class AlertsComponent {
 
   public typeLabel(type: AlertType): string {
     return this.metaFor(type).label;
-  }
-
-  public typeDescription(type: AlertType): string {
-    return this.metaFor(type).description;
   }
 
   // Tolerate alert types the backend added before this registry did (e.g. PolicyViolation,
@@ -123,11 +130,19 @@ export class AlertsComponent {
     this.toast.show('Alert dismissed', 'info');
   }
 
-  public openAlert(alert: Alert): void {
-    if (!alert.isRead) {
-      this.store.markRead(alert.id);
+  public onRowKey(event: Event, item: Alert): void {
+    if (event.target !== event.currentTarget) {
+      return;
     }
-    const target = alert.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
+    event.preventDefault();
+    this.openAlert(item);
+  }
+
+  public openAlert(item: Alert): void {
+    if (!item.isRead) {
+      this.store.markRead(item.id);
+    }
+    const target = item.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
     void this.router.navigateByUrl(target);
   }
 }

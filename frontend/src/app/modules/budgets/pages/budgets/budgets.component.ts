@@ -1,41 +1,51 @@
-import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
-  ButtonComponent,
   CardComponent,
-  FormFieldComponent,
+  CmnDialogService,
+  EmptyStateComponent,
+  IconComponent,
   InputComponent,
+  MenuComponent,
+  type MenuItem,
+  MonthStepperComponent,
   PageHeaderComponent,
-  SelectComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
+import {take} from 'rxjs';
 
-import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {CATEGORY_COLOR_FALLBACK} from '../../../../shared/store/categories/categories.computed';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
-import {BUDGETS_MONTHS_IN_YEAR} from '../../constants/budget/budget.constants';
+import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
+import {BUDGET_NEAR_LIMIT_PCT} from '../../constants/budget/budget.constants';
+import {type CreateBudgetRequest} from '../../models/budget/budget.model';
 import {BudgetsStore} from '../../store/budgets/budgets.store';
 
 const PCT_MAX = 100;
-const PCT_WARNING_THRESHOLD = 80;
+
+const BUDGET_MENU_ITEMS: MenuItem[] = [
+  {id: 'edit', label: 'Edit limit', icon: 'Pencil'},
+  {id: 'transactions', label: 'View transactions', icon: 'ArrowRight'},
+  {id: 'remove', label: 'Remove budget', icon: 'Trash2', destructive: true},
+];
 
 @Component({
   selector: 'fns-budgets',
   imports: [
     AlertComponent,
-    AppDecimalPipe,
-    ButtonComponent,
     CardComponent,
-    FormFieldComponent,
+    EmptyStateComponent,
     FormsModule,
+    IconComponent,
     InputComponent,
+    MenuComponent,
     MoneyPipe,
+    MonthStepperComponent,
     PageHeaderComponent,
-    SelectComponent,
     TagComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,17 +55,15 @@ const PCT_WARNING_THRESHOLD = 80;
 export class BudgetsComponent {
   private readonly router = inject(Router);
   private readonly categoryStore = inject(CategoryStore);
+  private readonly dialog = inject(CmnDialogService);
+  private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(BudgetsStore);
 
   public readonly editValue = signal('');
-  public readonly newCategory = signal('');
-  public readonly newLimit = signal('');
-
-  public readonly categories = this.categoryStore.categories;
-  public readonly categorySelectOptions = computed(() =>
-    this.categories().map(c => ({value: c.key, label: c.label}))
-  );
+  public readonly budgetMenuItems = BUDGET_MENU_ITEMS;
+  public readonly nearLimitPct = BUDGET_NEAR_LIMIT_PCT;
+  public readonly currentMonth = new Date();
 
   public categoryColor(category: string): string {
     return this.categoryStore.colorMap()[category] ?? CATEGORY_COLOR_FALLBACK;
@@ -70,10 +78,23 @@ export class BudgetsComponent {
     if (spent > limit) {
       return 'var(--color-status-error)';
     }
-    if (pct >= PCT_WARNING_THRESHOLD) {
+    if (pct >= BUDGET_NEAR_LIMIT_PCT) {
       return 'var(--color-status-warning)';
     }
     return this.categoryColor(category);
+  }
+
+  public onBudgetAction(
+    action: string,
+    budget: {id: string; category: string; monthlyLimit: number}
+  ): void {
+    if (action === 'edit') {
+      this.startEdit(budget.id, budget.monthlyLimit);
+    } else if (action === 'transactions') {
+      this.viewTransactions(budget.category);
+    } else if (action === 'remove') {
+      this.store.remove(budget.id);
+    }
   }
 
   public startEdit(id: string, monthlyLimit: number): void {
@@ -97,47 +118,27 @@ export class BudgetsComponent {
     this.store.setEditing(null);
   }
 
-  public createBudget(): void {
-    const cat = this.newCategory();
-    const lim = parseFloat(this.newLimit());
-    if (!cat || isNaN(lim) || lim <= 0) {
-      return;
-    }
-    this.store.create({category: cat, monthlyLimit: lim});
-    this.newCategory.set('');
-    this.newLimit.set('');
-  }
-
-  public deleteBudget(id: string): void {
-    this.store.remove(id);
+  public openAddBudget(): void {
+    this.dialog
+      .open<CreateBudgetRequest>(AddBudgetDialogComponent, {
+        title: 'Add budget',
+        size: 'sm',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(request => {
+        if (request) {
+          this.store.create(request);
+        }
+      });
   }
 
   public viewTransactions(category: string): void {
     void this.router.navigate([AppRoute.Transactions], {queryParams: {category}});
   }
 
-  public previousMonth(): void {
-    const year = this.store.selectedYear();
-    const month = this.store.selectedMonth();
-    if (month === 1) {
-      this.store.navigateToPeriod({year: year - 1, month: BUDGETS_MONTHS_IN_YEAR});
-    } else {
-      this.store.navigateToPeriod({year, month: month - 1});
-    }
-  }
-
-  public nextMonth(): void {
-    const year = this.store.selectedYear();
-    const month = this.store.selectedMonth();
-    const now = new Date();
-    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-    if (isCurrentMonth) {
-      return;
-    }
-    if (month === BUDGETS_MONTHS_IN_YEAR) {
-      this.store.navigateToPeriod({year: year + 1, month: 1});
-    } else {
-      this.store.navigateToPeriod({year, month: month + 1});
-    }
+  public onMonthChange(month: Date): void {
+    this.store.navigateToPeriod({year: month.getFullYear(), month: month.getMonth() + 1});
   }
 }
