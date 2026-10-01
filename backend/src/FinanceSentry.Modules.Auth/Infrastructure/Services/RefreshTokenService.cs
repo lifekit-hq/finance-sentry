@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
@@ -7,9 +8,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.Auth.Infrastructure.Services;
 
+// RefreshToken rows run under AuthDbContext's Owner query filter, but every read here opts out: a raw token is the
+// credential itself and is presented to anonymous endpoints (refresh, session probe, logout, MCP token exchange)
+// whose access token has expired or was never sent, and a bulk revoke names its user explicitly. Each opt-out keeps
+// its own predicate (the token hash, or the named user id).
 public class RefreshTokenService(AuthDbContext db) : IRefreshTokenService
 {
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromDays(30);
+
+    private IQueryable<RefreshToken> AllUsers => db.RefreshTokens.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<(string RawToken, RefreshToken Entity)> IssueAsync(
           string userId, CancellationToken cancellationToken = default)
@@ -24,10 +31,10 @@ public class RefreshTokenService(AuthDbContext db) : IRefreshTokenService
         return (raw, entity);
     }
 
-    public async Task<RefreshToken?> ValidateAsync(string rawToken, CancellationToken cancellationToken = default)
+    public async Task<RefreshToken?> ValidateUnscopedAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         var hash = Hash(rawToken);
-        var entity = await db.RefreshTokens
+        var entity = await AllUsers
             .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
 
         return entity?.IsValid() == true ? entity : null;
@@ -50,7 +57,7 @@ public class RefreshTokenService(AuthDbContext db) : IRefreshTokenService
 
     public async Task RevokeAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var tokens = await db.RefreshTokens
+        var tokens = await AllUsers
             .Where(t => t.UserId == userId && !t.IsRevoked)
             .ToListAsync(cancellationToken);
 
@@ -60,10 +67,10 @@ public class RefreshTokenService(AuthDbContext db) : IRefreshTokenService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RevokeTokenAsync(string rawToken, CancellationToken cancellationToken = default)
+    public async Task RevokeTokenUnscopedAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         var hash = Hash(rawToken);
-        var entity = await db.RefreshTokens
+        var entity = await AllUsers
             .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
 
         if (entity is null || entity.IsRevoked)

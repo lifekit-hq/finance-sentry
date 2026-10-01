@@ -18,7 +18,7 @@ public sealed class AuthorizeMcpCommandHandler(
     public async Task<AuthorizeMcpResult> Handle(AuthorizeMcpCommand request, CancellationToken cancellationToken)
     {
         var redirectUri = McpLoopbackRedirectUri.Validate(request.RedirectUri);
-        var existing = await refreshTokenService.ValidateAsync(request.RawRefreshToken, cancellationToken)
+        var existing = await refreshTokenService.ValidateUnscopedAsync(request.RawRefreshToken, cancellationToken)
             ?? throw new InvalidRefreshTokenException("No session found.");
 
         var user = await userManager.FindByIdAsync(existing.UserId)

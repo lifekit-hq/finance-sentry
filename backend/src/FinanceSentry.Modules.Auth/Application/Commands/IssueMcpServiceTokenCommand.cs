@@ -23,7 +23,7 @@ public sealed class IssueMcpServiceTokenCommandHandler(
 
     public async Task<IssueMcpServiceTokenResult> Handle(IssueMcpServiceTokenCommand request, CancellationToken cancellationToken)
     {
-        var existing = await refreshTokenService.ValidateAsync(request.RawRefreshToken, cancellationToken)
+        var existing = await refreshTokenService.ValidateUnscopedAsync(request.RawRefreshToken, cancellationToken)
             ?? throw new InvalidRefreshTokenException("No session found.");
 
         var user = await userManager.FindByIdAsync(existing.UserId)
