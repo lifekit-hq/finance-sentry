@@ -61,17 +61,32 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  const load = rxMethod<void>(
+  const fetchPage = rxMethod<'first' | 'next'>(
     pipe(
-      tap(() => store.setLoading()),
-      switchMap(() =>
-        bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
-          tap(res => store.setTransactions(res.items, res.totalCount, res.hasMore)),
-          StoreErrorUtils.catchAndSetError(store)
-        )
+      tap(page => {
+        if (page === 'next') {
+          store.nextPage();
+        }
+        store.setLoading();
+      }),
+      switchMap(page =>
+        bankSyncService
+          .getAllTransactions(pageParams(store, page === 'next' ? store.offset() : 0))
+          .pipe(
+            tap(res =>
+              page === 'next'
+                ? store.appendTransactions(res.items, res.totalCount, res.hasMore)
+                : store.setTransactions(res.items, res.totalCount, res.hasMore)
+            ),
+            StoreErrorUtils.catchAndSetError(store)
+          )
       )
     )
   );
+
+  const load = (): void => {
+    fetchPage('first');
+  };
 
   return {
     load,
@@ -92,20 +107,9 @@ export function transactionLedgerEffects(store: EffectsStore) {
         )
       )
     ),
-    loadMore: rxMethod<void>(
-      pipe(
-        tap(() => {
-          store.nextPage();
-          store.setLoading();
-        }),
-        switchMap(() =>
-          bankSyncService.getAllTransactions(pageParams(store, store.offset())).pipe(
-            tap(res => store.appendTransactions(res.items, res.totalCount, res.hasMore)),
-            StoreErrorUtils.catchAndSetError(store)
-          )
-        )
-      )
-    ),
+    loadMore: (): void => {
+      fetchPage('next');
+    },
     /** Follows the `account` query param: a changed value re-queries from the first page. */
     applyAccount: rxMethod<Nullable<string>>(
       pipe(

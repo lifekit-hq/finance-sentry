@@ -263,6 +263,32 @@ describe('transactionLedgerEffects', () => {
       });
       expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
     });
+
+    it('drops an in-flight next page when a filter change reloads the first page', () => {
+      const store = buildStore(PAGE_SIZE);
+      const service = buildService();
+      const stalePage = new Subject<unknown>();
+      service.getAllTransactions
+        .mockReturnValueOnce(stalePage)
+        .mockReturnValueOnce(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.loadMore();
+        effects.applyAccount('acc-1');
+      });
+      stalePage.next({
+        items: [TX_ITEM],
+        totalCount: 99,
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+        hasMore: true,
+      });
+
+      expect(store.appendTransactions).not.toHaveBeenCalled();
+      expect(store.setTransactions).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('applyAccount', () => {
