@@ -3,7 +3,7 @@
 #
 # Deploy-by-SHA pulls a fresh image per service per commit and nothing else removes them
 # (deploy.sh only drops dangling layers). For each published service this keeps the newest
-# KEEP commit-SHA-tagged images and removes the rest.
+# KEEP_NEWEST commit-SHA-tagged images and removes the rest.
 #
 # Safety:
 # - Only ghcr.io/lifekit-hq/finance-sentry-<service> repositories, only 40-hex SHA tags
@@ -12,14 +12,14 @@
 # - Plain `docker image rm` (no -f): Docker itself refuses images still in use.
 # - Never stops or restarts anything; no `image prune -a` / `system prune`; volumes untouched.
 #
-# Usage: docker/prune-host-images.sh [--dry-run]     KEEP=<n> overrides the default of 5.
+# Usage: docker/prune-host-images.sh [--dry-run]     (retention is the KEEP_NEWEST constant below)
 # Newest = most recently built (image creation time), which tracks commit order.
 
 set -euo pipefail
 
 REGISTRY="ghcr.io/lifekit-hq"
 SERVICES=(api mcp gateway frontend)
-KEEP="${KEEP:-5}"
+KEEP_NEWEST=5
 
 dry_run=false
 case "${1:-}" in
@@ -31,17 +31,12 @@ case "${1:-}" in
     ;;
 esac
 
-if ! [[ $KEEP =~ ^[0-9]+$ ]] || [[ $KEEP -lt 1 ]]; then
-  echo "error: KEEP must be a positive integer (got '$KEEP')" >&2
-  exit 2
-fi
-
 # Image IDs behind every container (running or stopped).
 in_use="$(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' | sort -u)"
 
 mode="removing"
 $dry_run && mode="dry run, would remove"
-echo "[prune] keep newest $KEEP SHA-tagged images per service ($mode the rest)"
+echo "[prune] keep newest $KEEP_NEWEST SHA-tagged images per service ($mode the rest)"
 
 removed=0
 for service in "${SERVICES[@]}"; do
@@ -56,7 +51,7 @@ for service in "${SERVICES[@]}"; do
   while read -r _ id tag; do
     [[ -n ${tag:-} ]] || continue
     index=$((index + 1))
-    if [[ $index -le $KEEP ]]; then
+    if [[ $index -le $KEEP_NEWEST ]]; then
       continue
     fi
     if grep -qxF "$id" <<<"$in_use"; then

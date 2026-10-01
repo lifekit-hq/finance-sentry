@@ -21,9 +21,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    # Shares the deploy group so a prune never overlaps a pull + up.
+    # Own group, not `deploy`: the script only removes unused finance-sentry images and keeps the newest N, so an image a concurrent deploy just pulled is kept.
     concurrency:
-      group: deploy
+      group: prune-host-images
       cancel-in-progress: false
     steps:
       - name: Checkout

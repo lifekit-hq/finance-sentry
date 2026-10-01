@@ -116,7 +116,7 @@ GET /health/ready → 503
 **Host pruning:** every deploy pulls one image per service per commit onto the host. The weekly *Prune Host Images* workflow (Mondays 07:00 UTC, self-hosted deploy runner, `docker/prune-host-images.sh`) keeps the newest **5** SHA-tagged images of each `ghcr.io/lifekit-hq/finance-sentry-*` repository and removes older ones. Five commits back stay on the host, so a rollback to a recent commit needs no pull; anything older is pulled from ghcr as usual. It never removes an image used by a container, never forces removal, and only touches those repositories' SHA tags (not `:local`, not other projects' images, not volumes).
 
 - Dry run: dispatch *Prune Host Images* with `dry_run` ticked, or run `docker/prune-host-images.sh --dry-run` on the host. The job log lists every `removed` / `would remove` / `keep` decision.
-- Change the retention: `KEEP=<n> docker/prune-host-images.sh`, or edit the default in the script.
+- Change the retention: edit the `KEEP_NEWEST` constant in `docker/prune-host-images.sh`.
 
 ## Contact
 
