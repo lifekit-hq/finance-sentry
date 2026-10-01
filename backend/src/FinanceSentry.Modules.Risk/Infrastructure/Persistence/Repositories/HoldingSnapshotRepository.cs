@@ -41,10 +41,4 @@ public sealed class HoldingSnapshotRepository(RiskDbContext db) : IHoldingSnapsh
             .Where(s => s.UserId == userId && s.Symbol == symbol && s.Sleeve == sleeve)
             .OrderBy(s => s.CapturedAt)
             .ToListAsync(ct);
-
-    public async Task<IReadOnlyList<Guid>> GetUserIdsAsync(CancellationToken ct = default)
-        => await db.HoldingSnapshots
-            .Select(s => s.UserId)
-            .Distinct()
-            .ToListAsync(ct);
 }

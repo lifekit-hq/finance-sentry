@@ -28,10 +28,6 @@ public sealed class UserRegisteredSettingsProvisioningHandlerTests
             Upserted = setting;
             return Task.CompletedTask;
         }
-
-        public Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-            NotificationMode mode, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CompanionNotificationSetting>>([]);
     }
 
     [Fact]

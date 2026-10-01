@@ -14,8 +14,4 @@ public interface INotificationSettingRepository
     /// <summary>Insert or update the user's setting. Registration provisions it with no person in scope, so the
     /// existence check opts out of the Owner query filter.</summary>
     Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default);
-
-    /// <summary>Users currently set to the given mode (persisted rows only).</summary>
-    Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-        NotificationMode mode, CancellationToken ct = default);
 }

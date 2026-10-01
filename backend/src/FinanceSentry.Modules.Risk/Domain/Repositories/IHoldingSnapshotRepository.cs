@@ -12,6 +12,4 @@ public interface IHoldingSnapshotRepository
 
     Task<IReadOnlyList<HoldingSnapshot>> ListForSymbolAsync(
         Guid userId, string symbol, string sleeve, CancellationToken ct = default);
-
-    Task<IReadOnlyList<Guid>> GetUserIdsAsync(CancellationToken ct = default);
 }

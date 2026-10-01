@@ -32,10 +32,6 @@ public sealed class DigestConsolidationTests
 
         public Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
             => Task.CompletedTask;
-
-        public Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-            NotificationMode mode, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CompanionNotificationSetting>>([]);
     }
 
     private sealed class RecordingLogger : ILogger<GetPendingCompanionEventsQueryHandler>

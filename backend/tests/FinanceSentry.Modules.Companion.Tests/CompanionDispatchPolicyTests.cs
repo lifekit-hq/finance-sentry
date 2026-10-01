@@ -32,10 +32,6 @@ public sealed class CompanionDispatchPolicyTests
 
         public Task UpsertAsync(CompanionNotificationSetting s, CancellationToken ct = default)
             => Task.CompletedTask;
-
-        public Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-            NotificationMode mode, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CompanionNotificationSetting>>([]);
     }
 
     private sealed class RecordingDispatcher : IAgentWakeDispatcher

@@ -27,11 +27,6 @@ public sealed class SetNotificationModeTests
             Saved = setting;
             return Task.CompletedTask;
         }
-
-        public Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-            NotificationMode mode, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CompanionNotificationSetting>>(
-                Saved is not null && Saved.Mode == mode ? [Saved] : []);
     }
 
     [Fact]

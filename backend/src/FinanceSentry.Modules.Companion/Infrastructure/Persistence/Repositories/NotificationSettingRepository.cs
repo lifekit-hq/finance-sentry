@@ -23,10 +23,6 @@ public class NotificationSettingRepository(CompanionDbContext db, IOptions<Compa
         => await db.NotificationSettings.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == userId, ct) ?? Default(userId);
 
-    public async Task<IReadOnlyList<CompanionNotificationSetting>> ListByModeAsync(
-        NotificationMode mode, CancellationToken ct = default)
-        => await db.NotificationSettings.AsNoTracking().Where(s => s.Mode == mode).ToListAsync(ct);
-
     public async Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
     {
         var existing = await db.NotificationSettings.IgnoreQueryFilters([OwnerQueryFilter.Name])
