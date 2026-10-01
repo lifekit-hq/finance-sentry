@@ -49,7 +49,7 @@ describe('AccountBalancePipe', () => {
     expect(result.owed).toBe(true);
   });
 
-  it.each([0, -5])('does not label a credit account with balance %d as owed', (currentBalance) => {
+  it.each([0, -5])('does not label a credit account with balance %d as owed', currentBalance => {
     const result = pipe.transform(account({accountType: 'credit', currentBalance}));
 
     expect(result.native).toBe(MoneyUtils.format(currentBalance, 'EUR'));
