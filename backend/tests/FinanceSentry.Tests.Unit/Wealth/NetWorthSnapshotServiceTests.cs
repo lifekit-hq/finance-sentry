@@ -56,7 +56,7 @@ public class NetWorthSnapshotServiceTests
         NetWorthSnapshot? captured = null;
         var repositoryMock = new Mock<INetWorthSnapshotRepository>();
         repositoryMock
-            .Setup(r => r.GetLatestBeforeAsync(UserId, SnapshotDate, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetLatestBeforeUnscopedAsync(UserId, SnapshotDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(previous);
         repositoryMock
             .Setup(r => r.UpsertAsync(It.IsAny<NetWorthSnapshot>(), It.IsAny<CancellationToken>()))
@@ -135,16 +135,16 @@ public class NetWorthSnapshotServiceTests
     public async Task PersistSnapshotAsync_CarryForwardBaselineIsStrictlyBeforeSnapshotDate()
     {
         // A same-day refresh must never carry forward from its own earlier write —
-        // the baseline query is GetLatestBeforeAsync(date), verified here.
+        // the baseline query is GetLatestBeforeUnscopedAsync(date), verified here.
         var (repo, _) = SetupUpsertCapture(previous: null);
 
         await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, MakeData(), CancellationToken.None);
 
         repo.Verify(
-            r => r.GetLatestBeforeAsync(UserId, SnapshotDate, It.IsAny<CancellationToken>()),
+            r => r.GetLatestBeforeUnscopedAsync(UserId, SnapshotDate, It.IsAny<CancellationToken>()),
             Times.Once);
         repo.Verify(
-            r => r.GetLatestByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            r => r.GetLatestByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

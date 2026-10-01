@@ -9,7 +9,7 @@ public sealed class BrokerageValueHistoryReader(INetWorthSnapshotRepository snap
     public async Task<IReadOnlyList<DailyBrokerageValue>> GetDailyAsync(
         Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
-        var raw = await snapshots.GetByUserIdAsync(userId, from, to, ct);
+        var raw = await snapshots.GetByUserIdUnscopedAsync(userId, from, to, ct);
         return raw
             .Select(s => new DailyBrokerageValue(s.SnapshotDate, s.BrokerageTotal))
             .ToList();

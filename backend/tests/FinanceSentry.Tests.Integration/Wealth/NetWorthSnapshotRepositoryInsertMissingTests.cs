@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Integration.Wealth;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Infrastructure.Persistence;
 using FinanceSentry.Modules.Wealth.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -17,8 +18,9 @@ public sealed class NetWorthSnapshotRepositoryInsertMissingTests : IDisposable
 
     public NetWorthSnapshotRepositoryInsertMissingTests()
     {
+        // The backfill command runs as the person it backfills.
         _db = new WealthDbContext(new DbContextOptionsBuilder<WealthDbContext>()
-            .UseInMemoryDatabase($"wealth-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"wealth-{Guid.NewGuid():N}").Options, new FixedCurrentUser(UserId));
         _repo = new NetWorthSnapshotRepository(_db);
     }
 

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Wealth.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class WealthDbContextFactory : IDesignTimeDbContextFactory<WealthDbContex
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_wealth", "public"));
 
-        return new WealthDbContext(optionsBuilder.Options);
+        return new WealthDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

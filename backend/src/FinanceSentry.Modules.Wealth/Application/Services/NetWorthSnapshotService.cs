@@ -16,7 +16,7 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         // tell a measured net worth from a partially carried-forward one. The baseline is
         // the latest snapshot BEFORE the target date — same-day refreshes must not carry
         // forward from themselves.
-        var previous = await _repository.GetLatestBeforeAsync(userId, data.SnapshotDate, ct);
+        var previous = await _repository.GetLatestBeforeUnscopedAsync(userId, data.SnapshotDate, ct);
         var stale = new List<string>();
 
         var banking = ResolveSleeve("banking", data.BankingTotal, data.BankingFresh, previous?.BankingTotal, stale);

@@ -26,7 +26,7 @@ public sealed class NetWorthSnapshotBackfillService(
 
     private async Task BackfillUserAsync(Guid userId, DateOnly today, DateTimeOffset now, CancellationToken ct)
     {
-        var latestSnapshot = await _snapshotRepository.GetLatestByUserIdAsync(userId, ct);
+        var latestSnapshot = await _snapshotRepository.GetLatestByUserIdUnscopedAsync(userId, ct);
 
         if (latestSnapshot is null)
         {

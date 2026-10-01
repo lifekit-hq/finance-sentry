@@ -161,7 +161,7 @@ public sealed class ReadPortCompositionTests
         var from = new DateOnly(2026, 9, 1);
         var to = new DateOnly(2026, 9, 2);
         var snapshots = new Mock<INetWorthSnapshotRepository>();
-        snapshots.Setup(s => s.GetByUserIdAsync(User, from, to, It.IsAny<CancellationToken>()))
+        snapshots.Setup(s => s.GetByUserIdUnscopedAsync(User, from, to, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new NetWorthSnapshot { UserId = User, SnapshotDate = from, BankingTotal = 5m, BrokerageTotal = 100m, TotalNetWorth = 105m },
                 new NetWorthSnapshot { UserId = User, SnapshotDate = to, BankingTotal = 5m, BrokerageTotal = 110m, TotalNetWorth = 115m },

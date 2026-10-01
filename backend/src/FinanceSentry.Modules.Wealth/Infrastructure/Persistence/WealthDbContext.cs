@@ -1,11 +1,15 @@
 namespace FinanceSentry.Modules.Wealth.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Wealth.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class WealthDbContext(DbContextOptions<WealthDbContext> options) : DbContext(options)
+public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<NetWorthSnapshot> NetWorthSnapshots { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,5 +37,7 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options) : DbCont
         e.HasIndex(s => new { s.UserId, s.SnapshotDate })
             .IsUnique()
             .HasDatabaseName("idx_net_worth_snapshot_user_date_unique");
+
+        e.HasQueryFilter(OwnerQueryFilter.Name, s => s.UserId == CurrentUserId);
     }
 }
