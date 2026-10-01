@@ -24,3 +24,12 @@ The convention, enforced structurally:
 - Unknown currency: `CurrencyConverter.ToUsd` falls back to 1:1. Use `CurrencyConverter.IsKnown(currency)` if you need to flag a total as approximate rather than trust a silent fallback.
 
 ---
+
+## Owner Query Filter - per-user DbContexts
+
+A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and declares the named filter on every per-user entity: `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
+
+- Every job or sweep that legitimately reads across users opts out explicitly with `IgnoreQueryFilters([OwnerQueryFilter.Name])` and keeps its own `UserId` predicate. Inserts and `SaveChanges` are not filtered; `ExecuteUpdate`/`ExecuteDelete` are.
+- Each converted context ships a two-user isolation test and a no-principal test per cross-user job (see `AlertsOwnerQueryFilterTests`).
+- Hosts register `ICurrentUser` explicitly (API: `HttpContextCurrentUser`; MCP: `IdentityResolverCurrentUser`); design-time factories pass `NoCurrentUser.Instance`.
+- Converted so far: `AlertsDbContext`.

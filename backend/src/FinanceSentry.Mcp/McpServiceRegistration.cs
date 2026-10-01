@@ -1,4 +1,5 @@
 using System.Reflection;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Integration;
@@ -65,6 +66,7 @@ public static class McpServiceRegistration
         services.AddSingleton<McpOAuthTokenClient>();
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
+        services.AddScoped<ICurrentUser, IdentityResolverCurrentUser>();
 
         foreach (var toolType in McpAssembly.GetTypes()
             .Where(t => !t.IsAbstract && !t.IsInterface && t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null))

@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Integration.Alerts;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -17,7 +18,7 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
     public AlertRepositoryByTypesTests()
     {
         _db = new AlertsDbContext(new DbContextOptionsBuilder<AlertsDbContext>()
-            .UseInMemoryDatabase($"alerts-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"alerts-{Guid.NewGuid():N}").Options, new FixedCurrentUser(User));
         _repo = new AlertRepository(_db);
     }
 
@@ -82,7 +83,7 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
         Add(AlertType.SyncFailure, 5, isRead: false, isResolved: true);
         await _db.SaveChangesAsync();
 
-        var (_, _, unreadCount) = await _repo.GetPagedAsync(User, filter: null, page: 1, pageSize: 10);
+        var (_, _, unreadCount) = await _repo.GetPagedAsync(User, filter: "all", page: 1, pageSize: 10);
 
         unreadCount.Should().Be(1);
     }

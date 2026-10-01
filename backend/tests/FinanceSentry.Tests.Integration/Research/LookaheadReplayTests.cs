@@ -223,12 +223,14 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
     private async Task<List<Alert>> AlertsOfTypeAsync(string type)
     {
-        await using var read = AlertsContext();
+        await using var read = AlertsContext(_userId);
         return await read.Alerts.AsNoTracking().Where(a => a.UserId == _userId && a.Type == type).ToListAsync();
     }
 
-    private AlertsDbContext AlertsContext() =>
-        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    // The jobs and the capture run with no person in scope (null), as they do in production; assertion reads act as the user.
+    private AlertsDbContext AlertsContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
     private CompanionDbContext CompanionContext() =>
         new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);

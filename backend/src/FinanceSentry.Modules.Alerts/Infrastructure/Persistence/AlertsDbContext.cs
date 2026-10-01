@@ -1,11 +1,15 @@
 namespace FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Alerts.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class AlertsDbContext(DbContextOptions<AlertsDbContext> options) : DbContext(options)
+public class AlertsDbContext(DbContextOptions<AlertsDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<Alert> Alerts { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -15,6 +19,7 @@ public class AlertsDbContext(DbContextOptions<AlertsDbContext> options) : DbCont
         var ab = modelBuilder.Entity<Alert>();
         ab.ToTable("alerts");
         ab.HasKey(a => a.Id);
+        ab.HasQueryFilter(OwnerQueryFilter.Name, a => a.UserId == CurrentUserId);
         ab.Property(a => a.Id).HasDefaultValueSql("gen_random_uuid()");
         ab.Property(a => a.UserId).IsRequired();
         ab.Property(a => a.Type).IsRequired().HasMaxLength(30);
