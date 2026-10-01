@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Agent.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Agent.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,14 @@ using Microsoft.EntityFrameworkCore;
 /// <c>__ef_migrations_history_agent</c>. Holds conversations and their messages — financial context,
 /// so it inherits retention/backup (024).
 /// </summary>
-public class AgentDbContext(DbContextOptions<AgentDbContext> options) : DbContext(options)
+public class AgentDbContext(DbContextOptions<AgentDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<Conversation> Conversations { get; set; } = null!;
 
     public DbSet<Message> Messages { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +35,7 @@ public class AgentDbContext(DbContextOptions<AgentDbContext> options) : DbContex
         conversation.HasIndex(x => new { x.UserId, x.UpdatedAt })
             .IsDescending(false, true)
             .HasDatabaseName("idx_agent_conversations_user_updated");
+        conversation.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         conversation.HasMany(x => x.Messages)
             .WithOne()
             .HasForeignKey(m => m.ConversationId)
@@ -48,5 +53,10 @@ public class AgentDbContext(DbContextOptions<AgentDbContext> options) : DbContex
         message.Property(x => x.CreatedAt).IsRequired();
         message.HasIndex(x => new { x.ConversationId, x.CreatedAt })
             .HasDatabaseName("idx_agent_messages_conversation_created");
+
+        // A message carries no UserId of its own; it belongs to whoever owns its conversation.
+        message.HasQueryFilter(
+            OwnerQueryFilter.Name,
+            x => Conversations.Any(c => c.Id == x.ConversationId && c.UserId == CurrentUserId));
     }
 }

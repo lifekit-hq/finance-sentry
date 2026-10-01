@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 /// <summary>
 /// EF Core repository for agent conversations. Every query filters by the caller's <c>userId</c> so a
 /// caller can only ever touch their own threads (FR-008) — there is no method that omits the owner.
+/// Reads also run under the Owner query filter; every caller is a request acting for the signed-in person.
 /// </summary>
 public sealed class ConversationRepository(AgentDbContext db) : IConversationRepository
 {

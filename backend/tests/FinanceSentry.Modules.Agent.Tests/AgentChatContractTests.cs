@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Agent.Tests;
 using System.Security.Claims;
 using System.Text;
 using FinanceSentry.API.Controllers;
+using FinanceSentry.Infrastructure.Auth;
 using FinanceSentry.Modules.Agent.Application.Commands;
 using FinanceSentry.Modules.Agent.Application.Queries;
 using FinanceSentry.Modules.Agent.Application.Services;
@@ -24,10 +25,13 @@ using Xunit;
 /// </summary>
 public sealed class AgentChatContractTests
 {
-    private static AgentDbContext NewDb() =>
+    // The context reads the controller's principal through the API's own ICurrentUser, so the Owner query
+    // filter scopes each call to whoever Authenticate signed in.
+    private static AgentDbContext NewDb(IHttpContextAccessor httpContext) =>
         new(new DbContextOptionsBuilder<AgentDbContext>()
             .UseInMemoryDatabase($"agent-{Guid.NewGuid()}")
-            .Options);
+            .Options,
+            new HttpContextCurrentUser(httpContext));
 
     private static AgentOptions ConfiguredOptions()
     {
@@ -38,7 +42,8 @@ public sealed class AgentChatContractTests
 
     private static Harness BuildHarness(AgentOptions options, ILlmClient llm)
     {
-        var db = NewDb();
+        var httpContext = new ControllerHttpContextAccessor();
+        var db = NewDb(httpContext);
         var repo = new ConversationRepository(db);
         var opts = Options.Create(options);
 
@@ -57,6 +62,7 @@ public sealed class AgentChatContractTests
         var deleteHandler = new DeleteConversationCommandHandler(repo);
 
         var controller = new AgentChatController(sendHandler, listHandler, getHandler, deleteHandler);
+        httpContext.Controller = controller;
         return new Harness(controller, repo, db);
     }
 
@@ -163,4 +169,15 @@ public sealed class AgentChatContractTests
     }
 
     private sealed record Harness(AgentChatController Controller, ConversationRepository Repo, AgentDbContext Db);
+
+    private sealed class ControllerHttpContextAccessor : IHttpContextAccessor
+    {
+        public ControllerBase? Controller { get; set; }
+
+        public HttpContext? HttpContext
+        {
+            get => Controller?.ControllerContext.HttpContext;
+            set => throw new NotSupportedException();
+        }
+    }
 }
