@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Architecture;
 
 using System.Reflection;
+using FinanceSentry.Core.Auth;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -73,17 +74,28 @@ public class ModelSnapshotSyncTests
     [MemberData(nameof(AllContexts))]
     public void Model_matches_its_snapshot_so_migrations_can_apply(Type contextType)
     {
-        var optionsBuilderType = typeof(DbContextOptionsBuilder<>).MakeGenericType(contextType);
-        var optionsBuilder = (DbContextOptionsBuilder)Activator.CreateInstance(optionsBuilderType)!;
-
         // The connection string is never opened — HasPendingModelChanges only
         // compares the compiled model against the migrations assembly's snapshot.
-        optionsBuilder.UseNpgsql("Host=localhost;Database=design_time_only;Username=x;Password=x");
-
-        using var context = (DbContext)Activator.CreateInstance(contextType, optionsBuilder.Options)!;
+        using var context = CreateOffline(contextType);
 
         context.Database.HasPendingModelChanges().Should().BeFalse(
             $"{contextType.Name}'s model differs from its ModelSnapshot — Database.Migrate() will refuse to " +
             "apply ANY pending migration for this context until the snapshot is reconciled with the model");
+    }
+
+    /// <summary>
+    /// A context over a connection string that is never opened. Contexts under the Owner query filter also take
+    /// an <see cref="ICurrentUser"/>; the model does not depend on who it is, so they get <see cref="NoCurrentUser"/>.
+    /// </summary>
+    internal static DbContext CreateOffline(Type contextType)
+    {
+        var optionsBuilderType = typeof(DbContextOptionsBuilder<>).MakeGenericType(contextType);
+        var optionsBuilder = (DbContextOptionsBuilder)Activator.CreateInstance(optionsBuilderType)!;
+        optionsBuilder.UseNpgsql("Host=localhost;Database=design_time_only;Username=x;Password=x");
+
+        var takesCurrentUser = contextType.GetConstructors()
+            .Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(ICurrentUser)));
+        object[] args = takesCurrentUser ? [optionsBuilder.Options, NoCurrentUser.Instance] : [optionsBuilder.Options];
+        return (DbContext)Activator.CreateInstance(contextType, args)!;
     }
 }

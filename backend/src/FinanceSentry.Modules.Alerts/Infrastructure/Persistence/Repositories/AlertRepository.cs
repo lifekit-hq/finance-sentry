@@ -1,12 +1,21 @@
 namespace FinanceSentry.Modules.Alerts.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+/// <summary>
+/// Reads run under <see cref="AlertsDbContext"/>'s Owner query filter. The generator's dedup/write path and the
+/// expiry/purge sweeps run from background jobs with no person in scope and act on whichever user the caller
+/// names (or on every user), so those methods opt out of the filter through <see cref="AllUsers"/>; their own
+/// predicates keep them scoped to the intended rows.
+/// </summary>
 public class AlertRepository(AlertsDbContext db) : IAlertRepository
 {
     private readonly AlertsDbContext _db = db;
+
+    private IQueryable<Alert> AllUsers => _db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
         Guid userId, string filter, int page, int pageSize, CancellationToken ct = default)
@@ -44,7 +53,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public Task<Alert?> FindActiveAsync(
         Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
     {
-        return _db.Alerts
+        return AllUsers
             .Where(a => a.UserId == userId
                      && a.Type == type
                      && a.ReferenceId == referenceId
@@ -55,7 +64,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
 
     public Task<bool> ExistsAsync(Guid userId, string type, Guid? referenceId, CancellationToken ct = default)
     {
-        return _db.Alerts.AsNoTracking()
+        return AllUsers.AsNoTracking()
             .AnyAsync(a => a.UserId == userId && a.Type == type && a.ReferenceId == referenceId, ct);
     }
 
@@ -63,7 +72,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         Guid userId, string type, Guid? referenceId, string? referenceLabel, DateTimeOffset createdAfter,
         CancellationToken ct = default)
     {
-        return _db.Alerts.AsNoTracking()
+        return AllUsers.AsNoTracking()
             .AnyAsync(a => a.UserId == userId
                         && a.Type == type
                         && a.ReferenceId == referenceId
@@ -104,7 +113,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
 
     public async Task ResolveAsync(Guid alertId, CancellationToken ct = default)
     {
-        var alert = await _db.Alerts.FirstOrDefaultAsync(a => a.Id == alertId, ct);
+        var alert = await AllUsers.FirstOrDefaultAsync(a => a.Id == alertId, ct);
         if (alert is null || alert.IsResolved) return;
         var now = DateTimeOffset.UtcNow;
         alert.IsResolved = true;
@@ -116,7 +125,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public async Task BumpOccurrenceAsync(Guid alertId, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
-        await _db.Alerts
+        await AllUsers
             .Where(a => a.Id == alertId)
             .ExecuteUpdateAsync(set => set
                 .SetProperty(a => a.OccurrenceCount, a => a.OccurrenceCount + 1)
@@ -126,14 +135,14 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
 
     public Task<int> PurgeOldAsync(DateTimeOffset olderThan, CancellationToken ct = default)
     {
-        return _db.Alerts
+        return AllUsers
             .Where(a => (a.IsResolved || a.IsDismissed) && a.CreatedAt < olderThan)
             .ExecuteDeleteAsync(ct);
     }
 
     public async Task DeleteByReferenceIdAsync(Guid referenceId, CancellationToken ct = default)
     {
-        await _db.Alerts
+        await AllUsers
             .Where(a => a.ReferenceId == referenceId)
             .ExecuteDeleteAsync(ct);
     }
@@ -213,14 +222,14 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     public async Task<IReadOnlyList<Alert>> GetOpenAlertsByTypesAsync(
         IReadOnlyCollection<string> types, CancellationToken ct = default)
     {
-        return await _db.Alerts
+        return await AllUsers
             .Where(a => !a.IsResolved && !a.IsDismissed && types.Contains(a.Type))
             .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<Alert>> GetOpenDeferredAlertsAsync(CancellationToken ct = default)
     {
-        return await _db.Alerts
+        return await AllUsers
             .Where(a => !a.IsResolved && !a.IsDismissed && a.AcknowledgementDecision == "Defer")
             .ToListAsync(ct);
     }

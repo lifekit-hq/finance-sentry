@@ -26,9 +26,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .Build();
+        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _postgres.StartAsync();
     }
 
@@ -38,10 +36,12 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 
-    private AlertsDbContext CreateContext() =>
+    // Null acts as a background job (no person in scope); assertion reads and request-path calls act as the user.
+    private AlertsDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<AlertsDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options);
+            .Options,
+            new FixedCurrentUser(actingUser));
 
     [DockerRequiredFact]
     public async Task SilenceOnly_PastWindowWithEarlierAlertStillOpen_SupersedesItInsteadOfViolatingIndex()
@@ -76,7 +76,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
                 userId, referenceId, "INTC", "moved 12.2% intraday", dedup: AlertDedup.SilenceOnly);
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(userId);
         var alerts = await read.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && a.ReferenceId == referenceId)
             .ToListAsync();
@@ -118,7 +118,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
             await generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(userId);
         var alerts = await read.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && a.ReferenceId == referenceId)
             .ToListAsync();
@@ -155,7 +155,7 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
             await repository.AddAsync(NewAlert(userId, xrpReference, "XRP-USD"));
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(userId);
         var alerts = await read.Alerts.AsNoTracking().Where(a => a.UserId == userId).ToListAsync();
         alerts.Select(a => a.ReferenceLabel).Should().BeEquivalentTo(["SOL-USD", "XRP-USD"]);
     }

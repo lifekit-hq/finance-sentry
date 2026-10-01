@@ -1,7 +1,6 @@
 namespace FinanceSentry.Tests.Unit.Architecture;
 
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
@@ -25,11 +24,7 @@ public class MigrationScriptGenerationTests
     [MemberData(nameof(ModelSnapshotSyncTests.AllContexts), MemberType = typeof(ModelSnapshotSyncTests))]
     public void Full_migration_script_generates_without_error(Type contextType)
     {
-        var optionsBuilderType = typeof(DbContextOptionsBuilder<>).MakeGenericType(contextType);
-        var optionsBuilder = (DbContextOptionsBuilder)Activator.CreateInstance(optionsBuilderType)!;
-        optionsBuilder.UseNpgsql("Host=localhost;Database=design_time_only;Username=x;Password=x");
-
-        using var context = (DbContext)Activator.CreateInstance(contextType, optionsBuilder.Options)!;
+        using var context = ModelSnapshotSyncTests.CreateOffline(contextType);
 
         var act = () => context.GetService<IMigrator>().GenerateScript();
 

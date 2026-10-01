@@ -8,6 +8,7 @@ using FinanceSentry.API.Hangfire;
 using FinanceSentry.API.Logging;
 using FinanceSentry.API.Migrations;
 using FinanceSentry.API.Modules;
+using FinanceSentry.Infrastructure.Auth;
 using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Infrastructure.Observability;
@@ -68,6 +69,11 @@ builder.Services.AddAllModules(builder.Configuration);
 // After AddAllModules: Identity (Auth module) registers its cookie scheme as the default; the API authenticates
 // with JwtBearer and requires an authenticated user on every endpoint not marked [AllowAnonymous].
 builder.Services.AddApiAuthentication();
+
+// Owner query filter: per-user DbContexts scope their rows to the authenticated request principal; outside a
+// request (Hangfire jobs) there is no user and cross-user jobs opt out of the filter explicitly.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
 // 039: cross-module read ports (adapters live in the host — neither module references the other).
 builder.Services.AddCrossModulePorts();

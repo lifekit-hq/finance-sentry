@@ -1,11 +1,13 @@
 namespace FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Implements the companion read contract (feature 031) over the alerts table — active alerts created
-/// after a watermark. Keeps the Companion module decoupled from the Alerts internals.
+/// after a watermark. Keeps the Companion module decoupled from the Alerts internals. Its caller is the
+/// companion capture job, which reads every user's new alerts, so it opts out of the Owner query filter.
 /// </summary>
 public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader
 {
@@ -15,7 +17,7 @@ public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader
         DateTimeOffset watermark, int limit, CancellationToken ct = default)
     {
         var effective = Math.Clamp(limit, 1, MaxLimit);
-        return await db.Alerts.AsNoTracking()
+        return await db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(a => a.CreatedAt > watermark && !a.IsDismissed)
             .OrderBy(a => a.CreatedAt)
             .Take(effective)

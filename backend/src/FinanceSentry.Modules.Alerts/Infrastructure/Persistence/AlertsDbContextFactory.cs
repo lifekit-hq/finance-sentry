@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -27,6 +28,6 @@ public class AlertsDbContextFactory : IDesignTimeDbContextFactory<AlertsDbContex
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history_alerts", "public");
             });
 
-        return new AlertsDbContext(optionsBuilder.Options);
+        return new AlertsDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

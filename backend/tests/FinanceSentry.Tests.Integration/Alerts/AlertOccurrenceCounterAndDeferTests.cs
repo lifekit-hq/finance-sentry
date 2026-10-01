@@ -33,10 +33,12 @@ public sealed class AlertOccurrenceCounterAndDeferTests : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 
-    private AlertsDbContext CreateContext() =>
+    // Null acts as a background job (no person in scope); assertion reads and request-path calls act as the user.
+    private AlertsDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<AlertsDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options);
+            .Options,
+            new FixedCurrentUser(actingUser));
 
     [DockerRequiredFact]
     public async Task MigrateAsync_AppliesM004_ExistingAndNewRowsDefaultToOccurrenceCountOne()
@@ -59,7 +61,7 @@ public sealed class AlertOccurrenceCounterAndDeferTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(seeded.UserId);
         var reloaded = await read.Alerts.AsNoTracking().SingleAsync(a => a.Id == seeded.Id);
 
         reloaded.OccurrenceCount.Should().Be(1);
@@ -95,7 +97,7 @@ public sealed class AlertOccurrenceCounterAndDeferTests : IAsyncLifetime
             await repository.BumpOccurrenceAsync(alert.Id);
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(userId);
         var all = await read.Alerts.AsNoTracking().Where(a => a.UserId == userId).ToListAsync();
 
         all.Should().ContainSingle("a suppressed repeat must bump the existing row, not insert a new one");
@@ -125,14 +127,14 @@ public sealed class AlertOccurrenceCounterAndDeferTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using (var ctx = CreateContext())
+        await using (var ctx = CreateContext(userId))
         {
             var repository = new AlertRepository(ctx);
             var ok = await repository.AcknowledgeAsync(userId, alert.Id, "Defer");
             ok.Should().BeTrue();
         }
 
-        await using var read = CreateContext();
+        await using var read = CreateContext(userId);
         var reloaded = await read.Alerts.AsNoTracking().SingleAsync(a => a.Id == alert.Id);
 
         reloaded.IsRead.Should().BeTrue("Defer means 'not now' — it acknowledges the alert as read");

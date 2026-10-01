@@ -255,6 +255,7 @@ public sealed class ToolParityTests
 
         services.AddSingleton<FinanceSentry.Mcp.Abstractions.IIdentityResolver>(
             new FakeIdentityResolver { ResolvedUserId = actingUserId });
+        services.AddScoped<FinanceSentry.Core.Auth.ICurrentUser, FinanceSentry.Mcp.Abstractions.IdentityResolverCurrentUser>();
         services.AddScoped<GetAccountSummaryTool>();
         services.AddScoped<ListTransactionsTool>();
         services.AddScoped<GetBudgetStatusTool>();

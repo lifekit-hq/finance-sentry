@@ -39,7 +39,7 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _postgres.StartAsync();
 
         await using var alerts = AlertsContext();
@@ -58,8 +58,10 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
         }
     }
 
-    private AlertsDbContext AlertsContext() =>
-        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    // The generator runs from jobs with no person in scope (null); assertion reads act as the user.
+    private AlertsDbContext AlertsContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
     private RiskDbContext RiskContext() =>
         new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
@@ -101,7 +103,7 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
 
     private async Task<List<Alert>> CashShortfallAlertsAsync()
     {
-        await using var read = AlertsContext();
+        await using var read = AlertsContext(_userId);
         return await read.Alerts.AsNoTracking()
             .Where(a => a.UserId == _userId && a.Type == AlertType.CashShortfall)
             .ToListAsync();
