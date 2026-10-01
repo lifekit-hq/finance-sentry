@@ -39,6 +39,13 @@ public sealed class GeopoliticsSourceSeedJob(
     ICommandHandler<RegisterThesisSourceCommand, RegisteredSourceDto> registerSource,
     ILogger<GeopoliticsSourceSeedJob> logger)
 {
+    /// <summary>
+    /// Name prefix of every source this job registers. Ingestion stores articles under
+    /// <c>src:{source name}</c> and keeps no source-type field, so the prefix is how
+    /// <see cref="NewsMaterialityJob"/> recognises Google-News-seeded articles.
+    /// </summary>
+    public const string SourceNamePrefix = "Google News: ";
+
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var theses = await research.Theses.AsNoTracking()
@@ -66,7 +73,7 @@ public sealed class GeopoliticsSourceSeedJob(
                 await registerSource.Handle(
                     new RegisterThesisSourceCommand(
                         thesis.Id,
-                        $"Google News: {thesis.Ticker} geopolitics",
+                        $"{SourceNamePrefix}{thesis.Ticker} geopolitics",
                         url,
                         "Rss",
                         GeopoliticsTermMatcher.MatchTerms(thesis.ThesisText)),
