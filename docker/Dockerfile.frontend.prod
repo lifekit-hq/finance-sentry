@@ -27,6 +27,10 @@ FROM nginxinc/nginx-unprivileged:alpine AS serve
 # The base image ends as uid 101; the config edits below need root, and the last line drops back.
 USER root
 
+# apk upgrade first: the nginx base image lags Alpine security releases (e.g. pcre2 CVE-2026-103111),
+# and the CI Trivy gate fails the image build on any fixable HIGH/CRITICAL finding.
+RUN apk upgrade --no-cache
+
 # Platform contract (guardrail 1, spec 048), applied to the image's own nginx.conf:
 #   - load the njs module (ships with nginx-unprivileged:alpine) for the /metrics handler —
 #     `load_module` is only valid in the main context, which conf.d files never reach;
