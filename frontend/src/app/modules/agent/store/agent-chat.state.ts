@@ -9,6 +9,8 @@ export interface AgentChatState {
   history: CmnChatMessage[];
   // Bumped on new-chat / conversation-switch to remount <cmn-chat>; NOT on first-turn id capture.
   threadNonce: number;
+  // Phone only: the sessions list is a sheet behind a button; from md it is always visible.
+  sessionsOpen: boolean;
 }
 
 export const initialAgentChatState: AgentChatState = {
@@ -16,4 +18,5 @@ export const initialAgentChatState: AgentChatState = {
   activeConversationId: null,
   history: [],
   threadNonce: 0,
+  sessionsOpen: false,
 };

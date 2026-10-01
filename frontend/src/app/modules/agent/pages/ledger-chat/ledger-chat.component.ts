@@ -21,6 +21,7 @@ export class LedgerChatComponent {
   public readonly store = inject(AgentChatStore);
 
   protected readonly newChatIcon: LucideIconName = 'Plus';
+  protected readonly sessionsIcon: LucideIconName = 'History';
   protected readonly deleteIcon: LucideIconName = 'Trash2';
 
   public readonly chatStream: CmnChatStreamFn = text => this.store.stream(text);

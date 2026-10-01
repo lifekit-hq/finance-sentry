@@ -3,10 +3,8 @@
     class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[440px]"
   >
     <div class="mb-cmn-8">
-      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">Secure Access</h1>
-      <p class="text-cmn-sm text-text-secondary">
-        Enter your credentials to manage your operational assets.
-      </p>
+      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">Welcome back</h1>
+      <p class="text-cmn-sm text-text-secondary">Sign in to Finance Sentry</p>
     </div>
 
     @if (flashMessage(); as flash) {
@@ -28,15 +26,11 @@
       </cmn-form-field>
 
       <div class="mb-cmn-6">
-        <div class="flex items-center justify-between mb-cmn-1">
-          <span class="text-cmn-xs font-medium text-text-secondary tracking-wide uppercase"
-            >Password</span
-          >
-          <a href="#" class="text-cmn-xs text-accent-default hover:underline no-underline"
-            >Forgot?</a
-          >
-        </div>
-        <cmn-form-field [control]="form.get('password')" formControlName="password">
+        <cmn-form-field
+          [control]="form.get('password')"
+          label="PASSWORD"
+          formControlName="password"
+        >
           <cmn-input type="password" placeholder="••••••••" />
         </cmn-form-field>
       </div>
@@ -47,19 +41,20 @@
         type="submit"
         variant="primary"
         class="block w-full mb-cmn-6"
-        >{{ loading() ? 'Authenticating…' : 'Authenticate →' }}</cmn-button
+        >{{ loading() ? 'Signing in…' : 'Sign in' }}</cmn-button
       >
     </form>
 
     <div class="flex items-center gap-cmn-3 mb-cmn-6">
       <div class="flex-1 h-px bg-border-default"></div>
-      <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or SSO</span>
+      <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
       <div class="flex-1 h-px bg-border-default"></div>
     </div>
 
     <div class="flex justify-center mb-cmn-6">
       <cmn-google-sign-in-button
         [clientId]="googleClientId"
+        [locale]="googleLocale"
         (credential)="onGoogleCredential($event)"
       />
     </div>

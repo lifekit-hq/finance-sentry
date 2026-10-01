@@ -60,11 +60,11 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       [avatarMenuItems]="avatarMenuItems"
       [versionLabel]="versionLabel"
       [tabRoutes]="tabRoutes"
+      [avatarLabel]="avatarLabel()"
       (navClick)="navigate($event)"
       (themeToggle)="themeService.toggle()"
       (searchClick)="openPalette()"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
-      avatarLabel="D"
     >
       <router-outlet />
     </cmn-app-layout>
@@ -114,6 +114,9 @@ export class AppShellComponent {
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
+  );
+  public readonly avatarLabel = computed(() =>
+    (this.authStore.email()?.trim().charAt(0) || '?').toUpperCase()
   );
   public readonly isDark = computed(() => this.theme() === 'dark');
   public readonly activeRoute = computed(() => {
