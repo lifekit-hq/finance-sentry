@@ -14,9 +14,9 @@
           [class.text-text-primary]="store.totalSpent() <= store.totalBudget()"
           class="mt-1 font-mono text-xl font-bold"
         >
-          {{ store.totalSpent() | appCurrency }}
+          {{ store.totalSpent() | money }}
           <span class="text-cmn-sm font-normal text-text-secondary"
-            >/ {{ store.totalBudget() | appCurrency }}</span
+            >/ {{ store.totalBudget() | money }}</span
           >
         </div>
       </div>
@@ -24,23 +24,11 @@
 
     <!-- Period navigation -->
     <div class="flex items-center justify-between">
-      <button
-        (click)="previousMonth()"
-        class="rounded px-cmn-2 py-1 text-cmn-sm text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-        aria-label="Previous month"
-      >
-        ‹ Prev
-      </button>
+      <cmn-button (clicked)="previousMonth()" variant="secondary" size="sm">‹ Prev</cmn-button>
       <span class="font-label text-cmn-sm font-semibold text-text-primary">
         {{ store.periodLabel() }}
       </span>
-      <button
-        (click)="nextMonth()"
-        class="rounded px-cmn-2 py-1 text-cmn-sm text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-        aria-label="Next month"
-      >
-        Next ›
-      </button>
+      <cmn-button (clicked)="nextMonth()" variant="secondary" size="sm">Next ›</cmn-button>
     </div>
 
     <!-- Over-budget warning -->
@@ -82,7 +70,7 @@
           <div
             [style.flex]="b.spent"
             [style.background]="categoryColor(b.category)"
-            [title]="b.categoryLabel + ': ' + (b.spent | appCurrency)"
+            [title]="b.categoryLabel + ': ' + (b.spent | money)"
             class="min-w-[2px] transition-[flex] duration-300"
           ></div>
         }
@@ -116,30 +104,16 @@
             placeholder="Select category…"
           />
         </div>
-        <div class="w-36">
-          <label
-            for="budget-limit"
-            class="mb-1 block font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-          >
-            Monthly limit
-          </label>
-          <input
+        <cmn-form-field class="w-36" label="Monthly limit">
+          <cmn-input
             [ngModel]="newLimit()"
             (ngModelChange)="newLimit.set($event)"
             (keydown.enter)="createBudget()"
-            id="budget-limit"
             type="number"
-            min="1"
             placeholder="0.00"
-            class="w-full rounded border border-surface-raised bg-surface-bg px-cmn-2 py-1.5 text-right font-mono text-cmn-sm text-text-primary outline-none focus:border-accent-default"
           />
-        </div>
-        <button
-          (click)="createBudget()"
-          class="rounded bg-accent-default px-cmn-3 py-1.5 text-cmn-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          Add
-        </button>
+        </cmn-form-field>
+        <cmn-button (clicked)="createBudget()" variant="primary">Add</cmn-button>
       </div>
     </cmn-card>
 
@@ -169,13 +143,9 @@
               } @else if (nearOver) {
                 <cmn-tag variant="warning">Near limit</cmn-tag>
               }
-              <button
-                (click)="deleteBudget(b.id)"
-                class="rounded px-1 py-0.5 text-cmn-xs text-text-disabled transition-colors hover:bg-status-error-subtle hover:text-status-error"
-                aria-label="Delete budget"
+              <cmn-button (clicked)="deleteBudget(b.id)" variant="secondary" size="sm"
+                >Remove</cmn-button
               >
-                ✕
-              </button>
             </div>
           </div>
 
@@ -194,20 +164,21 @@
               [class.text-status-error]="over"
               [class.text-text-primary]="!over"
               class="font-mono text-base font-bold"
-              >{{ b.spent | appCurrency }}</span
+              >{{ b.spent | money }}</span
             >
 
             @if (isEditing) {
               <div class="flex items-center gap-1">
                 <span class="text-cmn-xs text-text-secondary">/ $</span>
-                <input
+                <cmn-input
                   [ngModel]="editValue()"
                   (ngModelChange)="editValue.set($event)"
-                  (blur)="saveEdit(b.id)"
+                  (focusout)="saveEdit(b.id)"
                   (keydown.enter)="saveEdit(b.id)"
                   (keydown.escape)="cancelEdit()"
-                  class="w-20 rounded border border-accent-default bg-surface-bg px-1.5 py-0.5 text-right font-mono text-cmn-sm text-text-primary outline-none"
-                  type="text"
+                  class="w-24"
+                  size="sm"
+                  type="number"
                 />
               </div>
             } @else {
@@ -215,7 +186,7 @@
                 (click)="startEdit(b.id, b.monthlyLimit)"
                 class="rounded px-1 py-0.5 font-mono text-cmn-xs text-text-disabled transition-colors hover:bg-accent-subtle hover:text-accent-default"
               >
-                / {{ b.monthlyLimit | appCurrency }} ✎
+                / {{ b.monthlyLimit | money }} ✎
               </button>
             }
           </div>
@@ -227,9 +198,9 @@
             class="text-cmn-xs"
           >
             @if (over) {
-              {{ b.spent - b.monthlyLimit | appCurrency }} over budget
+              {{ b.spent - b.monthlyLimit | money }} over budget
             } @else {
-              {{ b.remaining | appCurrency }} remaining · {{ pct | appDecimal: '1.0-0' }}% used
+              {{ b.remaining | money }} remaining · {{ pct | appDecimal: '1.0-0' }}% used
             }
           </div>
 

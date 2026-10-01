@@ -6,10 +6,12 @@ import {
   ButtonComponent,
   CardComponent,
   EmptyStateComponent,
+  SkeletonComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type DossierSignalItem} from '../../models/dossier/dossier.model';
 import {DossierStore} from '../../store/dossier.store';
@@ -30,6 +32,8 @@ const SPARKLINE_MIN_POINTS = 2;
     CardComponent,
     DatePipe,
     DecimalPipe,
+    MoneyPipe,
+    SkeletonComponent,
     EmptyStateComponent,
     TagComponent,
   ],

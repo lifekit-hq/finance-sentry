@@ -16,6 +16,7 @@ import {
 import {map} from 'rxjs';
 
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
@@ -38,6 +39,7 @@ const TYPE_LABELS: Record<string, string> = {debit: 'Spending', credit: 'Income'
     EmptyStateComponent,
     IconComponent,
     MerchantCategoryPipe,
+    MoneyPipe,
     SkeletonComponent,
     StatCardComponent,
     TransactionAmountClassPipe,

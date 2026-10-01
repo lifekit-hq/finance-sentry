@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
+  <div class="mb-cmn-6 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-4">
     <cmn-stat-card
       [value]="store.incomeFormatted()"
       [loading]="store.isLoading()"
@@ -126,7 +126,7 @@
               <span class="text-cmn-xs text-text-secondary">{{ group.note }}</span>
             </div>
             <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
-              ${{ group.totalUsd | number: '1.0-0' }}
+              {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
             </span>
           </div>
           <div class="overflow-x-auto">
@@ -156,13 +156,12 @@
                       [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
                       class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums"
                     >
-                      {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | number: '1.2-2' }}
-                      {{ i.currency }}
+                      {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
                     </td>
                     <td
                       class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums text-text-secondary"
                     >
-                      ${{ i.amountUsd | number: '1.0-0' }}
+                      {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
                     </td>
                   </tr>
                 }

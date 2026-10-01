@@ -1,7 +1,7 @@
-import {DecimalPipe} from '@angular/common';
-import {inject, Pipe, type PipeTransform} from '@angular/core';
+import {Pipe, type PipeTransform} from '@angular/core';
 
 import {type AccountBalanceItem} from '../../../shared/models/wealth/wealth.model';
+import {MoneyUtils} from '../../../shared/utils/money.utils';
 
 export interface FormattedBalance {
   native: string;
@@ -10,15 +10,12 @@ export interface FormattedBalance {
 
 @Pipe({name: 'accountBalance'})
 export class AccountBalancePipe implements PipeTransform {
-  private readonly decimalPipe = inject(DecimalPipe);
-
   public transform({
     currentBalance,
     currency,
     balanceInBaseCurrency,
   }: AccountBalanceItem): FormattedBalance {
-    const nativeAmount = this.decimalPipe.transform(currentBalance, '1.2-2') ?? '';
-    const native = `${nativeAmount} ${currency}`;
+    const native = MoneyUtils.format(currentBalance, currency);
 
     if (
       currency === 'USD' ||
@@ -28,7 +25,6 @@ export class AccountBalancePipe implements PipeTransform {
       return {native, usd: null};
     }
 
-    const usdAmount = this.decimalPipe.transform(balanceInBaseCurrency, '1.0-0') ?? '';
-    return {native, usd: `~ $${usdAmount}`};
+    return {native, usd: MoneyUtils.formatEquivalent(balanceInBaseCurrency)};
   }
 }

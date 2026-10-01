@@ -34,9 +34,9 @@
     </div>
   }
 
-  <div class="mb-cmn-8 grid grid-cols-3 gap-cmn-4">
+  <div class="mb-cmn-8 grid grid-cols-1 gap-cmn-4 sm:grid-cols-3">
     <cmn-stat-card
-      [value]="'$' + ((store.monthlyOutflow() | number: '1.2-2') ?? '0.00')"
+      [value]="store.monthlyOutflow() | money"
       [loading]="store.isLoading()"
       label="Monthly Outflow"
       icon="TrendingDown"

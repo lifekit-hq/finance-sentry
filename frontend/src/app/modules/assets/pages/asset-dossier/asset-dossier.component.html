@@ -1,8 +1,8 @@
 <div class="space-y-cmn-5">
   @if (store.isDossierLoading()) {
-    <div class="h-32 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800"></div>
-    <div class="h-48 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800"></div>
-    <div class="h-64 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800"></div>
+    <cmn-skeleton height="8rem" width="100%" />
+    <cmn-skeleton height="12rem" width="100%" />
+    <cmn-skeleton height="16rem" width="100%" />
   } @else if (store.dossierErrorMessage()) {
     <cmn-alert variant="error">{{ store.dossierErrorMessage() }}</cmn-alert>
   } @else if (store.dossier(); as dossier) {
@@ -85,10 +85,12 @@
           </div>
 
           @if (store.isLedgerReadLoading()) {
-            <div
-              class="mt-cmn-4 h-16 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800"
+            <cmn-skeleton
+              class="mt-cmn-4 block"
               data-testid="ledger-read-loading"
-            ></div>
+              height="4rem"
+              width="100%"
+            />
           } @else if (store.ledgerReadErrorMessage(); as ledgerReadError) {
             <cmn-alert variant="error" class="mt-cmn-4 block" data-testid="ledger-read-error">
               {{ ledgerReadError }}
@@ -114,7 +116,7 @@
           <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Position</h2>
           <p class="text-cmn-xs text-text-secondary">{{ position.provider }}</p>
 
-          <div class="mt-cmn-4 grid grid-cols-2 gap-cmn-4 md:grid-cols-4">
+          <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
             <div>
               <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Quantity</p>
               <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
@@ -124,14 +126,14 @@
             <div>
               <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Current Value</p>
               <p class="mt-cmn-1 font-mono font-semibold tabular-nums text-text-primary">
-                {{ position.currentValueUsd | number: '1.2-2' }} USD
+                {{ position.currentValueUsd | money }}
               </p>
             </div>
             @if (position.costBasisUsd !== null) {
               <div>
                 <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Cost Basis</p>
                 <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                  {{ position.costBasisUsd | number: '1.2-2' }} USD
+                  {{ position.costBasisUsd | money }}
                 </p>
               </div>
             }
@@ -147,7 +149,7 @@
                   {{ position.unrealizedPnlPercent | number: '1.2-2' }}%
                   @if (position.unrealizedPnlUsd !== null) {
                     <span class="text-cmn-xs font-normal"
-                      >({{ position.unrealizedPnlUsd | number: '1.2-2' }} USD)</span
+                      >({{ position.unrealizedPnlUsd | money }})</span
                     >
                   }
                 </p>
@@ -168,9 +170,9 @@
                     <span class="font-mono tabular-nums text-text-primary">{{
                       lot.quantity | number: '1.0-8'
                     }}</span>
-                    <span class="font-mono tabular-nums text-text-primary"
-                      >{{ lot.currentValueUsd | number: '1.2-2' }} USD</span
-                    >
+                    <span class="font-mono tabular-nums text-text-primary">{{
+                      lot.currentValueUsd | money
+                    }}</span>
                     @if (lot.unrealizedPnlPercent !== null) {
                       <span
                         [class]="
@@ -268,7 +270,7 @@
               }
             </div>
 
-            <div class="mt-cmn-4 grid grid-cols-2 gap-cmn-4 md:grid-cols-4">
+            <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
               @if (valuation.metrics.trailingPe.value !== null) {
                 <div>
                   <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
@@ -311,7 +313,7 @@
                     Consensus Target
                   </p>
                   <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                    {{ valuation.consensusTarget | number: '1.2-2' }} USD
+                    {{ valuation.consensusTarget | money }}
                   </p>
                   @if (valuation.impliedUpsidePct !== null) {
                     <p
@@ -357,7 +359,7 @@
                   }
                   @if (action.newTarget !== null) {
                     <span class="font-mono tabular-nums text-text-secondary"
-                      >PT {{ action.newTarget | number: '1.2-2' }} USD</span
+                      >PT {{ action.newTarget | money }}</span
                     >
                   }
                   <span class="ml-auto shrink-0 text-text-secondary">{{ action.actionDate }}</span>

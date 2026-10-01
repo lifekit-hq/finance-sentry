@@ -7,6 +7,7 @@ import {
   ChipComponent,
   CmnDialogService,
   ConfirmDialogComponent,
+  FormFieldComponent,
   InputComponent,
   LineChartComponent,
   ListItemRowComponent,
@@ -15,7 +16,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
-import {AppCurrencyPipe} from '../../../../core/pipes/app-currency.pipe';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {
   type Subscription,
   type SubscriptionSort,
@@ -35,7 +36,8 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
 @Component({
   selector: 'fns-subscriptions',
   imports: [
-    AppCurrencyPipe,
+    FormFieldComponent,
+    MoneyPipe,
     ButtonComponent,
     CardComponent,
     ChipComponent,
