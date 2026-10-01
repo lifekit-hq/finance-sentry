@@ -19,7 +19,7 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
-import {CONNECT_ACTION_ID, PERMISSION_BY_ENTRY} from './app-shell.constants';
+import {CONNECT_ACTION_ID, PERMISSION_BY_ENTRY, PHONE_TAB_ROUTES} from './app-shell.constants';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
@@ -59,6 +59,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       [isDark]="isDark()"
       [avatarMenuItems]="avatarMenuItems"
       [versionLabel]="versionLabel"
+      [tabRoutes]="tabRoutes"
       (navClick)="navigate($event)"
       (themeToggle)="themeService.toggle()"
       (searchClick)="openPalette()"
@@ -90,7 +91,7 @@ export class AppShellComponent {
 
   private readonly alertsStore = inject(AlertsStore);
   private readonly allNavItems: NavItem[] = [
-    {label: 'Dashboard', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
+    {label: 'Home', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
     {label: 'Accounts', icon: 'Building2', route: AppRoute.Accounts},
     {label: 'Transactions', icon: 'ArrowLeftRight', route: AppRoute.Transactions},
     {label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets},
@@ -110,6 +111,7 @@ export class AppShellComponent {
   public readonly themeService = inject(ThemeService);
   public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
   public readonly versionLabel = `v${APP_VERSION}`;
+  public readonly tabRoutes = [...PHONE_TAB_ROUTES];
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );

@@ -69,7 +69,7 @@
         </div>
 
         <cmn-data-table [rows]="group.rows">
-          <cmn-column key="symbol" header="Symbol">
+          <cmn-column key="symbol" listSlot="primary" header="Symbol">
             <ng-template let-row cmnCell>
               <button
                 (click)="navigateToDossier(row.symbol)"
@@ -84,12 +84,12 @@
               </button>
             </ng-template>
           </cmn-column>
-          <cmn-column key="provider" header="Provider">
+          <cmn-column key="provider" listSlot="secondary" header="Provider">
             <ng-template let-row cmnCell>
               <span class="text-text-secondary">{{ row.provider }}</span>
             </ng-template>
           </cmn-column>
-          <cmn-column key="quantity" header="Quantity" align="right">
+          <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
             <ng-template let-row cmnCell>
               <span class="font-mono tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
             </ng-template>
@@ -103,14 +103,14 @@
               }
             </ng-template>
           </cmn-column>
-          <cmn-column key="value" header="Value" align="right">
+          <cmn-column key="value" listSlot="trailing" header="Value" align="right">
             <ng-template let-row cmnCell>
               <span class="font-mono tabular-nums font-semibold">{{
                 row.currentValue | money
               }}</span>
             </ng-template>
           </cmn-column>
-          <cmn-column key="pnl" header="P&L %" align="right">
+          <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L %" align="right">
             <ng-template let-row cmnCell>
               @if (row.pnlPercent === null) {
                 <span

@@ -13,3 +13,11 @@ export const PERMISSION_BY_ENTRY: Readonly<Record<string, Permission>> = {
   [AppRoute.SettingsPeople]: Permission.UsersManage,
   [CONNECT_ACTION_ID]: Permission.ConnectionsManage,
 };
+
+/** Nav routes shown as bottom tabs below the md breakpoint; every other nav item sits under "More". */
+export const PHONE_TAB_ROUTES: readonly string[] = [
+  AppRoute.Dashboard,
+  AppRoute.Accounts,
+  AppRoute.Transactions,
+  AppRoute.Alerts,
+];
