@@ -407,6 +407,9 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
             .Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid _, string provider, CancellationToken _) => captured.GetValueOrDefault(provider));
         CredentialRepoMock
+            .Setup(r => r.GetUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, string provider, CancellationToken _) => captured.GetValueOrDefault(provider));
+        CredentialRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         CredentialRepoMock
@@ -430,6 +433,9 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
             .ReturnsAsync([]);
         HoldingRepoMock
             .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        HoldingRepoMock
+            .Setup(r => r.GetAllByUserAndProviderUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         HoldingRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
