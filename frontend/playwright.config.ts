@@ -20,6 +20,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${SPA_PORT}`,
     trace: 'on-first-retry',
+    // The app registers a service worker; requests it handles bypass page.route() mocks.
+    serviceWorkers: 'block',
     launchOptions: {
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
     },
