@@ -1,9 +1,9 @@
-import {CurrencyPipe} from '@angular/common';
 import {computed, inject, type Signal} from '@angular/core';
 import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
+import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
   MIN_PROJECTION_MONTHS,
   PROJECTION_HORIZON_MONTHS,
@@ -19,16 +19,7 @@ interface StateSignals {
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
   historyLoading: Signal<boolean>;
   historyError: Signal<string | null>;
-  projectionReturnRate: Signal<number>;
 }
-
-const COMPACT_FORMATTER = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  notation: 'compact',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 1,
-});
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short'});
 const DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short', day: 'numeric'});
@@ -47,8 +38,11 @@ const MS_PER_DAY = 86_400_000;
 const SLEEVE_COLOR = {banking: '#10b981', brokerage: '#6366f1', crypto: '#f59e0b'} as const;
 const INCOME_COLOR = '#10b981';
 const SPENDING_COLOR = '#ef4444';
-const SAVINGS_COLOR = '#6366f1';
 const PERCENT = 100;
+
+// Shown instead of a red "100% below pace" while nothing has landed yet: salary posts once,
+// so an empty month early on is the normal state, not a shortfall.
+const NO_INCOME_LABEL = 'No income yet this month';
 
 // The month-to-date tiles compare against the average of this many complete months,
 // prorated by how far into the current month we are. Three is enough to absorb a single
@@ -65,7 +59,6 @@ const INCOME_LANDED_FRACTION = 0.5;
 // Need at least a start and end snapshot to state a change over the window.
 const MIN_POINTS_FOR_DELTA = 2;
 
-const MONTHS_PER_YEAR = 12;
 // An even-length sample has two middle values; the median is their average.
 const MEDIAN_HALVES = 2;
 
@@ -83,26 +76,12 @@ function median(values: number[]): number {
     : sorted[mid];
 }
 
-// Cents on a twelve-month forecast are noise, and the projection's addends have to share the
-// headline's formatter or the column will not visibly sum.
-const WHOLE_DOLLARS = '1.0-0';
+// Cents on a twelve-month forecast or a month-to-date tile are noise.
+const WHOLE_DOLLARS = {maxFractionDigits: 0} as const;
+const CHANGE_PERCENT_DIGITS = 1;
 
-function wholeUsd(value: number, currency: CurrencyPipe): string {
-  return currency.transform(value, 'USD', 'symbol', WHOLE_DOLLARS) ?? '';
-}
-
-/**
- * Money as a signed addend, following the U+2212 / ASCII-plus convention
- * `netWorthChangeFormatted` already sets in this file. Exact zero drops the sign: "+$0" reads
- * as a rounding artifact, while "$0" reads as the deliberate flat default the 0% option exists
- * to express.
- */
-function signedUsd(value: number, currency: CurrencyPipe): string {
-  const magnitude = wholeUsd(Math.abs(value), currency);
-  if (value === 0) {
-    return magnitude;
-  }
-  return `${value > 0 ? '+' : '−'}${magnitude}`;
+function wholeUsd(value: number): string {
+  return MoneyUtils.format(value, 'USD', WHOLE_DOLLARS);
 }
 
 function currentMonthKey(): string {
@@ -244,7 +223,6 @@ function savingsRateChip(
 }
 
 export function dashboardComputed(store: StateSignals) {
-  const currency = inject(CurrencyPipe);
   const categoryStore = inject(CategoryStore);
 
   // Snapshots with a real total; days with a missing feed land as 0 and would otherwise
@@ -291,14 +269,18 @@ export function dashboardComputed(store: StateSignals) {
     return mtd.inflow >= normalInflow * INCOME_LANDED_FRACTION ? savingsRateOf(mtd) : null;
   });
 
-  const inflowChip = computed(() => paceChip(inflowPace(), true, 'above pace', 'below pace'));
+  const inflowChip = computed(() => {
+    if (inflowPace() !== null && (monthToDate()?.inflow ?? 0) <= 0) {
+      return {delta: 0, label: NO_INCOME_LABEL};
+    }
+    return paceChip(inflowPace(), true, 'above pace', 'below pace');
+  });
   const spendingChip = computed(() => paceChip(outflowPace(), false, 'over pace', 'under pace'));
   const savingsChip = computed(() => savingsRateChip(savingsRateMonthToDate(), completeMonths()));
 
   // Forecasting the net-worth line itself would be forecasting the market — most of the book
   // is market-marked and its daily swings dwarf a month of savings. So the projection is built
-  // from what the user actually controls (contributions) and any market return is a separate,
-  // user-selected, explicitly worded assumption.
+  // from what the user actually controls (contributions) and assumes no market return.
   const completeMonthCount = computed(() => completeMonths().length);
   const hasProjection = computed(() => completeMonthCount() >= MIN_PROJECTION_MONTHS);
 
@@ -307,21 +289,18 @@ export function dashboardComputed(store: StateSignals) {
     return months.length === 0 ? 0 : median(months.map(([, v]) => v.inflow - v.outflow));
   });
 
-  // Only the sleeves that are actually marked to market can earn a market return. Banking cash
-  // cannot, and neither can the projected contributions — the app has no idea whether next
-  // month's savings land in a brokerage or sit in a current account.
-  const marketMarkedBalance = computed(() => {
-    const latest = validHistory().at(-1);
-    return latest ? latest.brokerageTotal + latest.cryptoTotal : 0;
-  });
-
-  // Named once and reused by both the headline and its breakdown line, so the addends the
-  // reader is invited to sum can never drift from the total they are shown against.
+  // Named once so the headline reads straight off the same figure the basis label describes.
   const projectedContributions = computed(() => medianMonthlySavings() * PROJECTION_HORIZON_MONTHS);
 
-  const marketGrowth = computed(() => {
-    const horizonYears = PROJECTION_HORIZON_MONTHS / MONTHS_PER_YEAR;
-    return marketMarkedBalance() * ((1 + store.projectionReturnRate()) ** horizonYears - 1);
+  // Net-worth change across the loaded window, null until there are two usable snapshots.
+  const netWorthChange = computed((): {delta: number; percent: number | null} | null => {
+    const history = validHistory();
+    if (history.length < MIN_POINTS_FOR_DELTA) {
+      return null;
+    }
+    const start = history[0].totalNetWorth;
+    const delta = history[history.length - 1].totalNetWorth - start;
+    return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
   });
 
   const snapshotLabeller = computed((): ((s: NetWorthSnapshotDto) => string) => {
@@ -337,74 +316,30 @@ export function dashboardComputed(store: StateSignals) {
   });
 
   return {
-    totalBalanceFormatted: computed(
-      () => currency.transform(store.data()?.totalNetWorthUsd ?? 0) ?? ''
-    ),
+    totalBalanceFormatted: computed(() => MoneyUtils.format(store.data()?.totalNetWorthUsd ?? 0)),
 
-    // Signed net-worth change across the loaded window.
+    // Signed net-worth change across the loaded window, shown inline under the hero figure.
     netWorthChangeFormatted: computed(() => {
-      const history = validHistory();
-      if (history.length < MIN_POINTS_FOR_DELTA) {
-        return '—';
-      }
-      const delta = history[history.length - 1].totalNetWorth - history[0].totalNetWorth;
-      const sign = delta >= 0 ? '+' : '−';
-      return `${sign}${COMPACT_FORMATTER.format(Math.abs(delta))}`;
+      const change = netWorthChange();
+      return change ? MoneyUtils.format(change.delta, 'USD', {...WHOLE_DOLLARS, signed: true}) : '';
     }),
+    netWorthChangePercentFormatted: computed(() => {
+      const percent = netWorthChange()?.percent;
+      return percent === null || percent === undefined
+        ? ''
+        : `${percent > 0 ? '+' : ''}${percent.toFixed(CHANGE_PERCENT_DIGITS)}%`;
+    }),
+    // Sign of the change, for colouring: 1 up, -1 down, 0 flat or unknown.
+    netWorthChangeDirection: computed(() => Math.sign(netWorthChange()?.delta ?? 0)),
 
     monthlySpendingFormatted: computed(() => {
       const cur = monthToDate();
-      return cur ? COMPACT_FORMATTER.format(cur.outflow) : '—';
+      return cur ? wholeUsd(cur.outflow) : '—';
     }),
 
     monthlyInflowFormatted: computed(() => {
       const cur = monthToDate();
-      return cur ? COMPACT_FORMATTER.format(cur.inflow) : '—';
-    }),
-
-    // Four-bucket breakdown of the month's income: Spent / Supported family / Invested / Kept.
-    // Spent and Supported family come out of outflow (both are real spending); Invested left
-    // the bank but not the user, so it is carved out of what remains rather than out of spend.
-    monthlySpentFormatted: computed(() => {
-      const cur = monthToDate();
-      if (!cur) {
-        return '—';
-      }
-      return COMPACT_FORMATTER.format(Math.max(0, cur.outflow - cur.familySupportOutflow));
-    }),
-
-    monthlyFamilySupportFormatted: computed(() => {
-      const cur = monthToDate();
-      if (!cur) {
-        return '—';
-      }
-      return COMPACT_FORMATTER.format(cur.familySupportOutflow);
-    }),
-
-    monthlyInvestedFormatted: computed(() => {
-      const cur = monthToDate();
-      if (!cur) {
-        return '—';
-      }
-      return COMPACT_FORMATTER.format(cur.invested);
-    }),
-
-    // What is left after spending AND after the part of the surplus that was put to work.
-    // Clamped at zero: a month that invested more than it saved would otherwise render a
-    // negative "Kept", which reads as debt rather than as an aggressive month.
-    monthlyKeptFormatted: computed(() => {
-      const cur = monthToDate();
-      if (!cur) {
-        return '—';
-      }
-      return COMPACT_FORMATTER.format(Math.max(0, cur.inflow - cur.outflow - cur.invested));
-    }),
-
-    // The breakdown only earns its space once something in it is non-zero; with no
-    // counterparty traffic at all it would just restate the tiles above it.
-    hasFlowBreakdown: computed(() => {
-      const cur = monthToDate();
-      return (cur?.familySupportOutflow ?? 0) > 0 || (cur?.invested ?? 0) > 0;
+      return cur ? wholeUsd(cur.inflow) : '—';
     }),
 
     savingsRateMonthToDateFormatted: computed(() => {
@@ -485,65 +420,23 @@ export function dashboardComputed(store: StateSignals) {
       ];
     }),
 
-    // A near-zero-inflow month sends net/inflow to absurd magnitudes (the old chart read
-    // -500,000%), so months without real income are dropped on top of the shared
-    // complete-months window.
-    savingsRateBars: computed((): BarSeries[] => {
-      const points = completeMonths()
-        .filter(([, v]) => v.inflow > 0)
-        .map(([key, v]) => ({label: formatMonthKey(key), value: savingsRateOf(v)}));
-      return points.length > 0 ? [{label: 'Savings rate', color: SAVINGS_COLOR, points}] : [];
-    }),
-
     // Below three complete months the tile does not render at all — a projection off one or
     // two months is noise wearing a number's clothes.
     hasProjection,
 
     projectedNetWorthFormatted: computed(() =>
-      wholeUsd(
-        (store.data()?.totalNetWorthUsd ?? 0) + projectedContributions() + marketGrowth(),
-        currency
-      )
+      wholeUsd((store.data()?.totalNetWorthUsd ?? 0) + projectedContributions())
     ),
 
-    // The headline broken into the addends that produce it. Blending saving (behaviour the
-    // reader controls) with an assumed return (a guess they picked off a toggle) into one
-    // figure hides the very distinction this tile exists to draw, so the parts are shown and
-    // the reader can check that they sum.
-    projectionTodayFormatted: computed(() =>
-      wholeUsd(store.data()?.totalNetWorthUsd ?? 0, currency)
-    ),
-    projectedContributionsFormatted: computed(() => signedUsd(projectedContributions(), currency)),
-    projectedMarketReturnFormatted: computed(() => signedUsd(marketGrowth(), currency)),
-
-    medianMonthlySavingsFormatted: computed(() => wholeUsd(medianMonthlySavings(), currency)),
-
-    // Always plural: the tile is gated at three months, so the singular can never surface.
+    // Always plural: the line is gated at three months, so the singular can never surface.
     projectionBasisLabel: computed(
       () => `Median saved per month, based on ${completeMonthCount()} complete months`
     ),
-
-    // The assumption is spelled out in words next to the number, because the whole point of
-    // splitting return out of the projection is that the reader can see which part is their
-    // own behaviour and which part is a guess about the market.
-    projectionAssumptionLabel: computed(() => {
-      const percent = Math.round(store.projectionReturnRate() * PERCENT);
-      if (percent === 0) {
-        return 'Assumes no market return — this is contributions only.';
-      }
-      const marketBalance = marketMarkedBalance();
-      if (marketBalance <= 0) {
-        return `The latest snapshot has no market-marked balance, so ${percent}%/yr changes nothing.`;
-      }
-      const base = COMPACT_FORMATTER.format(marketBalance);
-      return `Assumes ${percent}%/yr on the ${base} already in brokerage and crypto. Cash and future contributions do not compound.`;
-    }),
 
     // Gated on the same complete-month window the charts plot: a user whose only data is
     // the in-progress month has nothing to chart yet, and rendering an empty frame reads
     // as a broken widget rather than as "not enough history".
     hasCashFlow: computed(() => completeMonths().length > 0),
-    hasIncome: computed(() => completeMonths().some(([, v]) => v.inflow > 0)),
 
     categoryChartData: computed((): DonutSegment[] =>
       (store.data()?.topCategories ?? []).map(c => ({

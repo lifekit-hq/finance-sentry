@@ -7,7 +7,6 @@ import {environment} from '../environments/environment';
 import {APP_ROUTES} from './app.routes';
 import {provideAppIcons} from './core/providers/app-icons.provider';
 import {provideAppInit} from './core/providers/app-init.provider';
-import {provideCurrencyPipe} from './core/providers/currency-pipe.provider';
 import {provideDecimalPipe} from './core/providers/decimal-pipe.provider';
 import {provideErrorHandler} from './core/providers/error-handler.provider';
 import {provideErrorMessages} from './core/providers/error-messages.provider';
@@ -24,7 +23,6 @@ export const appConfig: ApplicationConfig = {
     provideAppIcons(),
     provideAppInit(),
     provideDecimalPipe(),
-    provideCurrencyPipe(),
     provideAppServiceWorker(),
   ],
 };

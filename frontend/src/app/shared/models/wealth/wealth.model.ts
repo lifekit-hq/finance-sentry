@@ -53,6 +53,17 @@ export interface CategorySummary {
   institutions: Institution[];
 }
 
+/** One inventory section of the accounts page: a category and how its rows are named. */
+export interface CategorySection {
+  category: AccountCategory;
+  title: string;
+  /** What one institution of the section is called ("broker"), pluralised by the template. */
+  institutionNoun: string;
+  /** What the rows inside an institution are called ("position"). */
+  rowNoun: string;
+  summary: CategorySummary;
+}
+
 export interface AppliedFilters {
   category: Nullable<AccountCategory>;
   provider: Nullable<string>;

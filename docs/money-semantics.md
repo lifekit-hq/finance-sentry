@@ -4,7 +4,7 @@ Source of truth for Finance Sentry's money math. **Any PR that changes one of th
 behaviours must update this document in the same diff.** File references point at the
 implementing code; when they disagree, the code is the bug or this doc is stale — fix one.
 
-Last verified: 2026-09-16 (#472 PR 2 — Revolut X trades and venue fiat).
+Last verified: 2026-10-01 (UI plan phase 5 — liability presentation on the Accounts page).
 
 ---
 
@@ -110,6 +110,11 @@ zeroing recorded phantom net-worth drops.
 **Aggregates** (net worth, currency totals, banking sleeve, wealth institution/card-group
 totals, liquidity projections) always sum `SignedForNetTotal(...)`. **Per-account display**
 keeps the raw positive value ("you owe X"), matching how banks present credit cards.
+
+**Presentation** (frontend, display only): a credit account's row reads `Owes €120.00` in the
+error tone (`AccountBalancePipe`), and an institution or card-group total that nets negative
+reads `Owes $917.82` rather than a bare minus sign (`MoneyUtils.formatNetBalance`). The sign
+convention above is unchanged — only the label differs. Net worth totals stay signed.
 
 ## 3. Currency conversion
 

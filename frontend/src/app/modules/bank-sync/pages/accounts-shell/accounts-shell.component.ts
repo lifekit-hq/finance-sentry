@@ -1,26 +1,35 @@
-import {ChangeDetectionStrategy, Component} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
 import {RouterLink, RouterLinkActive, RouterOutlet} from '@angular/router';
-import {PageHeaderComponent} from '@lifekit-hq/ui';
+import {CmnDialogService, PageHeaderComponent} from '@lifekit-hq/ui';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
+import {AccountsStore} from '../../store/accounts/accounts.store';
+import {ConnectStore} from '../../store/connect/connect.store';
 
 interface AccountsTab {
   label: string;
   route: string;
 }
 
+// Both stores live on the shell so the Connect action in the header and the routed tab pages
+// share one instance: the connect forms reload the accounts store they find above them.
 @Component({
   selector: 'fns-accounts-shell',
   imports: [PageHeaderComponent, RouterLink, RouterLinkActive, RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [AccountsStore, ConnectStore],
   template: `
-    <div class="mx-auto max-w-[1200px] p-cmn-8">
+    <div class="mx-auto max-w-[1200px] p-cmn-4 sm:p-cmn-8">
       <cmn-page-header
+        (actionClick)="connectAccount()"
         title="Accounts"
-        subtitle="Balances, holdings and net worth across every connected provider"
+        subtitle="Balances and holdings across every provider"
+        actionLabel="Connect Account"
+        actionIcon="Plus"
       />
 
-      <nav class="mt-cmn-6 mb-cmn-8 flex gap-cmn-2 border-b border-border-default" role="tablist">
+      <nav class="mt-cmn-6 mb-cmn-6 flex gap-cmn-2 border-b border-border-default" role="tablist">
         @for (tab of tabs; track tab.route) {
           <a
             [routerLink]="tab.route"
@@ -39,8 +48,21 @@ interface AccountsTab {
   `,
 })
 export class AccountsShellComponent {
+  private readonly dialog = inject(CmnDialogService);
+  private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly connectStore = inject(ConnectStore);
+
   public readonly tabs: AccountsTab[] = [
     {label: 'Inventory', route: AppRoute.AccountsList},
     {label: 'Investments', route: AppRoute.AccountsInvestments},
   ];
+
+  public connectAccount(): void {
+    this.connectStore.openModal();
+    this.dialog.open(ConnectModalComponent, {
+      title: 'Connect account',
+      size: 'md',
+      viewContainerRef: this.viewContainerRef,
+    });
+  }
 }

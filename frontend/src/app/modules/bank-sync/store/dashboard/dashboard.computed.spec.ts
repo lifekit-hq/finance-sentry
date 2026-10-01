@@ -1,4 +1,3 @@
-import {CurrencyPipe} from '@angular/common';
 import {provideHttpClient} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
@@ -35,15 +34,9 @@ interface Fixture {
   monthlyFlow: MonthlyFlow[];
   totalNetWorthUsd?: number;
   netWorthHistory?: NetWorthSnapshotDto[];
-  projectionReturnRate?: number;
 }
 
-function build({
-  monthlyFlow,
-  totalNetWorthUsd = 0,
-  netWorthHistory = [],
-  projectionReturnRate = 0,
-}: Fixture) {
+function build({monthlyFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture) {
   const data: DashboardData = {
     aggregatedBalance: {USD: 0},
     totalNetWorthUsd,
@@ -59,7 +52,6 @@ function build({
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
-    projectionReturnRate: signal(projectionReturnRate),
   };
 }
 
@@ -109,7 +101,6 @@ describe('dashboardComputed', () => {
     vi.setSystemTime(NOW);
     TestBed.configureTestingModule({
       providers: [
-        CurrencyPipe,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideApiBaseUrl('http://localhost/api/v1'),
@@ -121,7 +112,7 @@ describe('dashboardComputed', () => {
     vi.useRealTimers();
   });
 
-  describe('charts plot complete calendar months only', () => {
+  describe('the chart plots complete calendar months only', () => {
     it('keeps the in-progress month out of income vs spending', () => {
       const bars = computedFor(steadyHistory(500, 900)).incomeVsSpendingBars();
 
@@ -131,35 +122,11 @@ describe('dashboardComputed', () => {
       }
     });
 
-    it('gives income vs spending and savings rate the same x-axis', () => {
-      const c = computedFor(steadyHistory(500, 900));
-
-      const incomeMonths = c.incomeVsSpendingBars()[0].points.map(p => p.label);
-      const savingsMonths = c.savingsRateBars()[0].points.map(p => p.label);
-
-      expect(savingsMonths).toEqual(incomeMonths);
-    });
-
-    it('still drops closed months that had no income at all', () => {
-      // A zero-inflow month sends net/inflow to absurd magnitudes; it is not a savings rate.
-      const c = computedFor([flow('2026-06', 0, 800), flow('2026-07', 4000, 2000)]);
-
-      expect(c.savingsRateBars()[0].points.map(p => p.label)).toEqual(["Jul '26"]);
-    });
-
-    it('computes the closed-month savings rate from net over inflow', () => {
-      const c = computedFor(steadyHistory(500, 900));
-
-      expect(c.savingsRateBars()[0].points[0].value).toBeCloseTo(50, 5);
-    });
-
     it('reports no chartable data when only the in-progress month exists', () => {
       const c = computedFor([flow('2026-08', 500, 900)]);
 
       expect(c.hasCashFlow()).toBe(false);
-      expect(c.hasIncome()).toBe(false);
       expect(c.incomeVsSpendingBars()).toEqual([]);
-      expect(c.savingsRateBars()).toEqual([]);
     });
   });
 
@@ -210,6 +177,13 @@ describe('dashboardComputed', () => {
       expect(behind.inflowPaceDelta()).toBeLessThan(0);
     });
 
+    it('reads a month with no income yet as neutral rather than a red shortfall', () => {
+      const c = computedFor(steadyHistory(0, 300));
+
+      expect(c.inflowPaceLabel()).toBe('No income yet this month');
+      expect(c.inflowPaceDelta()).toBe(0);
+    });
+
     it('shows no pace chip when there are no closed months to compare against', () => {
       const c = computedFor([flow('2026-08', 500, 900)]);
 
@@ -257,62 +231,12 @@ describe('dashboardComputed', () => {
     });
   });
 
-  describe('four-bucket flow breakdown', () => {
-    /** August: 4000 in, 2000 out (of which 500 family support), 900 routed to investments. */
-    function augustWithBuckets(): MonthlyFlow[] {
-      return [
-        ...steadyHistory(4000, 2000).slice(0, -1),
-        {...flow('2026-08', 4000, 2000), familySupportOutflowUsd: 500, investedOutflowUsd: 900},
-      ];
-    }
-
-    it('splits the month into spent / supported family / invested / kept', () => {
-      const c = computedFor(augustWithBuckets());
-
-      // Spent = outflow - family support; Invested is carved out of the surplus, not out
-      // of spend; Kept = what neither went out nor was put to work.
-      expect(c.monthlySpentFormatted()).toBe('$1.5K');
-      expect(c.monthlyFamilySupportFormatted()).toBe('$500');
-      expect(c.monthlyInvestedFormatted()).toBe('$900');
-      expect(c.monthlyKeptFormatted()).toBe('$1.1K');
-      expect(c.hasFlowBreakdown()).toBe(true);
-    });
-
-    it('shows the breakdown for an investing month with no family support', () => {
-      const c = computedFor([
-        ...steadyHistory(4000, 2000).slice(0, -1),
-        {...flow('2026-08', 4000, 2000), investedOutflowUsd: 1200},
-      ]);
-
-      expect(c.hasFlowBreakdown()).toBe(true);
-      expect(c.monthlyFamilySupportFormatted()).toBe('$0');
-      expect(c.monthlyInvestedFormatted()).toBe('$1.2K');
-      expect(c.monthlyKeptFormatted()).toBe('$800');
-    });
-
-    it('hides the breakdown when neither bucket carries anything', () => {
-      const c = computedFor(steadyHistory(4000, 2000));
-
-      expect(c.hasFlowBreakdown()).toBe(false);
-    });
-
-    it('never reports a negative Kept when investing outran the surplus', () => {
-      const c = computedFor([
-        ...steadyHistory(4000, 2000).slice(0, -1),
-        {...flow('2026-08', 4000, 2000), investedOutflowUsd: 3000},
-      ]);
-
-      expect(c.monthlyKeptFormatted()).toBe('$0');
-    });
-  });
-
   describe('twelve-month projection from savings contributions', () => {
     it('projects from the MEDIAN month, so one artifact month cannot drag the number', () => {
       // Nets are −200 / +1000 / +5000. Median 1000 → +12,000 over the horizon.
       // A mean (1933) would have produced $33,200 off the same months.
       const c = projectionFor({monthlyFlow: SKEWED_MONTHS, totalNetWorthUsd: 10_000});
 
-      expect(c.medianMonthlySavingsFormatted()).toBe('$1,000');
       expect(c.projectedNetWorthFormatted()).toBe('$22,000');
     });
 
@@ -328,7 +252,6 @@ describe('dashboardComputed', () => {
       });
 
       // Middle two are 300 and 500 → 400/mo → 4,800 over twelve months.
-      expect(c.medianMonthlySavingsFormatted()).toBe('$400');
       expect(c.projectedNetWorthFormatted()).toBe('$4,800');
     });
 
@@ -372,114 +295,54 @@ describe('dashboardComputed', () => {
         totalNetWorthUsd: 10_000,
       });
 
-      expect(c.medianMonthlySavingsFormatted()).toBe('-$200');
       expect(c.projectedNetWorthFormatted()).toBe('$7,600');
     });
 
-    it('compounds nothing at the 0% default, even with market-marked sleeves present', () => {
-      const c = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        netWorthHistory: [snapshot(2000, 8000, 2000)],
-      });
-
-      expect(c.projectedNetWorthFormatted()).toBe('$22,000');
-      expect(c.projectionAssumptionLabel()).toBe(
-        'Assumes no market return — this is contributions only.'
-      );
-    });
-
-    it('compounds only brokerage and crypto at a non-zero rate, never banking cash', () => {
-      const c = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        // Banking dwarfs the market sleeves; 5% of it would add 5,000, not 500.
-        netWorthHistory: [snapshot(100_000, 8000, 2000)],
-        projectionReturnRate: 0.05,
-      });
-
-      // 10,000 + 12,000 contributions + 5% of the 10,000 market-marked sleeves.
-      expect(c.projectedNetWorthFormatted()).toBe('$22,500');
-      expect(c.projectionAssumptionLabel()).toBe(
-        'Assumes 5%/yr on the $10K already in brokerage and crypto. ' +
-          'Cash and future contributions do not compound.'
-      );
-    });
-
-    it('reads the market-marked base from the latest snapshot, not the first', () => {
-      const c = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        netWorthHistory: [snapshot(0, 1000, 0), snapshot(0, 8000, 2000)],
-        projectionReturnRate: 0.05,
-      });
-
-      expect(c.projectedNetWorthFormatted()).toBe('$22,500');
-    });
-
-    it('breaks the headline into addends that sum to it at the 0% default', () => {
+    it('assumes no market return, even with market-marked sleeves present', () => {
       const c = projectionFor({
         monthlyFlow: SKEWED_MONTHS,
         totalNetWorthUsd: 10_000,
         netWorthHistory: [snapshot(100_000, 8000, 2000)],
       });
 
-      // 10,000 + 12,000 + 0 = 22,000, the headline. A flat default reads "$0", not "+$0".
-      expect(c.projectionTodayFormatted()).toBe('$10,000');
-      expect(c.projectedContributionsFormatted()).toBe('+$12,000');
-      expect(c.projectedMarketReturnFormatted()).toBe('$0');
+      // Contributions only: 10,000 + 12,000, with no return on the 10,000 market-marked sleeves.
       expect(c.projectedNetWorthFormatted()).toBe('$22,000');
     });
+  });
 
-    it('moves only the market-return addend when a rate is selected', () => {
-      const flat = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        netWorthHistory: [snapshot(100_000, 8000, 2000)],
-      });
-      const withReturn = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        netWorthHistory: [snapshot(100_000, 8000, 2000)],
-        projectionReturnRate: 0.05,
-      });
+  describe('net worth hero', () => {
+    function history(first: number, last: number): NetWorthSnapshotDto[] {
+      return [snapshot(first, 0, 0), snapshot(last, 0, 0)];
+    }
 
-      // Behaviour is untouched by the assumption — that is the whole point of the split.
-      expect(withReturn.projectionTodayFormatted()).toBe(flat.projectionTodayFormatted());
-      expect(withReturn.projectedContributionsFormatted()).toBe(
-        flat.projectedContributionsFormatted()
-      );
-      // 5% of the 10,000 market-marked sleeves, and 10,000 + 12,000 + 500 = the headline.
-      expect(withReturn.projectedMarketReturnFormatted()).toBe('+$500');
-      expect(withReturn.projectedNetWorthFormatted()).toBe('$22,500');
+    it('formats the headline symbol-first with cents', () => {
+      const c = projectionFor({monthlyFlow: [], totalNetWorthUsd: 18_981.48});
+
+      expect(c.totalBalanceFormatted()).toBe('$18,981.48');
     });
 
-    it('signs a shrinking contributions line, so a withdrawal cannot read as a credit', () => {
-      const c = projectionFor({
-        monthlyFlow: [
-          flow('2026-05', 1000, 1200),
-          flow('2026-06', 1000, 1300),
-          flow('2026-07', 1000, 1100),
-        ],
-        totalNetWorthUsd: 10_000,
-      });
+    it('states the window change in whole dollars and percent', () => {
+      const c = projectionFor({monthlyFlow: [], netWorthHistory: history(10_000, 10_320)});
 
-      // −200/mo over twelve months. U+2212, matching netWorthChangeFormatted.
-      expect(c.projectedContributionsFormatted()).toBe('−$2,400');
-      expect(c.projectedNetWorthFormatted()).toBe('$7,600');
+      expect(c.netWorthChangeFormatted()).toBe('+$320');
+      expect(c.netWorthChangePercentFormatted()).toBe('+3.2%');
+      expect(c.netWorthChangeDirection()).toBe(1);
     });
 
-    it('says a return assumption has no effect when no snapshot carries a market balance', () => {
-      const c = projectionFor({
-        monthlyFlow: SKEWED_MONTHS,
-        totalNetWorthUsd: 10_000,
-        projectionReturnRate: 0.07,
-      });
+    it('signs a decline', () => {
+      const c = projectionFor({monthlyFlow: [], netWorthHistory: history(10_000, 9_500)});
 
-      expect(c.projectedNetWorthFormatted()).toBe('$22,000');
-      expect(c.projectionAssumptionLabel()).toBe(
-        'The latest snapshot has no market-marked balance, so 7%/yr changes nothing.'
-      );
+      expect(c.netWorthChangeFormatted()).toBe('-$500');
+      expect(c.netWorthChangePercentFormatted()).toBe('-5.0%');
+      expect(c.netWorthChangeDirection()).toBe(-1);
+    });
+
+    it('shows nothing until two snapshots exist', () => {
+      const c = projectionFor({monthlyFlow: [], netWorthHistory: [snapshot(10_000, 0, 0)]});
+
+      expect(c.netWorthChangeFormatted()).toBe('');
+      expect(c.netWorthChangePercentFormatted()).toBe('');
+      expect(c.netWorthChangeDirection()).toBe(0);
     });
   });
 });

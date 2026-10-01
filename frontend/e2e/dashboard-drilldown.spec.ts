@@ -315,9 +315,10 @@ test.describe('Dashboard drill-downs', () => {
     // Stat cards should render (not empty state)
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
     // The in-progress month lives on the month-to-date tiles and nowhere else.
-    await expect(page.getByText('Income (MTD)')).toBeVisible();
-    await expect(page.getByText('Spending (MTD)')).toBeVisible();
-    await expect(page.getByText('Savings rate (MTD)')).toBeVisible();
+    await expect(page.getByText('This month')).toBeVisible();
+    await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
+    await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
+    await expect(page.getByRole('button', {name: /savings breakdown/i})).toBeVisible();
   });
 
   test('month-bucketed charts are labelled as complete months only', async ({page}) => {
@@ -327,7 +328,7 @@ test.describe('Dashboard drill-downs', () => {
     await expect(page.getByText('Income vs Spending (complete months)')).toBeVisible();
   });
 
-  test('clicking "Income (MTD)" navigates to /transactions with credit filter', async ({page}) => {
+  test('clicking the Income tile navigates to /transactions with credit filter', async ({page}) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
@@ -339,7 +340,9 @@ test.describe('Dashboard drill-downs', () => {
     await expect(page).toHaveURL(/\/transactions.*type=credit/);
   });
 
-  test('clicking "Spending (MTD)" navigates to /transactions with debit filter', async ({page}) => {
+  test('clicking the Spending tile navigates to /transactions with debit filter', async ({
+    page,
+  }) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
@@ -350,43 +353,15 @@ test.describe('Dashboard drill-downs', () => {
     await expect(page).toHaveURL(/\/transactions.*type=debit/);
   });
 
-  test('flow breakdown splits the month into spent / supported family / invested / kept', async ({
-    page,
-  }) => {
-    // Mock current month: 4800 in, 2900 out (800 of it family support), 600 invested.
-    // Spent = 2900 - 800 = 2100; Kept = 4800 - 2900 - 600 = 1300.
+  test('the "Breakdown →" link opens the flow breakdown page', async ({page}) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    // Flow breakdown section must be visible.
-    await expect(page.getByText('Flow breakdown (MTD)')).toBeVisible();
+    // The four bucket tiles are gone from the dashboard; one link replaces them.
+    await expect(page.getByText('Flow breakdown (MTD)')).toHaveCount(0);
+    await page.getByRole('link', {name: /breakdown of this month/i}).click();
 
-    // All four bucket tiles must be present.
-    const spentCard = page.locator('cmn-stat-card').filter({hasText: 'Spent'});
-    const familySupportCard = page.locator('cmn-stat-card').filter({hasText: 'Supported family'});
-    const investedCard = page.locator('cmn-stat-card').filter({hasText: 'Invested'});
-    const keptCard = page.locator('cmn-stat-card').filter({hasText: 'Kept'});
-
-    await expect(spentCard).toBeVisible();
-    await expect(familySupportCard).toBeVisible();
-    await expect(investedCard).toBeVisible();
-    await expect(keptCard).toBeVisible();
-
-    // Supported family must show the backend-reported net expense ($800), not $0 or merged into Spent.
-    const familySupportAmount = extractAmount((await familySupportCard.innerText()).trim());
-    expect(familySupportAmount).toBeCloseTo(800, 0);
-
-    // Spent must reflect outflow minus family support ($2100), not the full $2900 outflow.
-    const spentAmount = extractAmount((await spentCard.innerText()).trim());
-    expect(spentAmount).toBeCloseTo(2100, 0);
-
-    // Invested is reported on its own and must not have been folded into spending.
-    const investedAmount = extractAmount((await investedCard.innerText()).trim());
-    expect(investedAmount).toBeCloseTo(600, 0);
-
-    // Kept is the surplus that was neither spent nor put to work.
-    const keptAmount = extractAmount((await keptCard.innerText()).trim());
-    expect(keptAmount).toBeCloseTo(1300, 0);
+    await expect(page).toHaveURL(/\/dashboard\/breakdown/);
   });
 });
 
@@ -484,13 +459,13 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
 // explicitly documents this — a card hold is real spending). The consistency guarantee is
 // that BOTH surfaces show the same server-side number, not that pending is excluded.
 test.describe('Dashboard → Ledger spending consistency', () => {
-  test('Spending (MTD) and Monthly Outflow show the same underlying number', async ({page}) => {
+  test('the Spending tile and Monthly Outflow show the same underlying number', async ({page}) => {
     await mockApisWithLedger(page);
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    // Read the "Spending (MTD)" stat value from the dashboard card.
-    const spendingCard = page.locator('cmn-stat-card').filter({hasText: 'Spending (MTD)'});
+    // Read the Spending tile value from the dashboard.
+    const spendingCard = page.getByRole('button', {name: /view spending details/i});
     await expect(spendingCard).toBeVisible();
     const spendingText = (await spendingCard.innerText()).trim();
     const dashboardAmount = extractAmount(spendingText);

@@ -67,3 +67,33 @@ describe('MoneyUtils.formatEquivalent', () => {
     expect(MoneyUtils.formatEquivalent(500, 'EUR')).toBe('~ €500');
   });
 });
+
+describe('MoneyUtils.formatNetBalance', () => {
+  it('labels a net-negative balance as owed', () => {
+    expect(MoneyUtils.formatNetBalance(-917.82, 'USD')).toBe('Owes $917.82');
+    expect(MoneyUtils.formatNetBalance(-3, 'CHF')).toBe('Owes CHF 3.00');
+  });
+
+  it('formats a non-negative balance as plain money', () => {
+    expect(MoneyUtils.formatNetBalance(1200, 'EUR')).toBe('€1,200.00');
+    expect(MoneyUtils.formatNetBalance(0, 'USD')).toBe('$0.00');
+  });
+
+  it('does not call a rounded-to-zero balance owed', () => {
+    expect(MoneyUtils.formatNetBalance(-0.001, 'USD')).toBe('$0.00');
+  });
+
+  it('keeps the em dash for a missing balance', () => {
+    expect(MoneyUtils.formatNetBalance(null)).toBe('—');
+  });
+});
+
+describe('MoneyUtils.formatOwed', () => {
+  it('prefixes a positive liability amount', () => {
+    expect(MoneyUtils.formatOwed(120, 'EUR')).toBe('Owes €120.00');
+  });
+
+  it('keeps the em dash for a missing amount', () => {
+    expect(MoneyUtils.formatOwed(undefined, 'EUR')).toBe('—');
+  });
+});

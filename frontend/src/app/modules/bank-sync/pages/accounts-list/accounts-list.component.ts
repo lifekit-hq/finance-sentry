@@ -1,4 +1,4 @@
-import {DecimalPipe} from '@angular/common';
+import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, OnInit, ViewContainerRef} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
@@ -6,10 +6,13 @@ import {
   ButtonComponent,
   CardComponent,
   CmnDialogService,
+  DisclosureRowComponent,
   EmptyStateComponent,
+  IconComponent,
   InstitutionAvatarComponent,
+  MenuComponent,
+  type MenuItem,
   SkeletonComponent,
-  StatusIndicatorComponent,
   ToastService,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
@@ -19,6 +22,7 @@ import {type Institution} from '../../../../shared/models/wealth/wealth.model';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
@@ -28,6 +32,14 @@ import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
+import {
+  DISCONNECT_ONLY_MENU,
+  MENU_ACTION_DISCONNECT,
+  MENU_ACTION_RECONNECT,
+  RECONNECT_MENU,
+  RECONNECTABLE_PROVIDER,
+  SYNC_DOT_CLASS,
+} from './accounts-list.constants';
 
 const SKELETON_ROWS = 5;
 
@@ -40,19 +52,22 @@ const SKELETON_ROWS = 5;
     ButtonComponent,
     CardComponent,
     DecimalPipe,
+    DisclosureRowComponent,
     EmptyStateComponent,
+    IconComponent,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,
+    MenuComponent,
     MoneyPipe,
+    NetBalancePipe,
+    NgTemplateOutlet,
     RelativeTimePipe,
     SkeletonComponent,
-    StatusIndicatorComponent,
     SyncStatusLabelPipe,
     SyncStatusVariantPipe,
   ],
   templateUrl: './accounts-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [AccountsStore, ConnectStore],
 })
 export class AccountsListComponent implements OnInit {
   private readonly dialog = inject(CmnDialogService);
@@ -64,6 +79,7 @@ export class AccountsListComponent implements OnInit {
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly dotClass = SYNC_DOT_CLASS;
 
   public ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -129,6 +145,32 @@ export class AccountsListComponent implements OnInit {
         }
         this.store.disconnectAccount(account.accountId);
       });
+  }
+
+  public rowCountLabel(institution: Institution, noun: string): string {
+    const count = institution.cards?.length || institution.accounts.length;
+    const label = institution.cards?.length ? 'card' : noun;
+    return `${count} ${label}${count === 1 ? '' : 's'}`;
+  }
+
+  public needsAttention(institution: Institution): boolean {
+    return institution.syncStatus === 'failed' || institution.syncStatus === 'reauth_required';
+  }
+
+  public canReconnect(institution: Institution): boolean {
+    return institution.provider === RECONNECTABLE_PROVIDER;
+  }
+
+  public institutionMenu(institution: Institution): MenuItem[] {
+    return this.canReconnect(institution) ? RECONNECT_MENU : DISCONNECT_ONLY_MENU;
+  }
+
+  public onInstitutionAction(institution: Institution, action: string): void {
+    if (action === MENU_ACTION_RECONNECT) {
+      this.reconnect();
+    } else if (action === MENU_ACTION_DISCONNECT) {
+      this.disconnectInstitution(institution);
+    }
   }
 
   public navigateToDossier(symbol: string): void {
