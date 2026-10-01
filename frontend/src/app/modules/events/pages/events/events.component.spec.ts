@@ -7,6 +7,7 @@ import {
   type EventDayGroup,
   type EventKind,
   type EventsView,
+  type EventWeekSection,
   type FiredEvent,
   type UpcomingEvent,
 } from '../../models/event/event.model';
@@ -62,6 +63,14 @@ function groupsOf(items: UpcomingEvent[]): EventDayGroup[] {
   return [...map.entries()].map(([date, dayItems]) => ({date, items: dayItems}));
 }
 
+function sectionsOf(items: UpcomingEvent[]): EventWeekSection[] {
+  const groups = groupsOf(items);
+  return [
+    {id: 'week', label: 'This week', groups: groups.slice(0, 2)},
+    {id: 'later', label: 'Later', groups: groups.slice(2)},
+  ];
+}
+
 describe('EventsComponent', () => {
   let mockStore: {
     view: ReturnType<typeof signal<EventsView>>;
@@ -71,7 +80,7 @@ describe('EventsComponent', () => {
     upcomingErrorMessage: ReturnType<typeof signal<string>>;
     isUpcomingLoading: ReturnType<typeof signal<boolean>>;
     isUpcomingEmpty: ReturnType<typeof signal<boolean>>;
-    upcomingByDay: ReturnType<typeof signal<EventDayGroup[]>>;
+    upcomingSections: ReturnType<typeof signal<EventWeekSection[]>>;
     calendarWindow: ReturnType<typeof signal<CalendarWindow>>;
     firedErrorMessage: ReturnType<typeof signal<string>>;
     isFiredEmpty: ReturnType<typeof signal<boolean>>;
@@ -101,12 +110,12 @@ describe('EventsComponent', () => {
     mockStore = {
       view: signal<EventsView>('calendar'),
       horizonDays: signal(30),
-      isKindSelected: signal(() => true),
+      isKindSelected: signal(() => false),
       unavailableSourceLabels: signal<string[]>([]),
       upcomingErrorMessage: signal(''),
       isUpcomingLoading: signal(false),
       isUpcomingEmpty: signal(false),
-      upcomingByDay: signal(groupsOf(items)),
+      upcomingSections: signal(sectionsOf(items)),
       calendarWindow: signal({from: '2026-09-22', to: '2026-10-22'}),
       firedErrorMessage: signal(''),
       isFiredEmpty: signal(false),
@@ -155,6 +164,14 @@ describe('EventsComponent', () => {
     expect(host.querySelectorAll('[data-testid^="day-"]').length).toBe(3);
   });
 
+  it('labels the This week and Later sections when both have days', () => {
+    const {host} = render();
+    const labels = Array.from(host.querySelectorAll('[data-testid="week-section"]')).map(el =>
+      el.textContent?.trim()
+    );
+    expect(labels).toEqual(['This week', 'Later']);
+  });
+
   it('renders kind, subject, estimate marker, detail and time on the rows', () => {
     const {text} = render();
 
@@ -177,7 +194,7 @@ describe('EventsComponent', () => {
   });
 
   it('shows the calendar empty state when nothing is scheduled', () => {
-    mockStore.upcomingByDay.set([]);
+    mockStore.upcomingSections.set([]);
     mockStore.isUpcomingEmpty.set(true);
 
     expect(render().text).toContain('Nothing scheduled');
@@ -205,7 +222,8 @@ describe('EventsComponent', () => {
     expect(text).toContain('Guidance cut is priced in.');
     expect(text).toContain('Kept quiet');
     expect(host.querySelectorAll('[data-testid="verdict"]').length).toBe(1);
-    expect(text).toContain('silence is the answer');
+    expect(text).not.toContain('silence is the answer');
+    expect(text).not.toContain('Told you');
   });
 
   it('shows the fired empty state when nothing has fired', () => {

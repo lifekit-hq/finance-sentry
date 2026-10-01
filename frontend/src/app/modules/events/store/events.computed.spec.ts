@@ -107,11 +107,25 @@ describe('eventsComputed', () => {
     ]);
   });
 
-  it('isKindSelected treats an empty selection as every kind', () => {
-    expect(build().isKindSelected()('macro')).toBe(true);
+  it('isKindSelected lights no chip for an empty selection, only explicit picks', () => {
+    expect(build().isKindSelected()('macro')).toBe(false);
     const narrowed = build({kinds: ['earnings']});
     expect(narrowed.isKindSelected()('earnings')).toBe(true);
     expect(narrowed.isKindSelected()('macro')).toBe(false);
+  });
+
+  it('upcomingSections splits days into this week and later, dropping empty sections', () => {
+    const both = build({
+      upcoming: [upcoming('2026-09-23', 'MU'), upcoming('2026-10-20', 'PLTR')],
+    });
+    expect(both.upcomingSections().map(s => [s.id, s.groups.length])).toEqual([
+      ['week', 1],
+      ['later', 1],
+    ]);
+
+    const onlyLater = build({upcoming: [upcoming('2026-10-20', 'PLTR')]});
+    expect(onlyLater.upcomingSections().map(s => s.id)).toEqual(['later']);
+    expect(build().upcomingSections()).toEqual([]);
   });
 
   it('isUpcomingEmpty is true only when idle with nothing loaded', () => {

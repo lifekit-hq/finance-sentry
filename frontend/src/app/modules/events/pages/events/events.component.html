@@ -1,4 +1,4 @@
-<div class="mx-auto flex h-full w-full max-w-[960px] flex-col p-cmn-6">
+<div class="mx-auto flex h-full w-full max-w-[960px] flex-col p-cmn-4 sm:p-cmn-6">
   <cmn-page-header
     title="Events"
     subtitle="What is coming for your book, what fired, and what the reader made of it"
@@ -66,47 +66,61 @@
       </div>
     } @else {
       <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-5 overflow-auto pr-cmn-1">
-        @for (group of store.upcomingByDay(); track group.date) {
-          <section [attr.data-testid]="'day-' + group.date">
+        @for (section of store.upcomingSections(); track section.id) {
+          @if (store.upcomingSections().length > 1) {
             <h2
-              class="mb-cmn-2 flex items-baseline gap-cmn-2 text-cmn-sm font-semibold text-text-primary"
+              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+              data-testid="week-section"
             >
-              {{ group.date | eventDayLabel }}
-              <span class="text-cmn-xs font-normal text-text-secondary">{{ group.date }}</span>
+              {{ section.label }}
             </h2>
-            <ul class="divide-y divide-border-default rounded-cmn-md border border-border-default">
-              @for (
-                item of group.items;
-                track item.kind +
-                  item.subject +
-                  item.date +
-                  item.referenceId +
-                  item.title +
-                  item.detail
-              ) {
-                <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
-                  <cmn-tag [variant]="kindMeta(item.kind).variant">
-                    {{ kindMeta(item.kind).label }}
-                  </cmn-tag>
-                  <span class="font-mono text-cmn-sm font-semibold text-text-primary">
-                    {{ item.subject }}
-                  </span>
-                  <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
-                    {{ item.title }}
-                    @if (item.detail) {
-                      <span class="text-text-secondary"> · {{ item.detail }}</span>
+          }
+          @for (group of section.groups; track group.date) {
+            <section [attr.data-testid]="'day-' + group.date">
+              <h2
+                class="mb-cmn-2 flex items-baseline gap-cmn-2 text-cmn-sm font-semibold text-text-primary"
+              >
+                {{ group.date | eventDayLabel }}
+                <span class="text-cmn-xs font-normal text-text-secondary">{{ group.date }}</span>
+              </h2>
+              <ul
+                class="divide-y divide-border-default rounded-cmn-md border border-border-default"
+              >
+                @for (
+                  item of group.items;
+                  track item.kind +
+                    item.subject +
+                    item.date +
+                    item.referenceId +
+                    item.title +
+                    item.detail
+                ) {
+                  <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
+                    <cmn-tag [variant]="kindMeta(item.kind).variant">
+                      {{ kindMeta(item.kind).label }}
+                    </cmn-tag>
+                    <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                      {{ item.subject }}
+                    </span>
+                    <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
+                      {{ item.title }}
+                      @if (item.detail) {
+                        <span class="text-text-secondary"> · {{ item.detail }}</span>
+                      }
+                    </span>
+                    @if (item.time) {
+                      <span class="text-cmn-xs text-text-secondary">{{
+                        item.time.slice(0, 5)
+                      }}</span>
                     }
-                  </span>
-                  @if (item.time) {
-                    <span class="text-cmn-xs text-text-secondary">{{ item.time.slice(0, 5) }}</span>
-                  }
-                  @if (item.isEstimate) {
-                    <cmn-tag variant="warning">Estimate</cmn-tag>
-                  }
-                </li>
-              }
-            </ul>
-          </section>
+                    @if (item.isEstimate) {
+                      <cmn-tag variant="warning">Estimate</cmn-tag>
+                    }
+                  </li>
+                }
+              </ul>
+            </section>
+          }
         }
       </div>
     }
@@ -133,7 +147,6 @@
               </cmn-tag>
             </div>
             <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">{{ event.title }}</p>
-            <p class="text-cmn-sm text-text-secondary">{{ event.message }}</p>
             @if (event.verdict; as verdict) {
               <blockquote
                 class="mt-cmn-2 border-l-2 border-accent-default pl-cmn-3 text-cmn-sm text-text-primary"
@@ -145,10 +158,6 @@
                   {{ verdict.recordedAt | date: 'd MMM, HH:mm' }}
                 </span>
               </blockquote>
-            } @else {
-              <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                {{ outcomeMeta(event.outcome).description }}
-              </p>
             }
           </article>
         }
