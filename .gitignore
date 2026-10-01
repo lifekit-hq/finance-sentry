@@ -95,6 +95,8 @@ frontend/dist/
 frontend/.angular/
 frontend/out-tsc/
 frontend/**/*.tsbuildinfo
+frontend/.vitest-attachments/
+frontend/**/__screenshots__/
 docs/superpowers
 
 # Backend
