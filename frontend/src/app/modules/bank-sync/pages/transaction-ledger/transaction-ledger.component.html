@@ -1,13 +1,50 @@
-<div class="mx-auto flex h-full w-full max-w-[1200px] flex-col p-cmn-8">
-  <div class="mb-cmn-8">
-    <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Transaction Ledger</h1>
-    <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-      All transactions across connected accounts
-    </p>
+<div class="mx-auto flex h-full w-full max-w-[1200px] flex-col p-cmn-4 md:p-cmn-8">
+  <div class="mb-cmn-4 flex flex-wrap items-end justify-between gap-cmn-4">
+    <div class="min-w-0">
+      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Transactions</h1>
+      <p class="mt-cmn-1 text-cmn-sm text-text-secondary" data-testid="ledger-summary">
+        @if (store.monthlyOutflow() !== null) {
+          <span>{{ store.monthlyOutflow() | money }} out this month</span>
+          <span aria-hidden="true"> · </span>
+        }
+        @if (store.topCategory(); as top) {
+          <span>Top category: {{ top }}</span>
+        }
+      </p>
+    </div>
+    <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
+      <cmn-input
+        [formControl]="searchControl"
+        type="search"
+        placeholder="Search transactions"
+        autocomplete="off"
+      />
+    </div>
   </div>
 
+  @if (store.accounts().length > 1) {
+    <div
+      class="mb-cmn-4 -mx-cmn-4 flex gap-cmn-2 overflow-x-auto px-cmn-4 pb-cmn-1 md:mx-0 md:flex-wrap md:px-0"
+      role="group"
+      aria-label="Account filter"
+    >
+      <cmn-chip [selected]="!activeAccount()" (clicked)="selectAccount(null)" class="shrink-0">
+        All accounts
+      </cmn-chip>
+      @for (account of store.accounts(); track account.accountId) {
+        <cmn-chip
+          [selected]="activeAccount() === account.accountId"
+          (clicked)="selectAccount(account.accountId)"
+          class="shrink-0"
+        >
+          {{ account.label }}
+        </cmn-chip>
+      }
+    </div>
+  }
+
   @if (activeCategoryLabel() || activeTypeLabel()) {
-    <div class="mb-cmn-6 flex flex-wrap items-center gap-cmn-2">
+    <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2">
       <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
         >Filter</span
       >
@@ -34,27 +71,6 @@
     </div>
   }
 
-  <div class="mb-cmn-8 grid grid-cols-1 gap-cmn-4 sm:grid-cols-3">
-    <cmn-stat-card
-      [value]="store.monthlyOutflow() | money"
-      [loading]="store.isLoading()"
-      label="Monthly Outflow"
-      icon="TrendingDown"
-    />
-    <cmn-stat-card
-      [value]="store.topCategory()"
-      [loading]="store.isLoading()"
-      label="Top Category"
-      icon="Tag"
-    />
-    <cmn-stat-card
-      [value]="(store.totalCount() | number) ?? ''"
-      [loading]="store.isLoading()"
-      label="Total Transactions"
-      icon="List"
-    />
-  </div>
-
   @if (store.errorMessage()) {
     <cmn-alert variant="error" class="mb-cmn-6 block">
       {{ store.errorMessage() }}
@@ -63,83 +79,89 @@
   }
 
   @if (store.isLoading()) {
-    <cmn-card class="min-h-0 flex-1">
-      <div class="space-y-cmn-3 p-cmn-4">
+    <cmn-card padding="none" class="min-h-0 flex-1">
+      <div class="divide-y divide-border-default">
         @for (_ of skeletonRows; track $index) {
-          <div class="flex gap-cmn-4">
-            <cmn-skeleton height="1rem" width="15%" />
-            <cmn-skeleton height="1rem" width="30%" />
-            <cmn-skeleton height="1rem" width="20%" />
-            <cmn-skeleton height="1rem" width="20%" />
-            <cmn-skeleton height="1rem" width="15%" />
+          <div class="flex items-center gap-cmn-3 px-cmn-4 py-cmn-3">
+            <cmn-skeleton height="2rem" width="2rem" />
+            <div class="flex-1 space-y-cmn-1">
+              <cmn-skeleton height="0.875rem" width="55%" />
+              <cmn-skeleton height="0.75rem" width="35%" />
+            </div>
+            <cmn-skeleton height="0.875rem" width="4rem" />
           </div>
         }
       </div>
     </cmn-card>
-  } @else if (store.isEmpty()) {
+  } @else if (store.isEmpty() || displayedTransactions().length === 0) {
     <div class="flex min-h-0 flex-1 items-center justify-center">
-      <cmn-empty-state
-        message="No transactions found"
-        subMessage="Connect an account to see your transaction history."
-      />
+      @if (store.hasActiveFilter() || activeCategoryLabel() || activeTypeLabel()) {
+        <cmn-empty-state
+          message="No matching transactions"
+          subMessage="Try a different search or filter."
+        />
+      } @else {
+        <cmn-empty-state
+          message="No transactions found"
+          subMessage="Connect an account to see your transaction history."
+        />
+      }
     </div>
   } @else {
-    <cmn-card [fill]="true" padding="none" class="min-h-0 flex-1">
-      <div class="min-h-0 flex-1 overflow-auto">
-        <table class="w-full text-cmn-sm" aria-label="Transaction ledger">
-          <thead class="sticky top-0 z-10">
-            <tr
-              class="border-b border-border-default bg-surface-card text-cmn-xs uppercase tracking-wide text-text-secondary"
-            >
-              <th class="px-cmn-4 py-cmn-3 text-left font-medium" scope="col">Date</th>
-              <th class="px-cmn-4 py-cmn-3 text-left font-medium" scope="col">Description</th>
-              <th class="px-cmn-4 py-cmn-3 text-left font-medium" scope="col">Category</th>
-              <th class="px-cmn-4 py-cmn-3 text-left font-medium" scope="col">Account</th>
-              <th class="px-cmn-4 py-cmn-3 text-right font-medium" scope="col">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (t of displayedTransactions(); track t.transactionId) {
-              <tr
+    <div class="min-h-0 flex-1 overflow-auto">
+      @for (group of dayGroups(); track group.dayKey) {
+        <section [attr.aria-label]="group.label" class="mb-cmn-4">
+          <h2
+            class="px-cmn-1 pb-cmn-2 text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+          >
+            {{ group.label }}
+          </h2>
+          <cmn-card padding="none">
+            @for (t of group.items; track t.transactionId) {
+              <div
                 (click)="openDrawer(t)"
-                class="cursor-pointer border-b border-border-default last:border-0 transition-colors hover:bg-surface-bg"
+                (keydown.enter)="openDrawer(t)"
+                class="cursor-pointer"
+                role="button"
+                tabindex="0"
+                data-testid="ledger-row"
               >
-                <td class="whitespace-nowrap px-cmn-4 py-cmn-4 text-text-secondary">
-                  {{ t.postedDate ?? t.date | date: 'MMM d, y' }}
-                  @if (t.isPending) {
-                    <span class="ml-1 text-cmn-xs text-amber-500">Pending</span>
-                  }
-                </td>
-                <td class="max-w-[280px] truncate px-cmn-4 py-cmn-4 text-text-primary">
-                  {{ t.description }}
-                </td>
-                <td class="px-cmn-4 py-cmn-4">
-                  @if (t.merchantCategory) {
-                    <cmn-tag variant="neutral">{{ t.merchantCategory | merchantCategory }}</cmn-tag>
-                  } @else {
-                    <span class="text-cmn-xs text-text-secondary">—</span>
-                  }
-                </td>
-                <td class="px-cmn-4 py-cmn-4 text-text-secondary">{{ t.bankName }}</td>
-                <td
-                  [class]="t | transactionAmountClass"
-                  class="px-cmn-4 py-cmn-4 text-right font-mono tabular-nums font-medium"
+                <cmn-list-item-row
+                  [label]="t.description"
+                  [sublabel]="
+                    t.bankName +
+                    (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
+                    (t.isPending ? ' · Pending' : '')
+                  "
+                  [dimmed]="t.isPending"
                 >
-                  {{ t | transactionAmount }}
-                </td>
-              </tr>
+                  <cmn-institution-avatar
+                    [name]="t.bankName"
+                    [logoUrl]="t.bankName | institutionLogo"
+                    size="sm"
+                    avatar
+                  />
+                  <span
+                    [class]="t | transactionAmountClass"
+                    class="shrink-0 whitespace-nowrap font-mono text-cmn-sm font-medium tabular-nums"
+                    amount
+                  >
+                    {{ t | transactionAmount }}
+                  </span>
+                </cmn-list-item-row>
+              </div>
             }
-          </tbody>
-        </table>
-      </div>
+          </cmn-card>
+        </section>
+      }
 
       @if (store.hasMore()) {
-        <div class="flex justify-center border-t border-border-default p-cmn-4">
+        <div class="flex justify-center p-cmn-4">
           <cmn-button (clicked)="store.loadMore()" variant="secondary" size="sm"
             >Load More</cmn-button
           >
         </div>
       }
-    </cmn-card>
+    </div>
   }
 </div>

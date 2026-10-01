@@ -20,6 +20,9 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
     setLedgerRead(ledgerRead: AssetLedgerReadDto): void {
       patchState(store, {ledgerRead, ledgerReadStatus: 'idle', ledgerReadErrorCode: null});
     },
+    toggleThesisExpanded(): void {
+      patchState(store, state => ({isThesisExpanded: !state.isThesisExpanded}));
+    },
     setLedgerReadError(errorCode: Nullable<string>): void {
       patchState(store, {ledgerReadStatus: 'error', ledgerReadErrorCode: errorCode});
     },

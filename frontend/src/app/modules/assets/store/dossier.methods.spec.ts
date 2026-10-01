@@ -127,4 +127,15 @@ describe('dossierMethods', () => {
     expect(state.ledgerReadStatus()).toBe('error');
     expect(state.ledgerReadErrorCode()).toBe('LEDGER_READ_UNAVAILABLE');
   });
+
+  it('toggleThesisExpanded flips the flag', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+
+    methods.toggleThesisExpanded();
+    expect(state.isThesisExpanded()).toBe(true);
+
+    methods.toggleThesisExpanded();
+    expect(state.isThesisExpanded()).toBe(false);
+  });
 });

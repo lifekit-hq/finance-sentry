@@ -37,7 +37,7 @@ test.describe('Live smoke — deployed stack', () => {
   test('transaction ledger renders with live data', async ({page}) => {
     await login(page);
     await page.goto('/transactions');
-    await expect(page.getByRole('heading', {name: 'Transaction Ledger'})).toBeVisible();
-    await expect(page.getByText('Monthly Outflow')).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
+    await expect(page.getByPlaceholder('Search transactions')).toBeVisible();
   });
 });

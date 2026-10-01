@@ -416,11 +416,10 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
   // stat reads the server-side aggregate, not a sum over the loaded page.
   test('Monthly Outflow shows server-side aggregate, not client-side page sum', async ({page}) => {
     await page.goto('/transactions');
-    await expect(page.getByRole('heading', {name: 'Transaction Ledger'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     // Backend says $2,900 — the stat must match this, not the $1,900 client-side sum
     // (400 grocery + 500 pending + 1000 transfer = $1,900 from debits in page).
-    await expect(page.getByText('$2,900.00')).toBeVisible();
-    await expect(page.getByText('Monthly Outflow')).toBeVisible();
+    await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00 out this month');
   });
 
   test('Monthly Outflow does not change when Load More is clicked', async ({page}) => {
@@ -464,15 +463,15 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
     });
 
     await page.goto('/transactions');
-    await expect(page.getByRole('heading', {name: 'Transaction Ledger'})).toBeVisible();
-    await expect(page.getByText('$2,900.00')).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
+    await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
 
     await page.getByRole('button', {name: /load more/i}).click();
     // The page-2 row rendered ⇒ the append happened…
     await expect(page.getByText('Electronics store')).toBeVisible();
     // …the button is gone (hasMore now false) and the stat did not move.
     await expect(page.getByRole('button', {name: /load more/i})).not.toBeVisible();
-    await expect(page.getByText('$2,900.00')).toBeVisible();
+    await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
   });
 });
 
@@ -499,13 +498,12 @@ test.describe('Dashboard → Ledger spending consistency', () => {
     // Navigate to the drill-down (same button the user clicks in the real flow).
     await page.getByRole('button', {name: /view spending details/i}).click();
     await expect(page).toHaveURL(/\/transactions.*type=debit/);
-    await expect(page.getByRole('heading', {name: 'Transaction Ledger'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
 
-    // Read the "Monthly Outflow" stat value from the ledger card.
-    const outflowCard = page.locator('cmn-stat-card').filter({hasText: 'Monthly Outflow'});
-    await expect(outflowCard).toBeVisible();
-    const outflowText = (await outflowCard.innerText()).trim();
-    const ledgerAmount = extractAmount(outflowText);
+    // Read the monthly outflow figure from the ledger's summary line.
+    const outflowSummary = page.getByTestId('ledger-summary');
+    await expect(outflowSummary).toContainText('out this month');
+    const ledgerAmount = extractAmount((await outflowSummary.innerText()).trim());
 
     // Transfer pair (tx-3 debit $1,000 + tx-6 credit $1,000) is in the loaded transaction
     // list but excluded from the backend aggregate. If the ledger used a client-side debit

@@ -1,28 +1,26 @@
-<div class="space-y-cmn-5">
+<div class="mx-auto w-full max-w-[1200px] space-y-cmn-5 p-cmn-4 md:p-cmn-8">
   @if (store.isDossierLoading()) {
-    <cmn-skeleton height="8rem" width="100%" />
-    <cmn-skeleton height="12rem" width="100%" />
-    <cmn-skeleton height="16rem" width="100%" />
+    <div data-testid="dossier-skeleton" class="space-y-cmn-5">
+      <cmn-skeleton height="2rem" width="40%" />
+      <cmn-skeleton height="10rem" width="100%" />
+      <cmn-skeleton height="12rem" width="100%" />
+      <cmn-skeleton height="12rem" width="100%" />
+    </div>
   } @else if (store.dossierErrorMessage()) {
     <cmn-alert variant="error">{{ store.dossierErrorMessage() }}</cmn-alert>
   } @else if (store.dossier(); as dossier) {
-    <!-- Header -->
-    <cmn-card class="block">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Asset Dossier</p>
-          <h1 class="mt-cmn-1 font-headline text-cmn-3xl font-bold text-text-primary">
-            {{ dossier.symbol }}
-          </h1>
-          <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-            Generated {{ dossier.generatedAt | date: 'medium' }}
-          </p>
-        </div>
-        <cmn-button (clicked)="goBack()" variant="secondary" size="sm">
-          ← Back to investments
-        </cmn-button>
-      </div>
-    </cmn-card>
+    <!-- Header: back link on its own line so it never competes with the symbol on a phone -->
+    <header>
+      <cmn-button (clicked)="goBack()" variant="secondary" size="sm" data-testid="dossier-back">
+        ← Investments
+      </cmn-button>
+      <h1 class="mt-cmn-3 font-headline text-cmn-3xl font-bold text-text-primary">
+        {{ dossier.symbol }}
+      </h1>
+      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+        Updated {{ dossier.generatedAt | relativeTime }}
+      </p>
+    </header>
 
     @if (!store.hasDossierSections()) {
       <cmn-card class="block" data-testid="dossier-no-data">
@@ -32,89 +30,99 @@
         />
       </cmn-card>
     } @else {
-      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. Needs ai.use. -->
-      @if (!canUseAi()) {
-        <cmn-card class="block" data-testid="ledger-read-unavailable">
-          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Ledger's read</h2>
-          <p class="mt-cmn-2 text-cmn-sm text-text-secondary">
-            Ledger's read is not available for your account.
-          </p>
-        </cmn-card>
-      } @else {
-        <cmn-card class="block" data-testid="ledger-read-card">
-          <div class="flex flex-wrap items-center justify-between gap-cmn-3">
-            <div>
-              <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
-                Ledger's read
-              </h2>
-              @if (store.ledgerRead()?.generatedAt; as generatedAt) {
-                <p
-                  class="mt-cmn-1 text-cmn-xs text-text-secondary"
-                  data-testid="ledger-read-generated"
-                >
-                  Generated {{ generatedAt | date: 'medium' }}
-                </p>
-              }
+      <!-- Ledger's read (US3): cached copy renders instantly; generation is explicit. Without ai.use the block does not exist. -->
+      @if (canUseAi()) {
+        @if (
+          store.isLedgerReadLoading() ||
+          store.ledgerReadErrorMessage() ||
+          store.ledgerReadNarrative()
+        ) {
+          <cmn-card class="block" data-testid="ledger-read-card">
+            <div class="flex flex-wrap items-center justify-between gap-cmn-3">
+              <div>
+                <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+                  Ledger's read
+                </h2>
+                @if (store.ledgerRead()?.generatedAt; as generatedAt) {
+                  <p
+                    class="mt-cmn-1 text-cmn-xs text-text-secondary"
+                    data-testid="ledger-read-generated"
+                  >
+                    Generated {{ generatedAt | relativeTime }}
+                  </p>
+                }
+              </div>
+              <div class="flex items-center gap-cmn-2">
+                @if (store.isLedgerReadStale()) {
+                  <cmn-tag variant="warning" data-testid="ledger-read-stale">out of date</cmn-tag>
+                }
+                @if (store.ledgerReadNarrative()) {
+                  <cmn-button
+                    [disabled]="store.isLedgerReadLoading()"
+                    (clicked)="generateLedgerRead(dossier.symbol, true)"
+                    variant="secondary"
+                    size="sm"
+                    data-testid="ledger-read-regenerate"
+                  >
+                    Regenerate
+                  </cmn-button>
+                } @else {
+                  <cmn-button
+                    [disabled]="store.isLedgerReadLoading()"
+                    (clicked)="generateLedgerRead(dossier.symbol, false)"
+                    variant="primary"
+                    size="sm"
+                    data-testid="ledger-read-generate"
+                  >
+                    Generate Ledger's read
+                  </cmn-button>
+                }
+              </div>
             </div>
-            <div class="flex items-center gap-cmn-2">
-              @if (store.isLedgerReadStale()) {
-                <cmn-tag variant="warning" data-testid="ledger-read-stale">out of date</cmn-tag>
-              }
-              @if (store.ledgerReadNarrative()) {
-                <cmn-button
-                  [disabled]="store.isLedgerReadLoading()"
-                  (clicked)="generateLedgerRead(dossier.symbol, true)"
-                  variant="secondary"
-                  size="sm"
-                  data-testid="ledger-read-regenerate"
-                >
-                  Regenerate
-                </cmn-button>
-              } @else {
-                <cmn-button
-                  [disabled]="store.isLedgerReadLoading()"
-                  (clicked)="generateLedgerRead(dossier.symbol, false)"
-                  variant="primary"
-                  size="sm"
-                  data-testid="ledger-read-generate"
-                >
-                  Generate Ledger's read
-                </cmn-button>
-              }
-            </div>
-          </div>
 
-          @if (store.isLedgerReadLoading()) {
-            <cmn-skeleton
-              class="mt-cmn-4 block"
-              data-testid="ledger-read-loading"
-              height="4rem"
-              width="100%"
-            />
-          } @else if (store.ledgerReadErrorMessage(); as ledgerReadError) {
-            <cmn-alert variant="error" class="mt-cmn-4 block" data-testid="ledger-read-error">
-              {{ ledgerReadError }}
-            </cmn-alert>
-          } @else if (store.ledgerReadNarrative(); as narrative) {
-            <p
-              class="mt-cmn-4 whitespace-pre-line text-cmn-sm leading-relaxed text-text-primary"
-              data-testid="ledger-read-narrative"
+            @if (store.isLedgerReadLoading()) {
+              <cmn-skeleton
+                class="mt-cmn-4 block"
+                data-testid="ledger-read-loading"
+                height="4rem"
+                width="100%"
+              />
+            } @else if (store.ledgerReadErrorMessage(); as ledgerReadError) {
+              <cmn-alert variant="error" class="mt-cmn-4 block" data-testid="ledger-read-error">
+                {{ ledgerReadError }}
+              </cmn-alert>
+            } @else {
+              <p
+                class="mt-cmn-4 whitespace-pre-line text-cmn-sm leading-relaxed text-text-primary"
+                data-testid="ledger-read-narrative"
+              >
+                {{ store.ledgerReadNarrative() }}
+              </p>
+            }
+          </cmn-card>
+        } @else {
+          <div
+            class="flex flex-wrap items-center justify-between gap-cmn-3"
+            data-testid="ledger-read-empty"
+          >
+            <p class="text-cmn-sm text-text-secondary">Ledger hasn't read this page yet.</p>
+            <cmn-button
+              (clicked)="generateLedgerRead(dossier.symbol, false)"
+              variant="primary"
+              size="sm"
+              data-testid="ledger-read-generate"
             >
-              {{ narrative }}
-            </p>
-          } @else {
-            <p class="mt-cmn-4 text-cmn-sm text-text-secondary" data-testid="ledger-read-empty">
-              Nothing generated yet — ask Ledger to read everything on this page and summarise it.
-            </p>
-          }
-        </cmn-card>
+              Generate Ledger's read
+            </cmn-button>
+          </div>
+        }
       }
 
       <!-- Position & P&L -->
       @if (dossier.position; as position) {
         <cmn-card class="block">
           <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Position</h2>
-          <p class="text-cmn-xs text-text-secondary">{{ position.provider }}</p>
+          <p class="text-cmn-xs text-text-secondary">{{ position.provider | providerLabel }}</p>
 
           <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
             <div>
@@ -158,14 +166,21 @@
           </div>
 
           @if (position.taxLots.length > 0) {
-            <div class="mt-cmn-5 border-t border-border-default pt-cmn-4">
-              <p class="mb-cmn-3 text-cmn-sm font-medium text-text-primary">
-                Tax Lots ({{ position.taxLots.length }})
-              </p>
-              <div class="space-y-cmn-2">
+            <details
+              class="group mt-cmn-5 border-t border-border-default pt-cmn-4"
+              data-testid="tax-lots"
+            >
+              <summary
+                class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"
+              >
+                Tax lots ({{ position.taxLots.length }})
+                <span class="text-text-secondary group-open:hidden">· show</span>
+                <span class="hidden text-text-secondary group-open:inline">· hide</span>
+              </summary>
+              <div class="mt-cmn-3 space-y-cmn-2">
                 @for (lot of position.taxLots; track $index) {
                   <div
-                    class="flex flex-wrap items-center gap-cmn-4 rounded-lg bg-neutral-50 px-cmn-3 py-cmn-2 text-cmn-sm dark:bg-neutral-800"
+                    class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-neutral-50 px-cmn-3 py-cmn-2 text-cmn-sm dark:bg-neutral-800"
                   >
                     <span class="font-mono tabular-nums text-text-primary">{{
                       lot.quantity | number: '1.0-8'
@@ -196,7 +211,7 @@
                   </div>
                 }
               </div>
-            </div>
+            </details>
           }
         </cmn-card>
       }
@@ -215,9 +230,22 @@
             }
           </div>
 
-          <p class="mt-cmn-3 text-cmn-sm leading-relaxed text-text-primary">
-            {{ thesis.thesisText }}
-          </p>
+          <div class="mt-cmn-3 space-y-cmn-2" data-testid="thesis-text">
+            @for (paragraph of store.visibleThesisParagraphs(); track $index) {
+              <p class="text-cmn-sm leading-relaxed text-text-primary">{{ paragraph }}</p>
+            }
+          </div>
+          @if (store.thesisHasMore()) {
+            <cmn-button
+              (clicked)="store.toggleThesisExpanded()"
+              class="mt-cmn-2 block"
+              variant="secondary"
+              size="sm"
+              data-testid="thesis-toggle"
+            >
+              {{ store.isThesisExpanded() ? 'Show less' : 'Read more' }}
+            </cmn-button>
+          }
 
           @if (thesis.brokenReason) {
             <cmn-alert variant="error" class="mt-cmn-3">{{ thesis.brokenReason }}</cmn-alert>
@@ -230,14 +258,7 @@
               </p>
               <ul class="space-y-cmn-1">
                 @for (trigger of thesis.invalidationTriggers; track $index) {
-                  <li class="text-cmn-sm text-text-secondary">
-                    <span class="font-mono text-text-primary">{{ trigger.metric }}</span>
-                    {{ trigger.direction }}
-                    <span class="font-mono text-text-primary">{{ trigger.threshold }}</span>
-                    @if (trigger.proxyTicker) {
-                      (via {{ trigger.proxyTicker }})
-                    }
-                  </li>
+                  <li class="text-cmn-sm text-text-primary">{{ trigger | triggerSentence }}</li>
                 }
               </ul>
             </div>
@@ -373,7 +394,40 @@
           @if (analysts.trends.length > 0) {
             <div class="mt-cmn-5 border-t border-border-default pt-cmn-4">
               <p class="mb-cmn-3 text-cmn-sm font-medium text-text-primary">Recommendation Trend</p>
-              <div class="overflow-x-auto">
+              <ul class="space-y-cmn-3 sm:hidden" data-testid="trend-list">
+                @for (trend of analysts.trends; track trend.period) {
+                  <li class="border-t border-border-default pt-cmn-2 first:border-0 first:pt-0">
+                    <p class="font-mono text-cmn-xs text-text-secondary">{{ trend.period }}</p>
+                    <dl class="mt-cmn-1 grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-1 text-cmn-sm">
+                      <div class="flex justify-between">
+                        <dt class="text-text-secondary">Strong buy</dt>
+                        <dd class="font-mono tabular-nums text-status-success">
+                          {{ trend.strongBuy }}
+                        </dd>
+                      </div>
+                      <div class="flex justify-between">
+                        <dt class="text-text-secondary">Buy</dt>
+                        <dd class="font-mono tabular-nums text-status-success">{{ trend.buy }}</dd>
+                      </div>
+                      <div class="flex justify-between">
+                        <dt class="text-text-secondary">Hold</dt>
+                        <dd class="font-mono tabular-nums text-text-secondary">{{ trend.hold }}</dd>
+                      </div>
+                      <div class="flex justify-between">
+                        <dt class="text-text-secondary">Sell</dt>
+                        <dd class="font-mono tabular-nums text-status-error">{{ trend.sell }}</dd>
+                      </div>
+                      <div class="flex justify-between">
+                        <dt class="text-text-secondary">Strong sell</dt>
+                        <dd class="font-mono tabular-nums text-status-error">
+                          {{ trend.strongSell }}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                }
+              </ul>
+              <div class="hidden overflow-x-auto sm:block">
                 <table class="w-full text-cmn-xs" aria-label="Recommendation trends">
                   <thead>
                     <tr class="text-text-secondary uppercase tracking-wide">
@@ -436,7 +490,7 @@
           <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Recent News</h2>
           <ul class="mt-cmn-4 space-y-cmn-4">
             @for (article of dossier.recentNews; track article.id) {
-              <li class="border-b border-border-default pb-cmn-4 last:border-0 last:pb-0">
+              <li class="border-b border-border-default pb-cmn-3 last:border-0 last:pb-0">
                 <a
                   [href]="article.url"
                   target="_blank"
@@ -446,11 +500,8 @@
                   {{ article.title }}
                 </a>
                 <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                  {{ article.source }} · {{ article.publishedAt | date: 'mediumDate' }}
+                  {{ article.source }} · {{ article.publishedAt | relativeTime }}
                 </p>
-                @if (article.summary) {
-                  <p class="mt-cmn-1 text-cmn-sm text-text-secondary">{{ article.summary }}</p>
-                }
               </li>
             }
           </ul>

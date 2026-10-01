@@ -48,4 +48,6 @@ export interface Position {
   // us no cost basis (crypto cost basis is reconstructed on our side, so we do
   // not surface a P&L we can't stand behind).
   pnlPercent: Nullable<number>;
+  /** Unrealized P&L in USD from the same provider cost basis as `pnlPercent`; null when that is. */
+  pnlUsd: Nullable<number>;
 }

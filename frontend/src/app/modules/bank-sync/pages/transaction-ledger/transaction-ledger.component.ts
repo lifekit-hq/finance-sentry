@@ -1,20 +1,23 @@
-import {DatePipe, DecimalPipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
+import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
   CardComponent,
+  ChipComponent,
   CmnDrawerService,
   EmptyStateComponent,
   IconComponent,
+  InputComponent,
+  InstitutionAvatarComponent,
+  ListItemRowComponent,
   SkeletonComponent,
-  StatCardComponent,
-  TagComponent,
 } from '@lifekit-hq/ui';
 import {map} from 'rxjs';
 
+import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
@@ -23,25 +26,29 @@ import {type GlobalTransactionDto} from '../../models/transaction/transaction.mo
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
+import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
+const DRAWER_WIDTH = '480px';
 const TYPE_LABELS: Record<string, string> = {debit: 'Spending', credit: 'Income'};
 
 @Component({
   selector: 'fns-transaction-ledger',
   imports: [
     AlertComponent,
-    TagComponent,
     ButtonComponent,
     CardComponent,
-    DatePipe,
-    DecimalPipe,
+    ChipComponent,
     EmptyStateComponent,
     IconComponent,
+    InputComponent,
+    InstitutionAvatarComponent,
+    InstitutionLogoPipe,
+    ListItemRowComponent,
     MerchantCategoryPipe,
     MoneyPipe,
+    ReactiveFormsModule,
     SkeletonComponent,
-    StatCardComponent,
     TransactionAmountClassPipe,
     TransactionAmountPipe,
   ],
@@ -57,6 +64,12 @@ export class TransactionLedgerComponent {
 
   public readonly store = inject(TransactionLedgerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly searchControl = new FormControl('', {nonNullable: true});
+
+  public readonly activeAccount = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('account'))),
+    {initialValue: null}
+  );
 
   public readonly activeCategory = toSignal(
     this.route.queryParamMap.pipe(map(p => p.get('category'))),
@@ -92,11 +105,27 @@ export class TransactionLedgerComponent {
     return all;
   });
 
+  public readonly dayGroups = computed(() =>
+    TransactionGroupUtils.groupByDay(this.displayedTransactions())
+  );
+
+  constructor() {
+    this.store.applyAccount(this.activeAccount);
+    this.store.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
+  }
+
   public openDrawer(tx: GlobalTransactionDto): void {
     this.drawer.open(TransactionDrawerComponent, {
       title: tx.description,
       data: tx,
-      width: '480px',
+      width: DRAWER_WIDTH,
+    });
+  }
+
+  public selectAccount(accountId: Nullable<string>): void {
+    void this.router.navigate([], {
+      queryParams: {account: accountId},
+      queryParamsHandling: 'merge',
     });
   }
 

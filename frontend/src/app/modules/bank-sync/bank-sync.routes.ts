@@ -9,13 +9,6 @@ export const BANK_SYNC_ROUTES: Routes = [
     providers: [provideConnectStrategies()],
     children: [
       {
-        path: ':accountId/transactions',
-        loadComponent: () =>
-          import('./pages/transaction-list/transaction-list.component').then(
-            m => m.TransactionListComponent
-          ),
-      },
-      {
         path: '',
         loadComponent: () =>
           import('./pages/accounts-shell/accounts-shell.component').then(

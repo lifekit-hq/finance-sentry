@@ -1,12 +1,13 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {of, throwError} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {of, Subject, throwError} from 'rxjs';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {type AccountsResponse} from '../../models/bank-account/bank-account.model';
 import {type DashboardData} from '../../models/dashboard/dashboard.model';
 import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
-import {transactionLedgerEffects} from './transaction-ledger.effects';
+import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 // Mirrors the private helper in effects.ts so test data stays in sync with the runtime.
@@ -81,17 +82,45 @@ function buildDashboardData(currentOutflowUsd: number, priorOutflowUsd?: number)
   };
 }
 
-// offset is a real Signal<number> (not a mock) so the EffectsStore type constraint is satisfied.
+const ACCOUNTS: AccountsResponse = {
+  accounts: [
+    {
+      accountId: 'acc-1',
+      bankName: 'Test Bank',
+      accountType: 'checking',
+      accountNumberLast4: '1234',
+      currency: 'USD',
+      ownerName: 'Owner',
+      currentBalance: 10,
+      availableBalance: 10,
+      syncStatus: 'active',
+      lastSyncTimestamp: null,
+      lastSyncDurationMs: null,
+      provider: 'monobank',
+      createdAt: '2026-08-10T00:00:00Z',
+    },
+  ],
+  totalCount: 1,
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- mirrors the API payload
+  currency_totals: {USD: 10},
+};
+
+// Signals are real so the EffectsStore type constraint is satisfied.
 // Pass initialOffset to simulate the state after nextPage() has advanced the cursor.
 function buildStore(initialOffset = 0) {
   return {
     offset: signal(initialOffset),
+    accountId: signal<string | null>(null),
+    search: signal(''),
     setLoading: vi.fn(),
     setTransactions: vi.fn(),
     appendTransactions: vi.fn(),
     nextPage: vi.fn(),
     setError: vi.fn(),
     setMonthlyOutflowUsd: vi.fn(),
+    setAccountId: vi.fn(),
+    setSearch: vi.fn(),
+    setAccounts: vi.fn(),
   };
 }
 
@@ -99,6 +128,7 @@ function buildService() {
   return {
     getAllTransactions: vi.fn(),
     getDashboardData: vi.fn(),
+    getAccounts: vi.fn(),
   };
 }
 
@@ -114,11 +144,10 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('load', () => {
-    it('calls both services and sets transactions and current-month outflow', () => {
+    it('fetches the first page and sets transactions', () => {
       const store = buildStore();
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900)));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
@@ -126,46 +155,90 @@ describe('transactionLedgerEffects', () => {
       expect(store.setLoading).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({offset: 0, limit: PAGE_SIZE});
       expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900);
     });
 
-    it('sums only the current-month outflowUsd and ignores past-month rows', () => {
-      // Prior month has 3 000 outflowUsd — must NOT be included.
+    it('sends the active account and a trimmed search to the server', () => {
       const store = buildStore();
+      store.accountId.set('acc-1');
+      store.search.set('  coffee ');
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900, 3000)));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(service.getAllTransactions).toHaveBeenCalledWith({
+        offset: 0,
+        limit: PAGE_SIZE,
+        accountId: 'acc-1',
+        search: 'coffee',
+      });
+    });
+
+    it('surfaces a transactions error', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.setError).toHaveBeenCalled();
+      expect(store.setTransactions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loadSummary', () => {
+    it('sets current-month outflow and the account options', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900)));
+      service.getAccounts.mockReturnValue(of(ACCOUNTS));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900);
+      expect(store.setAccounts).toHaveBeenCalledWith([
+        {accountId: 'acc-1', label: 'Test Bank · 1234'},
+      ]);
+    });
+
+    it('sums only the current-month outflowUsd and ignores past-month rows', () => {
+      // Prior month has 3 000 outflowUsd - must NOT be included.
+      const store = buildStore();
+      const service = buildService();
+      service.getDashboardData.mockReturnValue(of(buildDashboardData(2900, 3000)));
+      service.getAccounts.mockReturnValue(of(ACCOUNTS));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
       expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900); // not 5 900
     });
 
-    it('silences a dashboard error, sets monthlyOutflowUsd to null, keeps ledger loading', () => {
+    it('degrades to null outflow and no accounts when both reads fail', () => {
       const store = buildStore();
       const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       service.getDashboardData.mockReturnValue(throwError(() => new Error('network error')));
+      service.getAccounts.mockReturnValue(throwError(() => new Error('network error')));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      // Ledger data must still arrive.
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
-      // Outflow degrades to null, not a hard error.
       expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(null);
+      expect(store.setAccounts).toHaveBeenCalledWith([]);
       expect(store.setError).not.toHaveBeenCalled();
     });
 
-    it('sets monthlyOutflowUsd to 0 when monthlyFlow has no entry for the current month', () => {
+    it('sets outflow to 0 when monthlyFlow has no entry for the current month', () => {
       const store = buildStore();
       const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       service.getDashboardData.mockReturnValue(of({...buildDashboardData(2900), monthlyFlow: []}));
+      service.getAccounts.mockReturnValue(of(ACCOUNTS));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
       expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(0);
     });
@@ -189,6 +262,72 @@ describe('transactionLedgerEffects', () => {
         limit: PAGE_SIZE,
       });
       expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+    });
+  });
+
+  describe('applyAccount', () => {
+    it('stores a changed account and reloads from the first page', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount('acc-1'));
+
+      expect(store.setAccountId).toHaveBeenCalledWith('acc-1');
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a value the store already holds', () => {
+      const store = buildStore();
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount(null));
+
+      expect(store.setAccountId).not.toHaveBeenCalled();
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applySearch', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('waits for typing to pause, then stores the term and reloads once', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+      const typed = new Subject<string>();
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applySearch(typed));
+      typed.next('co');
+      typed.next('coffee');
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+
+      expect(store.setSearch).toHaveBeenCalledTimes(1);
+      expect(store.setSearch).toHaveBeenCalledWith('coffee');
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload when the term is unchanged', () => {
+      const store = buildStore();
+      const service = buildService();
+      configure(service);
+      const typed = new Subject<string>();
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applySearch(typed));
+      typed.next('  ');
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+
+      expect(store.setSearch).not.toHaveBeenCalled();
     });
   });
 });

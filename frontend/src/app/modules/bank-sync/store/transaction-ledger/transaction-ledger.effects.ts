@@ -1,14 +1,20 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
+import {catchError, debounceTime, filter, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
 
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
-import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
+import {
+  type GetAllTransactionsParams,
+  type GlobalTransactionDto,
+  type TransactionAccountOption,
+} from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 const MONTH_KEY_PAD = 2;
+export const SEARCH_DEBOUNCE_MS = 300;
 
 function currentUtcMonthKey(): string {
   const now = new Date();
@@ -22,6 +28,11 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 
 interface EffectsStore {
   offset: Signal<number>;
+  accountId: Signal<Nullable<string>>;
+  search: Signal<string>;
+  setAccountId: (accountId: Nullable<string>) => void;
+  setSearch: (search: string) => void;
+  setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: () => void;
   setTransactions: (
     transactions: GlobalTransactionDto[],
@@ -38,25 +49,45 @@ interface EffectsStore {
   setMonthlyOutflowUsd: (value: number | null) => void;
 }
 
+function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
+  return {
+    offset,
+    limit: PAGE_SIZE,
+    accountId: store.accountId() ?? undefined,
+    search: store.search().trim() || undefined,
+  };
+}
+
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
+  const load = rxMethod<void>(
+    pipe(
+      tap(() => store.setLoading()),
+      switchMap(() =>
+        bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
+          tap(res => store.setTransactions(res.items, res.totalCount, res.hasMore)),
+          StoreErrorUtils.catchAndSetError(store)
+        )
+      )
+    )
+  );
+
   return {
-    load: rxMethod<void>(
+    load,
+    loadSummary: rxMethod<void>(
       pipe(
-        tap(() => store.setLoading()),
         switchMap(() =>
           forkJoin({
-            txResponse$: bankSyncService.getAllTransactions({offset: 0, limit: PAGE_SIZE}),
-            dashboardData$: bankSyncService.getDashboardData().pipe(catchError(() => of(null))),
+            dashboard$: bankSyncService.getDashboardData().pipe(catchError(() => of(null))),
+            accounts$: bankSyncService.getAccounts().pipe(catchError(() => of(null))),
           }).pipe(
-            tap(({txResponse$, dashboardData$}) => {
-              store.setTransactions(txResponse$.items, txResponse$.totalCount, txResponse$.hasMore);
+            tap(({dashboard$, accounts$}) => {
               store.setMonthlyOutflowUsd(
-                dashboardData$ ? sumCurrentMonthOutflow(dashboardData$.monthlyFlow) : null
+                dashboard$ ? sumCurrentMonthOutflow(dashboard$.monthlyFlow) : null
               );
-            }),
-            StoreErrorUtils.catchAndSetError(store)
+              store.setAccounts(TransactionGroupUtils.toAccountOptions(accounts$?.accounts ?? []));
+            })
           )
         )
       )
@@ -68,11 +99,28 @@ export function transactionLedgerEffects(store: EffectsStore) {
           store.setLoading();
         }),
         switchMap(() =>
-          bankSyncService.getAllTransactions({offset: store.offset(), limit: PAGE_SIZE}).pipe(
+          bankSyncService.getAllTransactions(pageParams(store, store.offset())).pipe(
             tap(res => store.appendTransactions(res.items, res.totalCount, res.hasMore)),
             StoreErrorUtils.catchAndSetError(store)
           )
         )
+      )
+    ),
+    /** Follows the `account` query param: a changed value re-queries from the first page. */
+    applyAccount: rxMethod<Nullable<string>>(
+      pipe(
+        filter(accountId => accountId !== store.accountId()),
+        tap(accountId => store.setAccountId(accountId)),
+        tap(() => load())
+      )
+    ),
+    /** Follows the search box: debounced, then re-queries from the first page. */
+    applySearch: rxMethod<string>(
+      pipe(
+        debounceTime(SEARCH_DEBOUNCE_MS),
+        filter(search => search.trim() !== store.search().trim()),
+        tap(search => store.setSearch(search)),
+        tap(() => load())
       )
     ),
   };
@@ -80,8 +128,10 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
 interface HookStore {
   load: () => void;
+  loadSummary: () => void;
 }
 
 export function transactionLedgerHooks(store: HookStore): void {
   store.load();
+  store.loadSummary();
 }

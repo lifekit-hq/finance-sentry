@@ -1,4 +1,7 @@
-import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
+import {
+  type GlobalTransactionDto,
+  type TransactionAccountOption,
+} from '../../models/transaction/transaction.model';
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
@@ -8,6 +11,11 @@ export interface TransactionLedgerState {
   status: AsyncStatus;
   errorCode: Nullable<string>;
   monthlyOutflowUsd: number | null;
+  /** Server-side filter: a single account, or null for all. */
+  accountId: Nullable<string>;
+  /** Server-side free-text filter (description / merchant). */
+  search: string;
+  accounts: TransactionAccountOption[];
 }
 
 export const PAGE_SIZE = 50;
@@ -20,4 +28,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   status: 'idle',
   errorCode: null,
   monthlyOutflowUsd: null,
+  accountId: null,
+  search: '',
+  accounts: [],
 };

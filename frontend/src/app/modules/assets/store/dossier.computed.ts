@@ -11,13 +11,19 @@ interface StateSignals {
   ledgerRead: Signal<Nullable<AssetLedgerReadDto>>;
   ledgerReadStatus: Signal<DossierState['ledgerReadStatus']>;
   ledgerReadErrorCode: Signal<Nullable<string>>;
+  isThesisExpanded: Signal<boolean>;
 }
 
+const PARAGRAPH_BREAK = /\n\s*\n/;
 const DEFAULT_DOSSIER_ERROR = 'Failed to load asset dossier.';
 const DEFAULT_LEDGER_READ_ERROR = "Failed to load Ledger's read.";
 
 export function dossierComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
+  const thesisParagraphs = computed(() => {
+    const text = store.dossier()?.thesis?.thesisText ?? '';
+    return text.split(PARAGRAPH_BREAK).filter(p => p.trim().length > 0);
+  });
 
   return {
     isDossierLoading: computed(() => store.dossierStatus() === 'loading'),
@@ -44,6 +50,12 @@ export function dossierComputed(store: StateSignals) {
         dossier.radarSignals.length > 0
       );
     }),
+    // The thesis is a wall of text on a phone: show the first paragraph, the rest behind "Read more".
+    thesisParagraphs,
+    thesisHasMore: computed(() => thesisParagraphs().length > 1),
+    visibleThesisParagraphs: computed(() =>
+      store.isThesisExpanded() ? thesisParagraphs() : thesisParagraphs().slice(0, 1)
+    ),
     isLedgerReadLoading: computed(() => store.ledgerReadStatus() === 'loading'),
     ledgerReadNarrative: computed(() => store.ledgerRead()?.narrative ?? ''),
     // The backend reports a missing cache as stale; only an actual narrative can be out of date.

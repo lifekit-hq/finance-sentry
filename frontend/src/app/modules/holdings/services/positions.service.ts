@@ -24,6 +24,13 @@ function providerPnlPercent(
   return ((currentValue - costBasisUsd) / costBasisUsd) * PERCENT_SCALE;
 }
 
+function providerPnlUsd(currentValue: number, costBasisUsd: Nullable<number>): Nullable<number> {
+  if (costBasisUsd == null || costBasisUsd <= 0) {
+    return null;
+  }
+  return currentValue - costBasisUsd;
+}
+
 function cryptoUnitPrice(holding: CryptoHoldingDto): Nullable<number> {
   if (holding.isFiat) {
     return null;
@@ -59,6 +66,7 @@ export class PositionsService extends ApiService {
             currentValue: p.usdValue,
             currentPrice: p.quantity > 0 ? p.usdValue / p.quantity : 0,
             pnlPercent: providerPnlPercent(p.usdValue, costBasisUsd),
+            pnlUsd: providerPnlUsd(p.usdValue, costBasisUsd),
             isVenueCash: false,
           };
         });
@@ -72,6 +80,7 @@ export class PositionsService extends ApiService {
           currentValue: h.usdValue,
           currentPrice: cryptoUnitPrice(h),
           pnlPercent: null,
+          pnlUsd: null,
           isVenueCash: h.isFiat,
         }));
 

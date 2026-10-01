@@ -1,6 +1,9 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
-import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
+import {
+  type GlobalTransactionDto,
+  type TransactionAccountOption,
+} from '../../models/transaction/transaction.model';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
@@ -39,6 +42,15 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
     },
     setMonthlyOutflowUsd(value: number | null): void {
       patchState(store, {monthlyOutflowUsd: value});
+    },
+    setAccountId(accountId: Nullable<string>): void {
+      patchState(store, {accountId, offset: 0});
+    },
+    setSearch(search: string): void {
+      patchState(store, {search, offset: 0});
+    },
+    setAccounts(accounts: TransactionAccountOption[]): void {
+      patchState(store, {accounts});
     },
   };
 }
