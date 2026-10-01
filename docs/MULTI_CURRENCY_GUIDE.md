@@ -14,9 +14,11 @@ Finance Sentry supports multiple currencies (EUR, USD, GBP, UAH) without automat
 
 The aggregated balance section shows one card per currency:
 ```
-EUR: 5,000.00
-USD: 1,000.00
+€5,000.00
+$1,000.00
 ```
+
+Amounts are formatted symbol-first (see [Money Display](claude/frontend-rules.md)); conversion and aggregation rules live in [money-semantics.md](money-semantics.md).
 
 ## Monthly Flow Statistics
 
