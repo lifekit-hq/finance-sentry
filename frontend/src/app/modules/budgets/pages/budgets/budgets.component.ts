@@ -82,6 +82,10 @@ export class BudgetsComponent {
   }
 
   public saveEdit(id: string): void {
+    // Enter/Escape clear the editing state and the input's removal fires focusout; ignore that late save.
+    if (this.store.editingId() !== id) {
+      return;
+    }
     const val = parseFloat(this.editValue());
     if (!isNaN(val) && val > 0) {
       this.store.update({id, monthlyLimit: val});
