@@ -5,7 +5,6 @@ import {forkJoin, type Observable, pipe, switchMap, tap} from 'rxjs';
 import {
   type AddInstallmentRequest,
   type AddSubscriptionRequest,
-  type InstallmentFxImpactResponse,
   type Subscription,
   type SubscriptionSummary,
 } from '../../models/subscription/subscription.model';
@@ -14,7 +13,6 @@ import {SubscriptionsService} from '../../services/subscriptions.service';
 interface EffectsStore {
   setData: (subscriptions: Subscription[], hasInsufficientHistory: boolean) => void;
   setSummary: (summary: SubscriptionSummary) => void;
-  setFxImpact: (fxImpact: InstallmentFxImpactResponse) => void;
   dismissSubscription: (id: string) => void;
   restoreSubscription: (id: string) => void;
 }
@@ -26,12 +24,10 @@ export function subscriptionsEffects(store: EffectsStore) {
     forkJoin({
       list$: service.getSubscriptions(true),
       summary$: service.getSummary(),
-      fxImpact$: service.getFxImpact(),
     }).pipe(
-      tap(({list$, summary$, fxImpact$}) => {
+      tap(({list$, summary$}) => {
         store.setData(list$.items, list$.hasInsufficientHistory);
         store.setSummary(summary$);
-        store.setFxImpact(fxImpact$);
       })
     );
 

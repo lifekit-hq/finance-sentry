@@ -5,7 +5,6 @@ import {type Observable} from 'rxjs';
 import {
   type AddInstallmentRequest,
   type AddSubscriptionRequest,
-  type InstallmentFxImpactResponse,
   type SubscriptionsListResponse,
   type SubscriptionSummary,
 } from '../models/subscription/subscription.model';
@@ -25,10 +24,6 @@ export class SubscriptionsService extends ApiService {
 
   public getSummary(): Observable<SubscriptionSummary> {
     return this.get<SubscriptionSummary>('summary');
-  }
-
-  public getFxImpact(): Observable<InstallmentFxImpactResponse> {
-    return this.get<InstallmentFxImpactResponse>('installments/fx-impact');
   }
 
   public dismiss(id: string): Observable<void> {

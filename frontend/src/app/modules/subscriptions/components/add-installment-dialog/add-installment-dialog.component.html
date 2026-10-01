@@ -1,0 +1,21 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
+  <cmn-form-field [control]="form.controls.merchant" label="Merchant" class="sm:col-span-2">
+    <cmn-input formControlName="merchant" placeholder="e.g. Pandora" />
+  </cmn-form-field>
+  <cmn-form-field [control]="form.controls.monthlyAmount" label="Monthly amount">
+    <cmn-input formControlName="monthlyAmount" type="number" placeholder="0.00" />
+  </cmn-form-field>
+  <cmn-form-field [control]="form.controls.currency" label="Currency">
+    <cmn-input formControlName="currency" placeholder="e.g. UAH" />
+  </cmn-form-field>
+  <cmn-form-field [control]="form.controls.startDate" label="Start date" hint="Format YYYY-MM-DD">
+    <cmn-input formControlName="startDate" placeholder="2026-01-15" />
+  </cmn-form-field>
+  <cmn-form-field [control]="form.controls.termCount" label="Total payments" hint="Optional">
+    <cmn-input formControlName="termCount" type="number" placeholder="e.g. 12" />
+  </cmn-form-field>
+  <cmn-dialog-actions align="end" class="sm:col-span-2">
+    <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+    <cmn-button type="submit" variant="primary">Add installment</cmn-button>
+  </cmn-dialog-actions>
+</form>

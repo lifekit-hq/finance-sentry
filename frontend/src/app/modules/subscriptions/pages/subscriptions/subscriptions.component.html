@@ -1,9 +1,13 @@
-<div class="p-cmn-6">
+<div class="p-cmn-4 sm:p-cmn-6">
   <div class="mx-auto max-w-screen-lg space-y-cmn-5">
     <!-- Header -->
     <cmn-page-header
+      (actionClick)="openAddSubscription()"
+      (secondaryClick)="openAddInstallment()"
       title="Subscriptions"
       subtitle="Recurring charges detected from your transactions"
+      actionLabel="Add subscription"
+      secondaryActionLabel="Add installment"
     />
 
     <!-- Insufficient history banner -->
@@ -18,39 +22,20 @@
 
     <!-- Summary cards -->
     @let summary = store.summary();
-    <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="grid grid-cols-2 gap-cmn-4">
       <cmn-stat-card
         [value]="summary ? ((summary.combined.monthly | money: summary.currency) ?? '—') : '—'"
-        label="Monthly Total"
+        label="Monthly total"
         icon="Zap"
       />
       <cmn-stat-card
         [value]="summary ? ((summary.combined.next12Months | money: summary.currency) ?? '—') : '—'"
-        label="Next 12 Months"
+        label="Next 12 mo"
         icon="TrendingUp"
-      />
-      <cmn-stat-card
-        [value]="
-          summary
-            ? ((summary.installments.remainingCommitment | money: summary.currency) ?? '—')
-            : '—'
-        "
-        label="Left On Plans"
-        icon="Wallet"
-      />
-      <cmn-stat-card
-        [value]="summary ? ((summary.subscriptions.monthly | money: summary.currency) ?? '—') : '—'"
-        [label]="'Subscriptions · ' + (summary?.subscriptions?.activeCount ?? 0)"
-        icon="Repeat"
-      />
-      <cmn-stat-card
-        [value]="summary ? ((summary.installments.monthly | money: summary.currency) ?? '—') : '—'"
-        [label]="'Installments · ' + (summary?.installments?.activeCount ?? 0)"
-        icon="CreditCard"
       />
     </div>
 
-    <!-- Subscriptions never end on their own, so "Next 12 Months" projects them at full
+    <!-- Subscriptions never end on their own, so "Next 12 months" projects them at full
          run-rate; installments only count the payments they actually have left. -->
     @if (summary?.combined?.hasUnknownSchedule) {
       <p class="text-cmn-xs text-text-secondary">
@@ -59,246 +44,101 @@
       </p>
     }
 
-    <!-- Exchange-rate effect on foreign-currency plans. The native payment is fixed by
-         contract, so every move in the line below is the rate, not the debt. -->
-    @let fx = store.fxImpact();
-    @if (fx && fx.plans.length > 0) {
-      <cmn-card>
-        <div class="mb-cmn-3 flex flex-wrap items-baseline justify-between gap-cmn-2">
-          <span
-            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-          >
-            Exchange-rate effect
-          </span>
-          <span
-            [class.text-status-success]="fx.changeAmountTotal < 0"
-            [class.text-status-error]="fx.changeAmountTotal > 0"
-            class="font-mono text-cmn-sm font-semibold"
-          >
-            {{ fx.changeAmountTotal > 0 ? '+' : ''
-            }}{{ fx.changeAmountTotal | money: fx.baseCurrency }}/mo ({{
-              fx.changePercentTotal > 0 ? '+' : ''
-            }}{{ fx.changePercentTotal }}%)
-          </span>
-        </div>
-
-        <p class="mb-cmn-3 text-cmn-xs text-text-secondary">
-          These payments are fixed in their own currency. What has changed is what they cost you:
-          {{ fx.baselineCostTotal | money: fx.baseCurrency }} at the start versus
-          {{ fx.currentCostTotal | money: fx.baseCurrency }} today.
-        </p>
-
-        <cmn-line-chart
-          [data]="store.fxCostPoints()"
-          [currency]="fx.baseCurrency"
-          label="Monthly cost of plans"
-        />
-
-        <div class="mt-cmn-4 space-y-cmn-2">
-          @for (plan of fx.plans; track plan.id) {
-            <div class="flex flex-wrap items-baseline justify-between gap-cmn-2 text-cmn-sm">
-              <span class="text-text-primary">
-                {{ plan.merchant }}
-                @if (plan.baselineIsObserved) {
-                  <span
-                    class="text-cmn-xs text-text-disabled"
-                    title="Set a start date for this plan"
-                  >
-                    · since first seen
-                  </span>
-                }
-              </span>
-              <span class="font-mono text-cmn-xs text-text-secondary">
-                {{ plan.baselineCost | money: fx.baseCurrency }} →
-                {{ plan.currentCost | money: fx.baseCurrency }}
-                <span
-                  [class.text-status-success]="plan.changeAmount < 0"
-                  [class.text-status-error]="plan.changeAmount > 0"
-                >
-                  ({{ plan.changePercent > 0 ? '+' : '' }}{{ plan.changePercent }}%)
-                </span>
-              </span>
-            </div>
-          }
-        </div>
-      </cmn-card>
-    }
-
     <!-- Sort controls + active list -->
-    <div>
-      <div class="mb-cmn-3 flex items-center justify-between">
+    <div class="space-y-cmn-4">
+      <div class="flex flex-wrap items-center justify-between gap-cmn-2">
         <span
           class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
         >
           Active · {{ store.activeSubscriptions().length }}
         </span>
-        <div class="flex items-center gap-cmn-1">
+        <div class="flex items-center gap-cmn-1 overflow-x-auto">
           @for (opt of sortOptions; track opt.value) {
             <cmn-chip [selected]="store.sort() === opt.value" (clicked)="setSort(opt.value)">
               {{ opt.label }}
             </cmn-chip>
           }
-          <cmn-button (clicked)="toggleSubForm()" variant="secondary" size="sm">
-            {{ showSubForm() ? 'Cancel' : 'Add' }}
-          </cmn-button>
         </div>
       </div>
 
-      @if (showSubForm()) {
-        <cmn-card class="mb-cmn-3">
-          <form
-            [formGroup]="subForm"
-            (ngSubmit)="submitSubscription()"
-            class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2"
-          >
-            <cmn-form-field label="Merchant">
-              <cmn-input formControlName="merchant" placeholder="e.g. Claude" />
-            </cmn-form-field>
-            <cmn-form-field label="Monthly amount">
-              <cmn-input formControlName="monthlyAmount" type="number" placeholder="0.00" />
-            </cmn-form-field>
-            <cmn-form-field label="Currency">
-              <cmn-input formControlName="currency" placeholder="e.g. EUR" />
-            </cmn-form-field>
-            <cmn-form-field label="Start date">
-              <cmn-input formControlName="startDate" placeholder="YYYY-MM-DD" />
-            </cmn-form-field>
-            <div class="flex items-center">
-              <cmn-button (clicked)="submitSubscription()" variant="primary" size="sm"
-                >Add</cmn-button
-              >
+      @for (section of store.activeSections(); track section.id) {
+        <div>
+          @if (section.label) {
+            <div class="mb-cmn-2 text-cmn-xs font-semibold text-status-warning">
+              {{ section.label }}
             </div>
-          </form>
-        </cmn-card>
+          }
+          <cmn-card padding="none">
+            @for (sub of section.items; track sub.id) {
+              <cmn-list-item-row
+                [label]="sub.merchantName || 'Unknown'"
+                [sublabel]="
+                  cadenceLabels[sub.cadence] + ' · next ' + (sub.nextExpectedDate | date: 'd MMM')
+                "
+              >
+                <div
+                  [style.background]="sub.merchantName | merchantColor"
+                  avatar
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
+                >
+                  {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
+                </div>
+                <div amount class="min-w-[72px] text-right">
+                  <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
+                  <div class="font-mono text-cmn-sm font-semibold text-text-primary">
+                    {{ sub.monthlyEquivalent | money: sub.currency }}
+                  </div>
+                  <div class="text-[10px] text-text-disabled">/ mo</div>
+                </div>
+                <div actions class="flex shrink-0 gap-cmn-1">
+                  <cmn-button
+                    (clicked)="dismiss(sub)"
+                    variant="secondary"
+                    size="sm"
+                    icon="X"
+                    aria-label="Dismiss subscription"
+                  />
+                </div>
+              </cmn-list-item-row>
+            }
+          </cmn-card>
+        </div>
       }
 
-      <cmn-card padding="none">
-        @for (sub of store.sortedActive(); track sub.id) {
-          @let days = daysUntil(sub.nextExpectedDate);
-          @let soon = days <= 5;
-          <cmn-list-item-row [label]="sub.merchantName || 'Unknown'">
-            <div
-              [style.background]="sub.merchantName | merchantColor"
-              avatar
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
-            >
-              {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
-            </div>
-            <div meta class="min-w-[100px] text-center">
-              <div
-                [class.text-status-warning]="soon"
-                [class.font-semibold]="soon"
-                [class.text-text-secondary]="!soon"
-                class="text-cmn-xs"
-              >
-                {{ sub.nextExpectedDate | date: 'mediumDate' }}
-              </div>
-              <div
-                [class.text-status-warning]="soon"
-                [class.text-text-disabled]="!soon"
-                class="text-[11px]"
-              >
-                {{ days <= 0 ? 'Today' : 'in ' + days + 'd' }}
-              </div>
-            </div>
-            <div amount class="min-w-[72px] text-right">
-              <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
-              <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                {{ sub.monthlyEquivalent | money: sub.currency }}
-              </div>
-              <div class="text-[10px] text-text-disabled">/ mo</div>
-            </div>
-            <div actions class="flex shrink-0 gap-cmn-1">
-              <cmn-button (clicked)="dismiss(sub)" variant="secondary" size="sm" icon="X" />
-            </div>
-          </cmn-list-item-row>
-        }
-        @if (store.activeSubscriptions().length === 0 && !store.hasInsufficientHistory()) {
-          <div class="px-cmn-4 py-cmn-8 text-center text-cmn-sm text-text-secondary">
-            No active subscriptions detected yet.
-          </div>
-        }
-      </cmn-card>
+      @if (store.activeSubscriptions().length === 0 && !store.hasInsufficientHistory()) {
+        <cmn-empty-state
+          message="No active subscriptions yet"
+          subMessage="Recurring charges show up here once they are detected, or add one yourself."
+          icon="Repeat"
+        />
+      }
     </div>
 
     <!-- Installments -->
     <div>
-      <div class="mb-cmn-3 flex items-center justify-between">
+      <div class="mb-cmn-3">
         <span
           class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
         >
           Installments · {{ store.activeInstallments().length }}
         </span>
-        <cmn-button (clicked)="toggleAddForm()" variant="secondary" size="sm">
-          {{ showAddForm() ? 'Cancel' : 'Add installment' }}
-        </cmn-button>
       </div>
-
-      @if (showAddForm()) {
-        <cmn-card class="mb-cmn-3">
-          <form
-            [formGroup]="addForm"
-            (ngSubmit)="submitAdd()"
-            class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2"
-          >
-            <cmn-form-field label="Merchant">
-              <cmn-input formControlName="merchant" placeholder="e.g. Pandora" />
-            </cmn-form-field>
-            <cmn-form-field label="Monthly amount">
-              <cmn-input formControlName="monthlyAmount" type="number" placeholder="0.00" />
-            </cmn-form-field>
-            <cmn-form-field label="Currency">
-              <cmn-input formControlName="currency" placeholder="e.g. UAH" />
-            </cmn-form-field>
-            <cmn-form-field label="Start date">
-              <cmn-input formControlName="startDate" placeholder="YYYY-MM-DD" />
-            </cmn-form-field>
-            <cmn-form-field label="Total payments" hint="Optional">
-              <cmn-input formControlName="termCount" type="number" placeholder="e.g. 12" />
-            </cmn-form-field>
-            <div class="flex items-center">
-              <cmn-button (clicked)="submitAdd()" variant="primary" size="sm">Add</cmn-button>
-            </div>
-          </form>
-        </cmn-card>
-      }
 
       @if (store.activeInstallments().length > 0) {
         <cmn-card padding="none">
           @for (item of store.sortedInstallments(); track item.id) {
-            <cmn-list-item-row [label]="item.merchantName || 'Unknown'">
+            <cmn-list-item-row
+              [label]="item.merchantName || 'Unknown'"
+              [sublabel]="
+                (item | installmentProgress) + ' · next ' + (item.nextExpectedDate | date: 'd MMM')
+              "
+            >
               <div
                 [style.background]="item.merchantName | merchantColor"
                 avatar
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
               >
                 {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
-              </div>
-              <div meta class="min-w-[170px] text-center">
-                <div class="text-cmn-xs text-text-secondary">
-                  @if (item.termCount) {
-                    {{ item.occurrenceCount }} / {{ item.termCount }} paid
-                    @if (item.remainingPayments !== null) {
-                      · {{ item.remainingPayments }} left
-                    }
-                  } @else {
-                    {{ item.occurrenceCount }} payment{{ item.occurrenceCount !== 1 ? 's' : '' }}
-                  }
-                </div>
-                <div class="text-[11px] text-text-disabled">
-                  next {{ item.nextExpectedDate | date: 'mediumDate' }}
-                </div>
-                <div class="mt-cmn-1 flex items-center justify-center gap-cmn-1">
-                  <cmn-input
-                    [formControl]="termControl(item)"
-                    type="number"
-                    size="sm"
-                    placeholder="term"
-                  />
-                  <cmn-button (clicked)="saveTerm(item.id)" variant="secondary" size="sm"
-                    >Set</cmn-button
-                  >
-                </div>
               </div>
               <div amount class="min-w-[72px] text-right">
                 <div class="font-mono text-cmn-sm font-semibold text-text-primary">
@@ -307,15 +147,14 @@
                 <div class="text-[10px] text-text-disabled">/ mo</div>
               </div>
               <div actions class="flex shrink-0 gap-cmn-1">
-                <cmn-button (clicked)="markInstallmentDone(item.id)" variant="secondary" size="sm"
-                  >Done</cmn-button
+                <cmn-menu
+                  [items]="installmentMenuItems"
+                  (itemSelect)="onInstallmentAction($event.id, item)"
+                  ariaLabel="Installment actions"
+                  triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
                 >
-                <cmn-button
-                  (clicked)="deleteInstallment(item)"
-                  variant="secondary"
-                  size="sm"
-                  icon="Trash2"
-                />
+                  <cmn-icon name="Ellipsis" size="sm" />
+                </cmn-menu>
               </div>
             </cmn-list-item-row>
           }
