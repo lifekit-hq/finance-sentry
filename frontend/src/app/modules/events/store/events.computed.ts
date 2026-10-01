@@ -4,7 +4,6 @@ import {ErrorMessageService} from '@lifekit-hq/core';
 import {EVENT_SOURCE_LABELS, THIS_WEEK_DAYS} from '../constants/event/event.constants';
 import {
   type CalendarWindow,
-  type EventDayGroup,
   type EventKind,
   type EventSourceStatusEntry,
   type EventWeekSection,
@@ -47,7 +46,6 @@ export function eventsComputed(store: StateSignals) {
       }
       return errorMessages.resolve(store.upcomingErrorCode()) ?? DEFAULT_UPCOMING_ERROR;
     }),
-    upcomingByDay: computed((): EventDayGroup[] => EventDayUtils.groupByDay(store.upcoming())),
     /** Day groups split into "This week" and "Later"; a section with no days is left out. */
     upcomingSections: computed((): EventWeekSection[] => {
       const today = EventDayUtils.toIsoDate(new Date());

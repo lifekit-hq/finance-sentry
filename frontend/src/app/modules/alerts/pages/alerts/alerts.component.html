@@ -29,7 +29,8 @@
       @for (alert of filtered(); track alert.id) {
         <div
           (click)="openAlert(alert)"
-          (keydown.enter)="openAlert(alert)"
+          (keydown.enter)="onRowKey($event, alert)"
+          (keydown.space)="onRowKey($event, alert)"
           class="rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           role="button"
           tabindex="0"

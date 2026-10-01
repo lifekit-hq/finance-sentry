@@ -84,14 +84,6 @@ describe('eventsComputed', () => {
     expect(computed.calendarWindow()).toEqual({from: '2026-09-22', to: '2026-12-21'});
   });
 
-  it('upcomingByDay groups items by date', () => {
-    const computed = build({
-      upcoming: [upcoming('2026-10-01', 'PLTR'), upcoming('2026-09-22', 'MU')],
-    });
-
-    expect(computed.upcomingByDay().map(g => g.date)).toEqual(['2026-09-22', '2026-10-01']);
-  });
-
   it('unavailableSourceLabels names only the failed sources in words', () => {
     const computed = build({
       sources: [

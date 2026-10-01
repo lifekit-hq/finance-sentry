@@ -130,6 +130,14 @@ export class AlertsComponent {
     this.toast.show('Alert dismissed', 'info');
   }
 
+  public onRowKey(event: Event, alert: Alert): void {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    event.preventDefault();
+    this.openAlert(alert);
+  }
+
   public openAlert(alert: Alert): void {
     if (!alert.isRead) {
       this.store.markRead(alert.id);
