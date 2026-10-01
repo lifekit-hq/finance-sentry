@@ -20,19 +20,22 @@ public sealed class RiskEvaluationService(ILogger<RiskEvaluationService>? logger
         RiskRuleSet? ruleSet,
         IReadOnlyList<AllocationDriftTarget> allocationTargets,
         IReadOnlyList<PolicyViolationAck> acks,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        DrawdownCheck? drawdown = null)
     {
         var generatedAt = now ?? DateTimeOffset.UtcNow;
 
-        if (ruleSet is null)
+        // #700: the drawdown tolerance lives on the IPS, not the rule set, so it is enforced whether or
+        // not the owner has saved risk rules.
+        var raw = ruleSet is null ? new List<PolicyViolation>() : ComputeRawViolations(book, ruleSet, allocationTargets, logger);
+        if (DrawdownViolation(book, drawdown) is { } drawdownViolation)
         {
-            return new ComplianceReport(generatedAt, book.IsStale, book.StaleSources, [], HasRuleSet: false);
+            raw.Add(drawdownViolation);
         }
 
-        var raw = ComputeRawViolations(book, ruleSet, allocationTargets, logger);
         var acked = ApplyAcks(raw, acks);
 
-        return new ComplianceReport(generatedAt, book.IsStale, book.StaleSources, acked, HasRuleSet: true);
+        return new ComplianceReport(generatedAt, book.IsStale, book.StaleSources, acked, HasRuleSet: ruleSet is not null);
     }
 
     public RiskVerdict EvaluateProposal(
@@ -282,6 +285,28 @@ public sealed class RiskEvaluationService(ILogger<RiskEvaluationService>? logger
         }
 
         return violations;
+    }
+
+    private static PolicyViolation? DrawdownViolation(BookSnapshot book, DrawdownCheck? drawdown)
+    {
+        // The book's decline from its peak against the owner's recorded drawdown tolerance, passed in
+        // (like the allocation targets) so the service stays pure. Higher observed is worse, so
+        // acknowledgement and worsening work as for every rule but MinCashBuffer. ExcessUsd is the
+        // decline beyond tolerance, on the book's value at its peak.
+        if (drawdown is not { } dd || dd.ObservedDrawdown <= dd.MaxDrawdown || dd.ObservedDrawdown >= 1m)
+        {
+            return null;
+        }
+
+        var peakUsd = book.InvestedUsd / (1m - dd.ObservedDrawdown);
+        return new PolicyViolation(
+            RiskRuleKeys.MaxDrawdown,
+            RiskRuleKeys.BookSubject,
+            dd.ObservedDrawdown,
+            dd.MaxDrawdown,
+            (dd.ObservedDrawdown - dd.MaxDrawdown) * peakUsd,
+            dd.ObservedDrawdown - dd.MaxDrawdown,
+            PolicyViolationStatus.New);
     }
 
     private static List<PolicyViolation> ApplyAcks(

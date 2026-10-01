@@ -20,6 +20,7 @@ public static class CrossModulePortRegistration
         services.AddScoped<IBookFiguresService, BookFiguresService>();
 
         services.AddScoped<IAllocationPolicySource, IpsAllocationPolicySource>();
+        services.AddScoped<IDrawdownPolicySource, IpsDrawdownPolicySource>();
         services.AddScoped<IPositionCapSource, RiskPositionCapSource>();
 
         // 049: the Events module reads calendars, alerts and the companion outbox through these ports.

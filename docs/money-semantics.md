@@ -539,6 +539,30 @@ comparison; the bars are closed periods.
   own earliest synced transaction, so an account connected partway through the gap
   contributes only from that date onward.
 
+## 5b. Book drawdown (risk re-measurement, #700)
+
+The risk layer enforces the owner's recorded maximum drawdown (IPS `MaxDrawdownTolerancePct`, whole
+percent; the risk layer compares fractions). "Drawdown" here is the book's fall from its highest point
+in the lookback window (`RiskOptions.DrawdownLookbackDays`, default 365), **neutral to money moving in
+or out** - peak value against current value would read a withdrawal as a loss.
+
+- Source: `holding_snapshots` (per-position quantity and `UsdValue`, converted to USD at capture) within
+  the window, plus the live book as the latest capture. Captures are grouped by `CapturedAt`.
+- Each step between two consecutive captures revalues the quantities held at the EARLIER capture at the
+  LATER capture's prices; that over the earlier value is the step's return. Step returns chain into a
+  growth index; the drawdown is the index's fall from its peak. A position bought between captures adds
+  nothing to the step that bought it; one sold or gone stops contributing (held flat in its last step).
+- Split / reorganisation guard: a position whose value is about unchanged (<2%) while its quantity moves
+  by more than 10% is treated as flat for that step, not as a price move.
+- Fewer than two captures (no history yet) means no measurement and no enforcement.
+- Violation: `MaxDrawdown`, subject `BOOK`, observed and limit as fractions, excess USD on the book's
+  value at its peak. Acknowledgement works as for every rule where higher is worse.
+
+Accepted approximations: invested holdings only (cash and banking balances are not positions in the
+snapshots, so the measure is the invested book's decline, not net worth); snapshot cadence bounds how
+fast a fall is seen; a position with no snapshot price at a capture is dropped from that step; the
+split guard is a heuristic. The tolerance lives on the IPS, so it is checked whether or not a risk rule set exists.
+
 ## 9. Known approximations (accepted)
 
 - Everything is UTC; no user-timezone normalization of transaction dates or month edges.

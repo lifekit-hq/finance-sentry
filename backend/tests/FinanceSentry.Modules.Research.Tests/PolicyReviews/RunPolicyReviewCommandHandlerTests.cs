@@ -80,6 +80,8 @@ public class RunPolicyReviewCommandHandlerTests
     public async Task Due_review_is_recorded_with_its_proposal_and_presented()
     {
         var ips = Current();
+        ips.MaxDrawdownTolerancePct = 25m;
+        ips.RiskMeasuredAt = QuarterlyDue.AddDays(-10);
         GivenVersions(ips);
         var now = QuarterlyDue.AddHours(5);
 
@@ -106,6 +108,37 @@ public class RunPolicyReviewCommandHandlerTests
         _alerts.Verify(a => a.GeneratePolicyReviewMissedAlertAsync(
             It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Due_remeasurement_is_requested_in_the_review_and_its_alert()
+    {
+        var ips = Current();
+        ips.MaxDrawdownTolerancePct = null;
+        GivenVersions(ips);
+        string? summary = null;
+        _alerts.Setup(a => a.GeneratePolicyReviewAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, Guid, int, string, CancellationToken>((_, _, _, s, _) => summary = s)
+            .Returns(Task.CompletedTask);
+
+        await Handler(QuarterlyDue.AddHours(5)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        _recorded.Single().Rationale.Should().Contain("Re-measure risk on this review");
+        summary.Should().StartWith("Re-measure risk on this review", "the request must survive the alert's truncation");
+    }
+
+    [Fact]
+    public async Task Fresh_measurement_adds_no_remeasurement_request()
+    {
+        var ips = Current();
+        ips.MaxDrawdownTolerancePct = 25m;
+        ips.RiskMeasuredAt = QuarterlyDue.AddDays(-10);
+        GivenVersions(ips);
+
+        await Handler(QuarterlyDue.AddHours(5)).Handle(new RunPolicyReviewCommand(_userId), default);
+
+        _recorded.Single().Rationale.Should().NotContain("Re-measure risk");
     }
 
     [Fact]

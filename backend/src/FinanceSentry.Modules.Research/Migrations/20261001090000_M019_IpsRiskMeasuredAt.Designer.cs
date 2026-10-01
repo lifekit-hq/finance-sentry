@@ -3,6 +3,7 @@ using System;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinanceSentry.Modules.Research.Migrations
 {
     [DbContext(typeof(ResearchDbContext))]
-    partial class ResearchDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001090000_M019_IpsRiskMeasuredAt")]
+    partial class M019_IpsRiskMeasuredAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -161,96 +164,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasDatabaseName("idx_asset_ledger_reads_user_symbol");
 
                     b.ToTable("asset_ledger_reads", "research");
-                });
-
-            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.BenchmarkRelativeRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTimeOffset>("AsOf")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("BenchmarkReturnPct")
-                        .HasColumnType("numeric(12,4)");
-
-                    b.Property<string>("BenchmarkTicker")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTimeOffset>("ComputedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<int>("ConstituentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Covered")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("ExcessReturnPct")
-                        .HasColumnType("numeric(12,4)");
-
-                    b.Property<DateTimeOffset?>("FromTimestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<decimal?>("NetExcessReturnPct")
-                        .HasColumnType("numeric(12,4)");
-
-                    b.Property<string>("NetGate")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("ScopeKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<decimal?>("SubjectReturnPct")
-                        .HasColumnType("numeric(12,4)");
-
-                    b.Property<bool>("SustainedUnderperformance")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("ThesisId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("ToTimestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UnderperformingRuns")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Window")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "AsOf", "Scope", "ScopeKey", "Window")
-                        .IsUnique()
-                        .HasDatabaseName("idx_benchmark_relative_records_run");
-
-                    b.ToTable("benchmark_relative_records", "research");
                 });
 
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.CandidateScore", b =>

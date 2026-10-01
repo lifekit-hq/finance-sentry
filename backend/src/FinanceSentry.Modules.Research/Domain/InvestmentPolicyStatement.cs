@@ -29,6 +29,14 @@ public class InvestmentPolicyStatement
     public int? RiskCapacity { get; set; }
     public decimal? MaxDrawdownTolerancePct { get; set; }
 
+    /// <summary>
+    /// When tolerance, capacity and drawdown tolerance were last measured with the user (#700). Set by
+    /// a re-measurement or by a save that changed any of the three; carried forward unchanged by a
+    /// save that did not touch them, so a version written for another reason never passes for a
+    /// fresh measurement. Null = never measured (every statement authored before #700).
+    /// </summary>
+    public DateTimeOffset? RiskMeasuredAt { get; set; }
+
     // Target allocation + how/when to rebalance back to it.
     public List<AllocationTarget> AllocationTargets { get; set; } = [];
     public RebalancingRule RebalancingRule { get; set; } = RebalancingRule.Default;

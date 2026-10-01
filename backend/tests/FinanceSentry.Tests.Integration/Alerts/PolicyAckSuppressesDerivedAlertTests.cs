@@ -92,6 +92,7 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
             _book.Object,
             new RiskRuleSetRepository(risk),
             _allocations.Object,
+            Mock.Of<IDrawdownCheckProvider>(),
             new RiskEvaluationService());
 
         await new AlertGeneratorService(new AlertRepository(alerts), reader).GenerateCashShortfallAlertAsync(

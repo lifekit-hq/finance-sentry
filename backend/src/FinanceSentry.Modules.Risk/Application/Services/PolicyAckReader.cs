@@ -14,6 +14,7 @@ public sealed class PolicyAckReader(
     IBookSnapshotReader bookReader,
     IRiskRuleSetRepository ruleSetRepo,
     IAllocationPolicySource allocationPolicySource,
+    IDrawdownCheckProvider drawdownProvider,
     IRiskEvaluationService evaluationService) : IPolicyAckReader
 {
     public async Task<bool> IsPolicySilencedAsync(Guid userId, string policyKey, CancellationToken ct = default)
@@ -27,7 +28,9 @@ public sealed class PolicyAckReader(
         var book = await bookReader.ReadAsync(userId, ct);
         var ruleSet = await ruleSetRepo.GetCurrentAsync(userId, ct);
         var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(userId, ct);
-        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks);
+        var now = DateTimeOffset.UtcNow;
+        var drawdown = await drawdownProvider.GetAsync(userId, book, now, ct);
+        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now, drawdown);
 
         return !report.Violations.Any(v => v.RuleKey == policyKey && v.HasWorsenedPastStep);
     }

@@ -42,4 +42,10 @@ public static class RiskRuleKeys
     public const string Turnover = "Turnover";
     public const string AllocationDrift = "AllocationDrift";
     public const string AddToBrokenThesis = "AddToBrokenThesis";
+
+    /// <summary>#700: the book's decline from its peak against the owner's recorded drawdown tolerance.</summary>
+    public const string MaxDrawdown = "MaxDrawdown";
+
+    /// <summary>Subject of the book-wide <see cref="MaxDrawdown"/> violation.</summary>
+    public const string BookSubject = "BOOK";
 }

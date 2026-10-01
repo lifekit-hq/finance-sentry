@@ -3,7 +3,7 @@ namespace FinanceSentry.Modules.Risk.Application.Services;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Ports;
 
-/// <summary>Pure function: (BookSnapshot, RiskRuleSet, allocation targets, ack state) -&gt; ComplianceReport / RiskVerdict.</summary>
+/// <summary>Pure function: (BookSnapshot, RiskRuleSet, allocation targets, drawdown check, ack state) -&gt; ComplianceReport / RiskVerdict.</summary>
 public interface IRiskEvaluationService
 {
     ComplianceReport Evaluate(
@@ -11,7 +11,8 @@ public interface IRiskEvaluationService
         RiskRuleSet? ruleSet,
         IReadOnlyList<AllocationDriftTarget> allocationTargets,
         IReadOnlyList<PolicyViolationAck> acks,
-        DateTimeOffset? now = null);
+        DateTimeOffset? now = null,
+        DrawdownCheck? drawdown = null);
 
     RiskVerdict EvaluateProposal(
         BookSnapshot book,

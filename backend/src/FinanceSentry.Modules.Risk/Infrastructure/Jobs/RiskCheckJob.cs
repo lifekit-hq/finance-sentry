@@ -21,6 +21,7 @@ public sealed class RiskCheckJob(
     IHoldingSnapshotRepository snapshotRepo,
     IRiskEvaluationService evaluationService,
     IAllocationPolicySource allocationPolicySource,
+    IDrawdownCheckProvider drawdownProvider,
     ITurnoverTracker turnoverTracker,
     IAddToBrokenThesisDetector brokenThesisDetector,
     IBrokenThesisReader brokenThesisReader,
@@ -62,7 +63,8 @@ public sealed class RiskCheckJob(
         var ruleSet = await ruleSetRepo.GetCurrentAsync(userId, ct);
         var acks = await ackRepo.ListActiveAsync(userId, ct);
         var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(userId, ct);
-        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now);
+        var drawdown = await drawdownProvider.GetAsync(userId, book, now, ct);
+        var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now, drawdown);
 
         await EmitComplianceSignalsAsync(userId, report, ct);
         await ResolveClearedViolationsAsync(userId, book, report, ct);
@@ -79,7 +81,7 @@ public sealed class RiskCheckJob(
     private async Task ResolveClearedViolationsAsync(
         Guid userId, BookSnapshot book, ComplianceReport report, CancellationToken ct)
     {
-        if (!report.HasRuleSet || report.IsStale)
+        if (report.IsStale)
         {
             return;
         }
@@ -87,6 +89,20 @@ public sealed class RiskCheckJob(
         var violated = report.Violations
             .Select(v => (v.RuleKey, Subject: v.Subject.ToUpperInvariant()))
             .ToHashSet();
+
+        // #700: a book that has recovered inside its tolerance (or whose tolerance was loosened at a
+        // re-measurement) clears the drawdown alert the same way. The tolerance is on the IPS, so this
+        // holds with or without a rule set.
+        if (!violated.Contains((RiskRuleKeys.MaxDrawdown, RiskRuleKeys.BookSubject)))
+        {
+            await alertGenerator.ResolvePolicyViolationAlertAsync(
+                userId, RiskRuleKeys.MaxDrawdown, RiskRuleKeys.BookSubject, ct);
+        }
+
+        if (!report.HasRuleSet)
+        {
+            return;
+        }
 
         foreach (var position in book.Positions)
         {
@@ -166,7 +182,6 @@ public sealed class RiskCheckJob(
                 DedupKey: $"risk_rules:no_rules:{userId}",
                 Payload: new { },
                 OneTime: true), ct);
-            return;
         }
 
         var alertWorthy = report.Violations
@@ -197,7 +212,7 @@ public sealed class RiskCheckJob(
                 }), ct);
         }
 
-        if (report.Violations.Count == 0)
+        if (report.HasRuleSet && report.Violations.Count == 0)
         {
             await signalWriter.AppendSignalAsync(new RadarSignalRequest(
                 Scanner: "risk_rules",

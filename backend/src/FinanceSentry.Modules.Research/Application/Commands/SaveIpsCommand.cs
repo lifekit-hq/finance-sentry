@@ -19,15 +19,19 @@ public record SaveIpsCommand(
     string? SellDiscipline,
     int? CoolingOffDays,
     IReadOnlyList<string> Exclusions,
-    string? ReviewCadence) : ICommand<IpsDto>;
+    string? ReviewCadence,
+    bool RiskRemeasured = false) : ICommand<IpsDto>;
 
-public class SaveIpsCommandHandler(IIpsRepository repo) : ICommandHandler<SaveIpsCommand, IpsDto>
+public class SaveIpsCommandHandler(IIpsRepository repo, TimeProvider timeProvider) : ICommandHandler<SaveIpsCommand, IpsDto>
 {
     private const string DefaultReviewCadence = "annual";
 
     public async Task<IpsDto> Handle(SaveIpsCommand cmd, CancellationToken ct)
     {
         var nextVersion = await repo.GetMaxVersionAsync(cmd.UserId, ct) + 1;
+        var previous = await repo.GetCurrentAsync(cmd.UserId, ct);
+        var riskCapacity = cmd.RiskCapacity ?? previous?.RiskCapacity;
+        var maxDrawdownTolerancePct = cmd.MaxDrawdownTolerancePct ?? previous?.MaxDrawdownTolerancePct;
 
         var ips = new InvestmentPolicyStatement
         {
@@ -38,8 +42,9 @@ public class SaveIpsCommandHandler(IIpsRepository repo) : ICommandHandler<SaveIp
             PrimaryHorizonYears = cmd.PrimaryHorizonYears,
             EmergencyCushionUsd = cmd.EmergencyCushionUsd,
             RiskTolerance = cmd.RiskTolerance,
-            RiskCapacity = cmd.RiskCapacity,
-            MaxDrawdownTolerancePct = cmd.MaxDrawdownTolerancePct,
+            RiskCapacity = riskCapacity,
+            MaxDrawdownTolerancePct = maxDrawdownTolerancePct,
+            RiskMeasuredAt = RiskMeasuredAtFor(cmd, previous, riskCapacity, maxDrawdownTolerancePct),
             AllocationTargets = cmd.AllocationTargets.ToList(),
             RebalancingRule = cmd.RebalancingRule ?? Domain.RebalancingRule.Default,
             ContributionPlan = cmd.ContributionPlan,
@@ -59,9 +64,27 @@ public class SaveIpsCommandHandler(IIpsRepository repo) : ICommandHandler<SaveIp
 
         return new IpsDto(
             ips.Id, ips.Version, ips.IsCurrent, ips.Goals, ips.PrimaryHorizonYears,
-            ips.EmergencyCushionUsd, ips.RiskTolerance, ips.RiskCapacity, ips.MaxDrawdownTolerancePct,
+            ips.EmergencyCushionUsd, ips.RiskTolerance, ips.RiskCapacity, ips.MaxDrawdownTolerancePct, ips.RiskMeasuredAt,
             ips.AllocationTargets, ips.RebalancingRule, ips.ContributionPlan, ips.SellDiscipline,
             ips.CoolingOffDays, ips.Exclusions, ips.ReviewCadence,
             ips.LastReviewedAt, ips.CreatedAt, ips.UpdatedAt);
+    }
+
+    /// <summary>
+    /// A save that omits capacity or drawdown tolerance keeps the recorded values (an amendment for
+    /// another reason must not silently drop an enforced threshold). It stamps a fresh measurement
+    /// when it is the first statement, says so explicitly, or changed tolerance, capacity or drawdown
+    /// tolerance; otherwise the prior measurement carries forward untouched, so a version written for
+    /// another reason never passes for a re-measurement.
+    /// </summary>
+    private DateTimeOffset? RiskMeasuredAtFor(
+        SaveIpsCommand cmd, InvestmentPolicyStatement? previous, int? riskCapacity, decimal? maxDrawdownTolerancePct)
+    {
+        var riskChanged = previous is null
+            || previous.RiskTolerance != cmd.RiskTolerance
+            || previous.RiskCapacity != riskCapacity
+            || previous.MaxDrawdownTolerancePct != maxDrawdownTolerancePct;
+
+        return cmd.RiskRemeasured || riskChanged ? timeProvider.GetUtcNow() : previous?.RiskMeasuredAt;
     }
 }
