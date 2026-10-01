@@ -1,15 +1,18 @@
 namespace FinanceSentry.Modules.Budgets.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Budgets.Domain;
 using FinanceSentry.Modules.Budgets.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under the Owner filter. The budget-breach sentinel runs with no person in scope, so it calls
+// <c>GetAllUnscopedAsync</c>, which opts out explicitly for its all-users sweep.
 public class BudgetRepository(BudgetsDbContext db) : IBudgetRepository
 {
     private readonly BudgetsDbContext _db = db;
 
-    public Task<IReadOnlyList<Budget>> GetAllAsync(CancellationToken ct = default)
-        => _db.Budgets.AsNoTracking()
+    public Task<IReadOnlyList<Budget>> GetAllUnscopedAsync(CancellationToken ct = default)
+        => _db.Budgets.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .ToListAsync(ct)
             .ContinueWith<IReadOnlyList<Budget>>(t => t.Result, ct);
 

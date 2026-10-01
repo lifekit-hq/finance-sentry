@@ -1,11 +1,15 @@
 namespace FinanceSentry.Modules.Budgets.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Budgets.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class BudgetsDbContext(DbContextOptions<BudgetsDbContext> options) : DbContext(options)
+public class BudgetsDbContext(DbContextOptions<BudgetsDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<Budget> Budgets { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,5 +33,7 @@ public class BudgetsDbContext(DbContextOptions<BudgetsDbContext> options) : DbCo
         bb.HasIndex(b => new { b.UserId, b.Category })
             .IsUnique()
             .HasDatabaseName("idx_budget_user_category_unique");
+
+        bb.HasQueryFilter(OwnerQueryFilter.Name, b => b.UserId == CurrentUserId);
     }
 }
