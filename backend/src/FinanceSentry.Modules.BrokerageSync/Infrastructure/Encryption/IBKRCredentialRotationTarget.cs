@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
 
 using FinanceSentry.Infrastructure.Encryption;
@@ -18,7 +19,7 @@ public sealed class IBKRCredentialRotationTarget(
 
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
-        var stale = await db.IBKRCredentials
+        var stale = await db.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.KeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 

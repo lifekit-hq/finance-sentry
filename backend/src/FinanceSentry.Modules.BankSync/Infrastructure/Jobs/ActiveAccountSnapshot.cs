@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +31,7 @@ public sealed class ActiveAccountSnapshot
 
     public static async Task<ActiveAccountSnapshot> ReadAsync(BankSyncDbContext db, CancellationToken ct)
     {
-        var accounts = await db.BankAccounts
+        var accounts = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(a => a.IsActive)
             .Select(a => new ActiveAccount(a.Id, a.UserId, a.Currency))

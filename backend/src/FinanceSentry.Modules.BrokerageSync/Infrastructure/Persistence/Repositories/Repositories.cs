@@ -1,9 +1,13 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence.Repositories;
 
+// Reads and the upsert/delete helpers opt out of the Owner filter: the scheduled syncs run with no person in
+// scope, so a filtered read would find no existing rows and re-insert duplicates. Each query keeps its own
+// UserId predicate (or an explicit all-active sweep), so scoping stays explicit.
 public sealed class IBKRCredentialRepository : IIBKRCredentialRepository
 {
     private readonly BrokerageSyncDbContext _context;
@@ -20,19 +24,19 @@ public sealed class IBKRCredentialRepository : IIBKRCredentialRepository
 
     public async Task<IBKRCredential?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await _context.IBKRCredentials
+        return await _context.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(c => c.Id == id, ct);
     }
 
     public async Task<IBKRCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.IBKRCredentials
+        return await _context.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(c => c.UserId == userId, ct);
     }
 
     public async Task<IReadOnlyList<IBKRCredential>> GetAllActiveAsync(CancellationToken ct = default)
     {
-        return await _context.IBKRCredentials
+        return await _context.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.IsActive)
             .ToListAsync(ct);
     }
@@ -69,13 +73,13 @@ public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
 
     public async Task<IBKRFlexCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.IBKRFlexCredentials
+        return await _context.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(c => c.UserId == userId, ct);
     }
 
     public async Task<IReadOnlyList<IBKRFlexCredential>> GetAllActiveAsync(CancellationToken ct = default)
     {
-        return await _context.IBKRFlexCredentials
+        return await _context.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.IsActive)
             .ToListAsync(ct);
     }
@@ -104,7 +108,7 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
     {
         foreach (var holding in holdings)
         {
-            var existing = await _context.BrokerageHoldings
+            var existing = await _context.BrokerageHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
                 .FirstOrDefaultAsync(
                     h => h.UserId == holding.UserId
                         && h.Symbol == holding.Symbol
@@ -125,7 +129,7 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 
     public async Task<IReadOnlyList<BrokerageHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.BrokerageHoldings
+        return await _context.BrokerageHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(h => h.UserId == userId)
             .ToListAsync(ct);
     }
@@ -137,7 +141,7 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 
     public async Task DeleteByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        await _context.BrokerageHoldings
+        await _context.BrokerageHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(h => h.UserId == userId)
             .ExecuteDeleteAsync(ct);
     }
@@ -160,7 +164,7 @@ public sealed class BrokerageTradeRepository : IBrokerageTradeRepository
     public async Task<BrokerageTrade?> GetByExecutionIdAsync(
         Guid userId, string provider, string ibExecutionId, CancellationToken ct = default)
     {
-        return await _context.BrokerageTrades
+        return await _context.BrokerageTrades.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(
                 t => t.UserId == userId && t.Provider == provider && t.IbExecutionId == ibExecutionId,
                 ct);
@@ -178,7 +182,7 @@ public sealed class BrokerageTradeRepository : IBrokerageTradeRepository
 
     public async Task<IReadOnlyList<BrokerageTrade>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.BrokerageTrades
+        return await _context.BrokerageTrades.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(t => t.UserId == userId)
             .ToListAsync(ct);
     }
@@ -201,7 +205,7 @@ public sealed class BrokerageCashTransactionRepository : IBrokerageCashTransacti
     public async Task<BrokerageCashTransaction?> GetByIdempotencyKeyAsync(
         Guid userId, string provider, string idempotencyKey, CancellationToken ct = default)
     {
-        return await _context.BrokerageCashTransactions
+        return await _context.BrokerageCashTransactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(
                 c => c.UserId == userId && c.Provider == provider && c.IdempotencyKey == idempotencyKey,
                 ct);
@@ -214,7 +218,7 @@ public sealed class BrokerageCashTransactionRepository : IBrokerageCashTransacti
 
     public async Task<IReadOnlyList<BrokerageCashTransaction>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.BrokerageCashTransactions
+        return await _context.BrokerageCashTransactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.UserId == userId)
             .ToListAsync(ct);
     }
@@ -237,7 +241,7 @@ public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentReposito
     public async Task<BrokerageInstrument?> GetByConidAsync(
         Guid userId, string provider, long conid, CancellationToken ct = default)
     {
-        return await _context.BrokerageInstruments
+        return await _context.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(
                 i => i.UserId == userId && i.Provider == provider && i.Conid == conid,
                 ct);
@@ -245,13 +249,13 @@ public sealed class BrokerageInstrumentRepository : IBrokerageInstrumentReposito
 
     public async Task<BrokerageInstrument?> GetByIdAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
-        return await _context.BrokerageInstruments
+        return await _context.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(i => i.UserId == userId && i.Id == id, ct);
     }
 
     public async Task<IReadOnlyList<BrokerageInstrument>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
-        return await _context.BrokerageInstruments
+        return await _context.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(i => i.UserId == userId)
             .ToListAsync(ct);
     }

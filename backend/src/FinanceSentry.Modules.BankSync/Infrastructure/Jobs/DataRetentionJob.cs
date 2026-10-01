@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -35,9 +36,10 @@ public class DataRetentionJob(BankSyncDbContext db, ILogger<DataRetentionJob> lo
             "DataRetentionJob starting. Cutoff date: {Cutoff}. DryRun: {DryRun}",
             cutoff.ToString("yyyy-MM-dd"), dryRun);
 
-        // IgnoreQueryFilters() to access all rows, including already-inactive ones (idempotency)
+        // Sweeps every user (no person in scope) and includes already-inactive rows (idempotency), so it
+        // opts out of both the Owner and the soft-delete filter by name.
         var candidates = await _db.Transactions
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.ActiveFilterName])
             .Where(t => t.IsActive
                      && t.PostedDate.HasValue
                      && t.PostedDate.Value < cutoff)

@@ -32,4 +32,4 @@ A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core
 - Every job or sweep that legitimately reads across users opts out explicitly with `IgnoreQueryFilters([OwnerQueryFilter.Name])` and keeps its own `UserId` predicate. Inserts and `SaveChanges` are not filtered; `ExecuteUpdate`/`ExecuteDelete` are.
 - Each converted context ships a two-user isolation test and a no-principal test per cross-user job (see `AlertsOwnerQueryFilterTests`).
 - Hosts register `ICurrentUser` explicitly (API: `HttpContextCurrentUser`; MCP: `IdentityResolverCurrentUser`); design-time factories pass `NoCurrentUser.Instance`.
-- Converted so far: `AlertsDbContext`.
+- Converted so far: `AlertsDbContext`, `BankSyncDbContext`, `BrokerageSyncDbContext`, `CryptoSyncDbContext`. Sync upserts and dedup reads must opt out too: with no principal a filtered existence check finds nothing and re-inserts duplicates.

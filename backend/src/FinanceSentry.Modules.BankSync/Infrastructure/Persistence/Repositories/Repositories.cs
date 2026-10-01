@@ -1,15 +1,22 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 /// <summary>
-/// Entity Framework Core implementation of IBankAccountRepository.
+/// Entity Framework Core implementation of IBankAccountRepository. Reads run under the context's Owner
+/// query filter. The scheduled sync, the stale-sync reaper, the credential backup and the cross-module
+/// readers run with no person in scope and act on whichever account or user they are given (or on every
+/// account), so the methods they reach opt out through <see cref="AllUsers"/>; their own predicates keep
+/// them scoped, and request callers still check ownership themselves.
 /// </summary>
 public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepository
 {
     private readonly BankSyncDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    private IQueryable<BankAccount> AllUsers => _context.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<BankAccount> AddAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
@@ -29,25 +36,26 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 
     public async Task<BankAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        return await AllUsers
             .FirstOrDefaultAsync(ba => ba.Id == id && ba.IsActive, cancellationToken);
     }
 
     public async Task<BankAccount?> GetByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        return await AllUsers
             .FirstOrDefaultAsync(ba => ba.ExternalAccountId == externalAccountId && ba.IsActive, cancellationToken);
     }
 
     public async Task<bool> ExistsByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        // External account ids are unique across users, so the duplicate check must see every user's rows.
+        return await AllUsers
             .AnyAsync(ba => ba.ExternalAccountId == externalAccountId, cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        return await AllUsers
             .Where(ba => ba.UserId == userId && ba.IsActive)
             .OrderByDescending(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -89,14 +97,14 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 
     public async Task<IEnumerable<BankAccount>> GetBySyncStatusAsync(string status, CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        return await AllUsers
             .Where(ba => ba.SyncStatus == status && ba.IsActive)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetAllActiveAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.BankAccounts
+        return await AllUsers
             .Where(ba => ba.IsActive)
             .OrderBy(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -109,11 +117,20 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 }
 
 /// <summary>
-/// Entity Framework Core implementation of ITransactionRepository.
+/// Entity Framework Core implementation of ITransactionRepository. Reads run under the context's Owner
+/// query filter. The scheduled sync and the cross-module readers run with no person in scope and act on
+/// whichever account or user they are given, so the methods they reach opt out through
+/// <see cref="AllUsers"/>; their own predicates keep them scoped. Paths that also need archived rows opt out
+/// of the soft-delete filter by name instead of dropping every filter.
 /// </summary>
 public class TransactionRepository(BankSyncDbContext context) : ITransactionRepository
 {
     private readonly BankSyncDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    private IQueryable<Transaction> AllUsers => _context.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name]);
+
+    private IQueryable<Transaction> AllUsersIncludingArchived => _context.Transactions
+        .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.ActiveFilterName]);
 
     public async Task<Transaction> AddAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
@@ -142,7 +159,7 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
 
     public async Task<IEnumerable<Transaction>> GetByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
-        return await _context.Transactions
+        return await AllUsers
             .Where(t => t.AccountId == accountId)
             .OrderByDescending(t => t.PostedDate ?? t.TransactionDate)
             .ToListAsync(cancellationToken);
@@ -150,12 +167,11 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
 
     public async Task<IReadOnlyCollection<string>> GetAllUniqueHashesByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
-        // IgnoreQueryFilters() bypasses the global IsActive filter so soft-deleted rows are
-        // included. Their hashes still occupy the unique index (AccountId, UniqueHash); leaving
+        // Opting out of the soft-delete filter (and, as the sync job has no person in scope, the Owner
+        // filter) so soft-deleted rows are included. Their hashes still occupy the unique index (AccountId, UniqueHash); leaving
         // them out of the dedup set lets a re-synced transaction re-insert and violate the
         // constraint, which poisons the whole SaveChanges batch.
-        return await _context.Transactions
-            .IgnoreQueryFilters()
+        return await AllUsersIncludingArchived
             .Where(t => t.AccountId == accountId)
             .Select(t => t.UniqueHash)
             .ToListAsync(cancellationToken);
@@ -193,7 +209,7 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
 
     public async Task<IEnumerable<Transaction>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _context.Transactions
+        return await AllUsers
             .Where(t => t.UserId == userId)
             .OrderByDescending(t => t.PostedDate ?? t.TransactionDate)
             .ToListAsync(cancellationToken);
@@ -201,7 +217,7 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
 
     public async Task<IEnumerable<Transaction>> GetByUserIdSinceAsync(Guid userId, DateTime since, CancellationToken cancellationToken = default)
     {
-        return await _context.Transactions
+        return await AllUsers
             .Where(t => t.UserId == userId && (t.PostedDate >= since || t.TransactionDate >= since))
             .OrderByDescending(t => t.PostedDate ?? t.TransactionDate)
             .ToListAsync(cancellationToken);
@@ -293,10 +309,10 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
     public async Task SoftDeleteByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        // IgnoreQueryFilters() bypasses the IsActive global filter so already-inactive rows
-        // are also covered, making this operation idempotent.
+        // Opting out of the IsActive filter covers already-inactive rows too, making this operation
+        // idempotent; the Owner filter stays on (a request acting for another person matches nothing).
         var transactions = await _context.Transactions
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([BankSyncDbContext.ActiveFilterName])
             .Where(t => t.AccountId == accountId && t.IsActive)
             .ToListAsync(cancellationToken);
 
@@ -317,11 +333,16 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
 }
 
 /// <summary>
-/// Entity Framework Core implementation of ISyncJobRepository.
+/// Entity Framework Core implementation of ISyncJobRepository. Reads run under the context's Owner query
+/// filter. The sync run, the stale-sync reaper and the cross-module readers have no person in scope and
+/// act on whichever account or user they are given (or on every user), so the methods they reach opt out
+/// through <see cref="AllUsers"/>; their own predicates keep them scoped.
 /// </summary>
 public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 {
     private readonly BankSyncDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    private IQueryable<SyncJob> AllUsers => _context.SyncJobs.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<SyncJob> AddAsync(SyncJob job, CancellationToken cancellationToken = default)
     {
@@ -332,13 +353,13 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 
     public async Task<SyncJob?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .FirstOrDefaultAsync(sj => sj.Id == id, cancellationToken);
     }
 
     public async Task<IEnumerable<SyncJob>> GetByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .Where(sj => sj.AccountId == accountId)
             .OrderByDescending(sj => sj.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -346,7 +367,7 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 
     public async Task<SyncJob?> GetLatestByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .Where(sj => sj.AccountId == accountId)
             .OrderByDescending(sj => sj.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -354,7 +375,7 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 
     public async Task<IEnumerable<SyncJob>> GetByStatusAsync(string status, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .Where(sj => sj.Status == status)
             .OrderByDescending(sj => sj.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -369,7 +390,7 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var job = await _context.SyncJobs.FirstOrDefaultAsync(sj => sj.Id == id, cancellationToken);
+        var job = await AllUsers.FirstOrDefaultAsync(sj => sj.Id == id, cancellationToken);
         if (job == null)
             return false;
 
@@ -380,13 +401,13 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
 
     public async Task<bool> HasRunningJobAsync(Guid accountId, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .AnyAsync(sj => sj.AccountId == accountId && sj.Status == "running", cancellationToken);
     }
 
     public async Task<SyncJob?> GetLatestSuccessfulByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _context.SyncJobs
+        return await AllUsers
             .Where(sj => sj.UserId == userId && sj.Status == "success")
             .OrderByDescending(sj => sj.CompletedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -395,7 +416,7 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
     public async Task<IReadOnlyDictionary<Guid, DateTime>> GetLastSuccessfulSyncTimesByUserAsync(
         Guid userId, CancellationToken cancellationToken = default)
     {
-        var rows = await _context.SyncJobs
+        var rows = await AllUsers
             .Where(sj => sj.UserId == userId && sj.Status == "success" && sj.CompletedAt != null)
             .GroupBy(sj => sj.AccountId)
             .Select(g => new {AccountId = g.Key, LastSuccess = g.Max(sj => sj.CompletedAt)})
@@ -410,9 +431,16 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
     }
 }
 
+/// <summary>
+/// Reads run under the context's Owner query filter. The sync run and account discovery have no person in
+/// scope and act on whichever credential they are given (or on every credential), so those methods opt out
+/// through <see cref="AllUsers"/>; the connect flow's per-user lookup stays filtered.
+/// </summary>
 public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobankCredentialRepository
 {
     private readonly BankSyncDbContext _context = context;
+
+    private IQueryable<MonobankCredential> AllUsers => _context.MonobankCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<MonobankCredential> AddAsync(MonobankCredential credential, CancellationToken cancellationToken = default)
     {
@@ -422,13 +450,13 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
     }
 
     public async Task<MonobankCredential?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-        => await _context.MonobankCredentials.FirstOrDefaultAsync(mc => mc.Id == id, cancellationToken);
+        => await AllUsers.FirstOrDefaultAsync(mc => mc.Id == id, cancellationToken);
 
     public async Task<MonobankCredential?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
         => await _context.MonobankCredentials.FirstOrDefaultAsync(mc => mc.UserId == userId, cancellationToken);
 
     public async Task<IReadOnlyList<MonobankCredential>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await _context.MonobankCredentials.ToListAsync(cancellationToken);
+        => await AllUsers.ToListAsync(cancellationToken);
 
     public async Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default)
     {
@@ -450,9 +478,17 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
         => await _context.SaveChangesAsync(cancellationToken);
 }
 
+/// <summary>
+/// Reads run under the context's Owner query filter. The sync run, token refresh, the provider callback and
+/// the consent-expiry reminder have no person in scope and act on whichever connection they are given (or
+/// on every linked connection), so those methods opt out through <see cref="AllUsers"/>; the connect and
+/// disconnect flows' per-user lookups stay filtered.
+/// </summary>
 public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLayerConnectionRepository
 {
     private readonly BankSyncDbContext _context = context;
+
+    private IQueryable<TrueLayerConnection> AllUsers => _context.TrueLayerConnections.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<TrueLayerConnection> AddAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default)
     {
@@ -462,23 +498,23 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
     }
 
     public async Task<TrueLayerConnection?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-        => await _context.TrueLayerConnections.FirstOrDefaultAsync(tc => tc.Id == id, cancellationToken);
+        => await AllUsers.FirstOrDefaultAsync(tc => tc.Id == id, cancellationToken);
 
     public async Task<TrueLayerConnection?> GetByReferenceAsync(string reference, CancellationToken cancellationToken = default)
-        => await _context.TrueLayerConnections.FirstOrDefaultAsync(tc => tc.Reference == reference, cancellationToken);
+        => await AllUsers.FirstOrDefaultAsync(tc => tc.Reference == reference, cancellationToken);
 
     public async Task<TrueLayerConnection?> GetByUserAndProviderAsync(Guid userId, string providerId, CancellationToken cancellationToken = default)
         => await _context.TrueLayerConnections.FirstOrDefaultAsync(
             tc => tc.UserId == userId && tc.ProviderId == providerId, cancellationToken);
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default)
-        => await _context.TrueLayerConnections
+        => await AllUsers
             .AsNoTracking()
             .Where(tc => tc.Status == "LINKED")
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeAsync(DateTime threshold, CancellationToken cancellationToken = default)
-        => await _context.TrueLayerConnections
+        => await AllUsers
             .Where(tc => tc.Status == "LINKED"
                 && tc.ConnectionExpiresAt != null
                 && tc.ConnectionExpiresAt <= threshold

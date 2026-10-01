@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Integration.CryptoSync;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Encryption;
@@ -54,7 +55,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
     private CryptoSyncDbContext NewContext() =>
         new(new DbContextOptionsBuilder<CryptoSyncDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString(), b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public"))
-            .Options);
+            .Options, NoCurrentUser.Instance);
 
     private static CredentialEncryptionService Encryption(int currentVersion, Dictionary<int, string> keys) =>
         new(Options.Create(new EncryptionOptions { CurrentKeyVersion = currentVersion, Keys = keys }));
@@ -111,7 +112,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
         }
 
         await using var read = NewContext();
-        var credential = await read.ExchangeCredentials.AsNoTracking().SingleAsync();
+        var credential = await read.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().SingleAsync();
         credential.Id.Should().Be(_credentialId);
         credential.UserId.Should().Be(_userId);
         credential.Provider.Should().Be(CryptoExchangeProvider.Binance);
@@ -121,7 +122,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
         credential.ApiKeyIv.Should().Equal(iv);
         credential.ApiKeyAuthTag.Should().Equal(tag);
 
-        var holdings = await read.CryptoHoldings.AsNoTracking().OrderBy(h => h.Asset).ToListAsync();
+        var holdings = await read.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().OrderBy(h => h.Asset).ToListAsync();
         holdings.Should().OnlyContain(h => h.Provider == CryptoExchangeProvider.Binance);
         holdings.Select(h => (h.Asset, h.TradeCursor, h.TradeCount)).Should().Equal(
             ("BTC", "42", 3),
@@ -200,7 +201,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
         // Readable with v2 ALONE: the disclosed key can now be removed from configuration.
         var v2Only = Encryption(2, new() { [2] = FreshKeyV2 });
         await using var read = NewContext();
-        var row = await read.ExchangeCredentials.AsNoTracking().SingleAsync();
+        var row = await read.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().SingleAsync();
         row.KeyVersion.Should().Be(2);
         v2Only.Decrypt(row.EncryptedApiKey, row.ApiKeyIv, row.ApiKeyAuthTag, row.KeyVersion).Should().Be(ApiKey);
         v2Only.Decrypt(row.EncryptedApiSecret, row.ApiSecretIv, row.ApiSecretAuthTag, row.KeyVersion).Should().Be(ApiSecret);

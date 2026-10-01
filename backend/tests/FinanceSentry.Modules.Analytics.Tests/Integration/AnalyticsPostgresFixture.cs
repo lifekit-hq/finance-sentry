@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Analytics.Tests.Integration;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -45,9 +46,9 @@ public sealed class AnalyticsPostgresFixture : IAsyncLifetime
         var conn = ConnectionString!;
 
         // Base-table schemas first (order mirrors production MigrationExtensions), then Analytics.
-        Migrate(new BankSyncDbContext(Opts<BankSyncDbContext>(conn, "__EFMigrationsHistory")));
-        Migrate(new CryptoSyncDbContext(Opts<CryptoSyncDbContext>(conn, "__EFMigrationsHistory")));
-        Migrate(new BrokerageSyncDbContext(Opts<BrokerageSyncDbContext>(conn, "__EFMigrationsHistory")));
+        Migrate(new BankSyncDbContext(Opts<BankSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
+        Migrate(new CryptoSyncDbContext(Opts<CryptoSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
+        Migrate(new BrokerageSyncDbContext(Opts<BrokerageSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
         Migrate(new BudgetsDbContext(Opts<BudgetsDbContext>(conn, "__EFMigrationsHistory")));
         Migrate(new WealthDbContext(Opts<WealthDbContext>(conn, "__ef_migrations_history_wealth")));
         Migrate(new ResearchDbContext(Opts<ResearchDbContext>(conn, "__ef_migrations_history_research")));
@@ -77,7 +78,7 @@ public sealed class AnalyticsPostgresFixture : IAsyncLifetime
 
     private static async Task SeedAsync(string conn)
     {
-        using var db = new BankSyncDbContext(Opts<BankSyncDbContext>(conn, "__EFMigrationsHistory"));
+        using var db = new BankSyncDbContext(Opts<BankSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance);
 
         // Idempotent across reruns against a persistent DB.
         if (await db.Set<Transaction>().AnyAsync(t => t.UserId == UserA || t.UserId == UserB))

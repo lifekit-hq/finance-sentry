@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
@@ -44,7 +45,7 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
 
     private static BankSyncDbContext NewDb() => new(
         new DbContextOptionsBuilder<BankSyncDbContext>()
-            .UseInMemoryDatabase($"fxspread-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"fxspread-{Guid.NewGuid():N}").Options, NoCurrentUser.Instance);
 
     private static IOptions<HygieneSentinelsOptions> OptionsWith(
         int lookbackDays, decimal threshold, int? maxRateAgeHours = null)

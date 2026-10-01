@@ -1,3 +1,4 @@
+using FinanceSentry.Tests.Unit.BankSync;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Services;
@@ -26,11 +27,12 @@ namespace FinanceSentry.Tests.Unit.CryptoSync;
 /// </summary>
 public sealed class SyncExchangeHoldingsCommandTests : IDisposable
 {
-    private readonly Guid _userId = Guid.NewGuid();
+    private static readonly Guid SharedUserId = Guid.NewGuid();
+    private readonly Guid _userId = SharedUserId;
     private readonly CryptoSyncDbContext _db = new(
         new DbContextOptionsBuilder<CryptoSyncDbContext>()
             .UseInMemoryDatabase($"crypto-sync-{Guid.NewGuid()}")
-            .Options);
+            .Options, new FixedCurrentUser(SharedUserId));
 
     private readonly Mock<ICryptoExchangeAdapter> _binance = new(MockBehavior.Loose);
     private readonly Mock<ICryptoExchangeAdapter> _revolutX = new(MockBehavior.Loose);

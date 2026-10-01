@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.Encryption;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
@@ -43,7 +44,7 @@ public class CredentialKeyRotationTests
     private static BankSyncDbContext NewContext() =>
         new(new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"rotation-{Guid.NewGuid()}")
-            .Options);
+            .Options, NoCurrentUser.Instance);
 
     [Fact]
     public async Task RotateAsync_ReencryptsV1RowsUnderV2_AndPlaintextSurvives()
@@ -65,7 +66,7 @@ public class CredentialKeyRotationTests
 
         rotated.Should().Be(1);
 
-        var row = await db.MonobankCredentials.SingleAsync();
+        var row = await db.MonobankCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
         row.KeyVersion.Should().Be(2, "the payload and the version move together");
         atV2.Decrypt(row.EncryptedToken, row.Iv, row.AuthTag, row.KeyVersion)
             .Should().Be(token, "rotation re-encrypts the same secret, it never rewrites it");
@@ -116,8 +117,8 @@ public class CredentialKeyRotationTests
         db.MonobankCredentials.Add(mono);
         await db.SaveChangesAsync();
 
-        var storedConnection = await db.TrueLayerConnections.SingleAsync();
-        var storedMono = await db.MonobankCredentials.SingleAsync();
+        var storedConnection = await db.TrueLayerConnections.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
+        var storedMono = await db.MonobankCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
 
         storedConnection.KeyVersion.Should().Be(2);
         storedMono.KeyVersion.Should().Be(2);
@@ -155,7 +156,7 @@ public class CredentialKeyRotationTests
         await using var db = new CryptoSyncDbContext(
             new DbContextOptionsBuilder<CryptoSyncDbContext>()
                 .UseInMemoryDatabase($"rotation-crypto-{Guid.NewGuid()}")
-                .Options);
+                .Options, NoCurrentUser.Instance);
 
         var atV1 = ServiceAtVersion(1);
         var userId = Guid.NewGuid();
@@ -180,12 +181,12 @@ public class CredentialKeyRotationTests
         (await target.RotateAsync(2, default)).Should().Be(2);
         (await target.RotateAsync(2, default)).Should().Be(0);
 
-        var revolutX = await db.ExchangeCredentials.SingleAsync(c => c.Provider == CryptoExchangeProvider.RevolutX);
+        var revolutX = await db.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync(c => c.Provider == CryptoExchangeProvider.RevolutX);
         revolutX.KeyVersion.Should().Be(2);
         atV2.Decrypt(revolutX.EncryptedApiKey, revolutX.ApiKeyIv, revolutX.ApiKeyAuthTag, 2).Should().Be("revx-key");
         atV2.Decrypt(revolutX.EncryptedApiSecret, revolutX.ApiSecretIv, revolutX.ApiSecretAuthTag, 2).Should().Be(pem);
 
-        var binance = await db.ExchangeCredentials.SingleAsync(c => c.Provider == CryptoExchangeProvider.Binance);
+        var binance = await db.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync(c => c.Provider == CryptoExchangeProvider.Binance);
         atV2.Decrypt(binance.EncryptedApiSecret, binance.ApiSecretIv, binance.ApiSecretAuthTag, binance.KeyVersion)
             .Should().Be("binance-secret");
     }

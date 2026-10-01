@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,10 +6,16 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 
 public sealed class BrokerageSyncDbContext : DbContext
 {
-    public BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbContext> options)
+    private readonly ICurrentUser _currentUser;
+
+    public BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbContext> options, ICurrentUser currentUser)
         : base(options)
     {
+        _currentUser = currentUser;
     }
+
+    // Evaluated per query: EF parameterises the context member, so each context instance filters on its own principal.
+    private Guid? CurrentUserId => _currentUser.UserId;
 
     public DbSet<IBKRCredential> IBKRCredentials => Set<IBKRCredential>();
     public DbSet<IBKRFlexCredential> IBKRFlexCredentials => Set<IBKRFlexCredential>();
@@ -24,6 +31,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<IBKRCredential>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("IBKRCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -48,6 +56,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<IBKRFlexCredential>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("IBKRFlexCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -63,6 +72,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageHolding>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageHoldings");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Symbol, e.Provider }).IsUnique();
@@ -81,6 +91,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageInstrument>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageInstruments");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.Conid }).IsUnique();
@@ -95,6 +106,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageTrade>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageTrades");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.IbExecutionId }).IsUnique();
@@ -124,6 +136,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageCashTransaction>(entity =>
         {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageCashTransactions");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.IdempotencyKey }).IsUnique();

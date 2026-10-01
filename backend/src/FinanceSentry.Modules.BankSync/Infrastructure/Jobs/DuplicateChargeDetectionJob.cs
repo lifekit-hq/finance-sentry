@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -36,7 +37,7 @@ public sealed class DuplicateChargeDetectionJob(
             // Debit-only: adapters store amounts positive with TransactionType carrying the
             // direction ("debit"/"credit"); a signed negative amount is also a debit. A refund
             // (credit) at the same merchant/amount must never count toward a duplicate.
-            rows = await db.Transactions
+            rows = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
                 .AsNoTracking()
                 .Where(t => t.MerchantName != null
                          && t.TransactionDate >= since

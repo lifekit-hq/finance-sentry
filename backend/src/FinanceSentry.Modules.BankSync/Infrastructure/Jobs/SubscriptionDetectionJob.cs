@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -30,14 +31,14 @@ public sealed class SubscriptionDetectionJob(
     {
         var cutoff = DateTime.UtcNow.AddMonths(-LookbackMonths);
 
-        var transactions = await db.Transactions
+        var transactions = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
             .Where(t => t.IsActive
                      && !t.IsPending
                      && t.Amount != 0m   // skip €0.00 auth holds / reversals that skew amount stability
                      && t.TransactionDate >= cutoff
                      && (t.TransactionType == null || t.TransactionType == "debit"))
-            .Join(db.BankAccounts.Where(a => a.IsActive),
+            .Join(db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).Where(a => a.IsActive),
                 t => t.AccountId, a => a.Id, (t, a) => new SubscriptionDetectionAlgorithm.TxRow(
                     t.UserId, t.MerchantName, t.Description, t.Amount,
                     t.TransactionDate, t.MerchantCategory, t.Mcc, a.Currency))

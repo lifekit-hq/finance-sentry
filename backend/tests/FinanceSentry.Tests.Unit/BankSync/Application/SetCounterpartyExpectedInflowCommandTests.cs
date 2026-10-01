@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
+using FinanceSentry.Tests.Unit.BankSync;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Exceptions;
@@ -26,7 +27,7 @@ public class SetCounterpartyExpectedInflowCommandTests
 
     private static (ICounterpartyRepository Repository, BankSyncDbContext Context) NewRepository()
     {
-        var context = new BankSyncDbContext(Options($"expected-inflow-{Guid.NewGuid():N}"));
+        var context = new BankSyncDbContext(Options($"expected-inflow-{Guid.NewGuid():N}"), AmbientCurrentUser.Instance);
         return (new CounterpartyRepository(context), context);
     }
 
@@ -40,9 +41,16 @@ public class SetCounterpartyExpectedInflowCommandTests
 
     private static Task<SetCounterpartyExpectedInflowResult> SetExpectedInflow(
         ICounterpartyRepository repository, Guid userId, Guid counterpartyId, decimal? amount, string? currency) =>
-        new SetCounterpartyExpectedInflowCommandHandler(repository)
+        ActingAs(userId, () => new SetCounterpartyExpectedInflowCommandHandler(repository)
             .Handle(new SetCounterpartyExpectedInflowCommand(userId, counterpartyId, amount, currency),
-                CancellationToken.None);
+                CancellationToken.None));
+
+    // The request principal is the person the call is made for; the repository's Owner query filter scopes to it.
+    private static Task<T> ActingAs<T>(Guid userId, Func<Task<T>> call)
+    {
+        AmbientCurrentUser.ActAs(userId);
+        return call();
+    }
 
     [Fact]
     public async Task Set_ValidAmountAndCurrency_PersistsBoth()

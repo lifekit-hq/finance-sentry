@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,9 @@ public class CommittedMerchantPinRepository(BankSyncDbContext context) : ICommit
     public async Task<IReadOnlySet<string>> GetPinnedKeysAsync(
         Guid userId, CancellationToken cancellationToken = default)
     {
-        var keys = await _context.CommittedMerchantPins.AsNoTracking()
+        // Opts out of the Owner filter: the committed-outflow policy that reads this also runs inside the
+        // family-clearing job with no person in scope; the explicit predicate keeps it scoped to the user.
+        var keys = await _context.CommittedMerchantPins.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(p => p.UserId == userId)
             .Select(p => p.MerchantKey)
             .ToListAsync(cancellationToken);

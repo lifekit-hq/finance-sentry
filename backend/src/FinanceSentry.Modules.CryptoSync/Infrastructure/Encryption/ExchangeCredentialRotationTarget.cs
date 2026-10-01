@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Encryption;
 
 using FinanceSentry.Infrastructure.Encryption;
@@ -20,7 +21,7 @@ public sealed class ExchangeCredentialRotationTarget(
 
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
-        var stale = await db.ExchangeCredentials
+        var stale = await db.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.KeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 

@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,6 @@ public sealed class BrokerageSyncDbContextFactory : IDesignTimeDbContextFactory<
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history", "public");
             });
 
-        return new BrokerageSyncDbContext(optionsBuilder.Options);
+        return new BrokerageSyncDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

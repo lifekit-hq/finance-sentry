@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -22,7 +23,7 @@ public class CategorySpikeDetectionJobTests
 
     private static BankSyncDbContext NewDb() => new(
         new DbContextOptionsBuilder<BankSyncDbContext>()
-            .UseInMemoryDatabase($"catspike-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"catspike-{Guid.NewGuid():N}").Options, NoCurrentUser.Instance);
 
     private CategorySpikeDetectionJob MakeJob(BankSyncDbContext db, decimal? multiplier = null) =>
         new(db, _alerts.Object,

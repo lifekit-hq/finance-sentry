@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ public sealed class MonobankCredentialRotationTarget(
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
         // Idempotent by query: an already-rotated store selects nothing and does no writes.
-        var stale = await db.MonobankCredentials
+        var stale = await db.MonobankCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.KeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 
@@ -50,7 +51,7 @@ public sealed class TrueLayerConnectionRotationTarget(
 
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
-        var stale = await db.TrueLayerConnections
+        var stale = await db.TrueLayerConnections.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.KeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 
