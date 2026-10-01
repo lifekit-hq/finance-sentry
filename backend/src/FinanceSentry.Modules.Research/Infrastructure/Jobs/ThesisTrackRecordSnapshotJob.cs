@@ -38,7 +38,7 @@ public sealed class ThesisTrackRecordSnapshotJob(
 
     private async Task MaterializeRelativeTrackRecordAsync(CancellationToken ct)
     {
-        var userIds = await eventRepo.GetUserIdsWithEventsAsync(ct);
+        var userIds = await eventRepo.GetUserIdsWithEventsUnscopedAsync(ct);
 
         foreach (var userId in userIds)
         {
@@ -56,7 +56,7 @@ public sealed class ThesisTrackRecordSnapshotJob(
 
     private async Task BackfillPendingAsync(CancellationToken ct)
     {
-        var pending = await eventRepo.ListPendingAsync(ct);
+        var pending = await eventRepo.ListPendingUnscopedAsync(ct);
 
         foreach (var thesisEvent in pending)
         {
@@ -90,12 +90,12 @@ public sealed class ThesisTrackRecordSnapshotJob(
 
     private async Task SnapshotActiveThesesAsync(CancellationToken ct)
     {
-        var userIds = await thesisRepo.GetUserIdsWithThesesAsync(ct);
+        var userIds = await thesisRepo.GetUserIdsWithThesesUnscopedAsync(ct);
 
         foreach (var userId in userIds)
         {
-            var theses = await thesisRepo.ListAsync(userId, ct);
-            var events = await eventRepo.ListAsync(userId, subjectId: null, ct);
+            var theses = await thesisRepo.ListUnscopedAsync(userId, ct);
+            var events = await eventRepo.ListUnscopedAsync(userId, subjectId: null, ct);
             var eventsBySubject = events
                 .GroupBy(e => e.SubjectId)
                 .ToDictionary(g => g.Key, g => g.ToList());

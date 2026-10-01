@@ -323,7 +323,7 @@ public class RunPolicyReviewCommandHandlerTests
         => _drift.Setup(d => d.Handle(It.IsAny<GetAllocationDriftQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(dto);
 
     private void GivenVersions(params InvestmentPolicyStatement[] versions)
-        => _ipsRepo.Setup(r => r.ListVersionsAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(versions);
+        => _ipsRepo.Setup(r => r.ListVersionsUnscopedAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(versions);
 
     private InvestmentPolicyStatement Current() => new()
     {

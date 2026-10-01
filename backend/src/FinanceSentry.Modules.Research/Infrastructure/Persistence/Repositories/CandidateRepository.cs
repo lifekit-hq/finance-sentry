@@ -1,16 +1,23 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under the Owner filter. The opportunity scan and the expiry job run with no person in scope: the
+// upsert's existence check and the expiry sweep opt out explicitly (a filtered check would find nothing and insert a
+// duplicate Active candidate). The check keeps its own UserId predicate.
 public sealed class CandidateRepository(ResearchDbContext db) : ICandidateRepository
 {
     public async Task<(OpportunityCandidate Candidate, bool IsNew)> UpsertActiveAsync(
         Guid userId, string ticker, CandidateSource source, TimeSpan ttl, CancellationToken ct = default)
     {
-        var existing = await FindActiveByTickerAsync(userId, ticker, ct);
+        var existing = await db.OpportunityCandidates
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .FirstOrDefaultAsync(c =>
+                c.UserId == userId && c.Ticker == ticker && c.Status == CandidateStatus.Active, ct);
         if (existing is not null)
         {
             return (existing, false);
@@ -57,8 +64,10 @@ public sealed class CandidateRepository(ResearchDbContext db) : ICandidateReposi
         return await query.OrderByDescending(c => c.CreatedAt).ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<OpportunityCandidate>> ListExpiredAsync(DateTimeOffset asOf, CancellationToken ct = default)
+    public async Task<IReadOnlyList<OpportunityCandidate>> ListExpiredUnscopedAsync(
+        DateTimeOffset asOf, CancellationToken ct = default)
         => await db.OpportunityCandidates
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.Status == CandidateStatus.Active && c.ExpiresAt <= asOf)
             .ToListAsync(ct);
 

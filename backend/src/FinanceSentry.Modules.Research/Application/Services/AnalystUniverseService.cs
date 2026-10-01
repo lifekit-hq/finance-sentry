@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
@@ -40,13 +41,18 @@ public sealed class AnalystUniverseService(
             }
         }
 
-        var watchlist = await research.WatchlistItems.AsNoTracking().Select(w => w.Ticker).ToListAsync(ct);
+        // The universe spans every person's book, so the watchlist and candidate reads opt out of the Owner filter.
+        var watchlist = await research.WatchlistItems.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Select(w => w.Ticker)
+            .ToListAsync(ct);
         foreach (var ticker in watchlist)
         {
             Add(resolved, ticker, UniverseReason.Watchlist);
         }
 
         var candidateTickers = await research.OpportunityCandidates.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.Status == CandidateStatus.Active)
             .Select(c => c.Ticker)
             .ToListAsync(ct);

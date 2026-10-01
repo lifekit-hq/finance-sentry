@@ -40,7 +40,7 @@ public sealed class BenchmarkTrackRecordMaterializer(
 
     public async Task MaterializeAsync(Guid userId, CancellationToken ct = default)
     {
-        var series = (await eventRepo.ListAsync(userId, subjectId: null, ct))
+        var series = (await eventRepo.ListUnscopedAsync(userId, subjectId: null, ct))
             .Where(e => e.SubjectType == ThesisSubjectType.Thesis)
             .GroupBy(e => e.SubjectId)
             .ToList();
@@ -73,7 +73,7 @@ public sealed class BenchmarkTrackRecordMaterializer(
         var rows = calculator.Compute(
             userId, asOf, now, ThesisEventRecorder.DefaultBenchmarkTicker, subjects, frictionOptions.Value);
 
-        var previousRun = await recordRepo.ListPreviousRunAsync(userId, asOf, ct);
+        var previousRun = await recordRepo.ListPreviousRunUnscopedAsync(userId, asOf, ct);
         BenchmarkRelativeCalculator.ApplyUnderperformance(rows, previousRun, rule);
 
         await recordRepo.ReplaceRunAsync(userId, asOf, rows, ct);

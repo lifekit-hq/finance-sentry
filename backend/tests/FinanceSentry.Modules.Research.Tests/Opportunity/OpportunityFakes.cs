@@ -49,7 +49,7 @@ internal sealed class FakeCandidateRepository : ICandidateRepository
             .OrderByDescending(c => c.CreatedAt)
             .ToList());
 
-    public Task<IReadOnlyList<OpportunityCandidate>> ListExpiredAsync(DateTimeOffset asOf, CancellationToken ct = default)
+    public Task<IReadOnlyList<OpportunityCandidate>> ListExpiredUnscopedAsync(DateTimeOffset asOf, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<OpportunityCandidate>>(Candidates
             .Where(c => c.Status == CandidateStatus.Active && c.ExpiresAt <= asOf)
             .ToList());
@@ -187,7 +187,13 @@ internal sealed class FakeIpsRepository(InvestmentPolicyStatement? ips = null) :
     public Task AddVersionAsync(InvestmentPolicyStatement statement, CancellationToken ct = default)
         => Task.CompletedTask;
 
-    public Task<IReadOnlyList<Guid>> GetUserIdsWithCurrentIpsAsync(CancellationToken ct = default)
+    public Task<InvestmentPolicyStatement?> GetCurrentUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => GetCurrentAsync(userId, ct);
+
+    public Task<IReadOnlyList<InvestmentPolicyStatement>> ListVersionsUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => ListVersionsAsync(userId, ct);
+
+    public Task<IReadOnlyList<Guid>> GetUserIdsWithCurrentIpsUnscopedAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Guid>>(ips is null ? [] : [ips.UserId]);
 }
 

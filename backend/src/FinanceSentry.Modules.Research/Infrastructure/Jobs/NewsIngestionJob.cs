@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
@@ -28,6 +29,7 @@ public sealed class NewsIngestionJob(
         var tickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var watchlistTickers = await research.WatchlistItems.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(w => w.Ticker)
             .ToListAsync(ct);
         foreach (var t in watchlistTickers)
@@ -36,6 +38,7 @@ public sealed class NewsIngestionJob(
         }
 
         var thesisTickers = await research.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(t => t.Ticker)
             .ToListAsync(ct);
         foreach (var t in thesisTickers)
@@ -44,8 +47,9 @@ public sealed class NewsIngestionJob(
         }
 
         var userIds = await research.WatchlistItems.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(w => w.UserId)
-            .Union(research.Theses.AsNoTracking().Select(t => t.UserId))
+            .Union(research.Theses.AsNoTracking().IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(t => t.UserId))
             .Distinct()
             .ToListAsync(ct);
 

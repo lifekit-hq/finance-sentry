@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Tests.Unit;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FluentAssertions;
@@ -30,7 +31,7 @@ public sealed class ThesisTextLengthModelTests
             .UseNpgsql("Host=model-only;Database=model-only")
             .Options;
 
-        using var ctx = new ResearchDbContext(options);
+        using var ctx = new ResearchDbContext(options, NoCurrentUser.Instance);
         return ctx.Model.FindEntityType(typeof(InvestmentThesis))!
             .GetProperties()
             .ToDictionary(p => p.Name);

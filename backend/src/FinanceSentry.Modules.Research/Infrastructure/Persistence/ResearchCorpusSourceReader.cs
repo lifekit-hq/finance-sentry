@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +31,10 @@ public class ResearchCorpusSourceReader(ResearchDbContext db) : IResearchCorpusS
                 article.ThesisIds));
         }
 
-        var theses = await db.Theses.AsNoTracking().ToListAsync(ct);
+        // The corpus spans every person; each owned document keeps its UserId, and retrieval filters on it.
+        var theses = await db.Theses.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .ToListAsync(ct);
         foreach (var thesis in theses)
         {
             var text = thesis.BrokenAt is null
@@ -51,6 +55,7 @@ public class ResearchCorpusSourceReader(ResearchDbContext db) : IResearchCorpusS
         }
 
         var events = await db.ThesisEvents.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(e => e.DecisionNote != null && e.DecisionNote != string.Empty)
             .ToListAsync(ct);
         foreach (var thesisEvent in events)

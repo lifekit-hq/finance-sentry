@@ -36,7 +36,7 @@ public sealed class ThesisTextRoundTripTests
     private static async Task<InvestmentThesis> SaveAndReadBackAsync(
         ThesisSqliteFixture fixture, Guid userId, string thesisText)
     {
-        await using (var writeCtx = fixture.CreateContext())
+        await using (var writeCtx = fixture.CreateContext(userId))
         {
             var handler = new SaveThesisCommandHandler(
                 new ThesisRepository(writeCtx),
@@ -54,7 +54,7 @@ public sealed class ThesisTextRoundTripTests
 
         // FindByTickerAsync rather than ListAsync: both are production read paths, but ListAsync
         // orders by a DateTimeOffset, which the SQLite provider refuses to translate.
-        await using var readCtx = fixture.CreateContext();
+        await using var readCtx = fixture.CreateContext(userId);
         var found = await new ThesisRepository(readCtx)
             .FindByTickerAsync(userId, Ticker, CancellationToken.None);
 

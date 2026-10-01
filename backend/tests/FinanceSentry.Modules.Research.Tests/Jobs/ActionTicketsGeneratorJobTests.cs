@@ -36,7 +36,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_NoUsersWithIps_SkipsGracefully()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([]);
 
         await _job.ExecuteAsync();
 
@@ -48,7 +48,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_NeedsRebalanceFalse_NoAlertGenerated()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, []));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -63,7 +63,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_NeedsRebalanceFalse_ResolvesExistingProposal()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, []));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -81,7 +81,7 @@ public class ActionTicketsGeneratorJobTests
         {
             new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
         };
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -97,7 +97,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_HasIpsFalse_NoAlertGenerated()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, [], hasIps: false));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -116,7 +116,7 @@ public class ActionTicketsGeneratorJobTests
         {
             new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
         };
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -150,7 +150,7 @@ public class ActionTicketsGeneratorJobTests
         {
             new("Bonds", 30m, 25m, 35m, 15m, 15_000m, -15m, "UnderBand"),
         };
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -177,7 +177,7 @@ public class ActionTicketsGeneratorJobTests
         {
             new("Crypto", 0m, 0m, 0m, 5m, 5_000m, 5m, "Unplanned"),
         };
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -205,7 +205,7 @@ public class ActionTicketsGeneratorJobTests
             new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
             new("Micro", 0m, 0m, 0m, 0.5m, 500m, 0.5m, "Unplanned"),
         };
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -229,7 +229,7 @@ public class ActionTicketsGeneratorJobTests
         var user1 = Guid.NewGuid();
         var user2 = Guid.NewGuid();
 
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([user1, user2]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([user1, user2]);
 
         // user1 throws; user2 succeeds with a proposal
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(user1), default))
@@ -259,7 +259,7 @@ public class ActionTicketsGeneratorJobTests
     public async Task ExecuteAsync_CashExceedsBuffer_GeneratesCashSweepProposal()
     {
         // idle cash = $20k; min buffer = 10% of $100k = $10k; excess = $10k
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -282,7 +282,7 @@ public class ActionTicketsGeneratorJobTests
     public async Task ExecuteAsync_CashBelowBuffer_NoCashSweepAlert()
     {
         // idle cash = $5k; min buffer = 10% of $100k = $10k; no excess
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 5_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -297,7 +297,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_CashBelowBuffer_ResolvesExistingCashSweepProposal()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 5_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -311,7 +311,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_CashExceedsBuffer_DoesNotResolveCashSweepProposal()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -328,7 +328,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_NoRiskRules_NoCashSweepAlert()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 50_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -343,7 +343,7 @@ public class ActionTicketsGeneratorJobTests
     [Fact]
     public async Task ExecuteAsync_MinCashBufferPctIsZero_NoCashSweepAlert()
     {
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: false, [], cashUsd: 50_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))
@@ -363,7 +363,7 @@ public class ActionTicketsGeneratorJobTests
             new("Equities", 60m, 55m, 65m, 75m, 75_000m, 15m, "OverBand"),
         };
         // cash = $20k; min buffer = 10% of $100k = $10k; excess = $10k; AND rebalance needed
-        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsAsync(default)).ReturnsAsync([_userId]);
+        _ipsRepo.Setup(r => r.GetUserIdsWithCurrentIpsUnscopedAsync(default)).ReturnsAsync([_userId]);
         _driftQuery.Setup(q => q.Handle(new GetAllocationDriftQuery(_userId), default))
             .ReturnsAsync(BuildDrift(needsRebalance: true, sleeves, cashUsd: 20_000m));
         _riskQuery.Setup(q => q.Handle(new GetRiskRuleSetQuery(_userId), default))

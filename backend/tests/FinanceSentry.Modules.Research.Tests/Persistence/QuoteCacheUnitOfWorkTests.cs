@@ -30,8 +30,9 @@ public sealed class QuoteCacheUnitOfWorkTests
     [Fact]
     public async Task AFailedCacheWrite_LeavesNothingStaged_SoTheNextSaveOnTheSharedContextSucceeds()
     {
+        var userId = Guid.NewGuid();
         await using var fixture = await ThesisSqliteFixture.CreateAsync();
-        await using var ctx = fixture.CreateContext();
+        await using var ctx = fixture.CreateContext(userId);
         var cache = new QuoteCacheRepository(ctx);
 
         var write = async () => await cache.UpsertManyAsync([Quote(OverLongTicker)], CancellationToken.None);
@@ -43,7 +44,7 @@ public sealed class QuoteCacheUnitOfWorkTests
 
         // The caller swallowed the cache failure and carries on with its own write — as
         // ThesisEventRecorder.TryGetPricesAsync does between the thesis write and the event write.
-        var thesis = new InvestmentThesis { UserId = Guid.NewGuid(), Ticker = "XRP", ThesisText = "watch" };
+        var thesis = new InvestmentThesis { UserId = userId, Ticker = "XRP", ThesisText = "watch" };
         var carryOn = async () => await new ThesisRepository(ctx).UpsertAsync(thesis, CancellationToken.None);
 
         await carryOn.Should().NotThrowAsync(

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Tests.PolicyReviews;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -39,7 +40,7 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
         await using (var ctx = Context())
             await new PolicyReviewRepository(ctx).RecordAsync(Review(reviewed.Id, Completed));
 
-        await using var read = Context();
+        await using var read = Context(_userId);
         (await read.PolicyStatements.SingleAsync(x => x.Id == reviewed.Id)).LastReviewedAt.Should().Be(Completed);
         (await read.PolicyStatements.SingleAsync(x => x.Id == older.Id)).LastReviewedAt.Should().BeNull();
     }
@@ -53,7 +54,7 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
         await using (var ctx = Context())
             await new PolicyReviewRepository(ctx).RecordAsync(review);
 
-        await using var read = Context();
+        await using var read = Context(_userId);
         var latest = await new PolicyReviewRepository(read).GetLatestAsync(_userId);
         latest.Should().BeEquivalentTo(review);
     }
@@ -69,7 +70,7 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
             await repo.RecordAsync(Review(ips.Id, Completed));
         }
 
-        await using var read = Context();
+        await using var read = Context(_userId);
         (await new PolicyReviewRepository(read).GetLatestAsync(_userId))!.CompletedAt.Should().Be(Completed);
         (await new PolicyReviewRepository(read).GetLatestAsync(Guid.NewGuid())).Should().BeNull();
     }
@@ -90,7 +91,7 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
             await act.Should().ThrowAsync<DbUpdateException>();
         }
 
-        await using var read = Context();
+        await using var read = Context(_userId);
         (await read.PolicyStatements.SingleAsync()).LastReviewedAt.Should().Be(Completed.AddMonths(-3));
     }
 
@@ -135,16 +136,17 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
         Rationale = "Scheduled quarterly review.",
     };
 
-    private PolicyReviewSqliteContext Context() =>
-        new(new DbContextOptionsBuilder<ResearchDbContext>().UseSqlite(_connection).Options);
+    // The review job records with no person in scope (the default); reads act as the statement's owner.
+    private PolicyReviewSqliteContext Context(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<ResearchDbContext>().UseSqlite(_connection).Options, new FixedCurrentUser(actingUser));
 
     /// <summary>
     /// Keeps only the statement and review tables — the rest of the schema leans on Postgres-only
     /// constructs — and clears the Postgres <c>gen_random_uuid()</c> defaults. Timestamps are stored
     /// as binary so SQLite can order by them, as Postgres does natively.
     /// </summary>
-    private sealed class PolicyReviewSqliteContext(DbContextOptions<ResearchDbContext> options)
-        : ResearchDbContext(options)
+    private sealed class PolicyReviewSqliteContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser)
+        : ResearchDbContext(options, currentUser)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

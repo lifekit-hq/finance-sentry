@@ -28,7 +28,7 @@ public sealed class ExpireCandidatesCommandHandler(
 
     public async Task<ExpireCandidatesResult> Handle(ExpireCandidatesCommand command, CancellationToken ct)
     {
-        var due = await candidateRepo.ListExpiredAsync(command.AsOf, ct);
+        var due = await candidateRepo.ListExpiredUnscopedAsync(command.AsOf, ct);
 
         var expired = 0;
         foreach (var candidate in due)

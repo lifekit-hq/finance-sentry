@@ -1,19 +1,23 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// The indexer is the only caller and works over the whole corpus with no person in scope, so its document
+// reads opt out of the Owner query filter. Chunks and embeddings carry no owner and are reached by document id.
 public class ResearchDocumentRepository(ResearchDbContext db) : IResearchDocumentRepository
 {
-    public async Task<IReadOnlyList<ResearchDocumentIdentity>> ListIdentitiesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ResearchDocumentIdentity>> ListIdentitiesUnscopedAsync(CancellationToken ct = default)
         => await db.ResearchDocuments.AsNoTracking()
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Select(d => new ResearchDocumentIdentity(
                 d.Id, d.SourceType, d.SourceId, d.UserId, d.ContentHash, d.IndexStatus))
             .ToListAsync(ct);
 
-    public Task<ResearchDocument?> GetAsync(Guid id, CancellationToken ct = default)
-        => db.ResearchDocuments.FirstOrDefaultAsync(d => d.Id == id, ct);
+    public Task<ResearchDocument?> GetUnscopedAsync(Guid id, CancellationToken ct = default)
+        => db.ResearchDocuments.IgnoreQueryFilters([OwnerQueryFilter.Name]).FirstOrDefaultAsync(d => d.Id == id, ct);
 
     public async Task AddAsync(ResearchDocument document, CancellationToken ct = default)
     {
@@ -27,9 +31,10 @@ public class ResearchDocumentRepository(ResearchDbContext db) : IResearchDocumen
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<ResearchDocument>> ListByStatusAsync(
+    public async Task<IReadOnlyList<ResearchDocument>> ListByStatusUnscopedAsync(
         ResearchIndexStatus status, int limit, CancellationToken ct = default)
         => await db.ResearchDocuments
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(d => d.IndexStatus == status)
             .OrderBy(d => d.CapturedAt)
             .Take(limit)

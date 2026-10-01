@@ -281,7 +281,10 @@ public class RunThesisMonitorHandlerTests
         public Task<IReadOnlyList<InvestmentThesis>> ListAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(theses);
 
-        public Task<IReadOnlyList<Guid>> GetUserIdsWithThesesAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<InvestmentThesis>> ListUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => ListAsync(userId, ct);
+
+        public Task<IReadOnlyList<Guid>> GetUserIdsWithThesesUnscopedAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Guid>>([UserId]);
 
         public Task<InvestmentThesis?> FindAsync(Guid userId, Guid id, CancellationToken ct = default)

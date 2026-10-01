@@ -25,11 +25,11 @@ public class ThesisTrackRecordSnapshotJobTests
         };
 
         var eventRepo = new Mock<IThesisEventRepository>();
-        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.GetUserIdsWithEventsUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[]);
-        eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListPendingUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([pendingEvent]);
-        eventRepo.Setup(r => r.ListAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListUnscopedAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
 
         ThesisEvent? updated = null;
@@ -38,7 +38,7 @@ public class ThesisTrackRecordSnapshotJobTests
             .Returns(Task.CompletedTask);
 
         var thesisRepo = new Mock<IThesisRepository>();
-        thesisRepo.Setup(r => r.GetUserIdsWithThesesAsync(It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.GetUserIdsWithThesesUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[]);
 
         var marketData = new Mock<IMarketDataService>();
@@ -69,11 +69,11 @@ public class ThesisTrackRecordSnapshotJobTests
         var thesis = new InvestmentThesis { UserId = userId, Ticker = "MU" };
 
         var eventRepo = new Mock<IThesisEventRepository>();
-        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.GetUserIdsWithEventsUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[]);
-        eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListPendingUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
-        eventRepo.Setup(r => r.ListAsync(userId, null, It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListUnscopedAsync(userId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[
                 new ThesisEvent
                 {
@@ -91,9 +91,9 @@ public class ThesisTrackRecordSnapshotJobTests
             .Returns(Task.CompletedTask);
 
         var thesisRepo = new Mock<IThesisRepository>();
-        thesisRepo.Setup(r => r.GetUserIdsWithThesesAsync(It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.GetUserIdsWithThesesUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[userId]);
-        thesisRepo.Setup(r => r.ListAsync(userId, It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.ListUnscopedAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<InvestmentThesis>)[thesis]);
 
         var marketData = new Mock<IMarketDataService>();
@@ -124,11 +124,11 @@ public class ThesisTrackRecordSnapshotJobTests
         var thesis = new InvestmentThesis { UserId = userId, Ticker = "MU" };
 
         var eventRepo = new Mock<IThesisEventRepository>();
-        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.GetUserIdsWithEventsUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[]);
-        eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListPendingUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
-        eventRepo.Setup(r => r.ListAsync(userId, null, It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListUnscopedAsync(userId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[
                 new ThesisEvent
                 {
@@ -141,9 +141,9 @@ public class ThesisTrackRecordSnapshotJobTests
             ]);
 
         var thesisRepo = new Mock<IThesisRepository>();
-        thesisRepo.Setup(r => r.GetUserIdsWithThesesAsync(It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.GetUserIdsWithThesesUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[userId]);
-        thesisRepo.Setup(r => r.ListAsync(userId, It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.ListUnscopedAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<InvestmentThesis>)[thesis]);
 
         var marketData = new Mock<IMarketDataService>();
@@ -165,13 +165,13 @@ public class ThesisTrackRecordSnapshotJobTests
         var healthy = Guid.NewGuid();
 
         var eventRepo = new Mock<IThesisEventRepository>();
-        eventRepo.Setup(r => r.ListPendingAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.ListPendingUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<ThesisEvent>)[]);
-        eventRepo.Setup(r => r.GetUserIdsWithEventsAsync(It.IsAny<CancellationToken>()))
+        eventRepo.Setup(r => r.GetUserIdsWithEventsUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[failing, healthy]);
 
         var thesisRepo = new Mock<IThesisRepository>();
-        thesisRepo.Setup(r => r.GetUserIdsWithThesesAsync(It.IsAny<CancellationToken>()))
+        thesisRepo.Setup(r => r.GetUserIdsWithThesesUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[]);
 
         var trackRecord = new Mock<IBenchmarkTrackRecordMaterializer>();

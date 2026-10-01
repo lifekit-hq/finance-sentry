@@ -53,7 +53,7 @@ public sealed class BroadUniverseScanCycleTests
 
         // Read back through a context sharing nothing with the cycle but the database itself, so what
         // follows is what the cycle wrote, not what its change tracker still happened to hold.
-        await using var readBack = ResearchDatabase(databaseName);
+        await using var readBack = ResearchDatabase(databaseName, userId);
 
         var candidate = (await readBack.OpportunityCandidates.AsNoTracking().ToListAsync())
             .Should().ContainSingle("the lagging holding and the ETF lenses are not nominatable").Subject;
@@ -119,7 +119,7 @@ public sealed class BroadUniverseScanCycleTests
         await RunScanCycleAsync(radar, databaseName, new FakeOpportunityAlertGenerator());
         await RunScanCycleAsync(radar, databaseName, new FakeOpportunityAlertGenerator());
 
-        await using var readBack = ResearchDatabase(databaseName);
+        await using var readBack = ResearchDatabase(databaseName, userId);
         var candidate = (await readBack.OpportunityCandidates.AsNoTracking().ToListAsync())
             .Should().ContainSingle().Subject;
         candidate.NominationReasons.Should().OnlyHaveUniqueItems("re-nomination dedups reasons rather than accumulating them");
@@ -181,6 +181,8 @@ public sealed class BroadUniverseScanCycleTests
         await db.SaveChangesAsync();
     }
 
-    private static ResearchDbContext ResearchDatabase(string name)
-        => new(new DbContextOptionsBuilder<ResearchDbContext>().UseInMemoryDatabase(name).Options);
+    // The scan job runs with no person in scope (the default); the read-back acts as the book's owner.
+    private static ResearchDbContext ResearchDatabase(string name, Guid? actingUser = null)
+        => new(new DbContextOptionsBuilder<ResearchDbContext>().UseInMemoryDatabase(name).Options,
+            new FixedCurrentUser(actingUser));
 }

@@ -51,7 +51,7 @@ public sealed class AnalyticsPostgresFixture : IAsyncLifetime
         Migrate(new BrokerageSyncDbContext(Opts<BrokerageSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
         Migrate(new BudgetsDbContext(Opts<BudgetsDbContext>(conn, "__EFMigrationsHistory")));
         Migrate(new WealthDbContext(Opts<WealthDbContext>(conn, "__ef_migrations_history_wealth")));
-        Migrate(new ResearchDbContext(Opts<ResearchDbContext>(conn, "__ef_migrations_history_research")));
+        Migrate(new ResearchDbContext(Opts<ResearchDbContext>(conn, "__ef_migrations_history_research"), NoCurrentUser.Instance));
         Migrate(new AnalyticsDbContext(Opts<AnalyticsDbContext>(conn, "__ef_migrations_history_analytics")));
 
         await SeedAsync(conn);

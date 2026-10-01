@@ -34,7 +34,7 @@ public class RunThesisMonitorCommandHandler(
 
     public async Task<ThesisMonitorRunSummary> Handle(RunThesisMonitorCommand cmd, CancellationToken ct)
     {
-        var theses = await thesisRepo.ListAsync(cmd.UserId, ct);
+        var theses = await thesisRepo.ListUnscopedAsync(cmd.UserId, ct);
 
         var thesesEvaluated = 0;
         var triggersEvaluated = 0;

@@ -27,7 +27,7 @@ public class ThesisEventRecorder(
     {
         if (eventType == ThesisEventType.Created)
         {
-            var existingCreated = await repo.GetLatestForSubjectAsync(subjectType, subjectId, ct);
+            var existingCreated = await repo.GetLatestForSubjectUnscopedAsync(userId, subjectType, subjectId, ct);
             if (existingCreated is not null)
             {
                 // Exactly one Created event per subject (data-model.md invariant) — idempotent no-op.

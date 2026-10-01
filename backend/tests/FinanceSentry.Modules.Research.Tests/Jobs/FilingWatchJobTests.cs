@@ -44,7 +44,7 @@ public sealed class FilingWatchJobTests
 
         _banking.Setup(b => b.GetActiveUserIdsAsync(default)).ReturnsAsync([_userId]);
         _brokerage.Setup(b => b.GetHoldingsAsync(_userId, default)).ReturnsAsync([]);
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([]);
     }
 
     private EdgarFiling Filing(string ticker, string form, DateOnly? filingDate = null, string accession = "0001-25-000123")
@@ -90,7 +90,7 @@ public sealed class FilingWatchJobTests
     [Fact]
     public async Task Execute_ThesisProxyTicker_IsIncludedInTheFetch()
     {
-        _theses.Setup(t => t.ListAsync(_userId, default)).ReturnsAsync([
+        _theses.Setup(t => t.ListUnscopedAsync(_userId, default)).ReturnsAsync([
             new InvestmentThesis
             {
                 UserId = _userId,
@@ -287,7 +287,7 @@ public sealed class FilingWatchJobTests
             .ThrowsAsync(new InvalidOperationException("simulated error"));
         _brokerage.Setup(b => b.GetHoldingsAsync(userId2, default))
             .ReturnsAsync([new BrokerageHoldingSummary("AAPL", "STK", 10m, 2000m, DateTime.UtcNow, "IBKR")]);
-        _theses.Setup(t => t.ListAsync(userId2, default)).ReturnsAsync([]);
+        _theses.Setup(t => t.ListUnscopedAsync(userId2, default)).ReturnsAsync([]);
         _secEdgar.Setup(e => e.GetRecentFilingsAsync(
                 "AAPL", It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<int>(), default))
             .ReturnsAsync([Filing("AAPL", "10-Q")]);

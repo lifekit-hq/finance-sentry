@@ -44,7 +44,7 @@ public sealed class SaveThesisWritePathTests
     {
         // FindByTickerAsync rather than ListAsync: both are production read paths, but ListAsync
         // orders by a DateTimeOffset, which the SQLite provider refuses to translate.
-        await using var readCtx = fixture.CreateContext();
+        await using var readCtx = fixture.CreateContext(UserId);
         return await new ThesisRepository(readCtx).FindByTickerAsync(UserId, Ticker, CancellationToken.None);
     }
 
@@ -55,7 +55,7 @@ public sealed class SaveThesisWritePathTests
         var recorder = new RecordingThesisEventRecorder();
 
         ThesisDto saved;
-        await using (var ctx = fixture.CreateContext())
+        await using (var ctx = fixture.CreateContext(UserId))
         {
             saved = await HandlerOver(ctx, recorder).Handle(MinimalPayload(), CancellationToken.None);
         }
@@ -84,13 +84,13 @@ public sealed class SaveThesisWritePathTests
         var recorder = new RecordingThesisEventRecorder();
 
         Guid id;
-        await using (var ctx = fixture.CreateContext())
+        await using (var ctx = fixture.CreateContext(UserId))
         {
             id = (await HandlerOver(ctx, recorder).Handle(MinimalPayload(), CancellationToken.None)).Id;
         }
 
         ThesisDto updated;
-        await using (var ctx = fixture.CreateContext())
+        await using (var ctx = fixture.CreateContext(UserId))
         {
             updated = await HandlerOver(ctx, recorder).Handle(
                 MinimalPayload(id) with
@@ -125,7 +125,7 @@ public sealed class SaveThesisWritePathTests
         };
 
         ThesisDto saved;
-        await using (var ctx = fixture.CreateContext())
+        await using (var ctx = fixture.CreateContext(UserId))
         {
             saved = await HandlerOver(ctx, brokenRecorder).Handle(MinimalPayload(), CancellationToken.None);
         }

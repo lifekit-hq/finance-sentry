@@ -31,7 +31,7 @@ public sealed class ResearchIndexer(
                 ct.ThrowIfCancellationRequested();
                 // A document is attempted at most once per run: without this guard a document that
                 // fails in the Pending pass would be retried (and re-counted) by the Failed pass.
-                var batch = (await documents.ListByStatusAsync(status, opts.IndexingBatchSize, ct))
+                var batch = (await documents.ListByStatusUnscopedAsync(status, opts.IndexingBatchSize, ct))
                     .Where(d => attempted.Add(d.Id))
                     .ToList();
                 if (batch.Count == 0)
@@ -70,7 +70,7 @@ public sealed class ResearchIndexer(
     /// </summary>
     private async Task<int> SyncSourceDocumentsAsync(CancellationToken ct)
     {
-        var identities = await documents.ListIdentitiesAsync(ct);
+        var identities = await documents.ListIdentitiesUnscopedAsync(ct);
         var byIdentity = identities.ToDictionary(i => (i.SourceType, i.SourceId, i.UserId));
         var sourceDocuments = await sourceReader.LoadSourceDocumentsAsync(ct);
 
@@ -90,7 +90,7 @@ public sealed class ResearchIndexer(
                 continue;
             }
 
-            var stored = await documents.GetAsync(existing.Id, ct);
+            var stored = await documents.GetUnscopedAsync(existing.Id, ct);
             if (stored is null)
             {
                 continue;

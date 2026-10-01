@@ -66,7 +66,7 @@ public sealed class ScoreCandidateCommandHandler(
 
         var structureSnapshot = await structureReader.GetStructureAsync(ticker, ct);
         var fundamentalFacts = await secEdgar.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct);
-        var ips = await ipsRepo.GetCurrentAsync(command.UserId, ct);
+        var ips = await ipsRepo.GetCurrentUnscopedAsync(command.UserId, ct);
         // 039: the single-position cap now lives in its single home (the Risk rule set), read via port.
         var maxPositionCap = await positionCapSource.GetMaxPositionWeightAsync(command.UserId, ct);
         var holdings = await holdingsReader.GetHoldingsAsync(command.UserId, ct);

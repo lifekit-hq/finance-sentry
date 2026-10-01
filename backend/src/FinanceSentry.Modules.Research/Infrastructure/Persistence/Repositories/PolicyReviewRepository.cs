@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ public class PolicyReviewRepository(ResearchDbContext db) : IPolicyReviewReposit
     public async Task RecordAsync(PolicyReview review, CancellationToken ct = default)
     {
         var statement = await db.PolicyStatements
+            .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(x => x.Id == review.PolicyStatementId && x.UserId == review.UserId, ct)
             ?? throw new InvalidOperationException(
                 $"Policy statement {review.PolicyStatementId} no longer exists; the review cannot be recorded against it.");

@@ -61,7 +61,7 @@ public sealed class OpportunityScanJob(
                     .Concat(nominations.Skip(shortlist.Count).Select(n => n.Ticker))));
         }
 
-        var userIds = await ipsRepo.GetUserIdsWithCurrentIpsAsync(ct);
+        var userIds = await ipsRepo.GetUserIdsWithCurrentIpsUnscopedAsync(ct);
         var scored = 0;
         var newCandidates = 0;
         var errors = 0;
