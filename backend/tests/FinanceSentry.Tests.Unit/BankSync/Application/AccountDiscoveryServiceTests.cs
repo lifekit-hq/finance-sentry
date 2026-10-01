@@ -246,6 +246,9 @@ public class AccountDiscoveryServiceTests
         h.TrueLayerConnections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([deadConnection, healthyConnection]);
 
+        h.TrueLayerConnections.Setup(r => r.GetByIdUnscopedAsync(deadConnection.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(deadConnection);
+
         var deadAccount = new BankAccount { TrueLayerConnectionId = deadConnection.Id, UserId = UserId };
         var otherAccount = new BankAccount { TrueLayerConnectionId = healthyConnection.Id, UserId = UserId };
         h.Accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))

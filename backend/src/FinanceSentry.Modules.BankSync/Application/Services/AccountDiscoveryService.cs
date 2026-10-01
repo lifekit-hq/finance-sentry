@@ -61,7 +61,7 @@ public class AccountDiscoveryService(
             }
             catch (TrueLayerException ex) when (IsRefreshRejected(ex))
             {
-                await ExpireConnectionAsync(connection, ct);
+                await ExpireConnectionAsync(connection.Id, ct);
             }
             catch (Exception ex)
             {
@@ -81,21 +81,34 @@ public class AccountDiscoveryService(
 
     // Applies the credential-expiry policy: the connection leaves LINKED (so discovery stops retrying
     // it) and its accounts go to reauth_required, which the existing reconnect prompt keys on.
-    private async Task ExpireConnectionAsync(TrueLayerConnection connection, CancellationToken ct)
+    private async Task ExpireConnectionAsync(Guid connectionId, CancellationToken ct)
     {
-        logger.LogWarning(
-            "TrueLayer refresh rejected (invalid_grant) for connection {ConnectionId}; marking it expired and its accounts reauth_required.",
-            connection.Id);
-
-        connection.MarkExpired();
-        await trueLayerConnections.UpdateAsync(connection, ct);
-
-        var connectionAccounts = (await accounts.GetByUserIdUnscopedAsync(connection.UserId, ct))
-            .Where(a => a.TrueLayerConnectionId == connection.Id);
-        foreach (var account in connectionAccounts)
+        try
         {
-            account.MarkReauthRequired();
-            await accounts.UpdateAsync(account, ct);
+            var connection = await trueLayerConnections.GetByIdUnscopedAsync(connectionId, ct);
+            if (connection is null)
+                return;
+
+            logger.LogWarning(
+                "TrueLayer refresh rejected (invalid_grant) for connection {ConnectionId}; marking it expired and its accounts reauth_required.",
+                connectionId);
+
+            connection.MarkExpired();
+            await trueLayerConnections.UpdateAsync(connection, ct);
+
+            var connectionAccounts = (await accounts.GetByUserIdUnscopedAsync(connection.UserId, ct))
+                .Where(a => a.TrueLayerConnectionId == connectionId);
+            foreach (var account in connectionAccounts)
+            {
+                account.MarkReauthRequired();
+                await accounts.UpdateAsync(account, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Could not mark TrueLayer connection {ConnectionId} expired; skipping this connection.",
+                connectionId);
         }
     }
 
