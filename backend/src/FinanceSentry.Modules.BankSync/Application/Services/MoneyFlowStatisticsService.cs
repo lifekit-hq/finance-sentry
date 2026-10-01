@@ -100,13 +100,13 @@ public class MoneyFlowStatisticsService(
         var since = MonthWindow.StartOfMonthsAgo(months);
 
         // 1. Build currency map from active accounts
-        var accountList = await _accounts.GetByUserIdAsync(userId, ct);
+        var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var accountCurrencies = accountList
             .Where(a => a.IsActive)
             .ToDictionary(a => a.Id, a => a.Currency);
 
         // 2. Fetch transactions in window
-        var txList = (await _transactions.GetByUserIdSinceAsync(userId, since, ct)).ToList();
+        var txList = (await _transactions.GetByUserIdSinceUnscopedAsync(userId, since, ct)).ToList();
 
         // 3. Counterparty classification (computed once upstream): identifies transactions that
         //    belong to known counterparties (e.g. family rent / support) and carries their gross

@@ -6,7 +6,12 @@ public interface IExchangeCredentialRepository
 {
     Task AddAsync(ExchangeCredential credential, CancellationToken ct = default);
     Task<ExchangeCredential?> GetAsync(Guid userId, string provider, CancellationToken ct = default);
-    Task<IReadOnlyList<ExchangeCredential>> GetAllActiveAsync(string provider, CancellationToken ct = default);
+
+    /// <summary>The user's credential for the sync, which can run with no person in scope. Opts out of the Owner query filter.</summary>
+    Task<ExchangeCredential?> GetUnscopedAsync(Guid userId, string provider, CancellationToken ct = default);
+
+    /// <summary>Every user's active credentials for the venue, for the sync sweep. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<ExchangeCredential>> GetAllActiveUnscopedAsync(string provider, CancellationToken ct = default);
     void Update(ExchangeCredential credential);
     void Delete(ExchangeCredential credential);
     Task SaveChangesAsync(CancellationToken ct = default);
@@ -20,12 +25,19 @@ public interface ICryptoHoldingRepository
     /// <summary>Every venue's holdings for the user.</summary>
     Task<IReadOnlyList<CryptoHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
 
-    /// <summary>One venue's open holdings for the user — closed rows (#435 S2) are excluded.</summary>
-    Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderAsync(
+    /// <summary>Every venue's holdings for the user, for the cross-module reader, which has no person in scope. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CryptoHolding>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>One venue's open holdings for the user — closed rows (#435 S2) are excluded. For the sync; opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderUnscopedAsync(
         Guid userId, string provider, CancellationToken ct = default);
 
-    /// <summary>One venue's holdings for the user, closed rows included (sync and disconnect only).</summary>
+    /// <summary>One venue's holdings for the user, closed rows included (disconnect).</summary>
     Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default);
+
+    /// <summary>One venue's holdings for the user, closed rows included, for the sync. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderUnscopedAsync(
         Guid userId, string provider, CancellationToken ct = default);
 
     /// <summary>Marks the given tracked holdings for deletion (used to reconcile sold-out assets).</summary>

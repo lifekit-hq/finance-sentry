@@ -28,7 +28,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
     public async Task<FinalizeTrueLayerConnectResult> Handle(
         FinalizeTrueLayerConnectCommand request, CancellationToken cancellationToken)
     {
-        var connection = await connections.GetByReferenceAsync(request.Reference, cancellationToken)
+        var connection = await connections.GetByReferenceUnscopedAsync(request.Reference, cancellationToken)
             ?? throw new TrueLayerException(
                 "TRUELAYER_CONNECTION_NOT_FOUND",
                 $"No TrueLayer connection found for state '{request.Reference}'.",
@@ -66,7 +66,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 // Best-effort: skip balance, account is still usable.
             }
 
-            var existing = await accounts.GetByExternalAccountIdAsync(pa.AccountId, cancellationToken);
+            var existing = await accounts.GetByExternalAccountIdUnscopedAsync(pa.AccountId, cancellationToken);
             if (existing != null)
             {
                 // Reconnect/reauth: heal the existing account in place instead of skipping it.
@@ -114,7 +114,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 // Best-effort: skip balance, card is still usable.
             }
 
-            var existing = await accounts.GetByExternalAccountIdAsync(card.AccountId, cancellationToken);
+            var existing = await accounts.GetByExternalAccountIdUnscopedAsync(card.AccountId, cancellationToken);
             if (existing != null)
             {
                 existing.MarkReconnected(connection.Id, owed ?? existing.CurrentBalance ?? 0m);

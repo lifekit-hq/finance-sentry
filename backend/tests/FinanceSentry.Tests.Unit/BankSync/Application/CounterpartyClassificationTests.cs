@@ -65,11 +65,11 @@ public class CounterpartyClassificationTests
                 .ReturnsAsync(counterparties.ToList());
 
         var txMock = new Mock<ITransactionRepository>();
-        txMock.Setup(r => r.GetByUserIdSinceAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(windowTransactions.ToList());
 
         var acctMock = new Mock<IBankAccountRepository>();
-        acctMock.Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        acctMock.Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync([account]);
 
         return new CounterpartyClassificationService(repoMock.Object, txMock.Object, acctMock.Object);
@@ -405,10 +405,10 @@ public class CounterpartyClassificationTests
         repoMock.Setup(r => r.GetForUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync([cp]);
         var txMock = new Mock<ITransactionRepository>();
-        txMock.Setup(r => r.GetByUserIdSinceAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([MakeTx(18000m, "credit", "від мама", accountId: account.Id)]);
         var acctMock = new Mock<IBankAccountRepository>();
-        acctMock.Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        acctMock.Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync([account]);
 
         var sut = new CounterpartyClassificationService(repoMock.Object, txMock.Object, acctMock.Object);
@@ -417,7 +417,7 @@ public class CounterpartyClassificationTests
         var second = await sut.ClassifyForWindowAsync(UserId, months: 6);
 
         second.Should().BeSameAs(first);
-        txMock.Verify(r => r.GetByUserIdSinceAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        txMock.Verify(r => r.GetByUserIdSinceUnscopedAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
         repoMock.Verify(r => r.GetForUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 

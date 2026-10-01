@@ -14,8 +14,8 @@ public class BankingAccountsReader(
 
     public async Task<IReadOnlyList<BankingAccountSummary>> GetAccountSummariesAsync(Guid userId, CancellationToken ct = default)
     {
-        var list = await _accounts.GetByUserIdAsync(userId, ct);
-        var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserAsync(userId, ct);
+        var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
+        var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserUnscopedAsync(userId, ct);
 
         return list.Select(a => new BankingAccountSummary(
             a.Id,
@@ -37,13 +37,13 @@ public class BankingAccountsReader(
 
     public async Task<IReadOnlyList<Guid>> GetAllActiveUserIdsAsync(CancellationToken ct = default)
     {
-        var all = await _accounts.GetAllActiveAsync(ct);
+        var all = await _accounts.GetAllActiveUnscopedAsync(ct);
         return all.Select(a => a.UserId).Distinct().ToList();
     }
 
     public async Task<IReadOnlyList<AccountBalanceSnapshot>> GetActiveAccountSnapshotsAsync(Guid userId, CancellationToken ct = default)
     {
-        var list = await _accounts.GetByUserIdAsync(userId, ct);
+        var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return list
             .Where(a => a.IsActive)
             .Select(a => new AccountBalanceSnapshot(a.Id, a.BankName, a.AccountType, a.AccountNumberLast4, a.Currency, a.CurrentBalance))

@@ -64,8 +64,8 @@ public class TransactionRecategorizationService(
 
     public async Task<RecategorizationResult> RecategorizeUserAsync(Guid userId, CancellationToken ct = default)
     {
-        var userAccounts = (await _accounts.GetByUserIdAsync(userId, ct)).ToList();
-        var userTransactions = (await _transactions.GetByUserIdAsync(userId, ct)).ToList();
+        var userAccounts = (await _accounts.GetByUserIdUnscopedAsync(userId, ct)).ToList();
+        var userTransactions = (await _transactions.GetByUserIdUnscopedAsync(userId, ct)).ToList();
 
         // Read once for the whole pass: the loan rule matches each row against the user's
         // active repayment plans, so a per-row lookup would be one query per transaction.
@@ -192,7 +192,7 @@ public class TransactionRecategorizationService(
         if (account.MonobankCredentialId is null)
             throw new InvalidOperationException($"Monobank account {account.Id} has no credential id.");
 
-        var cred = await _monobankCredentials.GetByIdAsync(account.MonobankCredentialId.Value, ct)
+        var cred = await _monobankCredentials.GetByIdUnscopedAsync(account.MonobankCredentialId.Value, ct)
             ?? throw new InvalidOperationException($"Monobank credential {account.MonobankCredentialId} not found.");
         var token = _encryption.Decrypt(cred.EncryptedToken, cred.Iv, cred.AuthTag, cred.KeyVersion);
 

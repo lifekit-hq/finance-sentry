@@ -42,7 +42,7 @@ public class SyncIBKRHoldingsReconcileTests
         var credential = CredentialWithAccount();
 
         var credentialRepo = new Mock<IIBKRCredentialRepository>(MockBehavior.Loose);
-        credentialRepo.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
 
         var adapter = new Mock<IBrokerAdapter>(MockBehavior.Loose);
@@ -62,7 +62,7 @@ public class SyncIBKRHoldingsReconcileTests
             Holding("AAPL", 3m),
         };
         var holdingRepo = new Mock<IBrokerageHoldingRepository>(MockBehavior.Loose);
-        holdingRepo.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        holdingRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(persisted);
 
         List<BrokerageHolding>? upserted = null;

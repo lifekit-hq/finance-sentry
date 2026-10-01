@@ -293,7 +293,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
 
         var repo = new CryptoHoldingRepository(_db);
         (await repo.GetByUserIdAsync(_userId)).Should().BeEmpty();
-        (await repo.GetByUserAndProviderAsync(_userId, CryptoExchangeProvider.Binance)).Should().BeEmpty();
+        (await repo.GetByUserAndProviderUnscopedAsync(_userId, CryptoExchangeProvider.Binance)).Should().BeEmpty();
         (await repo.GetAllByUserAndProviderAsync(_userId, CryptoExchangeProvider.Binance)).Should().ContainSingle();
     }
 

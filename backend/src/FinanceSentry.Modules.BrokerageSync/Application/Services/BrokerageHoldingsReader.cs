@@ -22,8 +22,8 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
     public async Task<IReadOnlyList<BrokerageHoldingSummary>> GetHoldingsAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var holdings = await _repository.GetByUserIdAsync(userId, ct);
-        var trades = await _tradeRepository.GetByUserIdAsync(userId, ct);
+        var holdings = await _repository.GetByUserIdUnscopedAsync(userId, ct);
+        var trades = await _tradeRepository.GetByUserIdUnscopedAsync(userId, ct);
 
         return holdings
             .Select(h =>

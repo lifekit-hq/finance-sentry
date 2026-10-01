@@ -47,8 +47,8 @@ public class StaleSyncReaperJob(
         var resetAccounts = 0;
 
         // 1. Fail sync jobs left dangling by a crash/restart so HasRunningJobAsync stops blocking.
-        var inFlight = (await _syncJobs.GetByStatusAsync("running", cancellationToken))
-            .Concat(await _syncJobs.GetByStatusAsync("pending", cancellationToken));
+        var inFlight = (await _syncJobs.GetByStatusUnscopedAsync("running", cancellationToken))
+            .Concat(await _syncJobs.GetByStatusUnscopedAsync("pending", cancellationToken));
         foreach (var job in inFlight)
         {
             if (!startupSweep && job.CreatedAt > cutoff)
@@ -61,7 +61,7 @@ public class StaleSyncReaperJob(
 
         // 2. Release accounts wedged in "syncing" so the next scheduled cycle can re-run them.
         //    MarkFailed transitions "syncing" -> "failed"; the scheduler then retries cleanly.
-        var stuck = await _accounts.GetBySyncStatusAsync("syncing", cancellationToken);
+        var stuck = await _accounts.GetBySyncStatusUnscopedAsync("syncing", cancellationToken);
         foreach (var account in stuck)
         {
             if (!startupSweep && account.UpdatedAt > cutoff)

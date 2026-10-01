@@ -36,7 +36,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
     public async Task<SyncExchangeHoldingsResult> Handle(SyncExchangeHoldingsCommand request, CancellationToken ct)
     {
         var adapter = adapters.Get(request.Provider);
-        var credential = await credentialRepository.GetAsync(request.UserId, request.Provider, ct);
+        var credential = await credentialRepository.GetUnscopedAsync(request.UserId, request.Provider, ct);
         if (credential is not { IsActive: true })
         {
             throw new ExchangeAccountNotFoundException(request.Provider);
@@ -96,7 +96,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             var freshAssets = holdings
                 .Select(h => h.Asset)
                 .ToHashSet(StringComparer.Ordinal);
-            var persisted = await holdingRepository.GetByUserAndProviderAsync(request.UserId, request.Provider, ct);
+            var persisted = await holdingRepository.GetByUserAndProviderUnscopedAsync(request.UserId, request.Provider, ct);
             var stale = persisted
                 .Where(h => !freshAssets.Contains(h.Asset))
                 .ToList();
@@ -146,7 +146,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
         IReadOnlySet<string> justClosed,
         CancellationToken ct)
     {
-        var all = await holdingRepository.GetAllByUserAndProviderAsync(request.UserId, request.Provider, ct);
+        var all = await holdingRepository.GetAllByUserAndProviderUnscopedAsync(request.UserId, request.Provider, ct);
         return all.Where(h => !h.IsClosed || justClosed.Contains(h.Asset)).ToList();
     }
 

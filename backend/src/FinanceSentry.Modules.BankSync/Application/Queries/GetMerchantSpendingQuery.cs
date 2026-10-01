@@ -22,11 +22,11 @@ public class GetMerchantSpendingQueryHandler(
         var fromUtc = request.From.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var toUtc = request.To.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
-        var all = await _transactions.GetByUserIdAsync(request.UserId, cancellationToken);
+        var all = await _transactions.GetByUserIdUnscopedAsync(request.UserId, cancellationToken);
 
         // Convert to USD by account currency before summing — spend feeds budget comparisons,
         // which mix accounts in different currencies.
-        var accountList = await _accounts.GetByUserIdAsync(request.UserId, cancellationToken);
+        var accountList = await _accounts.GetByUserIdUnscopedAsync(request.UserId, cancellationToken);
         var currencyByAccount = accountList.ToDictionary(a => a.Id, a => a.Currency);
 
         var result = all

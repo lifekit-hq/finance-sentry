@@ -90,7 +90,7 @@ public sealed class IbkrFlexTradeSyncService(
             var instrumentType = financialInstrument?.AssetCategory ?? trade.AssetCategory ?? string.Empty;
             var isin = financialInstrument?.Isin ?? trade.Isin;
 
-            var instrument = await instrumentRepository.GetByConidAsync(userId, Provider, conid, ct);
+            var instrument = await instrumentRepository.GetByConidUnscopedAsync(userId, Provider, conid, ct);
             if (instrument is null)
             {
                 instrument = new BrokerageInstrument(userId, Provider, conid, symbol, instrumentType, isin);
@@ -134,7 +134,7 @@ public sealed class IbkrFlexTradeSyncService(
                 ? instrument.Id
                 : (Guid?)null;
 
-            var existing = await tradeRepository.GetByExecutionIdAsync(userId, Provider, raw.IbExecutionId, ct);
+            var existing = await tradeRepository.GetByExecutionIdUnscopedAsync(userId, Provider, raw.IbExecutionId, ct);
             if (existing is null)
             {
                 await tradeRepository.AddAsync(IbkrFlexMapper.CreateTrade(userId, Provider, raw, instrumentId), ct);
@@ -162,7 +162,7 @@ public sealed class IbkrFlexTradeSyncService(
         foreach (var raw in transactions)
         {
             var idempotencyKey = IbkrFlexMapper.ComputeCashTransactionIdempotencyKey(raw);
-            var existing = await cashTransactionRepository.GetByIdempotencyKeyAsync(userId, Provider, idempotencyKey, ct);
+            var existing = await cashTransactionRepository.GetByIdempotencyKeyUnscopedAsync(userId, Provider, idempotencyKey, ct);
             if (existing is not null)
                 continue;
 

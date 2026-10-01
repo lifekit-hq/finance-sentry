@@ -201,7 +201,7 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
             .Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ExchangeCredential?)null);
         _factory.HoldingRepoMock
-            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
             .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -226,7 +226,7 @@ public class CryptoControllerDisconnectContractTests(CryptoApiFactory factory) :
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _factory.HoldingRepoMock
-            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
             .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -314,7 +314,7 @@ public class CryptoControllerRevolutXContractTests(CryptoApiFactory factory) : I
             .ReturnsAsync(ExchangeCredential.Create(
                 _factory.TestUserId, CryptoExchangeProvider.RevolutX, [1], [2], [3], [4], [5], [6], 1));
         _factory.HoldingRepoMock
-            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
             .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -426,7 +426,7 @@ public class CryptoApiFactory : WebApplicationFactory<Program>
             .Setup(r => r.UpsertRangeAsync(It.IsAny<IReadOnlyList<CryptoHolding>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         HoldingRepoMock
-            .Setup(r => r.GetByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserAndProviderUnscopedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         HoldingRepoMock
             .Setup(r => r.GetAllByUserAndProviderAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

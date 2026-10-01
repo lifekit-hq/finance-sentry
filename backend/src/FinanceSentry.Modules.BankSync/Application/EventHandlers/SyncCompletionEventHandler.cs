@@ -14,7 +14,7 @@ public class SyncCompletionEventHandler(IBankAccountRepository accounts) : IEven
 
     public async Task Handle(AccountSyncCompletedEvent @event, CancellationToken cancellationToken)
     {
-        var account = await _accounts.GetByIdAsync(@event.AccountId, cancellationToken);
+        var account = await _accounts.GetByIdUnscopedAsync(@event.AccountId, cancellationToken);
         if (account == null)
             return;
 

@@ -28,7 +28,7 @@ public class ConsentExpiryReminderJob(
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var threshold = DateTime.UtcNow.AddDays(ReminderWindowDays);
-        var expiring = await _connections.GetLinkedExpiringBeforeAsync(threshold, ct);
+        var expiring = await _connections.GetLinkedExpiringBeforeUnscopedAsync(threshold, ct);
         var expiringIds = expiring.Select(c => c.Id).ToHashSet();
 
         var reminded = 0;
@@ -47,7 +47,7 @@ public class ConsentExpiryReminderJob(
                 "Consent-expiry reminder raised alerts for {Count} connection(s) expiring within {Days} days.",
                 reminded, ReminderWindowDays);
 
-        var allLinked = await _connections.GetAllLinkedAsync(ct);
+        var allLinked = await _connections.GetAllLinkedUnscopedAsync(ct);
         foreach (var c in allLinked)
         {
             if (expiringIds.Contains(c.Id))

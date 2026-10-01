@@ -146,23 +146,49 @@ public sealed class BankSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
-    public async Task Sync_repositories_with_no_person_read_and_write_the_named_accounts_and_users_rows()
+    public async Task Unscoped_sync_reads_with_no_person_see_rows_but_stay_bound_to_the_named_account_or_user()
+    {
+        var accountA = NewAccount(_userA);
+        var accountB = NewAccount(_userB);
+        var txA = NewTransaction(accountA);
+        var txB = NewTransaction(accountB);
+        await SeedAsync(accountA, accountB, txA, txB);
+
+        await using var ctx = CreateContext();
+        var accounts = new BankAccountRepository(ctx);
+        var transactions = new TransactionRepository(ctx);
+
+        (await accounts.GetByIdUnscopedAsync(accountA.Id)).Should().NotBeNull();
+        (await accounts.ExistsByExternalAccountIdUnscopedAsync(accountB.ExternalAccountId)).Should().BeTrue(
+            "external account ids are unique across users, so the duplicate check sees every user");
+        (await accounts.GetByUserIdUnscopedAsync(_userA)).Select(x => x.Id).Should().Equal(accountA.Id);
+        (await accounts.GetAllActiveUnscopedAsync()).Select(x => x.Id).Should().Contain([accountA.Id, accountB.Id]);
+        (await transactions.GetByAccountIdUnscopedAsync(accountA.Id)).Select(x => x.Id).Should().Equal(txA.Id);
+        (await transactions.GetByUserIdUnscopedAsync(_userB)).Select(x => x.Id).Should().Equal(txB.Id);
+    }
+
+    [DockerRequiredFact]
+    public async Task Filtered_sync_reads_follow_the_acting_person_and_see_nothing_without_one()
     {
         var accountA = NewAccount(_userA);
         var accountB = NewAccount(_userB);
         var txA = NewTransaction(accountA);
         await SeedAsync(accountA, accountB, txA);
 
-        await using var ctx = CreateContext();
-        var accounts = new BankAccountRepository(ctx);
-        var transactions = new TransactionRepository(ctx);
+        await using (var asA = CreateContext(_userA))
+        {
+            var accounts = new BankAccountRepository(asA);
+            (await accounts.GetByIdAsync(accountA.Id)).Should().NotBeNull();
+            (await accounts.GetByIdAsync(accountB.Id)).Should().BeNull();
+            (await accounts.GetByUserIdAsync(_userB)).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+            (await new TransactionRepository(asA).GetByAccountIdAsync(accountA.Id, 0, 10)).Select(x => x.Id)
+                .Should().Equal(txA.Id);
+        }
 
-        (await accounts.GetByIdAsync(accountA.Id)).Should().NotBeNull();
-        (await accounts.ExistsByExternalAccountIdAsync(accountB.ExternalAccountId)).Should().BeTrue(
-            "external account ids are unique across users, so the duplicate check sees every user");
-        (await accounts.GetByUserIdAsync(_userA)).Select(x => x.Id).Should().Equal(accountA.Id);
-        (await accounts.GetAllActiveAsync()).Select(x => x.Id).Should().BeEquivalentTo([accountA.Id, accountB.Id]);
-        (await transactions.GetByAccountIdAsync(accountA.Id)).Select(x => x.Id).Should().Equal(txA.Id);
+        await using var asNoOne = CreateContext();
+        (await new BankAccountRepository(asNoOne).GetByIdAsync(accountA.Id)).Should().BeNull();
+        (await new TransactionRepository(asNoOne).GetByAccountIdAsync(accountA.Id, 0, 10)).Should().BeEmpty();
     }
 
     [DockerRequiredFact]

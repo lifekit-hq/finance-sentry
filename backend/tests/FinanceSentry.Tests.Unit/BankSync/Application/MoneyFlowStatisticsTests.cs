@@ -49,7 +49,7 @@ public class MoneyFlowStatisticsTests
     private static Mock<ITransactionRepository> TxRepo(IReadOnlyList<Transaction> transactions)
     {
         var mock = new Mock<ITransactionRepository>();
-        mock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        mock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(transactions);
         return mock;
     }
@@ -57,7 +57,7 @@ public class MoneyFlowStatisticsTests
     private static Mock<IBankAccountRepository> AccountRepo(params BankAccount[] accounts)
     {
         var mock = new Mock<IBankAccountRepository>();
-        mock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        mock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(accounts);
         return mock;
     }
@@ -105,11 +105,11 @@ public class MoneyFlowStatisticsTests
         }
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(
@@ -151,11 +151,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(
@@ -190,11 +190,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([eurAccount, usdAccount]);
 
         var sut = new MoneyFlowStatisticsService(
@@ -240,11 +240,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([accountA, accountB]);
 
         var sut = new MoneyFlowStatisticsService(
@@ -276,11 +276,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         // A 50 USD family-support expense for May 2026.
@@ -324,11 +324,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var classification = CounterpartyResults.WithFlows(
@@ -369,11 +369,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var classification = CounterpartyResults.WithFlows(
@@ -413,11 +413,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var classification = CounterpartyResults.WithFlows(
@@ -454,11 +454,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var classification = CounterpartyResults.WithFlows(
@@ -486,11 +486,11 @@ public class MoneyFlowStatisticsTests
         var (account, _) = MakeAccount("USD");
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync([]);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var classification = CounterpartyResults.WithFlows(
@@ -591,11 +591,11 @@ public class MoneyFlowStatisticsTests
         };
 
         var txRepoMock = new Mock<ITransactionRepository>();
-        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        txRepoMock.Setup(r => r.GetByUserIdSinceUnscopedAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(transactions);
 
         var accountRepoMock = new Mock<IBankAccountRepository>();
-        accountRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        accountRepoMock.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
                        .ReturnsAsync([account]);
 
         var sut = new MoneyFlowStatisticsService(

@@ -49,7 +49,7 @@ public class AccountDiscoveryService(
 
     private async Task<int> DiscoverTrueLayerAsync(CancellationToken ct)
     {
-        var linkedConnections = await trueLayerConnections.GetAllLinkedAsync(ct);
+        var linkedConnections = await trueLayerConnections.GetAllLinkedUnscopedAsync(ct);
         var created = 0;
 
         foreach (var connection in linkedConnections)
@@ -78,7 +78,7 @@ public class AccountDiscoveryService(
         var providerAccounts = await trueLayerClient.ListAccountsAsync(accessToken, ct);
         foreach (var pa in providerAccounts)
         {
-            if (await accounts.ExistsByExternalAccountIdAsync(pa.AccountId, ct))
+            if (await accounts.ExistsByExternalAccountIdUnscopedAsync(pa.AccountId, ct))
                 continue;
 
             decimal? currentBalance = null;
@@ -112,7 +112,7 @@ public class AccountDiscoveryService(
 
         foreach (var card in providerCards)
         {
-            if (await accounts.ExistsByExternalAccountIdAsync(card.AccountId, ct))
+            if (await accounts.ExistsByExternalAccountIdUnscopedAsync(card.AccountId, ct))
                 continue;
 
             decimal? owed = null;
@@ -139,7 +139,7 @@ public class AccountDiscoveryService(
 
     private async Task<int> DiscoverMonobankAsync(CancellationToken ct)
     {
-        var credentials = await monobankCredentials.GetAllAsync(ct);
+        var credentials = await monobankCredentials.GetAllUnscopedAsync(ct);
         var created = 0;
 
         foreach (var credential in credentials)
@@ -162,7 +162,7 @@ public class AccountDiscoveryService(
                 {
                     monobankBalanceCache.Set(token, pa.Id, MonobankAdapter.ToBankAccountInfo(pa, clientInfo.Name));
 
-                    if (await accounts.ExistsByExternalAccountIdAsync(pa.Id, ct))
+                    if (await accounts.ExistsByExternalAccountIdUnscopedAsync(pa.Id, ct))
                         continue;
 
                     var account = MonobankAccountFactory.CreateAccount(credential.UserId, credential.Id, pa);

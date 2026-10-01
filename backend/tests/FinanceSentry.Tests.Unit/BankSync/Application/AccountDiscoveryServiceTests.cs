@@ -61,13 +61,13 @@ public class AccountDiscoveryServiceTests
                 addedAccounts.Add(a);
                 return a;
             });
-        accounts.Setup(r => r.ExistsByExternalAccountIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        accounts.Setup(r => r.ExistsByExternalAccountIdUnscopedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string id, CancellationToken _) => storedAccounts.Any(a => a.ExternalAccountId == id));
 
         // Default: no linked connections / credentials until a test sets them up.
-        trueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        trueLayerConnections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        monobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        monobankCredentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         trueLayerClient.Setup(c => c.ListCardsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
@@ -109,7 +109,7 @@ public class AccountDiscoveryServiceTests
     private static TrueLayerConnection SetupTrueLayer(Harness h, params string[] accountIds)
     {
         var connection = MakeConnection();
-        h.TrueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        h.TrueLayerConnections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([connection]);
         h.TrueLayerTokenRefresh
             .Setup(s => s.AcquireAccessTokenAsync(connection.Id, It.IsAny<CancellationToken>()))
@@ -125,7 +125,7 @@ public class AccountDiscoveryServiceTests
     private static void SetupMonobank(Harness h, params MonobankAccountInfo[] accounts)
     {
         var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
-        h.MonobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        h.MonobankCredentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([credential]);
         h.Encryption.Setup(e => e.Decrypt(
                 credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion))
@@ -212,7 +212,7 @@ public class AccountDiscoveryServiceTests
         var h = BuildSut();
         var failingConnection = MakeConnection();
         var healthyConnection = MakeConnection();
-        h.TrueLayerConnections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        h.TrueLayerConnections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([failingConnection, healthyConnection]);
 
         h.TrueLayerTokenRefresh
@@ -305,7 +305,7 @@ public class AccountDiscoveryServiceTests
     {
         var h = BuildSut();
         var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
-        h.MonobankCredentials.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        h.MonobankCredentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([credential]);
         h.Encryption.Setup(e => e.Decrypt(
                 credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion))

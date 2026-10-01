@@ -135,6 +135,45 @@ public sealed class CryptoSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Holdings_reads_follow_the_acting_person_and_the_unscoped_reads_serve_the_sync_without_one()
+    {
+        await SeedAsync(NewHolding(_userA), NewHolding(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repository = new CryptoHoldingRepository(asA);
+            (await repository.GetByUserIdAsync(_userA)).Should().ContainSingle(h => h.UserId == _userA);
+            (await repository.GetByUserIdAsync(_userB)).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+        }
+
+        await using var asNoOne = CreateContext();
+        var noPerson = new CryptoHoldingRepository(asNoOne);
+        (await noPerson.GetByUserIdAsync(_userA)).Should().BeEmpty();
+        (await noPerson.GetByUserIdUnscopedAsync(_userA)).Should().ContainSingle(h => h.UserId == _userA);
+        (await noPerson.GetByUserAndProviderUnscopedAsync(_userA, Provider)).Should().ContainSingle(h => h.UserId == _userA);
+        (await noPerson.GetAllByUserAndProviderUnscopedAsync(_userB, Provider)).Should().ContainSingle(h => h.UserId == _userB);
+    }
+
+    [DockerRequiredFact]
+    public async Task Credential_reads_follow_the_acting_person_and_the_unscoped_read_serves_jobs()
+    {
+        await SeedAsync(NewCredential(_userA), NewCredential(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repository = new ExchangeCredentialRepository(asA);
+            (await repository.GetAsync(_userA, Provider)).Should().NotBeNull();
+            (await repository.GetAsync(_userB, Provider)).Should().BeNull();
+        }
+
+        await using var asNoOne = CreateContext();
+        var noPerson = new ExchangeCredentialRepository(asNoOne);
+        (await noPerson.GetAsync(_userA, Provider)).Should().BeNull();
+        (await noPerson.GetUnscopedAsync(_userA, Provider))!.UserId.Should().Be(_userA);
+    }
+
+    [DockerRequiredFact]
     public async Task Trade_ingest_with_no_person_skips_trades_it_already_stored()
     {
         var trade = new CryptoTrade("t-1", "BTC", "USDT", 1m, 100m, 100m, true, DateTime.UtcNow);
@@ -157,7 +196,7 @@ public sealed class CryptoSyncOwnerQueryFilterTests : IAsyncLifetime
         await SeedAsync(NewCredential(_userA), NewCredential(_userB));
 
         await using var ctx = CreateContext();
-        var active = await new ExchangeCredentialRepository(ctx).GetAllActiveAsync(Provider);
+        var active = await new ExchangeCredentialRepository(ctx).GetAllActiveUnscopedAsync(Provider);
 
         active.Select(c => c.UserId).Should().Contain([_userA, _userB]);
     }

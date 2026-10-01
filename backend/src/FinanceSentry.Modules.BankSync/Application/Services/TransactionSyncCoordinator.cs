@@ -32,13 +32,13 @@ public class TransactionSyncCoordinator(
     /// <inheritdoc />
     public async Task<SyncResult> TriggerScheduledSyncAsync(Guid accountId, CancellationToken ct = default)
     {
-        if (await _syncJobs.HasRunningJobAsync(accountId, ct))
+        if (await _syncJobs.HasRunningJobUnscopedAsync(accountId, ct))
             return new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
 
         // An account whose provider consent has expired/been revoked cannot sync until the user
         // reconnects. Skip it in the recurring scheduler so it stops failing every cycle; the reconnect
         // flow clears the state via MarkActive. Manual syncs are unaffected.
-        var account = await _accounts.GetByIdAsync(accountId, ct);
+        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
         if (account?.SyncStatus == "reauth_required")
             return new SyncResult(false, 0, 0, "ITEM_LOGIN_REQUIRED", "Account requires reconnection; scheduled sync skipped.");
 
@@ -48,7 +48,7 @@ public class TransactionSyncCoordinator(
     /// <inheritdoc />
     public async Task<SyncResult> TriggerManualSyncAsync(Guid accountId, CancellationToken ct = default)
     {
-        if (await _syncJobs.HasRunningJobAsync(accountId, ct))
+        if (await _syncJobs.HasRunningJobUnscopedAsync(accountId, ct))
             return new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
 
         return ChaseWithDetection(await _syncService.PerformFullSyncAsync(accountId, ct: ct));

@@ -22,7 +22,7 @@ public class IbkrFlexTradeSyncServiceTests
     {
         public readonly List<BrokerageInstrument> Store = [];
 
-        public Task<BrokerageInstrument?> GetByConidAsync(Guid userId, string provider, long conid, CancellationToken ct = default) =>
+        public Task<BrokerageInstrument?> GetByConidUnscopedAsync(Guid userId, string provider, long conid, CancellationToken ct = default) =>
             Task.FromResult(Store.FirstOrDefault(i => i.UserId == userId && i.Provider == provider && i.Conid == conid));
 
         public Task<BrokerageInstrument?> GetByIdAsync(Guid userId, Guid id, CancellationToken ct = default) =>
@@ -49,7 +49,7 @@ public class IbkrFlexTradeSyncServiceTests
     {
         public readonly List<BrokerageTrade> Store = [];
 
-        public Task<BrokerageTrade?> GetByExecutionIdAsync(Guid userId, string provider, string ibExecutionId, CancellationToken ct = default) =>
+        public Task<BrokerageTrade?> GetByExecutionIdUnscopedAsync(Guid userId, string provider, string ibExecutionId, CancellationToken ct = default) =>
             Task.FromResult(Store.FirstOrDefault(
                 t => t.UserId == userId && t.Provider == provider && t.IbExecutionId == ibExecutionId));
 
@@ -67,6 +67,9 @@ public class IbkrFlexTradeSyncServiceTests
         public Task<IReadOnlyList<BrokerageTrade>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageTrade>>(Store.Where(t => t.UserId == userId).ToList());
 
+        public Task<IReadOnlyList<BrokerageTrade>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default) =>
+            GetByUserIdAsync(userId, ct);
+
         public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
     }
 
@@ -74,7 +77,7 @@ public class IbkrFlexTradeSyncServiceTests
     {
         public readonly List<BrokerageCashTransaction> Store = [];
 
-        public Task<BrokerageCashTransaction?> GetByIdempotencyKeyAsync(
+        public Task<BrokerageCashTransaction?> GetByIdempotencyKeyUnscopedAsync(
             Guid userId, string provider, string idempotencyKey, CancellationToken ct = default) =>
             Task.FromResult(Store.FirstOrDefault(
                 c => c.UserId == userId && c.Provider == provider && c.IdempotencyKey == idempotencyKey));

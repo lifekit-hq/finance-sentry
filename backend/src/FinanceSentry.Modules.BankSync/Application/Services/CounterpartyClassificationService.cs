@@ -149,12 +149,12 @@ public class CounterpartyClassificationService(
         if (_windowMemo.TryGetValue((userId, months), out var memoized))
             return memoized;
 
-        var accountList = await _accounts.GetByUserIdAsync(userId, ct);
+        var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var accountCurrencies = accountList
             .Where(a => a.IsActive)
             .ToDictionary(a => a.Id, a => a.Currency);
 
-        var txList = (await _transactions.GetByUserIdSinceAsync(
+        var txList = (await _transactions.GetByUserIdSinceUnscopedAsync(
             userId, MonthWindow.StartOfMonthsAgo(months), ct)).ToList();
 
         var result = await ClassifyAsync(userId, txList, accountCurrencies, ct);

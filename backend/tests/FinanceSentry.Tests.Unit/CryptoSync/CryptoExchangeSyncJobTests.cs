@@ -31,7 +31,7 @@ public class CryptoExchangeSyncJobTests
 
     private void GivenActive(string provider, params ExchangeCredential[] credentials) =>
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(provider, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(provider, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
 
     [Fact]
@@ -71,7 +71,7 @@ public class CryptoExchangeSyncJobTests
 
         captured.Should().Be(new SyncExchangeHoldingsCommand(userId, provider));
         _credentialRepo.Verify(
-            r => r.GetAllActiveAsync(It.Is<string>(p => p != provider), It.IsAny<CancellationToken>()),
+            r => r.GetAllActiveUnscopedAsync(It.Is<string>(p => p != provider), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

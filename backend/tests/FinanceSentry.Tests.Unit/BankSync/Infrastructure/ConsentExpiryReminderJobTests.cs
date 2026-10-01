@@ -20,7 +20,7 @@ public class ConsentExpiryReminderJobTests
 
     public ConsentExpiryReminderJobTests()
     {
-        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
     }
 
@@ -30,7 +30,7 @@ public class ConsentExpiryReminderJobTests
         var expiresAt = DateTime.UtcNow.AddDays(3);
         var conn = new TrueLayerConnection(Guid.NewGuid(), "ob-aib", "AIB", "ref-1");
         conn.MarkLinked(expiresAt);
-        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetLinkedExpiringBeforeUnscopedAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([conn]);
 
         await MakeJob().ExecuteAsync();
@@ -42,7 +42,7 @@ public class ConsentExpiryReminderJobTests
     [Fact]
     public async Task ExecuteAsync_NoExpiringConnections_RaisesNothing()
     {
-        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetLinkedExpiringBeforeUnscopedAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         await MakeJob().ExecuteAsync();
@@ -56,7 +56,7 @@ public class ConsentExpiryReminderJobTests
     public async Task ExecuteAsync_QueriesWithinReminderWindow()
     {
         DateTime? askedThreshold = null;
-        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetLinkedExpiringBeforeUnscopedAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Callback((DateTime t, CancellationToken _) => askedThreshold = t)
             .ReturnsAsync([]);
 
@@ -74,9 +74,9 @@ public class ConsentExpiryReminderJobTests
         var conn = new TrueLayerConnection(Guid.NewGuid(), "ob-aib", "AIB", "ref-1");
         conn.MarkLinked(DateTime.UtcNow.AddDays(60));
 
-        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetLinkedExpiringBeforeUnscopedAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([conn]);
 
         await MakeJob().ExecuteAsync();
@@ -92,9 +92,9 @@ public class ConsentExpiryReminderJobTests
         var conn = new TrueLayerConnection(Guid.NewGuid(), "ob-aib", "AIB", "ref-1");
         conn.MarkLinked(expiresAt);
 
-        _connections.Setup(r => r.GetLinkedExpiringBeforeAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetLinkedExpiringBeforeUnscopedAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([conn]);
-        _connections.Setup(r => r.GetAllLinkedAsync(It.IsAny<CancellationToken>()))
+        _connections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([conn]);
 
         await MakeJob().ExecuteAsync();

@@ -23,7 +23,7 @@ public sealed class IbkrFlexStatementFetcher(
 {
     public async Task<FlexStatementXml?> FetchAsync(Guid userId, FlexStatementWindow? window = null, CancellationToken ct = default)
     {
-        var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
+        var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId, ct);
         if (credential is null || !credential.IsActive)
         {
             logger.LogInformation("No active IBKR Flex credential for user {UserId}; skipping Flex fetch.", userId);

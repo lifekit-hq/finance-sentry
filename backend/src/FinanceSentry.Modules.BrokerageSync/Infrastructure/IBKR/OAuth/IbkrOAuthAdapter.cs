@@ -95,7 +95,7 @@ public sealed class IbkrOAuthAdapter(
 
     private async Task<IbkrOAuthCredentials> ResolveAsync(Guid credentialId, CancellationToken ct)
     {
-        var credential = await credentialRepository.GetByIdAsync(credentialId, ct)
+        var credential = await credentialRepository.GetByIdUnscopedAsync(credentialId, ct)
             ?? throw new BrokerAuthException(
                 $"No IBKR credential found for id {credentialId}.", "IBKR");
         return resolver.Resolve(credential);

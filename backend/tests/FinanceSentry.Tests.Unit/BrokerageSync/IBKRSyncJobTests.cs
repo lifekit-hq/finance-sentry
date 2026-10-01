@@ -58,7 +58,7 @@ public class IBKRSyncJobTests
         var user2 = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(user1), MakeCredential(user2)]);
 
         _syncHandler
@@ -78,7 +78,7 @@ public class IBKRSyncJobTests
         var userId = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(userId)]);
 
         SyncIBKRHoldingsCommand? capturedCommand = null;
@@ -101,7 +101,7 @@ public class IBKRSyncJobTests
         var successUser = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(failingUser), MakeCredential(successUser)]);
 
         _syncHandler
@@ -131,7 +131,7 @@ public class IBKRSyncJobTests
         var userId = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(userId)]);
 
         _syncHandler
@@ -153,7 +153,7 @@ public class IBKRSyncJobTests
         var userId = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(userId)]);
 
         _syncHandler
@@ -178,7 +178,7 @@ public class IBKRSyncJobTests
         var userId = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(userId)]);
 
         _syncHandler
@@ -200,7 +200,7 @@ public class IBKRSyncJobTests
         var userId = Guid.NewGuid();
 
         _credentialRepo
-            .Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([MakeCredential(userId)]);
 
         _syncHandler

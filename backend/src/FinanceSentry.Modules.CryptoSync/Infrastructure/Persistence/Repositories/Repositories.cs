@@ -6,9 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
 
-// Reads and the upsert/delete helpers opt out of the Owner filter: the scheduled syncs run with no person in
-// scope, so a filtered read would find no existing rows and re-insert duplicates. Each query keeps its own
-// UserId predicate (or an explicit all-active sweep), so scoping stays explicit.
+// Reads run under the Owner filter. The scheduled syncs and the cross-module readers run with no person in
+// scope, so they call the <c>…Unscoped…</c> methods, which opt out explicitly (a filtered existence check
+// would find no existing rows and re-insert duplicates); the sync upsert and trade dedup do the same
+// internally. Each opted-out query keeps its own UserId predicate (or an explicit all-active sweep).
 public sealed class ExchangeCredentialRepository(CryptoSyncDbContext context) : IExchangeCredentialRepository
 {
     private readonly CryptoSyncDbContext _context = context;
@@ -20,11 +21,17 @@ public sealed class ExchangeCredentialRepository(CryptoSyncDbContext context) : 
 
     public async Task<ExchangeCredential?> GetAsync(Guid userId, string provider, CancellationToken ct = default)
     {
+        return await _context.ExchangeCredentials
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.Provider == provider, ct);
+    }
+
+    public async Task<ExchangeCredential?> GetUnscopedAsync(Guid userId, string provider, CancellationToken ct = default)
+    {
         return await _context.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(c => c.UserId == userId && c.Provider == provider, ct);
     }
 
-    public async Task<IReadOnlyList<ExchangeCredential>> GetAllActiveAsync(string provider, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ExchangeCredential>> GetAllActiveUnscopedAsync(string provider, CancellationToken ct = default)
     {
         return await _context.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.IsActive && c.Provider == provider)
@@ -74,12 +81,19 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
 
     public async Task<IReadOnlyList<CryptoHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
+        return await _context.CryptoHoldings
+            .Where(h => h.UserId == userId && h.ClosedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CryptoHolding>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default)
+    {
         return await _context.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(h => h.UserId == userId && h.ClosedAt == null)
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderAsync(
+    public async Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderUnscopedAsync(
         Guid userId, string provider, CancellationToken ct = default)
     {
         return await _context.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
@@ -88,6 +102,14 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
     }
 
     public async Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+    {
+        return await _context.CryptoHoldings
+            .Where(h => h.UserId == userId && h.Provider == provider)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderUnscopedAsync(
         Guid userId, string provider, CancellationToken ct = default)
     {
         return await _context.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
@@ -102,7 +124,7 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
 
     public async Task DeleteByUserAndProviderAsync(Guid userId, string provider, CancellationToken ct = default)
     {
-        await _context.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
+        await _context.CryptoHoldings
             .Where(h => h.UserId == userId && h.Provider == provider)
             .ExecuteDeleteAsync(ct);
     }

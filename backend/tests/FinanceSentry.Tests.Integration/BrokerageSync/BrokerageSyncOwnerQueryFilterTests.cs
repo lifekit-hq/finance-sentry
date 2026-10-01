@@ -131,6 +131,45 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Holdings_reads_follow_the_acting_person_and_the_unscoped_read_serves_the_named_user_without_one()
+    {
+        await SeedAsync(NewHolding(_userA), NewHolding(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repository = new BrokerageHoldingRepository(asA);
+            (await repository.GetByUserIdAsync(_userA)).Should().ContainSingle(h => h.UserId == _userA);
+            (await repository.GetByUserIdAsync(_userB)).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+        }
+
+        await using var asNoOne = CreateContext();
+        var noPerson = new BrokerageHoldingRepository(asNoOne);
+        (await noPerson.GetByUserIdAsync(_userA)).Should().BeEmpty();
+        (await noPerson.GetByUserIdUnscopedAsync(_userA)).Should().ContainSingle(h => h.UserId == _userA);
+    }
+
+    [DockerRequiredFact]
+    public async Task Credential_reads_follow_the_acting_person_and_the_unscoped_reads_serve_jobs()
+    {
+        var a = new IBKRFlexCredential(_userA, "q", [1], [1], [1], 1);
+        await SeedAsync(a, new IBKRFlexCredential(_userB, "q", [1], [1], [1], 1));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repository = new IBKRFlexCredentialRepository(asA);
+            (await repository.GetByUserIdAsync(_userA)).Should().NotBeNull();
+            (await repository.GetByUserIdAsync(_userB)).Should().BeNull();
+        }
+
+        await using var asNoOne = CreateContext();
+        var noPerson = new IBKRFlexCredentialRepository(asNoOne);
+        (await noPerson.GetByUserIdAsync(_userA)).Should().BeNull();
+        (await noPerson.GetByUserIdUnscopedAsync(_userA)).Should().NotBeNull();
+        (await noPerson.GetByUserIdUnscopedAsync(_userB))!.UserId.Should().Be(_userB);
+    }
+
+    [DockerRequiredFact]
     public async Task Credential_sweeps_with_no_person_see_every_users_active_credentials()
     {
         await SeedAsync(
@@ -138,7 +177,7 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
             new IBKRFlexCredential(_userB, "q", [1], [1], [1], 1));
 
         await using var ctx = CreateContext();
-        var active = await new IBKRFlexCredentialRepository(ctx).GetAllActiveAsync();
+        var active = await new IBKRFlexCredentialRepository(ctx).GetAllActiveUnscopedAsync();
 
         active.Select(c => c.UserId).Should().Contain([_userA, _userB]);
     }

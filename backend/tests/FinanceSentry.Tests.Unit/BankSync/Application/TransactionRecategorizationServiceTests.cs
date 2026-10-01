@@ -61,9 +61,9 @@ public class TransactionRecategorizationServiceTests
             Mcc = 5411,
             MerchantCategory = CategoryKeys.Uncategorized,
         };
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
         _resolver.Setup(r => r.ResolveMcc(5411)).Returns(CategoryKeys.FoodAndDrink);
 
@@ -96,11 +96,11 @@ public class TransactionRecategorizationServiceTests
             MerchantCategory = CategoryKeys.Uncategorized,
         };
 
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([account]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
-        _monobankCredentials.Setup(r => r.GetByIdAsync(credentialId, It.IsAny<CancellationToken>()))
+        _monobankCredentials.Setup(r => r.GetByIdUnscopedAsync(credentialId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FinanceSentry.Modules.BankSync.Domain.MonobankCredential(
                 UserId, new byte[32], new byte[12], new byte[16], 1));
         _encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
@@ -145,9 +145,9 @@ public class TransactionRecategorizationServiceTests
         _activeSubscriptions = new StubActiveSubscriptionsReader(new ActiveInstallmentPlan(
             CommitmentKeyResolver.Resolve(null, mortgageDescription, mortgageAmount, 4829),
             mortgageAmount));
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
 
         var result = await BuildSut().RecategorizeUserAsync(UserId);
@@ -171,9 +171,9 @@ public class TransactionRecategorizationServiceTests
             SourceCategory = "Transfers",
             MerchantCategory = CategoryKeys.Uncategorized,
         };
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
 
         var result = await BuildSut().RecategorizeUserAsync(UserId);
@@ -198,9 +198,9 @@ public class TransactionRecategorizationServiceTests
             SourceCategory = "Restaurants",
             MerchantCategory = CategoryKeys.FoodAndDrink,
         };
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
         _resolver.Setup(r => r.ResolveCanonicalKey(CategoryKeys.FoodAndDrink))
             .Returns(CategoryKeys.FoodAndDrink);
@@ -223,9 +223,9 @@ public class TransactionRecategorizationServiceTests
             Mcc = 5411,
             MerchantCategory = CategoryKeys.Uncategorized,
         };
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
         _resolver.Setup(r => r.TryResolveKeyword("Amazon Marketplace")).Returns(CategoryKeys.GeneralMerchandise);
         _resolver.Setup(r => r.ResolveMcc(5411)).Returns(CategoryKeys.FoodAndDrink);
@@ -245,9 +245,9 @@ public class TransactionRecategorizationServiceTests
             Mcc = 4829,
             MerchantCategory = CategoryKeys.TransferOut,
         };
-        _accounts.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        _transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _transactions.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([tx]);
         _resolver.Setup(r => r.ResolveMcc(4829)).Returns(CategoryKeys.TransferOut);
 

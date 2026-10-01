@@ -13,25 +13,38 @@ public interface IBankAccountRepository
     Task<BankAccount> AddAsync(BankAccount account, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get bank account by ID.
+    /// Get bank account by ID. Runs under the Owner query filter: a request only finds its own accounts.
     /// </summary>
     Task<BankAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get bank account by its provider-side external account ID.
+    /// Get bank account by ID for the no-person callers (scheduled sync, sync-completion handler).
+    /// Opts out of the Owner query filter.
     /// </summary>
-    Task<BankAccount?> GetByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default);
+    Task<BankAccount?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Whether any row — active or soft-deleted — already holds this provider-side external
-    /// account ID (the unique index covers both).
+    /// Get bank account by its provider-side external account ID. For the anonymous provider callback;
+    /// opts out of the Owner query filter.
     /// </summary>
-    Task<bool> ExistsByExternalAccountIdAsync(string externalAccountId, CancellationToken cancellationToken = default);
+    Task<BankAccount?> GetByExternalAccountIdUnscopedAsync(string externalAccountId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get all accounts for a user.
+    /// Whether any row — active or soft-deleted, of any user — already holds this provider-side
+    /// external account ID (the unique index covers both). Opts out of the Owner query filter.
+    /// </summary>
+    Task<bool> ExistsByExternalAccountIdUnscopedAsync(string externalAccountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all accounts for a user. Runs under the Owner query filter.
     /// </summary>
     Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all accounts for a user for the no-person callers (cross-module readers, background jobs).
+    /// Opts out of the Owner query filter and keeps the explicit user predicate.
+    /// </summary>
+    Task<IEnumerable<BankAccount>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Update existing bank account.
@@ -51,14 +64,15 @@ public interface IBankAccountRepository
     Task<bool> HardDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get accounts with specific sync status.
+    /// Get accounts of every user with specific sync status. Opts out of the Owner query filter.
     /// </summary>
-    Task<IEnumerable<BankAccount>> GetBySyncStatusAsync(string status, CancellationToken cancellationToken = default);
+    Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get all active (IsActive=true) accounts regardless of sync status. Used by the scheduler.
+    /// Get every user's active (IsActive=true) accounts regardless of sync status. Used by the scheduler
+    /// and the cross-module readers; opts out of the Owner query filter.
     /// </summary>
-    Task<IEnumerable<BankAccount>> GetAllActiveAsync(CancellationToken cancellationToken = default);
+    Task<IEnumerable<BankAccount>> GetAllActiveUnscopedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Save changes to database.
@@ -87,9 +101,9 @@ public interface ITransactionRepository
     Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get all transactions for an account.
+    /// Get all transactions for an account for the scheduled sync. Opts out of the Owner query filter.
     /// </summary>
-    Task<IEnumerable<Transaction>> GetByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Transaction>> GetByAccountIdUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get transactions by account ID with pagination.
@@ -110,9 +124,10 @@ public interface ITransactionRepository
     /// All UniqueHash values for the account, <b>including soft-deleted (IsActive=false) rows</b>.
     /// Bypasses the global IsActive query filter so dedup catches hashes that still occupy the
     /// unique index (AccountId, UniqueHash); otherwise re-syncing a previously soft-deleted
-    /// transaction violates the constraint and poisons the whole batch.
+    /// transaction violates the constraint and poisons the whole batch. Also opts out of the Owner
+    /// query filter, as the scheduled sync has no person in scope.
     /// </summary>
-    Task<IReadOnlyCollection<string>> GetAllUniqueHashesByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<string>> GetAllUniqueHashesByAccountIdUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get transaction count for an account.
@@ -120,14 +135,28 @@ public interface ITransactionRepository
     Task<int> CountByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get all transactions for a user across all accounts.
+    /// Get all transactions for a user across all accounts. Runs under the Owner query filter.
     /// </summary>
     Task<IEnumerable<Transaction>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get all transactions for a user posted or occurring on/after the given date.
+    /// Get all transactions for a user across all accounts for the no-person callers (cross-module
+    /// readers, background jobs). Opts out of the Owner query filter and keeps the explicit user predicate.
+    /// </summary>
+    Task<IEnumerable<Transaction>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all transactions for a user posted or occurring on/after the given date. Runs under the
+    /// Owner query filter.
     /// </summary>
     Task<IEnumerable<Transaction>> GetByUserIdSinceAsync(Guid userId, DateTime since, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all transactions for a user posted or occurring on/after the given date for the no-person
+    /// callers (cross-module readers, background jobs). Opts out of the Owner query filter and keeps the
+    /// explicit user predicate.
+    /// </summary>
+    Task<IEnumerable<Transaction>> GetByUserIdSinceUnscopedAsync(Guid userId, DateTime since, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Composed, server-side filtered read for the global ledger: applies every dimension of
@@ -169,7 +198,7 @@ public interface ISyncJobRepository
     Task<SyncJob> AddAsync(SyncJob job, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get sync job by ID.
+    /// Get sync job by ID. Runs under the Owner query filter.
     /// </summary>
     Task<SyncJob?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
@@ -184,9 +213,9 @@ public interface ISyncJobRepository
     Task<SyncJob?> GetLatestByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get sync jobs with specific status.
+    /// Get every user's sync jobs with specific status. Opts out of the Owner query filter.
     /// </summary>
-    Task<IEnumerable<SyncJob>> GetByStatusAsync(string status, CancellationToken cancellationToken = default);
+    Task<IEnumerable<SyncJob>> GetByStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Update sync job.
@@ -200,9 +229,16 @@ public interface ISyncJobRepository
 
     /// <summary>
     /// Returns true if there is at least one SyncJob with the given status for the account.
-    /// Used to check for a currently running job before starting a new one.
+    /// Used to check for a currently running job before starting a new one. Runs under the Owner
+    /// query filter.
     /// </summary>
     Task<bool> HasRunningJobAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// <see cref="HasRunningJobAsync"/> for the scheduled sync, which has no person in scope. Opts out of
+    /// the Owner query filter.
+    /// </summary>
+    Task<bool> HasRunningJobUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get the most recent successful sync job for any account owned by the user.
@@ -220,6 +256,13 @@ public interface ISyncJobRepository
         Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// <see cref="GetLastSuccessfulSyncTimesByUserAsync"/> for the no-person callers (cross-module
+    /// readers). Opts out of the Owner query filter and keeps the explicit user predicate.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, DateTime>> GetLastSuccessfulSyncTimesByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Save changes to database.
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -229,13 +272,18 @@ public interface IMonobankCredentialRepository
 {
     Task<MonobankCredential> AddAsync(MonobankCredential credential, CancellationToken cancellationToken = default);
     Task<MonobankCredential?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Credential by ID for the scheduled sync, which has no person in scope. Opts out of the Owner query filter.
+    /// </summary>
+    Task<MonobankCredential?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MonobankCredential?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// All stored Monobank credentials. Used by the account-discovery pass, which re-lists
-    /// provider accounts for every connected Monobank token.
+    /// All stored Monobank credentials of every user. Used by the account-discovery pass, which re-lists
+    /// provider accounts for every connected Monobank token. Opts out of the Owner query filter.
     /// </summary>
-    Task<IReadOnlyList<MonobankCredential>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MonobankCredential>> GetAllUnscopedAsync(CancellationToken cancellationToken = default);
     Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -264,21 +312,33 @@ public interface ITrueLayerConnectionRepository
 {
     Task<TrueLayerConnection> AddAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default);
     Task<TrueLayerConnection?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<TrueLayerConnection?> GetByReferenceAsync(string reference, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Connection by ID for the token refresh and the scheduled sync, which have no person in scope.
+    /// Opts out of the Owner query filter.
+    /// </summary>
+    Task<TrueLayerConnection?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Connection by its connect-flow reference, for the anonymous provider callback. Opts out of the
+    /// Owner query filter.
+    /// </summary>
+    Task<TrueLayerConnection?> GetByReferenceUnscopedAsync(string reference, CancellationToken cancellationToken = default);
     Task<TrueLayerConnection?> GetByUserAndProviderAsync(Guid userId, string providerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrueLayerConnection>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// All LINKED connections. Used by the account-discovery pass to re-list provider accounts
-    /// for every connection that has a usable refresh token.
+    /// All LINKED connections of every user. Used by the account-discovery pass to re-list provider accounts
+    /// for every connection that has a usable refresh token. Opts out of the Owner query filter.
     /// </summary>
-    Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TrueLayerConnection>> GetAllLinkedUnscopedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// LINKED connections whose consent expires on/before <paramref name="threshold"/> (and hasn't
-    /// already lapsed) — the pre-expiry reminder detector uses this to nudge the user to reconnect.
+    /// already lapsed), of every user — the pre-expiry reminder detector uses this to nudge the user to
+    /// reconnect. Opts out of the Owner query filter.
     /// </summary>
-    Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeAsync(DateTime threshold, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeUnscopedAsync(DateTime threshold, CancellationToken cancellationToken = default);
     Task<TrueLayerConnection> UpdateAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
