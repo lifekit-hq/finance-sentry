@@ -235,6 +235,49 @@ public class AccountDiscoveryServiceTests
         h.AddedAccounts.Should().ContainSingle(a => a.ExternalAccountId == "new-acc-2");
     }
 
+    // ── A rejected refresh (invalid_grant) applies the credential-expiry policy ──
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_RefreshRejectedInvalidGrant_ExpiresConnectionAndFlagsItsAccountsReauthRequired()
+    {
+        var h = BuildSut();
+        var deadConnection = MakeConnection();
+        var healthyConnection = MakeConnection();
+        h.TrueLayerConnections.Setup(r => r.GetAllLinkedUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([deadConnection, healthyConnection]);
+
+        h.TrueLayerConnections.Setup(r => r.GetByIdUnscopedAsync(deadConnection.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(deadConnection);
+
+        var deadAccount = new BankAccount { TrueLayerConnectionId = deadConnection.Id, UserId = UserId };
+        var otherAccount = new BankAccount { TrueLayerConnectionId = healthyConnection.Id, UserId = UserId };
+        h.Accounts.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([deadAccount, otherAccount]);
+
+        h.TrueLayerTokenRefresh
+            .Setup(s => s.AcquireAccessTokenAsync(deadConnection.Id, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TrueLayerException(
+                "TRUELAYER_TOKEN_ERROR", "TrueLayer token endpoint error (400): {\"error\":\"invalid_grant\"}", 400));
+        h.TrueLayerTokenRefresh
+            .Setup(s => s.AcquireAccessTokenAsync(healthyConnection.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("access-token-2");
+        h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token-2", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeTrueLayerAccount("new-acc-2")]);
+        h.TrueLayerClient
+            .Setup(c => c.GetBalanceAsync("access-token-2", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrueLayerAccountBalance(50m, 50m, "EUR"));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
+        deadConnection.Status.Should().Be("EXPIRED");
+        healthyConnection.Status.Should().NotBe("EXPIRED");
+        deadAccount.SyncStatus.Should().Be("reauth_required");
+        otherAccount.SyncStatus.Should().NotBe("reauth_required");
+        h.TrueLayerConnections.Verify(r => r.UpdateAsync(deadConnection, It.IsAny<CancellationToken>()), Times.Once);
+        h.TrueLayerConnections.Verify(r => r.UpdateAsync(healthyConnection, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // ── Monobank: one known + one new → first run creates exactly one row; second run creates none ──
 
     [Fact]
