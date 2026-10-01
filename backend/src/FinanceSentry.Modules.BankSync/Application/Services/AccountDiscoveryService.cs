@@ -93,9 +93,6 @@ public class AccountDiscoveryService(
                 "TrueLayer refresh rejected (invalid_grant) for connection {ConnectionId}; marking it expired and its accounts reauth_required.",
                 connectionId);
 
-            connection.MarkExpired();
-            await trueLayerConnections.UpdateAsync(connection, ct);
-
             var connectionAccounts = (await accounts.GetByUserIdUnscopedAsync(connection.UserId, ct))
                 .Where(a => a.TrueLayerConnectionId == connectionId);
             foreach (var account in connectionAccounts)
@@ -103,6 +100,9 @@ public class AccountDiscoveryService(
                 account.MarkReauthRequired();
                 await accounts.UpdateAsync(account, ct);
             }
+
+            connection.MarkExpired();
+            await trueLayerConnections.UpdateAsync(connection, ct);
         }
         catch (Exception ex)
         {
