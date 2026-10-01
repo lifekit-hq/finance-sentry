@@ -205,7 +205,7 @@ Each module follows the same internal structure: `Domain/` → `Application/` (C
 Finance Sentry ships as a single product with one [SemVer](https://semver.org/) version (`vX.Y.Z`), managed by [release-please](https://github.com/googleapis/release-please):
 
 - Every change lands on `main` as a small, self-contained [Conventional Commit](https://www.conventionalcommits.org/) (`feat:` → minor bump, `fix:` → patch, `feat!:` → major).
-- Each push to `main` is deployed to production automatically (`deploy.yml`).
+- Each push to `main` is deployed to production automatically (`deploy.yml`) once Docker Build has published that commit's images; the deploy pulls them by commit SHA, and a manual `workflow_dispatch` with a `sha` input redeploys an older commit (rollback).
 - release-please maintains an open **release PR** that accumulates commits into a draft [CHANGELOG](CHANGELOG.md) entry. Merging it cuts the release: tag `vX.Y.Z`, GitHub Release with notes, and version bumps in `version.txt`, `frontend/package.json`, and `FinanceSentry.API.csproj` — all in one automated commit.
 - Deploys are continuous; releases are milestones. Cut one whenever a meaningful increment is complete (typically after each feature spec lands).
 
