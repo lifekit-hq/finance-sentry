@@ -3,15 +3,38 @@
 #
 # - Decrypts docker/.env.sops → docker/.env (requires age key at SOPS_AGE_KEY_FILE
 #   or ~/.config/sops/age/keys.txt).
-# - Builds + starts the prod compose stack with linux/arm64 images.
-# - Idempotent: safe to re-run on every push to main.
+# - Pulls the images Docker Build published for one commit (IMAGE_TAG = its full SHA) and
+#   starts the prod compose stack on them without building. Services without a published image
+#   (PUBLISHED below) are still built here.
+# - Idempotent: safe to re-run; re-running with an older SHA is a rollback.
 #
-# Runs on a self-hosted GitHub Actions runner inside the repo working directory.
-# Expects: docker, docker compose, sops, age installed on the host.
+# Runs on a self-hosted GitHub Actions runner inside the repo working directory, after the
+# workflow has logged in to ghcr. Expects: docker, docker compose, sops, age installed on the host.
+#
+# Break-glass (ghcr or CI unavailable): the compose file keeps a `build:` block for every
+# published service, so the stack can be built from the checked-out source on the host instead:
+#
+#   export NODE_AUTH_TOKEN=$(gh auth token)   # read:packages — the frontend build's npm registry
+#   IMAGE_TAG=local docker compose -f docker/docker-compose.prod.yml --env-file docker/.env \
+#     up -d --build --remove-orphans
+#
+# That skips this script's gates (platform contract, health wait), so run them by hand or re-run
+# a normal deploy once the images publish again.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# Services Docker Build publishes to ghcr by commit SHA; every other buildable service is built here.
+PUBLISHED=(api mcp gateway frontend)
+LOCAL_BUILD=(uptime-probe)
+
+IMAGE_TAG="${IMAGE_TAG:-}"
+if ! [[ $IMAGE_TAG =~ ^[0-9a-f]{40}$ ]]; then
+  echo "error: IMAGE_TAG must be the full commit SHA whose published images to deploy (got '$IMAGE_TAG')" >&2
+  exit 1
+fi
+export IMAGE_TAG
 
 KEYFILE="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}"
 if [[ ! -f "$KEYFILE" ]]; then
@@ -27,6 +50,25 @@ fi
 echo "[deploy] decrypt docker/.env.sops"
 SOPS_AGE_KEY_FILE="$KEYFILE" sops --decrypt --input-type dotenv --output-type dotenv docker/.env.sops > docker/.env
 chmod 600 docker/.env
+
+COMPOSE=(docker compose -f docker/docker-compose.prod.yml --env-file docker/.env)
+
+# Fail before anything changes, naming every missing image, when the commit has no published
+# images (Docker Build failed or never ran for it, or the versions were pruned).
+echo "[deploy] check published images for $IMAGE_TAG"
+images="$("${COMPOSE[@]}" config --format json | python3 -c \
+  'import json, sys; s = json.load(sys.stdin)["services"]; print("\n".join(s[n]["image"] for n in sys.argv[1:]))' \
+  "${PUBLISHED[@]}")"
+missing=0
+for image in $images; do
+  if ! docker manifest inspect "$image" >/dev/null 2>&1; then
+    echo "error: image $image not found — was it published for this commit?" >&2
+    missing=1
+  fi
+done
+if [[ $missing -ne 0 ]]; then
+  exit 1
+fi
 
 # --- Publish dashboards to the box's Grafana (lifekit-stack#133) ---------------
 # The BOX's Grafana moved to lifekit-stack's compose project, but the dashboards
@@ -58,14 +100,19 @@ fi
 # there). No existence check and no `|| true` on purpose: a missing checker fails
 # the deploy rather than silently skipping the gate. No waivers.
 CONTRACT=/srv/lifekit-stack/scripts/platform-contract.py
-COMPOSE=(docker compose -f docker/docker-compose.prod.yml --env-file docker/.env)
 
 # Static gate: every service's lifekit.contract.* declaration, before anything changes.
 echo "[deploy] platform contract: declarations"
 "${COMPOSE[@]}" config --format json | python3 "$CONTRACT" --static -
 
-echo "[deploy] docker compose build + up"
-"${COMPOSE[@]}" up -d --build --remove-orphans
+echo "[deploy] pull published images @ $IMAGE_TAG"
+"${COMPOSE[@]}" pull "${PUBLISHED[@]}"
+
+echo "[deploy] build unpublished images: ${LOCAL_BUILD[*]}"
+"${COMPOSE[@]}" build "${LOCAL_BUILD[@]}"
+
+echo "[deploy] docker compose up (no build)"
+"${COMPOSE[@]}" up -d --no-build --remove-orphans
 
 echo "[deploy] prune dangling images (free disk on the VPS)"
 docker image prune -f >/dev/null

@@ -1,10 +1,13 @@
 # Production stack for finance-sentry.
 #
-# Designed to run on the lifekit-vps via a self-hosted GitHub runner that builds
-# images locally (no external registry). Services bind to 127.0.0.1 — public
-# access is fronted by Tailscale Serve on the host (configured in deploy.sh).
+# Designed to run on the lifekit-vps via a self-hosted GitHub runner. api, mcp, frontend and
+# gateway run the images Docker Build published for one commit — ghcr.io/lifekit-hq/
+# finance-sentry-<service>:<commit SHA> — selected by IMAGE_TAG (deploy.sh requires it; unset
+# means a locally built `:local`, never `:main`). Their `build:` blocks stay for the break-glass
+# path documented in deploy.sh. Services bind to 127.0.0.1 — public access is fronted by
+# Tailscale Serve on the host (configured in deploy.sh).
 #
-# Deploy: ./docker/deploy.sh   (which runs sops decrypt + compose up).
+# Deploy: IMAGE_TAG=<sha> ./docker/deploy.sh   (sops decrypt + compose pull + up).
 # Env source: docker/.env  (decrypted from docker/.env.sops via sops/age).
 #
 # Platform contract (guardrail 1, spec 048): every traffic-serving service declares how it meets
@@ -24,7 +27,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       platforms: [linux/arm64]
-    image: finance-sentry/api:local
+    image: ghcr.io/lifekit-hq/finance-sentry-api:${IMAGE_TAG:-local}
     container_name: finance-sentry-api
     restart: unless-stopped
     mem_limit: 1g           # 1.3 budget: 7-day peak 616 MiB
@@ -146,7 +149,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.mcp
       platforms: [linux/arm64]
-    image: finance-sentry/mcp:local
+    image: ghcr.io/lifekit-hq/finance-sentry-mcp:${IMAGE_TAG:-local}
     container_name: finance-sentry-mcp
     restart: unless-stopped
     mem_limit: 384m         # 1.3 budget: 7-day peak 208 MiB
@@ -197,7 +200,7 @@ services:
       dockerfile: docker/Dockerfile.frontend.prod
       platforms: [linux/arm64]
       secrets: [npm_token]
-    image: finance-sentry/frontend:local
+    image: ghcr.io/lifekit-hq/finance-sentry-frontend:${IMAGE_TAG:-local}
     container_name: finance-sentry-frontend
     restart: unless-stopped
     mem_limit: 64m          # 1.3 budget: 7-day peak 13 MiB
@@ -251,7 +254,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gateway
       platforms: [linux/arm64]
-    image: finance-sentry/gateway:local
+    image: ghcr.io/lifekit-hq/finance-sentry-gateway:${IMAGE_TAG:-local}
     container_name: finance-sentry-gateway
     restart: unless-stopped
     mem_limit: 192m         # 1.3 budget: 7-day peak 89 MiB
@@ -414,8 +417,8 @@ networks:
           gateway: 10.231.77.1
 
 # GitHub Packages token for @lifekit-hq/* installs (BuildKit secret — not in layers).
-# Locally: export NODE_AUTH_TOKEN=$(gh auth token)  (needs read:packages scope).
-# CI/deploy: the workflow passes secrets.GITHUB_TOKEN.
+# Only a local frontend build reads it (the break-glass path in deploy.sh; CI builds the published
+# image). Locally: export NODE_AUTH_TOKEN=$(gh auth token)  (needs read:packages scope).
 secrets:
   npm_token:
     environment: NODE_AUTH_TOKEN

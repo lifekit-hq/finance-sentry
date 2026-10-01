@@ -20,7 +20,7 @@ After writing or modifying **any** Angular `.ts` file, run `npx eslint <file>` f
 
 **Before writing any Angular template or UI element**, check the component catalog first — the hosted Storybook at https://lifekit-hq.github.io/lifekit-common/ or `node_modules/@lifekit-hq/ui`. Use `cmn-button`, `cmn-input`, `cmn-form-field`, `cmn-alert`, `cmn-card`, etc. — never raw `<input>`, `<button>`, or `<div class="error">` when the library already has the component.
 
-**Registry auth**: `@lifekit-hq/*` installs from GitHub Packages — `frontend/.npmrc` expects `NODE_AUTH_TOKEN` in the environment (`export NODE_AUTH_TOKEN=$(gh auth token)`, token needs `read:packages`). CI and deploy pass `secrets.GITHUB_TOKEN`; Docker builds take it as the `npm_token` BuildKit secret.
+**Registry auth**: `@lifekit-hq/*` installs from GitHub Packages — `frontend/.npmrc` expects `NODE_AUTH_TOKEN` in the environment (`export NODE_AUTH_TOKEN=$(gh auth token)`, token needs `read:packages`). CI passes `secrets.GITHUB_TOKEN` (deploy no longer builds the frontend — it pulls the CI-built image; only the break-glass local build in `docker/deploy.sh` needs it); Docker builds take it as the `npm_token` BuildKit secret.
 
 **Local iteration against unpublished library changes**: in `lifekit-common` run `npm run build && npm pack ./dist/lifekit-hq/ui`, then here `npm install <tarball>` (repeat per iteration; never commit a tarball reference). Day-to-day component development happens in lifekit-common's Storybook, not by running this app.
 
