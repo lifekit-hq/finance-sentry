@@ -1,5 +1,7 @@
 @if (!isHidden()) {
-  <div class="fixed bottom-cmn-4 left-cmn-4 z-50 flex flex-col items-start gap-cmn-3">
+  <div
+    class="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-cmn-4 z-30 flex flex-col items-start gap-cmn-3 md:bottom-cmn-4"
+  >
     @if (isOpen()) {
       <section
         class="flex h-[min(560px,80vh)] w-[min(384px,calc(100vw-2rem))] flex-col overflow-hidden rounded-cmn-lg border border-border-default bg-surface-card shadow-2xl"

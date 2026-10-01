@@ -77,26 +77,26 @@
       (nextPage)="nextPage()"
       emptyMessage="No transactions found for the selected period."
     >
-      <cmn-column key="date" header="Date">
+      <cmn-column key="date" listSlot="secondary" header="Date">
         <ng-template let-row cmnCell>
           {{ row.postedDate ?? row.pendingDate | date: 'mediumDate' }}
         </ng-template>
       </cmn-column>
-      <cmn-column key="description" header="Description">
+      <cmn-column key="description" listSlot="primary" header="Description">
         <ng-template let-row cmnCell>{{ row.description }}</ng-template>
       </cmn-column>
-      <cmn-column key="amount" header="Amount" align="right">
+      <cmn-column key="amount" listSlot="trailing" header="Amount" align="right">
         <ng-template let-row cmnCell>{{ row | transactionAmount }}</ng-template>
       </cmn-column>
       <cmn-column key="type" header="Type" align="center">
         <ng-template let-row cmnCell>{{ row.transactionType }}</ng-template>
       </cmn-column>
-      <cmn-column key="category" header="Category">
+      <cmn-column key="category" listSlot="secondary" header="Category">
         <ng-template let-row cmnCell>
           {{ row.merchantCategory ? (row.merchantCategory | merchantCategory) : '—' }}
         </ng-template>
       </cmn-column>
-      <cmn-column key="status" header="Status" align="center">
+      <cmn-column key="status" listSlot="trailing-secondary" header="Status" align="center">
         <ng-template let-row cmnCell>{{ row.isPending ? 'Pending' : 'Posted' }}</ng-template>
       </cmn-column>
     </cmn-data-table>

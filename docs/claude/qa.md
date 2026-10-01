@@ -33,8 +33,9 @@ After **all tasks in a feature are complete**, act as a QA engineer: spin up the
 3. Open `http://localhost:4200` via Playwright
 4. Navigate the golden path of the feature as a real user would — click buttons, fill forms, follow redirects
 5. Also test key error/edge cases (invalid input, cancelled flows, etc.)
-6. Report findings: what passed, what failed, screenshots of any broken state
-7. If bugs are found, fix them (via Qwen) before declaring the feature done
+6. **Phone smoke (390 px)** for every UI change: resize the viewport to 390×844 and take one screenshot of each page the change touched, in light and dark. Check: the bottom tab bar (Home, Accounts, Transactions, Alerts, More) replaces the sidebar, nothing scrolls horizontally (`document.documentElement.scrollWidth === 390`), tables with list slots render as list rows, and drawers open as bottom sheets. Repeat at desktop width (≥ 1280 px) to confirm the sidebar layout is unchanged.
+7. Report findings: what passed, what failed, screenshots of any broken state
+8. If bugs are found, fix them (via Qwen) before declaring the feature done
 
 **Tools:** Use `mcp__plugin_playwright_playwright__browser_*` tools — snapshot first, screenshot only when visual proof is needed.
 
