@@ -27,6 +27,9 @@ public sealed class DigestConsolidationTests
         public Task<CompanionNotificationSetting> GetOrDefaultAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(new CompanionNotificationSetting { UserId = userId, Mode = NotificationMode.Digest });
 
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
+
         public Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
             => Task.CompletedTask;
 
@@ -54,7 +57,9 @@ public sealed class DigestConsolidationTests
 
     private static CompanionDbContext NewDb() => new(
         new DbContextOptionsBuilder<CompanionDbContext>()
-            .UseInMemoryDatabase($"digest-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"digest-{Guid.NewGuid():N}").Options,
+        // The in-memory provider applies the Owner query filter too; the pull and the ack run as User.
+        new FixedCurrentUser(User));
 
     private static CompanionEvent Held(Guid user, string key) => new()
     {
@@ -127,7 +132,7 @@ public sealed class DigestConsolidationTests
         (await handler.Handle(
             new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default)).Events.Should().BeEmpty();
         (await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default)).Events.Should().BeEmpty();
-        (await events.ListHeldForDigestAsync(User)).Should().BeEmpty();
+        (await events.ListHeldForDigestUnscopedAsync(User)).Should().BeEmpty();
     }
 
     [Fact]
@@ -171,7 +176,7 @@ public sealed class DigestConsolidationTests
             new GetPendingCompanionEventsQuery(
                 User, 25, true, WebhookAgentWakeDispatcher.DigestHeldOverrideReason), default);
         repeat.Events.Should().BeEmpty();
-        (await events.ListHeldForDigestAsync(User)).Should().BeEmpty();
+        (await events.ListHeldForDigestUnscopedAsync(User)).Should().BeEmpty();
     }
 
     [Fact]

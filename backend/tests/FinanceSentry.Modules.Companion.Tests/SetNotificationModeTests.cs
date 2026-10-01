@@ -19,6 +19,9 @@ public sealed class SetNotificationModeTests
         public Task<CompanionNotificationSetting> GetOrDefaultAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(Saved ?? new CompanionNotificationSetting { UserId = userId, Mode = NotificationMode.Scan });
 
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
+
         public Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
         {
             Saved = setting;

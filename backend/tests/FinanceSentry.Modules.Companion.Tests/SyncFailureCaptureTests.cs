@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
@@ -26,6 +27,9 @@ public sealed class SyncFailureCaptureTests
     {
         public Task<CompanionNotificationSetting> GetOrDefaultAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(new CompanionNotificationSetting { UserId = userId, Mode = NotificationMode.Realtime });
+
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
 
         public Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
             => Task.CompletedTask;
@@ -95,7 +99,8 @@ public sealed class SyncFailureCaptureTests
     {
         await using var db = new CompanionDbContext(
             new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"sync-failure-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"sync-failure-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
         var capture = new CompanionEventCapture(
             new OneAlert(alert),
             new NoAnalystActions(),
@@ -110,7 +115,7 @@ public sealed class SyncFailureCaptureTests
             NullLogger<CompanionEventCapture>.Instance);
 
         (await capture.CaptureAsync()).Should().Be(1);
-        return await db.Events.SingleAsync();
+        return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
     }
 
     [Fact]

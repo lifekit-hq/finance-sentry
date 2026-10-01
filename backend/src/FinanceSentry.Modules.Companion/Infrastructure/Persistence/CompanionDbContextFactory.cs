@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class CompanionDbContextFactory : IDesignTimeDbContextFactory<CompanionDb
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public"));
 
-        return new CompanionDbContext(optionsBuilder.Options);
+        return new CompanionDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

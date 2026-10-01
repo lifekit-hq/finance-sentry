@@ -33,6 +33,9 @@ public sealed class CompanionDispatchCapTests
                 QuietHoursEndLocal = null,
             });
 
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
+
         public Task UpsertAsync(CompanionNotificationSetting setting, CancellationToken ct = default)
             => Task.CompletedTask;
 
@@ -61,16 +64,16 @@ public sealed class CompanionDispatchCapTests
             Guid userId, IReadOnlyCollection<EventDisposition> dispositions, int limit, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingAsync(int limit, CancellationToken ct = default)
+        public Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingUnscopedAsync(int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<CompanionEvent>>([.. Pending]);
 
-        public Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestAsync(Guid userId, CancellationToken ct = default)
+        public Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestUnscopedAsync(Guid userId, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsUnscopedAsync(CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
+        public Task<int> CountDispatchedSinceUnscopedAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
             => Task.FromResult(DispatchedInLastHour);
 
         public Task<CompanionEvent?> GetAsync(Guid id, CancellationToken ct = default)

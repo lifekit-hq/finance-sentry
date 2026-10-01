@@ -16,8 +16,9 @@ public sealed class CompanionEventRepositoryDedupKeyTests : IDisposable
 
     public CompanionEventRepositoryDedupKeyTests()
     {
+        // The in-memory provider applies the Owner query filter too; the lookup runs as User.
         _db = new CompanionDbContext(new DbContextOptionsBuilder<CompanionDbContext>()
-            .UseInMemoryDatabase($"companion-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"companion-{Guid.NewGuid():N}").Options, new FixedCurrentUser(User));
         _repo = new CompanionEventRepository(_db);
     }
 

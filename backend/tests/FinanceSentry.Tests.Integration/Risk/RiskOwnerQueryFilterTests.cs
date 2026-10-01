@@ -187,7 +187,8 @@ public sealed class RiskOwnerQueryFilterTests : IAsyncLifetime
             .GetAsync(_userA, Book, Now, default);
 
         check.Should().NotBeNull("a filtered read would find no history and measure no decline");
-        check!.ObservedDrawdown.Should().BePositive();
+        check.Value.MaxDrawdown.Should().Be(0.20m);
+        check.Value.ObservedDrawdown.Should().BePositive();
     }
 
     [DockerRequiredFact]

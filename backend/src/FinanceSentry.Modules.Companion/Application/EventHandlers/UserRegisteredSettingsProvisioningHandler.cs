@@ -16,7 +16,7 @@ public sealed class UserRegisteredSettingsProvisioningHandler(INotificationSetti
 {
     public async Task Handle(UserRegisteredEvent @event, CancellationToken cancellationToken)
     {
-        var defaults = await settings.GetOrDefaultAsync(@event.UserId, cancellationToken);
+        var defaults = await settings.GetOrDefaultUnscopedAsync(@event.UserId, cancellationToken);
         await settings.UpsertAsync(defaults, cancellationToken);
     }
 }

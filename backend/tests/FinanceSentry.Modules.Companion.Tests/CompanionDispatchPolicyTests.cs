@@ -27,6 +27,9 @@ public sealed class CompanionDispatchPolicyTests
         public Task<CompanionNotificationSetting> GetOrDefaultAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(setting);
 
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
+
         public Task UpsertAsync(CompanionNotificationSetting s, CancellationToken ct = default)
             => Task.CompletedTask;
 
@@ -66,7 +69,10 @@ public sealed class CompanionDispatchPolicyTests
     {
         var db = new CompanionDbContext(
             new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"dispatch-policy-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"dispatch-policy-{Guid.NewGuid():N}").Options,
+            // The in-memory provider applies the Owner query filter too; the assertions read User's events
+            // through GetAsync, while the job's own reads are the unscoped ones.
+            new FixedCurrentUser(User));
         return new CompanionEventRepository(db);
     }
 
@@ -203,6 +209,6 @@ public sealed class CompanionDispatchPolicyTests
 
         dispatcher.WakeCalls.Should().Be(1);
         (await events.GetAsync(ownerEvent.Id))!.Disposition.Should().Be(EventDisposition.Dispatched);
-        (await events.ListRealtimePendingAsync(nonOwnerCount + 1)).Should().BeEmpty();
+        (await events.ListRealtimePendingUnscopedAsync(nonOwnerCount + 1)).Should().BeEmpty();
     }
 }

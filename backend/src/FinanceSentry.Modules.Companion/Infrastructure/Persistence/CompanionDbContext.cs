@@ -1,11 +1,15 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Companion.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class CompanionDbContext(DbContextOptions<CompanionDbContext> options) : DbContext(options)
+public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public const string Schema = "companion";
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     public DbSet<CompanionNotificationSetting> NotificationSettings => Set<CompanionNotificationSetting>();
 
@@ -22,6 +26,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options) : 
             e.ToTable("companion_notification_settings");
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.UserId).IsUnique();
+            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
             e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.TimeZoneId).HasMaxLength(64);
         });
@@ -33,6 +38,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options) : 
             e.HasIndex(x => x.DedupKey).IsUnique();
             e.HasIndex(x => new { x.UserId, x.Disposition, x.OccurredAt });
             e.HasIndex(x => new { x.UserId, x.CapturedAt });
+            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(24);
             e.Property(x => x.Disposition).HasConversion<string>().HasMaxLength(24);
             e.Property(x => x.Subject).HasMaxLength(128);

@@ -25,17 +25,17 @@ public sealed class CompanionDigestJob(
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var userIds = await events.ListHeldForDigestUserIdsAsync(ct);
+        var userIds = await events.ListHeldForDigestUserIdsUnscopedAsync(ct);
 
         foreach (var userId in userIds)
         {
-            var setting = await settings.GetOrDefaultAsync(userId, ct);
+            var setting = await settings.GetOrDefaultUnscopedAsync(userId, ct);
             if (QuietHours.LocalHour(setting.TimeZoneId, now) != setting.DigestHourLocal)
             {
                 continue;
             }
 
-            var held = await events.ListHeldForDigestAsync(userId, ct);
+            var held = await events.ListHeldForDigestUnscopedAsync(userId, ct);
             if (held.Count == 0)
             {
                 continue;

@@ -30,7 +30,7 @@ public sealed class CompanionDispatchJob(
     [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var pending = await events.ListRealtimePendingAsync(BatchLimit, ct);
+        var pending = await events.ListRealtimePendingUnscopedAsync(BatchLimit, ct);
         var now = DateTimeOffset.UtcNow;
         var aiUseByUser = new Dictionary<Guid, bool>();
 
@@ -48,7 +48,7 @@ public sealed class CompanionDispatchJob(
                 continue;
             }
 
-            var setting = await settings.GetOrDefaultAsync(evt.UserId, ct);
+            var setting = await settings.GetOrDefaultUnscopedAsync(evt.UserId, ct);
             if (setting.Mode != NotificationMode.Realtime)
             {
                 // Scan mode: the agent pulls these. Digest/quiet never reach Pending.
@@ -61,7 +61,7 @@ public sealed class CompanionDispatchJob(
                 continue;
             }
 
-            var dispatchedLastHour = await events.CountDispatchedSinceAsync(evt.UserId, now.AddHours(-1), ct);
+            var dispatchedLastHour = await events.CountDispatchedSinceUnscopedAsync(evt.UserId, now.AddHours(-1), ct);
             if (dispatchedLastHour >= setting.MaxProactivePerHour)
             {
                 await SetDispositionAsync(evt, EventDisposition.SuppressedByRateLimit, ct);

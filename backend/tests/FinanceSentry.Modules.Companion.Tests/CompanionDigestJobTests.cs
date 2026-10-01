@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
@@ -25,6 +26,9 @@ public sealed class CompanionDigestJobTests
     {
         public Task<CompanionNotificationSetting> GetOrDefaultAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(setting);
+
+        public Task<CompanionNotificationSetting> GetOrDefaultUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => GetOrDefaultAsync(userId, ct);
 
         public Task UpsertAsync(CompanionNotificationSetting s, CancellationToken ct = default)
             => Task.CompletedTask;
@@ -55,7 +59,8 @@ public sealed class CompanionDigestJobTests
     {
         var db = new CompanionDbContext(
             new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"digest-job-{Guid.NewGuid():N}").Options);
+                .UseInMemoryDatabase($"digest-job-{Guid.NewGuid():N}").Options,
+            NoCurrentUser.Instance);
         return new CompanionEventRepository(db);
     }
 
