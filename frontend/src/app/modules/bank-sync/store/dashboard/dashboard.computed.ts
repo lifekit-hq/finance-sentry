@@ -76,7 +76,7 @@ function median(values: number[]): number {
     : sorted[mid];
 }
 
-// Cents on a twelve-month forecast or a month-to-date tile are noise.
+// Cents on a twelve-month forecast are noise.
 const WHOLE_DOLLARS = {maxFractionDigits: 0} as const;
 const CHANGE_PERCENT_DIGITS = 1;
 
@@ -334,12 +334,12 @@ export function dashboardComputed(store: StateSignals) {
 
     monthlySpendingFormatted: computed(() => {
       const cur = monthToDate();
-      return cur ? wholeUsd(cur.outflow) : '—';
+      return cur ? MoneyUtils.format(cur.outflow, 'USD') : '—';
     }),
 
     monthlyInflowFormatted: computed(() => {
       const cur = monthToDate();
-      return cur ? wholeUsd(cur.inflow) : '—';
+      return cur ? MoneyUtils.format(cur.inflow, 'USD') : '—';
     }),
 
     savingsRateMonthToDateFormatted: computed(() => {

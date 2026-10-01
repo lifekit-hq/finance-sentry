@@ -134,8 +134,14 @@ describe('dashboardComputed', () => {
     it('reports month-to-date income and spending, not the closed months', () => {
       const c = computedFor(steadyHistory(500, 900));
 
-      expect(c.monthlyInflowFormatted()).toBe('$500');
-      expect(c.monthlySpendingFormatted()).toBe('$900');
+      expect(c.monthlyInflowFormatted()).toBe('$500.00');
+      expect(c.monthlySpendingFormatted()).toBe('$900.00');
+    });
+
+    it('keeps cents on the month-to-date tiles', () => {
+      const c = computedFor(steadyHistory(500, 169.42));
+
+      expect(c.monthlySpendingFormatted()).toBe('$169.42');
     });
 
     it('falls back to an em dash when the current month has no rows yet', () => {
