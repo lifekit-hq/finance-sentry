@@ -47,11 +47,11 @@ public class SyncIBKRHoldingsInstrumentMasterTests
         var credential = CredentialWithAccount();
 
         var credentialRepo = new Mock<IIBKRCredentialRepository>(MockBehavior.Loose);
-        credentialRepo.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
 
         var holdingRepo = new Mock<IBrokerageHoldingRepository>(MockBehavior.Loose);
-        holdingRepo.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        holdingRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<BrokerageHolding>());
 
         var adapter = new Mock<IBrokerAdapter>(MockBehavior.Loose);
@@ -64,7 +64,7 @@ public class SyncIBKRHoldingsInstrumentMasterTests
     {
         public readonly List<BrokerageInstrument> Store = [];
 
-        public Task<BrokerageInstrument?> GetByConidAsync(
+        public Task<BrokerageInstrument?> GetByConidUnscopedAsync(
             Guid userId, string provider, long conid, CancellationToken ct = default) =>
             Task.FromResult(Store.FirstOrDefault(
                 i => i.UserId == userId && i.Provider == provider && i.Conid == conid));

@@ -41,7 +41,7 @@ public class FinalizeTrueLayerConnectCommandTests
 
         var connection = new TrueLayerConnection(UserId, "ob-revolut", "Revolut", "ref-473");
 
-        connections.Setup(c => c.GetByReferenceAsync("ref-473", It.IsAny<CancellationToken>()))
+        connections.Setup(c => c.GetByReferenceUnscopedAsync("ref-473", It.IsAny<CancellationToken>()))
                    .ReturnsAsync(connection);
         connections.Setup(c => c.UpdateAsync(It.IsAny<TrueLayerConnection>(), It.IsAny<CancellationToken>()))
                    .ReturnsAsync((TrueLayerConnection c, CancellationToken _) => c);
@@ -55,7 +55,7 @@ public class FinalizeTrueLayerConnectCommandTests
         client.Setup(c => c.ListCardsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(Array.Empty<TrueLayerAccountInfo>());
 
-        accounts.Setup(a => a.GetByExternalAccountIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        accounts.Setup(a => a.GetByExternalAccountIdUnscopedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((BankAccount?)null);
         accounts.Setup(a => a.AddAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((BankAccount a, CancellationToken _) => a);

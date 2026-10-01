@@ -22,7 +22,7 @@ public sealed class IbkrFlexIncrementalSyncJob(
 
     public async Task ExecuteAsync()
     {
-        var activeCredentials = await credentialRepository.GetAllActiveAsync();
+        var activeCredentials = await credentialRepository.GetAllActiveUnscopedAsync();
         if (activeCredentials.Count == 0)
         {
             logger.LogInformation("No active IBKR Flex credentials; skipping incremental trade sync.");

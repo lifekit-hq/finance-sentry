@@ -32,7 +32,7 @@ public sealed class SyncIBKRHoldingsCommandHandler : ICommandHandler<SyncIBKRHol
 
     public async Task<SyncIBKRHoldingsResult> Handle(SyncIBKRHoldingsCommand request, CancellationToken ct)
     {
-        var credential = await _credentialRepository.GetByUserIdAsync(request.UserId, ct)
+        var credential = await _credentialRepository.GetByUserIdUnscopedAsync(request.UserId, ct)
             ?? throw new InvalidOperationException("No active IBKR credential found for this user.");
 
         try
@@ -77,7 +77,7 @@ public sealed class SyncIBKRHoldingsCommandHandler : ICommandHandler<SyncIBKRHol
             await _holdingRepository.SaveChangesAsync(ct);
 
             var positionByKey = activePositions.ToDictionary(p => p.Symbol, StringComparer.Ordinal);
-            var persisted = await _holdingRepository.GetByUserIdAsync(request.UserId, ct);
+            var persisted = await _holdingRepository.GetByUserIdUnscopedAsync(request.UserId, ct);
 
             // Reconcile: drop persisted holdings the user no longer holds (sold out /
             // no longer returned or now zero) so they leave the DB instead of lingering.
@@ -133,7 +133,7 @@ public sealed class SyncIBKRHoldingsCommandHandler : ICommandHandler<SyncIBKRHol
             if (position.Conid is not long conid || instrumentByConid.ContainsKey(conid))
                 continue;
 
-            var instrument = await _instrumentRepository.GetByConidAsync(userId, Provider, conid, ct);
+            var instrument = await _instrumentRepository.GetByConidUnscopedAsync(userId, Provider, conid, ct);
             if (instrument is null)
             {
                 instrument = new BrokerageInstrument(

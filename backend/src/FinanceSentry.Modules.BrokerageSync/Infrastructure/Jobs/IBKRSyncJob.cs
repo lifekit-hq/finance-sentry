@@ -29,7 +29,7 @@ public sealed class IBKRSyncJob(
 
     public async Task ExecuteAsync()
     {
-        var activeCredentials = await credentialRepository.GetAllActiveAsync();
+        var activeCredentials = await credentialRepository.GetAllActiveUnscopedAsync();
 
         foreach (var credential in activeCredentials)
         {

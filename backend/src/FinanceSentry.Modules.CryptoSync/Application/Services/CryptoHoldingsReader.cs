@@ -16,7 +16,7 @@ public sealed class CryptoHoldingsReader : ICryptoHoldingsReader
         Guid userId,
         CancellationToken ct = default)
     {
-        var holdings = await _holdingRepository.GetByUserIdAsync(userId, ct);
+        var holdings = await _holdingRepository.GetByUserIdUnscopedAsync(userId, ct);
 
         return holdings
             .Select(h => new CryptoHoldingSummary(

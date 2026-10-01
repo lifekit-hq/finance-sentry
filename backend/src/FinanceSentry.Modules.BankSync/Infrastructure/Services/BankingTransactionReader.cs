@@ -17,11 +17,11 @@ public class BankingTransactionReader(
         var fromUtc = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var toUtc = to.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
-        var accountList = await _accounts.GetByUserIdAsync(userId, ct);
+        var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var providerByAccount = accountList.ToDictionary(a => a.Id, a => a.Provider);
         var currencyByAccount = accountList.ToDictionary(a => a.Id, a => a.Currency);
 
-        var txList = await _transactions.GetByUserIdAsync(userId, ct);
+        var txList = await _transactions.GetByUserIdUnscopedAsync(userId, ct);
 
         return txList
             .Where(t => t.IsActive)

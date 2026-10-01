@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -101,7 +102,7 @@ public sealed class FxSpreadDetectionJob(
             // to a later settlement time (Monobank writes the transaction date even for a hold,
             // TrueLayer writes null and then the replacement posted row's own date), so that read
             // selects the same rows. Closing it needs a real settled-at stamp from ingest.
-            transactions = await db.Transactions
+            transactions = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
                 .AsNoTracking()
                 .Where(t => accountIds.Contains(t.AccountId)
                          && t.TransactionDate >= since

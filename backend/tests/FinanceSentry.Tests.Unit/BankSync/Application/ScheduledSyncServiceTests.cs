@@ -46,7 +46,7 @@ public class ScheduledSyncServiceTests
     {
         var accountRepo = new Mock<IBankAccountRepository>();
         var txRepo = new Mock<ITransactionRepository>();
-        txRepo.Setup(r => r.GetAllUniqueHashesByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        txRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(Array.Empty<string>());
         var jobRepo = new Mock<ISyncJobRepository>();
         var encryption = new Mock<ICredentialEncryptionService>();
@@ -89,13 +89,13 @@ public class ScheduledSyncServiceTests
             SyncStatus = "active",
         };
 
-        accountRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        accountRepo.Setup(r => r.GetByIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(account);
         accountRepo.Setup(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>())).ReturnsAsync(account);
         jobRepo.Setup(r => r.AddAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync((SyncJob j, CancellationToken _) => j);
         jobRepo.Setup(r => r.UpdateAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync((SyncJob j, CancellationToken _) => j);
-        truelayerConnections.Setup(r => r.GetByIdAsync(connection.Id, It.IsAny<CancellationToken>()))
+        truelayerConnections.Setup(r => r.GetByIdUnscopedAsync(connection.Id, It.IsAny<CancellationToken>()))
                             .ReturnsAsync(connection);
         encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
                   .Returns("refresh-token");
@@ -104,7 +104,7 @@ public class ScheduledSyncServiceTests
         trueLayerTokenRefresh
             .Setup(s => s.AcquireAccessTokenAsync(connection.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync("access-token");
-        txRepo.Setup(r => r.GetByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        txRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([]);
 
         var provider = new Mock<IBankProvider>();
@@ -129,7 +129,7 @@ public class ScheduledSyncServiceTests
     {
         var h = BuildSut();
 
-        h.AccountRepo.Setup(r => r.GetByIdAsync(AccountId, It.IsAny<CancellationToken>()))
+        h.AccountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>()))
                      .ReturnsAsync((BankAccount?)null);
 
         var result = await h.Sut.PerformFullSyncAsync(AccountId);
@@ -218,13 +218,13 @@ public class ScheduledSyncServiceTests
     [Fact]
     public async Task PerformFullSyncAsync_DedupSetIncludesSoftDeletedHashes()
     {
-        // The hash set handed to dedup must come from GetAllUniqueHashesByAccountIdAsync (which
+        // The hash set handed to dedup must come from GetAllUniqueHashesByAccountIdUnscopedAsync (which
         // includes soft-deleted rows), not just the active rows — otherwise a re-synced
         // soft-deleted transaction slips through and collides with the unique index.
         var h = BuildSut();
 
         SetupProviderCandidates(h, []);
-        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(["soft_deleted_hash"]);
 
         IReadOnlySet<string>? seenSet = null;
@@ -254,7 +254,7 @@ public class ScheduledSyncServiceTests
 
         // Only one existing transaction in DB
         var existingTx = new Transaction(h.Account.Id, UserId, 50m, DateTime.UtcNow.AddDays(-1), "Coffee", "hash_existing", false);
-        h.TxRepo.Setup(r => r.GetByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        h.TxRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([existingTx]);
 
         // Dedup returns only the NEW candidate (the existing one is filtered out)
@@ -328,9 +328,9 @@ public class ScheduledSyncServiceTests
 
         var txDate = DateTime.UtcNow.AddDays(-1);
         var pendingRow = new Transaction(h.Account.Id, UserId, 50m, txDate, "Coffee", "same_hash", isPending: true);
-        h.TxRepo.Setup(r => r.GetByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        h.TxRepo.Setup(r => r.GetByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync([pendingRow]);
-        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        h.TxRepo.Setup(r => r.GetAllUniqueHashesByAccountIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(["same_hash"]);
 
         var settledCandidate = new TransactionCandidate(
@@ -488,7 +488,7 @@ public class ScheduledSyncServiceTests
         var syncJobRepo = new Mock<ISyncJobRepository>();
         var syncService = new Mock<IScheduledSyncService>();
 
-        syncJobRepo.Setup(r => r.HasRunningJobAsync(AccountId, default)).ReturnsAsync(true);
+        syncJobRepo.Setup(r => r.HasRunningJobUnscopedAsync(AccountId, default)).ReturnsAsync(true);
 
         var coordinator = new TransactionSyncCoordinator(
             syncJobRepo.Object, new Mock<IBankAccountRepository>().Object, syncService.Object,
@@ -512,11 +512,11 @@ public class ScheduledSyncServiceTests
         var accountRepo = new Mock<IBankAccountRepository>();
         var syncService = new Mock<IScheduledSyncService>();
 
-        syncJobRepo.Setup(r => r.HasRunningJobAsync(AccountId, default)).ReturnsAsync(false);
+        syncJobRepo.Setup(r => r.HasRunningJobUnscopedAsync(AccountId, default)).ReturnsAsync(false);
         var account = new BankAccount { Provider = "truelayer" };
         account.BeginSync();
         account.MarkReauthRequired();
-        accountRepo.Setup(r => r.GetByIdAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        accountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
 
         var coordinator = new TransactionSyncCoordinator(
             syncJobRepo.Object, accountRepo.Object, syncService.Object,

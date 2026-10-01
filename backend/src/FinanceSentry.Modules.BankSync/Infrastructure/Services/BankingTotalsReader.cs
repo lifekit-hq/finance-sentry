@@ -13,13 +13,13 @@ public class BankingTotalsReader(
 
     public async Task<IReadOnlyList<Guid>> GetActiveUserIdsAsync(CancellationToken ct = default)
     {
-        var active = await _accounts.GetAllActiveAsync(ct);
+        var active = await _accounts.GetAllActiveUnscopedAsync(ct);
         return active.Select(a => a.UserId).Distinct().ToList();
     }
 
     public async Task<decimal> GetTotalUsdAsync(Guid userId, CancellationToken ct = default)
     {
-        var accounts = await _accounts.GetByUserIdAsync(userId, ct);
+        var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return accounts
             .Where(a => a.IsActive && a.CurrentBalance.HasValue)
             .Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, CurrencyConverter.ToUsd(a.CurrentBalance!.Value, a.Currency)));
@@ -27,12 +27,12 @@ public class BankingTotalsReader(
 
     public async Task<DateTime?> GetLatestSuccessfulSyncAsync(Guid userId, CancellationToken ct = default)
     {
-        var accounts = await _accounts.GetByUserIdAsync(userId, ct);
+        var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var activeIds = accounts.Where(a => a.IsActive).Select(a => a.Id).ToHashSet();
         if (activeIds.Count == 0)
             return null;
 
-        var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserAsync(userId, ct);
+        var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserUnscopedAsync(userId, ct);
         var times = lastSuccessful
             .Where(kv => activeIds.Contains(kv.Key))
             .Select(kv => kv.Value)

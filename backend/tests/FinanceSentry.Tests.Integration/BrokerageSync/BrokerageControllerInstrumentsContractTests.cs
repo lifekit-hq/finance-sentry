@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -97,7 +99,7 @@ public class BrokerageControllerInstrumentsContractTests(BrokerageApiFactory fac
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BrokerageSyncDbContext>();
-        var reloaded = db.BrokerageInstruments.Single(i => i.Id == instrument.Id);
+        var reloaded = db.BrokerageInstruments.IgnoreQueryFilters([OwnerQueryFilter.Name]).Single(i => i.Id == instrument.Id);
         reloaded.Classification.Should().BeNull();
     }
 }

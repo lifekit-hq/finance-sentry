@@ -26,7 +26,7 @@ public class IbkrFlexStatementFetcherTests
     {
         var userId = Guid.NewGuid();
         _credentialRepo
-            .Setup(r => r.GetByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((IBKRFlexCredential?)null);
 
         var result = await CreateFetcher().FetchAsync(userId, ct: CancellationToken.None);
@@ -46,7 +46,7 @@ public class IbkrFlexStatementFetcherTests
         var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
         credential.Deactivate();
         _credentialRepo
-            .Setup(r => r.GetByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
 
         var result = await CreateFetcher().FetchAsync(userId, ct: CancellationToken.None);
@@ -67,7 +67,7 @@ public class IbkrFlexStatementFetcherTests
         var statement = new FlexStatementXml { AccountId = "U0000001" };
 
         _credentialRepo
-            .Setup(r => r.GetByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credential);
         _resolver.Setup(r => r.Resolve(credential)).Returns(resolved);
         _flexClient

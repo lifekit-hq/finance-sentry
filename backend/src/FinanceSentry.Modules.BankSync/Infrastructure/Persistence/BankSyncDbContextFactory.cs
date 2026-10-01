@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +32,6 @@ public class BankSyncDbContextFactory : IDesignTimeDbContextFactory<BankSyncDbCo
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history", "public");
             });
 
-        return new BankSyncDbContext(optionsBuilder.Options);
+        return new BankSyncDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

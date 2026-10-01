@@ -25,7 +25,7 @@ public class CredentialBackupJob(
     {
         _logger.LogInformation("CredentialBackupJob starting at {Timestamp}", DateTime.UtcNow);
 
-        var accounts = await _accounts.GetAllActiveAsync(ct);
+        var accounts = await _accounts.GetAllActiveUnscopedAsync(ct);
         var accountList = accounts.ToList();
 
         // Build a manifest of account IDs + institution names (no sensitive data)

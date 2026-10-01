@@ -34,10 +34,10 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 
-    private BankSyncDbContext CreateContext() =>
+    private BankSyncDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options);
+            .Options, new FixedCurrentUser(actingUser));
 
     private static DateTime Utc(int year, int month, int day) =>
         new(year, month, day, 0, 0, 0, DateTimeKind.Utc);
@@ -77,7 +77,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(userId, new TransactionFilter(), 0, 50);
 
@@ -104,7 +104,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId, new TransactionFilter(AccountIds: [accountA.Id]), 0, 50);
@@ -131,7 +131,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId, new TransactionFilter(Categories: ["FOOD_AND_DRINK"]), 0, 50);
@@ -161,7 +161,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId, new TransactionFilter(From: Utc(2026, 3, 1), To: Utc(2026, 3, 31)), 0, 50);
@@ -188,7 +188,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId, new TransactionFilter(TransactionType: "credit"), 0, 50);
@@ -216,7 +216,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId, new TransactionFilter(Search: "blue bottle"), 0, 50);
@@ -244,7 +244,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByAccountIdAsync(
             account.Id, new TransactionFilter(MinAmount: 10m, MaxAmount: 100m), 0, 50);
@@ -276,7 +276,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId,
@@ -313,7 +313,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByUserIdAsync(
             userId,
@@ -342,7 +342,7 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        await using var ctx = CreateContext();
+        await using var ctx = CreateContext(userId);
         var repo = new TransactionRepository(ctx);
         var (items, totalCount) = await repo.GetFilteredByAccountIdAsync(account.Id, new TransactionFilter(), 0, 50);
 

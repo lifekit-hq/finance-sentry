@@ -87,7 +87,7 @@ public class ScheduledSyncService(
     {
         var startedAt = DateTime.UtcNow;
 
-        var account = await _accounts.GetByIdAsync(accountId, ct);
+        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
         if (account == null)
             return new SyncResult(false, 0, 0, "ACCOUNT_NOT_FOUND", "Account not found.");
 
@@ -130,7 +130,7 @@ public class ScheduledSyncService(
 
             try
             {
-                var freshAccount = await _accounts.GetByIdAsync(accountId, ct);
+                var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, ct);
                 if (freshAccount != null)
                 {
                     if (errorCode is "ITEM_LOGIN_REQUIRED" or "MONOBANK_TOKEN_INVALID")
@@ -235,7 +235,7 @@ public class ScheduledSyncService(
         if (account.MonobankCredentialId is null)
             throw new InvalidOperationException($"Monobank account {account.Id} has no credential id.");
 
-        var cred = await _monobankCredentials.GetByIdAsync(account.MonobankCredentialId.Value, ct)
+        var cred = await _monobankCredentials.GetByIdUnscopedAsync(account.MonobankCredentialId.Value, ct)
             ?? throw new InvalidOperationException($"Monobank credential {account.MonobankCredentialId} not found.");
 
         var plainToken = _encryption.Decrypt(cred.EncryptedToken, cred.Iv, cred.AuthTag, cred.KeyVersion);
@@ -325,7 +325,7 @@ public class ScheduledSyncService(
         var accessToken = preAcquiredAccessToken
             ?? await AcquireTrueLayerAccessTokenAsync(connectionId, job, account.Id, ct);
 
-        var connection = await _truelayerConnections.GetByIdAsync(connectionId, ct)
+        var connection = await _truelayerConnections.GetByIdUnscopedAsync(connectionId, ct)
             ?? throw new InvalidOperationException($"TrueLayer connection {connectionId} not found.");
 
         var provider = _providerFactory.Resolve("truelayer");
@@ -478,11 +478,11 @@ public class ScheduledSyncService(
         Guid accountId, IEnumerable<TransactionCandidate> candidates, CancellationToken ct)
     {
         var candidateList = candidates as IReadOnlyList<TransactionCandidate> ?? candidates.ToList();
-        var existingRows = (await _transactions.GetByAccountIdAsync(accountId, ct)).ToList();
+        var existingRows = (await _transactions.GetByAccountIdUnscopedAsync(accountId, ct)).ToList();
         // Dedup against ALL hashes — including soft-deleted rows, which still occupy the unique
         // (AccountId, UniqueHash) index — not just the active rows above. Missing a soft-deleted
         // hash here re-inserts it and violates the constraint, poisoning the whole batch.
-        var existingHashes = (await _transactions.GetAllUniqueHashesByAccountIdAsync(accountId, ct)).ToHashSet();
+        var existingHashes = (await _transactions.GetAllUniqueHashesByAccountIdUnscopedAsync(accountId, ct)).ToHashSet();
 
         // Settle in place: a Monobank hold keeps its date when it clears, so the settled
         // version hashes identically to the stored pending row. Dedup then discards the

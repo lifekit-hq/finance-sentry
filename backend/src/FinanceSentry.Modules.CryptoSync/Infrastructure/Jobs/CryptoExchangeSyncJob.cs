@@ -31,7 +31,7 @@ public abstract class CryptoExchangeSyncJob(
     [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteAsync()
     {
-        var activeCredentials = await credentialRepository.GetAllActiveAsync(Provider);
+        var activeCredentials = await credentialRepository.GetAllActiveUnscopedAsync(Provider);
         var failures = new List<Exception>();
 
         foreach (var credential in activeCredentials)

@@ -29,6 +29,7 @@ public class AuditLogServiceTests : IDisposable
         var dbName = $"audit-log-test-{Guid.NewGuid()}";
         services.AddDbContext<BankSyncDbContext>(options =>
             options.UseInMemoryDatabase(dbName, dbRoot));
+        services.AddSingleton<FinanceSentry.Core.Auth.ICurrentUser>(FinanceSentry.Core.Auth.NoCurrentUser.Instance);
         services.AddLogging();
 
         _provider = services.BuildServiceProvider();
@@ -118,7 +119,7 @@ public class AuditLogServiceTests : IDisposable
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
-            var row = await _db.AuditLogs.AsNoTracking()
+            var row = await _db.AuditLogs.IgnoreQueryFilters([FinanceSentry.Core.Auth.OwnerQueryFilter.Name]).AsNoTracking()
                 .FirstOrDefaultAsync(a => a.UserId == userId);
             if (row != null)
                 return row;

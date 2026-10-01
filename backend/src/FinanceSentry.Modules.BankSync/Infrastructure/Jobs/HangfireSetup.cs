@@ -97,7 +97,7 @@ public class SyncScheduler(
                 "Account discovery failed for this scheduled run; existing accounts will still be scheduled.");
         }
 
-        var activeAccounts = await _accounts.GetAllActiveAsync(ct);
+        var activeAccounts = await _accounts.GetAllActiveUnscopedAsync(ct);
         var activeIds = new HashSet<Guid>(activeAccounts.Select(a => a.Id));
 
         foreach (var account in activeAccounts)

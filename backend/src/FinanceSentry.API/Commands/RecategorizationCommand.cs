@@ -1,5 +1,6 @@
 namespace FinanceSentry.API.Commands;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,8 @@ public static class RecategorizationCommand
         if (args.Length > 1 && Guid.TryParse(args[1], out var userId))
             userIds = [userId];
         else
-            userIds = await db.BankAccounts.Select(a => a.UserId).Distinct().ToListAsync();
+            // Offline command: no person in scope, so it opts out of the Owner filter to enumerate every user.
+            userIds = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(a => a.UserId).Distinct().ToListAsync();
 
         // The service is intentionally not DI-registered — this is a one-off, so build it inline.
         var service = ActivatorUtilities.CreateInstance<TransactionRecategorizationService>(sp);

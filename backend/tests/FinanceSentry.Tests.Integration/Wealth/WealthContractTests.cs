@@ -36,7 +36,7 @@ public class WealthSummaryContractTests(WealthApiFactory factory) : IClassFixtur
     public async Task GetSummary_EmptyAccounts_Returns200WithEmptyCategories()
     {
         _factory.BankAccountRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/v1/wealth/summary");
@@ -58,7 +58,7 @@ public class WealthSummaryContractTests(WealthApiFactory factory) : IClassFixtur
         acc.MarkActive(1000m);
 
         _factory.BankAccountRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([acc]);
 
         var response = await _client.GetAsync("/api/v1/wealth/summary");
@@ -87,7 +87,7 @@ public class WealthSummaryContractTests(WealthApiFactory factory) : IClassFixtur
     public async Task GetSummary_CategoryFilter_Returns200()
     {
         _factory.BankAccountRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/v1/wealth/summary?category=banking");
@@ -143,10 +143,10 @@ public class TransactionSummaryContractTests(WealthApiFactory factory) : IClassF
     public async Task GetTxSummary_EmptyWindow_Returns200WithZeros()
     {
         _factory.BankAccountRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.TransactionRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/v1/wealth/transactions/summary?from=2026-04-01&to=2026-04-30");
@@ -162,10 +162,10 @@ public class TransactionSummaryContractTests(WealthApiFactory factory) : IClassF
     public async Task GetTxSummary_ValidRequest_Returns200WithCorrectShape()
     {
         _factory.BankAccountRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.TransactionRepoMock
-            .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/v1/wealth/transactions/summary?from=2026-04-01&to=2026-04-30");

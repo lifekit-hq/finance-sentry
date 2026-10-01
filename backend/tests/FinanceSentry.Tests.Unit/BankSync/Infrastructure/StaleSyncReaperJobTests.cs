@@ -23,11 +23,11 @@ public class StaleSyncReaperJobTests
 
     public StaleSyncReaperJobTests()
     {
-        _jobs.Setup(r => r.GetByStatusAsync("running", It.IsAny<CancellationToken>()))
+        _jobs.Setup(r => r.GetByStatusUnscopedAsync("running", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<SyncJob>());
-        _jobs.Setup(r => r.GetByStatusAsync("pending", It.IsAny<CancellationToken>()))
+        _jobs.Setup(r => r.GetByStatusUnscopedAsync("pending", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<SyncJob>());
-        _accounts.Setup(r => r.GetBySyncStatusAsync("syncing", It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetBySyncStatusUnscopedAsync("syncing", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<BankAccount>());
     }
 
@@ -36,9 +36,9 @@ public class StaleSyncReaperJobTests
     {
         var job = new SyncJob(Guid.NewGuid(), UserId); // CreatedAt == now (fresh)
         var account = MakeSyncingAccount();
-        _jobs.Setup(r => r.GetByStatusAsync("running", It.IsAny<CancellationToken>()))
+        _jobs.Setup(r => r.GetByStatusUnscopedAsync("running", It.IsAny<CancellationToken>()))
             .ReturnsAsync([job]);
-        _accounts.Setup(r => r.GetBySyncStatusAsync("syncing", It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetBySyncStatusUnscopedAsync("syncing", It.IsAny<CancellationToken>()))
             .ReturnsAsync([account]);
 
         await MakeReaper().ExecuteAsync(startupSweep: true);
@@ -55,9 +55,9 @@ public class StaleSyncReaperJobTests
     {
         var job = new SyncJob(Guid.NewGuid(), UserId); // fresh — a real sync in progress
         var account = MakeSyncingAccount();            // UpdatedAt == now
-        _jobs.Setup(r => r.GetByStatusAsync("running", It.IsAny<CancellationToken>()))
+        _jobs.Setup(r => r.GetByStatusUnscopedAsync("running", It.IsAny<CancellationToken>()))
             .ReturnsAsync([job]);
-        _accounts.Setup(r => r.GetBySyncStatusAsync("syncing", It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetBySyncStatusUnscopedAsync("syncing", It.IsAny<CancellationToken>()))
             .ReturnsAsync([account]);
 
         await MakeReaper().ExecuteAsync(startupSweep: false);
@@ -74,9 +74,9 @@ public class StaleSyncReaperJobTests
         var staleMinutes = StaleSyncReaperJob.StaleThresholdMinutes + 5;
         var job = Backdate(new SyncJob(Guid.NewGuid(), UserId), staleMinutes);
         var account = Backdate(MakeSyncingAccount(), staleMinutes);
-        _jobs.Setup(r => r.GetByStatusAsync("running", It.IsAny<CancellationToken>()))
+        _jobs.Setup(r => r.GetByStatusUnscopedAsync("running", It.IsAny<CancellationToken>()))
             .ReturnsAsync([job]);
-        _accounts.Setup(r => r.GetBySyncStatusAsync("syncing", It.IsAny<CancellationToken>()))
+        _accounts.Setup(r => r.GetBySyncStatusUnscopedAsync("syncing", It.IsAny<CancellationToken>()))
             .ReturnsAsync([account]);
 
         await MakeReaper().ExecuteAsync(startupSweep: false);

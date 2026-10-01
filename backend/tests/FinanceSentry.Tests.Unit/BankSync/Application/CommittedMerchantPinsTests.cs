@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
+using FinanceSentry.Tests.Unit.BankSync;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -27,22 +28,29 @@ public class CommittedMerchantPinsTests
 
     private static ICommittedMerchantPinRepository NewRepository(string? database = null) =>
         new CommittedMerchantPinRepository(
-            new BankSyncDbContext(Options(database ?? $"pins-{Guid.NewGuid():N}")));
+            new BankSyncDbContext(Options(database ?? $"pins-{Guid.NewGuid():N}"), AmbientCurrentUser.Instance));
 
     private static Task<PinCommittedMerchantResult> Pin(
         ICommittedMerchantPinRepository repository, Guid userId, string merchant) =>
-        new PinCommittedMerchantCommandHandler(repository)
-            .Handle(new PinCommittedMerchantCommand(userId, merchant), CancellationToken.None);
+        ActingAs(userId, () => new PinCommittedMerchantCommandHandler(repository)
+            .Handle(new PinCommittedMerchantCommand(userId, merchant), CancellationToken.None));
 
     private static Task<bool> Unpin(
         ICommittedMerchantPinRepository repository, Guid userId, string merchant) =>
-        new UnpinCommittedMerchantCommandHandler(repository)
-            .Handle(new UnpinCommittedMerchantCommand(userId, merchant), CancellationToken.None);
+        ActingAs(userId, () => new UnpinCommittedMerchantCommandHandler(repository)
+            .Handle(new UnpinCommittedMerchantCommand(userId, merchant), CancellationToken.None));
 
     private static Task<IReadOnlyList<CommittedMerchantPinDto>> List(
         ICommittedMerchantPinRepository repository, Guid userId) =>
-        new ListCommittedMerchantPinsQueryHandler(repository)
-            .Handle(new ListCommittedMerchantPinsQuery(userId), CancellationToken.None);
+        ActingAs(userId, () => new ListCommittedMerchantPinsQueryHandler(repository)
+            .Handle(new ListCommittedMerchantPinsQuery(userId), CancellationToken.None));
+
+    // The request principal is the person the call is made for; the repository's Owner query filter scopes to it.
+    private static Task<T> ActingAs<T>(Guid userId, Func<Task<T>> call)
+    {
+        AmbientCurrentUser.ActAs(userId);
+        return call();
+    }
 
     // ── The key a pin is stored under ────────────────────────────────────────
 
@@ -152,7 +160,7 @@ public class CommittedMerchantPinsTests
     /// </summary>
     private sealed class LosesItsFirstSave(
         DbContextOptions<BankSyncDbContext> options, Func<Task>? competingWriter)
-        : BankSyncDbContext(options)
+        : BankSyncDbContext(options, AmbientCurrentUser.Instance)
     {
         private bool _lost;
 

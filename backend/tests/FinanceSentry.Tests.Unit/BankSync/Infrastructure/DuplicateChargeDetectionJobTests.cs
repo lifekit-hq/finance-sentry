@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -22,7 +23,7 @@ public class DuplicateChargeDetectionJobTests
 
     private static BankSyncDbContext NewDb() => new(
         new DbContextOptionsBuilder<BankSyncDbContext>()
-            .UseInMemoryDatabase($"dup-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"dup-{Guid.NewGuid():N}").Options, NoCurrentUser.Instance);
 
     private DuplicateChargeDetectionJob MakeJob(BankSyncDbContext db, int? windowDays = null) =>
         new(db, _alerts.Object,

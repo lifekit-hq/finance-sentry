@@ -21,7 +21,7 @@ public class IbkrFlexJobsTests
     public async Task IncrementalSyncJob_NoActiveCredentials_NoOps_AndCallsSyncServiceNever()
     {
         var credentialRepo = new Mock<IIBKRFlexCredentialRepository>(MockBehavior.Strict);
-        credentialRepo.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+        credentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
 
@@ -39,7 +39,7 @@ public class IbkrFlexJobsTests
     public async Task BackfillJob_NoActiveCredentials_NoOps_AndCallsSyncServiceNever()
     {
         var credentialRepo = new Mock<IIBKRFlexCredentialRepository>(MockBehavior.Strict);
-        credentialRepo.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+        credentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
 
@@ -59,7 +59,7 @@ public class IbkrFlexJobsTests
         var userId = Guid.NewGuid();
         var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
         var credentialRepo = new Mock<IIBKRFlexCredentialRepository>(MockBehavior.Strict);
-        credentialRepo.Setup(r => r.GetAllActiveAsync(It.IsAny<CancellationToken>()))
+        credentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[credential]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
         syncService

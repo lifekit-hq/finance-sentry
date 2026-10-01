@@ -29,7 +29,7 @@ public class TrueLayerTokenRefreshServiceTests
 
         var connection = new TrueLayerConnection(UserId, "ob-testbank", "Test Bank", $"ref-{Guid.NewGuid():N}");
         connection.SetRefreshToken([1], [2], [3], 1);
-        connections.Setup(r => r.GetByIdAsync(connection.Id, It.IsAny<CancellationToken>()))
+        connections.Setup(r => r.GetByIdUnscopedAsync(connection.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(connection);
 
         encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
@@ -54,7 +54,7 @@ public class TrueLayerTokenRefreshServiceTests
     public async Task AcquireAccessTokenAsync_UnknownConnection_Throws()
     {
         var connections = new Mock<ITrueLayerConnectionRepository>();
-        connections.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        connections.Setup(r => r.GetByIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((TrueLayerConnection?)null);
 
         var sut = new TrueLayerTokenRefreshService(
@@ -76,7 +76,7 @@ public class TrueLayerTokenRefreshServiceTests
 
         var connection = new TrueLayerConnection(UserId, "ob-testbank", "Test Bank", $"ref-{Guid.NewGuid():N}");
         connection.SetRefreshToken([1], [2], [3], 1);
-        connections.Setup(r => r.GetByIdAsync(connection.Id, It.IsAny<CancellationToken>()))
+        connections.Setup(r => r.GetByIdUnscopedAsync(connection.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(connection);
         encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
             .Returns("old-refresh");

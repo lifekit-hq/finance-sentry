@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -45,7 +46,7 @@ public sealed class CategorySpikeDetectionJob(
             // a defensive arm only. A refund (credit) must never inflate a category's spend, and a
             // pending charge coexists with its posted twin (they hash differently) — counting both
             // would double the month's spend.
-            rows = await db.Transactions
+            rows = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
                 .AsNoTracking()
                 .Where(t => t.MerchantCategory != null
                          && (t.Amount < 0 || t.TransactionType == "debit")

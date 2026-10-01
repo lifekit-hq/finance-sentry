@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Integration.BankSync;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
@@ -40,7 +41,7 @@ public sealed class TransactionUserActivePostedDateIndexMigrationTests : IAsyncL
     {
         await using (var ctx = new BankSyncDbContext(new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseNpgsql(_postgres!.GetConnectionString())
-            .Options))
+            .Options, NoCurrentUser.Instance))
         {
             await ctx.Database.MigrateAsync();
         }

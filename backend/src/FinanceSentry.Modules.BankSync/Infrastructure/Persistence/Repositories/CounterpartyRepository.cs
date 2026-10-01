@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,10 @@ public class CounterpartyRepository(BankSyncDbContext context) : ICounterpartyRe
     {
         // Deterministic order (FR-009): classification is first-match-wins, so an unordered
         // read would let the database decide which counterparty claims an ambiguous match.
-        return await _context.Counterparties
+        // Opts out of the Owner filter: the shared system counterparties (UserId == Guid.Empty) belong to
+        // nobody in particular, and the family-clearing job reads this with no person in scope. The
+        // explicit predicate below keeps the read scoped to the user plus those shared rows.
+        return await _context.Counterparties.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Include(c => c.Rules)
             .Where(c => c.UserId == userId || c.UserId == Guid.Empty)
             .OrderBy(c => c.Id)

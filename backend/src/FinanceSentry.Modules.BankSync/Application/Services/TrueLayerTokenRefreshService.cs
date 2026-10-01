@@ -35,7 +35,7 @@ public class TrueLayerTokenRefreshService(
         await gate.WaitAsync(ct);
         try
         {
-            var connection = await connections.GetByIdAsync(connectionId, ct)
+            var connection = await connections.GetByIdUnscopedAsync(connectionId, ct)
                 ?? throw new InvalidOperationException($"TrueLayer connection {connectionId} not found.");
 
             var refreshToken = encryption.Decrypt(
