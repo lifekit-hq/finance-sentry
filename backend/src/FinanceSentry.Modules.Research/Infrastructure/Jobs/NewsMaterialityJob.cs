@@ -31,8 +31,17 @@ public sealed class NewsMaterialityJob(
     INewsRepository news,
     IMaterialityTermRepository materialityTerms,
     IAlertGeneratorService alerts,
-    ILogger<NewsMaterialityJob> logger)
+    ILogger<NewsMaterialityJob> logger,
+    int minGoogleNewsThesisStories = NewsMaterialityJob.DefaultMinGoogleNewsThesisStories)
 {
+    /// <summary>
+    /// Distinct fresh stories a Google-News-seeded thesis source must produce inside
+    /// <see cref="ClusterWindow"/> to fire the thesis-attached rule. One article fired it ~3.3 times a
+    /// day against a ~0.2/day design; replaying the real history put N=4 at ~0.34/day. Other thesis
+    /// sources keep a threshold of one.
+    /// </summary>
+    public const int DefaultMinGoogleNewsThesisStories = 4;
+
     private const string EquityInstrumentType = "STK";
     private const int MinClusterSources = 2;
     private const int ArticleLookbackLimit = 50;
@@ -151,8 +160,10 @@ public sealed class NewsMaterialityJob(
             return;
         }
 
-        var thesisHit = thesisIds.Count > 0 && retrievable.Any(a => a.ThesisIds.Any(thesisIds.Contains));
-        if (thesisHit)
+        var thesisArticles = thesisIds.Count == 0
+            ? []
+            : retrievable.Where(a => a.ThesisIds.Any(thesisIds.Contains)).ToList();
+        if (IsThesisHit(thesisArticles))
         {
             await alerts.GenerateNewsClusterAlertAsync(userId, ticker, "thesis-attached source hit", day, ct);
             return;
@@ -166,6 +177,20 @@ public sealed class NewsMaterialityJob(
             await alerts.GenerateNewsClusterAlertAsync(userId, ticker, $"material keyword: {matchedKeyword}", day, ct);
         }
     }
+
+    /// <summary>
+    /// A hit from a curated thesis source fires on its own; hits that only come from Google-News-seeded
+    /// sources (one source name per thesis, publisher lost) need
+    /// <c>minGoogleNewsThesisStories</c> distinct stories.
+    /// </summary>
+    private bool IsThesisHit(List<NewsArticle> thesisArticles)
+        => thesisArticles.Any(a => !IsGoogleNewsSeeded(a))
+            || (thesisArticles.Count > 0
+                && thesisArticles.Select(a => NormalizeTitle(a.Title)).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                    >= minGoogleNewsThesisStories);
+
+    private static bool IsGoogleNewsSeeded(NewsArticle article)
+        => article.Source.StartsWith($"src:{GeopoliticsSourceSeedJob.SourceNamePrefix}", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>An article with no usable link is not a retrievable underlying source (#693).</summary>
     private static bool IsRetrievable(NewsArticle article)

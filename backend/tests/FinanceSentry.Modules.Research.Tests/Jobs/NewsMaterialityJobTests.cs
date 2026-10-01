@@ -128,6 +128,10 @@ public sealed class NewsMaterialityJobTests
             ContentHash = Guid.NewGuid().ToString("N"),
         };
 
+    private static NewsArticle[] GoogleNewsStories(string ticker, Guid thesisId, int count)
+        => [.. Enumerable.Range(1, count).Select(i =>
+            RegisteredSourceArticle($"src:Google News: {ticker} geopolitics", $"{ticker} policy story {i}", thesisId))];
+
     private Guid SetupThesis(string ticker)
     {
         var thesisId = Guid.NewGuid();
@@ -160,7 +164,7 @@ public sealed class NewsMaterialityJobTests
         var thesisId = SetupThesis("AAPL");
         SetupThesisArticles(
             thesisId,
-            RegisteredSourceArticle("src:Google News: AAPL geopolitics", "New tariffs hit handset imports", thesisId));
+            GoogleNewsStories("AAPL", thesisId, 4));
 
         await _job.ExecuteAsync(_nowUtc);
 
@@ -186,7 +190,7 @@ public sealed class NewsMaterialityJobTests
             .ReturnsAsync([]);
         SetupThesisArticles(
             thesisId,
-            RegisteredSourceArticle("src:Google News: NVDA geopolitics", "Export curbs widen", thesisId));
+            GoogleNewsStories("NVDA", thesisId, 4));
 
         await _job.ExecuteAsync(_nowUtc);
 
@@ -210,6 +214,93 @@ public sealed class NewsMaterialityJobTests
 
         _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
             _userId, "AAPL", It.Is<string>(r => r.Contains("2 sources")), _today, default), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Execute_GoogleNewsThesisSource_BelowStoryThreshold_DoesNotFire(int stories)
+    {
+        var thesisId = SetupThesis("AAPL");
+        SetupThesisArticles(thesisId, GoogleNewsStories("AAPL", thesisId, stories));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleNewsThesisSource_RepostedTitle_CountsOnce()
+    {
+        var thesisId = SetupThesis("AAPL");
+        SetupThesisArticles(
+            thesisId,
+            [.. GoogleNewsStories("AAPL", thesisId, 3),
+                RegisteredSourceArticle("src:Google News: AAPL geopolitics", "AAPL  policy story 1.", thesisId)]);
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateOnly>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleNewsThesisSource_BelowThreshold_StillFiresOnKeyword()
+    {
+        var thesisId = SetupThesis("AAPL");
+        SetupThesisArticles(
+            thesisId,
+            RegisteredSourceArticle("src:Google News: AAPL geopolitics", "AAPL guidance cut", thesisId));
+
+        await _job.ExecuteAsync(_nowUtc);
+
+        _alerts.Verify(a => a.GenerateNewsClusterAlertAsync(
+            _userId, "AAPL", It.Is<string>(r => r.Contains("guidance")), _today, default), Times.Once);
+    }
+
+    /// <summary>
+    /// Replay of the volume-watch history: a Google News thesis feed publishing bursts of 1, 2, 3 and 4
+    /// stories on separate days. N=1 (the old rule) fires every day; the default N=4 fires only the
+    /// 4-story day.
+    /// </summary>
+    [Theory]
+    [InlineData(1, 4)]
+    [InlineData(NewsMaterialityJob.DefaultMinGoogleNewsThesisStories, 1)]
+    public async Task Execute_ReplayedGoogleNewsHistory_FiresOnlyDaysReachingThreshold(int threshold, int expectedFireDays)
+    {
+        var thesisId = SetupThesis("AAPL");
+        var firstDay = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
+        var history = new List<NewsArticle>();
+        for (var day = 0; day < 4; day++)
+        {
+            for (var story = 0; story <= day; story++)
+            {
+                var article = RegisteredSourceArticle(
+                    "src:Google News: AAPL geopolitics", $"AAPL policy day {day} story {story}", thesisId);
+                article.PublishedAt = firstDay.AddDays(day).AddHours(10).AddMinutes(10 * story);
+                history.Add(article);
+            }
+        }
+
+        _news.Setup(n => n.SearchAsync(
+                null, null, thesisId, It.IsAny<DateTimeOffset?>(), It.IsAny<int>(), default))
+            .ReturnsAsync((string? _, string? _, Guid? _, DateTimeOffset? since, int _, CancellationToken _)
+                => history.Where(a => a.PublishedAt >= since && a.PublishedAt <= since + TimeSpan.FromHours(2)).ToList());
+        var job = new NewsMaterialityJob(
+            _banking.Object, _brokerage.Object, _theses.Object, _news.Object,
+            _materialityTerms.Object, _alerts.Object, NullLogger<NewsMaterialityJob>.Instance, threshold);
+        var firedDays = new HashSet<DateOnly>();
+        _alerts.Setup(a => a.GenerateNewsClusterAlertAsync(
+                _userId, "AAPL", It.IsAny<string>(), It.IsAny<DateOnly>(), default))
+            .Callback((Guid _, string _, string _, DateOnly day, CancellationToken _) => firedDays.Add(day));
+
+        for (var slot = firstDay.AddMinutes(5); slot <= firstDay.AddDays(4); slot = slot.AddMinutes(30))
+        {
+            await job.ExecuteAsync(slot);
+        }
+
+        Assert.Equal(expectedFireDays, firedDays.Count);
     }
 
     [Theory]
