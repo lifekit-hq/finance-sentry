@@ -21,7 +21,7 @@ export class AccountBalancePipe implements PipeTransform {
     currency,
     balanceInBaseCurrency,
   }: AccountBalanceItem): FormattedBalance {
-    const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE;
+    const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && currentBalance > 0;
     const native = owed
       ? MoneyUtils.formatOwed(currentBalance, currency)
       : MoneyUtils.format(currentBalance, currency);

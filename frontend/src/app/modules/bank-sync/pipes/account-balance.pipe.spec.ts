@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 
 import {type AccountBalanceItem} from '../../../shared/models/wealth/wealth.model';
+import {MoneyUtils} from '../../../shared/utils/money.utils';
 import {AccountBalancePipe} from './account-balance.pipe';
 
 function account(overrides: Partial<AccountBalanceItem>): AccountBalanceItem {
@@ -46,5 +47,12 @@ describe('AccountBalancePipe', () => {
 
     expect(result.native).toBe('Owes €120.00');
     expect(result.owed).toBe(true);
+  });
+
+  it.each([0, -5])('does not label a credit account with balance %d as owed', (currentBalance) => {
+    const result = pipe.transform(account({accountType: 'credit', currentBalance}));
+
+    expect(result.native).toBe(MoneyUtils.format(currentBalance, 'EUR'));
+    expect(result.owed).toBe(false);
   });
 });
