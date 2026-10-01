@@ -16,8 +16,6 @@ import {SyncStatusResponse, TriggerSyncResponse} from '../models/sync/sync.model
 import {
   type GetAllTransactionsParams,
   type GlobalTransactionsResponse,
-  type TransactionListResponse,
-  type TransactionQueryParams,
 } from '../models/transaction/transaction.model';
 import {
   type BeginTrueLayerConnectRequest,
@@ -51,13 +49,6 @@ export class BankSyncService extends ApiService {
 
   public getAccounts(status?: string, currency?: string): Observable<AccountsResponse> {
     return this.get<AccountsResponse>('', {status, currency});
-  }
-
-  public getTransactions(
-    accountId: string,
-    queryParams?: TransactionQueryParams
-  ): Observable<TransactionListResponse> {
-    return this.get<TransactionListResponse>(`${accountId}/transactions`, queryParams);
   }
 
   public getAllTransactions(

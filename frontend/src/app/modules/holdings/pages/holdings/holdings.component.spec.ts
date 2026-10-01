@@ -16,10 +16,12 @@ const EQUITY_GROUP: PositionAssetGroup = {
     {
       symbol: 'DRAM',
       provider: 'ibkr',
+      providerLabel: 'Interactive Brokers',
       quantity: 10,
       currentPrice: 10,
       currentValue: 100,
       pnlPercent: 25.3,
+      pnlUsd: 20.2,
       weightPercent: 100,
     },
   ],
@@ -33,10 +35,12 @@ const CRYPTO_GROUP: PositionAssetGroup = {
     {
       symbol: 'SOL',
       provider: 'binance',
+      providerLabel: 'Binance',
       quantity: 1,
       currentPrice: 50,
       currentValue: 50,
       pnlPercent: null,
+      pnlUsd: null,
       weightPercent: 100,
     },
   ],
@@ -65,6 +69,7 @@ describe('InvestmentsComponent — positions view', () => {
           currentValue: 100,
           currentPrice: 10,
           pnlPercent: 25.3,
+          pnlUsd: 20.2,
           isVenueCash: false,
         },
         {
@@ -74,6 +79,7 @@ describe('InvestmentsComponent — positions view', () => {
           currentValue: 50,
           currentPrice: 50,
           pnlPercent: null,
+          pnlUsd: null,
           isVenueCash: false,
         },
       ]),
@@ -112,8 +118,38 @@ describe('InvestmentsComponent — positions view', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('+$20.20');
     expect(text).toContain('25.30%');
     expect(text).toContain('—');
+  });
+
+  it('shows the provider as a subtitle under the symbol', () => {
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Interactive Brokers');
+    expect(text).toContain('Binance');
+  });
+
+  it('renders skeleton rows while positions load', () => {
+    mockStore.isPositionsLoading.set(true);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="holdings-skeleton"]')).not.toBeNull();
+    expect(root.querySelector('cmn-data-table')).toBeNull();
+  });
+
+  it('hides the donut when there is nothing to draw', () => {
+    mockStore.totalPositionsValue.set(0);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('cmn-donut-chart')).toBeNull();
   });
 
   it('shows an empty state when there are no positions', () => {

@@ -15,6 +15,7 @@ function position(overrides: Partial<Position>): Position {
     currentValue: 0,
     currentPrice: 0,
     pnlPercent: null,
+    pnlUsd: null,
     isVenueCash: false,
     ...overrides,
   };
@@ -66,5 +67,25 @@ describe('holdingsComputed', () => {
       ['Crypto', 60],
       ['Venue cash', 20],
     ]);
+  });
+
+  it('shows the provider display name and carries the P&L value, biggest holding first', () => {
+    const computed = build([
+      position({symbol: 'SMALL', provider: 'ibkr', currentValue: 100, pnlPercent: 10, pnlUsd: 10}),
+      position({symbol: 'BIG', provider: 'ibkr', currentValue: 900, pnlPercent: -5, pnlUsd: -47}),
+    ]);
+
+    const rows = computed.positionsByAssetClass()[0].rows;
+
+    expect(rows.map(r => r.symbol)).toEqual(['BIG', 'SMALL']);
+    expect(rows[0]).toEqual(
+      expect.objectContaining({providerLabel: 'Interactive Brokers', pnlUsd: -47})
+    );
+  });
+
+  it('falls back to the raw slug for an unknown provider', () => {
+    const computed = build([position({provider: 'mystery', currentValue: 1})]);
+
+    expect(computed.positionsByAssetClass()[0].rows[0].providerLabel).toBe('mystery');
   });
 });

@@ -7,6 +7,7 @@ export interface DossierState {
   ledgerRead: Nullable<AssetLedgerReadDto>;
   ledgerReadStatus: AsyncStatus;
   ledgerReadErrorCode: Nullable<string>;
+  isThesisExpanded: boolean;
 }
 
 export const initialDossierState: DossierState = {
@@ -16,4 +17,5 @@ export const initialDossierState: DossierState = {
   ledgerRead: null,
   ledgerReadStatus: 'idle',
   ledgerReadErrorCode: null,
+  isThesisExpanded: false,
 };

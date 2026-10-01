@@ -2,6 +2,7 @@ import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
+import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position} from '../models/position/position.model';
 import {type HoldingsState} from './holdings.state';
 
@@ -19,10 +20,12 @@ export type AssetClass = 'equity' | 'crypto' | 'venueCash';
 export interface PositionRow {
   symbol: string;
   provider: string;
+  providerLabel: string;
   quantity: number;
   currentPrice: Nullable<number>;
   currentValue: number;
   pnlPercent: Nullable<number>;
+  pnlUsd: Nullable<number>;
   weightPercent: number;
 }
 
@@ -80,10 +83,12 @@ export function holdingsComputed(store: StateSignals) {
       const row: PositionRow = {
         symbol: p.symbol,
         provider: p.provider,
+        providerLabel: ProviderUtils.label(p.provider),
         quantity: p.quantity,
         currentPrice: p.currentPrice,
         currentValue: p.currentValue,
         pnlPercent: p.pnlPercent,
+        pnlUsd: p.pnlUsd,
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);

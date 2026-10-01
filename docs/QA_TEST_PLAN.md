@@ -7,7 +7,7 @@
 | 1 | Happy path: link account | Click "Connect Bank", complete the TrueLayer sandbox consent flow | Account appears in list with status "active" |
 | 2 | Duplicate account | Link same bank account twice | Second attempt rejected with clear error message |
 | 3 | Invalid public token | Submit corrupted `publicToken` | 400 "Bank credentials expired. Please reconnect." |
-| 4 | View transactions | Open linked account, view transaction list | Paginated list loads, amounts and dates correct |
+| 4 | View transactions | Open Transactions, optionally filter by the linked account's chip | Paginated list loads, amounts and dates correct |
 | 5 | Delete account | Click "Disconnect" on an account | Account removed from list; 204 returned |
 | 6 | User isolation | User A cannot see User B's accounts | 404 returned for cross-user account ID |
 

@@ -28,6 +28,7 @@ function buildSignals(overrides: Partial<DossierState> = {}) {
       overrides.ledgerReadStatus ?? 'idle'
     ),
     ledgerReadErrorCode: signal<Nullable<string>>(overrides.ledgerReadErrorCode ?? null),
+    isThesisExpanded: signal<boolean>(overrides.isThesisExpanded ?? false),
   };
 }
 
@@ -270,6 +271,50 @@ describe('dossierComputed', () => {
     TestBed.runInInjectionContext(() => {
       expect(dossierComputed(store).ledgerReadErrorMessage()).toBe('');
       expect(dossierComputed(store).isLedgerReadLoading()).toBe(true);
+    });
+  });
+
+  describe('thesis paragraphs', () => {
+    const twoParagraphs = emptyDossier({
+      thesis: {...THESIS, thesisText: 'First point.\n\nSecond point.\n\n  \n\nThird.'},
+    });
+
+    it('is empty without a thesis', () => {
+      TestBed.runInInjectionContext(() => {
+        const computeds = dossierComputed(buildSignals({dossier: emptyDossier()}));
+        expect(computeds.thesisParagraphs()).toEqual([]);
+        expect(computeds.thesisHasMore()).toBe(false);
+      });
+    });
+
+    it('shows only the first paragraph until expanded', () => {
+      TestBed.runInInjectionContext(() => {
+        const computeds = dossierComputed(buildSignals({dossier: twoParagraphs}));
+        expect(computeds.thesisHasMore()).toBe(true);
+        expect(computeds.visibleThesisParagraphs()).toEqual(['First point.']);
+      });
+    });
+
+    it('shows every non-blank paragraph once expanded', () => {
+      TestBed.runInInjectionContext(() => {
+        const computeds = dossierComputed(
+          buildSignals({dossier: twoParagraphs, isThesisExpanded: true})
+        );
+        expect(computeds.visibleThesisParagraphs()).toEqual([
+          'First point.',
+          'Second point.',
+          'Third.',
+        ]);
+      });
+    });
+
+    it('has no "read more" for a single paragraph', () => {
+      TestBed.runInInjectionContext(() => {
+        const computeds = dossierComputed(
+          buildSignals({dossier: emptyDossier({thesis: {...THESIS, thesisText: 'Only one.'}})})
+        );
+        expect(computeds.thesisHasMore()).toBe(false);
+      });
     });
   });
 });

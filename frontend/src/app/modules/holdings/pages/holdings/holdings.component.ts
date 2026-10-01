@@ -17,6 +17,8 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {HoldingsStore} from '../../store/holdings.store';
 
+const SKELETON_ROWS = 4;
+
 @Component({
   selector: 'fns-investments',
   imports: [
@@ -39,6 +41,7 @@ import {HoldingsStore} from '../../store/holdings.store';
 export class InvestmentsComponent {
   private readonly router = inject(Router);
   public readonly store = inject(HoldingsStore);
+  public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
 

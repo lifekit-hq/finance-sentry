@@ -12,8 +12,11 @@ import {
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
+import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type DossierSignalItem} from '../../models/dossier/dossier.model';
+import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
 import {DossierStore} from '../../store/dossier.store';
 
 const SEVERITY_VALUE: Record<string, number> = {high: 25, medium: 15, low: 5};
@@ -33,9 +36,12 @@ const SPARKLINE_MIN_POINTS = 2;
     DatePipe,
     DecimalPipe,
     MoneyPipe,
+    ProviderLabelPipe,
+    RelativeTimePipe,
     SkeletonComponent,
     EmptyStateComponent,
     TagComponent,
+    TriggerSentencePipe,
   ],
   templateUrl: './asset-dossier.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

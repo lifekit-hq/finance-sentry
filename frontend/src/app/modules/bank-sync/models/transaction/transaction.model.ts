@@ -20,35 +20,24 @@ export interface GlobalTransactionDto extends Timestamped {
 
 export type GlobalTransactionsResponse = PagedResponse<GlobalTransactionDto>;
 
-export interface Transaction extends Timestamped {
-  transactionId: string;
-  accountId: string;
-  amount: number;
-  transactionType: TransactionType;
-  postedDate: Nullable<string>;
-  pendingDate: Nullable<string>;
-  isPending: boolean;
-  description: string;
-  merchantCategory: Nullable<string>;
-  provider?: Nullable<string>;
-  accountType?: Nullable<string>;
-  syncedAt: string;
-}
-
-export interface TransactionListResponse extends PagedResponse<Transaction> {
-  accountId: string;
-  bankName: string;
-  currency: string;
-}
-
-export interface TransactionQueryParams extends PagedRequest {
-  startDate?: string;
-  endDate?: string;
-  status?: 'posted' | 'pending' | 'all';
-}
-
 export interface GetAllTransactionsParams extends PagedRequest {
   from?: string;
   to?: string;
   transactionType?: 'credit' | 'debit';
+  accountId?: string;
+  search?: string;
+}
+
+/** One selectable account in the ledger's Account filter. */
+export interface TransactionAccountOption {
+  accountId: string;
+  label: string;
+}
+
+/** Transactions sharing one calendar day, newest day first. */
+export interface TransactionDayGroup {
+  /** Calendar day as `YYYY-MM-DD`. */
+  dayKey: string;
+  label: string;
+  items: GlobalTransactionDto[];
 }

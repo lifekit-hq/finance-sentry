@@ -122,9 +122,9 @@ const DOSSIER_AAPL = {
     catalysts: [{date: '2026-10-15', event: 'Q4 Earnings expected strong services growth'}],
     invalidationTriggers: [
       {
-        metric: 'services_revenue_growth',
-        direction: 'below',
-        threshold: 5,
+        metric: 'revenue_yoy',
+        direction: 'lessThan',
+        threshold: 0.05,
         proxyTicker: null,
         consecutivePeriods: 2,
         periodType: 'Quarter',
@@ -361,7 +361,7 @@ test.describe('Asset Dossier', () => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Investment Thesis')).toBeVisible();
     await expect(page.getByText('Apple continues to expand its services revenue')).toBeVisible();
-    await expect(page.getByText('Active')).toBeVisible();
+    await expect(page.getByText('Active', {exact: true})).toBeVisible();
   });
 
   test('dossier page renders analyst coverage', async ({page}) => {
@@ -380,7 +380,7 @@ test.describe('Asset Dossier', () => {
     await page.goto('/assets/AAPL');
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
 
-    await page.getByRole('button', {name: /back to investments/i}).click();
+    await page.getByTestId('dossier-back').click();
 
     await expect(page).toHaveURL(/\/accounts\/investments/);
   });
@@ -394,12 +394,22 @@ test.describe('Asset Dossier', () => {
     await expect(page).toHaveURL(/\/assets\/AAPL/);
   });
 
+  test('dossier page keeps tax lots collapsed and shows triggers as sentences', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    const lots = page.getByTestId('tax-lots');
+    await expect(lots).toBeVisible();
+    await expect(lots).not.toHaveAttribute('open', '');
+    await expect(lots.locator('summary')).toContainText('Tax lots (');
+    await expect(page.getByText('Revenue growth (YoY) falls below 5.0%')).toBeVisible();
+  });
+
   test('dossier page renders recommendation trend table', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Recommendation Trend')).toBeVisible();
-    await expect(page.getByText('Strong Buy')).toBeVisible();
+    const table = page.getByRole('table', {name: 'Recommendation trends'});
+    await expect(table.getByRole('columnheader', {name: 'Strong Buy'})).toBeVisible();
     // Verify a trend row is rendered
-    await expect(page.getByRole('cell', {name: '18'})).toBeVisible();
+    await expect(table.getByRole('cell', {name: '18'})).toBeVisible();
   });
 
   test('dossier page renders radar sparkline SVG for multiple signals', async ({page}) => {
@@ -435,7 +445,8 @@ test.describe("Ledger's read", () => {
   test('offers to generate when nothing is cached', async ({page}) => {
     await page.goto('/assets/AAPL');
 
-    await expect(page.getByTestId('ledger-read-card')).toBeVisible();
+    // Nothing generated: a single line with the action, not a card.
+    await expect(page.getByTestId('ledger-read-card')).toHaveCount(0);
     await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
     await expect(page.getByTestId('ledger-read-generate')).toBeVisible();
     await expect(page.getByTestId('ledger-read-narrative')).toHaveCount(0);
@@ -574,7 +585,7 @@ test.describe('AI surfaces gated by the ai.use permission', () => {
     await mockApis(page);
   });
 
-  test('a Member without ai.use sees the read as unavailable and never requests it', async ({
+  test('a Member without ai.use sees no Ledger read block and never requests it', async ({
     page,
   }) => {
     await signInAsMember(page);
@@ -587,7 +598,9 @@ test.describe('AI surfaces gated by the ai.use permission', () => {
 
     await page.goto('/assets/AAPL');
 
-    await expect(page.getByTestId('ledger-read-unavailable')).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
+    await expect(page.getByTestId('ledger-read-unavailable')).toHaveCount(0);
+    await expect(page.getByTestId('ledger-read-empty')).toHaveCount(0);
     await expect(page.getByTestId('ledger-read-card')).toHaveCount(0);
     await expect(page.getByTestId('ledger-read-generate')).toHaveCount(0);
     expect(narrativeRequests).toEqual([]);

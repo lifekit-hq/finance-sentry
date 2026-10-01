@@ -20,4 +20,8 @@ describe('initialDossierState', () => {
     expect(initialDossierState.ledgerReadStatus).toBe('idle');
     expect(initialDossierState.ledgerReadErrorCode).toBeNull();
   });
+
+  it('starts with the thesis collapsed', () => {
+    expect(initialDossierState.isThesisExpanded).toBe(false);
+  });
 });
