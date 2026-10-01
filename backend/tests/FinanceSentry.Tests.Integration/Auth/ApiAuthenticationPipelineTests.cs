@@ -164,13 +164,13 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task ProtectedEndpoint_WithTokenWithoutAudience_Returns200DuringRollout()
+    public async Task ProtectedEndpoint_WithTokenWithoutAudience_Returns401()
     {
         var user = await CreateUserAsync("pipeline-no-audience@test.com");
 
         var response = await Client(MintToken(user.Id, audience: null)).GetAsync(ProtectedPath);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
