@@ -130,19 +130,19 @@ export class AlertsComponent {
     this.toast.show('Alert dismissed', 'info');
   }
 
-  public onRowKey(event: Event, alert: Alert): void {
+  public onRowKey(event: Event, item: Alert): void {
     if (event.target !== event.currentTarget) {
       return;
     }
     event.preventDefault();
-    this.openAlert(alert);
+    this.openAlert(item);
   }
 
-  public openAlert(alert: Alert): void {
-    if (!alert.isRead) {
-      this.store.markRead(alert.id);
+  public openAlert(item: Alert): void {
+    if (!item.isRead) {
+      this.store.markRead(item.id);
     }
-    const target = alert.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
+    const target = item.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
     void this.router.navigateByUrl(target);
   }
 }
