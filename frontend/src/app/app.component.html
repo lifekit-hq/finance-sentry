@@ -1,0 +1,12 @@
+<router-outlet />
+
+<div
+  class="pointer-events-none fixed inset-x-cmn-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-50 mx-auto flex max-w-md flex-col gap-cmn-2 *:pointer-events-auto *:rounded-cmn-lg *:shadow-lg"
+>
+  <lk-offline-banner />
+  <lk-update-prompt
+    [ready]="appUpdate.updateReady()"
+    (lk-update-prompt-reload)="appUpdate.reload()"
+  />
+  <lk-install-hint />
+</div>
