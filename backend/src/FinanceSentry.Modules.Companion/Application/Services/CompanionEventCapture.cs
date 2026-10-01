@@ -59,7 +59,7 @@ public sealed class CompanionEventCapture(
                 continue;
             }
 
-            var mode = (await settings.GetOrDefaultAsync(a.UserId, ct)).Mode;
+            var mode = (await settings.GetOrDefaultUnscopedAsync(a.UserId, ct)).Mode;
             var staleness = kind == CompanionEventKind.SyncFailure
                 ? await SourceStalenessAsync(a, accountsByUser, ct)
                 : null;
@@ -122,7 +122,7 @@ public sealed class CompanionEventCapture(
                     continue;
                 }
 
-                var mode = (await settings.GetOrDefaultAsync(userId, ct)).Mode;
+                var mode = (await settings.GetOrDefaultUnscopedAsync(userId, ct)).Mode;
                 var target = a.NewTarget is { } t ? $" (target ${t:0.##})" : string.Empty;
                 var evt = new CompanionEvent
                 {

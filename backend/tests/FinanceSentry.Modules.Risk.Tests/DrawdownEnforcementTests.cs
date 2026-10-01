@@ -112,7 +112,7 @@ public sealed class DrawdownEnforcementTests
         var policy = new Mock<IDrawdownPolicySource>();
         policy.Setup(p => p.GetMaxDrawdownAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(0.20m);
         var snapshots = new Mock<IHoldingSnapshotRepository>();
-        snapshots.Setup(s => s.ListSinceAsync(UserId, Now.AddDays(-365), It.IsAny<CancellationToken>()))
+        snapshots.Setup(s => s.ListSinceUnscopedAsync(UserId, Now.AddDays(-365), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new HoldingSnapshot { Symbol = "AAA", Sleeve = RiskSleeve.Brokerage, Quantity = 10m, UsdValue = 12_000m, CapturedAt = Now.AddDays(-30) }]);
 
         var result = await Provider(policy, snapshots).GetAsync(UserId, Book, Now, default);
@@ -126,7 +126,7 @@ public sealed class DrawdownEnforcementTests
         var policy = new Mock<IDrawdownPolicySource>();
         policy.Setup(p => p.GetMaxDrawdownAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(0.20m);
         var snapshots = new Mock<IHoldingSnapshotRepository>();
-        snapshots.Setup(s => s.ListSinceAsync(UserId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        snapshots.Setup(s => s.ListSinceUnscopedAsync(UserId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         (await Provider(policy, snapshots).GetAsync(UserId, Book, Now, default)).Should().BeNull();
     }

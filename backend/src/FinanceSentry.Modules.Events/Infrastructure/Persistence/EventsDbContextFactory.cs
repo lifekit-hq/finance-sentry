@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Events.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class EventsDbContextFactory : IDesignTimeDbContextFactory<EventsDbContex
             connectionString,
             b => b.MigrationsHistoryTable(EventsModule.MigrationsHistoryTable, "public"));
 
-        return new EventsDbContext(optionsBuilder.Options);
+        return new EventsDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

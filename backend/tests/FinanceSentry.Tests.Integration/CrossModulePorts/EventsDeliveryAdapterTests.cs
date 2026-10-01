@@ -5,6 +5,7 @@ using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -24,7 +25,9 @@ public sealed class EventsDeliveryAdapterTests : IDisposable
     public EventsDeliveryAdapterTests()
     {
         _db = new CompanionDbContext(new DbContextOptionsBuilder<CompanionDbContext>()
-            .UseInMemoryDatabase($"companion-{Guid.NewGuid():N}").Options);
+            .UseInMemoryDatabase($"companion-{Guid.NewGuid():N}").Options,
+            // The in-memory provider applies the Owner query filter too; the Events reads run as User.
+            new FixedCurrentUser(User));
         _adapter = new EventsDeliveryAdapter(new OutboxDeliveryReader(new CompanionEventRepository(_db), _policy));
     }
 

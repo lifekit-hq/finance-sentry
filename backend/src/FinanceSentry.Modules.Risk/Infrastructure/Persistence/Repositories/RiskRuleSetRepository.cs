@@ -1,13 +1,22 @@
 namespace FinanceSentry.Modules.Risk.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under the Owner filter. The daily check, the portfolio scan and the cross-module readers run with
+// no person in scope, so they call the <c>…Unscoped…</c> methods, which opt out explicitly and keep their own
+// UserId predicate (or an explicit all-users sweep).
 public sealed class RiskRuleSetRepository(RiskDbContext db) : IRiskRuleSetRepository
 {
     public Task<RiskRuleSet?> GetCurrentAsync(Guid userId, CancellationToken ct = default)
         => db.RiskRuleSets
+            .Where(r => r.UserId == userId && r.IsCurrent)
+            .SingleOrDefaultAsync(ct);
+
+    public Task<RiskRuleSet?> GetCurrentUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => db.RiskRuleSets.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(r => r.UserId == userId && r.IsCurrent)
             .SingleOrDefaultAsync(ct);
 
@@ -30,8 +39,8 @@ public sealed class RiskRuleSetRepository(RiskDbContext db) : IRiskRuleSetReposi
         return ruleSet;
     }
 
-    public async Task<IReadOnlyList<Guid>> GetUserIdsWithRuleSetsAsync(CancellationToken ct = default)
-        => await db.RiskRuleSets
+    public async Task<IReadOnlyList<Guid>> GetUserIdsWithRuleSetsUnscopedAsync(CancellationToken ct = default)
+        => await db.RiskRuleSets.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(r => r.IsCurrent)
             .Select(r => r.UserId)
             .Distinct()

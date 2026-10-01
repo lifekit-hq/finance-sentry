@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Agent.Infrastructure;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -28,6 +29,6 @@ public class AgentDbContextFactory : IDesignTimeDbContextFactory<AgentDbContext>
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public"));
 
-        return new AgentDbContext(optionsBuilder.Options);
+        return new AgentDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

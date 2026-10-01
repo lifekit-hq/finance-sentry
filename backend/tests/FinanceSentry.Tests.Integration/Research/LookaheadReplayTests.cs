@@ -178,8 +178,9 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     {
         await using var alerts = AlertsContext();
         await using var companion = CompanionContext();
-        await using var events = EventsContext();
-        var outbox = new CompanionEventRepository(companion);
+        await using var agentCompanion = CompanionContext(_userId);
+        await using var events = EventsContext(_userId);
+        var outbox = new CompanionEventRepository(agentCompanion);
 
         var capture = new CompanionEventCapture(
             new MaterialAlertReader(alerts),
@@ -188,7 +189,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
             _banking.Object,
             Mock.Of<IBankingAccountsReader>(),
             new NotificationSettingRepository(companion, Options.Create(new CompanionOptions())),
-            outbox,
+            new CompanionEventRepository(companion),
             new CompanionCaptureStateRepository(companion),
             _policy,
             Options.Create(new CompanionOptions()),
@@ -196,7 +197,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         (await capture.CaptureAsync()).Should().BeGreaterThan(0);
 
         var dedupKey = _policy.AlertDedupKey(alert.Id);
-        var evt = await companion.Events.AsNoTracking().SingleAsync(e => e.DedupKey == dedupKey);
+        var evt = await agentCompanion.Events.AsNoTracking().SingleAsync(e => e.DedupKey == dedupKey);
         evt.Disposition.Should().Be(EventDisposition.Pending, "the default Scan mode queues look-ahead events for the agent");
 
         (await new AcknowledgeCompanionEventsCommandHandler(outbox)
@@ -232,11 +233,13 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
         new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
             new FixedCurrentUser(actingUser));
 
-    private CompanionDbContext CompanionContext() =>
-        new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    private CompanionDbContext CompanionContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
-    private EventsDbContext EventsContext() =>
-        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    private EventsDbContext EventsContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
     /// <summary>Serves the captured provider responses; anything else is a 404, as an unknown ticker is live.</summary>
     private sealed class FixtureHttpClientFactory : IHttpClientFactory

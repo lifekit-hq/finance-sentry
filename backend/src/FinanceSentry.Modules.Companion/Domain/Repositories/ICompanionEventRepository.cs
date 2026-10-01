@@ -4,24 +4,26 @@ using FinanceSentry.Modules.Companion.Domain;
 
 public interface ICompanionEventRepository
 {
-    /// <summary>Insert only if no row with the same <c>DedupKey</c> exists. Returns true if inserted.</summary>
+    /// <summary>Insert only if no row with the same <c>DedupKey</c> exists. Returns true if inserted. The capture job
+    /// runs with no person in scope, so the dedup check opts out of the Owner query filter.</summary>
     Task<bool> InsertIfNewAsync(CompanionEvent evt, CancellationToken ct = default);
 
     /// <summary>Events for a user in any of the given dispositions, newest first.</summary>
     Task<IReadOnlyList<CompanionEvent>> ListByDispositionAsync(
         Guid userId, IReadOnlyCollection<EventDisposition> dispositions, int limit, CancellationToken ct = default);
 
-    /// <summary>All realtime-pending events across users, oldest first (relay input).</summary>
-    Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingAsync(int limit, CancellationToken ct = default);
+    /// <summary>All realtime-pending events across users, oldest first (relay input). Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingUnscopedAsync(int limit, CancellationToken ct = default);
 
-    /// <summary>All held-for-digest events for a user, oldest first.</summary>
-    Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>All held-for-digest events for a user, oldest first, for the digest job. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestUnscopedAsync(Guid userId, CancellationToken ct = default);
 
-    /// <summary>Distinct user ids with at least one event currently held for the digest.</summary>
-    Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default);
+    /// <summary>Distinct user ids with at least one event currently held for the digest. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsUnscopedAsync(CancellationToken ct = default);
 
-    /// <summary>Count of proactive events dispatched for a user since a cutoff (rate limiting).</summary>
-    Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default);
+    /// <summary>Count of proactive events dispatched for a user since a cutoff (rate limiting in the dispatch job).
+    /// Opts out of the Owner query filter.</summary>
+    Task<int> CountDispatchedSinceUnscopedAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default);
 
     Task<CompanionEvent?> GetAsync(Guid id, CancellationToken ct = default);
 

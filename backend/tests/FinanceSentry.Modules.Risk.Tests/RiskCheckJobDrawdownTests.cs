@@ -28,10 +28,10 @@ public sealed class RiskCheckJobDrawdownTests
         bookReader.Setup(r => r.ReadAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(Book);
 
         var ruleSets = new Mock<IRiskRuleSetRepository>();
-        ruleSets.Setup(r => r.GetCurrentAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
+        ruleSets.Setup(r => r.GetCurrentUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
 
         var acks = new Mock<IPolicyViolationAckRepository>();
-        acks.Setup(r => r.ListActiveAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        acks.Setup(r => r.ListActiveUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         var allocation = new Mock<IAllocationPolicySource>();
         allocation.Setup(s => s.GetAllocationTargetsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);

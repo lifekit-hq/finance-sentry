@@ -1,16 +1,20 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under the Owner filter. The capture, dispatch and digest jobs run with no person in scope, so they call
+// the <c>…Unscoped…</c> methods, which opt out explicitly and keep their own UserId predicate (or an explicit
+// all-users sweep).
 public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRepository
 {
     private const int MaxLimit = 200;
 
     public async Task<bool> InsertIfNewAsync(CompanionEvent evt, CancellationToken ct = default)
     {
-        var exists = await db.Events.AsNoTracking().AnyAsync(e => e.DedupKey == evt.DedupKey, ct);
+        var exists = await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().AnyAsync(e => e.DedupKey == evt.DedupKey, ct);
         if (exists)
         {
             return false;
@@ -41,10 +45,10 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingAsync(int limit, CancellationToken ct = default)
+    public async Task<IReadOnlyList<CompanionEvent>> ListRealtimePendingUnscopedAsync(int limit, CancellationToken ct = default)
     {
         var effective = Math.Clamp(limit, 1, MaxLimit);
-        return await db.Events
+        return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(e => e.Disposition == EventDisposition.Pending || e.Disposition == EventDisposition.DeferredQuietHours
                 || e.Disposition == EventDisposition.SuppressedByRateLimit)
             .OrderBy(e => e.OccurredAt)
@@ -52,21 +56,21 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestAsync(Guid userId, CancellationToken ct = default)
-        => await db.Events
+    public async Task<IReadOnlyList<CompanionEvent>> ListHeldForDigestUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(e => e.UserId == userId && e.Disposition == EventDisposition.HeldForDigest)
             .OrderBy(e => e.OccurredAt)
             .ToListAsync(ct);
 
-    public async Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsAsync(CancellationToken ct = default)
-        => await db.Events.AsNoTracking()
+    public async Task<IReadOnlyList<Guid>> ListHeldForDigestUserIdsUnscopedAsync(CancellationToken ct = default)
+        => await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(e => e.Disposition == EventDisposition.HeldForDigest)
             .Select(e => e.UserId)
             .Distinct()
             .ToListAsync(ct);
 
-    public async Task<int> CountDispatchedSinceAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
-        => await db.Events.AsNoTracking()
+    public async Task<int> CountDispatchedSinceUnscopedAsync(Guid userId, DateTimeOffset since, CancellationToken ct = default)
+        => await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .CountAsync(e => e.UserId == userId && e.DispatchedAt != null && e.DispatchedAt >= since, ct);
 
     public async Task<CompanionEvent?> GetAsync(Guid id, CancellationToken ct = default)

@@ -161,7 +161,7 @@ public sealed class ReadPortCompositionTests
         var from = new DateOnly(2026, 9, 1);
         var to = new DateOnly(2026, 9, 2);
         var snapshots = new Mock<INetWorthSnapshotRepository>();
-        snapshots.Setup(s => s.GetByUserIdAsync(User, from, to, It.IsAny<CancellationToken>()))
+        snapshots.Setup(s => s.GetByUserIdUnscopedAsync(User, from, to, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new NetWorthSnapshot { UserId = User, SnapshotDate = from, BankingTotal = 5m, BrokerageTotal = 100m, TotalNetWorth = 105m },
                 new NetWorthSnapshot { UserId = User, SnapshotDate = to, BankingTotal = 5m, BrokerageTotal = 110m, TotalNetWorth = 115m },
@@ -177,7 +177,7 @@ public sealed class ReadPortCompositionTests
     public async Task Position_cap_is_the_current_rule_sets_max_position_weight()
     {
         var ruleSets = new Mock<IRiskRuleSetRepository>();
-        ruleSets.Setup(r => r.GetCurrentAsync(User, It.IsAny<CancellationToken>()))
+        ruleSets.Setup(r => r.GetCurrentUnscopedAsync(User, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RiskRuleSet { UserId = User, MaxPositionWeightPct = 0.15m, MinCashBufferPct = 0.05m });
 
         var cap = await new RiskPositionCapSource(new RiskLimitsReader(ruleSets.Object))
@@ -190,7 +190,7 @@ public sealed class ReadPortCompositionTests
     public async Task Position_cap_is_null_without_a_rule_set()
     {
         var ruleSets = new Mock<IRiskRuleSetRepository>();
-        ruleSets.Setup(r => r.GetCurrentAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
+        ruleSets.Setup(r => r.GetCurrentUnscopedAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
 
         var cap = await new RiskPositionCapSource(new RiskLimitsReader(ruleSets.Object))
             .GetMaxPositionWeightAsync(User, CancellationToken.None);

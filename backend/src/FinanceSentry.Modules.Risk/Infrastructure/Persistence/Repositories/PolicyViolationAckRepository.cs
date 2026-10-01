@@ -1,13 +1,21 @@
 namespace FinanceSentry.Modules.Risk.Infrastructure.Persistence.Repositories;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Risk.Domain;
 using FinanceSentry.Modules.Risk.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
+// Reads run under the Owner filter. The daily check and the alert-side reader run with no person in scope, so
+// they call <see cref="ListActiveUnscopedAsync"/>, which opts out explicitly and keeps its own UserId predicate.
 public sealed class PolicyViolationAckRepository(RiskDbContext db) : IPolicyViolationAckRepository
 {
     public async Task<IReadOnlyList<PolicyViolationAck>> ListActiveAsync(Guid userId, CancellationToken ct = default)
         => await db.PolicyViolationAcks
+            .Where(a => a.UserId == userId && a.IsActive)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<PolicyViolationAck>> ListActiveUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => await db.PolicyViolationAcks.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(a => a.UserId == userId && a.IsActive)
             .ToListAsync(ct);
 

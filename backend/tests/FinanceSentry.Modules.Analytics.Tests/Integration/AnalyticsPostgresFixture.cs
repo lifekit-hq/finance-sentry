@@ -49,18 +49,19 @@ public sealed class AnalyticsPostgresFixture : IAsyncLifetime
         Migrate(new BankSyncDbContext(Opts<BankSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
         Migrate(new CryptoSyncDbContext(Opts<CryptoSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
         Migrate(new BrokerageSyncDbContext(Opts<BrokerageSyncDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
-        Migrate(new BudgetsDbContext(Opts<BudgetsDbContext>(conn, "__EFMigrationsHistory")));
-        Migrate(new WealthDbContext(Opts<WealthDbContext>(conn, "__ef_migrations_history_wealth")));
+        Migrate(new BudgetsDbContext(Opts<BudgetsDbContext>(conn, "__EFMigrationsHistory"), NoCurrentUser.Instance));
+        Migrate(new WealthDbContext(Opts<WealthDbContext>(conn, "__ef_migrations_history_wealth"), NoCurrentUser.Instance));
         Migrate(new ResearchDbContext(Opts<ResearchDbContext>(conn, "__ef_migrations_history_research"), NoCurrentUser.Instance));
-        Migrate(new AnalyticsDbContext(Opts<AnalyticsDbContext>(conn, "__ef_migrations_history_analytics")));
+        Migrate(new AnalyticsDbContext(Opts<AnalyticsDbContext>(conn, "__ef_migrations_history_analytics"), NoCurrentUser.Instance));
 
         await SeedAsync(conn);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    public AnalyticsDbContext NewAnalyticsContext()
-        => new(Opts<AnalyticsDbContext>(ConnectionString!, "__ef_migrations_history_analytics"));
+    // Null acts as a background job: no person in scope.
+    public AnalyticsDbContext NewAnalyticsContext(Guid? actingUser = null)
+        => new(Opts<AnalyticsDbContext>(ConnectionString!, "__ef_migrations_history_analytics"), new FixedCurrentUser(actingUser));
 
     private static DbContextOptions<T> Opts<T>(string conn, string historyTable)
         where T : DbContext

@@ -49,7 +49,7 @@ public class NetWorthSnapshotBackfillServiceTests
         var job = BuildJob(capturedDates);
         var snapshotRepositoryMock = new Mock<INetWorthSnapshotRepository>();
         snapshotRepositoryMock
-            .Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new NetWorthSnapshot
             {
                 Id = Guid.NewGuid(),
@@ -82,7 +82,7 @@ public class NetWorthSnapshotBackfillServiceTests
         var job = BuildJob(capturedDates);
         var snapshotRepositoryMock = new Mock<INetWorthSnapshotRepository>();
         snapshotRepositoryMock
-            .Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new NetWorthSnapshot
             {
                 Id = Guid.NewGuid(),

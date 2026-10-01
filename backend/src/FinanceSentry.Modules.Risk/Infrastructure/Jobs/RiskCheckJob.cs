@@ -60,8 +60,8 @@ public sealed class RiskCheckJob(
                 .ToList(),
             ct);
 
-        var ruleSet = await ruleSetRepo.GetCurrentAsync(userId, ct);
-        var acks = await ackRepo.ListActiveAsync(userId, ct);
+        var ruleSet = await ruleSetRepo.GetCurrentUnscopedAsync(userId, ct);
+        var acks = await ackRepo.ListActiveUnscopedAsync(userId, ct);
         var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(userId, ct);
         var drawdown = await drawdownProvider.GetAsync(userId, book, now, ct);
         var report = evaluationService.Evaluate(book, ruleSet, allocationTargets, acks, now, drawdown);
@@ -141,7 +141,7 @@ public sealed class RiskCheckJob(
             return;
         }
 
-        var history = await snapshotRepo.ListSinceAsync(userId, now - TimeSpan.FromDays(_rollingQuarterDays), ct);
+        var history = await snapshotRepo.ListSinceUnscopedAsync(userId, now - TimeSpan.FromDays(_rollingQuarterDays), ct);
         var count = turnoverTracker.CountDiscretionaryTradesInRollingQuarter(history, now);
         if (count < budget)
         {
@@ -234,7 +234,7 @@ public sealed class RiskCheckJob(
             return;
         }
 
-        var history = await snapshotRepo.ListSinceAsync(userId, now - TimeSpan.FromDays(_rollingQuarterDays), ct);
+        var history = await snapshotRepo.ListSinceUnscopedAsync(userId, now - TimeSpan.FromDays(_rollingQuarterDays), ct);
         var flags = brokenThesisDetector.Detect(history, brokenTheses);
 
         foreach (var flag in flags)

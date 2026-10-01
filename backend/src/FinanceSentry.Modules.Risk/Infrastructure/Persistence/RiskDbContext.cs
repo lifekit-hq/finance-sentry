@@ -1,15 +1,19 @@
 namespace FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Risk.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class RiskDbContext(DbContextOptions<RiskDbContext> options) : DbContext(options)
+public class RiskDbContext(DbContextOptions<RiskDbContext> options, ICurrentUser currentUser) : DbContext(options)
 {
     public DbSet<RiskRuleSet> RiskRuleSets { get; set; } = null!;
 
     public DbSet<PolicyViolationAck> PolicyViolationAcks { get; set; } = null!;
 
     public DbSet<HoldingSnapshot> HoldingSnapshots { get; set; } = null!;
+
+    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
+    private Guid? CurrentUserId => currentUser.UserId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -19,6 +23,7 @@ public class RiskDbContext(DbContextOptions<RiskDbContext> options) : DbContext(
         var ruleSet = modelBuilder.Entity<RiskRuleSet>();
         ruleSet.ToTable("risk_rule_sets");
         ruleSet.HasKey(x => x.Id);
+        ruleSet.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         ruleSet.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ruleSet.Property(x => x.UserId).IsRequired();
         ruleSet.Property(x => x.Version).IsRequired();
@@ -33,6 +38,7 @@ public class RiskDbContext(DbContextOptions<RiskDbContext> options) : DbContext(
         var ack = modelBuilder.Entity<PolicyViolationAck>();
         ack.ToTable("policy_violation_acks");
         ack.HasKey(x => x.Id);
+        ack.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         ack.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ack.Property(x => x.UserId).IsRequired();
         ack.Property(x => x.RuleKey).IsRequired().HasMaxLength(50);
@@ -46,6 +52,7 @@ public class RiskDbContext(DbContextOptions<RiskDbContext> options) : DbContext(
         var snapshot = modelBuilder.Entity<HoldingSnapshot>();
         snapshot.ToTable("holding_snapshots");
         snapshot.HasKey(x => x.Id);
+        snapshot.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
         snapshot.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         snapshot.Property(x => x.UserId).IsRequired();
         snapshot.Property(x => x.Symbol).IsRequired().HasMaxLength(40);

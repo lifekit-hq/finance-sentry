@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Analytics.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class AnalyticsDbContextFactory : IDesignTimeDbContextFactory<AnalyticsDb
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_analytics", "public"));
 
-        return new AnalyticsDbContext(optionsBuilder.Options);
+        return new AnalyticsDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

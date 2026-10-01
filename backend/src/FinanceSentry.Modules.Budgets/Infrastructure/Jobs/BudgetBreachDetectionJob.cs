@@ -96,7 +96,7 @@ public sealed class BudgetBreachDetectionJob(
         IReadOnlyList<Budget> all;
         try
         {
-            all = await budgets.GetAllAsync(ct);
+            all = await budgets.GetAllUnscopedAsync(ct);
         }
         catch (Exception ex)
         {

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Risk.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,6 @@ public class RiskDbContextFactory : IDesignTimeDbContextFactory<RiskDbContext>
             connectionString,
             b => b.MigrationsHistoryTable("__ef_migrations_history_risk", "public"));
 
-        return new RiskDbContext(optionsBuilder.Options);
+        return new RiskDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

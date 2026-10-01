@@ -19,7 +19,8 @@ public sealed class EventVerdictRepositoryTests : IDisposable
         var options = new DbContextOptionsBuilder<EventsDbContext>()
             .UseInMemoryDatabase($"events-{Guid.NewGuid():N}")
             .Options;
-        _db = new EventsDbContext(options);
+        // Acts as UserId, as the controller and MCP callers do.
+        _db = new EventsDbContext(options, new FixedCurrentUser(UserId));
         _repo = new EventVerdictRepository(_db);
     }
 

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Budgets.Infrastructure.Persistence;
 
+using FinanceSentry.Core.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,6 @@ public class BudgetsDbContextFactory : IDesignTimeDbContextFactory<BudgetsDbCont
                 npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history_budgets", "public");
             });
 
-        return new BudgetsDbContext(optionsBuilder.Options);
+        return new BudgetsDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
     }
 }

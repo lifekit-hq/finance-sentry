@@ -3,8 +3,9 @@ namespace FinanceSentry.Modules.Budgets.Domain.Repositories;
 public interface IBudgetRepository
 {
     /// <summary>All budgets across all users, for the daily budget-breach hygiene sentinel. Callers
-    /// group by <c>UserId</c> themselves so the per-user month-to-date spend read stays batched.</summary>
-    Task<IReadOnlyList<Budget>> GetAllAsync(CancellationToken ct = default);
+    /// group by <c>UserId</c> themselves so the per-user month-to-date spend read stays batched.
+    /// Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<Budget>> GetAllUnscopedAsync(CancellationToken ct = default);
 
     Task<IReadOnlyList<Budget>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
     Task<Budget?> GetByIdAsync(Guid id, CancellationToken ct = default);

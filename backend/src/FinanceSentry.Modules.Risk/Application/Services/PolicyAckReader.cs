@@ -19,14 +19,14 @@ public sealed class PolicyAckReader(
 {
     public async Task<bool> IsPolicySilencedAsync(Guid userId, string policyKey, CancellationToken ct = default)
     {
-        var acks = await ackRepo.ListActiveAsync(userId, ct);
+        var acks = await ackRepo.ListActiveUnscopedAsync(userId, ct);
         if (!acks.Any(a => a.RuleKey == policyKey))
         {
             return false;
         }
 
         var book = await bookReader.ReadAsync(userId, ct);
-        var ruleSet = await ruleSetRepo.GetCurrentAsync(userId, ct);
+        var ruleSet = await ruleSetRepo.GetCurrentUnscopedAsync(userId, ct);
         var allocationTargets = await allocationPolicySource.GetAllocationTargetsAsync(userId, ct);
         var now = DateTimeOffset.UtcNow;
         var drawdown = await drawdownProvider.GetAsync(userId, book, now, ct);

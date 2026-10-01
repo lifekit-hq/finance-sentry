@@ -27,7 +27,7 @@ public class PolicyAckReaderTests
 
     private void GivenMinCashAck()
     {
-        _acks.Setup(r => r.ListActiveAsync(_userId, default)).ReturnsAsync(
+        _acks.Setup(r => r.ListActiveUnscopedAsync(_userId, default)).ReturnsAsync(
         [
             new PolicyViolationAck
             {
@@ -38,7 +38,7 @@ public class PolicyAckReaderTests
                 WorseningStepPct = WorseningStep,
             },
         ]);
-        _ruleSets.Setup(r => r.GetCurrentAsync(_userId, default))
+        _ruleSets.Setup(r => r.GetCurrentUnscopedAsync(_userId, default))
             .ReturnsAsync(new RiskRuleSet { UserId = _userId, MinCashBufferPct = MinCash });
         _allocations.Setup(a => a.GetAllocationTargetsAsync(_userId, default)).ReturnsAsync([]);
     }
