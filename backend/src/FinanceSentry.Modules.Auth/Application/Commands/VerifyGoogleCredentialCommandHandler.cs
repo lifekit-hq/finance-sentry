@@ -5,53 +5,41 @@ using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
+/// <summary>
+/// Google sign-in for existing accounts only. The Google account resolves through Identity's external-login
+/// table; on first use it links to the account with the same (Google-verified) email, which includes a pending
+/// invite. An email with no account is refused: accounts are created by invite, never by sign-in.
+/// </summary>
 public class VerifyGoogleCredentialCommandHandler(
     UserManager<ApplicationUser> userManager,
     IUserAccessService userAccess,
     ITokenService tokenService,
     IRefreshTokenService refreshTokenService,
-    IGoogleCredentialVerifier verifier,
-    IEventBus eventBus) : ICommandHandler<VerifyGoogleCredentialCommand, AuthResult>
+    IGoogleCredentialVerifier verifier) : ICommandHandler<VerifyGoogleCredentialCommand, AuthResult>
 {
+    public const string LoginProvider = "Google";
+
     public async Task<AuthResult> Handle(VerifyGoogleCredentialCommand request, CancellationToken cancellationToken)
     {
         var googleUser = await verifier.VerifyAsync(request.Credential);
 
-        var user = await userManager.Users.FirstOrDefaultAsync(u => u.GoogleId == googleUser.GoogleId, cancellationToken);
+        var user = await userManager.FindByLoginAsync(LoginProvider, googleUser.GoogleId);
+        var isLinked = user is not null;
 
-        if (user is null)
-        {
-            user = await userManager.FindByEmailAsync(googleUser.Email);
-            if (user is not null && string.IsNullOrEmpty(user.GoogleId))
-            {
-                user.GoogleId = googleUser.GoogleId;
-                await userManager.UpdateAsync(user);
-            }
-        }
-
-        if (user is null)
-        {
-            user = new ApplicationUser
-            {
-                UserName = googleUser.Email,
-                Email = googleUser.Email,
-                GoogleId = googleUser.GoogleId,
-                EmailConfirmed = true
-            };
-            var result = await userManager.CreateAsync(user);
-
-            if (!result.Succeeded)
-                throw new InvalidOperationException("VALIDATION_ERROR:" + string.Join("|", result.Errors.Select(e => e.Description)));
-
-            await userAccess.GrantDefaultRoleAsync(user);
-
-            await PublishUserRegisteredAsync(user.Id, cancellationToken);
-        }
+        user ??= await userManager.FindByEmailAsync(googleUser.Email)
+            ?? throw new AccountNotInvitedException();
 
         if (await userManager.IsLockedOutAsync(user))
             throw new InvalidCredentialsException();
+
+        if (!isLinked)
+        {
+            var linked = await userManager.AddLoginAsync(user, new UserLoginInfo(LoginProvider, googleUser.GoogleId, LoginProvider));
+            if (!linked.Succeeded)
+                throw new InvalidOperationException(
+                    "Failed to link the Google account: " + string.Join(", ", linked.Errors.Select(e => e.Description)));
+        }
 
         var access = await userAccess.GetAsync(user);
         var (accessToken, expiresAt) = tokenService.GenerateToken(user, access.Roles);
@@ -59,21 +47,5 @@ public class VerifyGoogleCredentialCommandHandler(
         var (rawRefreshToken, _) = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
 
         return new AuthResult(new AuthResponse(new UserDto(user.Id, user.Email!, access.Roles, access.Permissions), expiresAt), rawRefreshToken, accessToken);
-    }
-
-    /// <summary>
-    /// Best-effort: a downstream module's per-user provisioning (e.g. Companion notification
-    /// settings, issue #686) must not fail sign-in.
-    /// </summary>
-    private async Task PublishUserRegisteredAsync(string userId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await eventBus.Publish(new UserRegisteredEvent(Guid.Parse(userId)), cancellationToken);
-        }
-        catch
-        {
-            // best-effort
-        }
     }
 }

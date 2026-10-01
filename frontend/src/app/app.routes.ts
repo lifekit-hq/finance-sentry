@@ -15,9 +15,11 @@ export const APP_ROUTES: Routes = [
     canActivate: [guestGuard],
   },
   {
-    path: AppRoute.Register.slice(1),
+    path: AppRoute.AcceptInvite.slice(1),
     loadComponent: () =>
-      import('./modules/auth/pages/register/register.component').then(m => m.RegisterComponent),
+      import('./modules/auth/pages/accept-invite/accept-invite.component').then(
+        m => m.AcceptInviteComponent
+      ),
     canActivate: [guestGuard],
   },
   {
@@ -101,6 +103,12 @@ export const APP_ROUTES: Routes = [
           import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
             m => m.LedgerChatComponent
           ),
+      },
+      {
+        path: AppRoute.SettingsPeople.slice(1),
+        canMatch: [permissionGuard(Permission.UsersManage)],
+        loadComponent: () =>
+          import('./modules/settings/pages/people/people.component').then(m => m.PeopleComponent),
       },
       {
         path: AppRoute.Settings.slice(1),

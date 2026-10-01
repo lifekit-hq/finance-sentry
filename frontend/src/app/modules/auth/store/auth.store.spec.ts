@@ -29,7 +29,7 @@ function routerMock(url = '/login') {
 function authServiceMock(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     login: vi.fn(),
-    register: vi.fn(),
+    acceptInvite: vi.fn(),
     verifyGoogleCredential: vi.fn(),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
     logout: vi.fn().mockReturnValue(of(null)),

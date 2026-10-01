@@ -64,10 +64,10 @@ describe('authMethods', () => {
       const {state, methods} = makeState();
       methods.setError('SOMETHING', 'login');
 
-      methods.setLoading('register');
+      methods.setLoading('acceptInvite');
 
       expect(state.status()).toBe('loading');
-      expect(state.flow()).toBe('register');
+      expect(state.flow()).toBe('acceptInvite');
       expect(state.errorCode()).toBeNull();
     });
   });
@@ -75,10 +75,10 @@ describe('authMethods', () => {
   describe('setError', () => {
     it('sets status to error with code and flow', () => {
       const {state, methods} = makeState();
-      methods.setError('DUPLICATE_EMAIL', 'register');
+      methods.setError('INVALID_INVITE', 'acceptInvite');
       expect(state.status()).toBe('error');
-      expect(state.errorCode()).toBe('DUPLICATE_EMAIL');
-      expect(state.flow()).toBe('register');
+      expect(state.errorCode()).toBe('INVALID_INVITE');
+      expect(state.flow()).toBe('acceptInvite');
     });
   });
 

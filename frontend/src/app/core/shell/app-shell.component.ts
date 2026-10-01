@@ -37,6 +37,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Events, label: 'Events', icon: 'CalendarDays', group: 'Pages'},
   {id: AppRoute.Ledger, label: 'Ledger', icon: 'Sparkles', group: 'Pages'},
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
+  {id: AppRoute.SettingsPeople, label: 'People', icon: 'Users', group: 'Pages'},
   {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
   {id: '_theme', label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
   {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},

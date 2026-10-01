@@ -12,5 +12,8 @@ public interface IMcpServiceTokenStore
     /// <summary>Marks the token revoked. Returns false when unknown or already revoked.</summary>
     Task<bool> RevokeAsync(Guid jti, CancellationToken cancellationToken = default);
 
+    /// <summary>Marks every unrevoked token of the user revoked. Returns how many were revoked.</summary>
+    Task<int> RevokeAllAsync(string userId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<McpServiceToken>> ListAsync(string userId, CancellationToken cancellationToken = default);
 }

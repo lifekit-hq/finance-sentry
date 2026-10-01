@@ -4,6 +4,10 @@ namespace FinanceSentry.Modules.Auth.Domain.Entities;
 
 public class ApplicationUser : IdentityUser
 {
+    /// <summary>
+    /// Legacy: the Google subject from before Google sign-in moved to Identity's external-login table. Kept (and
+    /// no longer written) so the column stays for the additive migration that copied it into that table.
+    /// </summary>
     public string? GoogleId { get; set; }
     public string? FirstName { get; set; }
     public string? LastName { get; set; }

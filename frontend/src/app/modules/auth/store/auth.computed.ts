@@ -13,7 +13,14 @@ interface StateSignals {
 }
 
 function flowFallback(flow: AuthFlow): string {
-  return flow === 'login' ? 'Invalid email or password.' : '';
+  switch (flow) {
+    case 'login':
+      return 'Invalid email or password.';
+    case 'acceptInvite':
+      return 'Could not set your password. Try again or ask the owner for a new invite.';
+    default:
+      return '';
+  }
 }
 
 export function authComputed(store: StateSignals) {
@@ -22,6 +29,7 @@ export function authComputed(store: StateSignals) {
   return {
     isAuthenticated: computed(() => store.userId() !== null),
     canUseAi: computed(() => store.permissions().includes(Permission.AiUse)),
+    canManageUsers: computed(() => store.permissions().includes(Permission.UsersManage)),
     isLoading: computed(() => store.status() === 'loading'),
     errorMessage: computed(() => {
       const code = store.errorCode();

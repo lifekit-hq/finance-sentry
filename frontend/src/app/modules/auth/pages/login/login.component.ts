@@ -1,6 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {RouterLink} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
@@ -10,14 +9,12 @@ import {
 } from '@lifekit-hq/ui';
 
 import {environment} from '../../../../../environments/environment';
-import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AuthStore} from '../../store/auth.store';
 
 @Component({
   selector: 'fns-login',
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     AlertComponent,
     ButtonComponent,
     FormFieldComponent,
@@ -35,7 +32,6 @@ export class LoginComponent {
     password: ['', Validators.required],
   });
   public readonly googleClientId = environment.googleClientId;
-  public readonly AppRoute = AppRoute;
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
   public readonly flashMessage = this.authStore.flashMessage;

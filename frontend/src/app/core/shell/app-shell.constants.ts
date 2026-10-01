@@ -10,5 +10,6 @@ export const CONNECT_ACTION_ID = '_connect';
  */
 export const PERMISSION_BY_ENTRY: Readonly<Record<string, Permission>> = {
   [AppRoute.Ledger]: Permission.AiUse,
+  [AppRoute.SettingsPeople]: Permission.UsersManage,
   [CONNECT_ACTION_ID]: Permission.ConnectionsManage,
 };

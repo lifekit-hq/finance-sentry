@@ -253,6 +253,25 @@
         </div>
       </div>
 
+      @if (canManageUsers()) {
+        <!-- ── People ── -->
+        <div
+          class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+        >
+          <div>
+            <h2 class="font-label text-cmn-sm font-semibold text-text-primary">People</h2>
+            <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
+              Invite people to this account and revoke access.
+            </p>
+          </div>
+          <div>
+            <cmn-button (clicked)="openPeople()" variant="secondary" icon="Users"
+              >Manage people</cmn-button
+            >
+          </div>
+        </div>
+      }
+
       <!-- ── Danger zone ── -->
       <div
         class="flex items-center justify-between gap-cmn-4 rounded-cmn-lg border border-status-error/30 bg-status-error/[0.04] p-cmn-5"

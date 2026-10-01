@@ -16,7 +16,7 @@ namespace FinanceSentry.Modules.Auth.API.Controllers;
 [Route("auth")]
 public class AuthController(
     ICommandHandler<LoginCommand, AuthResult> loginHandler,
-    ICommandHandler<RegisterCommand, AuthResult> registerHandler,
+    ICommandHandler<AcceptInviteCommand, AuthResult> acceptInviteHandler,
     ICommandHandler<RefreshCommand, AuthResult> refreshHandler,
     ICommandHandler<VerifyGoogleCredentialCommand, AuthResult> googleVerifyHandler,
     ICommandHandler<LogoutCommand, Unit> logoutHandler,
@@ -63,14 +63,17 @@ public class AuthController(
         return Ok(result.Response);
     }
 
+    // Sets an invited account's first password from the one-time invite token and signs it in.
     [AllowAnonymous]
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] AuthRequest request)
+    [HttpPost("invite/accept")]
+    public async Task<IActionResult> AcceptInvite([FromBody] AcceptInviteRequest request)
     {
-        var result = await registerHandler.Handle(new RegisterCommand(request.Email, request.Password), HttpContext.RequestAborted);
+        var result = await acceptInviteHandler.Handle(
+            new AcceptInviteCommand(request.UserId, request.Token, request.Password),
+            HttpContext.RequestAborted);
         SetRefreshTokenCookie(result.RawRefreshToken);
         SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
-        return Created(string.Empty, result.Response);
+        return Ok(result.Response);
     }
 
     [AllowAnonymous]

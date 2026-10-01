@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using System.Security.Claims;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Domain.People;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -16,7 +17,8 @@ using Microsoft.Extensions.Logging;
 /// <item>Grants <see cref="AuthRoles.Owner"/> to the account named by <c>Auth:OwnerEmail</c>. With that
 /// setting empty, the role goes to the only user when exactly one exists and nobody holds it yet, so a
 /// single-user deployment needs no configuration. Never removes the Owner role.</item>
-/// <item>Gives every user who holds no role the <see cref="AuthRoles.Member"/> role.</item>
+/// <item>Gives every user who holds no role the <see cref="AuthRoles.Member"/> role, except revoked accounts
+/// (<see cref="PersonStatus"/>), whose roles a revoke removed on purpose.</item>
 /// </list>
 /// Per-person permission grants live in the user-claim table and are left alone.
 /// </summary>
@@ -78,7 +80,7 @@ public static class RoleSeeder
     {
         foreach (var user in await users.Users.OrderBy(u => u.Id).ToListAsync())
         {
-            if ((await users.GetRolesAsync(user)).Count > 0)
+            if (PersonStatus.IsRevoked(user) || (await users.GetRolesAsync(user)).Count > 0)
                 continue;
 
             EnsureSucceeded(await users.AddToRoleAsync(user, AuthRoles.Member), "grant the Member role");
