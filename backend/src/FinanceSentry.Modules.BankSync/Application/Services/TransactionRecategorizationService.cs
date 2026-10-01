@@ -231,7 +231,7 @@ public class TransactionRecategorizationService(
         if (account.TrueLayerConnectionId is null)
             throw new InvalidOperationException($"TrueLayer account {account.Id} has no connection id.");
 
-        var connection = await _truelayerConnections.GetByIdAsync(account.TrueLayerConnectionId.Value, ct)
+        var connection = await _truelayerConnections.GetByIdUnscopedAsync(account.TrueLayerConnectionId.Value, ct)
             ?? throw new InvalidOperationException($"TrueLayer connection {account.TrueLayerConnectionId} not found.");
         var refreshToken = _encryption.Decrypt(
             connection.EncryptedRefreshToken, connection.Iv, connection.AuthTag, connection.KeyVersion);
