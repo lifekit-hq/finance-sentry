@@ -1,4 +1,4 @@
-<div class="mx-auto flex h-full w-full max-w-[1200px] flex-col overflow-auto p-cmn-8">
+<div class="mx-auto flex h-full w-full max-w-[1200px] flex-col overflow-auto p-cmn-4 md:p-cmn-8">
   <div class="mb-cmn-6 flex flex-wrap items-end justify-between gap-cmn-4">
     <div>
       <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Month breakdown</h1>
@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  <div class="mb-cmn-6 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
     <cmn-stat-card
       [value]="store.incomeFormatted()"
       [loading]="store.isLoading()"
@@ -129,7 +129,27 @@
               {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
             </span>
           </div>
-          <div class="overflow-x-auto">
+          <div class="md:hidden" data-testid="breakdown-rows">
+            @for (i of group.items; track i.transactionId) {
+              <cmn-list-item-row
+                [label]="i.description"
+                [sublabel]="i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')"
+              >
+                <div amount class="min-w-[72px] text-right">
+                  <div
+                    [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
+                    class="font-mono text-cmn-sm font-semibold tabular-nums"
+                  >
+                    {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
+                  </div>
+                  <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
+                    {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
+                  </div>
+                </div>
+              </cmn-list-item-row>
+            }
+          </div>
+          <div class="hidden overflow-x-auto md:block">
             <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
               <tbody>
                 @for (i of group.items; track i.transactionId) {
