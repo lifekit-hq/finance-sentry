@@ -66,12 +66,12 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       (searchClick)="openPalette()"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
     >
-      <div [class.pb-[4.5rem]]="canUseAi()">
+      <div class="h-full" [class.pb-[4.5rem]]="showChatWidget()">
         <router-outlet />
       </div>
     </cmn-app-layout>
 
-    @if (canUseAi()) {
+    @if (showChatWidget()) {
       <fns-chat-widget />
     }
   `,
@@ -114,6 +114,10 @@ export class AppShellComponent {
   public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
   public readonly versionLabel = `v${APP_VERSION}`;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
+  // The full-page Ledger already hosts a chat — the floating widget would be redundant there.
+  public readonly showChatWidget = computed(
+    () => this.canUseAi() && !this.routerUrl().startsWith(AppRoute.Ledger)
+  );
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );
