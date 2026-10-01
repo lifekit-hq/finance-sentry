@@ -15,6 +15,10 @@ function isAuthEndpoint(req: HttpRequest<unknown>): boolean {
   return req.url.includes('/auth/');
 }
 
+function isSessionProbe(req: HttpRequest<unknown>): boolean {
+  return req.method === 'GET' && req.url.endsWith('/auth/me');
+}
+
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
@@ -42,7 +46,9 @@ export const authInterceptor: HttpInterceptorFn = (
         );
       }
 
-      if (isUnauthorized && isAuthEndpoint(req)) {
+      // An anonymous visitor's session-restore probe is expected to 401; logging out would
+      // navigate to /login and clobber guest routes such as /accept-invite.
+      if (isUnauthorized && isAuthEndpoint(req) && !isSessionProbe(req)) {
         authStore.logout();
       }
 
