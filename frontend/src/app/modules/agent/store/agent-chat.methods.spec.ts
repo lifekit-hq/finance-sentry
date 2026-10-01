@@ -18,6 +18,17 @@ describe('agentChatMethods', () => {
     expect(store.threadNonce()).toBe(0);
   });
 
+  it('closes the phone sessions sheet when a thread is started or opened', () => {
+    const {store, methods} = build();
+    methods.setSessionsOpen(true);
+    methods.openConversation('c1', []);
+    expect(store.sessionsOpen()).toBe(false);
+
+    methods.setSessionsOpen(true);
+    methods.resetThread();
+    expect(store.sessionsOpen()).toBe(false);
+  });
+
   it('resetThread clears the thread and bumps the nonce to force a remount', () => {
     const {store, methods} = build();
     methods.setActiveConversationId('c1');

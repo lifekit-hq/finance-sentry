@@ -10,6 +10,7 @@ import {
 
 import {environment} from '../../../../../environments/environment';
 import {AuthStore} from '../../store/auth.store';
+import {GOOGLE_BUTTON_LOCALE} from './login.constants';
 
 @Component({
   selector: 'fns-login',
@@ -31,6 +32,7 @@ export class LoginComponent {
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
   });
+  public readonly googleLocale = GOOGLE_BUTTON_LOCALE;
   public readonly googleClientId = environment.googleClientId;
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
