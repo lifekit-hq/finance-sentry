@@ -1,0 +1,40 @@
+name: Prune Host Images
+
+# Deploy-by-SHA leaves one image per service per commit on the deploy host. Weekly, keep the
+# newest 5 SHA-tagged images per service (see docs/OPERATIONS_RUNBOOK.md §9) and remove the rest.
+on:
+  schedule:
+    # Mondays 07:00 UTC, after the registry prune and before the weekly release deploy.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List what would be removed without removing anything.
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  prune:
+    name: prune host images
+    runs-on: [self-hosted, lifekit-vps, finance-sentry]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # Own group, not `deploy`: the script only removes unused finance-sentry images and keeps the newest N, so an image a concurrent deploy just pulled is kept.
+    concurrency:
+      group: prune-host-images
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Prune old images
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [[ $DRY_RUN == true ]]; then
+            ./docker/prune-host-images.sh --dry-run
+          else
+            ./docker/prune-host-images.sh
+          fi

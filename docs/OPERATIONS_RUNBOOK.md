@@ -109,6 +109,15 @@ GET /health/ready → 503
 2. Fix the underlying migration issue (or restore database connectivity) and ship a new commit.
 3. Migrations are idempotent: the next start resumes from the failed migration rather than re-running earlier ones.
 
+## 9. Rollback and Host Image Pruning
+
+**Rollback:** run the *Deploy to VPS* workflow (`workflow_dispatch`) with `sha` set to the full commit SHA to return to. It redeploys that commit's images under the current compose config. The commit must postdate deploy-by-SHA, and its images must still exist in ghcr (the weekly *Prune Images* workflow keeps the newest 30 versions per service).
+
+**Host pruning:** every deploy pulls one image per service per commit onto the host. The weekly *Prune Host Images* workflow (Mondays 07:00 UTC, self-hosted deploy runner, `docker/prune-host-images.sh`) keeps the newest **5** SHA-tagged images of each `ghcr.io/lifekit-hq/finance-sentry-*` repository and removes older ones. Five commits back stay on the host, so a rollback to a recent commit needs no pull; anything older is pulled from ghcr as usual. It never removes an image used by a container, never forces removal, and only touches those repositories' SHA tags (not `:local`, not other projects' images, not volumes).
+
+- Dry run: dispatch *Prune Host Images* with `dry_run` ticked, or run `docker/prune-host-images.sh --dry-run` on the host. The job log lists every `removed` / `would remove` / `keep` decision.
+- Change the retention: edit the `KEEP_NEWEST` constant in `docker/prune-host-images.sh`.
+
 ## Contact
 
 - On-call channel: `#finance-sentry-oncall`
