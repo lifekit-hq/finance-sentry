@@ -2,6 +2,7 @@ const DEFAULT_CURRENCY = 'USD';
 const DEFAULT_FRACTION_DIGITS = 2;
 const EN_US = 'en-US';
 const EMPTY_VALUE = '—';
+const OWES_PREFIX = 'Owes ';
 
 // Symbol-first only where the symbol identifies the currency on its own; "¥" (JPY/CNY),
 // "kr" (SEK/NOK/DKK) and the many "$" currencies are ambiguous, so those fall back to the ISO code.
@@ -51,6 +52,28 @@ export class MoneyUtils {
       return `-${body}`;
     }
     return options.signed && value > 0 ? `+${body}` : body;
+  }
+
+  /**
+   * A balance that can be net-negative ("Owes $917.82"): institution and card totals are signed
+   * sums where credit balances count against the total, and a bare minus sign on a card reads
+   * as a refund rather than a debt. Non-negative values format as plain money.
+   */
+  public static formatNetBalance(
+    value: number | null | undefined,
+    currency: string | null | undefined = DEFAULT_CURRENCY
+  ): string {
+    const formatted = MoneyUtils.format(value, currency);
+    return formatted.startsWith('-') ? `${OWES_PREFIX}${formatted.slice(1)}` : formatted;
+  }
+
+  /** A per-account liability, stored as the positive amount owed: "Owes €120.00". */
+  public static formatOwed(
+    amount: number | null | undefined,
+    currency: string | null | undefined = DEFAULT_CURRENCY
+  ): string {
+    const formatted = MoneyUtils.format(amount, currency);
+    return formatted === EMPTY_VALUE ? formatted : `${OWES_PREFIX}${formatted}`;
   }
 
   /** The muted second line shown under a native amount: "~ $1,234". Whole units, no cents. */

@@ -3,7 +3,7 @@ import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {
   type AccountCategory,
-  type CategorySummary,
+  type CategorySection,
   type NetWorthBreakdownRow,
   type WealthSummaryResponse,
 } from '../../../../shared/models/wealth/wealth.model';
@@ -29,6 +29,12 @@ const CATEGORY_COLOR: Record<AccountCategory, string> = {
   other: '#64748b',
 };
 
+const SECTION_ORDER: Omit<CategorySection, 'summary'>[] = [
+  {category: 'banking', title: 'Banking', institutionNoun: 'institution', rowNoun: 'account'},
+  {category: 'brokerage', title: 'Brokerage', institutionNoun: 'broker', rowNoun: 'position'},
+  {category: 'crypto', title: 'Digital assets', institutionNoun: 'exchange', rowNoun: 'asset'},
+];
+
 export function accountsComputed(store: StateSignals) {
   return {
     isEmpty: computed(
@@ -36,18 +42,15 @@ export function accountsComputed(store: StateSignals) {
     ),
     totalNetWorth: computed(() => store.summary()?.totalNetWorth ?? 0),
     baseCurrency: computed(() => store.summary()?.baseCurrency ?? 'USD'),
-    bankingCategory: computed<Nullable<CategorySummary>>(
-      () => store.summary()?.categories.find(c => c.category === 'banking') ?? null
-    ),
-    cryptoCategory: computed<Nullable<CategorySummary>>(
-      () => store.summary()?.categories.find(c => c.category === 'crypto') ?? null
-    ),
-    brokerageCategory: computed<Nullable<CategorySummary>>(
-      () => store.summary()?.categories.find(c => c.category === 'brokerage') ?? null
-    ),
-    totalConnections: computed(
-      () => store.summary()?.categories.reduce((sum, cat) => sum + cat.institutionCount, 0) ?? 0
-    ),
+    // The inventory sections, in display order. The noun is what one institution of the
+    // section is called ("2 brokers"), and the child noun what its rows are ("positions").
+    categorySections: computed((): CategorySection[] => {
+      const categories = store.summary()?.categories ?? [];
+      return SECTION_ORDER.flatMap(def => {
+        const summary = categories.find(c => c.category === def.category);
+        return summary ? [{...def, summary}] : [];
+      });
+    }),
     netWorthSegments: computed((): DonutSegment[] =>
       (store.summary()?.categories ?? [])
         .filter(cat => cat.totalInBaseCurrency > 0)

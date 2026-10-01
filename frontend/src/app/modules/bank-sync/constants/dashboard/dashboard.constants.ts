@@ -20,24 +20,11 @@ export const HISTORY_RANGE_LABELS: Record<HistoryRange, string> = {
   all: 'All',
 };
 
-/** How far forward the net-worth projection tile looks. Fixed — there is no goal entity yet. */
+/** How far forward the net-worth projection line looks. Fixed — there is no goal entity yet. */
 export const PROJECTION_HORIZON_MONTHS = 12;
 
 /**
- * A projection off one or two months is noise wearing a number's clothes, so the tile stays
+ * A projection off one or two months is noise wearing a number's clothes, so the line stays
  * hidden until the complete-month window is at least this deep.
  */
 export const MIN_PROJECTION_MONTHS = 3;
-
-/**
- * Annual market-return assumptions the projection tile offers, as fractions. 0 is the default
- * and the honest one: the app knows what the user saves, not what the market will do. The
- * non-zero options exist so a return assumption is an explicit, labelled choice rather than
- * something baked silently into the headline number.
- */
-export const PROJECTION_RETURN_RATES: readonly {label: string; value: number}[] = [
-  {label: '0%', value: 0},
-  {label: '3%', value: 0.03},
-  {label: '5%', value: 0.05},
-  {label: '7%', value: 0.07},
-];

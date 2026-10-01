@@ -4,7 +4,7 @@ Source of truth for Finance Sentry's money math. **Any PR that changes one of th
 behaviours must update this document in the same diff.** File references point at the
 implementing code; when they disagree, the code is the bug or this doc is stale — fix one.
 
-Last verified: 2026-09-16 (#472 PR 2 — Revolut X trades and venue fiat).
+Last verified: 2026-10-01 (UI plan phase 5 — liability presentation on the Accounts page).
 
 ---
 
@@ -110,6 +110,12 @@ zeroing recorded phantom net-worth drops.
 **Aggregates** (net worth, currency totals, banking sleeve, wealth institution/card-group
 totals, liquidity projections) always sum `SignedForNetTotal(...)`. **Per-account display**
 keeps the raw positive value ("you owe X"), matching how banks present credit cards.
+
+**Presentation** (frontend, display only): a credit account with a positive balance reads
+`Owes €120.00` in the error tone (`AccountBalancePipe`; zero or negative — an overpaid card — falls
+back to plain money), and an institution or card-group total that nets negative
+reads `Owes $917.82` rather than a bare minus sign (`MoneyUtils.formatNetBalance`). The sign
+convention above is unchanged — only the label differs. Net worth totals stay signed.
 
 ## 3. Currency conversion
 
@@ -482,26 +488,29 @@ my money go" would be a real loss.
 Frontend-only (`dashboard.computed.ts`). The in-progress month appears in exactly one
 place, and the split is deliberate.
 
-**Charts plot complete calendar months only** — both *Income vs Spending* and *Monthly
-Savings Rate* read the same `completeMonths` window, so they always share an x-axis. A
-partial month as a bar next to complete ones is an apples-to-oranges comparison: income
-reads as collapsing, and the savings rate swings to absurd magnitudes (the old chart read
--500,000%), because salary posts once — often on the last day — so until then the month
-holds a full run of spending against stray small credits. Savings rate additionally drops
-completed months with zero inflow, for the same divide-by-near-zero reason.
+**Charts plot complete calendar months only** — the *Income vs Spending* chart reads the
+`completeMonths` window. A partial month as a bar next to complete ones is an
+apples-to-oranges comparison: income reads as collapsing, and a savings rate would swing to
+absurd magnitudes (the since-removed savings-rate chart read -500,000%), because salary posts
+once — often on the last day — so until then the month holds a full run of spending against
+stray small credits. The savings-rate baseline therefore drops completed months with zero
+inflow, for the same divide-by-near-zero reason.
 
-**Month-to-date tiles carry the in-progress month**, labelled `(MTD)`:
+**The "This month" card carries the in-progress month** — one card with Income, Spending
+and Savings columns, month-to-date by construction:
 
-- *Income (MTD)* / *Spending (MTD)*: current-month totals, compared against the average of
+- *Income* / *Spending*: current-month totals, compared against the average of
   the trailing 3 complete months **prorated by day-of-month elapsed** — without proration
   a figure two days into the month always reads as a collapse.
-- *Savings rate (MTD)*: withheld (shows `—`) until month-to-date inflow reaches
+- *Savings*: month-to-date savings rate, withheld (shows `—`) until month-to-date inflow reaches
   `INCOME_LANDED_FRACTION` (50%) of a normal month's income. Below that the raw rate is
   technically correct and completely misleading. Compared in **percentage points** against
   the trailing complete months, since a rate is scale-free and is not prorated.
-- The `cmn-stat-card` `delta` input drives colour and arrow off its **sign**, so the number
-  passed is "how good is this", not "which direction did it move" — for spending those are
-  opposites, and the wording (`over pace` / `under pace`) carries the direction instead.
+- The delta colour and arrow follow its **sign** (`paceClass`), so the number passed is "how
+  good is this", not "which direction did it move" — for spending those are opposites, and
+  the wording (`over pace` / `under pace`) carries the direction instead.
+- A month with no inflow yet shows neutral "No income yet this month" rather than a red
+  "100% below pace".
 
 This is the same split Binance and IBKR use: the current period is a tile with a
 comparison; the bars are closed periods.

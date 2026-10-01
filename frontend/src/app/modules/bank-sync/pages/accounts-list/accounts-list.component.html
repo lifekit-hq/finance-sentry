@@ -1,24 +1,15 @@
 <div>
-  @if (!store.isLoading() && !store.isEmpty()) {
-    <div class="mb-cmn-6 flex justify-end">
-      <cmn-button (clicked)="connectAccount()" variant="primary">Connect Account</cmn-button>
-    </div>
-  }
-
-  @if (!store.isLoading() && store.netWorthSegments().length > 1) {
+  @if (!store.isLoading() && store.totalNetWorth() !== 0) {
     <cmn-card class="block mb-cmn-8">
-      <div class="min-w-0">
-        <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
-        <p class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary">
-          {{ store.totalNetWorth() | money: store.baseCurrency() }}
-        </p>
-        <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-          {{ store.totalConnections() }} connection{{
-            store.totalConnections() !== 1 ? 's' : ''
-          }}
-          across {{ store.netWorthSegments().length }} categories
-        </p>
+      <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
+      <p
+        class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary"
+        data-testid="accounts-net-worth"
+      >
+        {{ store.totalNetWorth() | money: store.baseCurrency() }}
+      </p>
 
+      @if (store.netWorthBreakdown().length > 1) {
         <div class="mt-cmn-5 space-y-cmn-3 border-t border-border-default pt-cmn-4">
           @for (row of store.netWorthBreakdown(); track row.label) {
             <div class="flex items-center gap-cmn-3">
@@ -36,17 +27,7 @@
             </div>
           }
         </div>
-      </div>
-    </cmn-card>
-  } @else if (!store.isLoading() && store.totalNetWorth() !== 0) {
-    <cmn-card class="block mb-cmn-8">
-      <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
-      <p class="mt-cmn-1 font-mono text-cmn-3xl font-bold tabular-nums text-text-primary">
-        {{ store.totalNetWorth() | money: store.baseCurrency() }}
-      </p>
-      <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-        {{ store.totalConnections() }} connection{{ store.totalConnections() !== 1 ? 's' : '' }}
-      </p>
+      }
     </cmn-card>
   }
 
@@ -82,383 +63,166 @@
   }
 
   @if (!store.isLoading() && !store.isEmpty()) {
-    @if (store.bankingCategory(); as banking) {
+    @for (section of store.categorySections(); track section.category) {
       <div class="mb-cmn-8">
         <div class="flex items-center justify-between mb-cmn-3">
           <h2 class="text-cmn-xs font-semibold text-text-secondary uppercase tracking-wider">
-            Banking Institutions
+            {{ section.title }}
           </h2>
           <span class="text-cmn-xs text-text-secondary"
-            >{{ banking.institutionCount }} institution{{
-              banking.institutionCount !== 1 ? 's' : ''
-            }}</span
+            >{{ section.summary.institutionCount }} {{ section.institutionNoun
+            }}{{ section.summary.institutionCount !== 1 ? 's' : '' }}</span
           >
         </div>
-        <cmn-card class="!p-0">
-          @for (inst of banking.institutions; track inst.institutionId) {
-            <details class="group border-b border-border-default last:border-0" open>
-              <summary
-                class="flex items-center justify-between gap-cmn-4 px-cmn-4 py-cmn-4 cursor-pointer hover:bg-surface-bg transition-colors"
-              >
-                <div class="flex items-center gap-cmn-3 flex-1 min-w-0">
-                  <cmn-institution-avatar
-                    [name]="inst.name"
-                    [logoUrl]="inst.name | institutionLogo: inst.provider"
-                  />
-                  <div class="min-w-0">
-                    <p class="font-medium text-text-primary">{{ inst.name }}</p>
-                    @if (inst.cards && inst.cards.length > 0) {
-                      <p class="text-cmn-xs text-text-secondary">
-                        {{ inst.cards.length }} card{{ inst.cards.length !== 1 ? 's' : '' }}
-                      </p>
-                    } @else {
-                      <p class="text-cmn-xs text-text-secondary">
-                        {{ inst.accounts.length }} account{{
-                          inst.accounts.length !== 1 ? 's' : ''
-                        }}
-                      </p>
-                    }
-                  </div>
-                </div>
-                <cmn-status-indicator
-                  [variant]="inst.syncStatus | syncStatusVariant"
-                  [timestampLabel]="inst.lastSyncTimestamp | relativeTime"
+        <cmn-card padding="none">
+          @for (inst of section.summary.institutions; track inst.institutionId + inst.provider) {
+            <cmn-disclosure-row
+              [label]="inst.name"
+              [sublabel]="rowCountLabel(inst, section.rowNoun)"
+              [avatarName]="inst.name"
+              [avatarLogoUrl]="inst.name | institutionLogo: inst.provider"
+              [open]="true"
+            >
+              <div class="flex items-center gap-cmn-2 text-cmn-xs text-text-secondary" status>
+                <span
+                  [class]="dotClass[inst.syncStatus | syncStatusVariant]"
+                  class="h-2 w-2 shrink-0 rounded-full"
+                ></span>
+                <span
                   [title]="
                     inst.lastSuccessfulSyncTimestamp
                       ? 'Last successful sync ' + (inst.lastSuccessfulSyncTimestamp | relativeTime)
                       : 'No successful sync yet'
                   "
+                  class="hidden whitespace-nowrap sm:inline"
                 >
-                  {{ inst.syncStatus | syncStatusLabel }}
-                </cmn-status-indicator>
-                <div
-                  class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
-                >
-                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
-                </div>
-                @if (inst.provider === 'truelayer' && inst.syncStatus === 'reauth_required') {
+                  @if (needsAttention(inst)) {
+                    <span class="text-status-error">{{ inst.syncStatus | syncStatusLabel }}</span>
+                    ·
+                  }
+                  {{ inst.lastSyncTimestamp | relativeTime }}
+                </span>
+              </div>
+
+              <div
+                [class.text-status-error]="inst.totalInBaseCurrency < 0"
+                class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
+                status
+              >
+                {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
+              </div>
+
+              <div class="flex items-center gap-cmn-2" actions>
+                <!-- On a phone the menu carries Reconnect; the row keeps room for the figure. -->
+                @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
                   <cmn-button
                     (clicked)="reconnect(); $event.stopPropagation()"
+                    class="hidden sm:inline-block"
                     variant="primary"
                     size="sm"
                   >
                     Reconnect
                   </cmn-button>
                 }
-                <cmn-button
-                  (clicked)="disconnectInstitution(inst); $event.stopPropagation()"
-                  variant="secondary"
-                  size="sm"
+                <cmn-menu
+                  [items]="institutionMenu(inst)"
+                  [ariaLabel]="'Actions for ' + inst.name"
+                  (itemSelect)="onInstitutionAction(inst, $event.id)"
                 >
-                  Disconnect
-                </cmn-button>
-                <svg
-                  class="w-4 h-4 text-text-secondary transition-transform group-open:rotate-180 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </summary>
+                  <cmn-icon name="Ellipsis" />
+                </cmn-menu>
+              </div>
 
-              <table class="w-full text-cmn-sm bg-surface-bg" aria-label="Accounts">
-                <tbody>
+              <ul class="bg-surface-bg">
+                @if (section.category === 'banking') {
                   @if (inst.cards && inst.cards.length > 0) {
                     @for (card of inst.cards; track card.cardType) {
-                      <tr class="border-t border-border-default">
-                        <td class="py-cmn-2 pl-cmn-12 pr-cmn-4 w-full">
-                          <p class="font-medium text-text-primary">{{ card.displayName }}</p>
-                        </td>
-                        <td
-                          class="py-cmn-2 px-cmn-4 text-right font-mono tabular-nums text-cmn-xs text-text-secondary min-w-[7rem]"
+                      <li class="border-t border-border-default">
+                        <div
+                          class="flex items-baseline justify-between gap-cmn-4 py-cmn-2 pl-cmn-12 pr-cmn-4"
                         >
-                          {{ card.totalInBaseCurrency | money: store.baseCurrency() }}
-                        </td>
-                      </tr>
-                      @for (account of card.accounts; track account.accountId) {
-                        <tr class="border-t border-border-default">
-                          <td class="py-cmn-3 pl-cmn-16 pr-cmn-4 w-full">
-                            <p class="text-text-primary">{{ account.currency }}</p>
-                            <p class="text-cmn-xs text-text-secondary">
-                              •••• {{ account.accountNumberLast4 }}
-                            </p>
-                          </td>
-                          <td
-                            class="py-cmn-3 px-cmn-4 text-right font-mono tabular-nums text-text-primary min-w-[7rem]"
-                          >
-                            @let cardBal = account | accountBalance;
-                            <div>{{ cardBal.native }}</div>
-                            @if (cardBal.usd) {
-                              <div class="text-cmn-xs text-text-secondary">{{ cardBal.usd }}</div>
-                            }
-                          </td>
-                        </tr>
-                      }
+                          <span class="font-medium text-cmn-sm text-text-primary">{{
+                            card.displayName
+                          }}</span>
+                          <span class="font-mono tabular-nums text-cmn-xs text-text-secondary">{{
+                            card.totalInBaseCurrency | netBalance: store.baseCurrency()
+                          }}</span>
+                        </div>
+                        @for (account of card.accounts; track account.accountId) {
+                          <ng-container
+                            *ngTemplateOutlet="
+                              accountRow;
+                              context: {$implicit: account, title: account.currency}
+                            "
+                          />
+                        }
+                      </li>
                     }
                   } @else {
                     @for (account of inst.accounts; track account.accountId) {
-                      <tr class="border-t border-border-default">
-                        <td class="py-cmn-3 pl-cmn-16 pr-cmn-4 w-full">
-                          <p class="text-text-primary">{{ account.accountType }}</p>
-                          <p class="text-cmn-xs text-text-secondary">
-                            •••• {{ account.accountNumberLast4 }}
-                          </p>
-                        </td>
-                        <td
-                          class="py-cmn-3 px-cmn-4 text-right font-mono tabular-nums text-text-primary min-w-[7rem]"
-                        >
-                          @let bal = account | accountBalance;
-                          <div>{{ bal.native }}</div>
-                          @if (bal.usd) {
-                            <div class="text-cmn-xs text-text-secondary">{{ bal.usd }}</div>
-                          }
-                        </td>
-                      </tr>
+                      <li class="border-t border-border-default">
+                        <ng-container
+                          *ngTemplateOutlet="
+                            accountRow;
+                            context: {$implicit: account, title: account.accountType}
+                          "
+                        />
+                      </li>
                     }
                   }
-                </tbody>
-              </table>
-            </details>
-          }
-        </cmn-card>
-      </div>
-    }
-
-    @if (store.brokerageCategory(); as brokerage) {
-      <div class="mb-cmn-8">
-        <div class="flex items-center justify-between mb-cmn-3">
-          <h2 class="text-cmn-xs font-semibold text-text-secondary uppercase tracking-wider">
-            Brokerage &amp; Investment
-          </h2>
-          <span class="text-cmn-xs text-text-secondary"
-            >{{ brokerage.institutionCount }} broker{{
-              brokerage.institutionCount !== 1 ? 's' : ''
-            }}</span
-          >
-        </div>
-        <cmn-card class="!p-0">
-          @for (inst of brokerage.institutions; track inst.institutionId) {
-            <details class="group border-b border-border-default last:border-0" open>
-              <summary
-                class="flex items-center justify-between gap-cmn-4 px-cmn-4 py-cmn-4 cursor-pointer hover:bg-surface-bg transition-colors"
-              >
-                <div class="flex items-center gap-cmn-3 flex-1 min-w-0">
-                  <cmn-institution-avatar
-                    [name]="inst.name"
-                    [logoUrl]="inst.name | institutionLogo: inst.provider"
-                  />
-                  <div class="min-w-0">
-                    <p class="font-medium text-text-primary">{{ inst.name }}</p>
-                    <p class="text-cmn-xs text-text-secondary">
-                      {{ inst.accounts.length }} position{{ inst.accounts.length !== 1 ? 's' : '' }}
-                    </p>
-                  </div>
-                </div>
-                <cmn-status-indicator
-                  [variant]="inst.syncStatus | syncStatusVariant"
-                  [timestampLabel]="inst.lastSyncTimestamp | relativeTime"
-                  [title]="
-                    inst.lastSuccessfulSyncTimestamp
-                      ? 'Last successful sync ' + (inst.lastSuccessfulSyncTimestamp | relativeTime)
-                      : 'No successful sync yet'
-                  "
-                >
-                  {{ inst.syncStatus | syncStatusLabel }}
-                </cmn-status-indicator>
-                <div
-                  class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
-                >
-                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
-                </div>
-                <cmn-button
-                  (clicked)="disconnectInstitution(inst); $event.stopPropagation()"
-                  variant="secondary"
-                  size="sm"
-                >
-                  Disconnect
-                </cmn-button>
-                <svg
-                  class="w-4 h-4 text-text-secondary transition-transform group-open:rotate-180 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </summary>
-
-              <table class="w-full text-cmn-sm bg-surface-bg" aria-label="Positions">
-                <tbody>
+                } @else {
                   @for (
                     account of inst.accounts;
                     track account.accountId + account.accountNumberLast4
                   ) {
-                    <tr
-                      (click)="navigateToDossier(account.accountNumberLast4)"
-                      class="border-t border-border-default cursor-pointer hover:bg-surface-bg transition-colors"
-                    >
-                      <td class="py-cmn-3 pl-cmn-16 pr-cmn-4 w-full text-text-primary">
-                        <span class="inline-flex items-center gap-cmn-2">
+                    <li class="border-t border-border-default">
+                      <button
+                        (click)="navigateToDossier(account.accountNumberLast4)"
+                        class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
+                        type="button"
+                      >
+                        <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
                           <cmn-institution-avatar
                             [name]="account.accountNumberLast4"
                             [logoUrl]="account.accountNumberLast4 | assetLogo: account.provider"
                             size="sm"
                           />
-                          <span>{{ account.accountNumberLast4 }}</span>
+                          <span class="truncate">{{ account.accountNumberLast4 }}</span>
                         </span>
-                      </td>
-                      <td class="py-cmn-3 px-cmn-4 text-text-secondary">
-                        {{ account.accountType }}
-                      </td>
-                      <td
-                        class="py-cmn-3 px-cmn-4 text-right font-mono tabular-nums text-text-primary min-w-[7rem]"
-                      >
-                        @let bal = account | accountBalance;
-                        <div>{{ bal.native }}</div>
-                        @if (bal.usd) {
-                          <div class="text-cmn-xs text-text-secondary">{{ bal.usd }}</div>
-                        }
-                      </td>
-                    </tr>
+                        <ng-container
+                          *ngTemplateOutlet="amountCell; context: {$implicit: account}"
+                        />
+                      </button>
+                    </li>
                   }
-                </tbody>
-              </table>
-            </details>
+                }
+              </ul>
+            </cmn-disclosure-row>
           }
         </cmn-card>
       </div>
     }
-
-    @if (store.cryptoCategory(); as crypto) {
-      <div class="mb-cmn-8">
-        <div class="flex items-center justify-between mb-cmn-3">
-          <h2 class="text-cmn-xs font-semibold text-text-secondary uppercase tracking-wider">
-            Digital Assets
-          </h2>
-          <span class="text-cmn-xs text-text-secondary"
-            >{{ crypto.institutionCount }} exchange{{
-              crypto.institutionCount !== 1 ? 's' : ''
-            }}</span
-          >
-        </div>
-        <cmn-card class="!p-0">
-          @for (inst of crypto.institutions; track inst.provider) {
-            <details class="group border-b border-border-default last:border-0" open>
-              <summary
-                class="flex items-center justify-between gap-cmn-4 px-cmn-4 py-cmn-4 cursor-pointer hover:bg-surface-bg transition-colors"
-              >
-                <div class="flex items-center gap-cmn-3 flex-1 min-w-0">
-                  <cmn-institution-avatar
-                    [name]="inst.name"
-                    [logoUrl]="inst.name | institutionLogo: inst.provider"
-                  />
-                  <div class="min-w-0">
-                    <p class="font-medium text-text-primary">{{ inst.name }}</p>
-                    <p class="text-cmn-xs text-text-secondary">
-                      {{ inst.accounts.length }} asset{{ inst.accounts.length !== 1 ? 's' : '' }}
-                    </p>
-                  </div>
-                </div>
-                <cmn-status-indicator
-                  [variant]="inst.syncStatus | syncStatusVariant"
-                  [timestampLabel]="inst.lastSyncTimestamp | relativeTime"
-                  [title]="
-                    inst.lastSuccessfulSyncTimestamp
-                      ? 'Last successful sync ' + (inst.lastSuccessfulSyncTimestamp | relativeTime)
-                      : 'No successful sync yet'
-                  "
-                >
-                  {{ inst.syncStatus | syncStatusLabel }}
-                </cmn-status-indicator>
-                <div
-                  class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[7rem]"
-                >
-                  {{ inst.totalInBaseCurrency | money: store.baseCurrency() }}
-                </div>
-                <cmn-button
-                  (clicked)="disconnectInstitution(inst); $event.stopPropagation()"
-                  variant="secondary"
-                  size="sm"
-                >
-                  Disconnect
-                </cmn-button>
-                <svg
-                  class="w-4 h-4 text-text-secondary transition-transform group-open:rotate-180 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </summary>
-
-              <table class="w-full text-cmn-sm bg-surface-bg" aria-label="Assets">
-                <tbody>
-                  @for (
-                    account of inst.accounts;
-                    track account.accountId + account.accountNumberLast4
-                  ) {
-                    <tr
-                      (click)="navigateToDossier(account.accountNumberLast4)"
-                      class="border-t border-border-default cursor-pointer hover:bg-surface-bg transition-colors"
-                    >
-                      <td class="py-cmn-3 pl-cmn-16 pr-cmn-4 w-full text-text-primary">
-                        <span class="inline-flex items-center gap-cmn-2">
-                          <cmn-institution-avatar
-                            [name]="account.accountNumberLast4"
-                            [logoUrl]="account.accountNumberLast4 | assetLogo: account.provider"
-                            size="sm"
-                          />
-                          <span>{{ account.accountNumberLast4 }}</span>
-                        </span>
-                      </td>
-                      <td class="py-cmn-3 px-cmn-4 text-text-secondary">
-                        {{ account.accountType }}
-                      </td>
-                      <td
-                        class="py-cmn-3 px-cmn-4 text-right font-mono tabular-nums text-text-primary min-w-[7rem]"
-                      >
-                        @let bal = account | accountBalance;
-                        <div>{{ bal.native }}</div>
-                        @if (bal.usd) {
-                          <div class="text-cmn-xs text-text-secondary">{{ bal.usd }}</div>
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </details>
-          }
-        </cmn-card>
-      </div>
-    }
-
-    <div
-      class="flex items-center justify-between text-cmn-xs text-text-secondary border-t border-border-default pt-cmn-4"
-    >
-      <span
-        >{{ store.totalConnections() }} total connection{{
-          store.totalConnections() !== 1 ? 's' : ''
-        }}</span
-      >
-      <span>Net worth: {{ store.totalNetWorth() | money: store.baseCurrency() }}</span>
-    </div>
   }
 </div>
+
+<ng-template #accountRow let-account let-title="title">
+  <div class="flex items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4">
+    <div class="min-w-0">
+      <p class="text-cmn-sm text-text-primary">{{ title }}</p>
+      <p class="text-cmn-xs text-text-secondary">•••• {{ account.accountNumberLast4 }}</p>
+    </div>
+    <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
+  </div>
+</ng-template>
+
+<ng-template #amountCell let-account>
+  @let bal = account | accountBalance;
+  <div class="shrink-0 text-right font-mono tabular-nums">
+    <div [class]="bal.owed ? 'text-status-error' : 'text-text-primary'" class="text-cmn-sm">
+      {{ bal.native }}
+    </div>
+    @if (bal.usd) {
+      <div class="text-cmn-xs text-text-secondary">{{ bal.usd }}</div>
+    }
+  </div>
+</ng-template>

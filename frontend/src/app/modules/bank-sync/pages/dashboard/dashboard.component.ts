@@ -1,27 +1,26 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {Router} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   AreaChartComponent,
   BarChartComponent,
   ButtonComponent,
   CardComponent,
+  ChipComponent,
   CmnCellDirective,
   CmnColumnComponent,
   DataTableComponent,
   DonutChartComponent,
   IconComponent,
-  StatCardComponent,
+  PageHeaderComponent,
+  SkeletonComponent,
 } from '@lifekit-hq/ui';
 
-import {AppCurrencyPipe} from '../../../../core/pipes/app-currency.pipe';
 import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
-import {
-  HISTORY_RANGE_LABELS,
-  PROJECTION_RETURN_RATES,
-} from '../../constants/dashboard/dashboard.constants';
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {HISTORY_RANGE_LABELS} from '../../constants/dashboard/dashboard.constants';
 import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
 
@@ -36,29 +35,33 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   selector: 'fns-dashboard',
   imports: [
     AlertComponent,
-    AppCurrencyPipe,
     AppDecimalPipe,
     AreaChartComponent,
     BarChartComponent,
     ButtonComponent,
     CardComponent,
+    ChipComponent,
     CmnCellDirective,
     CmnColumnComponent,
     DataTableComponent,
     DonutChartComponent,
     IconComponent,
     MerchantCategoryPipe,
-    StatCardComponent,
+    MoneyPipe,
+    PageHeaderComponent,
+    RouterLink,
+    SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [DashboardStore],
   template: `
-    <div class="p-cmn-6">
+    <div class="p-cmn-4 sm:p-cmn-6">
       <div class="mx-auto max-w-screen-lg space-y-cmn-6">
-        <div>
-          <h1 class="font-headline text-2xl font-bold text-text-primary">Dashboard</h1>
-          <p class="mt-1 text-cmn-sm text-text-secondary">How your money is trending over time</p>
-        </div>
+        <cmn-page-header
+          class="block"
+          title="Dashboard"
+          subtitle="How your money is trending over time"
+        />
 
         @if (store.errorMessage()) {
           <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
@@ -85,237 +88,80 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
             </div>
           </cmn-card>
         } @else {
-          <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2">
-            <cmn-stat-card
-              [value]="store.totalBalanceFormatted()"
-              [loading]="store.isLoading()"
-              label="Net Worth"
-              icon="Wallet"
-            />
-            <cmn-stat-card
-              [value]="store.netWorthChangeFormatted()"
-              [loading]="store.isLoading()"
-              label="Change (period)"
-              icon="Activity"
-            />
-          </div>
-
           <!--
-            The in-progress month lives here and nowhere else. The charts below plot closed
-            months only, so a partial figure never sits next to a complete one pretending to
-            be comparable; here it is labelled month-to-date and paced against the trailing
-            complete months, which is the comparison that actually means something mid-month.
+            One hero for the headline figure and how it moved over the selected range. The range
+            chips drive the chart below, the delta here and the category widgets, so they sit with
+            the figure they change.
           -->
-          <div>
-            <div class="mb-cmn-3 flex items-baseline justify-between">
-              <span class="text-cmn-sm font-medium text-text-secondary">This month</span>
-              <span class="text-cmn-xs text-text-disabled">
-                Month to date, paced against the last 3 complete months
-              </span>
-            </div>
-            <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-3">
-              <button
-                (click)="goToIncome()"
-                type="button"
-                class="w-full cursor-pointer text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-                aria-label="View income details"
-              >
-                <cmn-stat-card
-                  [value]="store.monthlyInflowFormatted()"
-                  [delta]="store.inflowPaceDelta()"
-                  [deltaLabel]="store.inflowPaceLabel()"
-                  [loading]="store.isLoading()"
-                  label="Income (MTD)"
-                  icon="TrendingUp"
-                />
-              </button>
-              <button
-                (click)="goToSpending()"
-                type="button"
-                class="w-full cursor-pointer text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-                aria-label="View spending details"
-              >
-                <cmn-stat-card
-                  [value]="store.monthlySpendingFormatted()"
-                  [delta]="store.spendingPaceDelta()"
-                  [deltaLabel]="store.spendingPaceLabel()"
-                  [loading]="store.isLoading()"
-                  label="Spending (MTD)"
-                  icon="TrendingDown"
-                />
-              </button>
-              <button
-                (click)="goToBreakdown()"
-                type="button"
-                class="w-full cursor-pointer text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-                aria-label="View the transactions behind this month's savings"
-              >
-                <cmn-stat-card
-                  [value]="store.savingsRateMonthToDateFormatted()"
-                  [delta]="store.savingsRatePaceDelta()"
-                  [deltaLabel]="store.savingsRatePaceLabel()"
-                  [loading]="store.isLoading()"
-                  label="Savings rate (MTD)"
-                  icon="PiggyBank"
-                />
-              </button>
-            </div>
-          </div>
-
-          @if (store.hasFlowBreakdown()) {
-            <div>
-              <div class="mb-cmn-3">
-                <span class="text-cmn-sm font-medium text-text-secondary"
-                  >Flow breakdown (MTD)</span
+          <cmn-card>
+            <div class="space-y-cmn-2">
+              <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+                <span
+                  class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
                 >
-              </div>
-              <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-4">
-                @for (tile of flowBreakdownTiles; track tile.label) {
-                  <button
-                    [attr.aria-label]="'View the transactions behind ' + tile.label"
-                    (click)="goToBreakdown()"
-                    type="button"
-                    class="w-full cursor-pointer text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-                  >
-                    <cmn-stat-card
-                      [value]="tile.value()"
-                      [loading]="store.isLoading()"
-                      [label]="tile.label"
-                      [icon]="tile.icon"
-                    />
-                  </button>
-                }
-              </div>
-            </div>
-          }
-
-          <!--
-            Projected from contributions, never from the net-worth line: most of the book is
-            market-marked, so a trend fitted to that line would forecast the market and call it
-            a savings forecast. Market return is a separate assumption the reader chooses and
-            the tile spells out. Hidden below three complete months by hasProjection().
-          -->
-          @if (store.hasProjection()) {
-            <div>
-              <div class="mb-cmn-3 flex flex-wrap items-baseline justify-between gap-cmn-2">
-                <span class="text-cmn-sm font-medium text-text-secondary">
-                  Where this is heading
+                  Net worth
                 </span>
-                <div class="flex items-center gap-cmn-2">
-                  <span class="text-cmn-xs text-text-disabled">Assumed market return</span>
-                  <div class="flex gap-cmn-1">
-                    @for (rate of returnRates; track rate.value) {
-                      <cmn-button
-                        [variant]="
-                          store.projectionReturnRate() === rate.value ? 'primary' : 'secondary'
-                        "
-                        (clicked)="store.setProjectionReturnRate(rate.value)"
-                        size="sm"
-                        >{{ rate.label }}</cmn-button
-                      >
-                    }
-                  </div>
-                </div>
-              </div>
-              <cmn-card>
-                <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2">
-                  <div class="space-y-cmn-1">
-                    <p class="text-cmn-xs text-text-secondary">Projected net worth in 12 months</p>
-                    <p class="font-headline text-2xl font-bold text-text-primary">
-                      {{ store.projectedNetWorthFormatted() }}
-                    </p>
-                    <p class="text-cmn-xs text-text-disabled">
-                      {{ store.projectionAssumptionLabel() }}
-                    </p>
-                  </div>
-                  <button
-                    (click)="goToBreakdown()"
-                    type="button"
-                    class="cursor-pointer space-y-cmn-1 text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-                    aria-label="View the transactions behind the median monthly savings"
-                  >
-                    <p class="text-cmn-xs text-text-secondary">Median monthly savings</p>
-                    <p class="font-headline text-2xl font-bold text-text-primary">
-                      {{ store.medianMonthlySavingsFormatted() }}
-                    </p>
-                    <p class="text-cmn-xs text-text-disabled">
-                      {{ store.projectionBasisLabel() }}
-                    </p>
-                  </button>
-                </div>
-
-                <!--
-                  The headline split into the addends that make it. Only the market-return
-                  line moves with the rate toggle, so "held separate" is something the reader
-                  can check against the number rather than a claim in the prose above.
-                -->
-                <dl
-                  class="mt-cmn-4 grid grid-cols-3 gap-cmn-2 border-t border-border-default pt-cmn-3 text-cmn-xs"
-                >
-                  <div>
-                    <dt class="text-text-secondary">Today</dt>
-                    <dd class="font-medium text-text-primary">
-                      {{ store.projectionTodayFormatted() }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-text-secondary">Contributions</dt>
-                    <dd class="font-medium text-text-primary">
-                      {{ store.projectedContributionsFormatted() }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-text-secondary">Market return</dt>
-                    <dd class="font-medium text-text-primary">
-                      {{ store.projectedMarketReturnFormatted() }}
-                    </dd>
-                  </div>
-                </dl>
-              </cmn-card>
-            </div>
-          }
-
-          <div>
-            <div class="mb-cmn-3 flex items-center justify-between">
-              <span class="text-cmn-sm font-medium text-text-secondary">Net Worth Over Time</span>
-              <div class="flex items-center gap-cmn-3">
-                <div class="flex gap-cmn-1">
-                  <cmn-button
-                    [variant]="store.netWorthStacked() ? 'primary' : 'secondary'"
-                    (clicked)="store.setNetWorthStacked(true)"
-                    size="sm"
-                    >Stacked</cmn-button
-                  >
-                  <cmn-button
-                    [variant]="store.netWorthStacked() ? 'secondary' : 'primary'"
-                    (clicked)="store.setNetWorthStacked(false)"
-                    size="sm"
-                    >Lines</cmn-button
-                  >
-                </div>
-                <div class="flex gap-cmn-1">
+                <div class="flex gap-cmn-1" role="group" aria-label="History range">
                   @for (r of ranges; track r.value) {
-                    <cmn-button
-                      [variant]="store.historyRange() === r.value ? 'primary' : 'secondary'"
+                    <cmn-chip
+                      [selected]="store.historyRange() === r.value"
                       (clicked)="store.setHistoryRange(r.value)"
-                      size="sm"
-                      >{{ r.label }}</cmn-button
+                      >{{ r.label }}</cmn-chip
                     >
                   }
                 </div>
               </div>
+              @if (store.isLoading()) {
+                <cmn-skeleton height="2.25rem" width="50%" />
+              } @else {
+                <p
+                  class="font-mono text-cmn-3xl font-semibold tabular-nums text-text-primary"
+                  data-testid="net-worth-value"
+                >
+                  {{ store.totalBalanceFormatted() }}
+                </p>
+                @if (store.netWorthChangeFormatted()) {
+                  <p
+                    [class]="changeClass()"
+                    class="font-label text-cmn-sm font-medium"
+                    data-testid="net-worth-change"
+                  >
+                    {{ store.netWorthChangeFormatted() }}
+                    @if (store.netWorthChangePercentFormatted()) {
+                      ({{ store.netWorthChangePercentFormatted() }})
+                    }
+                    <span class="font-normal text-text-secondary">· {{ rangeLabel() }}</span>
+                  </p>
+                }
+              }
+              <!--
+                Projected from contributions, never from the net-worth line: most of the book is
+                market-marked, so a trend fitted to that line would forecast the market and call
+                it a savings forecast. Hidden below three complete months by hasProjection().
+              -->
+              @if (store.hasProjection()) {
+                <p [title]="store.projectionBasisLabel()" class="text-cmn-xs text-text-secondary">
+                  At this pace:
+                  <span class="font-medium text-text-primary">{{
+                    store.projectedNetWorthFormatted()
+                  }}</span>
+                  in 12 months
+                </p>
+              }
             </div>
+          </cmn-card>
 
+          <div>
             @if (store.historyErrorMessage()) {
               <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
             } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
               <cmn-alert variant="info"
-                >No history yet. Run the net worth snapshot job to populate the chart.</cmn-alert
+                >Net worth history starts after tonight's snapshot.</cmn-alert
               >
             } @else {
               <cmn-area-chart
                 [series]="store.netWorthAreaSeries()"
-                [stacked]="store.netWorthStacked()"
+                [stacked]="true"
                 label="Net worth by sleeve"
                 currency="USD"
               />
@@ -327,25 +173,64 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
             }
           </div>
 
-          @if (store.hasIncome()) {
-            <div class="grid grid-cols-1 gap-cmn-4 lg:grid-cols-2">
+          <!--
+            The in-progress month lives here and nowhere else. The charts below plot closed
+            months only, so a partial figure never sits next to a complete one pretending to
+            be comparable; here it is labelled month-to-date and paced against the trailing
+            complete months, which is the comparison that actually means something mid-month.
+          -->
+          <div>
+            <div class="mb-cmn-3 flex items-baseline justify-between">
+              <span class="text-cmn-sm font-medium text-text-secondary">This month</span>
+              <a
+                [routerLink]="breakdownRoute"
+                class="text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+                aria-label="View the breakdown of this month's money"
+                >Breakdown →</a
+              >
+            </div>
+            <cmn-card>
+              <div class="grid grid-cols-3 divide-x divide-border-default">
+                @for (tile of monthTiles; track tile.label) {
+                  <button
+                    [attr.aria-label]="tile.ariaLabel"
+                    (click)="tile.open()"
+                    type="button"
+                    class="min-w-0 cursor-pointer space-y-cmn-1 px-cmn-2 text-left transition-opacity first:pl-0 last:pr-0 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default sm:px-cmn-4"
+                  >
+                    <span
+                      class="block truncate font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+                      >{{ tile.label }}</span
+                    >
+                    @if (store.isLoading()) {
+                      <cmn-skeleton height="1.5rem" width="70%" />
+                    } @else {
+                      <span
+                        class="block truncate font-mono text-cmn-lg font-semibold tabular-nums text-text-primary sm:text-cmn-2xl"
+                        >{{ tile.value() }}</span
+                      >
+                      @if (tile.deltaLabel()) {
+                        <span
+                          [class]="paceClass(tile.delta())"
+                          class="block font-label text-cmn-xs font-medium"
+                          >{{ tile.deltaLabel() }}</span
+                        >
+                      }
+                    }
+                  </button>
+                }
+              </div>
+            </cmn-card>
+          </div>
+
+          @if (store.hasCashFlow()) {
+            <div>
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
                 label="Income vs Spending (complete months)"
                 currency="USD"
               />
-              <cmn-bar-chart
-                [series]="store.savingsRateBars()"
-                label="Monthly Savings Rate (complete months)"
-                valueFormat="percent"
-              />
             </div>
-          } @else if (store.hasCashFlow()) {
-            <cmn-bar-chart
-              [series]="store.incomeVsSpendingBars()"
-              label="Income vs Spending (complete months)"
-              currency="USD"
-            />
           }
 
           <div class="grid grid-cols-1 gap-cmn-4 lg:grid-cols-3">
@@ -367,7 +252,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
                 </cmn-column>
                 <cmn-column key="spend" header="Total Spend" align="right">
-                  <ng-template let-row cmnCell>{{ row.totalSpend | appCurrency }}</ng-template>
+                  <ng-template let-row cmnCell>{{ row.totalSpend | money }}</ng-template>
                 </cmn-column>
                 <cmn-column key="pct" header="% of Total" align="right">
                   <ng-template let-row cmnCell
@@ -387,21 +272,53 @@ export class DashboardComponent {
 
   public readonly store = inject(DashboardStore);
   public readonly ranges = HISTORY_RANGES;
-  public readonly returnRates = PROJECTION_RETURN_RATES;
+  public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly showEmptyState = computed(
     () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
   );
+  public readonly rangeLabel = computed(() => HISTORY_RANGE_LABELS[this.store.historyRange()]);
   public readonly topCategoriesLabel = computed(
-    () => `Top Spending Categories (${HISTORY_RANGE_LABELS[this.store.historyRange()]})`
+    () => `Top Spending Categories (${this.rangeLabel()})`
   );
-  // One tile per flow figure, all opening the same audit view — the breakdown page shows
-  // every bucket at once, so the tiles need no individual destinations.
-  public readonly flowBreakdownTiles = [
-    {label: 'Spent', icon: 'ShoppingBag', value: this.store.monthlySpentFormatted},
-    {label: 'Supported family', icon: 'Heart', value: this.store.monthlyFamilySupportFormatted},
-    {label: 'Invested', icon: 'TrendingUp', value: this.store.monthlyInvestedFormatted},
-    {label: 'Kept', icon: 'Banknote', value: this.store.monthlyKeptFormatted},
+  public readonly changeClass = computed(() =>
+    this.paceClass(this.store.netWorthChangeDirection())
+  );
+  // The three month-to-date figures read as one card. Savings opens the audit view, which
+  // shows every money bucket at once.
+  public readonly monthTiles = [
+    {
+      label: 'Income',
+      ariaLabel: 'View income details',
+      value: this.store.monthlyInflowFormatted,
+      delta: this.store.inflowPaceDelta,
+      deltaLabel: this.store.inflowPaceLabel,
+      open: (): void => this.goToIncome(),
+    },
+    {
+      label: 'Spending',
+      ariaLabel: 'View spending details',
+      value: this.store.monthlySpendingFormatted,
+      delta: this.store.spendingPaceDelta,
+      deltaLabel: this.store.spendingPaceLabel,
+      open: (): void => this.goToSpending(),
+    },
+    {
+      label: 'Savings',
+      ariaLabel: "View this month's savings breakdown",
+      value: this.store.savingsRateMonthToDateFormatted,
+      delta: this.store.savingsRatePaceDelta,
+      deltaLabel: this.store.savingsRatePaceLabel,
+      open: (): void => this.goToBreakdown(),
+    },
   ] as const;
+
+  // Green up, red down, muted when flat or unknown — the same convention the stat card uses.
+  public paceClass(delta: number | null): string {
+    if (!delta) {
+      return 'text-text-secondary';
+    }
+    return delta > 0 ? 'text-status-success' : 'text-status-error';
+  }
 
   public goToAccounts(): void {
     void this.router.navigateByUrl(AppRoute.AccountsList);

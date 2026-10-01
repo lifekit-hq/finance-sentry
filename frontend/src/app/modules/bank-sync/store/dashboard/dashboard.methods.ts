@@ -27,11 +27,5 @@ export function dashboardMethods(store: WritableStateSource<DashboardState>) {
     setHistoryHasHistory(hasHistory: boolean): void {
       patchState(store, {historyHasHistory: hasHistory});
     },
-    setNetWorthStacked(stacked: boolean): void {
-      patchState(store, {netWorthStacked: stacked});
-    },
-    setProjectionReturnRate(rate: number): void {
-      patchState(store, {projectionReturnRate: rate});
-    },
   };
 }

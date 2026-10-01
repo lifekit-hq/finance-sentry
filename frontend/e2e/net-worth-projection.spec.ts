@@ -64,8 +64,6 @@ function dashboardPayload(monthlyFlow: Record<string, unknown>[]): Record<string
   };
 }
 
-// Banking dwarfs the market sleeves on purpose: a return assumption that compounded cash
-// would add 5,000 here rather than the 500 the assertions expect.
 const NET_WORTH_HISTORY = {
   snapshots: [
     {
@@ -119,87 +117,37 @@ async function mockApis(page: Page, monthlyFlow: Record<string, unknown>[]): Pro
   );
 }
 
-const PROJECTION_HEADING = 'Where this is heading';
-const PROJECTED_LABEL = 'Projected net worth in 12 months';
+const PROJECTION_LINE = /At this pace:/;
 
 test.describe('Dashboard — twelve-month net worth projection', () => {
-  test('projects from the median complete month at the 0% default', async ({page}) => {
+  test('projects one line from the median complete month', async ({page}) => {
     await mockApis(page, [...COMPLETE_MONTHS, CURRENT_MONTH]);
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    await expect(page.getByText(PROJECTION_HEADING)).toBeVisible();
-
     // 10,000 today + median 1,000/mo x 12. A mean baseline (1,933) would read $33,200.
-    const tile = page.getByText(PROJECTED_LABEL).locator('..');
-    await expect(tile).toContainText('$22,000');
-    await expect(
-      page.getByText('Median saved per month, based on 3 complete months')
-    ).toBeVisible();
-    await expect(
-      page.getByText('Assumes no market return — this is contributions only.')
-    ).toBeVisible();
+    const line = page.getByText(PROJECTION_LINE);
+    await expect(line).toContainText('$22,000');
+    await expect(line).toContainText('in 12 months');
+    await expect(line).toHaveAttribute(
+      'title',
+      'Median saved per month, based on 3 complete months'
+    );
   });
 
-  test('hides the tile entirely below three complete months', async ({page}) => {
+  test('hides the line below three complete months', async ({page}) => {
     await mockApis(page, [...COMPLETE_MONTHS.slice(1), CURRENT_MONTH]);
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
-    await expect(page.getByText(PROJECTION_HEADING)).toHaveCount(0);
-    await expect(page.getByText(PROJECTED_LABEL)).toHaveCount(0);
+    await expect(page.getByText(PROJECTION_LINE)).toHaveCount(0);
   });
 
-  test('compounds only the market sleeves when a return is selected, without refetching', async ({
-    page,
-  }) => {
-    const dataRequests: string[] = [];
-    page.on('request', req => {
-      const url = req.url();
-      if (url.includes('dashboard/aggregated') || url.includes('net-worth/history')) {
-        dataRequests.push(url);
-      }
-    });
-
+  test('offers no return-rate assumption toggles', async ({page}) => {
     await mockApis(page, [...COMPLETE_MONTHS, CURRENT_MONTH]);
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
+    await expect(page.getByText(PROJECTION_LINE)).toBeVisible();
 
-    const tile = page.getByText(PROJECTED_LABEL).locator('..');
-    await expect(tile).toContainText('$22,000');
-    const requestsAfterLoad = dataRequests.length;
-
-    await page.getByRole('button', {name: '5%', exact: true}).click();
-
-    // +5% of the 10,000 in brokerage + crypto. Banking cash (100,000) does not compound.
-    await expect(tile).toContainText('$22,500');
-    await expect(
-      page.getByText('Assumes 5%/yr on the $10K already in brokerage and crypto.')
-    ).toBeVisible();
-
-    expect(dataRequests.length).toBe(requestsAfterLoad);
-  });
-
-  test('breaks the headline into addends and moves only the market-return one', async ({page}) => {
-    await mockApis(page, [...COMPLETE_MONTHS, CURRENT_MONTH]);
-    await page.goto('/dashboard');
-    await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
-
-    const today = page.getByText('Today', {exact: true}).locator('..');
-    const contributions = page.getByText('Contributions', {exact: true}).locator('..');
-    const marketReturn = page.getByText('Market return', {exact: true}).locator('..');
-
-    // 10,000 + 12,000 + 0 = the $22,000 headline. The flat default reads as a plain $0.
-    await expect(today).toContainText('$10,000');
-    await expect(contributions).toContainText('+$12,000');
-    await expect(marketReturn).toContainText('$0');
-
-    await page.getByRole('button', {name: '5%', exact: true}).click();
-
-    // Only the assumption line moves; today and contributions are behaviour, not a guess.
-    await expect(marketReturn).toContainText('+$500');
-    await expect(today).toContainText('$10,000');
-    await expect(contributions).toContainText('+$12,000');
-    await expect(page.getByText(PROJECTED_LABEL).locator('..')).toContainText('$22,500');
+    await expect(page.getByRole('button', {name: '5%', exact: true})).toHaveCount(0);
   });
 });
