@@ -8,6 +8,14 @@
     <cmn-button [icon]="newChatIcon" (clicked)="onNewChat()" variant="secondary">
       New chat
     </cmn-button>
+    <cmn-button
+      (clicked)="store.setSessionsOpen(false)"
+      class="md:hidden"
+      variant="secondary"
+      size="sm"
+    >
+      Close
+    </cmn-button>
 
     <div class="flex-1 overflow-y-auto">
       @if (store.hasConversations()) {
