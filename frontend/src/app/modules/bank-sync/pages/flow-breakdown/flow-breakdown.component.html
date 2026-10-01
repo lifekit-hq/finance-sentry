@@ -135,6 +135,11 @@
                 [label]="i.description"
                 [sublabel]="i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')"
               >
+                @if (i.counterpartyName) {
+                  <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
+                } @else if (i.category) {
+                  <cmn-tag variant="neutral" meta>{{ i.category | merchantCategory }}</cmn-tag>
+                }
                 <div amount class="min-w-[72px] text-right">
                   <div
                     [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"

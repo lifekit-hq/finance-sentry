@@ -33,7 +33,7 @@ const GROUP = {
   ],
 };
 
-function render() {
+function render(group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP) {
   const store = {
     month: signal('2026-09'),
     isLoading: signal(false),
@@ -41,7 +41,7 @@ function render() {
     errorMessage: signal(null),
     accountChips: signal([]),
     accountFilter: signal(null),
-    groups: signal([GROUP]),
+    groups: signal([group]),
     incomeFormatted: signal('$0'),
     spendingFormatted: signal('$100'),
     investedFormatted: signal('$0'),
@@ -65,6 +65,15 @@ describe('FlowBreakdownComponent phone layout', () => {
     expect(row?.textContent).toContain('Monobank ••1234 · Sep 12');
     expect(row?.textContent).toContain('−');
     expect(row?.textContent).toContain('$100');
+  });
+
+  it('keeps the counterparty tag, or the category tag, on phone rows', () => {
+    const withCounterparty = {...GROUP.items[0], counterpartyName: 'Alice'};
+    const withCategory = {...GROUP.items[0], category: 'groceries'};
+    const el = render({...GROUP, items: [withCounterparty, withCategory]});
+    const rows = el.querySelectorAll('[data-testid="breakdown-rows"] cmn-list-item-row');
+    expect(rows[0].querySelector('cmn-tag')?.textContent).toContain('Alice');
+    expect(rows[1].querySelector('cmn-tag')?.textContent?.trim()).toBe('Groceries');
   });
 
   it('keeps the table for md and up only', () => {
