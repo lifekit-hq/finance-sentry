@@ -59,6 +59,10 @@ public class AccountDiscoveryService(
                 var accessToken = await trueLayerTokenRefresh.AcquireAccessTokenAsync(connection.Id, ct);
                 created += await DiscoverTrueLayerConnectionAsync(connection, accessToken, ct);
             }
+            catch (TrueLayerException ex) when (IsRefreshRejected(ex))
+            {
+                await ExpireConnectionAsync(connection, ct);
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(ex,
@@ -68,6 +72,31 @@ public class AccountDiscoveryService(
         }
 
         return created;
+    }
+
+    // Same test the sync path uses (ScheduledSyncService.ExtractErrorCode): a rejected refresh means
+    // the consent is gone and only a user-present reconnect can restore it.
+    private static bool IsRefreshRejected(TrueLayerException ex)
+        => ex.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase);
+
+    // Applies the credential-expiry policy: the connection leaves LINKED (so discovery stops retrying
+    // it) and its accounts go to reauth_required, which the existing reconnect prompt keys on.
+    private async Task ExpireConnectionAsync(TrueLayerConnection connection, CancellationToken ct)
+    {
+        logger.LogWarning(
+            "TrueLayer refresh rejected (invalid_grant) for connection {ConnectionId}; marking it expired and its accounts reauth_required.",
+            connection.Id);
+
+        connection.MarkExpired();
+        await trueLayerConnections.UpdateAsync(connection, ct);
+
+        var connectionAccounts = (await accounts.GetByUserIdUnscopedAsync(connection.UserId, ct))
+            .Where(a => a.TrueLayerConnectionId == connection.Id);
+        foreach (var account in connectionAccounts)
+        {
+            account.MarkReauthRequired();
+            await accounts.UpdateAsync(account, ct);
+        }
     }
 
     private async Task<int> DiscoverTrueLayerConnectionAsync(
