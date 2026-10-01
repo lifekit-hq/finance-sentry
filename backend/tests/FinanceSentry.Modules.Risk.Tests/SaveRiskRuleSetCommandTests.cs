@@ -12,7 +12,7 @@ public sealed class SaveRiskRuleSetCommandTests
     [Fact]
     public async Task WeightOutOfRange_IsRejected()
     {
-        await using var db = TestSupport.NewContext();
+        await using var db = TestSupport.NewContext(UserId);
         var handler = new SaveRiskRuleSetCommandHandler(new RiskRuleSetRepository(db));
 
         var command = new SaveRiskRuleSetCommand(UserId, 1.5m, null, null, null, null, null);
@@ -25,7 +25,7 @@ public sealed class SaveRiskRuleSetCommandTests
     [Fact]
     public async Task NegativeTurnoverBudget_IsRejected()
     {
-        await using var db = TestSupport.NewContext();
+        await using var db = TestSupport.NewContext(UserId);
         var handler = new SaveRiskRuleSetCommandHandler(new RiskRuleSetRepository(db));
 
         var command = new SaveRiskRuleSetCommand(UserId, null, null, null, null, null, -1);
@@ -38,7 +38,7 @@ public sealed class SaveRiskRuleSetCommandTests
     [Fact]
     public async Task ValidSave_AppendsNewVersion_AndFlipsIsCurrent()
     {
-        await using var db = TestSupport.NewContext();
+        await using var db = TestSupport.NewContext(UserId);
         var repo = new RiskRuleSetRepository(db);
         var handler = new SaveRiskRuleSetCommandHandler(repo);
 
@@ -56,7 +56,7 @@ public sealed class SaveRiskRuleSetCommandTests
     [Fact]
     public async Task AllFieldsOptional_SaveIsAccepted()
     {
-        await using var db = TestSupport.NewContext();
+        await using var db = TestSupport.NewContext(UserId);
         var handler = new SaveRiskRuleSetCommandHandler(new RiskRuleSetRepository(db));
 
         var command = new SaveRiskRuleSetCommand(UserId, null, null, null, null, null, null);

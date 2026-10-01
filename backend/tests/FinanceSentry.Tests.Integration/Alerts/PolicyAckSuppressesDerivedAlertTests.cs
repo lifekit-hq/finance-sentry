@@ -63,8 +63,10 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
         new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
             new FixedCurrentUser(actingUser));
 
-    private RiskDbContext RiskContext() =>
-        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options);
+    // The acknowledgement is a request (acting as the user); the alert-side reader runs with no person in scope.
+    private RiskDbContext RiskContext(Guid? actingUser = null) =>
+        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+            new FixedCurrentUser(actingUser));
 
     private void GivenCashPct(decimal cashPct)
     {
@@ -75,7 +77,7 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
 
     private async Task AcknowledgeMinCashBufferAsync()
     {
-        await using var risk = RiskContext();
+        await using var risk = RiskContext(_userId);
         await new RiskRuleSetRepository(risk).SaveNewVersionAsync(
             new RiskRuleSet { UserId = _userId, MinCashBufferPct = MinCash });
 

@@ -29,7 +29,7 @@ public sealed class DrawdownCheckProvider(
         if (await policySource.GetMaxDrawdownAsync(userId, ct) is not { } limit)
             return null;
 
-        var history = await snapshotRepo.ListSinceAsync(userId, now - TimeSpan.FromDays(_lookbackDays), ct);
+        var history = await snapshotRepo.ListSinceUnscopedAsync(userId, now - TimeSpan.FromDays(_lookbackDays), ct);
         return BookDrawdownCalculator.Measure(history, book.Positions) is { } observed
             ? new DrawdownCheck(limit, observed)
             : null;

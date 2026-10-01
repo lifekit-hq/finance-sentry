@@ -27,7 +27,7 @@ public sealed class GetRiskRuleSetQueryHandler(IRiskRuleSetRepository repo)
 {
     public async Task<RiskRuleSetDto?> Handle(GetRiskRuleSetQuery query, CancellationToken ct)
     {
-        var current = await repo.GetCurrentAsync(query.UserId, ct);
+        var current = await repo.GetCurrentUnscopedAsync(query.UserId, ct);
         return current is null ? null : RiskRuleSetDto.FromEntity(current);
     }
 }

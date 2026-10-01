@@ -8,10 +8,10 @@ public sealed class RiskLimitsReader(IRiskRuleSetRepository ruleSets) : IRiskLim
 {
     public async Task<RiskLimits?> GetCurrentAsync(Guid userId, CancellationToken ct = default)
     {
-        var current = await ruleSets.GetCurrentAsync(userId, ct);
+        var current = await ruleSets.GetCurrentUnscopedAsync(userId, ct);
         return current is null ? null : new RiskLimits(current.MaxPositionWeightPct, current.MinCashBufferPct);
     }
 
     public Task<IReadOnlyList<Guid>> ListUserIdsWithRuleSetsAsync(CancellationToken ct = default)
-        => ruleSets.GetUserIdsWithRuleSetsAsync(ct);
+        => ruleSets.GetUserIdsWithRuleSetsUnscopedAsync(ct);
 }

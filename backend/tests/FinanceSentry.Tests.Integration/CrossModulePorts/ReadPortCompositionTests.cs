@@ -177,7 +177,7 @@ public sealed class ReadPortCompositionTests
     public async Task Position_cap_is_the_current_rule_sets_max_position_weight()
     {
         var ruleSets = new Mock<IRiskRuleSetRepository>();
-        ruleSets.Setup(r => r.GetCurrentAsync(User, It.IsAny<CancellationToken>()))
+        ruleSets.Setup(r => r.GetCurrentUnscopedAsync(User, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RiskRuleSet { UserId = User, MaxPositionWeightPct = 0.15m, MinCashBufferPct = 0.05m });
 
         var cap = await new RiskPositionCapSource(new RiskLimitsReader(ruleSets.Object))
@@ -190,7 +190,7 @@ public sealed class ReadPortCompositionTests
     public async Task Position_cap_is_null_without_a_rule_set()
     {
         var ruleSets = new Mock<IRiskRuleSetRepository>();
-        ruleSets.Setup(r => r.GetCurrentAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
+        ruleSets.Setup(r => r.GetCurrentUnscopedAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync((RiskRuleSet?)null);
 
         var cap = await new RiskPositionCapSource(new RiskLimitsReader(ruleSets.Object))
             .GetMaxPositionWeightAsync(User, CancellationToken.None);

@@ -43,10 +43,13 @@ public sealed class PortfolioScanDataReaderTests
         public Task<RiskRuleSet?> GetCurrentAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(current);
 
+        public Task<RiskRuleSet?> GetCurrentUnscopedAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(current);
+
         public Task<RiskRuleSet> SaveNewVersionAsync(RiskRuleSet ruleSet, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<Guid>> GetUserIdsWithRuleSetsAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<Guid>> GetUserIdsWithRuleSetsUnscopedAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Guid>>([UserId]);
     }
 
