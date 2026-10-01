@@ -57,7 +57,7 @@ Always target this project. Do not use the older "Finance Sentry" project (`1153
 Verify via `find frontend/src/app/modules -type d -name pages` before claiming coverage:
 
 - Auth: login, register
-- Bank-sync: accounts-list, connect-account, transaction-list, dashboard
+- Bank-sync: accounts-list, connect-account, transaction-ledger, dashboard
 - Not yet scaffolded but planned: holdings (crypto + brokerage), settings, global shell
 
 ## Workflow when invoked
