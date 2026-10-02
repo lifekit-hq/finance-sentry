@@ -20,6 +20,7 @@ import {
 import {environment} from '../../../../../environments/environment';
 import {AuthStore} from '../../store/auth.store';
 import {
+  GOOGLE_BUTTON_BASE_CONFIG,
   GOOGLE_BUTTON_LOCALE,
   GOOGLE_BUTTON_MAX_WIDTH,
   GOOGLE_BUTTON_MIN_WIDTH,
@@ -51,7 +52,7 @@ export class LoginComponent implements AfterViewInit {
   public readonly googleWidth = signal<number | null>(null);
   public readonly googleButtonConfig = computed(() => {
     const width = this.googleWidth();
-    return width === null ? null : {type: 'standard' as const, width};
+    return width === null ? null : {...GOOGLE_BUTTON_BASE_CONFIG, width};
   });
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
