@@ -109,7 +109,9 @@
             </cmn-column>
             <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
               <ng-template let-row cmnCell>
-                <span class="whitespace-nowrap font-mono tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
+                <span class="whitespace-nowrap font-mono tabular-nums">{{
+                  row.quantity | number: '1.0-8'
+                }}</span>
                 @if (row.currentPrice !== null) {
                   <span class="whitespace-nowrap font-mono tabular-nums md:hidden">
                     × {{ row.currentPrice | money }}</span
@@ -120,9 +122,13 @@
             <cmn-column key="price" header="Price" align="right">
               <ng-template let-row cmnCell>
                 @if (row.currentPrice === null) {
-                  <span class="whitespace-nowrap font-mono tabular-nums text-text-secondary">—</span>
+                  <span class="whitespace-nowrap font-mono tabular-nums text-text-secondary"
+                    >—</span
+                  >
                 } @else {
-                  <span class="whitespace-nowrap font-mono tabular-nums">{{ row.currentPrice | money }}</span>
+                  <span class="whitespace-nowrap font-mono tabular-nums">{{
+                    row.currentPrice | money
+                  }}</span>
                 }
               </ng-template>
             </cmn-column>
