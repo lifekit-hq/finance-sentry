@@ -19,7 +19,12 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
-import {CONNECT_ACTION_ID, PERMISSION_BY_ENTRY, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {
+  CONNECT_ACTION_ID,
+  FAB_CLEARANCE,
+  PERMISSION_BY_ENTRY,
+  PHONE_TAB_ROUTES,
+} from './app-shell.constants';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
@@ -66,7 +71,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       (searchClick)="openPalette()"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
     >
-      <div class="h-full overflow-y-auto" [class.pb-[4.5rem]]="reservesFabClearance()">
+      <div class="h-full overflow-y-auto" [style.padding-bottom]="fabClearance()">
         <router-outlet />
       </div>
     </cmn-app-layout>
@@ -114,8 +119,8 @@ export class AppShellComponent {
   public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
   public readonly versionLabel = `v${APP_VERSION}`;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
-  public readonly reservesFabClearance = computed(
-    () => this.canUseAi() && !this.routerUrl().startsWith(AppRoute.Ledger)
+  public readonly fabClearance = computed(() =>
+    this.canUseAi() && !this.routerUrl().startsWith(AppRoute.Ledger) ? FAB_CLEARANCE : null
   );
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
