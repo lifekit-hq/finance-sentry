@@ -186,7 +186,7 @@ const DOSSIER_AAPL = {
     ],
     trends: [
       {
-        period: '0m',
+        period: '2026-08-01',
         strongBuy: 18,
         buy: 12,
         hold: 5,
