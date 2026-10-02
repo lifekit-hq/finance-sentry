@@ -36,7 +36,7 @@ public static class OidcLoginExtensions
                 o.BackchannelHttpHandler = new OidcAuthorityRewriteHandler(options.Authority, options.BackchannelAuthority, new HttpClientHandler());
             o.ClientId = options.ClientId;
             o.ClientSecret = options.ClientSecret;
-            o.RequireHttpsMetadata = options.RequireHttpsMetadata;
+            o.RequireHttpsMetadata = options.RequireHttpsMetadata && !BackchannelIsPlainHttp(options);
             o.ResponseType = OpenIdConnectResponseType.Code;
             o.ResponseMode = OpenIdConnectResponseMode.Query;
             o.UsePkce = true;
@@ -82,6 +82,10 @@ public static class OidcLoginExtensions
 
         return services;
     }
+
+    private static bool BackchannelIsPlainHttp(OidcLoginOptions options) =>
+        !string.IsNullOrWhiteSpace(options.BackchannelAuthority)
+        && !options.BackchannelAuthority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The SPA login page, carrying an error code the page turns into a message.</summary>
     public static string LoginFailureUrl(string publicBaseUrl, string code) =>

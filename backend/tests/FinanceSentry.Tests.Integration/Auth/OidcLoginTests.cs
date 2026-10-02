@@ -270,6 +270,24 @@ public class OidcBackchannelTests(OidcBackchannelApiFactory factory) : IClassFix
     }
 }
 
+public class OidcMetadataSchemeTests(OidcApiFactory plain, OidcBackchannelApiFactory backchannel)
+    : IClassFixture<OidcApiFactory>, IClassFixture<OidcBackchannelApiFactory>
+{
+    [Fact]
+    public void RequireHttpsMetadata_StaysOn_WithoutABackchannel()
+    {
+        plain.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get("lifekit")
+            .RequireHttpsMetadata.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RequireHttpsMetadata_IsOff_WhenTheBackchannelIsPlainHttp()
+    {
+        backchannel.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get("lifekit")
+            .RequireHttpsMetadata.Should().BeFalse();
+    }
+}
+
 public class OidcAuthorityRewriteHandlerTests
 {
     private const string Public = "https://host.ts.net:3001/oidc";
