@@ -5,7 +5,7 @@ import {
   HttpRequest,
   HttpStatusCode,
 } from '@angular/common/http';
-import {inject} from '@angular/core';
+import {inject, Injector} from '@angular/core';
 import {catchError, switchMap, throwError} from 'rxjs';
 
 import {AuthService} from '../services/auth.service';
@@ -23,12 +23,13 @@ export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  const authStore = inject(AuthStore);
-  const authService = inject(AuthService);
+  const injector = inject(Injector);
   const authReq = req.clone({withCredentials: true});
 
   return next(authReq).pipe(
     catchError((err: unknown) => {
+      const authStore = injector.get(AuthStore);
+      const authService = injector.get(AuthService);
       const isUnauthorized =
         err instanceof HttpErrorResponse &&
         (err.status as HttpStatusCode) === HttpStatusCode.Unauthorized;
