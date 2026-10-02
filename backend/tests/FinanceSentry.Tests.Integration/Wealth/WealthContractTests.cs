@@ -267,6 +267,7 @@ public class WealthApiFactory : WebApplicationFactory<Program>
         var token = handler.CreateToken(new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity([new Claim("sub", userId.ToString())]),
+            Audience = FinanceSentry.Core.Auth.AuthAudiences.App,
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         });
