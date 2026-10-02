@@ -25,7 +25,7 @@
       />
     </div>
   } @else {
-    <div class="mt-cmn-3 min-h-0 flex-1 overflow-auto">
+    <div class="fab-scroll-tail mt-cmn-3 min-h-0 flex-1 overflow-auto">
       @for (alert of filtered(); track alert.id) {
         <div
           (click)="openAlert(alert)"

@@ -53,6 +53,7 @@ describe('AppShellComponent FAB clearance', () => {
   it('pads the scroll wrapper past the FAB for an AI user on a page', async () => {
     const fixture = await setup(AppRoute.Settings);
     expect(wrapper(fixture).style.paddingBottom).toBe(FAB_CLEARANCE);
+    expect(wrapper(fixture).style.getPropertyValue('--fab-clearance')).toBe(FAB_CLEARANCE);
   });
 
   it('adds no padding on the full-page Ledger', async () => {
