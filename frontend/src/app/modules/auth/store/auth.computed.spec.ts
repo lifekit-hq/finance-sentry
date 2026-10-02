@@ -110,6 +110,15 @@ describe('authComputed', () => {
       });
     });
 
+    it('maps ACCOUNT_LOCKED to the lockout message, not the generic login error', () => {
+      const store = build({errorCode: 'ACCOUNT_LOCKED', flow: 'login'});
+      TestBed.runInInjectionContext(() => {
+        const message = authComputed(store).errorMessage();
+        expect(message).toContain('Too many failed sign-in attempts');
+        expect(message).not.toContain('Invalid email or password');
+      });
+    });
+
     it('maps INVALID_INVITE through the registry', () => {
       const store = build({errorCode: 'INVALID_INVITE', flow: 'acceptInvite'});
       TestBed.runInInjectionContext(() => {

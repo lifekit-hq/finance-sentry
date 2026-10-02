@@ -5,6 +5,9 @@ namespace FinanceSentry.Modules.Auth.Domain.Exceptions;
 public sealed class InvalidCredentialsException()
     : ApiException(401, "INVALID_CREDENTIALS", "Invalid email or password.");
 
+public sealed class AccountLockedException()
+    : ApiException(429, "ACCOUNT_LOCKED", "Too many failed sign-in attempts. Try again in 5 minutes.");
+
 public sealed class InvalidRefreshTokenException(string message = "Refresh token invalid or expired.")
     : ApiException(401, "INVALID_REFRESH_TOKEN", message);
 

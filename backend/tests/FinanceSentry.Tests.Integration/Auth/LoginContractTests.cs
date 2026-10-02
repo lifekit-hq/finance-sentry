@@ -77,6 +77,43 @@ public class LoginContractTests : IClassFixture<AuthApiFactory>
     }
 
     [Fact]
+    public async Task Login_AfterFiveWrongPasswords_CorrectPasswordReturns429AccountLocked()
+    {
+        await _factory.EnsureUserExistsAsync("login-locked@test.com", "TestPass123!");
+
+        // The fifth failure is the one that trips Identity's lockout, so it already reports the lock.
+        for (var i = 0; i < 4; i++)
+        {
+            var bad = await _client.PostAsJsonAsync("/api/v1/auth/login",
+                new { email = "login-locked@test.com", password = "WrongPassword!" });
+            bad.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        var tripping = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new { email = "login-locked@test.com", password = "WrongPassword!" });
+        tripping.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new { email = "login-locked@test.com", password = "TestPass123!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
+        body!.ErrorCode.Should().Be("ACCOUNT_LOCKED");
+        body.Error.Should().Contain("Try again in 5 minutes");
+    }
+
+    [Fact]
+    public async Task Login_UnknownEmail_StillReturnsGenericInvalidCredentials()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new { email = "login-nobody@test.com", password = "WrongPassword!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
+        body!.ErrorCode.Should().Be("INVALID_CREDENTIALS");
+    }
+
+    [Fact]
     public async Task Login_MissingEmail_Returns400WithValidationError()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
