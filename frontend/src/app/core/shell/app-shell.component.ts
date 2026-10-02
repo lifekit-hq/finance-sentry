@@ -68,9 +68,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       (searchClick)="openPalette()"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
     >
-      <div class="h-full overflow-y-auto">
-        <router-outlet />
-      </div>
+      <router-outlet />
     </cmn-app-layout>
 
     @if (canUseAi()) {

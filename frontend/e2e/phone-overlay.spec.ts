@@ -70,20 +70,36 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(main.y).toBeLessThanOrEqual(topBox.y);
       expect(main.y + main.height).toBeGreaterThanOrEqual(tabBox.y + tabBox.height);
 
-      await page.evaluate(px => {
-        const scroller = document.querySelector('cmn-app-layout main .overflow-y-auto');
-        if (!scroller) {
-          throw new Error('scroller missing');
+      const scroll = await page.evaluate(px => {
+        const mainEl = document.querySelector('cmn-app-layout main');
+        const outlet = document.querySelector('cmn-app-layout main router-outlet');
+        const page = outlet?.nextElementSibling;
+        if (!mainEl || !page) {
+          throw new Error('main or routed page missing');
+        }
+        const scrollers: Element[] = [];
+        for (let el: Element | null = page; el; el = el.parentElement) {
+          const overflowY = getComputedStyle(el).overflowY;
+          if (overflowY === 'auto' || overflowY === 'scroll') {
+            scrollers.push(el);
+          }
         }
         const filler = document.createElement('div');
         filler.style.height = `${px}px`;
-        scroller.appendChild(filler);
-        scroller.scrollTop = px / 2;
+        mainEl.appendChild(filler);
+        mainEl.scrollTop = px / 2;
+        const rect = filler.getBoundingClientRect();
+        return {
+          nearestScrollerIsMain: scrollers[0] === mainEl,
+          scrollTop: mainEl.scrollTop,
+          fillerTop: rect.top,
+          fillerBottom: rect.bottom,
+        };
       }, TALL_CONTENT_PX);
-      const scrolled = await page.evaluate(
-        () => document.querySelector('cmn-app-layout main .overflow-y-auto')?.scrollTop
-      );
-      expect(scrolled ?? 0).toBeGreaterThan(0);
+      expect(scroll.nearestScrollerIsMain).toBe(true);
+      expect(scroll.scrollTop).toBeGreaterThan(0);
+      expect(scroll.fillerTop).toBeLessThan(topBox.y + topBox.height);
+      expect(scroll.fillerBottom).toBeGreaterThan(tabBox.y);
 
       await page.screenshot({path: `test-results/phone-overlay-${scheme}.png`});
     });
