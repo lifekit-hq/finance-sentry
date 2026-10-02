@@ -21,3 +21,6 @@ export const PHONE_TAB_ROUTES: readonly string[] = [
   AppRoute.Transactions,
   AppRoute.Alerts,
 ];
+
+/** Bottom padding that lets the last page content scroll clear of the floating Ledger chat button. */
+export const FAB_CLEARANCE = '4.5rem';
