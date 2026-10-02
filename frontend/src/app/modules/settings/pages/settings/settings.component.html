@@ -50,7 +50,7 @@
               type="email"
             />
           </cmn-form-field>
-          <div class="mb-cmn-4 flex justify-end">
+          <div class="flex justify-end pb-cmn-4">
             <cmn-button [loading]="store.profileSaving()" (clicked)="saveProfile()"
               >Save Profile</cmn-button
             >
@@ -228,7 +228,7 @@
                 />
               </cmn-form-field>
             </div>
-            <div class="mb-cmn-4 flex justify-end">
+            <div class="flex justify-end pb-cmn-4">
               <cmn-button
                 [loading]="store.passwordSaving()"
                 (clicked)="changePassword()"
