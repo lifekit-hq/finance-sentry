@@ -3,18 +3,25 @@ import {
   ButtonComponent,
   ChatComponent,
   type CmnChatStreamFn,
+  IconComponent,
   type LucideIconName,
+  MenuComponent,
+  type MenuItem,
 } from '@lifekit-hq/ui';
 
 import {type ConversationSummary} from '../../models/conversation/conversation.model';
 import {AgentChatStore} from '../../store/agent-chat.store';
+
+const CONVERSATION_MENU_ITEMS: MenuItem[] = [
+  {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
+];
 
 @Component({
   selector: 'fns-ledger-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block h-full'},
   providers: [AgentChatStore],
-  imports: [ButtonComponent, ChatComponent],
+  imports: [ButtonComponent, ChatComponent, IconComponent, MenuComponent],
   templateUrl: './ledger-chat.component.html',
 })
 export class LedgerChatComponent {
@@ -22,7 +29,7 @@ export class LedgerChatComponent {
 
   protected readonly newChatIcon: LucideIconName = 'Plus';
   protected readonly sessionsIcon: LucideIconName = 'History';
-  protected readonly deleteIcon: LucideIconName = 'Trash2';
+  protected readonly conversationMenuItems = CONVERSATION_MENU_ITEMS;
 
   public readonly chatStream: CmnChatStreamFn = text => this.store.stream(text);
 
@@ -34,8 +41,9 @@ export class LedgerChatComponent {
     this.store.selectConversation(conversation.id);
   }
 
-  public onDelete(conversation: ConversationSummary, event: Event): void {
-    event.stopPropagation();
-    this.store.deleteConversation(conversation.id);
+  public onConversationAction(actionId: string, conversation: ConversationSummary): void {
+    if (actionId === 'delete') {
+      this.store.deleteConversation(conversation.id);
+    }
   }
 }

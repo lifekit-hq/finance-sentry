@@ -32,13 +32,14 @@
               >
                 {{ conversation.title || 'Untitled' }}
               </button>
-              <cmn-button
-                [icon]="deleteIcon"
-                (clicked)="onDelete(conversation, $event)"
-                variant="destructive"
-                size="sm"
-                aria-label="Delete conversation"
-              />
+              <cmn-menu
+                [items]="conversationMenuItems"
+                (itemSelect)="onConversationAction($event.id, conversation)"
+                ariaLabel="Conversation actions"
+                triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
+              >
+                <cmn-icon name="Ellipsis" size="sm" />
+              </cmn-menu>
             </li>
           }
         </ul>
