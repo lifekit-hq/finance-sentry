@@ -190,13 +190,13 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               >
             </div>
             <cmn-card>
-              <div class="grid grid-cols-3 divide-x divide-border-default">
+              <div class="grid grid-cols-2 gap-y-cmn-3 sm:grid-cols-3">
                 @for (tile of monthTiles; track tile.label) {
                   <button
                     [attr.aria-label]="tile.ariaLabel"
                     (click)="tile.open()"
                     type="button"
-                    class="min-w-0 cursor-pointer space-y-cmn-1 px-cmn-2 text-left transition-opacity first:pl-0 last:pr-0 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default sm:px-cmn-4"
+                    class="min-w-0 cursor-pointer space-y-cmn-1 border-border-default px-cmn-4 text-left transition-opacity first:pl-0 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default max-sm:[&:nth-child(2)]:border-l max-sm:last:col-span-2 max-sm:last:border-t max-sm:last:px-0 max-sm:last:pt-cmn-3 sm:border-l sm:first:border-l-0 sm:last:pr-0"
                   >
                     <span
                       class="block truncate font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
@@ -212,7 +212,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       @if (tile.deltaLabel()) {
                         <span
                           [class]="paceClass(tile.delta())"
-                          class="block font-label text-cmn-xs font-medium"
+                          class="block truncate font-label text-cmn-xs font-medium"
                           >{{ tile.deltaLabel() }}</span
                         >
                       }
