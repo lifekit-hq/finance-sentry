@@ -1,4 +1,4 @@
-<div class="page-container flex h-full flex-col">
+<div class="page-container flex min-h-full flex-col md:h-full">
   <cmn-page-header
     [subtitle]="alertsSubtitle()"
     [secondaryActionLabel]="store.unreadCount() > 0 ? 'Mark all read' : null"
@@ -25,7 +25,7 @@
       />
     </div>
   } @else {
-    <div class="fab-scroll-tail mt-cmn-3 min-h-0 flex-1 overflow-auto">
+    <div class="mt-cmn-3 md:min-h-0 md:flex-1 md:overflow-auto">
       @for (alert of filtered(); track alert.id) {
         <div
           (click)="openAlert(alert)"
