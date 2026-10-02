@@ -179,7 +179,7 @@
               <div class="mt-cmn-3 space-y-cmn-2">
                 @for (lot of position.taxLots; track $index) {
                   <div
-                    class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-neutral-50 px-cmn-3 py-cmn-2 text-cmn-sm dark:bg-neutral-800"
+                    class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
                   >
                     <span class="font-mono tabular-nums text-text-primary">{{
                       lot.quantity | number: '1.0-8'
@@ -372,7 +372,7 @@
                 >
                   <span class="shrink-0 font-medium text-text-primary">{{ action.firm }}</span>
                   <span
-                    class="rounded-md bg-neutral-100 px-cmn-2 py-0.5 text-cmn-xs text-text-secondary dark:bg-neutral-800"
+                    class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
                   >
                     {{ action.actionType }}
                   </span>
@@ -569,7 +569,7 @@
           <ul class="mt-cmn-4 space-y-cmn-2">
             @for (signal of dossier.radarSignals; track $index) {
               <li
-                class="flex flex-wrap items-center gap-cmn-3 rounded-lg bg-neutral-50 px-cmn-3 py-cmn-2 text-cmn-sm dark:bg-neutral-800"
+                class="flex flex-wrap items-center gap-cmn-3 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
               >
                 <span class="shrink-0 font-mono text-cmn-xs text-text-secondary">
                   {{ signal.timestamp | date: 'mediumDate' }}
