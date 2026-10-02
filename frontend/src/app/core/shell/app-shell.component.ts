@@ -125,9 +125,7 @@ export class AppShellComponent {
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );
-  public readonly avatarLabel = computed(() =>
-    (this.authStore.email()?.trim().charAt(0) || '?').toUpperCase()
-  );
+  public readonly avatarLabel = this.authStore.avatarInitials;
   public readonly isDark = computed(() => this.theme() === 'dark');
   public readonly activeRoute = computed(() => {
     const url = this.routerUrl();

@@ -2,10 +2,12 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {NavigationEnd, Router} from '@angular/router';
+import {EMPTY} from 'rxjs';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
+import {SettingsService} from '../../settings/services/settings.service';
 import {type AuthResponse} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
@@ -23,6 +25,9 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     setError: vi.fn(),
     setReturnUrl: vi.fn(),
     setFlashMessage: vi.fn(),
+    setProfileName: vi.fn(),
+    loadProfileName: vi.fn(),
+    firstName: signal<Nullable<string>>(null),
     isAuthenticated: signal(overrides.isAuthenticated ?? false),
     returnUrl: signal<Nullable<string>>(overrides.returnUrl ?? null),
   };
@@ -55,6 +60,7 @@ function configure(
   TestBed.configureTestingModule({
     providers: [
       {provide: AuthService, useValue: service},
+      {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
       {provide: Router, useValue: router},
     ],
   });
@@ -192,6 +198,41 @@ describe('authEffects', () => {
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
     });
   });
+
+  describe('loadProfileName', () => {
+    function configureWithProfile(profile$: Subject<{firstName: string; lastName: string}>) {
+      TestBed.configureTestingModule({
+        providers: [
+          {provide: AuthService, useValue: buildService()},
+          {provide: SettingsService, useValue: {getProfile: () => profile$}},
+          {provide: Router, useValue: buildRouter()},
+        ],
+      });
+    }
+
+    it('stores the profile name while authenticated', () => {
+      const store = buildStore({isAuthenticated: true});
+      const profile$ = new Subject<{firstName: string; lastName: string}>();
+      configureWithProfile(profile$);
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
+      profile$.next({firstName: 'Denys', lastName: 'Tester'});
+
+      expect(store.setProfileName).toHaveBeenCalledWith('Denys', 'Tester');
+    });
+
+    it('drops a late response after the session ended', () => {
+      const store = buildStore({isAuthenticated: true});
+      const profile$ = new Subject<{firstName: string; lastName: string}>();
+      configureWithProfile(profile$);
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
+      store.isAuthenticated.set(false);
+      profile$.next({firstName: 'Denys', lastName: 'Tester'});
+
+      expect(store.setProfileName).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('authHooks', () => {
@@ -301,5 +342,22 @@ describe('authHooks', () => {
     TestBed.flushEffects();
 
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('loads the profile name once authenticated when it is not yet known', () => {
+    const store = buildStore();
+    TestBed.runInInjectionContext(() => authHooks(store));
+    store.isAuthenticated.set(true);
+    TestBed.tick();
+    expect(store.loadProfileName).toHaveBeenCalledOnce();
+  });
+
+  it('skips the profile load when the name is already known', () => {
+    const store = buildStore();
+    store.firstName.set('Denys');
+    TestBed.runInInjectionContext(() => authHooks(store));
+    store.isAuthenticated.set(true);
+    TestBed.tick();
+    expect(store.loadProfileName).not.toHaveBeenCalled();
   });
 });

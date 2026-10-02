@@ -21,12 +21,17 @@ export function authMethods(store: WritableStateSource<AuthState>) {
       patchState(store, {
         userId: null,
         email: null,
+        firstName: null,
+        lastName: null,
         roles: [],
         permissions: [],
         status: 'idle',
         errorCode: null,
         flow: null,
       });
+    },
+    setProfileName(firstName: Nullable<string>, lastName: Nullable<string>): void {
+      patchState(store, {firstName, lastName});
     },
     setLoading(flow: AuthFlow): void {
       patchState(store, {status: 'loading', errorCode: null, flow});

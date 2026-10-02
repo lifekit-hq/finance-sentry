@@ -5,6 +5,7 @@ import {catchError, EMPTY, filter, pipe, startWith, switchMap, tap} from 'rxjs';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {ErrorUtils} from '../../../shared/utils/error.utils';
+import {SettingsService} from '../../settings/services/settings.service';
 import {
   type AcceptInviteRequest,
   type AuthRequest,
@@ -16,12 +17,18 @@ import {type AuthFlow, type FlashMessage} from './auth.state';
 interface EffectsStore {
   applyAuthResponse: (res: AuthResponse) => void;
   clearSession: () => void;
+  setProfileName: (firstName: Nullable<string>, lastName: Nullable<string>) => void;
   setLoading: (flow: AuthFlow) => void;
   setError: (errorCode: Nullable<string>, flow: AuthFlow) => void;
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   isAuthenticated: Signal<boolean>;
   returnUrl: Signal<Nullable<string>>;
+}
+
+interface HookStore extends EffectsStore {
+  firstName: Signal<Nullable<string>>;
+  loadProfileName: () => void;
 }
 
 function flashFromParams(info: Nullable<string>, error: Nullable<string>): Nullable<FlashMessage> {
@@ -37,6 +44,7 @@ function flashFromParams(info: Nullable<string>, error: Nullable<string>): Nulla
 export function authEffects(store: EffectsStore) {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const settingsService = inject(SettingsService);
 
   return {
     login: rxMethod<AuthRequest>(
@@ -81,6 +89,17 @@ export function authEffects(store: EffectsStore) {
         )
       )
     ),
+    loadProfileName: rxMethod<void>(
+      pipe(
+        switchMap(() =>
+          settingsService.getProfile().pipe(
+            filter(() => store.isAuthenticated()),
+            tap(profile => store.setProfileName(profile.firstName, profile.lastName)),
+            catchError(() => EMPTY)
+          )
+        )
+      )
+    ),
     logout(): void {
       authService.logout().subscribe({error: () => undefined});
       store.clearSession();
@@ -89,7 +108,7 @@ export function authEffects(store: EffectsStore) {
   };
 }
 
-export function authHooks(store: EffectsStore): void {
+export function authHooks(store: HookStore): void {
   const router = inject(Router);
 
   router.events
@@ -108,6 +127,9 @@ export function authHooks(store: EffectsStore): void {
       return;
     }
     untracked(() => {
+      if (store.firstName() === null) {
+        store.loadProfileName();
+      }
       const target = store.returnUrl() ?? AppRoute.Accounts;
       const currentPath = router.url.split('?')[0];
       const loginPath: string = AppRoute.Login;
