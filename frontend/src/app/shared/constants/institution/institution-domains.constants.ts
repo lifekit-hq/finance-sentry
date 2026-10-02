@@ -5,8 +5,9 @@
  * PROVIDER_DOMAINS: direct-connect providers where the provider code IS the
  * institution (Monobank, IBKR, Binance, Revolut X).
  *
- * BANK_NAME_DOMAINS: aggregator-connected banks (e.g. TrueLayer) where the
- * specific institution lives in the display name, not the provider code.
+ * BANK_NAME_DOMAINS: institutions identified by display name, not provider
+ * code — aggregator-connected banks (e.g. TrueLayer) and rows that carry only
+ * a bank name (Transactions), which also lists the direct-connect providers.
  * Matched by case-insensitive substring, so keep keywords lowercase.
  */
 export const PROVIDER_DOMAINS: Readonly<Record<string, string>> = {
