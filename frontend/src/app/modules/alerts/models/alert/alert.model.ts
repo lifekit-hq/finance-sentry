@@ -1,5 +1,10 @@
 export type AlertType =
-  'LowBalance' | 'SyncFailure' | 'UnusualSpend' | 'PolicyViolation' | 'Opportunity';
+  | 'LowBalance'
+  | 'SyncFailure'
+  | 'UnusualSpend'
+  | 'PolicyViolation'
+  | 'Opportunity'
+  | 'FilingLanded';
 export type AlertSeverity = 'Error' | 'Warning' | 'Info';
 export type AlertFilter = 'all' | 'unread' | 'error' | 'warning' | 'info';
 
