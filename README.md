@@ -185,7 +185,7 @@ backend/
     FinanceSentry.API/                ASP.NET Core 9 host — middleware, DI, migration runner
     FinanceSentry.Core/               Shared interfaces and domain primitives
     FinanceSentry.Infrastructure/     Cross-cutting: encryption, logging
-    FinanceSentry.Modules.Auth/       Invite-only onboarding (People), login, Google sign-in, JWT + refresh tokens
+    FinanceSentry.Modules.Auth/       Invite-only onboarding (People), login, Google and org OIDC sign-in, JWT + refresh tokens
     FinanceSentry.Modules.BankSync/   Monobank + TrueLayer sync, transactions, dashboard
     FinanceSentry.Modules.CryptoSync/ Binance + Revolut X integrations, crypto holdings
     FinanceSentry.Modules.BrokerageSync/ IBKR Client Portal, brokerage holdings
