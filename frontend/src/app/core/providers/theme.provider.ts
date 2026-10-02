@@ -6,6 +6,8 @@ import {
 } from '@angular/core';
 import {ThemeService} from '@lifekit-hq/ui';
 
+import {type ThemePreference} from '../../modules/settings/models/settings/settings.model';
+
 const THEME_STORAGE_KEY = 'cmn-theme';
 const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
 
@@ -28,6 +30,18 @@ function clearStoredTheme(): void {
 function applySystemTheme(theme: ThemeService, dark: boolean): void {
   theme.setTheme(dark ? 'dark' : 'light');
   clearStoredTheme();
+}
+
+/** Applies a saved profile preference live: light/dark persist as an explicit choice, system follows the OS. */
+export function applyThemePreference(theme: ThemeService, preference: ThemePreference): void {
+  if (preference !== 'system') {
+    theme.setTheme(preference);
+    return;
+  }
+  const systemDark = window.matchMedia?.(DARK_SCHEME_QUERY);
+  if (systemDark) {
+    applySystemTheme(theme, systemDark.matches);
+  }
 }
 
 /**
