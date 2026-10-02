@@ -112,6 +112,13 @@ describe('authComputed', () => {
       });
     });
 
+    it('maps SIGN_IN_METHOD_DISABLED through the registry, not the generic login error', () => {
+      const store = build({errorCode: 'SIGN_IN_METHOD_DISABLED', flow: 'login'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).errorMessage()).toBe('This sign-in method is not available.');
+      });
+    });
+
     it('maps ACCOUNT_LOCKED to the lockout message, not the generic login error', () => {
       const store = build({
         errorCode: 'ACCOUNT_LOCKED',
