@@ -147,6 +147,17 @@ describe('authComputed', () => {
       });
     });
 
+    it('ignores the server detail for an unregistered code and keeps the flow fallback', () => {
+      const store = build({
+        errorCode: 'INTERNAL_ERROR',
+        errorDetail: 'An unexpected error occurred. Please try again.',
+        flow: 'login',
+      });
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).errorMessage()).toBe('Invalid email or password.');
+      });
+    });
+
     it('returns the accept-invite fallback for unknown code on acceptInvite flow', () => {
       const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'acceptInvite'});
       TestBed.runInInjectionContext(() => {

@@ -17,6 +17,8 @@ interface StateSignals {
   flow: Signal<AuthFlow>;
 }
 
+const ACCOUNT_LOCKED_CODE = 'ACCOUNT_LOCKED';
+
 function flowFallback(flow: AuthFlow): string {
   switch (flow) {
     case 'login':
@@ -44,7 +46,8 @@ export function authComputed(store: StateSignals) {
       if (!code) {
         return '';
       }
-      return errorMessages.resolve(code) ?? store.errorDetail() ?? flowFallback(store.flow());
+      const detail = code === ACCOUNT_LOCKED_CODE ? store.errorDetail() : null;
+      return errorMessages.resolve(code) ?? detail ?? flowFallback(store.flow());
     }),
   };
 }
