@@ -23,7 +23,7 @@
 2. Common causes:
    - DB connection pool exhausted: increase `Max Pool Size` in connection string.
    - Provider API down: check TrueLayer / Monobank status pages. Affected syncs will fail until resolved.
-   - Memory pressure: restart the API container (`docker-compose restart api`). Prod containers carry `mem_limit` caps (values and 7-day-peak rationale live beside each service in `docker/docker-compose.prod.yml`); a container that keeps restarting with `OOMKilled=true` (`docker inspect <name> --format '{{.State.OOMKilled}}'`) has hit its cap — raise the cap there rather than restarting repeatedly.
+   - Memory pressure: restart the API container (`docker compose -f docker/docker-compose.prod.yml --env-file docker/.env --env-file docker/.env.deploy restart api` — the prod compose file requires the hostname/edge values `deploy.sh` keeps in `docker/.env.deploy`; run it from the repo directory on the host). Prod containers carry `mem_limit` caps (values and 7-day-peak rationale live beside each service in `docker/docker-compose.prod.yml`); a container that keeps restarting with `OOMKilled=true` (`docker inspect <name> --format '{{.State.OOMKilled}}'`) has hit its cap — raise the cap there rather than restarting repeatedly.
 3. If DB migration pending: run `dotnet ef database update`.
 
 ## 3. Slow Queries (> 100ms)
@@ -100,7 +100,7 @@ GET /health/ready → 503
 
 ## 8. Startup Migration Failure
 
-**Symptoms:** `deploy.sh` fails with `STARTUP MIGRATION FAILURE`, or the api container crash-loops and `docker compose -f docker/docker-compose.prod.yml logs api | grep StartupMigrationException` matches.
+**Symptoms:** `deploy.sh` fails with `STARTUP MIGRATION FAILURE`, or the api container crash-loops and `docker compose -f docker/docker-compose.prod.yml --env-file docker/.env --env-file docker/.env.deploy logs api | grep StartupMigrationException` matches.
 
 **Meaning:** a module's EF Core migration failed against a reachable database (or the database connection was lost after earlier modules had migrated), and the API refused to start rather than serve a half-migrated schema.
 

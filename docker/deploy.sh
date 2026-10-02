@@ -3,6 +3,11 @@
 #
 # - Decrypts docker/.env.sops → docker/.env (requires age key at SOPS_AGE_KEY_FILE
 #   or ~/.config/sops/age/keys.txt).
+# - Persists the non-secret hostname/edge values (JWT_ISSUER, FRONTEND_BASE_URL,
+#   TRUELAYER_FRONTEND_REDIRECT_BASE, EDGE_SUBNET, EDGE_IP_RANGE, EDGE_BRIDGE_IP, EDGE_GATEWAY_IP)
+#   to the gitignored docker/.env.deploy. The deploy workflow supplies them from repository
+#   variables; a run without them (manual re-run, break-glass) reuses the last-deployed file.
+#   The compose file requires every one, so a missing value fails loudly at interpolation.
 # - Pulls the images Docker Build published for one commit (IMAGE_TAG = its full SHA) and
 #   starts the prod compose stack on them without building.
 # - Idempotent: safe to re-run; re-running with an older SHA is a rollback.
@@ -14,8 +19,10 @@
 # published service, so the stack can be built from the checked-out source on the host instead:
 #
 #   export NODE_AUTH_TOKEN=$(gh auth token)   # read:packages — the frontend build's npm registry
-#   IMAGE_TAG=local docker compose -f docker/docker-compose.prod.yml --env-file docker/.env \
-#     up -d --build --remove-orphans
+#   IMAGE_TAG=local docker compose -f docker/docker-compose.prod.yml \
+#     --env-file docker/.env --env-file docker/.env.deploy up -d --build --remove-orphans
+#
+# Any other host-side compose command (restart, logs, ps) takes the same two --env-file flags.
 #
 # That skips this script's gates (platform contract, health wait), so run them by hand or re-run
 # a normal deploy once the images publish again.
@@ -49,7 +56,27 @@ echo "[deploy] decrypt docker/.env.sops"
 SOPS_AGE_KEY_FILE="$KEYFILE" sops --decrypt --input-type dotenv --output-type dotenv docker/.env.sops > docker/.env
 chmod 600 docker/.env
 
-COMPOSE=(docker compose -f docker/docker-compose.prod.yml --env-file docker/.env)
+DEPLOY_ENV_FILE=docker/.env.deploy
+DEPLOY_ENV_VARS=(JWT_ISSUER FRONTEND_BASE_URL TRUELAYER_FRONTEND_REDIRECT_BASE EDGE_SUBNET EDGE_IP_RANGE EDGE_BRIDGE_IP EDGE_GATEWAY_IP)
+supplied=()
+unsupplied=()
+for name in "${DEPLOY_ENV_VARS[@]}"; do
+  if [[ -n "${!name:-}" ]]; then supplied+=("$name"); else unsupplied+=("$name"); fi
+done
+if [[ ${#supplied[@]} -eq ${#DEPLOY_ENV_VARS[@]} ]]; then
+  echo "[deploy] persist hostname/edge values -> $DEPLOY_ENV_FILE"
+  ( umask 077; for name in "${DEPLOY_ENV_VARS[@]}"; do printf '%s=%s\n' "$name" "${!name}"; done > "$DEPLOY_ENV_FILE" )
+elif [[ ${#supplied[@]} -gt 0 ]]; then
+  echo "error: hostname/edge values only partly supplied; missing: ${unsupplied[*]}" >&2
+  exit 1
+elif [[ -f "$DEPLOY_ENV_FILE" ]]; then
+  echo "[deploy] hostname/edge values not supplied — reusing last-deployed $DEPLOY_ENV_FILE"
+else
+  echo "error: hostname/edge values not supplied and no $DEPLOY_ENV_FILE from a previous deploy: ${DEPLOY_ENV_VARS[*]}" >&2
+  exit 1
+fi
+
+COMPOSE=(docker compose -f docker/docker-compose.prod.yml --env-file docker/.env --env-file "$DEPLOY_ENV_FILE")
 
 # Fail before anything changes, naming every missing image, when the commit has no published
 # images (Docker Build failed or never ran for it, or the versions were pruned).
@@ -120,7 +147,7 @@ echo "[deploy] wait for api health (via gateway — direct api port closed in 02
 deadline=$((SECONDS + 120))
 until curl -sf http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; do
   if [[ $SECONDS -gt $deadline ]]; then
-    api_logs="$(docker compose -f docker/docker-compose.prod.yml logs api 2>&1 || true)"
+    api_logs="$("${COMPOSE[@]}" logs api 2>&1 || true)"
     if grep -q StartupMigrationException <<<"$api_logs"; then
       echo "error: STARTUP MIGRATION FAILURE — the api refused to start rather than serve a half-migrated schema" >&2
       echo "error: see docs/OPERATIONS_RUNBOOK.md §8 (Startup Migration Failure)" >&2
@@ -128,7 +155,7 @@ until curl -sf http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; do
       exit 1
     fi
     echo "error: api health check timed out after 120s" >&2
-    docker compose -f docker/docker-compose.prod.yml logs --tail 60 api
+    "${COMPOSE[@]}" logs --tail 60 api
     exit 1
   fi
   sleep 2
