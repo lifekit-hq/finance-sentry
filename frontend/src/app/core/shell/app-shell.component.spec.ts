@@ -1,7 +1,6 @@
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
-import {ComponentFixture, TestBed} from '@angular/core/testing';
+import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
-import {AppLayoutComponent} from '@lifekit-hq/ui';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
@@ -10,7 +9,11 @@ import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {AppShellComponent} from './app-shell.component';
 import {FAB_CLEARANCE} from './app-shell.constants';
 
-@Component({selector: 'fns-chat-widget', template: '', changeDetection: ChangeDetectionStrategy.OnPush})
+@Component({
+  selector: 'fns-chat-widget',
+  template: '',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
 class ChatWidgetStubComponent {}
 
 describe('AppShellComponent FAB clearance', () => {

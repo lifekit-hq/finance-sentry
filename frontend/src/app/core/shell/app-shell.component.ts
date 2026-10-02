@@ -71,7 +71,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       (searchClick)="openPalette()"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
     >
-      <div class="h-full overflow-y-auto" [style.padding-bottom]="fabClearance()">
+      <div [style.padding-bottom]="fabClearance()" class="h-full overflow-y-auto">
         <router-outlet />
       </div>
     </cmn-app-layout>
