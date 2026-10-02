@@ -198,6 +198,41 @@ describe('authEffects', () => {
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
     });
   });
+
+  describe('loadProfileName', () => {
+    function configureWithProfile(profile$: Subject<{firstName: string; lastName: string}>) {
+      TestBed.configureTestingModule({
+        providers: [
+          {provide: AuthService, useValue: buildService()},
+          {provide: SettingsService, useValue: {getProfile: () => profile$}},
+          {provide: Router, useValue: buildRouter()},
+        ],
+      });
+    }
+
+    it('stores the profile name while authenticated', () => {
+      const store = buildStore({isAuthenticated: true});
+      const profile$ = new Subject<{firstName: string; lastName: string}>();
+      configureWithProfile(profile$);
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
+      profile$.next({firstName: 'Denys', lastName: 'Tester'});
+
+      expect(store.setProfileName).toHaveBeenCalledWith('Denys', 'Tester');
+    });
+
+    it('drops a late response after the session ended', () => {
+      const store = buildStore({isAuthenticated: true});
+      const profile$ = new Subject<{firstName: string; lastName: string}>();
+      configureWithProfile(profile$);
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
+      store.isAuthenticated.set(false);
+      profile$.next({firstName: 'Denys', lastName: 'Tester'});
+
+      expect(store.setProfileName).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('authHooks', () => {

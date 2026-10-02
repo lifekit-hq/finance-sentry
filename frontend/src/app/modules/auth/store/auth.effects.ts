@@ -93,6 +93,7 @@ export function authEffects(store: EffectsStore) {
       pipe(
         switchMap(() =>
           settingsService.getProfile().pipe(
+            filter(() => store.isAuthenticated()),
             tap(profile => store.setProfileName(profile.firstName, profile.lastName)),
             catchError(() => EMPTY)
           )
