@@ -163,6 +163,9 @@ describe('EventsComponent', () => {
     expect(text).toContain('Tomorrow');
     expect(text).toContain('Mon 5 Oct');
     expect(host.querySelectorAll('[data-testid^="day-"]').length).toBe(3);
+    expect(host.querySelector('[data-testid^="day-"] h2')?.textContent).not.toMatch(
+      /\d{4}-\d{2}-\d{2}/
+    );
   });
 
   it('labels the This week and Later sections when both have days', () => {
@@ -179,7 +182,9 @@ describe('EventsComponent', () => {
     expect(text).toContain('Earnings');
     expect(text).toContain('MU');
     expect(text).toContain('Estimate');
-    expect(text).toContain('Ex-dividend: PLTR');
+    expect(text).not.toContain('Earnings: MU');
+    expect(text).not.toContain('Ex-dividend: PLTR');
+    expect(text).toContain('PLTR');
     expect(text).toContain('US · high importance');
     expect(text).toContain('08:30');
   });
