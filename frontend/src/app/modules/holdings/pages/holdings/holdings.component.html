@@ -87,7 +87,7 @@
 
           <cmn-data-table
             [rows]="group.rows"
-            class="holdings-table max-lg:[&_.cdk-column-quantity]:hidden max-lg:[&_.cdk-column-price]:hidden max-lg:[&_.cdk-column-weight]:hidden xl:[&_table]:table-fixed xl:[&_.cdk-column-quantity]:w-[13rem] xl:[&_.cdk-column-price]:w-[9rem] xl:[&_.cdk-column-value]:w-[9rem] xl:[&_.cdk-column-pnl]:w-[13rem] xl:[&_.cdk-column-weight]:w-[6rem]"
+            class="max-lg:[&_.cdk-column-price]:hidden max-lg:[&_.cdk-column-quantity]:hidden max-lg:[&_.cdk-column-weight]:hidden"
           >
             <cmn-column key="symbol" listSlot="primary" header="Symbol">
               <ng-template let-row cmnCell>
