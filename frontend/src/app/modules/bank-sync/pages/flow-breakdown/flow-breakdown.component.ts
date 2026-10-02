@@ -1,13 +1,13 @@
-import {DatePipe} from '@angular/common';
+import {DatePipe, DecimalPipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
-  ButtonComponent,
   CardComponent,
+  ChipComponent,
   EmptyStateComponent,
-  IconComponent,
   ListItemRowComponent,
+  MonthStepperComponent,
   SkeletonComponent,
   StatCardComponent,
   TagComponent,
@@ -24,12 +24,13 @@ const SKELETON_ROWS = 8;
   selector: 'fns-flow-breakdown',
   imports: [
     AlertComponent,
-    ButtonComponent,
     CardComponent,
+    ChipComponent,
     DatePipe,
+    DecimalPipe,
     EmptyStateComponent,
-    IconComponent,
     ListItemRowComponent,
+    MonthStepperComponent,
     MerchantCategoryPipe,
     MoneyPipe,
     SkeletonComponent,
@@ -47,16 +48,11 @@ export class FlowBreakdownComponent {
   public readonly store = inject(FlowBreakdownStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
 
-  public readonly isCurrentMonth = computed(
-    () => this.store.month() === MonthKeyUtils.currentUtc()
-  );
+  public readonly currentMonth = new Date();
+  public readonly monthDate = computed(() => MonthKeyUtils.toDate(this.store.month()));
 
-  public goToPreviousMonth(): void {
-    this.navigateToMonth(MonthKeyUtils.shift(this.store.month(), -1));
-  }
-
-  public goToNextMonth(): void {
-    this.navigateToMonth(MonthKeyUtils.shift(this.store.month(), 1));
+  public onMonthChange(month: Date): void {
+    this.navigateToMonth(MonthKeyUtils.fromDate(month));
   }
 
   public toggleAccount(accountId: string): void {

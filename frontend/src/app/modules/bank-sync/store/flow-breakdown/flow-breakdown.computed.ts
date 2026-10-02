@@ -24,6 +24,8 @@ export interface BucketGroup {
   note: string;
   items: FlowBreakdownItem[];
   totalUsd: number;
+  /** Share of counted spending (outflow groups) or income (inflow groups), 0–100; null when mixed or the base is 0. */
+  sharePct: Nullable<number>;
 }
 
 /** An account chip for filtering the view down to one card. */
@@ -32,6 +34,7 @@ export interface AccountChip {
   label: string;
 }
 
+const PCT_MAX = 100;
 const DEFAULT_ERROR = 'Failed to load the month breakdown. Please try again.';
 
 // Render order + copy for each bucket. `counted` marks buckets that enter the savings
@@ -95,6 +98,13 @@ export function flowBreakdownComputed(store: StateSignals) {
   const spendingUsd = computed(() => sumUsd(itemsOf('spending')));
   const investedUsd = computed(() => sumUsd(itemsOf('invested')));
 
+  const sharePct = (items: FlowBreakdownItem[], totalUsd: number): Nullable<number> => {
+    const allIn = items.every(i => i.direction === 'in');
+    const allOut = items.every(i => i.direction === 'out');
+    const base = allIn ? incomeUsd() : allOut ? spendingUsd() : 0;
+    return base > 0 ? (totalUsd / base) * PCT_MAX : null;
+  };
+
   return {
     isLoading: computed(() => store.status() === 'loading'),
     isEmpty: computed(() => store.status() === 'idle' && filteredItems().length === 0),
@@ -107,7 +117,8 @@ export function flowBreakdownComputed(store: StateSignals) {
     groups: computed((): BucketGroup[] =>
       BUCKET_META.map(meta => {
         const items = itemsOf(meta.bucket);
-        return {...meta, items, totalUsd: sumUsd(items)};
+        const totalUsd = sumUsd(items);
+        return {...meta, items, totalUsd, sharePct: sharePct(items, totalUsd)};
       }).filter(g => g.items.length > 0)
     ),
     accountChips: computed((): AccountChip[] => {
