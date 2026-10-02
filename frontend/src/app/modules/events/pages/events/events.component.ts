@@ -26,6 +26,7 @@ import {
   type FiredEventKind,
 } from '../../models/event/event.model';
 import {EventDayLabelPipe} from '../../pipes/event-day-label.pipe';
+import {EventTitlePipe} from '../../pipes/event-title.pipe';
 import {EventsStore} from '../../store/events.store';
 
 const SKELETON_ROWS = 4;
@@ -39,6 +40,7 @@ const SKELETON_ROWS = 4;
     DatePipe,
     EmptyStateComponent,
     EventDayLabelPipe,
+    EventTitlePipe,
     PageHeaderComponent,
     SkeletonComponent,
     TagComponent,
