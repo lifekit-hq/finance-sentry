@@ -1,15 +1,15 @@
-namespace FinanceSentry.Modules.BankSync.API.Middleware;
+namespace FinanceSentry.Core.Api;
 
 /// <summary>
-/// Rate limiting policy name constants used with ASP.NET Core built-in rate limiter.
-/// Actual policies are registered in Program.cs via AddRateLimiter.
+/// Rate limiting policy names used with the ASP.NET Core rate limiter. The policies are registered in the
+/// API host's Program.cs via AddRateLimiter and attached to endpoints with <c>[EnableRateLimiting]</c>.
 /// </summary>
 public static class RateLimitingPolicies
 {
     /// <summary>100 requests/min for authenticated users (per user ID).</summary>
     public const string Authenticated = "authenticated";
 
-    /// <summary>10 requests/min for anonymous users (per IP).</summary>
+    /// <summary>10 requests/min for anonymous users (per resolved client address).</summary>
     public const string Anonymous = "anonymous";
 
     /// <summary>Exempt from all rate limiting (health checks).</summary>

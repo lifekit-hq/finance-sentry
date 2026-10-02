@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.API.Authentication;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -20,6 +22,7 @@ using System.Security.Claims;
 namespace FinanceSentry.Modules.Auth.API.Controllers;
 
 [ApiController]
+[EnableRateLimiting(RateLimitingPolicies.Anonymous)]
 [Route("auth")]
 public class AuthController(
     ICommandHandler<LoginCommand, AuthResult> loginHandler,
