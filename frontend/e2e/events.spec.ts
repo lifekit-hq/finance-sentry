@@ -43,6 +43,17 @@ const UPCOMING = {
       referenceId: null,
     },
     {
+      kind: 'ex_dividend',
+      date: isoDate(0),
+      time: null,
+      subject: 'PLTR',
+      title: 'Ex-dividend: PLTR',
+      detail: null,
+      isEstimate: false,
+      source: 'yahoo',
+      referenceId: null,
+    },
+    {
       kind: 'macro',
       date: isoDate(3),
       time: '14:00:00',
@@ -148,7 +159,14 @@ test.describe('Events', () => {
 
     await expect(page.getByRole('heading', {name: 'Events', level: 1})).toBeVisible();
     await expect(page.getByText('Today')).toBeVisible();
-    await expect(page.getByText('Earnings: MU')).toBeVisible();
+    const today = page.getByTestId(`day-${isoDate(0)}`);
+    await expect(today.getByRole('heading')).not.toContainText(isoDate(0));
+    const earningsRow = today.getByRole('listitem').filter({hasText: 'Earnings'});
+    await expect(earningsRow).toContainText('MU');
+    await expect(earningsRow).not.toContainText('Earnings: MU');
+    expect((await earningsRow.innerText()).match(/MU/g)).toHaveLength(1);
+    const exDividendRow = today.getByRole('listitem').filter({hasText: 'Ex-dividend'});
+    expect((await exDividendRow.innerText()).match(/PLTR/g)).toHaveLength(1);
     await expect(page.getByText('FOMC rate decision')).toBeVisible();
     await expect(page.getByText('HBM4 ramp update')).toBeVisible();
     await expect(page.getByTestId('sources-unavailable')).toContainText('filing due dates');
@@ -162,7 +180,7 @@ test.describe('Events', () => {
       }
     });
     await page.goto('/events');
-    await expect(page.getByText('Earnings: MU')).toBeVisible();
+    await expect(page.getByText('FOMC rate decision')).toBeVisible();
 
     await page.getByText('90 days').click();
 
