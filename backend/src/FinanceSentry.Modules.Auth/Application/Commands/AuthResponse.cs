@@ -9,3 +9,6 @@ public record UserDto(string Id, string Email, IReadOnlyList<string> Roles, IRea
 public record AuthResponse(UserDto User, DateTime ExpiresAt);
 
 public record MeResponse(UserDto User, DateTime ExpiresAt, UserProfileDto Profile);
+
+/// <summary>The sign-in methods a deployment offers; the login page renders only these.</summary>
+public record SignInMethodsResponse(bool Oidc, bool PasswordLogin, bool GoogleDirect);

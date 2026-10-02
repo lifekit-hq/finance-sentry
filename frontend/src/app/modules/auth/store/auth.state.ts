@@ -1,3 +1,5 @@
+import {type SignInMethods} from '../models/auth/auth.model';
+
 export type AuthFlow = 'login' | 'acceptInvite' | 'google' | null;
 
 export interface FlashMessage {
@@ -18,6 +20,8 @@ export interface AuthState {
   flow: AuthFlow;
   returnUrl: Nullable<string>;
   flashMessage: Nullable<FlashMessage>;
+  /** Null until `auth/methods` answers; the login pages render their method choices only once it is set. */
+  signInMethods: Nullable<SignInMethods>;
 }
 
 export const initialAuthState: AuthState = {
@@ -33,4 +37,5 @@ export const initialAuthState: AuthState = {
   flow: null,
   returnUrl: null,
   flashMessage: null,
+  signInMethods: null,
 };

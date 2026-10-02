@@ -12,6 +12,14 @@ export interface AcceptInviteRequest {
   password: string;
 }
 
+/** Which sign-in methods the API offers (`GET auth/methods`). */
+export interface SignInMethods {
+  /** The org identity provider (OIDC) login is configured. */
+  oidc: boolean;
+  passwordLogin: boolean;
+  googleDirect: boolean;
+}
+
 export interface UserDto {
   id: string;
   email: string;

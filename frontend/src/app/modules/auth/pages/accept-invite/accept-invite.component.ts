@@ -42,8 +42,13 @@ export class AcceptInviteComponent {
   );
   public readonly linkComplete = this.userId !== '' && this.token !== '';
   public readonly loginRoute = AppRoute.Login;
+  public readonly signInMethods = this.authStore.signInMethods;
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
+
+  public onOidcSignIn(): void {
+    this.authStore.startOidcSignIn();
+  }
 
   public onSubmit(): void {
     if (!this.linkComplete || this.form.invalid) {

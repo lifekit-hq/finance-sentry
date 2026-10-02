@@ -55,6 +55,7 @@ export class LoginComponent implements AfterViewInit {
     const width = this.googleWidth();
     return width === null ? null : {...GOOGLE_BUTTON_BASE_CONFIG, width};
   });
+  public readonly signInMethods = this.authStore.signInMethods;
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
   public readonly flashMessage = this.authStore.flashMessage;
@@ -72,6 +73,10 @@ export class LoginComponent implements AfterViewInit {
     }
     const {email, password} = this.form.value;
     this.authStore.login({email: email ?? '', password: password ?? ''});
+  }
+
+  public onOidcSignIn(): void {
+    this.authStore.startOidcSignIn();
   }
 
   public onGoogleCredential(credential: string): void {

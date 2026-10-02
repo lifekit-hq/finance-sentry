@@ -15,44 +15,73 @@
       <cmn-alert variant="error" class="block mb-cmn-4">{{ errorMessage() }}</cmn-alert>
     }
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()">
-      <cmn-form-field
-        [control]="form.get('email')"
-        label="Email address"
-        formControlName="email"
-        class="block mb-cmn-5"
-      >
-        <cmn-input type="email" placeholder="name@organization.com" />
-      </cmn-form-field>
+    @let methods = signInMethods();
 
-      <div class="mb-cmn-6">
-        <cmn-form-field
-          [control]="form.get('password')"
-          label="Password"
-          formControlName="password"
-        >
-          <cmn-input type="password" placeholder="••••••••" />
-        </cmn-form-field>
-      </div>
-
+    @if (methods?.oidc) {
       <cmn-button
-        [disabled]="loading() || form.invalid"
-        [loading]="loading()"
-        type="submit"
+        (click)="onOidcSignIn()"
+        type="button"
         variant="primary"
         class="block w-full mb-cmn-6"
-        >{{ loading() ? 'Signing in…' : 'Sign in' }}</cmn-button
+        >Sign in</cmn-button
       >
-    </form>
+    }
 
-    <div class="flex items-center gap-cmn-3 mb-cmn-6">
-      <div class="flex-1 h-px bg-border-default"></div>
-      <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
-      <div class="flex-1 h-px bg-border-default"></div>
-    </div>
+    @if (methods?.passwordLogin) {
+      @if (methods?.oidc) {
+        <div class="flex items-center gap-cmn-3 mb-cmn-6">
+          <div class="flex-1 h-px bg-border-default"></div>
+          <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
+          <div class="flex-1 h-px bg-border-default"></div>
+        </div>
+      }
 
-    <div #googleContainer class="flex justify-center mb-cmn-6">
-      @if (googleButtonConfig(); as config) {
+      <form [formGroup]="form" (ngSubmit)="onSubmit()">
+        <cmn-form-field
+          [control]="form.get('email')"
+          label="Email address"
+          formControlName="email"
+          class="block mb-cmn-5"
+        >
+          <cmn-input type="email" placeholder="name@organization.com" />
+        </cmn-form-field>
+
+        <div class="mb-cmn-6">
+          <cmn-form-field
+            [control]="form.get('password')"
+            label="Password"
+            formControlName="password"
+          >
+            <cmn-input type="password" placeholder="••••••••" />
+          </cmn-form-field>
+        </div>
+
+        <cmn-button
+          [disabled]="loading() || form.invalid"
+          [loading]="loading()"
+          [variant]="methods?.oidc ? 'secondary' : 'primary'"
+          type="submit"
+          class="block w-full mb-cmn-6"
+          >{{
+            loading() ? 'Signing in…' : methods?.oidc ? 'Sign in with password' : 'Sign in'
+          }}</cmn-button
+        >
+      </form>
+    }
+
+    @if (methods?.googleDirect) {
+      @if (methods?.passwordLogin || methods?.oidc) {
+        <div class="flex items-center gap-cmn-3 mb-cmn-6">
+          <div class="flex-1 h-px bg-border-default"></div>
+          <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
+          <div class="flex-1 h-px bg-border-default"></div>
+        </div>
+      }
+    }
+
+    <!-- Always in the DOM: its width is measured once after first render, before the methods have loaded. -->
+    <div #googleContainer [class.mb-cmn-6]="methods?.googleDirect" class="flex justify-center">
+      @if (methods?.googleDirect && googleButtonConfig(); as config) {
         <cmn-google-sign-in-button
           [clientId]="googleClientId"
           [locale]="googleLocale"

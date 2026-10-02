@@ -1,13 +1,16 @@
+import {DOCUMENT} from '@angular/common';
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {NavigationEnd, Router} from '@angular/router';
+import {ErrorMessageService} from '@lifekit-hq/core';
 import {EMPTY} from 'rxjs';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {SettingsService} from '../../settings/services/settings.service';
+import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
 import {type AuthResponse} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
@@ -26,7 +29,9 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     setReturnUrl: vi.fn(),
     setFlashMessage: vi.fn(),
     setProfileName: vi.fn(),
+    setSignInMethods: vi.fn(),
     loadProfileName: vi.fn(),
+    loadSignInMethods: vi.fn(),
     firstName: signal<Nullable<string>>(null),
     isAuthenticated: signal(overrides.isAuthenticated ?? false),
     returnUrl: signal<Nullable<string>>(overrides.returnUrl ?? null),
@@ -38,6 +43,7 @@ function buildService() {
     login: vi.fn(),
     acceptInvite: vi.fn(),
     verifyGoogleCredential: vi.fn(),
+    getSignInMethods: vi.fn().mockReturnValue(of(FALLBACK_SIGN_IN_METHODS)),
     logout: vi.fn().mockReturnValue(of(null)),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
   };
@@ -62,6 +68,13 @@ function configure(
       {provide: AuthService, useValue: service},
       {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
       {provide: Router, useValue: router},
+      {
+        provide: ErrorMessageService,
+        useValue: {
+          resolve: (code: string) =>
+            code === 'ACCOUNT_NOT_INVITED' ? 'No account exists for this email.' : null,
+        },
+      },
     ],
   });
 }
@@ -215,6 +228,46 @@ describe('authEffects', () => {
     });
   });
 
+  describe('startOidcSignIn', () => {
+    it('navigates the browser to the API start endpoint with the return path', () => {
+      const assign = vi.fn();
+      const store = buildStore({returnUrl: '/budgets'});
+      configure(buildService(), buildRouter());
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).startOidcSignIn());
+
+      expect(assign).toHaveBeenCalledWith(
+        expect.stringMatching(/\/auth\/oidc\/start\?returnUrl=%2Fbudgets$/)
+      );
+    });
+  });
+
+  describe('loadSignInMethods', () => {
+    it('stores the methods the API reports', () => {
+      const store = buildStore();
+      const service = buildService();
+      const methods = {oidc: true, passwordLogin: false, googleDirect: false};
+      service.getSignInMethods.mockReturnValue(of(methods));
+      configure(service, buildRouter());
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
+
+      expect(store.setSignInMethods).toHaveBeenCalledWith(methods);
+    });
+
+    it('falls back to the pre-OIDC methods when the request fails', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getSignInMethods.mockReturnValue(throwError(() => new Error('down')));
+      configure(service, buildRouter());
+
+      TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
+
+      expect(store.setSignInMethods).toHaveBeenCalledWith(FALLBACK_SIGN_IN_METHODS);
+    });
+  });
+
   describe('loadProfileName', () => {
     function configureWithProfile(profile$: Subject<{firstName: string; lastName: string}>) {
       TestBed.configureTestingModule({
@@ -286,6 +339,40 @@ describe('authHooks', () => {
       kind: 'info',
       text: expect.stringContaining('cancelled'),
     });
+  });
+
+  it('loads the sign-in methods on init', () => {
+    const store = buildStore();
+    configure(buildService(), buildRouter('/login'));
+
+    TestBed.runInInjectionContext(() => authHooks(store));
+
+    expect(store.loadSignInMethods).toHaveBeenCalledOnce();
+  });
+
+  it('turns an API error code from the OIDC callback into a flash message', () => {
+    const store = buildStore();
+    const router = buildRouter('/login');
+    setQueryParams(router, [['error', 'ACCOUNT_NOT_INVITED']]);
+    configure(buildService(), router);
+
+    TestBed.runInInjectionContext(() => authHooks(store));
+
+    expect(store.setFlashMessage).toHaveBeenCalledWith({
+      kind: 'error',
+      text: 'No account exists for this email.',
+    });
+  });
+
+  it('shows no flash for an error code the registry does not know', () => {
+    const store = buildStore();
+    const router = buildRouter('/login');
+    setQueryParams(router, [['error', 'SOMETHING_ELSE']]);
+    configure(buildService(), router);
+
+    TestBed.runInInjectionContext(() => authHooks(store));
+
+    expect(store.setFlashMessage).toHaveBeenCalledWith(null);
   });
 
   it('re-reads query params on NavigationEnd', () => {

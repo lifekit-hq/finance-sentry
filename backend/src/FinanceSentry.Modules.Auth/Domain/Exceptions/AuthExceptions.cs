@@ -45,7 +45,7 @@ public sealed class InvalidInviteException()
     : ApiException(400, "INVALID_INVITE", "This invite link is invalid or has expired. Ask the owner for a new one.");
 
 public sealed class AccountNotInvitedException()
-    : ApiException(403, "ACCOUNT_NOT_INVITED", "No account exists for this Google email. Ask the owner for an invite.");
+    : ApiException(403, "ACCOUNT_NOT_INVITED", "No account exists for this email. Ask the owner for an invite.");
 
 public sealed class CannotRevokeSelfException()
     : ApiException(400, "CANNOT_REVOKE_SELF", "You cannot revoke your own access.");
