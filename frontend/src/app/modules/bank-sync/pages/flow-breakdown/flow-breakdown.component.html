@@ -6,28 +6,11 @@
         Every transaction of the month and the bucket the savings math put it in
       </p>
     </div>
-    <div class="flex items-center gap-cmn-2">
-      <cmn-button
-        (clicked)="goToPreviousMonth()"
-        variant="secondary"
-        size="sm"
-        aria-label="Previous month"
-      >
-        <cmn-icon name="ChevronLeft" size="sm" />
-      </cmn-button>
-      <span class="min-w-[10rem] text-center text-cmn-base font-semibold text-text-primary">
-        {{ store.month() + '-01' | date: 'MMMM y' }}
-      </span>
-      <cmn-button
-        [disabled]="isCurrentMonth()"
-        (clicked)="goToNextMonth()"
-        variant="secondary"
-        size="sm"
-        aria-label="Next month"
-      >
-        <cmn-icon name="ChevronRight" size="sm" />
-      </cmn-button>
-    </div>
+    <cmn-month-stepper
+      [value]="monthDate()"
+      [max]="currentMonth"
+      (valueChange)="onMonthChange($event)"
+    />
   </div>
 
   <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
@@ -52,7 +35,7 @@
     <cmn-stat-card
       [value]="store.savedFormatted()"
       [loading]="store.isLoading()"
-      label="Saved (income − spending)"
+      label="Saved"
       icon="PiggyBank"
     />
   </div>
@@ -63,21 +46,12 @@
         >Account</span
       >
       @for (chip of store.accountChips(); track chip.accountId) {
-        <button
-          [class]="
-            store.accountFilter() === chip.accountId
-              ? 'border-accent-default bg-accent-subtle text-accent-default'
-              : 'border-border-default text-text-secondary hover:bg-surface-bg'
-          "
-          (click)="toggleAccount(chip.accountId)"
-          type="button"
-          class="inline-flex items-center gap-cmn-1 rounded-full border px-cmn-3 py-1 text-cmn-xs font-medium transition-colors"
+        <cmn-chip
+          [selected]="store.accountFilter() === chip.accountId"
+          (clicked)="toggleAccount(chip.accountId)"
         >
           {{ chip.label }}
-          @if (store.accountFilter() === chip.accountId) {
-            <cmn-icon name="X" size="sm" />
-          }
-        </button>
+        </cmn-chip>
       }
     </div>
   }
@@ -125,9 +99,30 @@
               }
               <span class="text-cmn-xs text-text-secondary">{{ group.note }}</span>
             </div>
-            <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
-              {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
-            </span>
+            <div class="flex items-center gap-cmn-3">
+              @if (group.sharePct !== null) {
+                <span
+                  [attr.aria-label]="'Share ' + (group.sharePct | number: '1.0-0') + '%'"
+                  class="flex items-center gap-cmn-2"
+                >
+                  <span
+                    class="h-1 w-16 overflow-hidden rounded-full bg-surface-bg"
+                    aria-hidden="true"
+                  >
+                    <span
+                      [style.width.%]="group.sharePct"
+                      class="block h-full rounded-full bg-accent-default"
+                    ></span>
+                  </span>
+                  <span class="font-mono text-cmn-xs tabular-nums text-text-secondary"
+                    >{{ group.sharePct | number: '1.0-0' }}%</span
+                  >
+                </span>
+              }
+              <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
+                {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
+              </span>
+            </div>
           </div>
           <div class="md:hidden" data-testid="breakdown-rows">
             @for (i of group.items; track i.transactionId) {

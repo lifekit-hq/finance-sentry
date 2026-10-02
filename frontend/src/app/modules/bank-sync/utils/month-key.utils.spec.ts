@@ -48,4 +48,16 @@ describe('MonthKeyUtils', () => {
       expect(MonthKeyUtils.shift('2026-05', 0)).toBe('2026-05');
     });
   });
+
+  describe('toDate / fromDate', () => {
+    it('toDate returns the first of the month', () => {
+      const date = MonthKeyUtils.toDate('2026-09');
+      expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 1]);
+    });
+
+    it('fromDate inverts toDate, padding the month', () => {
+      expect(MonthKeyUtils.fromDate(new Date(2026, 0, 15))).toBe('2026-01');
+      expect(MonthKeyUtils.fromDate(MonthKeyUtils.toDate('2026-12'))).toBe('2026-12');
+    });
+  });
 });
