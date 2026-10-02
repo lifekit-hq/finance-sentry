@@ -85,7 +85,10 @@
             </span>
           </div>
 
-          <cmn-data-table [rows]="group.rows" class="holdings-table">
+          <cmn-data-table
+            [rows]="group.rows"
+            class="holdings-table md:[&_table]:table-fixed md:[&_.cdk-column-quantity]:w-[10rem] md:[&_.cdk-column-price]:w-[9rem] md:[&_.cdk-column-value]:w-[9rem] md:[&_.cdk-column-pnl]:w-[13rem] md:[&_.cdk-column-weight]:w-[6rem]"
+          >
             <cmn-column key="symbol" listSlot="primary" header="Symbol">
               <ng-template let-row cmnCell>
                 <button
