@@ -38,6 +38,8 @@ while IFS= read -r f; do
     frontend/*) frontend=true docker_frontend=true ;;
     backend/*|agent/*|global.json|.config/*) backend=true docker=true ;;
     docker/Dockerfile|docker/Dockerfile.mcp|docker/Dockerfile.gateway) docker=true ;;
+    # Shared by the frontend image, the e2e server (frontend/e2e/serve.mjs) and the gateway config test.
+    docker/nginx.security-headers.conf) backend=true frontend=true docker_frontend=true ;;
     docker/Dockerfile.frontend.prod|docker/nginx.*) docker_frontend=true ;;
     .dockerignore) docker=true docker_frontend=true ;;
     .github/workflows/"$own_workflow") backend=true frontend=true docker=true docker_frontend=true ;;

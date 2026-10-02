@@ -8,6 +8,8 @@
     <link rel="icon" href="data:," />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <!-- The CSP admits this inline script by its sha256 (docker/nginx.security-headers.conf):
+         any edit to it, whitespace included, needs the new hash there or the browser blocks it. -->
     <script>
       // Apply the stored/OS theme before first paint so guest pages never flash light.
       (function () {
@@ -25,18 +27,6 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!--
-      No Content-Security-Policy header.
-
-      This app is deployed on Tailscale (single-user, tailnet-only). Public XSS
-      threat models don't apply: no anonymous attackers can reach the origin
-      and there is no cross-user session to hijack. A strict CSP would just
-      add friction every time a third-party asset host (bank logos, provider
-      SVGs, OAuth widgets) changes.
-
-      If Finance Sentry ever gets a public origin, re-enable CSP here with a
-      nonce/hash strategy — do NOT try to enumerate every host by hand.
-    -->
     <script src="https://accounts.google.com/gsi/client" async></script>
   </head>
   <body>

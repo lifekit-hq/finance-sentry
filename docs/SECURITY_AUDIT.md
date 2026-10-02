@@ -35,7 +35,7 @@
 |-------|--------|----------|
 | HTTPS enforced in production | ✅ | `UseHttpsRedirection()` in `Program.cs` |
 | CORS restricted | ✅ | Origin whitelist: `localhost:4200` (dev), `finance-sentry.com` (prod) |
-| CSP headers set | ❌ | No CSP header today (`index.html` documents the decision) |
+| CSP headers set | ✅ | CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` on every frontend (`docker/nginx.security-headers.conf`) and gateway (`Gateway:SecurityHeaders`) response; `frontend/e2e/security-headers.spec.ts` runs the app under the policy |
 
 ### Rate Limiting & DoS
 

@@ -23,6 +23,8 @@
     <!-- Load the shipped gateway config in tests so the route/cluster/policy invariants are checked
          against the real file, not a fixture copy. -->
     <Content Include="..\..\src\FinanceSentry.Gateway\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The frontend container's security headers, which the gateway's Gateway:SecurityHeaders must equal. -->
+    <Content Include="..\..\..\docker\nginx.security-headers.conf" Link="nginx.security-headers.conf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

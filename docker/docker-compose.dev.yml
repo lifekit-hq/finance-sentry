@@ -117,11 +117,14 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:8080
+      # 8081: the public listener (the app and /api/** only), for parity with production.
+      ASPNETCORE_URLS: http://+:8080;http://+:8081
+      Gateway__PublicListener__Port: "8081"
       # Trace spine (spec 023 amendment) OTLP exporter — empty so dev boots without a collector.
       Observability__Otlp__Endpoint: ""
     ports:
       - "8080:8080"
+      - "8081:8081"
     depends_on:
       api:
         condition: service_healthy
