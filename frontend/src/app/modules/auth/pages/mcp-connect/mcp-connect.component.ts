@@ -9,8 +9,9 @@ import {AuthStore} from '../../store/auth.store';
 @Component({
   selector: 'fns-mcp-connect',
   imports: [CardComponent, PageHeaderComponent],
+  host: {class: 'block h-full'},
   template: `
-    <div class="flex min-h-dvh items-center justify-center p-cmn-4 sm:p-cmn-6">
+    <div class="flex min-h-full items-center justify-center p-cmn-4 sm:p-cmn-6">
       <div class="w-full max-w-[36rem] space-y-cmn-8">
         <cmn-page-header title="Connecting MCP" />
         <cmn-card class="block">
