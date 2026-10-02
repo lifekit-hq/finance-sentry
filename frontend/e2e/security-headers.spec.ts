@@ -21,6 +21,22 @@ const UNAUTHORIZED = 401;
 const GOOGLE_BUTTON_FRAME = 'iframe[src*="accounts.google.com/gsi/button"]';
 const GOOGLE_BUTTON_URL = 'https://accounts.google.com/gsi/button';
 const GOOGLE_TIMEOUT_MS = 20_000;
+const GOOGLE_CLIENT_URL = 'https://accounts.google.com/gsi/client';
+
+// Stand-in for the GIS script: same contract the sign-in button component calls (initialize,
+// renderButton, prompt, cancel), and renderButton injects the same button frame the real one does.
+const GOOGLE_CLIENT_STUB = `
+  window.google = {accounts: {id: {
+    initialize() {},
+    prompt() {},
+    cancel() {},
+    renderButton(container) {
+      const frame = document.createElement('iframe');
+      frame.src = '${GOOGLE_BUTTON_URL}?stub=1';
+      container.appendChild(frame);
+    },
+  }}};
+`;
 
 function json(body: unknown, status = 200) {
   return {status, contentType: 'application/json', body: JSON.stringify(body)};
@@ -53,12 +69,23 @@ test.describe('Security headers', () => {
     expect(headers['permissions-policy']).toBeTruthy();
   });
 
-  // Google keeps the button frame at 0x0 on an origin its client ID does not list (the e2e server's
-  // localhost port), CSP or not, so this asserts what the CSP decides: the GIS script loads and runs,
-  // and the browser is allowed to load the button frame from Google.
+  // The browser enforces the CSP on the script and the frame before Playwright's route answers, so
+  // stubbing Google's responses keeps this a real CSP check while taking the live accounts.google.com
+  // network (flaky in CI) out of it: the GIS script is admitted and runs, and the browser is allowed
+  // to load the button frame from Google.
   test('the login page loads the Google sign-in button with no CSP violation', async ({page}) => {
     const violations = await recordCspViolations(page);
     await page.route(`${API}/**`, route => route.fulfill(json({}, UNAUTHORIZED)));
+    await page.route(GOOGLE_CLIENT_URL, route =>
+      route.fulfill({status: 200, contentType: 'text/javascript', body: GOOGLE_CLIENT_STUB})
+    );
+    await page.route(`${GOOGLE_BUTTON_URL}**`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><title>stub</title>',
+      })
+    );
     const buttonFrameLoaded = page.waitForResponse(
       response => response.url().startsWith(GOOGLE_BUTTON_URL),
       {timeout: GOOGLE_TIMEOUT_MS}
