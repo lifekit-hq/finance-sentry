@@ -12,12 +12,10 @@
 
     <!-- Insufficient history banner -->
     @if (store.hasInsufficientHistory()) {
-      <div
-        class="rounded-cmn-md border border-status-warning/30 bg-status-warning/10 px-cmn-4 py-cmn-3 text-cmn-sm text-status-warning"
-      >
+      <cmn-alert variant="warning">
         Not enough transaction history to detect subscriptions yet. Check back after a few months of
         transactions.
-      </div>
+      </cmn-alert>
     }
 
     <!-- Summary cards -->
