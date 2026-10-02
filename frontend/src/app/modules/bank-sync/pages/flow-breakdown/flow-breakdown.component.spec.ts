@@ -3,6 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {describe, expect, it} from 'vitest';
 
+import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {FlowBreakdownComponent} from './flow-breakdown.component';
 
@@ -47,7 +48,9 @@ function render(group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP) 
     investedFormatted: signal('$0'),
     savedFormatted: signal('$0'),
   };
-  TestBed.configureTestingModule({providers: [provideRouter([])]});
+  TestBed.configureTestingModule({
+    providers: [provideRouter([]), {provide: CategoryStore, useValue: {labelMap: signal({})}}],
+  });
   TestBed.overrideComponent(FlowBreakdownComponent, {
     set: {providers: [{provide: FlowBreakdownStore, useValue: store}]},
   });
@@ -86,5 +89,6 @@ describe('FlowBreakdownComponent phone layout', () => {
     const el = render();
     expect(el.firstElementChild?.className).toContain('p-cmn-4 md:p-cmn-8');
     expect(el.querySelector('.grid')?.className).toContain('grid-cols-2');
+    expect(el.firstElementChild?.className).not.toContain('overflow-auto');
   });
 });
