@@ -5,6 +5,7 @@ import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
+  type TransactionType,
 } from '../../models/transaction/transaction.model';
 
 interface StateSignals {
@@ -15,6 +16,7 @@ interface StateSignals {
   errorCode: Signal<Nullable<string>>;
   monthlyOutflowUsd: Signal<number | null>;
   accountId: Signal<Nullable<string>>;
+  transactionType: Signal<Nullable<TransactionType>>;
   search: Signal<string>;
   accounts: Signal<TransactionAccountOption[]>;
 }
@@ -27,7 +29,12 @@ export function transactionLedgerComputed(store: StateSignals) {
   return {
     isLoading: computed(() => store.status() === 'loading'),
     isEmpty: computed(() => store.status() === 'idle' && store.transactions().length === 0),
-    hasActiveFilter: computed(() => store.accountId() !== null || store.search().trim() !== ''),
+    hasActiveFilter: computed(
+      () =>
+        store.accountId() !== null ||
+        store.transactionType() !== null ||
+        store.search().trim() !== ''
+    ),
     errorMessage: computed(() => {
       if (store.status() !== 'error') {
         return '';

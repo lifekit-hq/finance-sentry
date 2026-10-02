@@ -8,6 +8,7 @@ import {
   type GetAllTransactionsParams,
   type GlobalTransactionDto,
   type TransactionAccountOption,
+  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
@@ -29,8 +30,10 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 interface EffectsStore {
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
+  transactionType: Signal<Nullable<TransactionType>>;
   search: Signal<string>;
   setAccountId: (accountId: Nullable<string>) => void;
+  setTransactionType: (transactionType: Nullable<TransactionType>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: () => void;
@@ -54,6 +57,7 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
     offset,
     limit: PAGE_SIZE,
     accountId: store.accountId() ?? undefined,
+    transactionType: store.transactionType() ?? undefined,
     search: store.search().trim() || undefined,
   };
 }
@@ -115,6 +119,14 @@ export function transactionLedgerEffects(store: EffectsStore) {
       pipe(
         filter(accountId => accountId !== store.accountId()),
         tap(accountId => store.setAccountId(accountId)),
+        tap(() => load())
+      )
+    ),
+    /** Follows the `type` query param (In / Out): a changed value re-queries from the first page. */
+    applyType: rxMethod<Nullable<TransactionType>>(
+      pipe(
+        filter(transactionType => transactionType !== store.transactionType()),
+        tap(transactionType => store.setTransactionType(transactionType)),
         tap(() => load())
       )
     ),

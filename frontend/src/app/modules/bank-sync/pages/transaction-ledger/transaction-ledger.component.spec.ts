@@ -19,6 +19,7 @@ function setup(type: string | null) {
     hasMore: signal(false),
     transactions: signal([]),
     applyAccount: () => undefined,
+    applyType: vi.fn(),
     applySearch: () => undefined,
   };
   TestBed.overrideComponent(TransactionLedgerComponent, {
@@ -34,7 +35,7 @@ function setup(type: string | null) {
   const root = fixture.nativeElement as HTMLElement;
   const chip = (id: string) => root.querySelector(`[data-testid="${id}"]`) as HTMLElement;
   const selected = (id: string) => chip(id).querySelector('button')?.getAttribute('aria-pressed');
-  return {chip, selected, navigate, root};
+  return {chip, selected, navigate, root, store};
 }
 
 describe('TransactionLedgerComponent type control', () => {
@@ -63,6 +64,24 @@ describe('TransactionLedgerComponent type control', () => {
       queryParams: {type: null},
       queryParamsHandling: 'merge',
     });
+  });
+
+  it('drives the store type filter from the type query param', () => {
+    const {store} = setup('credit');
+    const followed = store.applyType.mock.calls[0][0] as () => unknown;
+    expect(followed()).toBe('credit');
+  });
+
+  it('treats an unknown type query param as All', () => {
+    const {store, selected} = setup('bogus');
+    const followed = store.applyType.mock.calls[0][0] as () => unknown;
+    expect(followed()).toBeNull();
+    expect(selected('type-all')).toBe('true');
+  });
+
+  it('shows no duplicate removable Type chip for a deep-linked type', () => {
+    const {root} = setup('credit');
+    expect(root.textContent).not.toContain('Type:');
   });
 
   it('preselects the control from a deep-linked type', () => {
