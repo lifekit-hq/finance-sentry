@@ -93,11 +93,10 @@
               </cmn-alert>
             } @else {
               <p
-                class="mt-cmn-4 whitespace-pre-line text-cmn-sm leading-relaxed text-text-primary"
+                [innerHTML]="store.ledgerReadNarrative() | markdown"
+                class="mt-cmn-4 text-cmn-sm leading-relaxed text-text-primary"
                 data-testid="ledger-read-narrative"
-              >
-                {{ store.ledgerReadNarrative() }}
-              </p>
+              ></p>
             }
           </cmn-card>
         } @else {
@@ -360,7 +359,9 @@
             <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
               Analyst Coverage
             </h2>
-            <span class="text-cmn-xs text-text-secondary">{{ analysts.coverage }}</span>
+            <span class="text-cmn-xs text-text-secondary">{{
+              analysts.coverage | coverageLabel
+            }}</span>
           </div>
 
           @if (analysts.recentActions.length > 0) {
@@ -397,7 +398,9 @@
               <ul class="space-y-cmn-3 sm:hidden" data-testid="trend-list">
                 @for (trend of analysts.trends; track trend.period) {
                   <li class="border-t border-border-default pt-cmn-2 first:border-0 first:pt-0">
-                    <p class="font-mono text-cmn-xs text-text-secondary">{{ trend.period }}</p>
+                    <p class="font-mono text-cmn-xs text-text-secondary">
+                      {{ trend.period | date: 'MMM yyyy' }}
+                    </p>
                     <dl class="mt-cmn-1 grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-1 text-cmn-sm">
                       <div class="flex justify-between">
                         <dt class="text-text-secondary">Strong buy</dt>
@@ -442,7 +445,9 @@
                   <tbody>
                     @for (trend of analysts.trends; track trend.period) {
                       <tr class="border-t border-border-default">
-                        <td class="py-cmn-2 font-mono text-text-secondary">{{ trend.period }}</td>
+                        <td class="py-cmn-2 font-mono text-text-secondary">
+                          {{ trend.period | date: 'MMM yyyy' }}
+                        </td>
                         <td class="py-cmn-2 text-center font-mono tabular-nums text-status-success">
                           {{ trend.strongBuy }}
                         </td>
@@ -527,7 +532,7 @@
               <div class="text-right">
                 <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Latest</p>
                 <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">
-                  {{ latest.signalType }}
+                  {{ latest.signalType | signalTypeLabel }}
                 </p>
                 <p class="text-cmn-xs text-text-secondary">
                   {{ latest.timestamp | date: 'mediumDate' }}
@@ -569,7 +574,9 @@
                 <span class="shrink-0 font-mono text-cmn-xs text-text-secondary">
                   {{ signal.timestamp | date: 'mediumDate' }}
                 </span>
-                <span class="font-medium text-text-primary">{{ signal.signalType }}</span>
+                <span class="font-medium text-text-primary">{{
+                  signal.signalType | signalTypeLabel
+                }}</span>
                 <span class="text-text-secondary">{{ signal.scanner }}</span>
                 <span class="ml-auto">
                   @if (signal.severity === 'high') {

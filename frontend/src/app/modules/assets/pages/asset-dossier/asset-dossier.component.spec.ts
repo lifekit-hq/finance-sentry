@@ -57,10 +57,10 @@ const DOSSIER: AssetDossierDto = {
   valuation: null,
   analysts: {
     recentActions: [],
-    coverage: '12 analysts',
+    coverage: 'inUniverse',
     trends: [
       {
-        period: '0m',
+        period: '2026-08-01',
         strongBuy: 5,
         buy: 12,
         hold: 8,
@@ -228,6 +228,34 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('ledger-read-narrative')?.textContent).toContain('A read.');
       expect(byTestId('ledger-read-regenerate')).not.toBeNull();
       expect(byTestId('ledger-read-empty')).toBeNull();
+    });
+
+    it('renders **bold** as emphasis with no literal asterisks', () => {
+      mockStore.ledgerReadNarrative.set('Up **31%** this year.');
+      fixture.detectChanges();
+
+      const narrative = byTestId('ledger-read-narrative');
+      expect(narrative?.querySelector('strong')?.textContent).toBe('31%');
+      expect(narrative?.textContent).not.toContain('*');
+    });
+
+    it('sanitises unsafe HTML in the narrative', () => {
+      mockStore.ledgerReadNarrative.set('<img src=x onerror="alert(1)"> hi');
+      fixture.detectChanges();
+
+      const narrative = byTestId('ledger-read-narrative');
+      expect(narrative?.querySelector('img')).toBeNull();
+      expect(narrative?.textContent).toContain('<img');
+    });
+
+    it('shows coverage and trend period as plain language', () => {
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('In your research universe');
+      expect(text).not.toContain('inUniverse');
+      expect(text).toContain('Aug 2026');
+      expect(text).not.toContain('2026-08-01');
     });
 
     it('generates on click', () => {
