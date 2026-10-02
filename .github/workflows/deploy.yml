@@ -32,6 +32,17 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # Hostnames and edge-network addresses: configuration, not secrets, so they come from repository
+    # variables rather than docker/.env.sops. The prod compose file requires each one (no fallback);
+    # process env wins over --env-file, and an unset variable fails the deploy at compose interpolation.
+    env:
+      JWT_ISSUER: ${{ vars.JWT_ISSUER }}
+      FRONTEND_BASE_URL: ${{ vars.FRONTEND_BASE_URL }}
+      TRUELAYER_FRONTEND_REDIRECT_BASE: ${{ vars.TRUELAYER_FRONTEND_REDIRECT_BASE }}
+      EDGE_SUBNET: ${{ vars.EDGE_SUBNET }}
+      EDGE_IP_RANGE: ${{ vars.EDGE_IP_RANGE }}
+      EDGE_BRIDGE_IP: ${{ vars.EDGE_BRIDGE_IP }}
+      EDGE_GATEWAY_IP: ${{ vars.EDGE_GATEWAY_IP }}
     steps:
       # workflow_run: the commit Docker Build published. Dispatch: the `sha` input, else the
       # dispatched ref's head. Exported as IMAGE_TAG, which the prod compose file tags images with.

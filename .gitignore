@@ -63,6 +63,7 @@ appsettings.*.json
 # encrypted source of truth and IS committed (decrypt with docker/secrets-decrypt.sh).
 .env
 .env.local
+.env.deploy
 .env.*.local
 !.env.sops
 !.env.example

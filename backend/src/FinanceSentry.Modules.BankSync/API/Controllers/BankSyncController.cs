@@ -15,6 +15,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -336,6 +337,7 @@ public class BankSyncController(
     private static readonly TimeSpan TrueLayerStateCookieLifetime = TimeSpan.FromMinutes(15);
 
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicies.Anonymous)]
     [HttpGet("truelayer/callback")]
     public async Task<IActionResult> TrueLayerCallback(
         [FromQuery] string? code,

@@ -21,7 +21,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
+using FinanceSentry.Core.Api;
 using Microsoft.OpenApi;
 using DashboardObservability = FinanceSentry.Infrastructure.Observability.Hangfire;
 
@@ -113,23 +113,14 @@ builder.Services.AddHealthChecks()
         RecurringJobRegistrationHealthCheck.Name,
         tags: ["ready"]);
 
+// Policies attach to endpoints below (a default on every controller action, overrides via
+// [EnableRateLimiting] on the anonymous auth endpoints and the health probe).
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddFixedWindowLimiter(RateLimitingPolicies.Authenticated, cfg =>
-    {
-        cfg.PermitLimit = 100;
-        cfg.Window = TimeSpan.FromMinutes(1);
-        cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        cfg.QueueLimit = 0;
-    });
-    options.AddFixedWindowLimiter(RateLimitingPolicies.Anonymous, cfg =>
-    {
-        cfg.PermitLimit = 10;
-        cfg.Window = TimeSpan.FromMinutes(1);
-        cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        cfg.QueueLimit = 0;
-    });
-    options.RejectionStatusCode = 429;
+    options.AddPolicy(RateLimitingPolicies.Authenticated, RateLimitPartitions.Authenticated);
+    options.AddPolicy(RateLimitingPolicies.Anonymous, RateLimitPartitions.Anonymous);
+    options.AddPolicy(RateLimitingPolicies.Exempt, RateLimitPartitions.Exempt);
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 var app = builder.Build();
@@ -177,7 +168,15 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
-app.MapControllers();
+
+// Every controller action without its own rate-limit attribute gets the authenticated policy.
+app.MapControllers().Finally(endpoint =>
+{
+    if (!endpoint.Metadata.Any(m => m is EnableRateLimitingAttribute or DisableRateLimitingAttribute))
+    {
+        endpoint.Metadata.Add(new EnableRateLimitingAttribute(RateLimitingPolicies.Authenticated));
+    }
+});
 
 // Hangfire dashboard (FR-004): ops.admin only (AuthPolicies.RequireOwner) in every environment, backed by
 // durable Postgres storage so history/schedule survive restarts.

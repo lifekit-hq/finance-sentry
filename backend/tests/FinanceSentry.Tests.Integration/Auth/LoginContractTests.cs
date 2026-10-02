@@ -1,5 +1,6 @@
 ﻿namespace FinanceSentry.Tests.Integration.Auth;
 
+using FinanceSentry.API.Conventions;
 using System.Net;
 using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
@@ -196,6 +197,8 @@ public class AuthApiFactory : WebApplicationFactory<Program>
             services.AddScoped(_ => mockVerifier.Object);
         });
 
+        // The test server has no client address, so every anonymous call shares one partition.
+        builder.UseSetting(RateLimitPartitions.AnonymousPermitKey, int.MaxValue.ToString());
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default",
             "Host=localhost;Database=test;Username=test;Password=test");
