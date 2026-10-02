@@ -85,10 +85,7 @@
             </span>
           </div>
 
-          <cmn-data-table
-            [rows]="group.rows"
-            class="max-lg:[&_.cdk-column-price]:hidden max-lg:[&_.cdk-column-quantity]:hidden max-lg:[&_.cdk-column-weight]:hidden"
-          >
+          <cmn-data-table [rows]="group.rows">
             <cmn-column key="symbol" listSlot="primary" header="Symbol">
               <ng-template let-row cmnCell>
                 <button
@@ -109,11 +106,11 @@
             </cmn-column>
             <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
               <ng-template let-row cmnCell>
-                <span class="whitespace-nowrap font-mono tabular-nums">{{
+                <span class="font-mono tabular-nums">{{
                   row.quantity | number: '1.0-8'
                 }}</span>
                 @if (row.currentPrice !== null) {
-                  <span class="whitespace-nowrap font-mono tabular-nums md:hidden">
+                  <span class="font-mono tabular-nums md:hidden">
                     × {{ row.currentPrice | money }}</span
                   >
                 }
@@ -122,11 +119,11 @@
             <cmn-column key="price" header="Price" align="right">
               <ng-template let-row cmnCell>
                 @if (row.currentPrice === null) {
-                  <span class="whitespace-nowrap font-mono tabular-nums text-text-secondary"
+                  <span class="font-mono tabular-nums text-text-secondary"
                     >—</span
                   >
                 } @else {
-                  <span class="whitespace-nowrap font-mono tabular-nums">{{
+                  <span class="font-mono tabular-nums">{{
                     row.currentPrice | money
                   }}</span>
                 }
@@ -134,7 +131,7 @@
             </cmn-column>
             <cmn-column key="value" listSlot="trailing" header="Value" align="right">
               <ng-template let-row cmnCell>
-                <span class="whitespace-nowrap font-mono tabular-nums font-semibold">{{
+                <span class="font-mono tabular-nums font-semibold">{{
                   row.currentValue | money
                 }}</span>
               </ng-template>
@@ -143,14 +140,14 @@
               <ng-template let-row cmnCell>
                 @if (row.pnlPercent === null) {
                   <span
-                    class="whitespace-nowrap font-mono tabular-nums text-text-secondary"
+                    class="font-mono tabular-nums text-text-secondary"
                     title="No cost basis reported by provider"
                     >—</span
                   >
                 } @else {
                   <span
                     [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                    class="whitespace-nowrap font-mono tabular-nums"
+                    class="font-mono tabular-nums"
                     >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
                       row.pnlPercent | number: '1.2-2'
                     }}%)</span
@@ -160,7 +157,7 @@
             </cmn-column>
             <cmn-column key="weight" header="Weight" align="right">
               <ng-template let-row cmnCell>
-                <span class="whitespace-nowrap font-mono tabular-nums text-text-secondary"
+                <span class="font-mono tabular-nums text-text-secondary"
                   >{{ row.weightPercent | number: '1.1-1' }}%</span
                 >
               </ng-template>
