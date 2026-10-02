@@ -27,6 +27,14 @@ describe('InstitutionLogoUtils', () => {
       );
     });
 
+    it.each([
+      ['Monobank', 'monobank.ua'],
+      ['Interactive Brokers', 'interactivebrokers.com'],
+      ['Binance', 'binance.com'],
+    ])('resolves %s by name alone (no provider)', (name, domain) => {
+      expect(InstitutionLogoUtils.faviconUrl(null, name)).toContain(domain);
+    });
+
     it('prefers the provider code over the name when both match', () => {
       // provider binance wins even though the name mentions revolut
       expect(InstitutionLogoUtils.faviconUrl('binance', 'revolut')).toContain('binance.com');

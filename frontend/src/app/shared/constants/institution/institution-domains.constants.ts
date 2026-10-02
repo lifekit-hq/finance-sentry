@@ -25,4 +25,8 @@ export const BANK_NAME_DOMAINS: readonly (readonly [string, string])[] = [
   ['monzo', 'monzo.com'],
   ['wise', 'wise.com'],
   ['starling', 'starlingbank.com'],
+  // Rows that carry only a bank name (Transactions) have no provider code.
+  ['monobank', 'monobank.ua'],
+  ['interactive brokers', 'interactivebrokers.com'],
+  ['binance', 'binance.com'],
 ];
