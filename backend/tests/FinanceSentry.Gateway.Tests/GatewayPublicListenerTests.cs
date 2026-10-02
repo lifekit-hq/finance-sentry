@@ -68,6 +68,22 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("//metrics")]
+    [InlineData("//healthz")]
+    [InlineData("//readyz")]
+    [InlineData("///readyz")]
+    [InlineData("//gateway/health")]
+    [InlineData("/%2Fmetrics")]
+    [InlineData("/%2fhealthz")]
+    [InlineData("/%5Cmetrics")]
+    public async Task PublicListener_RefusesPathsNginxWouldNormalizeToTheAdminSurface(string path)
+    {
+        var response = await SendAsync(factory, path, PublicPort);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task PublicListener_RefusesEveryRouteOutsideTheAllowList()
     {
@@ -94,6 +110,7 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     [InlineData("/api/v1/health/ready")]
     [InlineData("/healthz")]
     [InlineData("/readyz")]
+    [InlineData("//healthz")]
     [InlineData("/dashboard")]
     [InlineData("/api/v1/accounts")]
     public async Task AdminListener_KeepsProxyingTheFullSurface(string path)
