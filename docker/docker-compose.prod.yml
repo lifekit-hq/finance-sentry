@@ -129,6 +129,9 @@ services:
       Auth__Oidc__ClientId: ${AUTH_OIDC_CLIENT_ID:-}
       Auth__Oidc__ClientSecret: ${AUTH_OIDC_CLIENT_SECRET:-}
       Auth__Oidc__PublicBaseUrl: ${AUTH_OIDC_PUBLIC_BASE_URL:-}
+      # The API's own discovery/JWKS/token/userinfo calls go over the identity-oidc docker network (a container
+      # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
+      Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
@@ -137,6 +140,7 @@ services:
     networks:
       finance-sentry: {}
       lifekit-shared: {}   # agents on the shared network reach the API directly; Loki/OTLP by name
+      identity-oidc: {}    # back channel to the org identity provider (Logto) by name
       finance-sentry-edge:
         aliases: [api-edge]   # the gateway's upstream — see finance-sentry-edge below
     healthcheck:
@@ -417,6 +421,8 @@ networks:
     name: finance-sentry
   lifekit-shared:
     external: true              # owned by lifekit-stack; must exist before deploy
+  identity-oidc:
+    external: true              # only Logto and its on-box OIDC clients; deploy.sh creates it idempotently
   # Gateway <-> API hop with pinned addresses: forwarded-header trust on both hosts names these
   # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender. ip_range
   # keeps dynamic allocation (the API) on .4-.7 so it can never take the gateway's pinned .2.

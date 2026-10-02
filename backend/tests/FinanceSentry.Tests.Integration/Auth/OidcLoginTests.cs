@@ -22,6 +22,9 @@ public class OidcApiFactory : AuthApiFactory
     public const string AuthorizationEndpoint = "https://idp.test/oidc/auth";
     public const string PublicBaseUrl = "https://app.test";
 
+    /// <summary>What the stubbed discovery document advertises as the authorize endpoint.</summary>
+    protected virtual string DiscoveredAuthorizationEndpoint => AuthorizationEndpoint;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -34,7 +37,7 @@ public class OidcApiFactory : AuthApiFactory
             var discovery = new OpenIdConnectConfiguration
             {
                 Issuer = "https://idp.test/oidc",
-                AuthorizationEndpoint = AuthorizationEndpoint,
+                AuthorizationEndpoint = DiscoveredAuthorizationEndpoint,
                 TokenEndpoint = "https://idp.test/oidc/token",
             };
             o.Configuration = discovery;
@@ -241,4 +244,87 @@ public class OidcDisabledTests(AuthApiFactory factory) : IClassFixture<AuthApiFa
     }
 
     private sealed record MethodsShape(bool Oidc, bool PasswordLogin, bool GoogleDirect);
+}
+
+/// <summary>An API host whose server-side OIDC calls go to a back-channel address while the browser keeps the public one.</summary>
+public class OidcBackchannelApiFactory : OidcApiFactory
+{
+    // The provider builds endpoints from the host it was asked on, so discovery over the back channel advertises it.
+    protected override string DiscoveredAuthorizationEndpoint => "http://logto:3001/oidc/auth";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Auth:Oidc:BackchannelAuthority", "http://logto:3001/oidc");
+    }
+}
+
+public class OidcBackchannelTests(OidcBackchannelApiFactory factory) : IClassFixture<OidcBackchannelApiFactory>
+{
+    [Fact]
+    public async Task Start_WhenDiscoveryRanOnTheBackchannel_StillSendsTheBrowserToThePublicAuthorizeEndpoint()
+    {
+        var response = await factory.CookieClient().GetAsync("/api/v1/auth/oidc/start");
+
+        response.Headers.Location!.ToString().Should().StartWith(OidcApiFactory.AuthorizationEndpoint);
+    }
+}
+
+public class OidcAuthorityRewriteHandlerTests
+{
+    private const string Public = "https://host.ts.net:3001/oidc";
+    private const string Backchannel = "http://logto:3001/oidc";
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public Uri? Seen { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Seen = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
+    private static async Task<Uri?> Send(string url, string publicAuthority = Public)
+    {
+        var inner = new RecordingHandler();
+        using var client = new HttpClient(new Modules.Auth.Infrastructure.Authentication.OidcAuthorityRewriteHandler(publicAuthority, Backchannel, inner));
+        await client.GetAsync(url);
+        return inner.Seen;
+    }
+
+    [Theory]
+    [InlineData(Public + "/.well-known/openid-configuration", Backchannel + "/.well-known/openid-configuration")]
+    [InlineData(Public + "/jwks", Backchannel + "/jwks")]
+    [InlineData(Public + "/token", Backchannel + "/token")]
+    [InlineData(Public + "/me?x=1", Backchannel + "/me?x=1")]
+    public async Task Rewrites_CallsUnderThePublicAuthority(string url, string expected)
+    {
+        (await Send(url))!.AbsoluteUri.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(Backchannel + "/auth", Public + "/auth")]
+    [InlineData(Backchannel + "/session/end", Public + "/session/end")]
+    [InlineData("https://elsewhere.example/auth", "https://elsewhere.example/auth")]
+    public void ToPublic_MapsBackchannelEndpointsBackToThePublicAuthority(string url, string expected)
+    {
+        Modules.Auth.Infrastructure.Authentication.OidcAuthorityRewriteHandler.ToPublic(url, Public, Backchannel).Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task Rewrites_WhenTheConfiguredAuthorityHasATrailingSlash()
+    {
+        (await Send(Public + "/jwks", Public + "/"))!.AbsoluteUri.Should().Be(Backchannel + "/jwks");
+    }
+
+    [Theory]
+    [InlineData("https://other.example/oidc/jwks")]
+    [InlineData("https://host.ts.net:3001/oidcevil/jwks")]
+    [InlineData("https://host.ts.net:3001/other")]
+    public async Task LeavesOtherAddressesAlone(string url)
+    {
+        (await Send(url))!.AbsoluteUri.Should().Be(url);
+    }
 }

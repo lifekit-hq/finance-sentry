@@ -69,6 +69,7 @@ services:
       Auth__Oidc__ClientId: ${AUTH_OIDC_CLIENT_ID:-}
       Auth__Oidc__ClientSecret: ${AUTH_OIDC_CLIENT_SECRET:-}
       Auth__Oidc__PublicBaseUrl: ${AUTH_OIDC_PUBLIC_BASE_URL:-}
+      Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
       # Ship structured logs to Loki (fire-and-forget); empty disables the sink.
       Observability__Loki__Url: http://loki:3100

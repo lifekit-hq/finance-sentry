@@ -19,6 +19,14 @@ public class OidcLoginOptions
     /// <summary>The issuer, e.g. <c>https://host.tailnet.ts.net:3001/oidc</c>.</summary>
     public string Authority { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional address the API itself uses for discovery, JWKS, token and userinfo calls, e.g.
+    /// <c>http://logto:3001/oidc</c> on a shared docker network when a container cannot reach the provider's
+    /// public (tailnet) address. The issuer validated and the browser's authorize redirect keep using
+    /// <see cref="Authority"/>. Empty = call the authority directly.
+    /// </summary>
+    public string BackchannelAuthority { get; set; } = string.Empty;
+
     public string ClientId { get; set; } = string.Empty;
 
     /// <summary>The confidential client's secret. Comes from the SOPS-rendered env, never from a committed file.</summary>

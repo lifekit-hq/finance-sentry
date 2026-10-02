@@ -105,6 +105,10 @@ CONTRACT=/srv/lifekit-stack/scripts/platform-contract.py
 echo "[deploy] platform contract: declarations"
 "${COMPOSE[@]}" config --format json | python3 "$CONTRACT" --static -
 
+# The API reaches the org identity provider (Logto) by name over this external network. lifekit-stack's
+# deploy creates it too; creating it idempotently here keeps the deploy order irrelevant.
+docker network inspect identity-oidc >/dev/null 2>&1 || docker network create identity-oidc >/dev/null
+
 echo "[deploy] pull published images @ $IMAGE_TAG"
 "${COMPOSE[@]}" pull "${PUBLISHED[@]}"
 

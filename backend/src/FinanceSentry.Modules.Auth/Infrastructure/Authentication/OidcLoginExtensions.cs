@@ -32,6 +32,8 @@ public static class OidcLoginExtensions
         {
             o.SignInScheme = IdentityConstants.ExternalScheme;
             o.Authority = options.Authority;
+            if (!string.IsNullOrWhiteSpace(options.BackchannelAuthority))
+                o.BackchannelHttpHandler = new OidcAuthorityRewriteHandler(options.Authority, options.BackchannelAuthority, new HttpClientHandler());
             o.ClientId = options.ClientId;
             o.ClientSecret = options.ClientSecret;
             o.RequireHttpsMetadata = options.RequireHttpsMetadata;
@@ -60,6 +62,9 @@ public static class OidcLoginExtensions
             o.Events.OnRedirectToIdentityProvider = context =>
             {
                 context.ProtocolMessage.RedirectUri = options.RedirectUri;
+                // The browser follows this redirect, so it must target the public address even when discovery ran on the back channel.
+                if (!string.IsNullOrWhiteSpace(options.BackchannelAuthority) && context.ProtocolMessage.IssuerAddress is { Length: > 0 } issuerAddress)
+                    context.ProtocolMessage.IssuerAddress = OidcAuthorityRewriteHandler.ToPublic(issuerAddress, options.Authority, options.BackchannelAuthority);
                 return Task.CompletedTask;
             };
             o.Events.OnAuthorizationCodeReceived = context =>
