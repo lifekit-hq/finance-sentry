@@ -49,7 +49,7 @@ Always target this project. Do not use the older "Finance Sentry" project (`1153
 - **Type**: Inter throughout. Tabular monospaced numerals for all money, right-aligned.
 - **Surfaces**: 1px neutral border over drop shadows. Cards = 12px radius + border, flat. Inputs/buttons = 8px radius. No shadows.
 - **Icons**: Lucide, 20px, stroke 1.75.
-- **Shell** (authenticated pages): 240px left sidebar (Dashboard, Accounts, Transactions, Holdings, Settings; collapsible to 64px). Top bar: title left, ⌘K search center, theme toggle + avatar right. Main maxes at 1440px with 32px padding.
+- **Shell** (authenticated pages): 240px left sidebar (Dashboard, Accounts, Transactions, Holdings, Settings; collapsible to 64px). Top bar: title left, ⌘K search center, avatar right (no theme toggle — theme lives in Settings). Main maxes at 1440px with 32px padding.
 - **Responsive**: 1440 desktop, 768 tablet, 375 mobile.
 
 ## Current screens (pages that exist or are planned)

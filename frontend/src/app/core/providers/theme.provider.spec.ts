@@ -3,7 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {ThemeService} from '@lifekit-hq/ui';
 import {firstValueFrom} from 'rxjs';
 
-import {provideAppTheme} from './theme.provider';
+import {applyThemePreference, provideAppTheme} from './theme.provider';
 
 const THEME_STORAGE_KEY = 'cmn-theme';
 
@@ -131,5 +131,39 @@ describe('provideAppTheme', () => {
     await expect(boot()).resolves.toBeUndefined();
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+});
+
+describe('applyThemePreference', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.setAttribute('data-theme', 'light');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('applies and persists an explicit dark choice', async () => {
+    stubSystemDark(false);
+    await boot();
+
+    applyThemePreference(TestBed.inject(ThemeService), 'dark');
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+  });
+
+  it('follows the OS and clears the stored choice for system', async () => {
+    stubSystemDark(true);
+    await boot();
+    const theme = TestBed.inject(ThemeService);
+    applyThemePreference(theme, 'light');
+
+    applyThemePreference(theme, 'system');
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 });

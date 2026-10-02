@@ -62,6 +62,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       [navItems]="navItems()"
       [activeRoute]="activeRoute()"
       [isDark]="isDark()"
+      [showThemeToggle]="false"
       [avatarMenuItems]="avatarMenuItems"
       [versionLabel]="versionLabel"
       [tabRoutes]="tabRoutes"

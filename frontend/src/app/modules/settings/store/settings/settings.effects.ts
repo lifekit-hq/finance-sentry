@@ -1,8 +1,10 @@
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
+import {ThemeService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
+import {applyThemePreference} from '../../../../core/providers/theme.provider';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
 import {type ChangePasswordRequest, SettingsService} from '../../services/settings.service';
@@ -19,6 +21,7 @@ interface EffectsStore {
 export function settingsEffects(store: EffectsStore) {
   const service = inject(SettingsService);
   const authStore = inject(AuthStore);
+  const themeService = inject(ThemeService);
 
   return {
     load: rxMethod<void>(
@@ -45,6 +48,7 @@ export function settingsEffects(store: EffectsStore) {
             tap(profile => {
               store.setProfile(profile);
               authStore.setProfileName(profile.firstName, profile.lastName);
+              applyThemePreference(themeService, profile.theme);
               store.setProfileSaving(false);
             }),
             catchError(err => {
