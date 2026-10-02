@@ -33,7 +33,8 @@ function applySystemTheme(theme: ThemeService, dark: boolean): void {
 /**
  * Instantiates ThemeService at app start so the stored theme applies on every route,
  * guest pages included. With no stored choice the OS preference is followed live and
- * never persisted (the service state is synced, then its key cleared); only an explicit ThemeService.setTheme/toggle writes the key.
+ * never persisted (the service state is synced, then its key cleared); only an explicit
+ * ThemeService.setTheme/toggle writes the key.
  */
 export function provideAppTheme(): EnvironmentProviders {
   return makeEnvironmentProviders([
