@@ -39,17 +39,21 @@ function applySystemTheme(theme: ThemeService, dark: boolean): void {
 export function provideAppTheme(): EnvironmentProviders {
   return makeEnvironmentProviders([
     provideAppInitializer(() => {
-      const theme = inject(ThemeService);
-      const systemDark = window.matchMedia?.(DARK_SCHEME_QUERY);
-      if (!systemDark || readStoredTheme() !== null) {
-        return;
-      }
-      applySystemTheme(theme, systemDark.matches);
-      systemDark.addEventListener('change', event => {
-        if (readStoredTheme() === null) {
-          applySystemTheme(theme, event.matches);
+      try {
+        const theme = inject(ThemeService);
+        const systemDark = window.matchMedia?.(DARK_SCHEME_QUERY);
+        if (!systemDark || readStoredTheme() !== null) {
+          return;
         }
-      });
+        applySystemTheme(theme, systemDark.matches);
+        systemDark.addEventListener('change', event => {
+          if (readStoredTheme() === null) {
+            applySystemTheme(theme, event.matches);
+          }
+        });
+      } catch {
+        // blocked storage: keep the theme the pre-paint script applied
+      }
     }),
   ]);
 }

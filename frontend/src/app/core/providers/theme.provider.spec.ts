@@ -116,4 +116,19 @@ describe('provideAppTheme', () => {
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
+
+  it('still boots and keeps the pre-paint theme when storage is blocked', async () => {
+    stubSystemDark(true);
+    document.documentElement.setAttribute('data-theme', 'dark');
+    const blocked = (): never => {
+      throw new DOMException('blocked', 'SecurityError');
+    };
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(blocked);
+
+    await expect(boot()).resolves.toBeUndefined();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
 });
