@@ -43,6 +43,10 @@ const INSTALLMENT_MENU_ITEMS: MenuItem[] = [
   {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
 ];
 
+const SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
+  {id: 'dismiss', label: 'Dismiss', icon: 'X', destructive: true},
+];
+
 @Component({
   selector: 'fns-subscriptions',
   imports: [
@@ -73,6 +77,7 @@ export class SubscriptionsComponent {
   public readonly store = inject(SubscriptionsStore);
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
+  public readonly subscriptionMenuItems = SUBSCRIPTION_MENU_ITEMS;
   public readonly installmentMenuItems = INSTALLMENT_MENU_ITEMS;
 
   public setSort(sort: SubscriptionSort): void {
@@ -118,6 +123,12 @@ export class SubscriptionsComponent {
       this.store.completeInstallment(item.id);
     } else if (action === 'delete') {
       this.deleteInstallment(item);
+    }
+  }
+
+  public onSubscriptionAction(action: string, sub: Subscription): void {
+    if (action === 'dismiss') {
+      this.dismiss(sub);
     }
   }
 

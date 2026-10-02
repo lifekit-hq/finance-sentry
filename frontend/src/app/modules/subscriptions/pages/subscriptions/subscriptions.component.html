@@ -64,7 +64,11 @@
       @for (section of store.activeSections(); track section.id) {
         <div>
           @if (section.label) {
-            <div class="mb-cmn-2 text-cmn-xs font-semibold text-status-warning">
+            <div
+              [class.text-status-warning]="section.id === 'due'"
+              [class.text-text-secondary]="section.id === 'later'"
+              class="mb-cmn-2 text-cmn-xs font-semibold"
+            >
               {{ section.label }}
             </div>
           }
@@ -91,13 +95,14 @@
                   <div class="text-[10px] text-text-disabled">/ mo</div>
                 </div>
                 <div actions class="flex shrink-0 gap-cmn-1">
-                  <cmn-button
-                    (clicked)="dismiss(sub)"
-                    variant="secondary"
-                    size="sm"
-                    icon="X"
-                    aria-label="Dismiss subscription"
-                  />
+                  <cmn-menu
+                    [items]="subscriptionMenuItems"
+                    (itemSelect)="onSubscriptionAction($event.id, sub)"
+                    ariaLabel="Subscription actions"
+                    triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
+                  >
+                    <cmn-icon name="Ellipsis" size="sm" />
+                  </cmn-menu>
                 </div>
               </cmn-list-item-row>
             }

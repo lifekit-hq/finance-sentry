@@ -58,7 +58,7 @@ describe('subscriptionsComputed activeSections', () => {
 
     expect(sections.map(s => [s.id, s.label, s.items.map(i => i.id)])).toEqual([
       ['due', 'Due this week', ['soon']],
-      ['later', null, ['later']],
+      ['later', 'Later', ['later']],
     ]);
   });
 
