@@ -43,6 +43,7 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     [InlineData("/api/v1/accounts")]
     [InlineData("/api/v1/auth/login")]
     [InlineData("/api/v1/health")]
+    [InlineData("/api/v1/healthcheck")]
     public async Task PublicListener_ProxiesTheAppAndTheApi(string path)
     {
         var response = await SendAsync(factory, path, PublicPort);
@@ -61,6 +62,11 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     [InlineData("/api/v1/health/ready")]
     [InlineData("/healthz")]
     [InlineData("/readyz")]
+    [InlineData("/api/v1/health/ready/")]
+    [InlineData("/api/v1/health/ready/x")]
+    [InlineData("/API/V1/HEALTH/READY")]
+    [InlineData("/healthz/")]
+    [InlineData("/readyz/")]
     public async Task PublicListener_RefusesTheAdminSurface(string path)
     {
         var response = await SendAsync(factory, path, PublicPort);
@@ -111,6 +117,7 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     [InlineData("/healthz")]
     [InlineData("/readyz")]
     [InlineData("//healthz")]
+    [InlineData("/api/v1/health/ready/")]
     [InlineData("/dashboard")]
     [InlineData("/api/v1/accounts")]
     public async Task AdminListener_KeepsProxyingTheFullSurface(string path)
