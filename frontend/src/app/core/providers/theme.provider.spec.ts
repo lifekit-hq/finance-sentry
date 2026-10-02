@@ -34,6 +34,7 @@ describe('provideAppTheme', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
   });
