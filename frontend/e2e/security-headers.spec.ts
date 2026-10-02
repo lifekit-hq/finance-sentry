@@ -17,6 +17,8 @@ const AUTH_RESPONSE = {
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
+const SIGN_IN_METHODS = {oidc: false, passwordLogin: true, googleDirect: true};
+
 const UNAUTHORIZED = 401;
 const GOOGLE_BUTTON_FRAME = 'iframe[src*="accounts.google.com/gsi/button"]';
 const GOOGLE_BUTTON_URL = 'https://accounts.google.com/gsi/button';
@@ -86,6 +88,8 @@ test.describe('Security headers', () => {
         body: '<!doctype html><title>stub</title>',
       })
     );
+    // Anonymous endpoint: answering it 401 would make the auth interceptor log out in a loop.
+    await page.route(`${API}/auth/methods`, route => route.fulfill(json(SIGN_IN_METHODS)));
     const buttonFrameLoaded = page.waitForResponse(
       response => response.url().startsWith(GOOGLE_BUTTON_URL),
       {timeout: GOOGLE_TIMEOUT_MS}
