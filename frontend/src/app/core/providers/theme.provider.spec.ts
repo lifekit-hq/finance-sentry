@@ -5,11 +5,19 @@ import {provideAppTheme} from './theme.provider';
 
 const THEME_STORAGE_KEY = 'cmn-theme';
 
-function stubSystemDark(matches: boolean): void {
+type SchemeListener = (event: {matches: boolean}) => void;
+
+function stubSystemDark(matches: boolean): {emit: SchemeListener} {
+  const listeners: SchemeListener[] = [];
   vi.stubGlobal(
     'matchMedia',
-    vi.fn().mockReturnValue({matches, addEventListener: vi.fn(), removeEventListener: vi.fn()})
+    vi.fn().mockReturnValue({
+      matches,
+      addEventListener: (_type: string, listener: SchemeListener) => listeners.push(listener),
+      removeEventListener: vi.fn(),
+    })
   );
+  return {emit: event => listeners.forEach(listener => listener(event))};
 }
 
 async function boot(): Promise<void> {
@@ -52,6 +60,38 @@ describe('provideAppTheme', () => {
     await boot();
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+
+  it('does not persist the OS preference as an explicit choice', async () => {
+    stubSystemDark(true);
+
+    await boot();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('follows OS preference changes while nothing is stored', async () => {
+    const system = stubSystemDark(true);
+    await boot();
+
+    system.emit({matches: false});
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+    system.emit({matches: true});
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('ignores OS preference changes once the user has chosen a theme', async () => {
+    const system = stubSystemDark(true);
+    await boot();
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    document.documentElement.setAttribute('data-theme', 'light');
+
+    system.emit({matches: true});
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
   it('stays light when nothing is stored and the OS prefers light', async () => {
