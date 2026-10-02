@@ -4,8 +4,7 @@
 # - Decrypts docker/.env.sops → docker/.env (requires age key at SOPS_AGE_KEY_FILE
 #   or ~/.config/sops/age/keys.txt).
 # - Pulls the images Docker Build published for one commit (IMAGE_TAG = its full SHA) and
-#   starts the prod compose stack on them without building. Services without a published image
-#   (PUBLISHED below) are still built here.
+#   starts the prod compose stack on them without building.
 # - Idempotent: safe to re-run; re-running with an older SHA is a rollback.
 #
 # Runs on a self-hosted GitHub Actions runner inside the repo working directory, after the
@@ -25,9 +24,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Services Docker Build publishes to ghcr by commit SHA; every other buildable service is built here.
+# Services Docker Build publishes to ghcr by commit SHA.
 PUBLISHED=(api mcp gateway frontend)
-LOCAL_BUILD=(uptime-probe)
 
 IMAGE_TAG="${IMAGE_TAG:-}"
 if ! [[ $IMAGE_TAG =~ ^[0-9a-f]{40}$ ]]; then
@@ -112,9 +110,6 @@ docker network inspect identity-oidc >/dev/null 2>&1 || docker network create id
 echo "[deploy] pull published images @ $IMAGE_TAG"
 "${COMPOSE[@]}" pull "${PUBLISHED[@]}"
 
-echo "[deploy] build unpublished images: ${LOCAL_BUILD[*]}"
-"${COMPOSE[@]}" build "${LOCAL_BUILD[@]}"
-
 echo "[deploy] docker compose up (no build)"
 "${COMPOSE[@]}" up -d --no-build --remove-orphans
 
@@ -163,21 +158,6 @@ for ((attempt = 1; attempt <= contract_attempts; attempt++)); do
   echo "[deploy] platform contract: attempt $attempt failed — retrying in 15s"
   sleep 15
 done
-
-# --- Uptime probe (issue #511) -------------------------------------------------
-# The probe is the `uptime-probe` compose service (started by `up` above). Earlier deploys
-# installed it into the operator's crontab and ~/.fs-uptime; remove that cron line so the
-# two probes don't double-alert. Only the fs-uptime line is filtered out; the ~/.fs-uptime
-# directory is left for the operator to delete.
-# grep exits 1 on an empty/absent crontab — the `|| true` keeps errexit+pipefail from
-# killing the list mid-pipe and clobbering the crontab with empty input (broke deploy once).
-# Best-effort: no crontab binary, or nothing to remove, must never fail a deploy.
-if command -v crontab >/dev/null 2>&1 && crontab -l 2>/dev/null | grep -q 'fs-uptime'; then
-  echo "[deploy] remove legacy uptime-probe cron line"
-  {
-    crontab -l 2>/dev/null | grep -v 'fs-uptime' || true
-  } | crontab - || echo "[deploy] warn: could not rewrite crontab" >&2
-fi
 
 if [[ $contract_ok != true ]]; then
   echo "error: platform contract failed after $contract_attempts attempts (table above)" >&2
