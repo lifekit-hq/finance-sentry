@@ -7,8 +7,9 @@ using Yarp.ReverseProxy.Model;
 /// <c>ASPNETCORE_URLS</c>) that serves only the YARP routes named in <c>Gateway:PublicListener:Routes</c> —
 /// the app and its API. Everything else answers 404 on that port: every other proxy route (Hangfire, MCP,
 /// the API's detailed readiness, the frontend's probes) and the gateway's own endpoints (health, ready,
-/// metrics), as well as any path that is not in normalized form. The allow-list is by route id, so a route added later stays off the public port until it is
-/// named here. The original listener keeps the full surface unchanged. Port unset or 0: no public listener.
+/// metrics), as well as any path that is not in normalized form. The allow-list is by route id, so a
+/// route added later stays off the public port until it is named here. The original listener keeps the
+/// full surface unchanged. Port unset or 0: no public listener.
 /// </summary>
 public sealed class GatewayPublicListener
 {
