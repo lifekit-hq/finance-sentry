@@ -39,7 +39,10 @@ public class OidcLoginOptions
     /// </summary>
     public string PublicBaseUrl { get; set; } = string.Empty;
 
-    /// <summary>Turn off only for a local, plain-HTTP provider; production keeps HTTPS metadata.</summary>
+    /// <summary>
+    /// Turn off only for a local, plain-HTTP provider; otherwise keep HTTPS metadata. Ignored (treated as off) when
+    /// <see cref="BackchannelAuthority"/> is plain HTTP, because the provider then advertises its JWKS on that address.
+    /// </summary>
     public bool RequireHttpsMetadata { get; set; } = true;
 
     public bool IsConfigured =>
