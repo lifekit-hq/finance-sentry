@@ -1,12 +1,16 @@
 <div class="p-cmn-4 sm:p-cmn-6">
   <div class="mx-auto max-w-[900px] space-y-cmn-8">
+    <cmn-button (clicked)="goBack()" variant="secondary" size="sm" data-testid="people-back">
+      ← Settings
+    </cmn-button>
+
     <cmn-page-header
       title="People"
       subtitle="Invite people to this account and manage who can sign in."
     />
 
     <!-- ── Invite ── -->
-    <cmn-card>
+    <cmn-card class="mt-cmn-6">
       <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Invite someone</h2>
       <p class="mt-1 mb-cmn-4 text-cmn-xs text-text-secondary leading-relaxed">
         Creates a member account and a one-time link they use to set a password. Send the link to
