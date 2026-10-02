@@ -184,7 +184,8 @@ describe('EventsComponent', () => {
     expect(text).toContain('Estimate');
     expect(text).not.toContain('Earnings: MU');
     expect(text).not.toContain('Ex-dividend: PLTR');
-    expect(text).toContain('PLTR');
+    expect(text.match(/MU/g)).toHaveLength(1);
+    expect(text.match(/PLTR/g)).toHaveLength(1);
     expect(text).toContain('US · high importance');
     expect(text).toContain('08:30');
   });

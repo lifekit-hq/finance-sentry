@@ -101,10 +101,13 @@
                     <span class="font-mono text-cmn-sm font-semibold text-text-primary">
                       {{ item.subject }}
                     </span>
+                    @let rowTitle = item.title | eventTitle: kindMeta(item.kind).label : item.subject;
                     <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
-                      {{ item.title | eventTitle: kindMeta(item.kind).label }}
+                      {{ rowTitle }}
                       @if (item.detail) {
-                        <span class="text-text-secondary"> · {{ item.detail }}</span>
+                        <span class="text-text-secondary">
+                          {{ rowTitle ? '· ' : '' }}{{ item.detail }}
+                        </span>
                       }
                     </span>
                     @if (item.time) {

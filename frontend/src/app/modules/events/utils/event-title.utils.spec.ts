@@ -2,21 +2,25 @@ import {describe, expect, it} from 'vitest';
 
 import {EventTitleUtils} from './event-title.utils';
 
-describe('EventTitleUtils.stripKindPrefix', () => {
-  it('strips the duplicated kind prefix', () => {
-    expect(EventTitleUtils.stripKindPrefix('Earnings: MU', 'Earnings')).toBe('MU');
+describe('EventTitleUtils.rowTitle', () => {
+  it('returns an empty title when only the subject remains after the kind prefix', () => {
+    expect(EventTitleUtils.rowTitle('Earnings: MU', 'Earnings', 'MU')).toBe('');
   });
 
-  it('matches the prefix case-insensitively', () => {
-    expect(EventTitleUtils.stripKindPrefix('earnings: MU', 'Earnings')).toBe('MU');
+  it('matches the prefix and subject case-insensitively', () => {
+    expect(EventTitleUtils.rowTitle('earnings: mu', 'Earnings', 'MU')).toBe('');
+  });
+
+  it('keeps the remainder when it differs from the subject', () => {
+    expect(EventTitleUtils.rowTitle('Earnings: MU Q3 call', 'Earnings', 'MU')).toBe('MU Q3 call');
   });
 
   it('leaves titles of other shapes unchanged', () => {
-    expect(EventTitleUtils.stripKindPrefix('CPI (Sep)', 'Macro')).toBe('CPI (Sep)');
-    expect(EventTitleUtils.stripKindPrefix('News cluster: x', 'Earnings')).toBe('News cluster: x');
+    expect(EventTitleUtils.rowTitle('CPI (Sep)', 'Macro', 'US')).toBe('CPI (Sep)');
+    expect(EventTitleUtils.rowTitle('News cluster: x', 'Earnings', 'MU')).toBe('News cluster: x');
   });
 
-  it('keeps the title when nothing would remain', () => {
-    expect(EventTitleUtils.stripKindPrefix('Earnings: ', 'Earnings')).toBe('Earnings: ');
+  it('keeps the title when nothing would remain after the prefix', () => {
+    expect(EventTitleUtils.rowTitle('Earnings: ', 'Earnings', 'MU')).toBe('Earnings: ');
   });
 });

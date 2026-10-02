@@ -4,7 +4,7 @@ import {EventTitleUtils} from '../utils/event-title.utils';
 
 @Pipe({name: 'eventTitle'})
 export class EventTitlePipe implements PipeTransform {
-  public transform(title: string, kindLabel: string): string {
-    return EventTitleUtils.stripKindPrefix(title, kindLabel);
+  public transform(title: string, kindLabel: string, subject: string): string {
+    return EventTitleUtils.rowTitle(title, kindLabel, subject);
   }
 }
