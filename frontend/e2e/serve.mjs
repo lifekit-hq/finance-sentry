@@ -7,6 +7,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, '..', 'dist', 'finance-sentry', 'browser');
 const PORT = process.env['PORT'] ?? 4200;
 
+// The production nginx's security headers (CSP included), read from the file nginx itself includes,
+// so every e2e spec runs the built app under the exact policy it ships with.
+const SECURITY_HEADERS_FILE = path.join(
+  __dirname,
+  '..',
+  '..',
+  'docker',
+  'nginx.security-headers.conf'
+);
+const SECURITY_HEADERS = Object.fromEntries(
+  [
+    ...fs
+      .readFileSync(SECURITY_HEADERS_FILE, 'utf8')
+      .matchAll(/^add_header (\S+) "([^"]*)" always;$/gm),
+  ].map(([, name, value]) => [name, value])
+);
+if (!SECURITY_HEADERS['Content-Security-Policy']) {
+  throw new Error(`No Content-Security-Policy found in ${SECURITY_HEADERS_FILE}`);
+}
+
 const MIME = {
   '.js': 'application/javascript',
   '.mjs': 'application/javascript',
@@ -22,6 +42,10 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(name, value);
+  }
+
   let reqPath = req.url.split('?')[0];
   if (reqPath === '/') reqPath = '/index.html';
 

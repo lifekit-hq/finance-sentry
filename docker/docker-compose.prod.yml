@@ -276,7 +276,10 @@ services:
       lifekit.contract.service: finance-sentry-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:8080
+      # 8080 serves the full surface (app, API, Hangfire, MCP, health, metrics) as before;
+      # 8081 is the public listener, which serves only the app and /api/** (Gateway:PublicListener).
+      ASPNETCORE_URLS: http://+:8080;http://+:8081
+      Gateway__PublicListener__Port: "8081"
       # Public-domain ACME (leave empty for Tailscale-terminated mode):
       LettuceEncrypt__DomainNames__0: ${GATEWAY_DOMAIN:-}
       LettuceEncrypt__EmailAddress: ${GATEWAY_ACME_EMAIL:-}
@@ -291,6 +294,8 @@ services:
       ForwardedHeaders__KnownProxies__0: 10.231.77.1
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+      # Public listener, loopback only: for the edge proxy to pick up.
+      - "127.0.0.1:${GATEWAY_PUBLIC_PORT:-8081}:8081"
       # ACME cutover: uncomment to publish the public TLS ports (requires GATEWAY_DOMAIN + DNS).
       # - "80:80"
       # - "443:443"

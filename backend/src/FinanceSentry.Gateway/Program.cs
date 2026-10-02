@@ -129,8 +129,10 @@ builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(HstsMaxAg
 
 var app = builder.Build();
 
-// Order matters: forwarded headers first (so the rate-limiter partition, HSTS and proxied X-Forwarded-*
-// see the real client and scheme), then rate limiting, then the proxy.
+// Order matters: security headers first (registered before anything can end the response, so every
+// response carries them), forwarded headers next (so the rate-limiter partition, HSTS and proxied
+// X-Forwarded-* see the real client and scheme), then rate limiting, then the proxy.
+app.UseGatewaySecurityHeaders(app.Configuration);
 app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
@@ -142,6 +144,10 @@ if (tlsEnabled)
 {
     app.UseHttpsRedirection();
 }
+
+// Routing runs here, explicitly, so the public-listener scope below sees the matched endpoint.
+app.UseRouting();
+app.UseGatewayPublicListener(app.Configuration);
 
 app.UseRateLimiter();
 
