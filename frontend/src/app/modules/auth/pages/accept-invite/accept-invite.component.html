@@ -2,16 +2,34 @@
   <div
     class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[440px]"
   >
+    @let methods = signInMethods();
+
     <div class="mb-cmn-8">
-      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">
-        Accept your invite
-      </h1>
-      <p class="text-cmn-sm text-text-secondary">
-        Choose a password to finish setting up your account.
-      </p>
+      @if (methods?.oidc) {
+        <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">
+          You're invited
+        </h1>
+        <p class="text-cmn-sm text-text-secondary">Sign in to finish setting up your account.</p>
+      } @else {
+        <h1 class="font-headline text-cmn-2xl font-bold text-text-primary mb-cmn-1">
+          Accept your invite
+        </h1>
+        <p class="text-cmn-sm text-text-secondary">
+          Choose a password to finish setting up your account.
+        </p>
+      }
     </div>
 
-    @if (!linkComplete) {
+    @if (methods?.oidc) {
+      <!-- The invite is the owner's say-so that this email may use the app; the identity provider proves who is signing in. -->
+      <cmn-button
+        (click)="onOidcSignIn()"
+        type="button"
+        variant="primary"
+        class="block w-full mb-cmn-6"
+        >Sign in</cmn-button
+      >
+    } @else if (!linkComplete) {
       <cmn-alert variant="error" title="This invite link is incomplete" class="block mb-cmn-6">
         Open the full link you were sent, or ask the account owner for a new one.
       </cmn-alert>
@@ -51,7 +69,7 @@
       </form>
     }
 
-    <p class="text-center text-cmn-sm text-text-secondary">
+    <p [class.hidden]="methods?.oidc" class="text-center text-cmn-sm text-text-secondary">
       Already set up?
       <a
         [routerLink]="loginRoute"

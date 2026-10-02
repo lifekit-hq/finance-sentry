@@ -33,6 +33,9 @@ function authServiceMock(overrides: Partial<Record<string, unknown>> = {}) {
     login: vi.fn(),
     acceptInvite: vi.fn(),
     verifyGoogleCredential: vi.fn(),
+    getSignInMethods: vi
+      .fn()
+      .mockReturnValue(of({oidc: false, passwordLogin: true, googleDirect: true})),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
     logout: vi.fn().mockReturnValue(of(null)),
     getMe: vi.fn().mockReturnValue(throwError(() => new Error('no session'))),

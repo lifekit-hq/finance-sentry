@@ -2,7 +2,12 @@ import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {Observable} from 'rxjs';
 
-import {AcceptInviteRequest, AuthRequest, AuthResponse} from '../models/auth/auth.model';
+import {
+  AcceptInviteRequest,
+  AuthRequest,
+  AuthResponse,
+  SignInMethods,
+} from '../models/auth/auth.model';
 
 @Injectable({providedIn: 'root'})
 export class AuthService extends ApiService {
@@ -12,6 +17,10 @@ export class AuthService extends ApiService {
 
   public getMe(): Observable<AuthResponse> {
     return this.get<AuthResponse>('me');
+  }
+
+  public getSignInMethods(): Observable<SignInMethods> {
+    return this.get<SignInMethods>('methods');
   }
 
   public login(req: AuthRequest): Observable<AuthResponse> {
