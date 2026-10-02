@@ -4,6 +4,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   GOOGLE_ACCOUNT_ONLY: "This account uses Google sign-in. Click 'Continue with Google' instead.",
   DUPLICATE_EMAIL: 'This email already belongs to an account.',
   INVALID_INVITE: 'This invite link is invalid or has expired. Ask the owner for a new one.',
+  SIGN_IN_METHOD_DISABLED: 'This sign-in method is not available.',
   ACCOUNT_NOT_INVITED: 'No account exists for this Google email. Ask the owner for an invite.',
   CANNOT_REVOKE_SELF: 'You cannot revoke your own access.',
   CANNOT_REVOKE_OWNER: "The owner's access cannot be revoked.",

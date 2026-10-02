@@ -3,7 +3,9 @@ using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Domain.People;
+using FinanceSentry.Modules.Auth.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.Auth.Application.Commands;
 
@@ -12,10 +14,14 @@ public class LoginCommandHandler(
     IUserAccessService userAccess,
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
-    IRefreshTokenService refreshTokenService) : ICommandHandler<LoginCommand, AuthResult>
+    IRefreshTokenService refreshTokenService,
+    IOptions<AuthSignInOptions> signInOptions) : ICommandHandler<LoginCommand, AuthResult>
 {
     public async Task<AuthResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        if (!signInOptions.Value.PasswordLogin.Enabled)
+            throw new SignInMethodDisabledException();
+
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)
             throw new InvalidCredentialsException();

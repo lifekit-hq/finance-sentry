@@ -20,6 +20,9 @@ public sealed class AccountLockedException : ApiException
     }
 }
 
+public sealed class SignInMethodDisabledException()
+    : ApiException(403, "SIGN_IN_METHOD_DISABLED", "This sign-in method is not available.");
+
 public sealed class InvalidRefreshTokenException(string message = "Refresh token invalid or expired.")
     : ApiException(401, "INVALID_REFRESH_TOKEN", message);
 
