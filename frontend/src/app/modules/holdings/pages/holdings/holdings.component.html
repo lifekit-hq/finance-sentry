@@ -60,7 +60,7 @@
         </div>
 
         @if (store.totalPositionsValue() > 0) {
-          <div class="mx-auto w-full max-w-[240px] md:mx-0 md:shrink-0">
+          <div class="mx-auto w-full max-w-[160px] md:max-w-[240px] md:mx-0 md:shrink-0">
             <cmn-donut-chart
               [segments]="store.allocationSegments()"
               [chrome]="false"
@@ -70,92 +70,95 @@
           </div>
         }
       </div>
+
+      @for (group of store.positionsByAssetClass(); track group.assetClass) {
+        <section
+          class="mt-cmn-6 grid gap-cmn-3 border-t border-border-default pt-cmn-5"
+          data-testid="holdings-group"
+        >
+          <div class="flex items-baseline justify-between">
+            <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+              {{ group.label }}
+            </h2>
+            <span class="font-mono tabular-nums text-cmn-sm text-text-secondary">
+              {{ group.totalValue | money }}
+            </span>
+          </div>
+
+          <cmn-data-table [rows]="group.rows" class="holdings-table">
+            <cmn-column key="symbol" listSlot="primary" header="Symbol">
+              <ng-template let-row cmnCell>
+                <button
+                  (click)="navigateToDossier(row.symbol)"
+                  class="inline-flex cursor-pointer items-center gap-cmn-3 text-left transition-colors hover:text-brand-primary"
+                >
+                  <cmn-institution-avatar
+                    [name]="row.symbol"
+                    [logoUrl]="row.symbol | assetLogo: row.provider"
+                    size="sm"
+                  />
+                  <span class="flex flex-col leading-tight">
+                    <span class="font-semibold text-text-primary">{{ row.symbol }}</span>
+                    <span class="text-cmn-xs text-text-secondary">{{ row.providerLabel }}</span>
+                  </span>
+                </button>
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
+              <ng-template let-row cmnCell>
+                <span class="font-mono tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
+                @if (row.currentPrice !== null) {
+                  <span class="font-mono tabular-nums md:hidden">
+                    × {{ row.currentPrice | money }}</span
+                  >
+                }
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="price" header="Price" align="right">
+              <ng-template let-row cmnCell>
+                @if (row.currentPrice === null) {
+                  <span class="font-mono tabular-nums text-text-secondary">—</span>
+                } @else {
+                  <span class="font-mono tabular-nums">{{ row.currentPrice | money }}</span>
+                }
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="value" listSlot="trailing" header="Value" align="right">
+              <ng-template let-row cmnCell>
+                <span class="font-mono tabular-nums font-semibold">{{
+                  row.currentValue | money
+                }}</span>
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">
+              <ng-template let-row cmnCell>
+                @if (row.pnlPercent === null) {
+                  <span
+                    class="font-mono tabular-nums text-text-secondary"
+                    title="No cost basis reported by provider"
+                    >—</span
+                  >
+                } @else {
+                  <span
+                    [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                    class="font-mono tabular-nums"
+                    >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
+                      row.pnlPercent | number: '1.2-2'
+                    }}%)</span
+                  >
+                }
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="weight" header="Weight" align="right">
+              <ng-template let-row cmnCell>
+                <span class="font-mono tabular-nums text-text-secondary"
+                  >{{ row.weightPercent | number: '1.1-1' }}%</span
+                >
+              </ng-template>
+            </cmn-column>
+          </cmn-data-table>
+        </section>
+      }
     </cmn-card>
-
-    @for (group of store.positionsByAssetClass(); track group.assetClass) {
-      <cmn-card class="grid gap-cmn-4">
-        <div class="flex items-baseline justify-between">
-          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
-            {{ group.label }}
-          </h2>
-          <span class="font-mono tabular-nums text-cmn-sm text-text-secondary">
-            {{ group.totalValue | money }}
-          </span>
-        </div>
-
-        <cmn-data-table [rows]="group.rows">
-          <cmn-column key="symbol" listSlot="primary" header="Symbol">
-            <ng-template let-row cmnCell>
-              <button
-                (click)="navigateToDossier(row.symbol)"
-                class="inline-flex cursor-pointer items-center gap-cmn-3 text-left transition-colors hover:text-brand-primary"
-              >
-                <cmn-institution-avatar
-                  [name]="row.symbol"
-                  [logoUrl]="row.symbol | assetLogo: row.provider"
-                  size="sm"
-                />
-                <span class="flex flex-col leading-tight">
-                  <span class="font-semibold text-text-primary">{{ row.symbol }}</span>
-                  <span class="text-cmn-xs text-text-secondary">{{ row.providerLabel }}</span>
-                </span>
-              </button>
-            </ng-template>
-          </cmn-column>
-          <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
-            <ng-template let-row cmnCell>
-              <span class="font-mono tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
-              @if (row.currentPrice !== null) {
-                <span class="font-mono tabular-nums md:hidden">
-                  × {{ row.currentPrice | money }}</span
-                >
-              }
-            </ng-template>
-          </cmn-column>
-          <cmn-column key="price" header="Price" align="right">
-            <ng-template let-row cmnCell>
-              @if (row.currentPrice === null) {
-                <span class="font-mono tabular-nums text-text-secondary">—</span>
-              } @else {
-                <span class="font-mono tabular-nums">{{ row.currentPrice | money }}</span>
-              }
-            </ng-template>
-          </cmn-column>
-          <cmn-column key="value" listSlot="trailing" header="Value" align="right">
-            <ng-template let-row cmnCell>
-              <span class="font-mono tabular-nums font-semibold">{{
-                row.currentValue | money
-              }}</span>
-            </ng-template>
-          </cmn-column>
-          <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">
-            <ng-template let-row cmnCell>
-              @if (row.pnlPercent === null) {
-                <span
-                  class="font-mono tabular-nums text-text-secondary"
-                  title="No cost basis reported by provider"
-                  >—</span
-                >
-              } @else {
-                <span
-                  [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                  class="font-mono tabular-nums"
-                  >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
-                    row.pnlPercent | number: '1.2-2'
-                  }}%)</span
-                >
-              }
-            </ng-template>
-          </cmn-column>
-          <cmn-column key="weight" header="Weight" align="right">
-            <ng-template let-row cmnCell>
-              <span class="font-mono tabular-nums text-text-secondary"
-                >{{ row.weightPercent | number: '1.1-1' }}%</span
-              >
-            </ng-template>
-          </cmn-column>
-        </cmn-data-table>
-      </cmn-card>
-    }
   }
 </div>

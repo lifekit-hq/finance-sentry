@@ -35,6 +35,26 @@ const SKELETON_ROWS = 4;
     InstitutionAvatarComponent,
   ],
   templateUrl: './holdings.component.html',
+  styles: `
+    @media (min-width: 768px) {
+      :host ::ng-deep .holdings-table table {
+        table-layout: fixed;
+      }
+      :host ::ng-deep .holdings-table .cdk-column-quantity {
+        width: 8rem;
+      }
+      :host ::ng-deep .holdings-table .cdk-column-price,
+      :host ::ng-deep .holdings-table .cdk-column-value {
+        width: 7rem;
+      }
+      :host ::ng-deep .holdings-table .cdk-column-pnl {
+        width: 11rem;
+      }
+      :host ::ng-deep .holdings-table .cdk-column-weight {
+        width: 5rem;
+      }
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [HoldingsStore],
 })
