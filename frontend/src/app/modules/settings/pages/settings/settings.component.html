@@ -50,7 +50,7 @@
               type="email"
             />
           </cmn-form-field>
-          <div class="flex justify-end">
+          <div class="mb-cmn-4 flex justify-end">
             <cmn-button [loading]="store.profileSaving()" (clicked)="saveProfile()"
               >Save Profile</cmn-button
             >
@@ -69,34 +69,22 @@
           </p>
         </div>
         <div class="space-y-cmn-4">
-          <div>
-            <label
-              for="s-currency"
-              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary block mb-cmn-1"
-            >
-              Base Currency
-            </label>
+          <cmn-form-field label="Base Currency" fieldId="s-currency">
             <cmn-select
               [ngModel]="profile.baseCurrency"
               [options]="currencyOptions"
               (ngModelChange)="store.updateProfile({baseCurrency: $event})"
               id="s-currency"
             />
-          </div>
-          <div>
-            <label
-              for="s-theme"
-              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary block mb-cmn-1"
-            >
-              Theme
-            </label>
+          </cmn-form-field>
+          <cmn-form-field label="Theme" fieldId="s-theme">
             <cmn-select
               [ngModel]="profile.theme"
               [options]="themeOptions"
               (ngModelChange)="store.updateProfile({theme: $event})"
               id="s-theme"
             />
-          </div>
+          </cmn-form-field>
         </div>
       </div>
 
@@ -140,7 +128,11 @@
             />
           </div>
           @if (profile.lowBalanceAlerts) {
-            <cmn-form-field label="Low balance threshold (USD)" fieldId="s-thresh">
+            <cmn-form-field
+              class="block pt-cmn-2"
+              label="Low balance threshold (USD)"
+              fieldId="s-thresh"
+            >
               <cmn-input
                 [ngModel]="profile.lowBalanceThreshold.toString()"
                 (ngModelChange)="store.updateProfile({lowBalanceThreshold: +$event || 0})"
@@ -199,11 +191,7 @@
             (submit)="$event.preventDefault(); changePassword()"
             class="space-y-cmn-3 border-t border-border-default pt-cmn-4"
           >
-            <div
-              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-            >
-              Change Password
-            </div>
+            <h3 class="font-label text-cmn-sm font-semibold text-text-primary">Change password</h3>
             <input [value]="profile.email" type="text" autocomplete="username" class="hidden" />
             <cmn-form-field label="Current Password" fieldId="s-cpw">
               <cmn-input
@@ -240,7 +228,7 @@
                 />
               </cmn-form-field>
             </div>
-            <div class="flex justify-end">
+            <div class="mb-cmn-4 flex justify-end">
               <cmn-button
                 [loading]="store.passwordSaving()"
                 (clicked)="changePassword()"
