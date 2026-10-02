@@ -20,3 +20,31 @@ describe('AlertMessageUtils.roundNumbers', () => {
     expect(AlertMessageUtils.roundNumbers('')).toBe('');
   });
 });
+
+describe('AlertMessageUtils filing URL', () => {
+  const url = 'https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240630.htm';
+  const message = `AAPL filed a 10-Q on 2024-08-02. ${url}`;
+
+  it('splits the trailing sec.gov URL off the sentence', () => {
+    expect(AlertMessageUtils.stripFilingUrl(message)).toBe('AAPL filed a 10-Q on 2024-08-02.');
+    expect(AlertMessageUtils.filingUrl(message)).toBe(url);
+  });
+
+  it('leaves messages without a sec.gov URL untouched', () => {
+    expect(AlertMessageUtils.stripFilingUrl('Spent 12 of 100')).toBe('Spent 12 of 100');
+    expect(AlertMessageUtils.filingUrl('Spent 12 of 100')).toBeNull();
+  });
+
+  it('ignores non-sec.gov and non-trailing URLs', () => {
+    expect(AlertMessageUtils.filingUrl('See https://example.com/sec.gov')).toBeNull();
+    expect(AlertMessageUtils.filingUrl(`${url} was filed`)).toBeNull();
+    expect(AlertMessageUtils.stripFilingUrl('See https://example.com/x')).toBe(
+      'See https://example.com/x'
+    );
+  });
+
+  it('returns empty / null for null and empty input', () => {
+    expect(AlertMessageUtils.stripFilingUrl(null)).toBe('');
+    expect(AlertMessageUtils.filingUrl(null)).toBeNull();
+  });
+});

@@ -24,6 +24,7 @@ import {
 } from '../../models/alert/alert.model';
 import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
+import {AlertMessageUtils} from '../../utils/alert-message.utils';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -141,6 +142,12 @@ export class AlertsComponent {
   public openAlert(item: Alert): void {
     if (!item.isRead) {
       this.store.markRead(item.id);
+    }
+    const filingUrl =
+      item.type === 'FilingLanded' ? AlertMessageUtils.filingUrl(item.message) : null;
+    if (filingUrl) {
+      window.open(filingUrl, '_blank', 'noopener,noreferrer');
+      return;
     }
     const target = item.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
     void this.router.navigateByUrl(target);
