@@ -1,4 +1,4 @@
-<div class="flex items-center justify-center min-h-screen bg-surface-bg">
+<div class="flex items-center justify-center min-h-screen bg-surface-bg px-cmn-4">
   <div
     class="bg-surface-card p-cmn-8 rounded-cmn-md border border-border-default w-full max-w-[440px]"
   >
@@ -18,7 +18,7 @@
     <form [formGroup]="form" (ngSubmit)="onSubmit()">
       <cmn-form-field
         [control]="form.get('email')"
-        label="EMAIL ADDRESS"
+        label="Email address"
         formControlName="email"
         class="block mb-cmn-5"
       >
@@ -28,7 +28,7 @@
       <div class="mb-cmn-6">
         <cmn-form-field
           [control]="form.get('password')"
-          label="PASSWORD"
+          label="Password"
           formControlName="password"
         >
           <cmn-input type="password" placeholder="••••••••" />
@@ -51,12 +51,15 @@
       <div class="flex-1 h-px bg-border-default"></div>
     </div>
 
-    <div class="flex justify-center mb-cmn-6">
-      <cmn-google-sign-in-button
-        [clientId]="googleClientId"
-        [locale]="googleLocale"
-        (credential)="onGoogleCredential($event)"
-      />
+    <div #googleContainer class="flex justify-center mb-cmn-6">
+      @if (googleButtonConfig(); as config) {
+        <cmn-google-sign-in-button
+          [clientId]="googleClientId"
+          [locale]="googleLocale"
+          [buttonConfiguration]="config"
+          (credential)="onGoogleCredential($event)"
+        />
+      }
     </div>
 
     <p class="text-center text-cmn-sm text-text-secondary">
