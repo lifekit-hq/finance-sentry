@@ -6,7 +6,7 @@ public class BankAccount : Entity
 {
     /// <summary>
     /// <see cref="Provider"/> of an account the startup smoke seed writes: fake data with no provider behind it,
-    /// so the sync scheduler never schedules it.
+    /// so every cross-user read (<c>GetAllActiveUnscopedAsync</c>: the sync scheduler, background jobs) skips it.
     /// </summary>
     public const string SeededProvider = "seeded";
 

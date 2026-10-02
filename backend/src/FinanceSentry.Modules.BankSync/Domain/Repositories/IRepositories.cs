@@ -69,8 +69,9 @@ public interface IBankAccountRepository
     Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get every user's active (IsActive=true) accounts regardless of sync status. Used by the scheduler
-    /// and the cross-module readers; opts out of the Owner query filter.
+    /// Get every user's active (IsActive=true) accounts regardless of sync status, except fake
+    /// <see cref="BankAccount.SeededProvider"/> accounts, so a seeded user is invisible to the scheduler, the
+    /// cross-user jobs and the cross-module readers. Opts out of the Owner query filter.
     /// </summary>
     Task<IEnumerable<BankAccount>> GetAllActiveUnscopedAsync(CancellationToken cancellationToken = default);
 

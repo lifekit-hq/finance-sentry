@@ -118,7 +118,7 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<IEnumerable<BankAccount>> GetAllActiveUnscopedAsync(CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .Where(ba => ba.IsActive)
+            .Where(ba => ba.IsActive && ba.Provider != BankAccount.SeededProvider)
             .OrderBy(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
     }

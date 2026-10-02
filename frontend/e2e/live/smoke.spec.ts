@@ -19,7 +19,7 @@ async function login(page: Page): Promise<void> {
   // input, so placeholder/role locators match twice — target the native inputs.
   await page.locator('input[type="email"]').fill(EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.getByRole('button', {name: 'Sign in', exact: true}).click();
+  await page.locator('form').getByRole('button', {name: /sign in/i}).click();
   // Post-login the app lands on /accounts (its default target); navigate from there.
   await page.waitForURL(url => !url.pathname.startsWith('/login'), {timeout: 15_000});
   await page.goto('/dashboard');

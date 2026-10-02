@@ -1,22 +1,20 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Auth;
-using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
-using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Seeding;
+using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FluentAssertions;
-using Hangfire;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
 /// <summary>
 /// The smoke account's fake bank data (<see cref="SmokeDataSeeder"/>): written once for that user only, at
-/// startup with no principal, and never scheduled for a provider sync.
+/// startup with no principal, and excluded from every cross-user active-account read.
 /// </summary>
 public class SmokeDataSeederTests
 {
@@ -72,20 +70,38 @@ public class SmokeDataSeederTests
     }
 
     [Fact]
-    public async Task Scheduler_SkipsTheSeededAccount()
+    public async Task CrossUserActiveRead_ExcludesTheSeededAccount()
     {
-        var real = new BankAccount(Guid.NewGuid(), "ext-1", "Bank", "checking", "1234", "Owner", "EUR", Guid.NewGuid(), "monobank");
-        var seeded = new BankAccount(SmokeUserId, "seeded-1", "Demo Bank", "checking", "0000", "Smoke Test", "EUR",
-            SmokeUserId, BankAccount.SeededProvider);
-        var accounts = new Mock<IBankAccountRepository>();
-        accounts.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([real, seeded]);
-        var recurringJobs = new Mock<IRecurringJobManager>();
+        var realUser = Guid.NewGuid();
+        using (var db = NewContext())
+        {
+            db.BankAccounts.Add(new BankAccount(realUser, "ext-1", "Bank", "checking", "1234", "Owner", "EUR", Guid.NewGuid(), "monobank"));
+            db.SaveChanges();
+            SmokeDataSeeder.Seed(db, SmokeUserId, Now).Should().BeTrue();
+        }
 
-        await new SyncScheduler(accounts.Object, recurringJobs.Object, Mock.Of<IAccountDiscoveryService>(),
-            NullLogger<SyncScheduler>.Instance).ScheduleAllActiveAccounts();
+        using var read = NewContext();
+        var active = await new BankAccountRepository(read).GetAllActiveUnscopedAsync();
 
-        recurringJobs.Invocations.Select(i => i.Arguments[0])
-            .Should().Equal($"sync-account-{real.Id}");
+        active.Select(a => a.UserId).Should().Equal(realUser);
+    }
+
+    [Fact]
+    public async Task ActiveUserIds_OmitTheSeededUser()
+    {
+        var realUser = Guid.NewGuid();
+        using (var db = NewContext())
+        {
+            db.BankAccounts.Add(new BankAccount(realUser, "ext-1", "Bank", "checking", "1234", "Owner", "EUR", Guid.NewGuid(), "monobank"));
+            db.SaveChanges();
+            SmokeDataSeeder.Seed(db, SmokeUserId, Now);
+        }
+
+        using var read = NewContext();
+        var ids = await new BankingTotalsReader(new BankAccountRepository(read), Mock.Of<ISyncJobRepository>())
+            .GetActiveUserIdsAsync();
+
+        ids.Should().Equal(realUser);
     }
 
     private BankSyncDbContext NewContext() =>

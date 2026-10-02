@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using FinanceSentry.Modules.BankSync.Application.Services;
-using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 public static class HangfireSetup
@@ -98,9 +97,7 @@ public class SyncScheduler(
                 "Account discovery failed for this scheduled run; existing accounts will still be scheduled.");
         }
 
-        var activeAccounts = (await _accounts.GetAllActiveUnscopedAsync(ct))
-            .Where(a => a.Provider != BankAccount.SeededProvider)
-            .ToList();
+        var activeAccounts = await _accounts.GetAllActiveUnscopedAsync(ct);
         var activeIds = new HashSet<Guid>(activeAccounts.Select(a => a.Id));
 
         foreach (var account in activeAccounts)

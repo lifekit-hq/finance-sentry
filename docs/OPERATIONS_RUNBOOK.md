@@ -63,7 +63,7 @@ the API seeds at startup from `Auth__SmokeAccount__Email` / `Auth__SmokeAccount_
 the seed creates the account as a Member, marked with the `seeded-account: smoke` user claim, plus one fake `seeded`
 bank account with a few transactions; later starts only converge its password, so rotating the secrets needs just a
 redeploy. Either unset = no seed. It never touches an account it did not create, is never granted Owner, is not shared
-with anyone, and its `seeded` account is never scheduled for a provider sync. A People-page revoke stays in effect; to
+with anyone, and its `seeded` account is excluded from every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from any background job. A People-page revoke stays in effect; to
 retire it, revoke it there and delete the two secrets.
 
 **Steps:**
