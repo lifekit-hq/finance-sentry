@@ -132,21 +132,29 @@
             class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
             data-testid="fired-event"
           >
-            <div class="flex flex-wrap items-center gap-cmn-2">
+            <div class="flex items-center gap-cmn-2" data-testid="fired-line-1">
               <cmn-tag [variant]="firedKindMeta(event.kind).variant">
                 {{ firedKindMeta(event.kind).label }}
               </cmn-tag>
-              <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+              <span class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary">
                 {{ event.subject }}
               </span>
-              <span class="ml-auto text-cmn-xs text-text-secondary">
+              <span class="ml-auto shrink-0 text-cmn-xs text-text-secondary">
                 {{ event.occurredAt | date: 'd MMM, HH:mm' }}
               </span>
-              <cmn-tag [variant]="outcomeMeta(event.outcome).variant" data-testid="outcome">
+            </div>
+            <div class="mt-cmn-1 flex items-center gap-cmn-2" data-testid="fired-line-2">
+              <p class="min-w-0 flex-1 text-cmn-sm font-medium text-text-primary">
+                {{ event.title }}
+              </p>
+              <cmn-tag
+                [variant]="outcomeMeta(event.outcome).variant"
+                class="shrink-0"
+                data-testid="outcome"
+              >
                 {{ outcomeMeta(event.outcome).label }}
               </cmn-tag>
             </div>
-            <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">{{ event.title }}</p>
             @if (event.verdict; as verdict) {
               <blockquote
                 class="mt-cmn-2 border-l-2 border-accent-default pl-cmn-3 text-cmn-sm text-text-primary"
