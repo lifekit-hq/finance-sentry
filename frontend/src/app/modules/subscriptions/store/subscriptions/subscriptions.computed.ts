@@ -50,7 +50,7 @@ export function subscriptionsComputed(store: StateSignals) {
     completedInstallments: computed(() =>
       store.subscriptions().filter(s => s.status === 'completed' && isInstallment(s))
     ),
-    /** Active subscriptions split into a "Due this week" block and the rest (no label). */
+    /** Active subscriptions split into a "Due this week" block and a "Later" block. */
     activeSections: computed((): SubscriptionSection[] => {
       const active = sortBy(
         store.subscriptions().filter(s => s.status === 'active' && isSubscription(s)),
@@ -59,7 +59,7 @@ export function subscriptionsComputed(store: StateSignals) {
       return (
         [
           {id: 'due', label: 'Due this week', items: active.filter(isDueThisWeek)},
-          {id: 'later', label: null, items: active.filter(s => !isDueThisWeek(s))},
+          {id: 'later', label: 'Later', items: active.filter(s => !isDueThisWeek(s))},
         ] satisfies SubscriptionSection[]
       ).filter(section => section.items.length > 0);
     }),
