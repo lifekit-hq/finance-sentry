@@ -74,7 +74,10 @@ describe('AccountsListComponent sync status text', () => {
   });
 
   it('shows "Syncing…" while a sync is in progress, even with a previous timestamp', () => {
-    const element = setup(true, {syncStatus: 'syncing', lastSyncTimestamp: new Date().toISOString()});
+    const element = setup(true, {
+      syncStatus: 'syncing',
+      lastSyncTimestamp: new Date().toISOString(),
+    });
     const text = element.textContent ?? '';
     expect(text).toContain('0 accounts · Syncing…');
   });
@@ -86,7 +89,10 @@ describe('AccountsListComponent sync status text', () => {
   });
 
   it('shows "synced <time>" for a synced institution with a timestamp', () => {
-    const element = setup(true, {syncStatus: 'synced', lastSyncTimestamp: new Date().toISOString()});
+    const element = setup(true, {
+      syncStatus: 'synced',
+      lastSyncTimestamp: new Date().toISOString(),
+    });
     const text = element.textContent ?? '';
     expect(text).toContain('0 accounts · synced just now');
   });
