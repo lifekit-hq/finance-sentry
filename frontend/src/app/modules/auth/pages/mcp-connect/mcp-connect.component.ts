@@ -13,7 +13,7 @@ import {AuthStore} from '../../store/auth.store';
     <div class="p-cmn-4 sm:p-cmn-6">
       <div class="mx-auto max-w-[36rem] space-y-cmn-8 pt-cmn-8">
         <cmn-page-header title="Connecting MCP" />
-        <cmn-card>
+        <cmn-card class="block">
           <p class="text-cmn-sm text-text-secondary leading-relaxed">{{ message }}</p>
         </cmn-card>
       </div>
