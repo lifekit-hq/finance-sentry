@@ -212,6 +212,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       @if (tile.deltaLabel()) {
                         <span
                           [class]="paceClass(tile.delta())"
+                          [attr.title]="tile.deltaLabel()"
                           class="block truncate font-label text-cmn-xs font-medium"
                           >{{ tile.deltaLabel() }}</span
                         >
