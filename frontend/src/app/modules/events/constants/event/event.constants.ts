@@ -79,7 +79,7 @@ export const OUTCOME_META_REGISTRY = {
   },
   ['not_delivered']: {
     label: 'Not delivered',
-    variant: 'error',
+    variant: 'neutral',
   },
 } satisfies Record<EventOutcome, OutcomeMeta>;
 

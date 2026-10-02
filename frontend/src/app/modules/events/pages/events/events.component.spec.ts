@@ -2,6 +2,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {OUTCOME_META_REGISTRY} from '../../constants/event/event.constants';
 import {
   type CalendarWindow,
   type EventDayGroup,
@@ -224,6 +225,25 @@ describe('EventsComponent', () => {
     expect(host.querySelectorAll('[data-testid="verdict"]').length).toBe(1);
     expect(text).not.toContain('silence is the answer');
     expect(text).not.toContain('Told you');
+  });
+
+  it('places the outcome tag on the second line of every fired row, never beside the date', () => {
+    mockStore.view.set('fired');
+
+    const {host} = render();
+
+    const rows = Array.from(host.querySelectorAll('[data-testid="fired-event"]'));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.querySelector('[data-testid="fired-line-1"] [data-testid="outcome"]')).toBeNull();
+      expect(
+        row.querySelector('[data-testid="fired-line-2"] [data-testid="outcome"]')
+      ).not.toBeNull();
+    }
+  });
+
+  it('maps not_delivered to the neutral variant', () => {
+    expect(OUTCOME_META_REGISTRY.not_delivered.variant).toBe('neutral');
   });
 
   it('shows the fired empty state when nothing has fired', () => {
