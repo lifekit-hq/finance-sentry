@@ -1,6 +1,7 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
 import {
+  AlertComponent,
   ButtonComponent,
   CardComponent,
   ChipComponent,
@@ -52,6 +53,7 @@ const SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
   imports: [
     ButtonComponent,
     CardComponent,
+    AlertComponent,
     ChipComponent,
     DatePipe,
     EmptyStateComponent,

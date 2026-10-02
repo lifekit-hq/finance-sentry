@@ -70,14 +70,10 @@
         >Filter</span
       >
       @if (activeCategoryLabel(); as label) {
-        <button
-          (click)="clearCategory()"
-          type="button"
-          class="inline-flex items-center gap-cmn-1 rounded-full border border-accent-default bg-accent-subtle px-cmn-3 py-1 text-cmn-xs font-medium text-accent-default transition-colors hover:bg-accent-200"
-        >
+        <cmn-chip [selected]="true" (clicked)="clearCategory()">
           Category: {{ label }}
           <cmn-icon name="X" size="sm" />
-        </button>
+        </cmn-chip>
       }
     </div>
   }
