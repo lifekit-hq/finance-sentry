@@ -1,13 +1,19 @@
 import {expect, type Page, test} from '@playwright/test';
 
 // READ-ONLY smoke against the deployed stack. This suite hits the production
-// database as the QA test user — it must never create, mutate, or delete
+// database as the seeded smoke account (a Member with fake data, seeded by the
+// API from the same credentials) — it must never create, mutate, or delete
 // anything, and must assert shape (headings, tables, health), never exact
-// values, which depend on live data.
-const EMAIL = process.env['E2E_LIVE_EMAIL'] ?? 'test@gmail.com';
-const PASSWORD = process.env['E2E_LIVE_PASSWORD'] ?? 'Darkfly21';
+// values. The credentials come only from the environment; there is no default.
+const EMAIL = process.env['E2E_LIVE_EMAIL'];
+const PASSWORD = process.env['E2E_LIVE_PASSWORD'];
 
 async function login(page: Page): Promise<void> {
+  if (!EMAIL || !PASSWORD) {
+    throw new Error(
+      'E2E_LIVE_EMAIL and E2E_LIVE_PASSWORD must both be set to sign in to the deployed stack.'
+    );
+  }
   await page.goto('/');
   // The cmn-input wrapper mirrors the placeholder attribute of its inner native
   // input, so placeholder/role locators match twice — target the native inputs.
@@ -28,7 +34,7 @@ test.describe('Live smoke — deployed stack', () => {
 
   test('login lands on a populated dashboard', async ({page}) => {
     await login(page);
-    // The QA test user has connected accounts — the empty state must not show.
+    // The smoke account has a seeded bank account — the empty state must not show.
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
     await expect(page.getByText('This month')).toBeVisible();
     await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();

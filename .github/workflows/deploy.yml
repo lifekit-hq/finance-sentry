@@ -99,8 +99,13 @@ jobs:
 
       # A commit from before deploy-by-SHA has a compose file that builds its images instead, so
       # it cannot be deployed this way.
+      # The smoke account the next step signs in with is seeded by the API from these at startup;
+      # compose takes them from this step's environment (runbook §4).
       - name: Deploy
         if: steps.target.outputs.stale != 'true'
+        env:
+          SMOKE_ACCOUNT_EMAIL: ${{ secrets.E2E_LIVE_EMAIL }}
+          SMOKE_ACCOUNT_PASSWORD: ${{ secrets.E2E_LIVE_PASSWORD }}
         run: |
           if ! grep -q 'IMAGE_TAG' docker/docker-compose.prod.yml; then
             echo "::error::$IMAGE_TAG predates deploying by commit SHA; pick a later commit"
@@ -114,12 +119,15 @@ jobs:
       # so npm never writes into the runner workspace.
       - name: Live e2e smoke (deployed stack)
         if: steps.target.outputs.stale != 'true'
+        env:
+          E2E_LIVE_EMAIL: ${{ secrets.E2E_LIVE_EMAIL }}
+          E2E_LIVE_PASSWORD: ${{ secrets.E2E_LIVE_PASSWORD }}
         run: |
           # CI=true enables the config's single retry with a trace on that retry; the
           # trace lands in a host directory so it outlives the --rm container.
           results="$RUNNER_TEMP/live-smoke-results"
           rm -rf "$results" && mkdir -p "$results"
-          docker run --rm --network host -e CI=true \
+          docker run --rm --network host -e CI=true -e E2E_LIVE_EMAIL -e E2E_LIVE_PASSWORD \
             -v "$PWD/frontend:/repo:ro" -v "$results:/work/test-results" -w /work \
             mcr.microsoft.com/playwright:v1.62.1-noble \
             bash -c "cp -r /repo/e2e /repo/playwright.live.config.ts . \

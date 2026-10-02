@@ -18,7 +18,8 @@ using Xunit;
 /// The startup role seed (<see cref="RoleSeeder"/>): each role exists with exactly the permissions
 /// <see cref="Permissions.ByRole"/> gives it; the <see cref="AuthRoles.Owner"/> role goes to the account named
 /// by <c>Auth:OwnerEmail</c>, else the sole user while nobody holds it, never more; every other account
-/// without a role becomes a <see cref="AuthRoles.Member"/>, except a revoked one; per-person grants are left alone.
+/// without a role becomes a <see cref="AuthRoles.Member"/>, except a revoked one; per-person grants are left alone;
+/// the smoke account (<see cref="SmokeAccountSeeder.MarkerClaim"/>) is never the owner.
 /// </summary>
 public sealed class RoleSeederTests : IAsyncDisposable
 {
@@ -90,6 +91,37 @@ public sealed class RoleSeederTests : IAsyncDisposable
         using var scope = _services.CreateScope();
         (await scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>().RoleExistsAsync(AuthRoles.Owner))
             .Should().BeTrue();
+        (await OwnersAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Seed_WithOnlyTheSmokeAccountAndNoConfiguredOwner_GrantsNobody()
+    {
+        await CreateUserAsync("smoke@test.com", smoke: true);
+
+        await SeedAsync(ownerEmail: null);
+
+        (await OwnersAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Seed_WithTheSmokeAccountAndOneOtherUser_GrantsTheOtherUser()
+    {
+        await CreateUserAsync("smoke@test.com", smoke: true);
+        await CreateUserAsync("only@test.com");
+
+        await SeedAsync(ownerEmail: null);
+
+        (await OwnersAsync()).Should().Equal("only@test.com");
+    }
+
+    [Fact]
+    public async Task Seed_WithConfiguredOwnerNamingTheSmokeAccount_GrantsNobody()
+    {
+        await CreateUserAsync("smoke@test.com", smoke: true);
+
+        await SeedAsync(ownerEmail: "smoke@test.com");
+
         (await OwnersAsync()).Should().BeEmpty();
     }
 
@@ -185,11 +217,14 @@ public sealed class RoleSeederTests : IAsyncDisposable
             NullLogger.Instance);
     }
 
-    private async Task CreateUserAsync(string email)
+    private async Task CreateUserAsync(string email, bool smoke = false)
     {
         using var scope = _services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        (await users.CreateAsync(new ApplicationUser { UserName = email, Email = email })).Succeeded.Should().BeTrue();
+        var user = new ApplicationUser { UserName = email, Email = email };
+        (await users.CreateAsync(user)).Succeeded.Should().BeTrue();
+        if (smoke)
+            (await users.AddClaimAsync(user, SmokeAccountSeeder.MarkerClaim)).Succeeded.Should().BeTrue();
     }
 
     private Task<List<string?>> OwnersAsync() => UsersInRoleAsync(AuthRoles.Owner);
