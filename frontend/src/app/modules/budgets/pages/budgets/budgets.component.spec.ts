@@ -104,3 +104,52 @@ describe('BudgetsComponent actions', () => {
     expect(component.barColor(10, 100, 'x')).toBe('#94a3b8');
   });
 });
+
+describe('BudgetsComponent hero copy', () => {
+  function render(spent: number, budget: number): string {
+    const store = {
+      editingId: signal<string | null>(null),
+      monthName: signal('September'),
+      overBudgetCount: signal(0),
+      overallPct: signal(0),
+      selectedMonthDate: signal(new Date(2026, 8, 1)),
+      status: signal('loaded'),
+      summaryItems: signal([
+        {
+          id: 'b1',
+          category: 'groceries',
+          categoryLabel: 'Groceries',
+          monthlyLimit: budget,
+          spent,
+          remaining: budget - spent,
+          isOverBudget: spent > budget,
+        },
+      ]),
+      totalBudget: signal(budget),
+      totalSpent: signal(spent),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        {provide: Router, useValue: {navigate: vi.fn()}},
+        {provide: CmnDialogService, useValue: {open: vi.fn()}},
+        {provide: CategoryStore, useValue: {categories: signal([]), colorMap: signal({})}},
+      ],
+    });
+    TestBed.overrideComponent(BudgetsComponent, {
+      set: {providers: [{provide: BudgetsStore, useValue: store}]},
+    });
+    const fixture = TestBed.createComponent(BudgetsComponent);
+    fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).textContent?.replace(/\s+/g, ' ') ?? '';
+  }
+
+  it('reads "<amount> over · <limit> budget" when over budget', () => {
+    const text = render(171.2, 150);
+    expect(text).toContain('$21.20 over · $150.00 budget');
+    expect(text).not.toContain('over of');
+  });
+
+  it('reads "<amount> left of <limit>" when under budget', () => {
+    expect(render(100, 150)).toContain('$50.00 left of $150.00');
+  });
+});
