@@ -55,8 +55,8 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [DashboardStore],
   template: `
-    <div class="p-cmn-4 sm:p-cmn-6">
-      <div class="mx-auto max-w-screen-lg space-y-cmn-6">
+    <div class="page-container">
+      <div class="space-y-cmn-6">
         <cmn-page-header
           class="block"
           title="Dashboard"

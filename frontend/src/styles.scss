@@ -6,6 +6,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared desktop page width + gutter: the single owner, so page titles share one x. */
+@layer components {
+  .page-container {
+    --page-max: 1200px;
+    @apply mx-auto w-full p-cmn-4 md:p-cmn-8;
+    max-width: var(--page-max);
+  }
+}
+
 /* Global Styles */
 html,
 body {

@@ -87,7 +87,7 @@ describe('FlowBreakdownComponent phone layout', () => {
 
   it('uses the 16px phone gutter and two-column stats', () => {
     const el = render();
-    expect(el.firstElementChild?.className).toContain('p-cmn-4 md:p-cmn-8');
+    expect(el.firstElementChild?.className).toContain('page-container');
     expect(el.querySelector('.grid')?.className).toContain('grid-cols-2');
     expect(el.firstElementChild?.className).not.toContain('overflow-auto');
   });

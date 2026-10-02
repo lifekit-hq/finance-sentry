@@ -20,7 +20,7 @@ interface AccountsTab {
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [AccountsStore, ConnectStore],
   template: `
-    <div class="mx-auto max-w-[1200px] p-cmn-4 sm:p-cmn-8">
+    <div class="page-container">
       <cmn-page-header
         (actionClick)="connectAccount()"
         title="Accounts"
