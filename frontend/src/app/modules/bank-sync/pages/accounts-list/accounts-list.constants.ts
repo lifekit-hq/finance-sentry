@@ -24,3 +24,5 @@ export const SYNC_DOT_CLASS: Record<'success' | 'warning' | 'error', string> = {
   warning: 'bg-status-warning',
   error: 'bg-status-error',
 };
+
+export const PHONE_MEDIA_QUERY = '(max-width: 639px)';

@@ -1,5 +1,7 @@
+import {BreakpointObserver} from '@angular/cdk/layout';
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, OnInit, ViewContainerRef} from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
   AlertComponent,
@@ -15,7 +17,7 @@ import {
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
-import {take} from 'rxjs';
+import {map, take} from 'rxjs';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
@@ -26,6 +28,7 @@ import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
+import {TimeUtils} from '../../../../shared/utils/time.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
@@ -36,6 +39,7 @@ import {
   DISCONNECT_ONLY_MENU,
   MENU_ACTION_DISCONNECT,
   MENU_ACTION_RECONNECT,
+  PHONE_MEDIA_QUERY,
   RECONNECT_MENU,
   RECONNECTABLE_PROVIDER,
   SYNC_DOT_CLASS,
@@ -76,6 +80,12 @@ export class AccountsListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly isPhone = toSignal(
+    inject(BreakpointObserver)
+      .observe(PHONE_MEDIA_QUERY)
+      .pipe(map(state => state.matches)),
+    {initialValue: false}
+  );
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
@@ -151,6 +161,22 @@ export class AccountsListComponent implements OnInit {
     const count = institution.cards?.length || institution.accounts.length;
     const label = institution.cards?.length ? 'card' : noun;
     return `${count} ${label}${count === 1 ? '' : 's'}`;
+  }
+
+  /** Row subtitle: on a phone the sync status moves here as text (not colour alone). */
+  public rowSublabel(institution: Institution, noun: string): string {
+    const count = this.rowCountLabel(institution, noun);
+    return this.isPhone() ? `${count} · ${this.syncSummary(institution)}` : count;
+  }
+
+  public syncSummary(institution: Institution): string {
+    if (institution.syncStatus === 'reauth_required') {
+      return 'Reconnect needed';
+    }
+    if (institution.syncStatus === 'failed') {
+      return 'Sync failed';
+    }
+    return `synced ${TimeUtils.getRelativeTime(institution.lastSyncTimestamp).toLowerCase()}`;
   }
 
   public needsAttention(institution: Institution): boolean {

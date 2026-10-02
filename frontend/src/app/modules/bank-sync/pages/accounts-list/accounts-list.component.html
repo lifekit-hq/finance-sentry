@@ -78,7 +78,7 @@
           @for (inst of section.summary.institutions; track inst.institutionId + inst.provider) {
             <cmn-disclosure-row
               [label]="inst.name"
-              [sublabel]="rowCountLabel(inst, section.rowNoun)"
+              [sublabel]="rowSublabel(inst, section.rowNoun)"
               [avatarName]="inst.name"
               [avatarLogoUrl]="inst.name | institutionLogo: inst.provider"
               [open]="true"
