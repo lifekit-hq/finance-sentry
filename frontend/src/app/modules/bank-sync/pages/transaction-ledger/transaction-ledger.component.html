@@ -12,13 +12,34 @@
         }
       </p>
     </div>
-    <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
-      <cmn-input
-        [formControl]="searchControl"
-        type="search"
-        placeholder="Search transactions"
-        autocomplete="off"
-      />
+    <div class="flex w-full flex-wrap items-center gap-cmn-2 md:w-auto">
+      <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
+        <cmn-chip [selected]="!activeType()" (clicked)="selectType(null)" data-testid="type-all">
+          All
+        </cmn-chip>
+        <cmn-chip
+          [selected]="activeType() === 'credit'"
+          (clicked)="selectType('credit')"
+          data-testid="type-in"
+        >
+          In
+        </cmn-chip>
+        <cmn-chip
+          [selected]="activeType() === 'debit'"
+          (clicked)="selectType('debit')"
+          data-testid="type-out"
+        >
+          Out
+        </cmn-chip>
+      </div>
+      <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
+        <cmn-input
+          [formControl]="searchControl"
+          type="search"
+          placeholder="Search transactions"
+          autocomplete="off"
+        />
+      </div>
     </div>
   </div>
 

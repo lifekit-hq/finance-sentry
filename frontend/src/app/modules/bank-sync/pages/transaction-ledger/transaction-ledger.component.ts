@@ -133,6 +133,10 @@ export class TransactionLedgerComponent {
     void this.router.navigate([], {queryParams: {category: null}, queryParamsHandling: 'merge'});
   }
 
+  public selectType(type: Nullable<'credit' | 'debit'>): void {
+    void this.router.navigate([], {queryParams: {type}, queryParamsHandling: 'merge'});
+  }
+
   public clearType(): void {
     void this.router.navigate([], {queryParams: {type: null}, queryParamsHandling: 'merge'});
   }
