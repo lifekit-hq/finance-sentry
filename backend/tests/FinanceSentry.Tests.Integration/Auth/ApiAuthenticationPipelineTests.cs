@@ -216,16 +216,20 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         await factory.EnsureUserExistsAsync(email, Password);
         using var client = Client();
 
-        for (var attempt = 0; attempt < 5; attempt++)
+        for (var attempt = 0; attempt < 4; attempt++)
         {
             var failed = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "WrongPassword!" });
             failed.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
+        // The fifth failure trips the lockout.
+        (await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "WrongPassword!" }))
+            .StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+
         var withCorrectPassword = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = Password });
 
-        withCorrectPassword.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await withCorrectPassword.Content.ReadFromJsonAsync<ErrorResponseShape>())!.ErrorCode.Should().Be("INVALID_CREDENTIALS");
+        withCorrectPassword.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await withCorrectPassword.Content.ReadFromJsonAsync<ErrorResponseShape>())!.ErrorCode.Should().Be("ACCOUNT_LOCKED");
         using var scope = factory.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         (await users.IsLockedOutAsync((await users.FindByEmailAsync(email))!)).Should().BeTrue();

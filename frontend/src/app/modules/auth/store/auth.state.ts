@@ -14,6 +14,7 @@ export interface AuthState {
   permissions: string[];
   status: AsyncStatus;
   errorCode: Nullable<string>;
+  errorDetail: Nullable<string>;
   flow: AuthFlow;
   returnUrl: Nullable<string>;
   flashMessage: Nullable<FlashMessage>;
@@ -28,6 +29,7 @@ export const initialAuthState: AuthState = {
   permissions: [],
   status: 'idle',
   errorCode: null,
+  errorDetail: null,
   flow: null,
   returnUrl: null,
   flashMessage: null,

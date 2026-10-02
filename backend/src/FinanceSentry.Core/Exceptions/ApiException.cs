@@ -4,6 +4,7 @@ public abstract class ApiException : Exception
 {
     public int StatusCode { get; }
     public string ErrorCode { get; }
+    public int? RetryAfterSeconds { get; protected init; }
 
     protected ApiException(int statusCode, string errorCode, string message)
         : base(message)

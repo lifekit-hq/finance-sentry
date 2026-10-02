@@ -2,6 +2,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
+using FinanceSentry.Modules.Auth.Domain.People;
 using Microsoft.AspNetCore.Identity;
 
 namespace FinanceSentry.Modules.Auth.Application.Commands;
@@ -25,8 +26,11 @@ public class LoginCommandHandler(
                 ? new GoogleAccountOnlyException()
                 : new InvalidCredentialsException();
 
-        // Counts failures towards Identity lockout; a locked-out account gets the same generic error.
+        // Counts failures towards Identity lockout. A throttled account says so, otherwise the user retries blind;
+        // a revoked person stays on the generic error so revocation is not disclosed at the login form.
         var signIn = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+        if (signIn.IsLockedOut && !PersonStatus.IsRevoked(user))
+            throw new AccountLockedException((user.LockoutEnd ?? DateTimeOffset.UtcNow) - DateTimeOffset.UtcNow);
         if (!signIn.Succeeded)
             throw new InvalidCredentialsException();
 

@@ -12,6 +12,7 @@ function build(
     userId: Nullable<string>;
     status: AsyncStatus;
     errorCode: Nullable<string>;
+    errorDetail: Nullable<string>;
     flow: AuthFlow;
     permissions: string[];
     email: Nullable<string>;
@@ -23,6 +24,7 @@ function build(
     userId: signal<Nullable<string>>(overrides.userId ?? null),
     status: signal<AsyncStatus>(overrides.status ?? 'idle'),
     errorCode: signal<Nullable<string>>(overrides.errorCode ?? null),
+    errorDetail: signal<Nullable<string>>(overrides.errorDetail ?? null),
     flow: signal<AuthFlow>(overrides.flow ?? null),
     permissions: signal<string[]>(overrides.permissions ?? []),
     email: signal<Nullable<string>>(overrides.email ?? null),
@@ -110,6 +112,18 @@ describe('authComputed', () => {
       });
     });
 
+    it('maps ACCOUNT_LOCKED to the lockout message, not the generic login error', () => {
+      const store = build({
+        errorCode: 'ACCOUNT_LOCKED',
+        errorDetail: 'Too many failed sign-in attempts. Try again in 3 minutes.',
+        flow: 'login',
+      });
+      TestBed.runInInjectionContext(() => {
+        const message = authComputed(store).errorMessage();
+        expect(message).toBe('Too many failed sign-in attempts. Try again in 3 minutes.');
+      });
+    });
+
     it('maps INVALID_INVITE through the registry', () => {
       const store = build({errorCode: 'INVALID_INVITE', flow: 'acceptInvite'});
       TestBed.runInInjectionContext(() => {
@@ -128,6 +142,17 @@ describe('authComputed', () => {
 
     it('returns generic invalid-credentials message for unknown code on login flow', () => {
       const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'login'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).errorMessage()).toBe('Invalid email or password.');
+      });
+    });
+
+    it('ignores the server detail for an unregistered code and keeps the flow fallback', () => {
+      const store = build({
+        errorCode: 'INTERNAL_ERROR',
+        errorDetail: 'An unexpected error occurred. Please try again.',
+        flow: 'login',
+      });
       TestBed.runInInjectionContext(() => {
         expect(authComputed(store).errorMessage()).toBe('Invalid email or password.');
       });
