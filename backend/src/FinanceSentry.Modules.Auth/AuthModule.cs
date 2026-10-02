@@ -70,6 +70,7 @@ public static class AuthModule
         services.AddScoped<IMcpServiceTokenStore, PersistedMcpServiceTokenStore>();
         services.AddScoped<IMcpOAuthService, McpOAuthService>();
 
+        services.Configure<AuthSignInOptions>(config.GetSection(AuthSignInOptions.SectionName));
         services.Configure<GoogleOAuthOptions>(config.GetSection("GoogleOAuth"));
         services.AddScoped<IGoogleCredentialVerifier, GoogleCredentialVerifier>();
 
