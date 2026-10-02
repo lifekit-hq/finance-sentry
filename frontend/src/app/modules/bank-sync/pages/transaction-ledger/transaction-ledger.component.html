@@ -12,13 +12,34 @@
         }
       </p>
     </div>
-    <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
-      <cmn-input
-        [formControl]="searchControl"
-        type="search"
-        placeholder="Search transactions"
-        autocomplete="off"
-      />
+    <div class="flex w-full flex-wrap items-center gap-cmn-2 md:w-auto">
+      <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
+        <cmn-chip [selected]="!activeType()" (clicked)="selectType(null)" data-testid="type-all">
+          All
+        </cmn-chip>
+        <cmn-chip
+          [selected]="activeType() === 'credit'"
+          (clicked)="selectType('credit')"
+          data-testid="type-in"
+        >
+          In
+        </cmn-chip>
+        <cmn-chip
+          [selected]="activeType() === 'debit'"
+          (clicked)="selectType('debit')"
+          data-testid="type-out"
+        >
+          Out
+        </cmn-chip>
+      </div>
+      <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
+        <cmn-input
+          [formControl]="searchControl"
+          type="search"
+          placeholder="Search transactions"
+          autocomplete="off"
+        />
+      </div>
     </div>
   </div>
 
@@ -43,7 +64,7 @@
     </div>
   }
 
-  @if (activeCategoryLabel() || activeTypeLabel()) {
+  @if (activeCategoryLabel()) {
     <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2">
       <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
         >Filter</span
@@ -55,16 +76,6 @@
           class="inline-flex items-center gap-cmn-1 rounded-full border border-accent-default bg-accent-subtle px-cmn-3 py-1 text-cmn-xs font-medium text-accent-default transition-colors hover:bg-accent-200"
         >
           Category: {{ label }}
-          <cmn-icon name="X" size="sm" />
-        </button>
-      }
-      @if (activeTypeLabel(); as label) {
-        <button
-          (click)="clearType()"
-          type="button"
-          class="inline-flex items-center gap-cmn-1 rounded-full border border-accent-default bg-accent-subtle px-cmn-3 py-1 text-cmn-xs font-medium text-accent-default transition-colors hover:bg-accent-200"
-        >
-          Type: {{ label }}
           <cmn-icon name="X" size="sm" />
         </button>
       }
@@ -95,7 +106,7 @@
     </cmn-card>
   } @else if (store.isEmpty() || displayedTransactions().length === 0) {
     <div class="flex min-h-0 flex-1 items-center justify-center">
-      @if (store.hasActiveFilter() || activeCategoryLabel() || activeTypeLabel()) {
+      @if (store.hasActiveFilter() || activeCategoryLabel()) {
         <cmn-empty-state
           message="No matching transactions"
           subMessage="Try a different search or filter."

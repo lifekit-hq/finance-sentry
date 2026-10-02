@@ -5,7 +5,10 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type AccountsResponse} from '../../models/bank-account/bank-account.model';
 import {type DashboardData} from '../../models/dashboard/dashboard.model';
-import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
+import {
+  type GlobalTransactionDto,
+  type TransactionType,
+} from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
 import {PAGE_SIZE} from './transaction-ledger.state';
@@ -111,6 +114,7 @@ function buildStore(initialOffset = 0) {
   return {
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
+    transactionType: signal<TransactionType | null>(null),
     search: signal(''),
     setLoading: vi.fn(),
     setTransactions: vi.fn(),
@@ -119,6 +123,7 @@ function buildStore(initialOffset = 0) {
     setError: vi.fn(),
     setMonthlyOutflowUsd: vi.fn(),
     setAccountId: vi.fn(),
+    setTransactionType: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
@@ -172,6 +177,22 @@ describe('transactionLedgerEffects', () => {
         limit: PAGE_SIZE,
         accountId: 'acc-1',
         search: 'coffee',
+      });
+    });
+
+    it('sends the active type filter to the server', () => {
+      const store = buildStore();
+      store.transactionType.set('credit');
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(service.getAllTransactions).toHaveBeenCalledWith({
+        offset: 0,
+        limit: PAGE_SIZE,
+        transactionType: 'credit',
       });
     });
 
@@ -312,6 +333,31 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount(null));
 
       expect(store.setAccountId).not.toHaveBeenCalled();
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyType', () => {
+    it('stores a changed type and reloads from the first page', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType('debit'));
+
+      expect(store.setTransactionType).toHaveBeenCalledWith('debit');
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a value the store already holds', () => {
+      const store = buildStore();
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType(null));
+
+      expect(store.setTransactionType).not.toHaveBeenCalled();
       expect(service.getAllTransactions).not.toHaveBeenCalled();
     });
   });

@@ -3,6 +3,7 @@ import {patchState, type WritableStateSource} from '@ngrx/signals';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
+  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
@@ -45,6 +46,9 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
     },
     setAccountId(accountId: Nullable<string>): void {
       patchState(store, {accountId, offset: 0});
+    },
+    setTransactionType(transactionType: Nullable<TransactionType>): void {
+      patchState(store, {transactionType, offset: 0});
     },
     setSearch(search: string): void {
       patchState(store, {search, offset: 0});

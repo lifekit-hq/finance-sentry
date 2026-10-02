@@ -1,6 +1,7 @@
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
+  type TransactionType,
 } from '../../models/transaction/transaction.model';
 
 export interface TransactionLedgerState {
@@ -13,6 +14,8 @@ export interface TransactionLedgerState {
   monthlyOutflowUsd: number | null;
   /** Server-side filter: a single account, or null for all. */
   accountId: Nullable<string>;
+  /** Server-side filter: credits (In), debits (Out), or null for all. */
+  transactionType: Nullable<TransactionType>;
   /** Server-side free-text filter (description / merchant). */
   search: string;
   accounts: TransactionAccountOption[];
@@ -29,6 +32,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   errorCode: null,
   monthlyOutflowUsd: null,
   accountId: null,
+  transactionType: null,
   search: '',
   accounts: [],
 };

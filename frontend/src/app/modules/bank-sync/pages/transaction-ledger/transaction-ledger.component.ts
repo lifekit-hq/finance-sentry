@@ -22,7 +22,10 @@ import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.p
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
-import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
+import {
+  type GlobalTransactionDto,
+  type TransactionType,
+} from '../../models/transaction/transaction.model';
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
@@ -30,7 +33,6 @@ import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
 const DRAWER_WIDTH = '480px';
-const TYPE_LABELS: Record<string, string> = {debit: 'Spending', credit: 'Income'};
 
 @Component({
   selector: 'fns-transaction-ledger',
@@ -76,31 +78,28 @@ export class TransactionLedgerComponent {
     {initialValue: null}
   );
 
-  public readonly activeType = toSignal(this.route.queryParamMap.pipe(map(p => p.get('type'))), {
-    initialValue: null,
-  });
+  public readonly activeType = toSignal(
+    this.route.queryParamMap.pipe(
+      map((p): Nullable<TransactionType> => {
+        const type = p.get('type');
+        return type === 'credit' || type === 'debit' ? type : null;
+      })
+    ),
+    {initialValue: null}
+  );
 
   public readonly activeCategoryLabel = computed(() => {
     const cat = this.activeCategory();
     return cat ? MerchantCategoryUtils.format(cat) : null;
   });
 
-  public readonly activeTypeLabel = computed(() => {
-    const type = this.activeType();
-    return type ? (TYPE_LABELS[type] ?? type) : null;
-  });
-
   public readonly displayedTransactions = computed(() => {
     const cat = this.activeCategory();
-    const type = this.activeType();
     let all = this.store.transactions();
 
     if (cat) {
       const target = cat.toLowerCase();
       all = all.filter(t => t.merchantCategory?.toLowerCase() === target);
-    }
-    if (type) {
-      all = all.filter(t => t.transactionType === type);
     }
     return all;
   });
@@ -111,6 +110,7 @@ export class TransactionLedgerComponent {
 
   constructor() {
     this.store.applyAccount(this.activeAccount);
+    this.store.applyType(this.activeType);
     this.store.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
   }
 
@@ -133,7 +133,7 @@ export class TransactionLedgerComponent {
     void this.router.navigate([], {queryParams: {category: null}, queryParamsHandling: 'merge'});
   }
 
-  public clearType(): void {
-    void this.router.navigate([], {queryParams: {type: null}, queryParamsHandling: 'merge'});
+  public selectType(type: Nullable<TransactionType>): void {
+    void this.router.navigate([], {queryParams: {type}, queryParamsHandling: 'merge'});
   }
 }

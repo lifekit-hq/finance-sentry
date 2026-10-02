@@ -23,7 +23,7 @@ export type GlobalTransactionsResponse = PagedResponse<GlobalTransactionDto>;
 export interface GetAllTransactionsParams extends PagedRequest {
   from?: string;
   to?: string;
-  transactionType?: 'credit' | 'debit';
+  transactionType?: TransactionType;
   accountId?: string;
   search?: string;
 }
