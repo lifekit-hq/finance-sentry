@@ -37,6 +37,7 @@ import {
     InputComponent,
   ],
   templateUrl: './login.component.html',
+  host: {class: 'block h-full'},
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent implements AfterViewInit {

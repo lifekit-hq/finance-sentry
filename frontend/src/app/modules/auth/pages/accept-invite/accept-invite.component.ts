@@ -24,6 +24,7 @@ const MIN_PASSWORD_LENGTH = 8;
     InputComponent,
   ],
   templateUrl: './accept-invite.component.html',
+  host: {class: 'block h-full'},
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AcceptInviteComponent {

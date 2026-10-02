@@ -6,6 +6,7 @@ import {AppUpdateService} from '@lifekit-hq/core/pwa';
   selector: 'fns-root',
   imports: [RouterOutlet],
   templateUrl: './app.component.html',
+  host: {class: 'block h-full'},
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
