@@ -28,6 +28,10 @@ export const ALERT_TYPE_META_REGISTRY = {
     icon: 'Lightbulb',
     label: 'opportunity',
   },
+  ['FilingLanded']: {
+    icon: 'FileText',
+    label: 'filing',
+  },
 } satisfies Record<AlertType, AlertTypeMeta>;
 
 /**
