@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>Finance Sentry</title>
@@ -8,6 +8,18 @@
     <link rel="icon" href="data:," />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <script>
+      // Apply the stored/OS theme before first paint so guest pages never flash light.
+      (function () {
+        var theme = 'light';
+        try {
+          var stored = localStorage.getItem('cmn-theme');
+          if (stored === 'dark' || stored === 'light') theme = stored;
+          else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
     <meta name="theme-color" content="#4f46e5" />
     <!--
       No Content-Security-Policy header.
