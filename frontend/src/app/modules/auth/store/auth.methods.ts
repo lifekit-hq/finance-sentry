@@ -13,6 +13,7 @@ export function authMethods(store: WritableStateSource<AuthState>) {
         permissions: res.user.permissions,
         status: 'idle',
         errorCode: null,
+        errorDetail: null,
         flow: null,
         flashMessage: null,
       });
@@ -27,6 +28,7 @@ export function authMethods(store: WritableStateSource<AuthState>) {
         permissions: [],
         status: 'idle',
         errorCode: null,
+        errorDetail: null,
         flow: null,
       });
     },
@@ -34,13 +36,13 @@ export function authMethods(store: WritableStateSource<AuthState>) {
       patchState(store, {firstName, lastName});
     },
     setLoading(flow: AuthFlow): void {
-      patchState(store, {status: 'loading', errorCode: null, flow});
+      patchState(store, {status: 'loading', errorCode: null, errorDetail: null, flow});
     },
-    setError(errorCode: Nullable<string>, flow: AuthFlow): void {
-      patchState(store, {status: 'error', errorCode, flow});
+    setError(errorCode: Nullable<string>, flow: AuthFlow, errorDetail: Nullable<string> = null): void {
+      patchState(store, {status: 'error', errorCode, errorDetail, flow});
     },
     resetError(): void {
-      patchState(store, {status: 'idle', errorCode: null});
+      patchState(store, {status: 'idle', errorCode: null, errorDetail: null});
     },
     setReturnUrl(returnUrl: Nullable<string>): void {
       patchState(store, {returnUrl});

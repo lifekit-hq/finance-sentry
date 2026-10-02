@@ -99,8 +99,22 @@ describe('authEffects', () => {
         authEffects(store).login({email: 'a@b.c', password: 'pw'});
       });
 
-      expect(store.setError).toHaveBeenCalledWith('INVALID_CREDENTIALS', 'login');
+      expect(store.setError).toHaveBeenCalledWith('INVALID_CREDENTIALS', 'login', null);
       expect(store.applyAuthResponse).not.toHaveBeenCalled();
+    });
+
+    it('passes the server message through for a lockout', () => {
+      const store = buildStore();
+      const service = buildService();
+      const error = 'Too many failed sign-in attempts. Try again in 3 minutes.';
+      service.login.mockReturnValue(throwError(() => ({error: {errorCode: 'ACCOUNT_LOCKED', error}})));
+      configure(service, buildRouter());
+
+      TestBed.runInInjectionContext(() => {
+        authEffects(store).login({email: 'a@b.c', password: 'pw'});
+      });
+
+      expect(store.setError).toHaveBeenCalledWith('ACCOUNT_LOCKED', 'login', error);
     });
 
     it('sets null errorCode when error payload is unstructured', () => {
@@ -113,7 +127,7 @@ describe('authEffects', () => {
         authEffects(store).login({email: 'a@b.c', password: 'pw'});
       });
 
-      expect(store.setError).toHaveBeenCalledWith(null, 'login');
+      expect(store.setError).toHaveBeenCalledWith(null, 'login', null);
     });
   });
 

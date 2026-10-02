@@ -19,7 +19,7 @@ interface EffectsStore {
   clearSession: () => void;
   setProfileName: (firstName: Nullable<string>, lastName: Nullable<string>) => void;
   setLoading: (flow: AuthFlow) => void;
-  setError: (errorCode: Nullable<string>, flow: AuthFlow) => void;
+  setError: (errorCode: Nullable<string>, flow: AuthFlow, errorDetail?: Nullable<string>) => void;
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   isAuthenticated: Signal<boolean>;
@@ -54,7 +54,7 @@ export function authEffects(store: EffectsStore) {
           authService.login(req).pipe(
             tap(res => store.applyAuthResponse(res)),
             catchError((err: unknown) => {
-              store.setError(ErrorUtils.extractCode(err), 'login');
+              store.setError(ErrorUtils.extractCode(err), 'login', ErrorUtils.extractMessage(err));
               return EMPTY;
             })
           )

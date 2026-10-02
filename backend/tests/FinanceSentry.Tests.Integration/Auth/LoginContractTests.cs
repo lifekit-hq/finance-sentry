@@ -99,7 +99,8 @@ public class LoginContractTests : IClassFixture<AuthApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
         body!.ErrorCode.Should().Be("ACCOUNT_LOCKED");
-        body.Error.Should().Contain("Try again in 5 minutes");
+        body.Error.Should().Be("Too many failed sign-in attempts. Try again in 5 minutes.");
+        response.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().BeInRange(290, 300);
     }
 
     [Fact]

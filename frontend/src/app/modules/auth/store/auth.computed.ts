@@ -13,6 +13,7 @@ interface StateSignals {
   permissions: Signal<string[]>;
   status: Signal<AsyncStatus>;
   errorCode: Signal<Nullable<string>>;
+  errorDetail: Signal<Nullable<string>>;
   flow: Signal<AuthFlow>;
 }
 
@@ -43,7 +44,7 @@ export function authComputed(store: StateSignals) {
       if (!code) {
         return '';
       }
-      return errorMessages.resolve(code) ?? flowFallback(store.flow());
+      return errorMessages.resolve(code) ?? store.errorDetail() ?? flowFallback(store.flow());
     }),
   };
 }

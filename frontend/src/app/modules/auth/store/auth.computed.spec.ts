@@ -12,6 +12,7 @@ function build(
     userId: Nullable<string>;
     status: AsyncStatus;
     errorCode: Nullable<string>;
+    errorDetail: Nullable<string>;
     flow: AuthFlow;
     permissions: string[];
     email: Nullable<string>;
@@ -23,6 +24,7 @@ function build(
     userId: signal<Nullable<string>>(overrides.userId ?? null),
     status: signal<AsyncStatus>(overrides.status ?? 'idle'),
     errorCode: signal<Nullable<string>>(overrides.errorCode ?? null),
+    errorDetail: signal<Nullable<string>>(overrides.errorDetail ?? null),
     flow: signal<AuthFlow>(overrides.flow ?? null),
     permissions: signal<string[]>(overrides.permissions ?? []),
     email: signal<Nullable<string>>(overrides.email ?? null),
@@ -111,11 +113,14 @@ describe('authComputed', () => {
     });
 
     it('maps ACCOUNT_LOCKED to the lockout message, not the generic login error', () => {
-      const store = build({errorCode: 'ACCOUNT_LOCKED', flow: 'login'});
+      const store = build({
+        errorCode: 'ACCOUNT_LOCKED',
+        errorDetail: 'Too many failed sign-in attempts. Try again in 3 minutes.',
+        flow: 'login',
+      });
       TestBed.runInInjectionContext(() => {
         const message = authComputed(store).errorMessage();
-        expect(message).toContain('Too many failed sign-in attempts');
-        expect(message).not.toContain('Invalid email or password');
+        expect(message).toBe('Too many failed sign-in attempts. Try again in 3 minutes.');
       });
     });
 

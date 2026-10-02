@@ -30,7 +30,7 @@ public class LoginCommandHandler(
         // a revoked person stays on the generic error so revocation is not disclosed at the login form.
         var signIn = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (signIn.IsLockedOut && !PersonStatus.IsRevoked(user))
-            throw new AccountLockedException();
+            throw new AccountLockedException((user.LockoutEnd ?? DateTimeOffset.UtcNow) - DateTimeOffset.UtcNow);
         if (!signIn.Succeeded)
             throw new InvalidCredentialsException();
 

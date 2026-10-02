@@ -66,6 +66,8 @@ public class ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorHandling
             _logger.LogWarning("Handled exception [{ErrorCode}]: {Message}", errorCode, exception.Message);
 
         context.Response.StatusCode = statusCode;
+        if (exception is ApiException { RetryAfterSeconds: { } retryAfter })
+            context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
         context.Response.ContentType = "application/json";
 
         var response = new ApiErrorBody(userMessage, errorCode);

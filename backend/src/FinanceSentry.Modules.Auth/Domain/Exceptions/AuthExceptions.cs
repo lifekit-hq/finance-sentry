@@ -5,8 +5,20 @@ namespace FinanceSentry.Modules.Auth.Domain.Exceptions;
 public sealed class InvalidCredentialsException()
     : ApiException(401, "INVALID_CREDENTIALS", "Invalid email or password.");
 
-public sealed class AccountLockedException()
-    : ApiException(429, "ACCOUNT_LOCKED", "Too many failed sign-in attempts. Try again in 5 minutes.");
+public sealed class AccountLockedException : ApiException
+{
+    public AccountLockedException(TimeSpan remaining)
+        : base(429, "ACCOUNT_LOCKED", Describe(remaining))
+    {
+        RetryAfterSeconds = (int)Math.Ceiling(Math.Max(remaining.TotalSeconds, 1));
+    }
+
+    private static string Describe(TimeSpan remaining)
+    {
+        var minutes = Math.Max((int)Math.Ceiling(remaining.TotalMinutes), 1);
+        return $"Too many failed sign-in attempts. Try again in {minutes} {(minutes == 1 ? "minute" : "minutes")}.";
+    }
+}
 
 public sealed class InvalidRefreshTokenException(string message = "Refresh token invalid or expired.")
     : ApiException(401, "INVALID_REFRESH_TOKEN", message);
