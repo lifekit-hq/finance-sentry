@@ -41,8 +41,8 @@
 
 | Check | Status | Evidence |
 |-------|--------|----------|
-| Anonymous rate limit | ✅ | 10 req/min (ASP.NET Core fixed-window limiter) |
-| Authenticated rate limit | ✅ | 100 req/min per user |
+| Anonymous rate limit | ✅ | 10 req/min per client address on the anonymous auth endpoints (`RateLimitPartitions.Anonymous`, attached via `[EnableRateLimiting]`); tunable `RateLimiting:Anonymous:PermitPerMinute` |
+| Authenticated rate limit | ✅ | 100 req/min per user (client address when unauthenticated), the default on every controller action (`Program.cs`); health probe exempt; tunable `RateLimiting:Authenticated:PermitPerMinute`. Address comes from forwarded headers trusted only from `ForwardedHeaders:KnownProxies` |
 
 ### Input Validation
 
