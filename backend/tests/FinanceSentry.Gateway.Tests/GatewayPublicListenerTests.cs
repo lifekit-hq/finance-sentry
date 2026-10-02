@@ -143,7 +143,9 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     public static async Task<HttpResponseMessage> SendAsync(
         WebApplicationFactory<Program> host, string path, int? localPort)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        // Absolute URI: a relative "//metrics" would parse as a network-path reference (host "metrics")
+        // and never exercise the double-slash path.
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"http://localhost{path}"));
         if (localPort is { } port)
             request.Headers.Add(LocalPortHeader, port.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return await host.CreateClient().SendAsync(request);
