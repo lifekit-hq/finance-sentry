@@ -213,7 +213,7 @@ describe('dashboardComputed', () => {
     it('reads a month with no income yet as neutral rather than a red shortfall', () => {
       const c = computedFor(steadyHistory(0, 300));
 
-      expect(c.inflowPaceLabel()).toBe('No income yet this month');
+      expect(c.inflowPaceLabel()).toBe('No income yet');
       expect(c.inflowPaceDelta()).toBe(0);
     });
 

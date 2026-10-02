@@ -501,7 +501,7 @@ and Savings columns, month-to-date by construction:
 
 - *Income*: current-month total, **no pace delta** — income is lumpy (salary posts once,
   often on the last day), so prorating it against a baseline is wrong at any point in the
-  month. The only chip is the neutral "No income yet this month" once there is history.
+  month. The only chip is the neutral "No income yet" once there is history.
 - *Spending*: current-month total, compared against the average of the trailing 3 complete
   months **prorated by day-of-month elapsed** — without proration a figure two days into the
   month always reads as a collapse. The pace is **null (no chip) before day 7** of the month
@@ -515,7 +515,7 @@ and Savings columns, month-to-date by construction:
 - The delta colour and arrow follow its **sign** (`paceClass`), so the number passed is "how
   good is this", not "which direction did it move" — for spending those are opposites, and
   the wording (`over pace` / `under pace`) carries the direction instead.
-- A month with no inflow yet shows neutral "No income yet this month" rather than a red
+- A month with no inflow yet shows neutral "No income yet" rather than a red
   "100% below pace".
 
 This is the same split Binance and IBKR use: the current period is a tile with a

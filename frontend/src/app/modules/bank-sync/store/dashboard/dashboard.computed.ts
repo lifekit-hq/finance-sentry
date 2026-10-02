@@ -42,7 +42,7 @@ const PERCENT = 100;
 
 // Shown instead of a red "100% below pace" while nothing has landed yet: salary posts once,
 // so an empty month early on is the normal state, not a shortfall.
-const NO_INCOME_LABEL = 'No income yet this month';
+const NO_INCOME_LABEL = 'No income yet';
 
 // The month-to-date tiles compare against the average of this many complete months,
 // prorated by how far into the current month we are. Three is enough to absorb a single
