@@ -196,6 +196,8 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.screenshot({path: `test-results/phone-overlay-${scheme}-scrolled.png`});
     });
 
+    // Fails on @lifekit-hq/ui 0.6.0 (document scrolls by 62px, tab labels squeezed to 6px) and
+    // passes on 0.6.1. Chromium emulation of the iOS shape, not WebKit standalone.
     test('shell does not depend on viewport units (iOS 26 web app shape)', async ({page}) => {
       await openAlerts(page, {top: 0, bottom: INSET_BOTTOM});
       await page.addStyleTag({content: VIEWPORT_UNITS_TALLER_BY_INSET});
