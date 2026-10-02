@@ -4,7 +4,7 @@ const API = '**/api/v1';
 const PHONE = {width: 390, height: 844};
 const INSET_TOP = 47;
 const INSET_BOTTOM = 34;
-const TALL_CONTENT_PX = 3000;
+const ALERT_COUNT = 30;
 
 const AUTH_RESPONSE = {
   user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner'], permissions: ['ai.use']},
@@ -16,9 +16,29 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/alerts/unread-count`, route => route.fulfill(json({count: 0})));
+  const items = Array.from({length: ALERT_COUNT}, (_, i) => ({
+    id: `alert-${i}`,
+    type: 'Opportunity',
+    severity: 'Info',
+    title: `Alert ${i}`,
+    message: 'A populated list long enough to overflow the phone viewport.',
+    referenceId: null,
+    referenceLabel: null,
+    isRead: false,
+    isResolved: false,
+    createdAt: '2026-10-01T09:00:00Z',
+    resolvedAt: null,
+  }));
   await page.route(`${API}/alerts?**`, route =>
     route.fulfill(
-      json({items: [], totalCount: 0, unreadCount: 0, page: 1, pageSize: 20, totalPages: 0})
+      json({
+        items,
+        totalCount: ALERT_COUNT,
+        unreadCount: ALERT_COUNT,
+        page: 1,
+        pageSize: ALERT_COUNT,
+        totalPages: 1,
+      })
     )
   );
   await page.route(`${API}/events/**`, route => route.fulfill(json({items: []})));
@@ -47,7 +67,7 @@ for (const scheme of ['light', 'dark'] as const) {
 
     test('tab bar is fully visible and content scrolls under both bars', async ({page}) => {
       await mockApis(page);
-      await page.goto('/events');
+      await page.goto('/alerts');
       await simulateInsets(page, INSET_TOP, INSET_BOTTOM);
       await page.reload();
 
@@ -70,36 +90,38 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(main.y).toBeLessThanOrEqual(topBox.y);
       expect(main.y + main.height).toBeGreaterThanOrEqual(tabBox.y + tabBox.height);
 
-      const scroll = await page.evaluate(px => {
+      const rows = page.locator('fns-alerts [role="button"]');
+      await expect(rows).toHaveCount(ALERT_COUNT);
+
+      const nearestScrollerIsMain = await page.evaluate(() => {
         const mainEl = document.querySelector('cmn-app-layout main');
-        const outlet = document.querySelector('cmn-app-layout main router-outlet');
-        const page = outlet?.nextElementSibling;
-        if (!mainEl || !page) {
-          throw new Error('main or routed page missing');
-        }
-        const scrollers: Element[] = [];
-        for (let el: Element | null = page; el; el = el.parentElement) {
+        const row = document.querySelector('fns-alerts [role="button"]');
+        for (let el: Element | null = row; el; el = el.parentElement) {
           const overflowY = getComputedStyle(el).overflowY;
           if (overflowY === 'auto' || overflowY === 'scroll') {
-            scrollers.push(el);
+            return el === mainEl;
           }
         }
-        const filler = document.createElement('div');
-        filler.style.height = `${px}px`;
-        mainEl.appendChild(filler);
-        mainEl.scrollTop = px / 2;
-        const rect = filler.getBoundingClientRect();
-        return {
-          nearestScrollerIsMain: scrollers[0] === mainEl,
-          scrollTop: mainEl.scrollTop,
-          fillerTop: rect.top,
-          fillerBottom: rect.bottom,
-        };
-      }, TALL_CONTENT_PX);
-      expect(scroll.nearestScrollerIsMain).toBe(true);
-      expect(scroll.scrollTop).toBeGreaterThan(0);
-      expect(scroll.fillerTop).toBeLessThan(topBox.y + topBox.height);
-      expect(scroll.fillerBottom).toBeGreaterThan(tabBox.y);
+        return false;
+      });
+      expect(nearestScrollerIsMain).toBe(true);
+
+      const firstAtRest = await box(rows.first());
+      expect(firstAtRest.y).toBeGreaterThanOrEqual(topBox.y + topBox.height);
+
+      await page.locator('cmn-app-layout main').evaluate(el => {
+        el.scrollTop = el.scrollHeight / 2;
+      });
+      const rects = await rows.evaluateAll(els =>
+        els.map(el => {
+          const r = el.getBoundingClientRect();
+          return {top: r.top, bottom: r.bottom};
+        })
+      );
+      const underTopBar = rects.some(r => r.top < topBox.y + topBox.height && r.bottom > topBox.y);
+      const underTabBar = rects.some(r => r.top < tabBox.y + tabBox.height && r.bottom > tabBox.y);
+      expect(underTopBar).toBe(true);
+      expect(underTabBar).toBe(true);
 
       await page.screenshot({path: `test-results/phone-overlay-${scheme}.png`});
     });

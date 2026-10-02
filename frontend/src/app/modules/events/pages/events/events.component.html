@@ -1,4 +1,4 @@
-<div class="page-container flex h-full flex-col">
+<div class="page-container flex min-h-full flex-col md:h-full">
   <cmn-page-header
     title="Events"
     subtitle="What is coming for your book, what fired, and what the reader made of it"
@@ -65,7 +65,7 @@
         />
       </div>
     } @else {
-      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-5 overflow-auto pr-cmn-1">
+      <div class="mt-cmn-5 space-y-cmn-5 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
         @for (section of store.upcomingSections(); track section.id) {
           @if (store.upcomingSections().length > 1) {
             <h2
@@ -129,7 +129,7 @@
     }
   } @else {
     @if (store.hasFiredRows()) {
-      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
+      <div class="mt-cmn-5 space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
         @for (event of store.fired(); track event.alertId) {
           <article
             class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"

@@ -1,4 +1,4 @@
-<div class="page-container flex h-full flex-col">
+<div class="page-container flex min-h-full flex-col md:h-full">
   <div class="mb-cmn-4 flex flex-wrap items-end justify-between gap-cmn-4">
     <div class="min-w-0">
       <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Transactions</h1>
@@ -119,7 +119,7 @@
       }
     </div>
   } @else {
-    <div class="min-h-0 flex-1 overflow-auto">
+    <div class="md:min-h-0 md:flex-1 md:overflow-auto">
       @for (group of dayGroups(); track group.dayKey) {
         <section [attr.aria-label]="group.label" class="mb-cmn-4">
           <h2
