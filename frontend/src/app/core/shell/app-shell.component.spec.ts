@@ -28,7 +28,7 @@ describe('AppShellComponent FAB clearance', () => {
           useValue: {
             canUseAi,
             permissions: signal([]),
-            email: signal('a@b.c'),
+            avatarInitials: signal('DT'),
             logout: () => undefined,
           },
         },
@@ -64,5 +64,10 @@ describe('AppShellComponent FAB clearance', () => {
     canUseAi.set(false);
     const fixture = await setup(AppRoute.Settings);
     expect(wrapper(fixture).style.paddingBottom).toBe('');
+  });
+
+  it('shows the store avatar initials in the top bar', async () => {
+    const fixture = await setup(AppRoute.Settings);
+    expect(fixture.componentInstance.avatarLabel()).toBe('DT');
   });
 });

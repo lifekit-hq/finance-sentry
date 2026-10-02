@@ -14,6 +14,9 @@ function build(
     errorCode: Nullable<string>;
     flow: AuthFlow;
     permissions: string[];
+    email: Nullable<string>;
+    firstName: Nullable<string>;
+    lastName: Nullable<string>;
   }> = {}
 ) {
   return {
@@ -22,6 +25,9 @@ function build(
     errorCode: signal<Nullable<string>>(overrides.errorCode ?? null),
     flow: signal<AuthFlow>(overrides.flow ?? null),
     permissions: signal<string[]>(overrides.permissions ?? []),
+    email: signal<Nullable<string>>(overrides.email ?? null),
+    firstName: signal<Nullable<string>>(overrides.firstName ?? null),
+    lastName: signal<Nullable<string>>(overrides.lastName ?? null),
   };
 }
 
@@ -145,6 +151,22 @@ describe('authComputed', () => {
       const store = build({errorCode: null, flow: 'login'});
       TestBed.runInInjectionContext(() => {
         expect(authComputed(store).errorMessage()).toBe('');
+      });
+    });
+  });
+
+  describe('avatarInitials', () => {
+    it('uses first and last name initials when the profile name is known', () => {
+      const store = build({email: 'test@gmail.com', firstName: 'Denys', lastName: 'Test'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).avatarInitials()).toBe('DT');
+      });
+    });
+
+    it('falls back to the email first letter without a profile name', () => {
+      const store = build({email: 'test@gmail.com'});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).avatarInitials()).toBe('T');
       });
     });
   });

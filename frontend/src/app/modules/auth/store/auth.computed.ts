@@ -2,10 +2,14 @@ import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
 import {Permission} from '../../../shared/enums/permission/permission.enum';
+import {InitialsUtils} from '../../../shared/utils/initials.utils';
 import {type AuthFlow} from './auth.state';
 
 interface StateSignals {
   userId: Signal<Nullable<string>>;
+  email: Signal<Nullable<string>>;
+  firstName: Signal<Nullable<string>>;
+  lastName: Signal<Nullable<string>>;
   permissions: Signal<string[]>;
   status: Signal<AsyncStatus>;
   errorCode: Signal<Nullable<string>>;
@@ -27,6 +31,9 @@ export function authComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
 
   return {
+    avatarInitials: computed(() =>
+      InitialsUtils.fromProfile(store.firstName(), store.lastName(), store.email())
+    ),
     isAuthenticated: computed(() => store.userId() !== null),
     canUseAi: computed(() => store.permissions().includes(Permission.AiUse)),
     canManageUsers: computed(() => store.permissions().includes(Permission.UsersManage)),

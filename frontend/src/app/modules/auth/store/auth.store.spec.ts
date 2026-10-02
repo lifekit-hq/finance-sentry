@@ -1,10 +1,12 @@
 import {TestBed} from '@angular/core/testing';
 import {Router} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
+import {EMPTY} from 'rxjs';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
+import {SettingsService} from '../../settings/services/settings.service';
 import {type AuthResponse} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {AuthStore} from './auth.store';
@@ -42,6 +44,7 @@ function configure(authService: unknown, router = routerMock()) {
   TestBed.configureTestingModule({
     providers: [
       {provide: AuthService, useValue: authService},
+      {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
       {provide: Router, useValue: router},
       {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
     ],

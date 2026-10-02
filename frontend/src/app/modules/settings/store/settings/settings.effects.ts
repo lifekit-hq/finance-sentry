@@ -3,6 +3,7 @@ import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
+import {AuthStore} from '../../../auth/store/auth.store';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
 import {type ChangePasswordRequest, SettingsService} from '../../services/settings.service';
 
@@ -17,13 +18,17 @@ interface EffectsStore {
 
 export function settingsEffects(store: EffectsStore) {
   const service = inject(SettingsService);
+  const authStore = inject(AuthStore);
 
   return {
     load: rxMethod<void>(
       pipe(
         switchMap(() =>
           service.getProfile().pipe(
-            tap(profile => store.setProfile(profile)),
+            tap(profile => {
+              store.setProfile(profile);
+              authStore.setProfileName(profile.firstName, profile.lastName);
+            }),
             catchError(err => {
               store.setLoadError(extractErrorCode(err));
               return EMPTY;
@@ -39,6 +44,7 @@ export function settingsEffects(store: EffectsStore) {
           service.updateProfile(request).pipe(
             tap(profile => {
               store.setProfile(profile);
+              authStore.setProfileName(profile.firstName, profile.lastName);
               store.setProfileSaving(false);
             }),
             catchError(err => {

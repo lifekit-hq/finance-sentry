@@ -1,6 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {InitialsUtils} from '../../../../shared/utils/initials.utils';
 import {type UserProfile} from '../../models/settings/settings.model';
 
 interface StateSignals {
@@ -19,10 +20,7 @@ export function settingsComputed(store: StateSignals) {
   return {
     avatarInitials: computed(() => {
       const p = store.profile();
-      if (!p) {
-        return '?';
-      }
-      return `${p.firstName[0] ?? ''}${p.lastName[0] ?? ''}`.toUpperCase();
+      return p ? InitialsUtils.fromProfile(p.firstName, p.lastName, null) : '?';
     }),
     fullName: computed(() => {
       const p = store.profile();
