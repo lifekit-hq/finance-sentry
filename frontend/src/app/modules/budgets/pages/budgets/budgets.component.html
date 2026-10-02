@@ -50,7 +50,11 @@
             {{ heroAmount | money }}
           </span>
           <span class="text-cmn-sm text-text-secondary">
-            {{ over ? 'over' : 'left' }} of {{ store.totalBudget() | money }}
+            {{
+              over
+                ? 'over · ' + (store.totalBudget() | money) + ' budget'
+                : 'left of ' + (store.totalBudget() | money)
+            }}
           </span>
         </div>
         <div class="mt-cmn-3 h-2.5 overflow-hidden rounded-full bg-surface-raised">
@@ -109,9 +113,9 @@
                 {{ leftAmount | money }}
               </span>
               <span class="text-cmn-xs text-text-secondary">
-                {{ b.isOverBudget ? 'over' : 'left' }} of
+                {{ b.isOverBudget ? 'over ·' : 'left of' }}
                 @if (!isEditing) {
-                  {{ b.monthlyLimit | money }}
+                  {{ b.monthlyLimit | money }}{{ b.isOverBudget ? ' budget' : '' }}
                 }
               </span>
               @if (isEditing) {
