@@ -176,6 +176,12 @@ export class AccountsListComponent implements OnInit {
     if (institution.syncStatus === 'failed') {
       return 'Sync failed';
     }
+    if (institution.syncStatus === 'syncing') {
+      return 'Syncing…';
+    }
+    if (!institution.lastSyncTimestamp) {
+      return 'Not synced yet';
+    }
     return `synced ${TimeUtils.getRelativeTime(institution.lastSyncTimestamp).toLowerCase()}`;
   }
 

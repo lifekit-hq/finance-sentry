@@ -9,7 +9,7 @@ import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsListComponent} from './accounts-list.component';
 
-const failedInstitution: Institution = {
+const baseInstitution: Institution = {
   institutionId: 'inst-1',
   provider: 'truelayer',
   name: 'Test Bank',
@@ -21,7 +21,8 @@ const failedInstitution: Institution = {
   accounts: [],
 };
 
-function setup(isPhone: boolean): HTMLElement {
+function setup(isPhone: boolean, overrides: Partial<Institution> = {}): HTMLElement {
+  const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
     isLoading: signal(false),
     isEmpty: signal(false),
@@ -39,7 +40,7 @@ function setup(isPhone: boolean): HTMLElement {
           category: 'banking',
           totalInBaseCurrency: 100,
           institutionCount: 1,
-          institutions: [failedInstitution],
+          institutions: [institution],
         },
       },
     ]),
@@ -63,8 +64,31 @@ function setup(isPhone: boolean): HTMLElement {
 
 describe('AccountsListComponent sync status text', () => {
   it('shows "Sync failed" as row subtitle text on a phone, not by colour alone', () => {
-    const text = setup(true).textContent ?? '';
+    const text = setup(true, {syncStatus: 'failed'}).textContent ?? '';
     expect(text).toContain('0 accounts · Sync failed');
+  });
+
+  it('shows "Reconnect needed" for a reauth-required institution on a phone', () => {
+    const text = setup(true, {syncStatus: 'reauth_required'}).textContent ?? '';
+    expect(text).toContain('0 accounts · Reconnect needed');
+  });
+
+  it('shows "Syncing…" while a sync is in progress, even with a previous timestamp', () => {
+    const element = setup(true, {syncStatus: 'syncing', lastSyncTimestamp: new Date().toISOString()});
+    const text = element.textContent ?? '';
+    expect(text).toContain('0 accounts · Syncing…');
+  });
+
+  it('shows "Not synced yet" for a pending institution that never synced', () => {
+    const text = setup(true, {syncStatus: 'pending'}).textContent ?? '';
+    expect(text).toContain('0 accounts · Not synced yet');
+    expect(text).not.toContain('synced never');
+  });
+
+  it('shows "synced <time>" for a synced institution with a timestamp', () => {
+    const element = setup(true, {syncStatus: 'synced', lastSyncTimestamp: new Date().toISOString()});
+    const text = element.textContent ?? '';
+    expect(text).toContain('0 accounts · synced just now');
   });
 
   it('keeps the plain count subtitle off phone', () => {
