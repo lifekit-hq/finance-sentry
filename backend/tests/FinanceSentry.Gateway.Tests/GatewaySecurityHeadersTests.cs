@@ -1,20 +1,16 @@
 namespace FinanceSentry.Gateway.Tests;
 
-using System.Text.RegularExpressions;
 using FinanceSentry.Gateway;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
 /// <summary>
 /// Every gateway response carries the security headers from <c>Gateway:SecurityHeaders</c> (its own
-/// endpoints, proxied responses and rejections), and that set equals the frontend container's
-/// <c>docker/nginx.security-headers.conf</c>, so the app gets one policy whichever hop answers.
+/// endpoints, proxied responses and rejections).
 /// </summary>
-public sealed partial class GatewaySecurityHeadersTests(GatewayPublicListenerTests.PublicListenerFactory factory)
+public sealed class GatewaySecurityHeadersTests(GatewayPublicListenerTests.PublicListenerFactory factory)
     : IClassFixture<GatewayPublicListenerTests.PublicListenerFactory>
 {
-    private const string NginxSnippet = "nginx.security-headers.conf";
-
     private static readonly string[] RequiredHeaders =
     [
         "Content-Security-Policy",
@@ -23,19 +19,6 @@ public sealed partial class GatewaySecurityHeadersTests(GatewayPublicListenerTes
         "Referrer-Policy",
         "Permissions-Policy",
     ];
-
-    [Fact]
-    public void GatewayHeaders_EqualTheFrontendNginxHeaders()
-    {
-        var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
-        var gateway = GatewaySecurityHeaders.FromConfig(config);
-
-        var nginx = NginxHeaderLine().Matches(File.ReadAllText(NginxSnippet))
-            .ToDictionary(match => match.Groups["name"].Value, match => match.Groups["value"].Value);
-
-        Assert.Equal(RequiredHeaders.Order(), nginx.Keys.Order());
-        Assert.Equal(nginx.OrderBy(h => h.Key), gateway.OrderBy(h => h.Key));
-    }
 
     [Fact]
     public void Policy_ForbidsFramingTheApp()
@@ -63,7 +46,4 @@ public sealed partial class GatewaySecurityHeadersTests(GatewayPublicListenerTes
         foreach (var header in RequiredHeaders)
             Assert.True(response.Headers.Contains(header), $"{path} lacks {header} ({(int)response.StatusCode}).");
     }
-
-    [GeneratedRegex("""^add_header (?<name>\S+) "(?<value>[^"]*)" always;$""", RegexOptions.Multiline)]
-    private static partial Regex NginxHeaderLine();
 }

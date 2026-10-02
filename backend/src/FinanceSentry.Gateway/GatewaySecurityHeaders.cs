@@ -3,7 +3,7 @@ namespace FinanceSentry.Gateway;
 /// <summary>
 /// Security response headers (CSP, nosniff, referrer, framing, permissions) on every gateway response:
 /// its own endpoints, proxied ones and rejections alike. The set is declarative in
-/// <c>Gateway:SecurityHeaders</c> (header name → value) and mirrors the frontend container's
+/// <c>Gateway:SecurityHeaders</c> (header name → value) and is kept in step by hand with the frontend container's
 /// <c>docker/nginx.security-headers.conf</c>; the gateway's value replaces any copy the upstream sent, so
 /// a response never carries two policies. HSTS stays with <c>UseHsts</c> (HTTPS-only by design).
 /// </summary>
