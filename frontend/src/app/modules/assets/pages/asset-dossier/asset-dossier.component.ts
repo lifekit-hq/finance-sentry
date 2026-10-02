@@ -16,6 +16,8 @@ import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type DossierSignalItem} from '../../models/dossier/dossier.model';
+import {CoverageLabelPipe, SignalTypeLabelPipe} from '../../pipes/dossier-label.pipe';
+import {MarkdownPipe} from '../../pipes/markdown.pipe';
 import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
 import {DossierStore} from '../../store/dossier.store';
 
@@ -33,11 +35,14 @@ const SPARKLINE_MIN_POINTS = 2;
     AlertComponent,
     ButtonComponent,
     CardComponent,
+    CoverageLabelPipe,
     DatePipe,
     DecimalPipe,
+    MarkdownPipe,
     MoneyPipe,
     ProviderLabelPipe,
     RelativeTimePipe,
+    SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,
     TagComponent,
