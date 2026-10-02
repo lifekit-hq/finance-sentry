@@ -17,27 +17,36 @@ function readStoredTheme(): string | null {
   }
 }
 
-function applySystemTheme(dark: boolean): void {
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+function clearStoredTheme(): void {
+  try {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {
+    // storage unavailable: nothing was persisted
+  }
+}
+
+function applySystemTheme(theme: ThemeService, dark: boolean): void {
+  theme.setTheme(dark ? 'dark' : 'light');
+  clearStoredTheme();
 }
 
 /**
  * Instantiates ThemeService at app start so the stored theme applies on every route,
  * guest pages included. With no stored choice the OS preference is followed live and
- * never persisted; only an explicit ThemeService.setTheme/toggle writes the key.
+ * never persisted (the service state is synced, then its key cleared); only an explicit ThemeService.setTheme/toggle writes the key.
  */
 export function provideAppTheme(): EnvironmentProviders {
   return makeEnvironmentProviders([
     provideAppInitializer(() => {
-      inject(ThemeService);
+      const theme = inject(ThemeService);
       const systemDark = window.matchMedia?.(DARK_SCHEME_QUERY);
       if (!systemDark || readStoredTheme() !== null) {
         return;
       }
-      applySystemTheme(systemDark.matches);
+      applySystemTheme(theme, systemDark.matches);
       systemDark.addEventListener('change', event => {
         if (readStoredTheme() === null) {
-          applySystemTheme(event.matches);
+          applySystemTheme(theme, event.matches);
         }
       });
     }),

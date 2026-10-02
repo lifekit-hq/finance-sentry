@@ -1,5 +1,7 @@
 import {ApplicationInitStatus} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {ThemeService} from '@lifekit-hq/ui';
+import {firstValueFrom} from 'rxjs';
 
 import {provideAppTheme} from './theme.provider';
 
@@ -69,6 +71,19 @@ describe('provideAppTheme', () => {
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('syncs the service state with the OS theme and persists only on an explicit toggle', async () => {
+    stubSystemDark(true);
+    await boot();
+    const theme = TestBed.inject(ThemeService);
+
+    expect(await firstValueFrom(theme.activeTheme$)).toBe('dark');
+
+    theme.toggle();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
   it('follows OS preference changes while nothing is stored', async () => {
