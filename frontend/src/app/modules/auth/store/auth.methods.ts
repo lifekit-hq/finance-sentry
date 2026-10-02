@@ -38,7 +38,11 @@ export function authMethods(store: WritableStateSource<AuthState>) {
     setLoading(flow: AuthFlow): void {
       patchState(store, {status: 'loading', errorCode: null, errorDetail: null, flow});
     },
-    setError(errorCode: Nullable<string>, flow: AuthFlow, errorDetail: Nullable<string> = null): void {
+    setError(
+      errorCode: Nullable<string>,
+      flow: AuthFlow,
+      errorDetail: Nullable<string> = null
+    ): void {
       patchState(store, {status: 'error', errorCode, errorDetail, flow});
     },
     resetError(): void {

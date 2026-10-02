@@ -107,7 +107,9 @@ describe('authEffects', () => {
       const store = buildStore();
       const service = buildService();
       const error = 'Too many failed sign-in attempts. Try again in 3 minutes.';
-      service.login.mockReturnValue(throwError(() => ({error: {errorCode: 'ACCOUNT_LOCKED', error}})));
+      service.login.mockReturnValue(
+        throwError(() => ({error: {errorCode: 'ACCOUNT_LOCKED', error}}))
+      );
       configure(service, buildRouter());
 
       TestBed.runInInjectionContext(() => {
