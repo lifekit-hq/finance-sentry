@@ -13,14 +13,6 @@
     @apply mx-auto w-full p-cmn-4 md:p-cmn-8;
     max-width: var(--page-max);
   }
-
-  /* The inner scroller of a full-height page (h-full, list scrolls inside). The shell pads its
-     wrapper by --fab-clearance so content clears the Ledger FAB, which here would leave a static
-     blank band above the tab bar: run the list down through that band and pad its scroll content. */
-  .fab-scroll-tail {
-    margin-bottom: calc(-1 * var(--fab-clearance, 0px));
-    padding-bottom: var(--fab-clearance, 0px);
-  }
 }
 
 /* Global Styles */
@@ -32,28 +24,6 @@ body {
   font-size: 14px;
   color: var(--color-text-primary);
   background: var(--color-surface-bg);
-}
-
-/* viewport-fit=cover lets the installed PWA draw edge to edge; keep the shell
-   clear of the notch, rounded corners and home indicator. Insets are 0 in a
-   regular browser tab, so this is a no-op there. */
-body {
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
-}
-
-/* The signed-in shell fills the viewport itself (h-dvh) and owns its vertical insets: the top bar
-   extends under the status bar and the bottom tab bar already pads the home indicator. Body padding
-   on top of that pushed the shell past the viewport and clipped the tab bar. */
-body:has(fns-app-shell) {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-fns-app-shell cmn-top-bar {
-  display: block;
-  padding-top: env(safe-area-inset-top);
-  background: var(--color-surface-card);
 }
 
 * {

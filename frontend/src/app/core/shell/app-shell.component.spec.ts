@@ -7,7 +7,6 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {AppShellComponent} from './app-shell.component';
-import {FAB_CLEARANCE} from './app-shell.constants';
 
 @Component({
   selector: 'fns-chat-widget',
@@ -44,28 +43,6 @@ describe('AppShellComponent FAB clearance', () => {
     fixture.detectChanges();
     return fixture;
   };
-
-  const wrapper = (fixture: ComponentFixture<AppShellComponent>): HTMLElement =>
-    fixture.nativeElement.querySelector('cmn-app-layout .overflow-y-auto.h-full');
-
-  beforeEach(() => canUseAi.set(true));
-
-  it('pads the scroll wrapper past the FAB for an AI user on a page', async () => {
-    const fixture = await setup(AppRoute.Settings);
-    expect(wrapper(fixture).style.paddingBottom).toBe(FAB_CLEARANCE);
-    expect(wrapper(fixture).style.getPropertyValue('--fab-clearance')).toBe(FAB_CLEARANCE);
-  });
-
-  it('adds no padding on the full-page Ledger', async () => {
-    const fixture = await setup(AppRoute.Ledger);
-    expect(wrapper(fixture).style.paddingBottom).toBe('');
-  });
-
-  it('adds no padding for a user without ai.use', async () => {
-    canUseAi.set(false);
-    const fixture = await setup(AppRoute.Settings);
-    expect(wrapper(fixture).style.paddingBottom).toBe('');
-  });
 
   it('shows the store avatar initials in the top bar', async () => {
     const fixture = await setup(AppRoute.Settings);

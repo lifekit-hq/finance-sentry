@@ -65,7 +65,7 @@
         />
       </div>
     } @else {
-      <div class="fab-scroll-tail mt-cmn-5 min-h-0 flex-1 space-y-cmn-5 overflow-auto pr-cmn-1">
+      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-5 overflow-auto pr-cmn-1">
         @for (section of store.upcomingSections(); track section.id) {
           @if (store.upcomingSections().length > 1) {
             <h2
@@ -129,7 +129,7 @@
     }
   } @else {
     @if (store.hasFiredRows()) {
-      <div class="fab-scroll-tail mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
+      <div class="mt-cmn-5 min-h-0 flex-1 space-y-cmn-2 overflow-auto pr-cmn-1">
         @for (event of store.fired(); track event.alertId) {
           <article
             class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
