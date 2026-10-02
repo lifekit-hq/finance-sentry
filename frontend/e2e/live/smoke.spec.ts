@@ -13,7 +13,7 @@ async function login(page: Page): Promise<void> {
   // input, so placeholder/role locators match twice — target the native inputs.
   await page.locator('input[type="email"]').fill(EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.getByRole('button', {name: /authenticate/i}).click();
+  await page.getByRole('button', {name: 'Sign in', exact: true}).click();
   // Post-login the app lands on /accounts (its default target); navigate from there.
   await page.waitForURL(url => !url.pathname.startsWith('/login'), {timeout: 15_000});
   await page.goto('/dashboard');
@@ -30,14 +30,15 @@ test.describe('Live smoke — deployed stack', () => {
     await login(page);
     // The QA test user has connected accounts — the empty state must not show.
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
-    await expect(page.getByText('Income (MTD)')).toBeVisible();
-    await expect(page.getByText('Spending (MTD)')).toBeVisible();
+    await expect(page.getByText('This month')).toBeVisible();
+    await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
+    await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
   });
 
   test('transaction ledger renders with live data', async ({page}) => {
     await login(page);
     await page.goto('/transactions');
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
-    await expect(page.getByPlaceholder('Search transactions')).toBeVisible();
+    await expect(page.getByRole('searchbox', {name: 'Search transactions'})).toBeVisible();
   });
 });
