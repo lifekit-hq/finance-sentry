@@ -4,6 +4,12 @@ using FinanceSentry.Core.Domain;
 
 public class BankAccount : Entity
 {
+    /// <summary>
+    /// <see cref="Provider"/> of an account the startup smoke seed writes: fake data with no provider behind it,
+    /// so every cross-user read (<c>GetAllActiveUnscopedAsync</c>: the sync scheduler, background jobs) skips it.
+    /// </summary>
+    public const string SeededProvider = "seeded";
+
     public Guid UserId { get; set; }
 
     public string ExternalAccountId { get; set; } = string.Empty;

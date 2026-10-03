@@ -56,6 +56,17 @@ registered account, and only while nobody holds it — so once a second account 
 `auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
 (`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
+**Smoke account:** the post-deploy live smoke (`frontend/e2e/live/smoke.spec.ts`) signs in as a dedicated account
+the API seeds at startup from `Auth__SmokeAccount__Email` / `Auth__SmokeAccount__Password` (prod: compose reads
+`SMOKE_ACCOUNT_EMAIL` / `SMOKE_ACCOUNT_PASSWORD` from the deploy step's environment, which `deploy.yml` fills from the
+`E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD` GitHub Actions secrets; the smoke step reads the same two secrets). Both set =
+the seed creates the account as a Member, marked with the `seeded-account: smoke` user claim, plus one fake `seeded`
+bank account with a few transactions; later starts only converge its password, so rotating the secrets needs just a
+redeploy. Either unset = no seed. It never touches an account it did not create, is never granted Owner, is not shared
+with anyone, and its `seeded` account is excluded from every cross-user read (`GetAllActiveUnscopedAsync`), so it gets
+no provider sync, snapshot, alert or external lookup from any background job. A People-page revoke stays in effect; to
+retire it, revoke it there and delete the two secrets.
+
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).
 2. Check server list — if empty, Hangfire worker is not running. Restart API.

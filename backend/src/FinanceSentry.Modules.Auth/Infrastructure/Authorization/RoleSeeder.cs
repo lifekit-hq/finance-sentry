@@ -16,7 +16,8 @@ using Microsoft.Extensions.Logging;
 /// <see cref="Permissions.ByRole"/> (adds missing, removes ones the code no longer grants).</item>
 /// <item>Grants <see cref="AuthRoles.Owner"/> to the account named by <c>Auth:OwnerEmail</c>. With that
 /// setting empty, the role goes to the only user when exactly one exists and nobody holds it yet, so a
-/// single-user deployment needs no configuration. Never removes the Owner role.</item>
+/// single-user deployment needs no configuration. Never removes the Owner role, and never grants it to the
+/// smoke account (<see cref="SmokeAccountSeeder.MarkerClaim"/>).</item>
 /// <item>Gives every user who holds no role the <see cref="AuthRoles.Member"/> role, except revoked accounts
 /// (<see cref="PersonStatus"/>), whose roles a revoke removed on purpose.</item>
 /// </list>
@@ -97,13 +98,20 @@ public static class RoleSeeder
             if (configured is null)
                 logger.LogWarning("{ConfigKey} names no existing account; the {Role} role was not granted.",
                     OwnerEmailConfigKey, AuthRoles.Owner);
+            else if (await SmokeAccountSeeder.IsMarkedAsync(users, configured))
+            {
+                logger.LogWarning("The owner email setting names the smoke account; the {Role} role was not granted.",
+                    AuthRoles.Owner);
+                return null;
+            }
             return configured;
         }
 
         if ((await users.GetUsersInRoleAsync(AuthRoles.Owner)).Count > 0)
             return null;
 
-        var candidates = await users.Users.OrderBy(u => u.Id).Take(2).ToListAsync();
+        var smokeIds = (await users.GetUsersForClaimAsync(SmokeAccountSeeder.MarkerClaim)).Select(u => u.Id).ToList();
+        var candidates = await users.Users.Where(u => !smokeIds.Contains(u.Id)).OrderBy(u => u.Id).Take(2).ToListAsync();
         if (candidates.Count == 1)
             return candidates[0];
 

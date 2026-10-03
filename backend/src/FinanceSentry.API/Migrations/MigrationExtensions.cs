@@ -5,6 +5,7 @@ using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
+using FinanceSentry.Modules.BankSync.Infrastructure.Seeding;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
@@ -66,6 +67,7 @@ public static class MigrationExtensions
 
         SeedBankSyncCategories(sp, app.Logger);
         SeedRoles(sp, app.Logger, status);
+        SeedSmokeAccount(sp, app.Logger, status);
 
         return app;
     }
@@ -87,6 +89,28 @@ public static class MigrationExtensions
         catch (Exception ex)
         {
             logger.LogError(ex, "Role seeding failed. Startup will continue.");
+        }
+    }
+
+    // After the roles exist: the smoke account is created as a Member. Its fake bank data is written only for
+    // the user id the Auth seed returns, so it can never land on another person's account.
+    private static void SeedSmokeAccount(IServiceProvider sp, ILogger logger, StartupMigrationStatus status)
+    {
+        if (status.SkippedContexts.Contains(typeof(AuthDbContext)) || status.SkippedContexts.Contains(typeof(BankSyncDbContext)))
+            return;
+
+        try
+        {
+            var userId = SmokeAccountSeeder.SeedAsync(
+                sp.GetRequiredService<UserManager<ApplicationUser>>(),
+                sp.GetRequiredService<IConfiguration>(),
+                logger).GetAwaiter().GetResult();
+            if (userId is { } id && SmokeDataSeeder.Seed(sp.GetRequiredService<BankSyncDbContext>(), id, DateTime.UtcNow))
+                logger.LogInformation("Seeded fake bank data for the smoke account {UserId}.", id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Smoke account seeding failed. Startup will continue.");
         }
     }
 
