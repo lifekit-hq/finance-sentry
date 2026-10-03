@@ -2,7 +2,7 @@
 
 ## QA — Test Account
 
-`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production live checks use the seeded smoke account (a Member with fake data), whose credentials live only in the CI secrets `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD`.
+`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production live checks use the seeded smoke account, whose credentials live only in the CI secrets `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD`.
 
 ### Key test scenarios (check before declaring any fix done)
 
