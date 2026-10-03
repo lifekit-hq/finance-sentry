@@ -39,8 +39,7 @@ public static class SmokeAccountSeeder
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
         {
             if (!string.IsNullOrEmpty(email) || !string.IsNullOrEmpty(password))
-                logger.LogWarning("Only one of {EmailKey} and {PasswordKey} is set; the smoke account was not seeded.",
-                    EmailConfigKey, PasswordConfigKey);
+                logger.LogWarning("Only one of the smoke account email and password settings is set; the smoke account was not seeded.");
             return null;
         }
 
@@ -50,8 +49,7 @@ public static class SmokeAccountSeeder
 
         if (!await IsMarkedAsync(users, user))
         {
-            logger.LogWarning("{ConfigKey} names an account the smoke seed did not create; it was left alone.",
-                EmailConfigKey);
+            logger.LogWarning("The smoke account email setting names an account the smoke seed did not create; it was left alone.");
             return null;
         }
 

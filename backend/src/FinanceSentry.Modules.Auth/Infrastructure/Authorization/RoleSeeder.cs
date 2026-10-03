@@ -100,8 +100,8 @@ public static class RoleSeeder
                     OwnerEmailConfigKey, AuthRoles.Owner);
             else if (await SmokeAccountSeeder.IsMarkedAsync(users, configured))
             {
-                logger.LogWarning("{ConfigKey} names the smoke account; the {Role} role was not granted.",
-                    OwnerEmailConfigKey, AuthRoles.Owner);
+                logger.LogWarning("The owner email setting names the smoke account; the {Role} role was not granted.",
+                    AuthRoles.Owner);
                 return null;
             }
             return configured;
