@@ -72,9 +72,9 @@ Not auto-loaded — follow these links when the task touches them:
 - [Speckit agent context](docs/claude/speckit-context.md) — machine-appended Active Technologies / Recent Changes (owned by `.specify/scripts/bash/update-agent-context.sh`; never hand-grow this file's sections in CLAUDE.md again)
 - [Program roadmap & backlog](specs/ROADMAP.md) — destination, radar architecture, unimplemented specs
 
-## QA — Test User
+## QA — Test Account
 
-`test@gmail.com` / `Darkfly21` — has TrueLayer, Monobank, Binance and IBKR connections. Full scenarios: [QA guide](docs/claude/qa.md).
+`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production live checks use the seeded smoke account, whose credentials live only in the CI secrets `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD`. Full scenarios: [QA guide](docs/claude/qa.md).
 
 ---
 
