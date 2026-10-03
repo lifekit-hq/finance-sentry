@@ -1,13 +1,8 @@
 # Finance Sentry — QA Guide
 
-## QA — Test User Credentials
+## QA — Test Account
 
-| Field | Value |
-|---|---|
-| Email | test@gmail.com |
-| Password | Darkfly21 |
-
-This account has connected accounts across TrueLayer (banking), Monobank (banking), Binance (crypto), and IBKR (brokerage).
+`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production live checks use the seeded smoke account, whose credentials live only in the CI secrets `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD`.
 
 ### Key test scenarios (check before declaring any fix done)
 
