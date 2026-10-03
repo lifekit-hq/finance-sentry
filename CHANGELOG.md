@@ -5,6 +5,100 @@ All notable changes to Finance Sentry are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Entries from v0.12.0 onward are
 generated automatically by [release-please](https://github.com/googleapis/release-please).
 
+## [1.14.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.13.0...v1.14.0) (2026-10-03)
+
+
+### Features
+
+* **agent:** restrict agent chat and Ledger write-ups to the Owner role ([#757](https://github.com/lifekit-hq/finance-sentry/issues/757)) ([f36e0c9](https://github.com/lifekit-hq/finance-sentry/commit/f36e0c9d7aa6d255b63e0eefc54b9970582228a3))
+* **alerts:** scope alerts to the current user with a named Owner query filter ([#773](https://github.com/lifekit-hq/finance-sentry/issues/773)) ([34edf43](https://github.com/lifekit-hq/finance-sentry/commit/34edf43888c228274a7c16853834c7a4213e40fa))
+* **api:** attach rate-limit policies and require hostname/edge config ([#834](https://github.com/lifekit-hq/finance-sentry/issues/834)) ([e927c64](https://github.com/lifekit-hq/finance-sentry/commit/e927c646986ee15f3a6747535e6902ece08ef9dd))
+* **auth:** add Owner/Member roles with permission claims and frontend guards ([#770](https://github.com/lifekit-hq/finance-sentry/issues/770)) ([90d47e1](https://github.com/lifekit-hq/finance-sentry/commit/90d47e19e8ec1a4cb9ab7708231e148b7dbf18e0))
+* **auth:** invite-only onboarding with an owner People page ([#776](https://github.com/lifekit-hq/finance-sentry/issues/776)) ([b83c762](https://github.com/lifekit-hq/finance-sentry/commit/b83c762b57dcfc4aae1b98947b85722ec9e09c60))
+* **auth:** move the API host to the stock ASP.NET Core authentication pipeline ([#755](https://github.com/lifekit-hq/finance-sentry/issues/755)) ([774419a](https://github.com/lifekit-hq/finance-sentry/commit/774419aacbf74432d176c34bc3b41c3110e11d01))
+* **auth:** scope refresh tokens and MCP authorization codes to the current user with the Owner query filter ([#781](https://github.com/lifekit-hq/finance-sentry/issues/781)) ([046f44b](https://github.com/lifekit-hq/finance-sentry/commit/046f44bd07bc6b3d5c94a94f539de7efe61e90cb))
+* **auth:** seed a dedicated smoke account for the post-deploy live smoke ([#835](https://github.com/lifekit-hq/finance-sentry/issues/835)) ([423a654](https://github.com/lifekit-hq/finance-sentry/commit/423a6540b9f6582c347bf9f06f99814dcc0ef549))
+* **auth:** sign in through the lifekit OIDC provider ([#828](https://github.com/lifekit-hq/finance-sentry/issues/828)) ([f9a8ba8](https://github.com/lifekit-hq/finance-sentry/commit/f9a8ba8f7e9a3a09ab77924b7eae1afbf757c5d9))
+* **backend:** scope Agent, Analytics, Budgets, Companion, Events, Risk and Wealth with the Owner query filter ([#779](https://github.com/lifekit-hq/finance-sentry/issues/779)) ([264a928](https://github.com/lifekit-hq/finance-sentry/commit/264a928daef2a55f771fc5c1a0b6e2c977a551fc))
+* **banksync:** scope BankSync, BrokerageSync and CryptoSync to the current user with the Owner query filter ([#775](https://github.com/lifekit-hq/finance-sentry/issues/775)) ([73a5d15](https://github.com/lifekit-hq/finance-sentry/commit/73a5d15e66bd828bedd0e7466a751c0eb0368cc9))
+* **deploy:** deploy CI-built images by commit SHA ([#771](https://github.com/lifekit-hq/finance-sentry/issues/771)) ([b0deb80](https://github.com/lifekit-hq/finance-sentry/commit/b0deb8005bf80d5c33a647db7ae8b64d4325bb38))
+* **frontend:** adopt [@lifekit-hq](https://github.com/lifekit-hq) 0.5.0 phone shell and table list rows ([#783](https://github.com/lifekit-hq/finance-sentry/issues/783)) ([6fa3d57](https://github.com/lifekit-hq/finance-sentry/commit/6fa3d570b9c7e55fffd390cd40d9eb16677bab2e))
+* **frontend:** adopt the shared lifekit-common PWA prompts and update service ([#791](https://github.com/lifekit-hq/finance-sentry/issues/791)) ([2885a9f](https://github.com/lifekit-hq/finance-sentry/commit/2885a9f38c37f6568ebe9406f1f424f0c20bba93))
+* **frontend:** day-grouped transactions, tidier holdings and asset dossier ([#787](https://github.com/lifekit-hq/finance-sentry/issues/787)) ([47404a4](https://github.com/lifekit-hq/finance-sentry/commit/47404a4b8cac99b9b50e2b3c42b7c5979011dc16))
+* **frontend:** drop the header theme toggle from the app shell ([#821](https://github.com/lifekit-hq/finance-sentry/issues/821)) ([514d5dd](https://github.com/lifekit-hq/finance-sentry/commit/514d5dd33a0964da5e06917cfc0249dfea51b372))
+* **frontend:** installable PWA app shell with API-safe service worker ([#778](https://github.com/lifekit-hq/finance-sentry/issues/778)) ([c670e01](https://github.com/lifekit-hq/finance-sentry/commit/c670e01db771468bb3b51497386e928bb2bb386a))
+* **frontend:** login copy, Ledger sessions sheet on phone, avatar initial from signed-in user ([#789](https://github.com/lifekit-hq/finance-sentry/issues/789)) ([4e07bda](https://github.com/lifekit-hq/finance-sentry/commit/4e07bda316b705028950b35aab95ebe00dc792aa))
+* **frontend:** shared money pipe, responsive stat grids, skeletons and library form controls ([#774](https://github.com/lifekit-hq/finance-sentry/issues/774)) ([0f351c4](https://github.com/lifekit-hq/finance-sentry/commit/0f351c4fc93a210064a6bba1aa1acaaf2612149f))
+* **frontend:** simplify Dashboard and Accounts pages ([9eca32b](https://github.com/lifekit-hq/finance-sentry/commit/9eca32ba0f171444fb66fea86a3c8ca5d691a4b1))
+* **frontend:** simplify Subscriptions, Budgets, Alerts and Events pages ([#788](https://github.com/lifekit-hq/finance-sentry/issues/788)) ([b6d2286](https://github.com/lifekit-hq/finance-sentry/commit/b6d22869be2cc0e16e801b1f58b2a6251b89a4aa))
+* **gateway:** add security headers and a public listener limited to app and API ([#822](https://github.com/lifekit-hq/finance-sentry/issues/822)) ([8f47865](https://github.com/lifekit-hq/finance-sentry/commit/8f47865b678a6072ce907a50e41b0dc217b38bd5))
+* **mcp:** move the MCP HTTP host to the stock ASP.NET Core authentication pipeline ([#760](https://github.com/lifekit-hq/finance-sentry/issues/760)) ([92b136c](https://github.com/lifekit-hq/finance-sentry/commit/92b136c4b84949fd15936dcd4483026a605e7014))
+* **ops:** run the uptime probe as a compose service instead of operator cron ([#761](https://github.com/lifekit-hq/finance-sentry/issues/761)) ([6a2fc3e](https://github.com/lifekit-hq/finance-sentry/commit/6a2fc3e19096bcc7357919d3d9120c5e67ce88d8))
+* **radar,subscriptions:** scope Radar and Subscriptions to the current user with the Owner query filter ([#780](https://github.com/lifekit-hq/finance-sentry/issues/780)) ([d5a3001](https://github.com/lifekit-hq/finance-sentry/commit/d5a30011bcccad0d975ad3c71d1092e0ba32171f))
+* **research:** fire scheduled policy review on recorded cadence ([#765](https://github.com/lifekit-hq/finance-sentry/issues/765)) ([b6aa2df](https://github.com/lifekit-hq/finance-sentry/commit/b6aa2df80ea6ca76d63794031ab2a09ed94396e2))
+* **research:** prove the look-ahead detectors on real events and report silent ones ([#698](https://github.com/lifekit-hq/finance-sentry/issues/698)) ([#764](https://github.com/lifekit-hq/finance-sentry/issues/764)) ([7668543](https://github.com/lifekit-hq/finance-sentry/commit/766854351b754800d9efa639d2aa3967d60ae5e6))
+* **research:** re-measure risk tolerance and enforce drawdown tolerance ([#768](https://github.com/lifekit-hq/finance-sentry/issues/768)) ([e56bf46](https://github.com/lifekit-hq/finance-sentry/commit/e56bf464ba12f84086738e99f51f93d382fa8579))
+* **research:** scope Research to the current user with the Owner query filter ([#777](https://github.com/lifekit-hq/finance-sentry/issues/777)) ([cd19dbc](https://github.com/lifekit-hq/finance-sentry/commit/cd19dbc5d633706228fd832fd8276893d1b014f8))
+* **research:** surface a benchmark-relative track record ([#766](https://github.com/lifekit-hq/finance-sentry/issues/766)) ([e9f1f15](https://github.com/lifekit-hq/finance-sentry/commit/e9f1f153f226c4087a9441900f9402fcc4b231c7))
+
+
+### Bug Fixes
+
+* **agent:** move Ledger conversation delete behind a ••• menu ([#801](https://github.com/lifekit-hq/finance-sentry/issues/801)) ([6a86aa9](https://github.com/lifekit-hq/finance-sentry/commit/6a86aa90a4a78320bff9fda40fc08b2331ce2681))
+* **alerts:** hide raw SEC URL in filing alerts and open filing in new tab ([#831](https://github.com/lifekit-hq/finance-sentry/issues/831)) ([489bdc8](https://github.com/lifekit-hq/finance-sentry/commit/489bdc8fccf6f41c25d52b37fea7b39f961cbd19))
+* **alerts:** make a policy acknowledgement cover every alert derived from that policy ([#762](https://github.com/lifekit-hq/finance-sentry/issues/762)) ([15dbf12](https://github.com/lifekit-hq/finance-sentry/commit/15dbf12a00872790787227578091d370670c78d3))
+* **analytics:** allowlist SQL guard functions and revoke set_config from PUBLIC ([#750](https://github.com/lifekit-hq/finance-sentry/issues/750)) ([baabb55](https://github.com/lifekit-hq/finance-sentry/commit/baabb55bc2a162a72ec223506da69abb40afa4f6))
+* **api:** flush fatal unhandled exceptions to the log before the process dies ([#748](https://github.com/lifekit-hq/finance-sentry/issues/748)) ([16f3c39](https://github.com/lifekit-hq/finance-sentry/commit/16f3c39e58f4af496b87274d1de6b92aa4791ab9))
+* **api:** register recurring jobs in a background service with lock-aware retry ([#746](https://github.com/lifekit-hq/finance-sentry/issues/746)) ([1e9d24b](https://github.com/lifekit-hq/finance-sentry/commit/1e9d24b56f6870f297f8dcb68ff6f33cf3878134))
+* **assets:** plain-language labels and rendered markdown in asset dossier ([#799](https://github.com/lifekit-hq/finance-sentry/issues/799)) ([a9c23e7](https://github.com/lifekit-hq/finance-sentry/commit/a9c23e77e3bb49c607824efc179cabfdff71c5e0))
+* **assets:** use surface-raised token for dossier rows in dark mode ([#806](https://github.com/lifekit-hq/finance-sentry/issues/806)) ([877fcb2](https://github.com/lifekit-hq/finance-sentry/commit/877fcb2195729be951a095e4f457058898f69f27))
+* **auth:** remove no-audience token exception from API host ([#792](https://github.com/lifekit-hq/finance-sentry/issues/792)) ([4a5a64a](https://github.com/lifekit-hq/finance-sentry/commit/4a5a64a15d9684fe261f775cd3cc57e82dede1ab))
+* **auth:** require Owner role for Hangfire dashboard and restrict forwarded-header trust ([#751](https://github.com/lifekit-hq/finance-sentry/issues/751)) ([1ca08e7](https://github.com/lifekit-hq/finance-sentry/commit/1ca08e7461ce5a7506584babb4ec9a3ba3cc6a15))
+* **auth:** restyle MCP connect page with page header and card ([#811](https://github.com/lifekit-hq/finance-sentry/issues/811)) ([cd41af7](https://github.com/lifekit-hq/finance-sentry/commit/cd41af7d59706ab3a63919812669de0445c4b5cd))
+* **auth:** tell a locked-out user the account is locked ([#819](https://github.com/lifekit-hq/finance-sentry/issues/819)) ([b9115ac](https://github.com/lifekit-hq/finance-sentry/commit/b9115acff14749b90d238adbc5b3d24938b3552a))
+* **bank-sync:** bind the TrueLayer callback state to the initiating browser ([#752](https://github.com/lifekit-hq/finance-sentry/issues/752)) ([4a5a042](https://github.com/lifekit-hq/finance-sentry/commit/4a5a042ec65da53a881671fc6de80ae07b4aafe9))
+* **bank-sync:** calm dashboard Month pace chips ([#793](https://github.com/lifekit-hq/finance-sentry/issues/793)) ([ba5ba03](https://github.com/lifekit-hq/finance-sentry/commit/ba5ba03897ae1969f5da841583149ee1500c813e))
+* **bank-sync:** Flow breakdown month stepper, Saved label and category share bars ([#832](https://github.com/lifekit-hq/finance-sentry/issues/832)) ([a3566fe](https://github.com/lifekit-hq/finance-sentry/commit/a3566fef1c7559efdd7b26cf3edd488d075a1321))
+* **bank-sync:** mark TrueLayer connection expired when refresh is rejected during discovery ([#785](https://github.com/lifekit-hq/finance-sentry/issues/785)) ([cd4e138](https://github.com/lifekit-hq/finance-sentry/commit/cd4e138bcde59b40bf4b5e14a63df6217a80f692))
+* **bank-sync:** phone list rows, 16px gutter and 2x2 stats on Month breakdown ([#796](https://github.com/lifekit-hq/finance-sentry/issues/796)) ([fea0471](https://github.com/lifekit-hq/finance-sentry/commit/fea0471386365cb9401dd45e40d1f79b9163b541))
+* **bank-sync:** show sync status as text on phone Accounts list ([#800](https://github.com/lifekit-hq/finance-sentry/issues/800)) ([d1fab3a](https://github.com/lifekit-hq/finance-sentry/commit/d1fab3a8c964b5f121ddd97dd9a30f4175ac8165))
+* **bank-sync:** two-row month stat tiles on phone dashboard ([#803](https://github.com/lifekit-hq/finance-sentry/issues/803)) ([80aa7fb](https://github.com/lifekit-hq/finance-sentry/commit/80aa7fb551d71fe0e12babda45d3ae3b0347d646))
+* **ci:** cap the no-mistakes backend test step's memory so it stops being OOM-killed ([#754](https://github.com/lifekit-hq/finance-sentry/issues/754)) ([179927e](https://github.com/lifekit-hq/finance-sentry/commit/179927ed57268a30c361e9bfd44e36fcbc26806a))
+* **companion:** keep held-for-digest events out of the realtime pull ([#763](https://github.com/lifekit-hq/finance-sentry/issues/763)) ([76d75c4](https://github.com/lifekit-hq/finance-sentry/commit/76d75c4323f8e220d8688fd14e8b4cd9a83b7538))
+* **docker:** set the real Google OAuth client id in the production secrets ([#818](https://github.com/lifekit-hq/finance-sentry/issues/818)) ([06b9133](https://github.com/lifekit-hq/finance-sentry/commit/06b913392faeed13828adfa248280a1b6f544af8))
+* **events:** dedupe calendar day header and row titles ([#808](https://github.com/lifekit-hq/finance-sentry/issues/808)) ([54b9feb](https://github.com/lifekit-hq/finance-sentry/commit/54b9feb5ffdc8fee872dbb124dcf422d50d54bc8))
+* **events:** stop outcome tag wrapping in Fired rows, mute not_delivered ([#802](https://github.com/lifekit-hq/finance-sentry/issues/802)) ([cdd70e1](https://github.com/lifekit-hq/finance-sentry/commit/cdd70e19808c3809ad2f81a1d0024bd5d9d56d0c))
+* **frontend:** add All/In/Out type chips to Transactions ([#812](https://github.com/lifekit-hq/finance-sentry/issues/812)) ([7f3521e](https://github.com/lifekit-hq/finance-sentry/commit/7f3521e986340a4ed4d54bfb12a477b8c802afe1))
+* **frontend:** adopt the phone overlay layout for the PWA shell ([#823](https://github.com/lifekit-hq/finance-sentry/issues/823)) ([a58b90a](https://github.com/lifekit-hq/finance-sentry/commit/a58b90a5e8d66c7e9adca6e560484cc981636863))
+* **frontend:** apply stored and OS theme on guest pages ([#798](https://github.com/lifekit-hq/finance-sentry/issues/798)) ([4d5cbbc](https://github.com/lifekit-hq/finance-sentry/commit/4d5cbbcb47290bf57ece7d023556fe69128a5fa2))
+* **frontend:** budgets over-budget copy reads "&lt;amount&gt; over · &lt;limit&gt; budget" ([#809](https://github.com/lifekit-hq/finance-sentry/issues/809)) ([0a6edf7](https://github.com/lifekit-hq/finance-sentry/commit/0a6edf7f0e6b2daa495262e284dac8542618691c))
+* **frontend:** fit the phone PWA shell to the full viewport height ([#817](https://github.com/lifekit-hq/finance-sentry/issues/817)) ([53dfd41](https://github.com/lifekit-hq/finance-sentry/commit/53dfd41c110ffe2e906ef0aacbf0a88b5fe04a72))
+* **frontend:** flatten Holdings group cards and shrink phone donut ([#815](https://github.com/lifekit-hq/finance-sentry/issues/815)) ([88094b0](https://github.com/lifekit-hq/finance-sentry/commit/88094b04b46fe91c09577825e54c414c8a94e1f2))
+* **frontend:** header avatar uses profile name initials, falls back to email ([#813](https://github.com/lifekit-hq/finance-sentry/issues/813)) ([c8aefe5](https://github.com/lifekit-hq/finance-sentry/commit/c8aefe532f2ebfa87ab532eafe283d51c9eeaf93))
+* **frontend:** label Later subscriptions and use ••• row menu ([#807](https://github.com/lifekit-hq/finance-sentry/issues/807)) ([56cdf53](https://github.com/lifekit-hq/finance-sentry/commit/56cdf533c5a1ae32c85f1e2651b53678f3b07a99))
+* **frontend:** login phone gutter, sentence-case labels, Google button width ([#805](https://github.com/lifekit-hq/finance-sentry/issues/805)) ([bbe329d](https://github.com/lifekit-hq/finance-sentry/commit/bbe329dadc141d8afe77b0e83578a4536e2ebb14))
+* **frontend:** make the active Accounts tab visibly distinct and aria-current ([#794](https://github.com/lifekit-hq/finance-sentry/issues/794)) ([a59b452](https://github.com/lifekit-hq/finance-sentry/commit/a59b452b53acd207284487206d439ebd65f15960))
+* **frontend:** show Monobank, IBKR and Binance logos on Transactions rows ([#797](https://github.com/lifekit-hq/finance-sentry/issues/797)) ([cda2945](https://github.com/lifekit-hq/finance-sentry/commit/cda2945281abc974c2168e2fd232647f97c2fd0f))
+* **frontend:** stop signed-out pages scrolling on iOS home-screen apps ([#827](https://github.com/lifekit-hq/finance-sentry/issues/827)) ([44746cd](https://github.com/lifekit-hq/finance-sentry/commit/44746cddb647ef400684ddc1b762ae49f7d7547c))
+* **frontend:** stop the phone shell scrolling the document and clipping the tab bar ([#826](https://github.com/lifekit-hq/finance-sentry/issues/826)) ([1a69b7d](https://github.com/lifekit-hq/finance-sentry/commit/1a69b7d902bdd33dc40e021be03b56851f702296))
+* **frontend:** use one shared page-container width across pages ([#814](https://github.com/lifekit-hq/finance-sentry/issues/814)) ([97495e7](https://github.com/lifekit-hq/finance-sentry/commit/97495e7601d922075699b9239690e2f9a9bc9bce))
+* **mcp:** scope all MCP tools to the authenticated user ([#749](https://github.com/lifekit-hq/finance-sentry/issues/749)) ([8d2a9fb](https://github.com/lifekit-hq/finance-sentry/commit/8d2a9fbfc912f87b6df4cd38d72e39f26fd04b83))
+* **research:** require 4 distinct stories for Google News thesis hits ([#790](https://github.com/lifekit-hq/finance-sentry/issues/790)) ([766e072](https://github.com/lifekit-hq/finance-sentry/commit/766e0724725d6d05401ea505cd9e436efa5c1ce5))
+* **settings:** add back link to Settings and spacing on People page ([#810](https://github.com/lifekit-hq/finance-sentry/issues/810)) ([33b4511](https://github.com/lifekit-hq/finance-sentry/commit/33b45116dbf134b4888c5aeb6e43229218b490aa))
+* **settings:** use labelled form fields and spacing on Settings page ([#804](https://github.com/lifekit-hq/finance-sentry/issues/804)) ([b560151](https://github.com/lifekit-hq/finance-sentry/commit/b560151e5b5f7166ff971e02c739d96163112287))
+* **shell:** reserve clearance for the floating Ledger chat button ([#795](https://github.com/lifekit-hq/finance-sentry/issues/795)) ([2feebb0](https://github.com/lifekit-hq/finance-sentry/commit/2feebb05da0b13adce83d9120ddef59c7a4c82c7))
+
+
+### Refactoring
+
+* **auth:** make external sign-in provider-agnostic ([#820](https://github.com/lifekit-hq/finance-sentry/issues/820)) ([19e93a5](https://github.com/lifekit-hq/finance-sentry/commit/19e93a540258267ef184ddca116dd81d3153b6c6))
+* **frontend:** use library controls for the last raw buttons and banner ([#830](https://github.com/lifekit-hq/finance-sentry/issues/830)) ([332ef36](https://github.com/lifekit-hq/finance-sentry/commit/332ef3630c9ff3816d9d40380dba18a39671be31))
+
+
+### Documentation
+
+* **qa:** correct QA test-account guidance and drop stale credentials ([#836](https://github.com/lifekit-hq/finance-sentry/issues/836)) ([7147ea0](https://github.com/lifekit-hq/finance-sentry/commit/7147ea0d7ab70ee0a5533f25e395d61f0677cfd3))
+
 ## [1.13.0](https://github.com/lifekit-hq/finance-sentry/compare/v1.12.0...v1.13.0) (2026-09-29)
 
 
