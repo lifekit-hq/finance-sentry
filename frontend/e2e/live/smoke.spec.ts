@@ -20,9 +20,11 @@ async function login(page: Page): Promise<void> {
   await page.locator('input[type="email"]').fill(EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('form').getByRole('button', {name: /sign in/i}).click();
-  // Post-login the app lands on /accounts (its default target); navigate from there.
+  // The unauthenticated '/' bounces to /login?returnUrl=/dashboard, so sign-in lands on the
+  // dashboard. Do not reload it: every full page load spends two requests (/auth/methods,
+  // /auth/me) of the API's 10-per-minute anonymous budget per address, and the suite's
+  // logins and page loads share that budget.
   await page.waitForURL(url => !url.pathname.startsWith('/login'), {timeout: 15_000});
-  await page.goto('/dashboard');
   await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible({timeout: 15_000});
 }
 
