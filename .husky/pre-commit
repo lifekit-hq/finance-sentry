@@ -1,58 +1,20 @@
 #!/bin/sh
 
-# Husky Pre-Commit Hook
-# Enforces (hard gate — commit is blocked on any failure):
-#   1. Auto-fix + format staged frontend files (lint-staged)
-#   2. Full frontend lint (the UI libraries moved to lifekit-common;
-#      frontend/projects/ no longer exists but stays in the trigger glob as a guard)
-#   3. Prettier format check
-#
-# Versioning is intentionally NOT enforced here: release-please owns the version
-# for both frontend/package.json and FinanceSentry.API.csproj, deriving bumps
-# from Conventional Commit messages on merge to main. A manual pre-commit gate
-# duplicated that job and actively fought it — every code change was forced to
-# hand-bump a version release-please would then bump again, so committers (and
-# automated agents) routed around the constraint. Removed; let release-please do it.
-#
-# NOTE: this repo's git root is one level above the npm package (frontend/),
-# so husky's own installer can't wire it. `frontend`'s `prepare` script sets
-# `core.hooksPath` to this directory instead — see frontend/package.json.
-
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo "🔍 Running pre-commit checks..."
 
-# Get list of staged files
-STAGED_FILES=$(git diff --cached --name-only)
+echo "📝 Linting and formatting staged frontend files..."
 
-# Frontend: lint runs on any src OR library (projects) change.
-FRONTEND_LINT_NEEDED=false
-if echo "$STAGED_FILES" | grep -qE "^frontend/(src|projects)/"; then
-  FRONTEND_LINT_NEEDED=true
-fi
-
-# Frontend lint + format gate (mirrors the Frontend CI `lint-build-test` job)
-if [ "$FRONTEND_LINT_NEEDED" = true ]; then
-  echo "📝 Auto-fixing staged files (lint-staged)..."
-  (cd frontend && npx lint-staged)
-
-  echo "🧹 Linting the frontend app..."
-  if ! (cd frontend && npm run lint); then
-    echo -e "${RED}❌ ERROR: frontend lint failed. Fix the errors above before committing.${NC}"
-    exit 1
-  fi
-
-  echo "🎨 Verifying formatting..."
-  if ! (cd frontend && npm run format:check); then
-    echo -e "${RED}❌ ERROR: formatting check failed. Run 'npm run format' in frontend/.${NC}"
-    exit 1
-  fi
+if ! (cd frontend && npx lint-staged); then
+  echo -e "${RED}❌ ERROR: lint-staged failed. Fix the errors above before committing.${NC}"
+  exit 1
 fi
 
 echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
+
 exit 0
