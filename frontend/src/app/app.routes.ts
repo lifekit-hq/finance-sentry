@@ -9,13 +9,13 @@ import {Permission} from './shared/enums/permission/permission.enum';
 
 export const APP_ROUTES: Routes = [
   {
-    path: AppRoute.Login.slice(1),
+    path: AppRoute.Login,
     loadComponent: () =>
       import('./modules/auth/pages/login/login.component').then(m => m.LoginComponent),
     canActivate: [guestGuard],
   },
   {
-    path: AppRoute.AcceptInvite.slice(1),
+    path: AppRoute.AcceptInvite,
     loadComponent: () =>
       import('./modules/auth/pages/accept-invite/accept-invite.component').then(
         m => m.AcceptInviteComponent
@@ -23,7 +23,7 @@ export const APP_ROUTES: Routes = [
     canActivate: [guestGuard],
   },
   {
-    path: AppRoute.McpConnect.slice(1),
+    path: AppRoute.McpConnect,
     loadComponent: () =>
       import('./modules/auth/pages/mcp-connect/mcp-connect.component').then(
         m => m.McpConnectComponent
@@ -35,28 +35,28 @@ export const APP_ROUTES: Routes = [
     canActivate: [authGuard],
     children: [
       {
-        path: AppRoute.FlowBreakdown.slice(1),
+        path: AppRoute.FlowBreakdown,
         loadComponent: () =>
           import('./modules/bank-sync/pages/flow-breakdown/flow-breakdown.component').then(
             m => m.FlowBreakdownComponent
           ),
       },
       {
-        path: AppRoute.Dashboard.slice(1),
+        path: AppRoute.Dashboard,
         loadComponent: () =>
           import('./modules/bank-sync/pages/dashboard/dashboard.component').then(
             m => m.DashboardComponent
           ),
       },
       {
-        path: AppRoute.Accounts.slice(1),
+        path: AppRoute.Accounts,
         loadChildren: () =>
           import('./modules/bank-sync/bank-sync.routes').then(
             ({BANK_SYNC_ROUTES}) => BANK_SYNC_ROUTES
           ),
       },
       {
-        path: AppRoute.Transactions.slice(1),
+        path: AppRoute.Transactions,
         loadComponent: () =>
           import('./modules/bank-sync/pages/transaction-ledger/transaction-ledger.component').then(
             m => m.TransactionLedgerComponent
@@ -66,38 +66,38 @@ export const APP_ROUTES: Routes = [
         // The Income page was the transaction ledger filtered to credits, plus charts the
         // dashboard already owns. Kept as a redirect so old links and bookmarks still land
         // somewhere sensible instead of on a dead route.
-        path: AppRoute.Income.slice(1),
+        path: AppRoute.Income,
         redirectTo: () => inject(Router).parseUrl(`${AppRoute.Transactions}?type=credit`),
       },
       {
-        path: AppRoute.Investments.slice(1),
-        redirectTo: AppRoute.AccountsInvestments.slice(1),
+        path: AppRoute.Investments,
+        redirectTo: AppRoute.AccountsInvestments,
         pathMatch: 'full',
       },
       {
-        path: AppRoute.Budgets.slice(1),
+        path: AppRoute.Budgets,
         loadComponent: () =>
           import('./modules/budgets/pages/budgets/budgets.component').then(m => m.BudgetsComponent),
       },
       {
-        path: AppRoute.Subscriptions.slice(1),
+        path: AppRoute.Subscriptions,
         loadComponent: () =>
           import('./modules/subscriptions/pages/subscriptions/subscriptions.component').then(
             m => m.SubscriptionsComponent
           ),
       },
       {
-        path: AppRoute.Alerts.slice(1),
+        path: AppRoute.Alerts,
         loadComponent: () =>
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),
       },
       {
-        path: AppRoute.Events.slice(1),
+        path: AppRoute.Events,
         loadComponent: () =>
           import('./modules/events/pages/events/events.component').then(m => m.EventsComponent),
       },
       {
-        path: AppRoute.Ledger.slice(1),
+        path: AppRoute.Ledger,
         canMatch: [permissionGuard(Permission.AiUse)],
         loadComponent: () =>
           import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
@@ -105,13 +105,13 @@ export const APP_ROUTES: Routes = [
           ),
       },
       {
-        path: AppRoute.SettingsPeople.slice(1),
+        path: AppRoute.SettingsPeople,
         canMatch: [permissionGuard(Permission.UsersManage)],
         loadComponent: () =>
           import('./modules/settings/pages/people/people.component').then(m => m.PeopleComponent),
       },
       {
-        path: AppRoute.Settings.slice(1),
+        path: AppRoute.Settings,
         loadComponent: () =>
           import('./modules/settings/pages/settings/settings.component').then(
             m => m.SettingsComponent
