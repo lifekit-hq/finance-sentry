@@ -134,6 +134,9 @@ services:
       # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
+      # Direct Google sign-in button on the login page. Off by default in production (the org provider offers
+      # Google); set AUTH_GOOGLE_DIRECT_ENABLED=true to turn it back on.
+      Auth__GoogleDirect__Enabled: ${AUTH_GOOGLE_DIRECT_ENABLED:-false}
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
