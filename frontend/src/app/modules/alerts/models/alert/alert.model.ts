@@ -2,9 +2,28 @@ export type AlertType =
   | 'LowBalance'
   | 'SyncFailure'
   | 'UnusualSpend'
+  | 'ThesisBroken'
+  | 'MarketStructure'
   | 'PolicyViolation'
   | 'Opportunity'
-  | 'FilingLanded';
+  | 'ConsentExpiring'
+  | 'JobFailure'
+  | 'PerformanceBrief'
+  | 'CashShortfall'
+  | 'PriceHike'
+  | 'DuplicateCharge'
+  | 'CategorySpike'
+  | 'FxSpread'
+  | 'RebalanceProposal'
+  | 'CashSweepProposal'
+  | 'EarningsAhead'
+  | 'FilingLanded'
+  | 'NewsCluster'
+  | 'BudgetBreach'
+  | 'FamilyStatement'
+  | 'PolicyReview'
+  | 'PolicyReviewMissed'
+  | 'RelativeUnderperformance';
 export type AlertSeverity = 'Error' | 'Warning' | 'Info';
 export type AlertFilter = 'all' | 'unread' | 'error' | 'warning' | 'info';
 
@@ -20,6 +39,9 @@ export interface Alert {
   isResolved: boolean;
   createdAt: string;
   resolvedAt: Nullable<string>;
+  /** Times a suppressed repeat bumped this row; 1 for an alert that fired once. */
+  occurrenceCount: number;
+  lastOccurredAt: string;
 }
 
 export interface AlertsPageResponse {

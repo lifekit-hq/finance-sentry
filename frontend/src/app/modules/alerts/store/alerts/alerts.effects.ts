@@ -2,7 +2,8 @@ import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
+import {type Alert} from '../../models/alert/alert.model';
+import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
 
 interface EffectsStore {
@@ -12,20 +13,17 @@ interface EffectsStore {
   markReadLocal: (id: string) => void;
   markAllReadLocal: () => void;
   dismissLocal: (id: string) => void;
-  filter: Signal<AlertFilter>;
-  currentPage: Signal<number>;
-  pageSize: Signal<number>;
 }
 
 export function alertsEffects(store: EffectsStore) {
   const api = inject(AlertsService);
 
   return {
-    load: rxMethod<void>(
+    load: rxMethod<AlertsQuery>(
       pipe(
         tap(() => store.setStatus('loading')),
-        switchMap(() =>
-          api.getAlerts(store.filter(), store.currentPage(), store.pageSize()).pipe(
+        switchMap(({filter, page, pageSize}) =>
+          api.getAlerts(filter, page, pageSize).pipe(
             tap(res => store.setData(res.items, res.totalCount, res.unreadCount)),
             catchError(() => {
               store.setStatus('error');
@@ -79,11 +77,12 @@ export function alertsEffects(store: EffectsStore) {
 }
 
 interface HookStore {
-  load: () => void;
+  query: Signal<AlertsQuery>;
+  load: (query: Signal<AlertsQuery>) => unknown;
   loadUnreadCount: () => void;
 }
 
 export function alertsHooks(store: HookStore): void {
-  store.load();
+  store.load(store.query);
   store.loadUnreadCount();
 }
