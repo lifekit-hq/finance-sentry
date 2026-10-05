@@ -78,6 +78,42 @@ public sealed class FlexStatementXml
     [XmlArray("FinancialInstrumentInformation")]
     [XmlArrayItem("FinancialInstrument")]
     public List<FlexFinancialInstrumentXml> FinancialInstruments { get; set; } = [];
+
+    [XmlArray("OpenPositions")]
+    [XmlArrayItem("OpenPosition")]
+    public List<FlexOpenPositionXml> OpenPositions { get; set; } = [];
+
+    [XmlArray("CashReport")]
+    [XmlArrayItem("CashReportCurrency")]
+    public List<FlexCashReportCurrencyXml> CashReport { get; set; } = [];
+}
+
+/// <summary>One row of the Open Positions section. Raw wire strings, like the other Flex rows.
+/// <c>LevelOfDetail</c> is <c>SUMMARY</c> for the per-symbol row and <c>LOT</c> for per-lot rows.</summary>
+public sealed class FlexOpenPositionXml
+{
+    [XmlAttribute("accountId")] public string? AccountId { get; set; }
+    [XmlAttribute("currency")] public string? Currency { get; set; }
+    [XmlAttribute("assetCategory")] public string? AssetCategory { get; set; }
+    [XmlAttribute("symbol")] public string? Symbol { get; set; }
+    [XmlAttribute("description")] public string? Description { get; set; }
+    [XmlAttribute("conid")] public string? Conid { get; set; }
+    [XmlAttribute("isin")] public string? Isin { get; set; }
+    [XmlAttribute("reportDate")] public string? ReportDate { get; set; }
+    [XmlAttribute("position")] public string? Position { get; set; }
+    [XmlAttribute("markPrice")] public string? MarkPrice { get; set; }
+    [XmlAttribute("positionValue")] public string? PositionValue { get; set; }
+    [XmlAttribute("costBasisPrice")] public string? CostBasisPrice { get; set; }
+    [XmlAttribute("levelOfDetail")] public string? LevelOfDetail { get; set; }
+}
+
+/// <summary>One row of the Cash Report section — a per-currency row, plus a <c>BASE_SUMMARY</c> total row.</summary>
+public sealed class FlexCashReportCurrencyXml
+{
+    [XmlAttribute("accountId")] public string? AccountId { get; set; }
+    [XmlAttribute("currency")] public string? Currency { get; set; }
+    [XmlAttribute("endingCash")] public string? EndingCash { get; set; }
+    [XmlAttribute("levelOfDetail")] public string? LevelOfDetail { get; set; }
 }
 
 /// <summary>

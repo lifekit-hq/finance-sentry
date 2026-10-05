@@ -86,6 +86,7 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerageInstrumentRepository, BrokerageInstrumentRepository>();
         services.AddScoped<IBrokerageTradeRepository, BrokerageTradeRepository>();
         services.AddScoped<IBrokerageCashTransactionRepository, BrokerageCashTransactionRepository>();
+        services.AddScoped<IIbkrFlexHoldingsSyncService, IbkrFlexHoldingsSyncService>();
         services.AddScoped<IIbkrFlexTradeSyncService, IbkrFlexTradeSyncService>();
         services.AddSingleton<BrokerageCostBasisReconciler>();
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();

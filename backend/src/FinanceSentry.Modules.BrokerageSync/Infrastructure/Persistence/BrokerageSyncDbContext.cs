@@ -83,6 +83,7 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.Provider).IsRequired().HasMaxLength(20).HasDefaultValue("ibkr");
             entity.Property(e => e.AverageCostUsd).HasPrecision(20, 8);
             entity.Property(e => e.CostBasisUsd).HasPrecision(20, 4);
+            entity.Property(e => e.FlexAsOfDate);
             entity.HasOne<BrokerageInstrument>()
                 .WithMany()
                 .HasForeignKey(e => e.InstrumentId)

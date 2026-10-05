@@ -24,6 +24,7 @@ public sealed record BrokerageHoldingsResponse(
     string Provider,
     DateTime? SyncedAt,
     bool IsStale,
+    DateOnly? FlexAsOfDate,
     IReadOnlyList<BrokeragePositionDto> Positions,
     decimal TotalUsdValue);
 
@@ -53,13 +54,16 @@ public sealed class GetBrokerageHoldingsQueryHandler(
                 Provider: "ibkr",
                 SyncedAt: null,
                 IsStale: false,
+                FlexAsOfDate: null,
                 Positions: [],
                 TotalUsdValue: 0m);
         }
 
         var trades = await _tradeRepository.GetByUserIdAsync(request.UserId, ct);
         var latestSyncedAt = holdings.Max(h => h.SyncedAt);
-        var isStale = DateTime.UtcNow - latestSyncedAt > StaleThreshold;
+        // Flex-sourced holdings are daily by nature: report their statement date and don't flag them stale on the hourly threshold.
+        var flexAsOf = holdings.Where(h => h.FlexAsOfDate.HasValue).Max(h => h.FlexAsOfDate);
+        var isStale = flexAsOf is null && DateTime.UtcNow - latestSyncedAt > StaleThreshold;
         var totalUsd = holdings.Sum(h => h.UsdValue);
 
         var positions = holdings
@@ -83,6 +87,7 @@ public sealed class GetBrokerageHoldingsQueryHandler(
             Provider: "ibkr",
             SyncedAt: latestSyncedAt,
             IsStale: isStale,
+            FlexAsOfDate: flexAsOf,
             Positions: positions,
             TotalUsdValue: totalUsd);
     }
