@@ -7,6 +7,7 @@ export interface ConnectOutcome {
   readonly successCode: 'CONNECTED' | 'POLLING';
   readonly count: number;
   readonly institutionType: InstitutionType;
+  readonly importPending?: boolean;
 }
 
 export interface ConnectStrategy {

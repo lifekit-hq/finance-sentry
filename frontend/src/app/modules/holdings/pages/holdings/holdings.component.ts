@@ -15,6 +15,7 @@ import {
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {HoldingsStore} from '../../store/holdings.store';
 
 const SKELETON_ROWS = 4;
@@ -41,6 +42,7 @@ const SKELETON_ROWS = 4;
 export class InvestmentsComponent {
   private readonly router = inject(Router);
   public readonly store = inject(HoldingsStore);
+  public readonly connectStore = inject(ConnectStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';

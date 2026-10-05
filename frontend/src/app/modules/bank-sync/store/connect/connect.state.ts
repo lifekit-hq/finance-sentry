@@ -12,6 +12,7 @@ export interface ConnectState {
   statusMessage: Nullable<string>;
   modalStep: ModalStep;
   institutionType: Nullable<InstitutionType>;
+  importPending: boolean;
 }
 
 export const initialConnectState: ConnectState = {
@@ -21,4 +22,5 @@ export const initialConnectState: ConnectState = {
   statusMessage: null,
   modalStep: 'closed',
   institutionType: null,
+  importPending: false,
 };

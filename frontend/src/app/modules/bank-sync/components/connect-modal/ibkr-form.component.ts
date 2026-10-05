@@ -1,3 +1,4 @@
+import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
@@ -8,10 +9,13 @@ import {
   InputComponent,
 } from '@lifekit-hq/ui';
 
-import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
+import {IbkrConnectStore} from '../../store/ibkr-connect/ibkr-connect.store';
 import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
-import {CONSUMER_KEY_LENGTH, type PemControlName} from './ibkr-form.constants';
+import {IbkrFlexGuideComponent} from './ibkr-flex-guide.component';
+import {OAUTH_GUIDE_STEPS} from './ibkr-flex-guide.constants';
+import {FLEX_FRESHNESS_NOTE, FLEX_QUERY_ID_PATTERN} from './ibkr-form.constants';
+import {IbkrOauthFormComponent} from './ibkr-oauth-form.component';
 
 @Component({
   selector: 'fns-ibkr-form',
@@ -19,93 +23,69 @@ import {CONSUMER_KEY_LENGTH, type PemControlName} from './ibkr-form.constants';
   imports: [
     AlertComponent,
     ButtonComponent,
+    DatePipe,
     DialogActionsComponent,
     FormFieldComponent,
+    IbkrFlexGuideComponent,
+    IbkrOauthFormComponent,
     InputComponent,
     ReactiveFormsModule,
   ],
+  providers: [IbkrConnectStore],
   templateUrl: './ibkr-form.component.html',
 })
 export class IbkrFormComponent {
   private readonly strategy = inject(CONNECT_STRATEGY);
-  private readonly accountsStore = inject(AccountsStore);
 
   public readonly store = inject(ConnectStore);
+  public readonly ibkr = inject(IbkrConnectStore);
+
+  public readonly freshnessNote = FLEX_FRESHNESS_NOTE;
+  public readonly oauthGuideSteps = OAUTH_GUIDE_STEPS;
 
   public readonly form = new FormGroup({
-    consumerKey: new FormControl<string>('', {
+    token: new FormControl<string>('', {nonNullable: true, validators: [Validators.required]}),
+    queryId: new FormControl<string>('', {
       nonNullable: true,
-      validators: [
-        Validators.required,
-        Validators.minLength(CONSUMER_KEY_LENGTH),
-        Validators.maxLength(CONSUMER_KEY_LENGTH),
-      ],
+      validators: [Validators.required, Validators.pattern(FLEX_QUERY_ID_PATTERN)],
     }),
-    accessToken: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
-    accessTokenSecret: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
-    signatureKey: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
-    encryptionKey: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
-    dhParam: new FormControl<string>('', {nonNullable: true, validators: [Validators.required]}),
   });
 
-  public readonly isDuplicateError = computed(() => this.store.errorCode() === 'IBKR_DUPLICATE');
+  public readonly showsConnectError = computed(() => this.ibkr.path() === 'flex');
 
-  public async onFileSelected(event: Event, control: PemControlName): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-    const text = await file.text();
-    this.form.controls[control].setValue(text.trim());
-    this.form.controls[control].markAsTouched();
+  /** Spaces creep in when a token is copied from a web page. */
+  private flexRequest(): {token: string; queryId: string} {
+    const value = this.form.getRawValue();
+    return {token: value.token.replace(/\s+/g, ''), queryId: value.queryId.trim()};
   }
 
-  public submit(): void {
+  public check(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
-    const value = this.form.getRawValue();
+    this.store.resetError();
+    this.ibkr.setPath('flex');
+    this.ibkr.validate(this.flexRequest());
+  }
+
+  public confirm(): void {
+    if (this.form.invalid || !this.ibkr.hasPreview()) {
+      return;
+    }
+    this.ibkr.setPath('flex');
     this.store.connect({
       strategy: this.strategy,
-      payload: {
-        consumerKey: value.consumerKey.trim().toUpperCase(),
-        accessToken: value.accessToken.trim(),
-        accessTokenSecret: value.accessTokenSecret.trim(),
-        signatureKey: value.signatureKey.trim(),
-        encryptionKey: value.encryptionKey.trim(),
-        dhParam: value.dhParam.trim(),
-      },
+      payload: {kind: 'flex', payload: this.flexRequest()},
     });
+  }
+
+  public edit(): void {
+    this.store.resetError();
+    this.ibkr.resetValidation();
   }
 
   public back(): void {
     this.store.setModalStep('type-picker');
-  }
-
-  public disconnectExisting(): void {
-    this.accountsStore.disconnectIBKR();
-    this.store.resetError();
-    this.form.reset({
-      consumerKey: '',
-      accessToken: '',
-      accessTokenSecret: '',
-      signatureKey: '',
-      encryptionKey: '',
-      dhParam: '',
-    });
   }
 }

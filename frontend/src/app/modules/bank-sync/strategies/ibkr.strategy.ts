@@ -3,7 +3,7 @@ import {map, type Observable} from 'rxjs';
 
 import {type Provider} from '../../../shared/models/provider/provider.model';
 import {IbkrFormComponent} from '../components/connect-modal/ibkr-form.component';
-import {type ConnectIBKRRequest} from '../models/ibkr/ibkr.model';
+import {type IbkrConnectInput} from '../models/ibkr/ibkr.model';
 import {IBKRService} from '../services/ibkr.service';
 import {type ConnectOutcome, type ConnectStrategy} from './connect-strategy';
 
@@ -15,7 +15,18 @@ export class IbkrConnectStrategy implements ConnectStrategy {
   public readonly formComponent: Type<unknown> = IbkrFormComponent;
 
   public submit(input: unknown): Observable<ConnectOutcome> {
-    const payload = input as ConnectIBKRRequest;
+    const {kind, payload} = input as IbkrConnectInput;
+    if (kind === 'flex') {
+      // The Flex credential is saved only; holdings arrive with the daily Flex sync.
+      return this.ibkr.connectFlex(payload).pipe(
+        map(() => ({
+          successCode: 'CONNECTED' as const,
+          count: 0,
+          institutionType: 'broker' as const,
+          importPending: true,
+        }))
+      );
+    }
     return this.ibkr.connect(payload).pipe(
       map(result => ({
         successCode: 'CONNECTED' as const,

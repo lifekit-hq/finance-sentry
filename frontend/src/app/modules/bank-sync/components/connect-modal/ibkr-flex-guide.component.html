@@ -1,0 +1,201 @@
+<ol class="flex flex-col gap-cmn-6 text-cmn-sm">
+  <li class="flex flex-col gap-cmn-2">
+    <p class="font-semibold">1. Open Flex Queries</p>
+    <p>
+      Log in to the IBKR Client Portal on the website. In the menu choose
+      <strong>Performance &amp; Reports</strong>, then <strong>Flex Queries</strong>.
+    </p>
+    <svg
+      viewBox="0 0 320 120"
+      role="img"
+      aria-label="Client Portal menu with Performance and Reports expanded and Flex Queries highlighted"
+      class="w-full rounded-cmn-md border border-cmn-border"
+    >
+      <rect x="0" y="0" width="320" height="120" fill="currentColor" fill-opacity="0.04" />
+      <rect x="0" y="0" width="320" height="22" fill="currentColor" fill-opacity="0.1" />
+      <text x="10" y="15" font-size="10" fill="currentColor">Client Portal</text>
+      <text x="170" y="15" font-size="9" fill="currentColor" fill-opacity="0.6">Portfolio</text>
+      <text x="215" y="15" font-size="9" fill="currentColor" fill-opacity="0.6">Trade</text>
+      <rect x="250" y="5" width="60" height="14" rx="3" fill="currentColor" fill-opacity="0.15" />
+      <text x="254" y="15" font-size="8" fill="currentColor">Performance</text>
+      <rect x="196" y="24" width="120" height="86" rx="4" fill="currentColor" fill-opacity="0.08" />
+      <text x="204" y="40" font-size="9" fill="currentColor" fill-opacity="0.7">Statements</text>
+      <text x="204" y="56" font-size="9" fill="currentColor" fill-opacity="0.7">Tax Documents</text>
+      <g class="text-accent-default">
+        <rect
+          x="200"
+          y="62"
+          width="112"
+          height="18"
+          rx="3"
+          fill="currentColor"
+          fill-opacity="0.18"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="206" y="75" font-size="10" font-weight="bold" fill="currentColor">
+          Flex Queries
+        </text>
+      </g>
+      <text x="204" y="96" font-size="9" fill="currentColor" fill-opacity="0.7">Reports</text>
+    </svg>
+  </li>
+
+  <li class="flex flex-col gap-cmn-2">
+    <p class="font-semibold">2. Create the report</p>
+    <p>
+      Next to <strong>Activity Flex Query</strong> press <strong>+</strong>. Name it
+      <em>Finance Sentry</em>. In <strong>Sections</strong> tick exactly these five, and in each one
+      press <strong>Select All</strong> so every field is included:
+    </p>
+    <ul class="flex flex-wrap gap-cmn-2">
+      @for (section of sections; track section) {
+        <li class="rounded-cmn-md bg-cmn-surface-raised px-cmn-3 py-cmn-1">{{ section }}</li>
+      }
+    </ul>
+    <p>
+      Then scroll to <strong>Delivery Configuration</strong> and set the following. These make the
+      report readable by Finance Sentry.
+    </p>
+    <svg
+      viewBox="0 0 320 150"
+      role="img"
+      aria-label="Query form: five ticked sections and delivery configuration values"
+      class="w-full rounded-cmn-md border border-cmn-border"
+    >
+      <rect x="0" y="0" width="320" height="150" fill="currentColor" fill-opacity="0.04" />
+      <text x="10" y="16" font-size="10" font-weight="bold" fill="currentColor">Sections</text>
+      @for (section of sections; track section; let i = $index) {
+        <g class="text-accent-default">
+          <rect
+            [attr.y]="24 + i * 18"
+            x="10"
+            width="10"
+            height="10"
+            rx="2"
+            fill="currentColor"
+            fill-opacity="0.25"
+            stroke="currentColor"
+          />
+          <path
+            [attr.d]="'M12 ' + (29 + i * 18) + ' l2.5 2.5 l4 -5'"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+        </g>
+        <text [attr.y]="33 + i * 18" x="26" font-size="9" fill="currentColor">{{ section }}</text>
+      }
+      <text x="180" y="16" font-size="10" font-weight="bold" fill="currentColor">
+        Delivery Configuration
+      </text>
+      @for (setting of deliverySettings.slice(0, 5); track setting.label; let i = $index) {
+        <text [attr.y]="32 + i * 18" x="180" font-size="7.5" fill="currentColor" fill-opacity="0.6">
+          {{ setting.label }}
+        </text>
+        <text [attr.y]="40 + i * 18" x="180" font-size="8.5" fill="currentColor">
+          {{ setting.value }}
+        </text>
+      }
+    </svg>
+    <dl class="grid grid-cols-[1fr_auto] gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs">
+      @for (setting of deliverySettings; track setting.label) {
+        <dt class="text-cmn-text-secondary">{{ setting.label }}</dt>
+        <dd class="text-right font-medium">{{ setting.value }}</dd>
+      }
+    </dl>
+    <p>Press <strong>Continue</strong>, then <strong>Create</strong>.</p>
+  </li>
+
+  <li class="flex flex-col gap-cmn-2">
+    <p class="font-semibold">3. Turn on the Flex Web Service and copy the token</p>
+    <p>
+      Back on the Flex Queries page, find <strong>Flex Web Service</strong> and press the gear icon.
+      Switch the service <strong>on</strong>, press <strong>Generate New Token</strong> and pick the
+      longest expiry (1 year) so you don't have to redo this often. Leave the IP restriction off.
+      Copy the token that appears.
+    </p>
+    <svg
+      viewBox="0 0 320 110"
+      role="img"
+      aria-label="Flex Web Service dialog with the service switched on and a token to copy"
+      class="w-full rounded-cmn-md border border-cmn-border"
+    >
+      <rect x="0" y="0" width="320" height="110" fill="currentColor" fill-opacity="0.04" />
+      <text x="10" y="18" font-size="10" font-weight="bold" fill="currentColor">
+        Flex Web Service Configuration
+      </text>
+      <text x="10" y="40" font-size="9" fill="currentColor">Flex Web Service Status</text>
+      <g class="text-accent-default">
+        <rect x="150" y="30" width="34" height="14" rx="7" fill="currentColor" />
+        <circle cx="177" cy="37" r="5" fill="white" />
+        <text x="190" y="41" font-size="9" fill="currentColor">On</text>
+      </g>
+      <text x="10" y="62" font-size="9" fill="currentColor">Current Token</text>
+      <rect x="80" y="52" width="170" height="14" rx="3" fill="currentColor" fill-opacity="0.1" />
+      <text x="86" y="62" font-size="9" fill="currentColor" font-family="monospace">
+        1234567890123456789012
+      </text>
+      <text x="10" y="86" font-size="9" fill="currentColor">Token valid for</text>
+      <g class="text-accent-default">
+        <rect
+          x="80"
+          y="76"
+          width="90"
+          height="14"
+          rx="3"
+          fill="currentColor"
+          fill-opacity="0.18"
+          stroke="currentColor"
+        />
+        <text x="86" y="86" font-size="9" fill="currentColor">1 year</text>
+      </g>
+    </svg>
+    <cmn-alert variant="info">
+      When the token expires, syncing stops until you generate a new one and paste it here.
+    </cmn-alert>
+  </li>
+
+  <li class="flex flex-col gap-cmn-2">
+    <p class="font-semibold">4. Copy the Query ID</p>
+    <p>
+      Return to the list of Activity Flex Queries. The number shown beside
+      <em>Finance Sentry</em> is the <strong>Query ID</strong> (press the <strong>i</strong> icon if
+      you don't see it).
+    </p>
+    <svg
+      viewBox="0 0 320 70"
+      role="img"
+      aria-label="Query list row with the Query ID number highlighted"
+      class="w-full rounded-cmn-md border border-cmn-border"
+    >
+      <rect x="0" y="0" width="320" height="70" fill="currentColor" fill-opacity="0.04" />
+      <text x="10" y="16" font-size="8" fill="currentColor" fill-opacity="0.6">Query Name</text>
+      <text x="200" y="16" font-size="8" fill="currentColor" fill-opacity="0.6">Query ID</text>
+      <line x1="0" y1="22" x2="320" y2="22" stroke="currentColor" stroke-opacity="0.2" />
+      <text x="10" y="42" font-size="10" fill="currentColor">Finance Sentry</text>
+      <g class="text-accent-default">
+        <rect
+          x="194"
+          y="30"
+          width="64"
+          height="18"
+          rx="3"
+          fill="currentColor"
+          fill-opacity="0.18"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="202" y="43" font-size="10" font-weight="bold" fill="currentColor">123456</text>
+      </g>
+    </svg>
+  </li>
+
+  <li class="flex flex-col gap-cmn-2">
+    <p class="font-semibold">5. Paste both above</p>
+    <p>
+      Enter the token and the Query ID, then press <strong>Check connection</strong>. You'll see
+      your account and what the report contains before anything is saved.
+    </p>
+  </li>
+</ol>

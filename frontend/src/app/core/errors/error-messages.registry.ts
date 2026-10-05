@@ -30,6 +30,19 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   IBKR_DUPLICATE: 'IBKR account already connected. Disconnect the existing one to reconnect.',
   IBKR_ALREADY_CONNECTED:
     'IBKR account already connected. Disconnect the existing one to reconnect.',
+  IBKR_FLEX_INVALID_TOKEN:
+    "IBKR didn't accept this token. Copy it again from Flex Web Service Configuration, with no spaces — a token stops working once a new one is generated.",
+  IBKR_FLEX_TOKEN_EXPIRED:
+    'This token has expired. Generate a new one in Flex Web Service Configuration (pick the 1 year expiry) and paste it here.',
+  IBKR_FLEX_QUERY_NOT_FOUND:
+    "IBKR couldn't find a Flex query with that ID. Copy the Query ID from the list of Activity Flex Queries — it's the number beside your query's name, not the token.",
+  IBKR_FLEX_NOT_READY:
+    'IBKR is still preparing the report. This is normal — wait a minute and press Check connection again.',
+  IBKR_FLEX_RATE_LIMITED: 'IBKR limits how often a token can be used. Wait a minute and try again.',
+  IBKR_FLEX_IP_RESTRICTED:
+    'This token is restricted to specific IP addresses. In Flex Web Service Configuration remove the IP restriction, then try again.',
+  IBKR_FLEX_ERROR:
+    'IBKR could not run this Flex query. Check the token and query ID, and that it is an Activity Flex Query.',
   IBKR_GATEWAY_UNAVAILABLE:
     'Could not reach the IBKR gateway. This is usually temporary — try again in a minute.',
   VALIDATION_ERROR: 'Some fields look wrong — please review the highlighted errors.',

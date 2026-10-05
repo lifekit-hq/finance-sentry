@@ -22,3 +22,31 @@ export interface IBKRConnectResult {
   holdingsCount: number;
   connectedAt: string;
 }
+
+/**
+ * IBKR connect via the Flex Web Service — the default path. Two values from the user's own
+ * Client Portal: the Flex Web Service token and the id of an Activity Flex Query. Both are
+ * posted to POST /brokerage/ibkr/flex/validate (dry run) and then /flex/connect (save).
+ */
+export interface ConnectIbkrFlexRequest {
+  token: string;
+  queryId: string;
+}
+
+/** What the Flex query returned for a not-yet-saved token + query id. */
+export interface IbkrFlexPreview {
+  accountId: string;
+  /** ISO date (yyyy-MM-dd), or null when IBKR sent no parseable period. */
+  fromDate: Nullable<string>;
+  toDate: Nullable<string>;
+  /** ISO timestamp of when IBKR generated the report, or null. */
+  generatedAtUtc: Nullable<string>;
+  openPositionsCount: number;
+  cashCurrencies: string[];
+  tradesCount: number;
+  cashTransactionsCount: number;
+}
+
+/** The two ways to connect IBKR; the strategy routes on `kind`. */
+export type IbkrConnectInput =
+  {kind: 'flex'; payload: ConnectIbkrFlexRequest} | {kind: 'oauth'; payload: ConnectIBKRRequest};

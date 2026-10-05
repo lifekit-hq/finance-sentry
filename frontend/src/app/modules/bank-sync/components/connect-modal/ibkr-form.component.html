@@ -1,98 +1,140 @@
-<form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-cmn-6">
-  <cmn-form-field
-    [control]="form.controls.consumerKey"
-    label="Consumer key"
-    hint="The 9-character key you chose on IBKR's self-service OAuth portal."
-  >
-    <cmn-input formControlName="consumerKey" type="text" placeholder="e.g. FINSENTRY" />
-  </cmn-form-field>
+<div class="flex flex-col gap-cmn-6">
+  @if (ibkr.hasPreview()) {
+    @if (ibkr.preview(); as preview) {
+      <cmn-alert title="Account {{ preview.accountId }} found" variant="success" icon="CircleCheck">
+        <dl class="mt-cmn-2 grid grid-cols-[1fr_auto] gap-x-cmn-4 gap-y-cmn-1 text-cmn-sm">
+          <dt>Open positions</dt>
+          <dd class="text-right font-medium">{{ preview.openPositionsCount }}</dd>
+          <dt>Cash currencies</dt>
+          <dd class="text-right font-medium">
+            {{ preview.cashCurrencies.length ? preview.cashCurrencies.join(', ') : 'none' }}
+          </dd>
+          <dt>Trades in report</dt>
+          <dd class="text-right font-medium">{{ preview.tradesCount }}</dd>
+          <dt>Cash transactions</dt>
+          <dd class="text-right font-medium">{{ preview.cashTransactionsCount }}</dd>
+          @if (preview.fromDate && preview.toDate) {
+            <dt>Report period</dt>
+            <dd class="text-right font-medium">
+              {{ preview.fromDate | date: 'mediumDate' }} –
+              {{ preview.toDate | date: 'mediumDate' }}
+            </dd>
+          }
+          @if (preview.generatedAtUtc) {
+            <dt>Generated</dt>
+            <dd class="text-right font-medium">{{ preview.generatedAtUtc | date: 'medium' }}</dd>
+          }
+        </dl>
+      </cmn-alert>
 
-  <cmn-form-field [control]="form.controls.accessToken" label="Access token">
-    <cmn-input
-      formControlName="accessToken"
-      type="text"
-      placeholder="Access token from the portal"
-    />
-  </cmn-form-field>
+      @if (ibkr.missingSections().length) {
+        <cmn-alert variant="warning" title="Something looks missing">
+          The report has no {{ ibkr.missingSections().join(' or ') }} data. You can still connect,
+          but your portfolio will be incomplete until that section is ticked in the query (step 2 of
+          the guide).
+        </cmn-alert>
+      }
 
-  <cmn-form-field
-    [control]="form.controls.accessTokenSecret"
-    label="Access token secret"
-    hint="Shown only once on the portal. Stored encrypted at rest."
-  >
-    <cmn-input
-      formControlName="accessTokenSecret"
-      type="password"
-      placeholder="Access token secret"
-    />
-  </cmn-form-field>
+      <cmn-alert variant="info" icon="Clock">{{ freshnessNote }}</cmn-alert>
 
-  <cmn-form-field
-    [control]="form.controls.signatureKey"
-    label="Signature key (private_signature.pem)"
-    hint="RSA key that signs the daily session-token request."
-  >
-    <input
-      (change)="onFileSelected($event, 'signatureKey')"
-      type="file"
-      accept=".pem"
-      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
-    />
-  </cmn-form-field>
+      @if (showsConnectError() && store.errorMessage()) {
+        <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
+      }
 
-  <cmn-form-field
-    [control]="form.controls.encryptionKey"
-    label="Encryption key (private_encryption.pem)"
-    hint="RSA key that decrypts the access token secret."
-  >
-    <input
-      (change)="onFileSelected($event, 'encryptionKey')"
-      type="file"
-      accept=".pem"
-      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
-    />
-  </cmn-form-field>
-
-  <cmn-form-field
-    [control]="form.controls.dhParam"
-    label="DH parameters (dhparam.pem)"
-    hint="Diffie-Hellman parameters seeding the session-token exchange."
-  >
-    <input
-      (change)="onFileSelected($event, 'dhParam')"
-      type="file"
-      accept=".pem"
-      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
-    />
-  </cmn-form-field>
-
-  @if (isDuplicateError()) {
-    <cmn-alert variant="error">
-      <div class="flex flex-col gap-cmn-2">
-        <span>{{ store.errorMessage() }}</span>
-        <cmn-button (clicked)="disconnectExisting()" variant="secondary" size="sm">
-          Disconnect existing
+      <cmn-dialog-actions align="between">
+        <cmn-button (clicked)="edit()" variant="secondary" icon="ArrowLeft">Edit</cmn-button>
+        <cmn-button
+          [loading]="store.isBusy()"
+          [disabled]="store.isBusy()"
+          (clicked)="confirm()"
+          variant="primary"
+        >
+          Save &amp; connect
         </cmn-button>
+      </cmn-dialog-actions>
+    }
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="check()" class="flex flex-col gap-cmn-6">
+      <p class="text-cmn-sm">
+        Connect Interactive Brokers with two values from your IBKR account. No keys or files, and
+        read-only: Finance Sentry can't trade.
+      </p>
+
+      <cmn-form-field
+        [control]="form.controls.token"
+        label="Flex Web Service token"
+        hint="Generated in Flex Web Service Configuration. Stored encrypted."
+      >
+        <cmn-input
+          formControlName="token"
+          type="password"
+          autocomplete="off"
+          placeholder="Paste your token"
+        />
+      </cmn-form-field>
+
+      <cmn-form-field
+        [control]="form.controls.queryId"
+        label="Flex query ID"
+        hint="The number beside your Activity Flex Query."
+      >
+        <cmn-input
+          formControlName="queryId"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="e.g. 123456"
+        />
+      </cmn-form-field>
+
+      @if (ibkr.validationErrorMessage()) {
+        <cmn-alert variant="error">{{ ibkr.validationErrorMessage() }}</cmn-alert>
+      }
+
+      <details class="rounded-cmn-md border border-cmn-border px-cmn-4 py-cmn-3">
+        <summary class="cursor-pointer text-cmn-sm font-semibold">
+          Where do I find these? Step-by-step guide
+        </summary>
+        <div class="mt-cmn-4">
+          <fns-ibkr-flex-guide />
+        </div>
+      </details>
+
+      <cmn-alert variant="accent" icon="ShieldCheck" title="How fresh is the data?">
+        {{ freshnessNote }}
+      </cmn-alert>
+
+      <cmn-dialog-actions align="between">
+        <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
+        <cmn-button
+          [loading]="ibkr.isValidating()"
+          [disabled]="form.invalid || ibkr.isValidating()"
+          variant="primary"
+          type="submit"
+        >
+          Check connection
+        </cmn-button>
+      </cmn-dialog-actions>
+    </form>
+
+    <details class="rounded-cmn-md border border-cmn-border px-cmn-4 py-cmn-3">
+      <summary class="cursor-pointer text-cmn-sm font-semibold">
+        Advanced: live prices (optional)
+      </summary>
+      <div class="mt-cmn-4 flex flex-col gap-cmn-4">
+        <p class="text-cmn-sm">
+          Optional. Adds live prices through IBKR's OAuth API on top of the daily Flex report. It
+          needs a consumer key and three key files, so most people can skip it.
+        </p>
+        <ol class="flex list-decimal flex-col gap-cmn-2 pl-cmn-5 text-cmn-sm">
+          @for (step of oauthGuideSteps; track step.title) {
+            <li>
+              <strong>{{ step.title }}.</strong> {{ step.body }}
+            </li>
+          }
+        </ol>
+        <fns-ibkr-oauth-form />
       </div>
-    </cmn-alert>
-  } @else if (store.errorMessage()) {
-    <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
+    </details>
   }
-
-  <cmn-alert variant="accent" icon="ShieldCheck" title="Signed OAuth session">
-    Your keys are encrypted at rest (AES-256-GCM) and used to sign each IBKR request. No password,
-    no 2FA prompts, and no session conflict with the IBKR mobile app.
-  </cmn-alert>
-
-  <cmn-dialog-actions align="between">
-    <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
-    <cmn-button
-      [loading]="store.isBusy()"
-      [disabled]="form.invalid || store.isBusy()"
-      variant="primary"
-      type="submit"
-    >
-      Connect IBKR
-    </cmn-button>
-  </cmn-dialog-actions>
-</form>
+</div>
