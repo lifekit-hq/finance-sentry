@@ -24,6 +24,35 @@ function tx(id: string, date: string, postedDate: string | null = date): GlobalT
 }
 
 describe('TransactionGroupUtils.dayKey', () => {
+  // A bank reports a booking day as its local midnight: 2026-10-02 00:00 in Dublin (UTC+1) is
+  // 2026-10-01T23:00Z, so slicing the UTC text puts the row a day early. The test scripts pin
+  // TZ=Europe/Dublin so this fixture resolves to Oct 2 for the viewer.
+  const bankMidnight = '2026-10-01T23:00:00.000Z';
+
+  it("keeps a bank's local midnight on its own day (booked row)", () => {
+    expect(TransactionGroupUtils.dayKey(tx('atm', bankMidnight, bankMidnight))).toBe('2026-10-02');
+  });
+
+  it("keeps a bank's local midnight on its own day (pending row, no posted date)", () => {
+    expect(TransactionGroupUtils.dayKey(tx('mobi', bankMidnight, null))).toBe('2026-10-02');
+  });
+
+  it('groups both rows into one Oct 2 day rather than Oct 1', () => {
+    const groups = TransactionGroupUtils.groupByDay(
+      [tx('atm', bankMidnight, bankMidnight), tx('mobi', bankMidnight, null)],
+      NOW
+    );
+    expect(groups.map(g => g.dayKey)).toEqual(['2026-10-02']);
+  });
+
+  it('falls back to the leading date text when the value is not parseable', () => {
+    expect(TransactionGroupUtils.dayKey(tx('a', '2026-10-02Tgarbage', null))).toBe('2026-10-02');
+  });
+
+  it('treats a bare calendar date as that day', () => {
+    expect(TransactionGroupUtils.dayKey(tx('a', '2026-10-02', '2026-10-02'))).toBe('2026-10-02');
+  });
+
   it('prefers the posted date', () => {
     expect(TransactionGroupUtils.dayKey(tx('a', '2026-08-09T10:00:00Z', '2026-08-10'))).toBe(
       '2026-08-10'

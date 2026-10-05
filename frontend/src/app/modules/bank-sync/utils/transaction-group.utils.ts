@@ -8,6 +8,7 @@ const DAY_KEY_LENGTH = 10;
 const DATE_PART_WIDTH = 2;
 const MS_PER_DAY = 86_400_000;
 const LABEL_LOCALE = 'en-US';
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export class TransactionGroupUtils {
   /** Groups a newest-first page into calendar days, keeping the incoming order. */
@@ -30,8 +31,20 @@ export class TransactionGroupUtils {
     return groups;
   }
 
+  /**
+   * Calendar day of a row in the viewer's timezone — the same day the drawer shows. A bare
+   * `YYYY-MM-DD` is already a calendar day; a timestamp is an instant (a bank's local midnight
+   * arrives as the previous evening in UTC), so slicing its UTC text would shift the row back a day.
+   */
   public static dayKey(tx: Pick<GlobalTransactionDto, 'postedDate' | 'date'>): string {
-    return (tx.postedDate ?? tx.date).slice(0, DAY_KEY_LENGTH);
+    const raw = tx.postedDate ?? tx.date;
+    if (DATE_ONLY.test(raw)) {
+      return raw;
+    }
+    const instant = new Date(raw);
+    return Number.isNaN(instant.getTime())
+      ? raw.slice(0, DAY_KEY_LENGTH)
+      : TransactionGroupUtils.localDayKey(instant);
   }
 
   /** "Today", "Yesterday", otherwise "Mon, Aug 10" (the year is added outside the current one). */

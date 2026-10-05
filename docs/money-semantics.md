@@ -580,7 +580,9 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
 
 ## 9. Known approximations (accepted)
 
-- Everything is UTC; no user-timezone normalization of transaction dates or month edges.
+- Everything is UTC; no user-timezone normalization of transaction dates or month edges. The one exception is
+  display: the Transactions list groups rows under the viewer-local calendar day (`TransactionGroupUtils.dayKey`),
+  matching the detail drawer; a bare `YYYY-MM-DD` is kept as-is. No total or window uses it.
 - Unknown currencies convert 1:1 (§3).
 - A pending transaction and its posted twin can both be active between the twin's arrival
   and the account's next sync — a transient double-count window of one sync cycle.
