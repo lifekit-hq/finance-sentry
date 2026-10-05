@@ -49,7 +49,7 @@ public sealed class IbkrFlexConnector(
         var statement = await flexClient.FetchStatementAsync(
             new IbkrFlexCredentials(userId, artifacts.Token, artifacts.QueryId), ct: ct);
 
-        var cashCurrencies = statement.CashReport
+        var cashCurrencies = (statement.CashReport ?? [])
             .Where(r => !string.Equals(r.LevelOfDetail, BaseSummaryLevel, StringComparison.OrdinalIgnoreCase)
                         && !string.IsNullOrWhiteSpace(r.Currency))
             .Select(r => r.Currency!)
@@ -62,7 +62,7 @@ public sealed class IbkrFlexConnector(
             ParseDate(statement.FromDate),
             ParseDate(statement.ToDate),
             ParseGeneratedAt(statement.WhenGenerated),
-            statement.OpenPositions.Count(p => !string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase)),
+            (statement.OpenPositions ?? []).Count(p => !string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase)),
             cashCurrencies,
             statement.Trades.Count,
             statement.CashTransactions.Count);
