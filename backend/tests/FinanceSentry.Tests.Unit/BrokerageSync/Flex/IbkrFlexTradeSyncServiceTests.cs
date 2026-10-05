@@ -157,7 +157,8 @@ public class IbkrFlexTradeSyncServiceTests
         var cashRepo = new FakeCashTransactionRepository();
 
         var service = new IbkrFlexTradeSyncService(
-            fetcher.Object, instrumentRepo, tradeRepo, cashRepo, NullLogger<IbkrFlexTradeSyncService>.Instance);
+            fetcher.Object, instrumentRepo, tradeRepo, cashRepo,
+            Mock.Of<IIbkrFlexHoldingsSyncService>(), NullLogger<IbkrFlexTradeSyncService>.Instance);
 
         return (fetcher, instrumentRepo, tradeRepo, cashRepo, service);
     }

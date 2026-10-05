@@ -130,7 +130,7 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 
             if (existing is not null)
             {
-                existing.Update(holding.Quantity, holding.UsdValue, holding.InstrumentId);
+                existing.Update(holding.Quantity, holding.UsdValue, holding.InstrumentId, holding.FlexAsOfDate);
                 _context.BrokerageHoldings.Update(existing);
             }
             else

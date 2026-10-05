@@ -18,6 +18,12 @@ public sealed class BrokerageHolding
     /// <summary>Links to the durable <see cref="BrokerageInstrument"/> row, when the broker gave us an instrument id.</summary>
     public Guid? InstrumentId { get; private set; }
 
+    /// <summary>
+    /// Set only for holdings sourced from the daily Flex statement: the statement date the quantity and
+    /// value are as of. Null for live (OAuth) holdings.
+    /// </summary>
+    public DateOnly? FlexAsOfDate { get; private set; }
+
     private BrokerageHolding() { }
 
     public BrokerageHolding(
@@ -29,7 +35,8 @@ public sealed class BrokerageHolding
         string provider,
         decimal? averageCostUsd = null,
         DateTime? acquiredAt = null,
-        Guid? instrumentId = null)
+        Guid? instrumentId = null,
+        DateOnly? flexAsOfDate = null)
     {
         Id = Guid.NewGuid();
         UserId = userId;
@@ -43,10 +50,12 @@ public sealed class BrokerageHolding
         CostBasisUsd = averageCostUsd.HasValue ? Math.Round(averageCostUsd.Value * quantity, 4) : null;
         AcquiredAt = acquiredAt;
         InstrumentId = instrumentId;
+        FlexAsOfDate = flexAsOfDate;
     }
 
-    public void Update(decimal quantity, decimal usdValue, Guid? instrumentId = null)
+    public void Update(decimal quantity, decimal usdValue, Guid? instrumentId = null, DateOnly? flexAsOfDate = null)
     {
+        FlexAsOfDate = flexAsOfDate;
         Quantity = quantity;
         UsdValue = usdValue;
         SyncedAt = DateTime.UtcNow;

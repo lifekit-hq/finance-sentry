@@ -188,7 +188,7 @@ backend/
     FinanceSentry.Modules.Auth/       Invite-only onboarding (People), login, Google and org OIDC sign-in, JWT + refresh tokens
     FinanceSentry.Modules.BankSync/   Monobank + TrueLayer sync, transactions, dashboard
     FinanceSentry.Modules.CryptoSync/ Binance + Revolut X integrations, crypto holdings
-    FinanceSentry.Modules.BrokerageSync/ IBKR Client Portal, brokerage holdings
+    FinanceSentry.Modules.BrokerageSync/ IBKR (Flex statements + optional live feed), brokerage holdings
     FinanceSentry.Modules.Budgets/    Budget definitions, spend tracking per category
     FinanceSentry.Modules.Alerts/     Alert rules, unusual spend detection, nightly job
     FinanceSentry.Modules.Subscriptions/ Recurring charge detection (heuristic, installment-aware)

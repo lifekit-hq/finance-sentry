@@ -34,6 +34,7 @@ public sealed class IbkrFlexTradeSyncService(
     IBrokerageInstrumentRepository instrumentRepository,
     IBrokerageTradeRepository tradeRepository,
     IBrokerageCashTransactionRepository cashTransactionRepository,
+    IIbkrFlexHoldingsSyncService holdingsSyncService,
     ILogger<IbkrFlexTradeSyncService> logger) : IIbkrFlexTradeSyncService
 {
     private const string Provider = "ibkr";
@@ -51,6 +52,8 @@ public sealed class IbkrFlexTradeSyncService(
         var instrumentByConid = await UpsertInstrumentsAsync(userId, statement, ct);
         var tradesUpserted = await UpsertTradesAsync(userId, statement.Trades, instrumentByConid, ct);
         var cashTransactionsUpserted = await UpsertCashTransactionsAsync(userId, statement.CashTransactions, ct);
+
+        await holdingsSyncService.ApplyAsync(userId, statement, ct);
 
         logger.LogInformation(
             "Synced IBKR Flex statement for user {UserId}: {TradeCount} trades, {CashCount} cash transactions.",

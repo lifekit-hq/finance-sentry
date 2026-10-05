@@ -130,10 +130,13 @@ public sealed class IbkrFlexClient(
             ?? throw new IbkrFlexException(null, "IBKR Flex returned an empty response.");
     }
 
-    private static FlexQueryResponseXml DeserializeStatement(string xml)
+    public static FlexQueryResponseXml DeserializeStatement(string xml)
     {
         using var reader = new StringReader(xml);
-        return (FlexQueryResponseXml?)StatementSerializer.Deserialize(reader)
+        var response = (FlexQueryResponseXml?)StatementSerializer.Deserialize(reader)
             ?? throw new IbkrFlexException(null, "IBKR Flex returned an empty statement.");
+        foreach (var statement in response.FlexStatements.Items)
+            statement.NormalizeAbsentSections();
+        return response;
     }
 }

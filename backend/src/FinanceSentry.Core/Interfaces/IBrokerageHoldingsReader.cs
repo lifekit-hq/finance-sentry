@@ -18,4 +18,5 @@ public sealed record BrokerageHoldingSummary(
     DateTime SyncedAt,
     string Provider,
     decimal? CostBasisUsd = null,
-    string BasisState = "Unknown");
+    string BasisState = "Unknown",
+    DateOnly? FlexAsOfDate = null);

@@ -78,6 +78,61 @@ public sealed class FlexStatementXml
     [XmlArray("FinancialInstrumentInformation")]
     [XmlArrayItem("FinancialInstrument")]
     public List<FlexFinancialInstrumentXml> FinancialInstruments { get; set; } = [];
+
+    /// <summary>Null when the query does not include the section; empty when it does and nothing is held.
+    /// <see cref="XmlSerializer"/> materialises an absent collection as empty, so
+    /// <see cref="NormalizeAbsentSections"/> restores null from the <c>…Specified</c> flags.</summary>
+    [XmlArray("OpenPositions")]
+    [XmlArrayItem("OpenPosition")]
+    public List<FlexOpenPositionXml>? OpenPositions { get; set; }
+
+    [XmlArray("CashReport")]
+    [XmlArrayItem("CashReportCurrency")]
+    public List<FlexCashReportCurrencyXml>? CashReport { get; set; }
+
+    /// <summary>Set by the serializer when the section element was present in the document.</summary>
+    [XmlIgnore]
+    public bool OpenPositionsSpecified { get; set; }
+
+    [XmlIgnore]
+    public bool CashReportSpecified { get; set; }
+
+    /// <summary>Marks sections the document did not contain as null rather than empty.</summary>
+    public void NormalizeAbsentSections()
+    {
+        if (!OpenPositionsSpecified)
+            OpenPositions = null;
+        if (!CashReportSpecified)
+            CashReport = null;
+    }
+}
+
+/// <summary>One row of the Open Positions section. Raw wire strings, like the other Flex rows.
+/// <c>LevelOfDetail</c> is <c>SUMMARY</c> for the per-symbol row and <c>LOT</c> for per-lot rows.</summary>
+public sealed class FlexOpenPositionXml
+{
+    [XmlAttribute("accountId")] public string? AccountId { get; set; }
+    [XmlAttribute("currency")] public string? Currency { get; set; }
+    [XmlAttribute("assetCategory")] public string? AssetCategory { get; set; }
+    [XmlAttribute("symbol")] public string? Symbol { get; set; }
+    [XmlAttribute("description")] public string? Description { get; set; }
+    [XmlAttribute("conid")] public string? Conid { get; set; }
+    [XmlAttribute("isin")] public string? Isin { get; set; }
+    [XmlAttribute("reportDate")] public string? ReportDate { get; set; }
+    [XmlAttribute("position")] public string? Position { get; set; }
+    [XmlAttribute("markPrice")] public string? MarkPrice { get; set; }
+    [XmlAttribute("positionValue")] public string? PositionValue { get; set; }
+    [XmlAttribute("costBasisPrice")] public string? CostBasisPrice { get; set; }
+    [XmlAttribute("levelOfDetail")] public string? LevelOfDetail { get; set; }
+}
+
+/// <summary>One row of the Cash Report section — a per-currency row, plus a <c>BASE_SUMMARY</c> total row.</summary>
+public sealed class FlexCashReportCurrencyXml
+{
+    [XmlAttribute("accountId")] public string? AccountId { get; set; }
+    [XmlAttribute("currency")] public string? Currency { get; set; }
+    [XmlAttribute("endingCash")] public string? EndingCash { get; set; }
+    [XmlAttribute("levelOfDetail")] public string? LevelOfDetail { get; set; }
 }
 
 /// <summary>
