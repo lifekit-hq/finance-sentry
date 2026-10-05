@@ -476,11 +476,11 @@ the total.
   detector uses payoffs only to mark a plan completed, and a completed plan is no longer
   `active` — so a payoff reads as discretionary unless its category carries it. Ordinary spend
   — groceries, restaurants, clothes — is discretionary by construction, which is the point.
-- **Known under-count, narrow**: a manual commitment (see rule (a) above) still cannot match a
+- **Known under-count, narrow**: a legacy hand-typed commitment (see rule (a) above; a row added from a transaction matches by its stored key) still cannot match a
   debit whose statement carries no `MerchantName` and names the merchant only inside its free-text
   `Description` in a form `MerchantNameNormalizer.Normalize` cannot recover verbatim from the
   merchant's display name — the same shape of gap rule (d) documents for pins. This is now the
-  only case a manual row cannot match; every other debit for a manually pinned merchant is
+  only case a legacy row cannot match; every other debit for a manually pinned merchant is
   committed (#560).
 - **Known over-claim**: rule (b) inherits whatever the ingest ladder (#553) put in its two
   keys, and `RENT_AND_UTILITIES` is wider than rent — the telecom MCC range 4812–4900 and the
