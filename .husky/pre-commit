@@ -8,11 +8,13 @@ NC='\033[0m'
 
 echo "🔍 Running pre-commit checks..."
 
-echo "📝 Linting and formatting staged frontend files..."
+if git diff --cached --name-only | grep -qE "^frontend/(src|projects)/"; then
+  echo "📝 Linting and formatting staged frontend files..."
 
-if ! (cd frontend && npx lint-staged); then
-  echo -e "${RED}❌ ERROR: lint-staged failed. Fix the errors above before committing.${NC}"
-  exit 1
+  if ! (cd frontend && npx lint-staged); then
+    echo -e "${RED}❌ ERROR: lint-staged failed. Fix the errors above before committing.${NC}"
+    exit 1
+  fi
 fi
 
 echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
