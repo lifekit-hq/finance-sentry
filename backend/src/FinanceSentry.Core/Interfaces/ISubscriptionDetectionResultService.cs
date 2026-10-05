@@ -7,6 +7,16 @@ public interface ISubscriptionDetectionResultService
         IReadOnlyList<DetectedSubscriptionData> results,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Advances every manual row added from a transaction by the user's later charges under the
+    /// same key; detection never updates a manual row, and a commitment with too few charges for
+    /// detection to own would otherwise keep the dates it was added with.
+    /// </summary>
+    Task TrackManualCommitmentsAsync(
+        string userId,
+        IReadOnlyList<CommitmentCharge> charges,
+        CancellationToken ct = default);
+
     Task MarkStaleAsPotentiallyCancelledAsync(
         string userId,
         CancellationToken ct = default);

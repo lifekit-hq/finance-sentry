@@ -2,13 +2,15 @@
   <div class="space-y-cmn-5">
     <!-- Header -->
     <cmn-page-header
-      (actionClick)="openAddSubscription()"
-      (secondaryClick)="openAddInstallment()"
+      (actionClick)="openAdd()"
       title="Subscriptions"
       subtitle="Recurring charges detected from your transactions"
-      actionLabel="Add subscription"
-      secondaryActionLabel="Add installment"
+      actionLabel="Add"
     />
+
+    @if (store.addErrorMessage()) {
+      <cmn-alert variant="error">{{ store.addErrorMessage() }}</cmn-alert>
+    }
 
     <!-- Insufficient history banner -->
     @if (store.hasInsufficientHistory()) {
@@ -64,7 +66,7 @@
           @if (section.label) {
             <div
               [class.text-status-warning]="section.id === 'due'"
-              [class.text-text-secondary]="section.id === 'later'"
+              [class.text-text-secondary]="section.id !== 'due'"
               class="mb-cmn-2 text-cmn-xs font-semibold"
             >
               {{ section.label }}
@@ -75,7 +77,9 @@
               <cmn-list-item-row
                 [label]="sub.merchantName || 'Unknown'"
                 [sublabel]="
-                  cadenceLabels[sub.cadence] + ' · next ' + (sub.nextExpectedDate | date: 'd MMM')
+                  cadenceLabels[sub.cadence] +
+                  (section.id === 'missed' ? ' · expected ' : ' · next ') +
+                  (sub.nextExpectedDate | date: 'd MMM')
                 "
               >
                 <div

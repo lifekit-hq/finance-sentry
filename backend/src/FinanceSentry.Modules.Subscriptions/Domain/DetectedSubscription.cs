@@ -41,7 +41,11 @@ public class DetectedSubscription
     /// matters for pricing the plan against the exchange rate at signing.
     /// </summary>
     public DateOnly? StartDate { get; private set; }
-    /// <summary>True when the user added this by hand — detection never overwrites or auto-stales it.</summary>
+    /// <summary>
+    /// True when the user added this rather than detection finding it; detection never
+    /// overwrites it. A row added from a picked transaction is still tracked by its charges
+    /// (<see cref="IsTracked"/>); a legacy hand-typed row is not.
+    /// </summary>
     public bool IsManual { get; private set; }
     public DateTimeOffset DetectedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
@@ -52,6 +56,16 @@ public class DetectedSubscription
         EndDate is DateOnly end
             ? Math.Max(0, ((end.Year - LastChargeDate.Year) * 12) + end.Month - LastChargeDate.Month)
             : TermCount is int term ? Math.Max(0, term - OccurrenceCount) : null;
+
+    /// <summary>
+    /// Whether the row follows the user's transactions: every detected row, and a manual row
+    /// added from a picked transaction (keyed as the detection job keys that transaction's
+    /// charges). Only a legacy hand-typed row (<c>manual:{kind}:{merchant}</c>) matches no charge,
+    /// so its dates stay where they were typed.
+    /// </summary>
+    public bool IsTracked => !MerchantNameNormalized.StartsWith(LegacyManualKeyPrefix, StringComparison.Ordinal);
+
+    private const string LegacyManualKeyPrefix = "manual:";
 
     private DetectedSubscription() { }
 
@@ -130,7 +144,69 @@ public class DetectedSubscription
     }
 
     private static string MerchantNameKey(string display, string kind) =>
-        $"manual:{kind}:{display.Trim().ToLowerInvariant()}";
+        $"{LegacyManualKeyPrefix}{kind}:{display.Trim().ToLowerInvariant()}";
+
+    /// <summary>
+    /// Creates a user-added commitment from one of their transactions. It is keyed as the
+    /// detection job keys that transaction's charges, so each later matching charge advances
+    /// it (<see cref="RecordCharge"/>) and it lapses like a detected row when the charges stop.
+    /// </summary>
+    public static DetectedSubscription CreateFromTransaction(
+        string userId,
+        string trackingKey,
+        string merchantNameDisplay,
+        decimal monthlyAmount,
+        string currency,
+        DateOnly chargeDate,
+        int? termCount,
+        string kind)
+    {
+        var entity = new DetectedSubscription
+        {
+            UserId = userId,
+            MerchantNameNormalized = trackingKey,
+            MerchantNameDisplay = merchantNameDisplay,
+            Cadence = "monthly",
+            AverageAmount = monthlyAmount,
+            LastKnownAmount = monthlyAmount,
+            Currency = currency,
+            LastChargeDate = chargeDate,
+            NextExpectedDate = chargeDate.AddMonths(1),
+            OccurrenceCount = 1,
+            ConfidenceScore = 100,
+            Category = null,
+            Kind = kind,
+            TermCount = kind == SubscriptionKinds.Installment && termCount is > 0 ? termCount : null,
+            StartDate = kind == SubscriptionKinds.Installment ? chargeDate : null,
+            IsManual = true,
+        };
+        entity.EvaluateCompletion(false);
+        return entity;
+    }
+
+    /// <summary>
+    /// Advances a tracked row by a charge that resolved to its key: the charge becomes the last
+    /// one, the next is expected one cadence later, and a row that had lapsed is active again.
+    /// Returns false (and changes nothing) for a charge at or before the last one already seen.
+    /// </summary>
+    public bool RecordCharge(DateOnly chargeDate, decimal amount, string? currency = null)
+    {
+        if (chargeDate <= LastChargeDate)
+            return false;
+
+        LastChargeDate = chargeDate;
+        NextExpectedDate = Cadence == "annual" ? chargeDate.AddYears(1) : chargeDate.AddMonths(1);
+        LastKnownAmount = amount;
+        AverageAmount = amount;
+        // The unit the amounts above are in: billing moved to another account restates them.
+        if (!string.IsNullOrWhiteSpace(currency))
+            Currency = currency;
+        OccurrenceCount++;
+        Status = SubscriptionStatus.Active;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        EvaluateCompletion(false);
+        return true;
+    }
 
     public void UpdateFromDetection(
         string merchantNameDisplay,

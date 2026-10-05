@@ -20,8 +20,7 @@ public class SubscriptionsController(
     ICommandHandler<SetInstallmentTermCommand, bool> setTerm,
     ICommandHandler<CompleteInstallmentCommand, bool> completeInstallment,
     ICommandHandler<DeleteInstallmentCommand, bool> deleteInstallment,
-    ICommandHandler<AddManualInstallmentCommand, Guid> addInstallment,
-    ICommandHandler<AddManualSubscriptionCommand, Guid> addSubscription) : ControllerBase
+    ICommandHandler<AddCommitmentCommand, Guid> addCommitment) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetSubscriptions(
@@ -89,43 +88,29 @@ public class SubscriptionsController(
         return NoContent();
     }
 
-    [HttpPost("installments")]
-    public async Task<IActionResult> AddInstallment([FromBody] AddInstallmentRequest body, CancellationToken ct = default)
+    /// <summary>
+    /// Adds a subscription or installment from one of the user's transactions; the row then
+    /// follows that transaction's later charges.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Add([FromBody] AddCommitmentRequest body, CancellationToken ct = default)
     {
-        var id = await addInstallment.Handle(new AddManualInstallmentCommand(
-            User.RequireUserId().ToString(),
+        var id = await addCommitment.Handle(new AddCommitmentCommand(
+            User.RequireUserId(),
+            body.TransactionId,
+            body.Kind,
             body.Merchant,
             body.MonthlyAmount,
-            body.Currency,
-            body.StartDate,
             body.TermCount), ct);
-        return Ok(new { id });
-    }
-
-    [HttpPost("manual-subscription")]
-    public async Task<IActionResult> AddSubscription([FromBody] AddSubscriptionRequest body, CancellationToken ct = default)
-    {
-        var id = await addSubscription.Handle(new AddManualSubscriptionCommand(
-            User.RequireUserId().ToString(),
-            body.Merchant,
-            body.MonthlyAmount,
-            body.Currency,
-            body.StartDate), ct);
         return Ok(new { id });
     }
 }
 
 public record SetTermRequest(int? TermCount, DateOnly? EndDate = null, DateOnly? StartDate = null);
 
-public record AddSubscriptionRequest(
-    string Merchant,
-    decimal MonthlyAmount,
-    string Currency,
-    DateOnly StartDate);
-
-public record AddInstallmentRequest(
-    string Merchant,
-    decimal MonthlyAmount,
-    string Currency,
-    DateOnly StartDate,
-    int? TermCount);
+public record AddCommitmentRequest(
+    Guid TransactionId,
+    string Kind,
+    string? Merchant = null,
+    decimal? MonthlyAmount = null,
+    int? TermCount = null);

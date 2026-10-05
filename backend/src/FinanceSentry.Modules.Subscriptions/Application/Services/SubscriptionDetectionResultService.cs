@@ -79,6 +79,27 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
         return true;
     }
 
+    public async Task TrackManualCommitmentsAsync(
+        string userId,
+        IReadOnlyList<CommitmentCharge> charges,
+        CancellationToken ct = default)
+    {
+        var manual = await _repository.GetLiveManualUnscopedAsync(userId, ct);
+        if (manual.Count == 0) return;
+
+        var chargesByKey = charges.ToLookup(c => c.Key, StringComparer.Ordinal);
+
+        foreach (var subscription in manual.Where(s => s.IsTracked))
+        {
+            var advanced = false;
+            foreach (var charge in chargesByKey[subscription.MerchantNameNormalized].OrderBy(c => c.Date))
+                advanced |= subscription.RecordCharge(charge.Date, charge.Amount, charge.Currency);
+
+            if (advanced)
+                await _repository.UpsertAsync(subscription, ct);
+        }
+    }
+
     public async Task MarkStaleAsPotentiallyCancelledAsync(
         string userId,
         CancellationToken ct = default)
@@ -88,7 +109,8 @@ public class SubscriptionDetectionResultService(IDetectedSubscriptionRepository 
 
         foreach (var subscription in active)
         {
-            if (subscription.IsManual) continue;
+            // A legacy hand-typed row matches no charge, so silence is no evidence it stopped.
+            if (!subscription.IsTracked) continue;
 
             var averageIntervalDays = subscription.Cadence == "annual" ? 365 : 30;
             var staleThreshold = subscription.LastChargeDate.AddDays((int)(averageIntervalDays * 1.5));

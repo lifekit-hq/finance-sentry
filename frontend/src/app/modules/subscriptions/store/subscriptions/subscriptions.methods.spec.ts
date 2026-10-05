@@ -72,6 +72,17 @@ describe('subscriptionsMethods', () => {
     expect(state.status()).toBe('idle');
   });
 
+  it('setAddError stores and clears the add error code', () => {
+    const state = signalState(initialSubscriptionsState);
+    const methods = subscriptionsMethods(state);
+
+    methods.setAddError('COMMITMENT_ALREADY_TRACKED');
+    expect(state.addErrorCode()).toBe('COMMITMENT_ALREADY_TRACKED');
+
+    methods.setAddError(null);
+    expect(state.addErrorCode()).toBeNull();
+  });
+
   it('setSummary stores the summary', () => {
     const state = signalState(initialSubscriptionsState);
     const methods = subscriptionsMethods(state);

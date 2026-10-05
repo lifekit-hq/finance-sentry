@@ -1,0 +1,105 @@
+import {DialogRef} from '@angular/cdk/dialog';
+import {DatePipe} from '@angular/common';
+import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {
+  AlertComponent,
+  ButtonComponent,
+  ChipComponent,
+  DialogActionsComponent,
+  EmptyStateComponent,
+  FormFieldComponent,
+  InputComponent,
+  SelectableCardComponent,
+} from '@lifekit-hq/ui';
+
+import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {
+  COMMITMENT_KIND_OPTIONS,
+  MIN_TERM_COUNT,
+} from '../../constants/commitment-candidate/commitment-candidate.constants';
+import {MIN_MONTHLY_AMOUNT} from '../../constants/subscription/subscription-form.constants';
+import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {
+  type AddCommitmentRequest,
+  type SubscriptionKind,
+} from '../../models/subscription/subscription.model';
+import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
+
+@Component({
+  selector: 'fns-add-commitment-dialog',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    AlertComponent,
+    ButtonComponent,
+    ChipComponent,
+    DatePipe,
+    DialogActionsComponent,
+    EmptyStateComponent,
+    FormFieldComponent,
+    InputComponent,
+    MoneyPipe,
+    ReactiveFormsModule,
+    SelectableCardComponent,
+  ],
+  providers: [CommitmentPickerStore],
+  templateUrl: './add-commitment-dialog.component.html',
+})
+export class AddCommitmentDialogComponent {
+  private readonly dialogRef = inject<DialogRef<AddCommitmentRequest>>(DialogRef);
+
+  public readonly picker = inject(CommitmentPickerStore);
+  public readonly kindOptions = COMMITMENT_KIND_OPTIONS;
+  public readonly searchControl = new FormControl('', {nonNullable: true});
+
+  public readonly form = new FormGroup({
+    kind: new FormControl<SubscriptionKind>('subscription', {nonNullable: true}),
+    transactionId: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
+    merchant: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
+    monthlyAmount: new FormControl<number | null>(null, {
+      validators: [Validators.required, Validators.min(MIN_MONTHLY_AMOUNT)],
+    }),
+    termCount: new FormControl<number | null>(null, {
+      validators: [Validators.min(MIN_TERM_COUNT)],
+    }),
+  });
+
+  constructor() {
+    this.picker.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
+  }
+
+  public setKind(kind: SubscriptionKind): void {
+    this.form.controls.kind.setValue(kind);
+  }
+
+  /** Picking a charge pre-fills the name and amount; both stay editable. */
+  public pick(candidate: CommitmentCandidate): void {
+    this.picker.select(candidate);
+    this.form.patchValue({
+      transactionId: candidate.transactionId,
+      merchant: candidate.merchantName || candidate.description,
+      monthlyAmount: candidate.amount,
+    });
+  }
+
+  public submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    const value = this.form.getRawValue();
+    const isInstallment = value.kind === 'installment';
+    this.dialogRef.close({
+      transactionId: value.transactionId,
+      kind: value.kind,
+      merchant: value.merchant.trim(),
+      monthlyAmount: Number(value.monthlyAmount),
+      termCount: isInstallment && value.termCount ? Number(value.termCount) : null,
+    });
+  }
+
+  public cancel(): void {
+    this.dialogRef.close();
+  }
+}

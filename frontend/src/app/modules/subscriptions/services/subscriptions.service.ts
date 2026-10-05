@@ -3,8 +3,7 @@ import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
 import {
-  type AddInstallmentRequest,
-  type AddSubscriptionRequest,
+  type AddCommitmentRequest,
   type SubscriptionsListResponse,
   type SubscriptionSummary,
 } from '../models/subscription/subscription.model';
@@ -46,11 +45,7 @@ export class SubscriptionsService extends ApiService {
     return this.delete<void>(`installments/${id}`);
   }
 
-  public addInstallment(payload: AddInstallmentRequest): Observable<{id: string}> {
-    return this.post<{id: string}>('installments', payload);
-  }
-
-  public addSubscription(payload: AddSubscriptionRequest): Observable<{id: string}> {
-    return this.post<{id: string}>('manual-subscription', payload);
+  public add(payload: AddCommitmentRequest): Observable<{id: string}> {
+    return this.post<{id: string}>('', payload);
   }
 }

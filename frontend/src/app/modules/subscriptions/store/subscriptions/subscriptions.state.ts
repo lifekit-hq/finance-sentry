@@ -10,6 +10,8 @@ export interface SubscriptionsState {
   summary: Nullable<SubscriptionSummary>;
   hasInsufficientHistory: boolean;
   status: AsyncStatus;
+  /** Error code from the last failed add; cleared when the next add starts. */
+  addErrorCode: Nullable<string>;
 }
 
 export const initialSubscriptionsState: SubscriptionsState = {
@@ -18,4 +20,5 @@ export const initialSubscriptionsState: SubscriptionsState = {
   summary: null,
   hasInsufficientHistory: false,
   status: 'idle',
+  addErrorCode: null,
 };

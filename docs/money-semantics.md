@@ -396,15 +396,21 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   keeps the stored key and the matched key from drifting apart. A plan's identity includes its
   rounded monthly amount, so concurrent plans at one shop stay distinct and only the plan the
   user actually holds is claimed.
-  A manual row (`DetectedSubscription.CreateManual`, `IsManual`) is stored under
-  `manual:{kind}:{merchant}` — a form no transaction ever derives, by design: that key is how
-  the row is found and re-used on the next manual edit, and detection never re-keys or
-  overwrites a manual row (`SubscriptionDetectionResultService.ShouldUpdate`). Rule (a) still
-  claims its debits: `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual
-  rows' display names via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync`
-  and folds `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same
-  key set rule (a) matches against — the stored key is untouched, only the match set is widened
-  (#560).
+  A manual row (`IsManual`) is added from a picked transaction
+  (`DetectedSubscription.CreateFromTransaction`, `POST /subscriptions`) and stored under that
+  transaction's `CommitmentKeyResolver` key, so rule (a) matches its debits directly. Detection
+  never re-keys or overwrites a manual row (`SubscriptionDetectionResultService.ShouldUpdate`);
+  instead `SubscriptionDetectionJob` hands every charge to
+  `TrackManualCommitmentsAsync`, which advances the row's last and next charge dates from
+  charges under its key (`DetectedSubscription.RecordCharge`), so a commitment with too few
+  charges for detection still follows its transactions, and the stale sweep lapses it like a
+  detected row when they stop. An older hand-typed row is stored under
+  `manual:{kind}:{merchant}`, a form no transaction ever derives, and is neither tracked nor
+  swept (`DetectedSubscription.IsTracked`). Rule (a) still claims its debits:
+  `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual rows' display names
+  via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync` and folds
+  `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same key set rule
+  (a) matches against; the stored key is untouched, only the match set is widened (#560).
 - **(b) a committed category** — `RENT_AND_UTILITIES` or `LOAN_PAYMENTS`. Rent is the largest
   fixed outflow in the book and the detector can never see it: the same payee for the same
   amount every month is not a merchant recurrence signature. A loan payment is a debt

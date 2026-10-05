@@ -1,10 +1,10 @@
 import {inject} from '@angular/core';
+import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {forkJoin, type Observable, pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, forkJoin, type Observable, pipe, switchMap, tap} from 'rxjs';
 
 import {
-  type AddInstallmentRequest,
-  type AddSubscriptionRequest,
+  type AddCommitmentRequest,
   type Subscription,
   type SubscriptionSummary,
 } from '../../models/subscription/subscription.model';
@@ -15,6 +15,7 @@ interface EffectsStore {
   setSummary: (summary: SubscriptionSummary) => void;
   dismissSubscription: (id: string) => void;
   restoreSubscription: (id: string) => void;
+  setAddError: (errorCode: Nullable<string>) => void;
 }
 
 export function subscriptionsEffects(store: EffectsStore) {
@@ -69,11 +70,19 @@ export function subscriptionsEffects(store: EffectsStore) {
     deleteInstallment: rxMethod<string>(
       pipe(switchMap(id => service.deleteInstallment(id).pipe(switchMap(() => refresh()))))
     ),
-    addInstallment: rxMethod<AddInstallmentRequest>(
-      pipe(switchMap(payload => service.addInstallment(payload).pipe(switchMap(() => refresh()))))
-    ),
-    addSubscription: rxMethod<AddSubscriptionRequest>(
-      pipe(switchMap(payload => service.addSubscription(payload).pipe(switchMap(() => refresh()))))
+    addCommitment: rxMethod<AddCommitmentRequest>(
+      pipe(
+        tap(() => store.setAddError(null)),
+        switchMap(payload =>
+          service.add(payload).pipe(
+            switchMap(() => refresh()),
+            catchError((err: unknown) => {
+              store.setAddError(extractErrorCode(err));
+              return EMPTY;
+            })
+          )
+        )
+      )
     ),
   };
 }

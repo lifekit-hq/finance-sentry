@@ -24,19 +24,13 @@ export interface Subscription {
   isManual: boolean;
 }
 
-export interface AddInstallmentRequest {
+/** Adds a commitment from a picked transaction; later charges like it keep it current. */
+export interface AddCommitmentRequest {
+  transactionId: string;
+  kind: SubscriptionKind;
   merchant: string;
   monthlyAmount: number;
-  currency: string;
-  startDate: string;
   termCount: Nullable<number>;
-}
-
-export interface AddSubscriptionRequest {
-  merchant: string;
-  monthlyAmount: number;
-  currency: string;
-  startDate: string;
 }
 
 export interface SpendBucket {
@@ -69,7 +63,8 @@ export interface SubscriptionsListResponse {
 }
 
 export interface SubscriptionSection {
-  id: 'due' | 'later';
+  /** `missed`: the expected charge date has passed without a matching charge. */
+  id: 'due' | 'missed' | 'later';
   label: Nullable<string>;
   items: Subscription[];
 }

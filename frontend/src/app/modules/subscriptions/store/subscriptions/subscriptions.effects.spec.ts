@@ -1,5 +1,6 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
-import {of} from 'rxjs';
+import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
@@ -68,6 +69,7 @@ function buildStore() {
     setSummary: vi.fn(),
     dismissSubscription: vi.fn(),
     restoreSubscription: vi.fn(),
+    setAddError: vi.fn(),
   };
 }
 
@@ -77,6 +79,7 @@ function buildService() {
     getSummary: vi.fn(),
     dismiss: vi.fn(),
     restore: vi.fn(),
+    add: vi.fn(),
   };
 }
 
@@ -133,5 +136,51 @@ describe('subscriptionsEffects', () => {
     expect(store.restoreSubscription).toHaveBeenCalledWith('sub-1');
     expect(service.getSummary).toHaveBeenCalled();
     expect(store.setSummary).toHaveBeenCalledWith(SUMMARY);
+  });
+
+  it('addCommitment: posts the pick and reloads the list', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.add.mockReturnValue(of({id: 'new'}));
+    service.getSubscriptions.mockReturnValue(of(LIST_RESPONSE));
+    service.getSummary.mockReturnValue(of(SUMMARY));
+    configure(service);
+    const payload = {
+      transactionId: 'tx-1',
+      kind: 'subscription' as const,
+      merchant: 'Acme',
+      monthlyAmount: 10,
+      termCount: null,
+    };
+
+    TestBed.runInInjectionContext(() => subscriptionsEffects(store).addCommitment(payload));
+
+    expect(service.add).toHaveBeenCalledWith(payload);
+    expect(store.setAddError).toHaveBeenCalledWith(null);
+    expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
+  });
+
+  it('addCommitment: keeps the error code when the add is refused', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.add.mockReturnValue(
+      throwError(
+        () => new HttpErrorResponse({status: 409, error: {errorCode: 'COMMITMENT_ALREADY_TRACKED'}})
+      )
+    );
+    configure(service);
+
+    TestBed.runInInjectionContext(() =>
+      subscriptionsEffects(store).addCommitment({
+        transactionId: 'tx-1',
+        kind: 'installment',
+        merchant: 'Acme',
+        monthlyAmount: 10,
+        termCount: 12,
+      })
+    );
+
+    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED');
+    expect(store.setData).not.toHaveBeenCalled();
   });
 });

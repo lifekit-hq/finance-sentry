@@ -18,13 +18,11 @@ import {
 import {take} from 'rxjs';
 
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {AddInstallmentDialogComponent} from '../../components/add-installment-dialog/add-installment-dialog.component';
-import {AddSubscriptionDialogComponent} from '../../components/add-subscription-dialog/add-subscription-dialog.component';
+import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
 import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
 import {
-  type AddInstallmentRequest,
-  type AddSubscriptionRequest,
+  type AddCommitmentRequest,
   type Subscription,
   type SubscriptionSort,
 } from '../../models/subscription/subscription.model';
@@ -86,10 +84,10 @@ export class SubscriptionsComponent {
     this.store.setSort(sort);
   }
 
-  public openAddSubscription(): void {
+  public openAdd(): void {
     this.dialog
-      .open<AddSubscriptionRequest>(AddSubscriptionDialogComponent, {
-        title: 'Add subscription',
+      .open<AddCommitmentRequest>(AddCommitmentDialogComponent, {
+        title: 'Add subscription or installment',
         size: 'md',
         viewContainerRef: this.viewContainerRef,
       })
@@ -97,23 +95,7 @@ export class SubscriptionsComponent {
       .pipe(take(1))
       .subscribe(payload => {
         if (payload) {
-          this.store.addSubscription(payload);
-        }
-      });
-  }
-
-  public openAddInstallment(): void {
-    this.dialog
-      .open<AddInstallmentRequest>(AddInstallmentDialogComponent, {
-        title: 'Add installment',
-        size: 'md',
-        viewContainerRef: this.viewContainerRef,
-      })
-      .afterClosed()
-      .pipe(take(1))
-      .subscribe(payload => {
-        if (payload) {
-          this.store.addInstallment(payload);
+          this.store.addCommitment(payload);
         }
       });
   }
