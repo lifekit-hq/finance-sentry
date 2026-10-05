@@ -24,10 +24,10 @@ npm run build
 npx playwright test --reporter=json
 ```
 
-Commit hook rule: `.husky/pre-commit` (wired by `frontend`'s `prepare` script) runs lint-staged,
-the full frontend lint and the Prettier check only when `frontend/src/**` is staged (about 50 s),
-and never runs `npm ci` — it assumes `frontend/node_modules` exists and is the repo's commit gate,
-not something to bypass.
+Commit hook rule: `.husky/pre-commit` (wired by `frontend`'s `prepare` script) runs lint-staged
+(eslint --fix + prettier on staged frontend files) only when `frontend/src/**` or `frontend/projects/**` is staged;
+the full lint and format check run in CI. It never runs `npm ci` — it assumes `frontend/node_modules` exists for
+frontend commits — and is not something to bypass.
 
 ## Project layout
 
