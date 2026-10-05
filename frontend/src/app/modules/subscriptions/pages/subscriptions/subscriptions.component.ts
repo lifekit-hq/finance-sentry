@@ -18,13 +18,13 @@ import {
 import {take} from 'rxjs';
 
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {AddInstallmentDialogComponent} from '../../components/add-installment-dialog/add-installment-dialog.component';
-import {AddSubscriptionDialogComponent} from '../../components/add-subscription-dialog/add-subscription-dialog.component';
+import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
 import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
+import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {
-  type AddInstallmentRequest,
-  type AddSubscriptionRequest,
+  type AddCommitmentRequest,
+  type LinkCommitmentRequest,
   type Subscription,
   type SubscriptionSort,
 } from '../../models/subscription/subscription.model';
@@ -38,15 +38,21 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
   {value: 'name', label: 'Name'},
 ];
 
+const LINK_MENU_ITEM: MenuItem = {id: 'link', label: 'Link transaction', icon: 'Link'};
+
 const INSTALLMENT_MENU_ITEMS: MenuItem[] = [
   {id: 'term', label: 'Set term', icon: 'Pencil'},
   {id: 'done', label: 'Mark as done', icon: 'Check'},
   {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
 ];
 
+const UNLINKED_INSTALLMENT_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...INSTALLMENT_MENU_ITEMS];
+
 const SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
   {id: 'dismiss', label: 'Dismiss', icon: 'X', destructive: true},
 ];
+
+const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRIPTION_MENU_ITEMS];
 
 @Component({
   selector: 'fns-subscriptions',
@@ -79,17 +85,23 @@ export class SubscriptionsComponent {
   public readonly store = inject(SubscriptionsStore);
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
-  public readonly subscriptionMenuItems = SUBSCRIPTION_MENU_ITEMS;
-  public readonly installmentMenuItems = INSTALLMENT_MENU_ITEMS;
+
+  public subscriptionMenuItems(sub: Pick<Subscription, 'isTracked'>): MenuItem[] {
+    return sub.isTracked ? SUBSCRIPTION_MENU_ITEMS : UNLINKED_SUBSCRIPTION_MENU_ITEMS;
+  }
+
+  public installmentMenuItems(item: Pick<Subscription, 'isTracked'>): MenuItem[] {
+    return item.isTracked ? INSTALLMENT_MENU_ITEMS : UNLINKED_INSTALLMENT_MENU_ITEMS;
+  }
 
   public setSort(sort: SubscriptionSort): void {
     this.store.setSort(sort);
   }
 
-  public openAddSubscription(): void {
+  public openAdd(): void {
     this.dialog
-      .open<AddSubscriptionRequest>(AddSubscriptionDialogComponent, {
-        title: 'Add subscription',
+      .open<AddCommitmentRequest>(AddCommitmentDialogComponent, {
+        title: 'Add subscription or installment',
         size: 'md',
         viewContainerRef: this.viewContainerRef,
       })
@@ -97,29 +109,32 @@ export class SubscriptionsComponent {
       .pipe(take(1))
       .subscribe(payload => {
         if (payload) {
-          this.store.addSubscription(payload);
+          this.store.addCommitment(payload);
         }
       });
   }
 
-  public openAddInstallment(): void {
+  public openLink(item: Pick<Subscription, 'id' | 'merchantName' | 'kind'>): void {
     this.dialog
-      .open<AddInstallmentRequest>(AddInstallmentDialogComponent, {
-        title: 'Add installment',
+      .open<LinkCommitmentRequest>(AddCommitmentDialogComponent, {
+        title: `Link ${item.merchantName} to a transaction`,
+        data: {linkTo: item.merchantName, kind: item.kind} satisfies CommitmentDialogData,
         size: 'md',
         viewContainerRef: this.viewContainerRef,
       })
       .afterClosed()
       .pipe(take(1))
-      .subscribe(payload => {
-        if (payload) {
-          this.store.addInstallment(payload);
+      .subscribe(request => {
+        if (request) {
+          this.store.linkCommitment({id: item.id, request});
         }
       });
   }
 
   public onInstallmentAction(action: string, item: Subscription): void {
-    if (action === 'term') {
+    if (action === 'link') {
+      this.openLink(item);
+    } else if (action === 'term') {
       this.openSetTerm(item);
     } else if (action === 'done') {
       this.store.completeInstallment(item.id);
@@ -129,7 +144,9 @@ export class SubscriptionsComponent {
   }
 
   public onSubscriptionAction(action: string, sub: Subscription): void {
-    if (action === 'dismiss') {
+    if (action === 'link') {
+      this.openLink(sub);
+    } else if (action === 'dismiss') {
       this.dismiss(sub);
     }
   }

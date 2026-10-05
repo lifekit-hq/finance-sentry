@@ -25,4 +25,11 @@ public interface IDetectedSubscriptionRepository
     /// <summary>The user's active subscriptions, tracked, for the detection job's staleness sweep. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<DetectedSubscription>> GetStaleActiveUnscopedAsync(
         string userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The user's manual rows that are still running (active or lapsed), tracked, for the detection
+    /// job to advance by their charges. Opts out of the Owner query filter.
+    /// </summary>
+    Task<IReadOnlyList<DetectedSubscription>> GetLiveManualUnscopedAsync(
+        string userId, CancellationToken ct = default);
 }

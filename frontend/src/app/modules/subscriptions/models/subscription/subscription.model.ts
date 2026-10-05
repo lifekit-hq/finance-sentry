@@ -2,11 +2,12 @@ export type SubscriptionStatus = 'active' | 'dismissed' | 'potentially_cancelled
 export type SubscriptionSort = 'date' | 'amount' | 'name';
 export type DismissedSubscription = Extract<SubscriptionStatus, 'dismissed'>;
 export type SubscriptionKind = 'subscription' | 'installment';
+export type SubscriptionCadence = 'monthly' | 'annual';
 
 export interface Subscription {
   id: string;
   merchantName: string;
-  cadence: 'monthly' | 'annual';
+  cadence: SubscriptionCadence;
   averageAmount: number;
   lastKnownAmount: number;
   monthlyEquivalent: number;
@@ -22,21 +23,26 @@ export interface Subscription {
   startDate: Nullable<string>;
   remainingPayments: Nullable<number>;
   isManual: boolean;
+  /** False for a legacy hand-typed row: it matches no charge, so its dates are only what was typed. */
+  isTracked: boolean;
 }
 
-export interface AddInstallmentRequest {
+/** Adds a commitment from a picked transaction; later charges like it keep it current. */
+export interface AddCommitmentRequest {
+  transactionId: string;
+  kind: SubscriptionKind;
   merchant: string;
   monthlyAmount: number;
-  currency: string;
-  startDate: string;
   termCount: Nullable<number>;
+  /** Stored as given; the dialog pre-selects the cadence read from the charge history. */
+  cadence: SubscriptionCadence;
 }
 
-export interface AddSubscriptionRequest {
-  merchant: string;
-  monthlyAmount: number;
-  currency: string;
-  startDate: string;
+/** Links a legacy hand-typed row to a picked transaction; later charges like it keep it current. */
+export interface LinkCommitmentRequest {
+  transactionId: string;
+  /** Stored as given; the dialog pre-selects the cadence read from the charge history. */
+  cadence: SubscriptionCadence;
 }
 
 export interface SpendBucket {
@@ -69,7 +75,8 @@ export interface SubscriptionsListResponse {
 }
 
 export interface SubscriptionSection {
-  id: 'due' | 'later';
+  /** `missed`: the expected date passed without a charge. `unlinked`: no charges to judge by. */
+  id: 'due' | 'missed' | 'later' | 'unlinked';
   label: Nullable<string>;
   items: Subscription[];
 }

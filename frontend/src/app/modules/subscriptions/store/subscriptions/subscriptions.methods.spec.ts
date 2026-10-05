@@ -27,6 +27,7 @@ function mkSubscription(overrides: Partial<Subscription> = {}): Subscription {
     startDate: null,
     remainingPayments: null,
     isManual: false,
+    isTracked: true,
     ...overrides,
   };
 }
@@ -70,6 +71,28 @@ describe('subscriptionsMethods', () => {
     expect(state.subscriptions()).toHaveLength(1);
     expect(state.hasInsufficientHistory()).toBe(true);
     expect(state.status()).toBe('idle');
+  });
+
+  it('setAddError stores and clears the add error code', () => {
+    const state = signalState(initialSubscriptionsState);
+    const methods = subscriptionsMethods(state);
+
+    methods.setAddError('COMMITMENT_ALREADY_TRACKED');
+    expect(state.addErrorCode()).toBe('COMMITMENT_ALREADY_TRACKED');
+
+    methods.setAddError(null);
+    expect(state.addErrorCode()).toBeNull();
+  });
+
+  it('setAddError keeps the server text and clears it with the code', () => {
+    const state = signalState(initialSubscriptionsState);
+    const methods = subscriptionsMethods(state);
+
+    methods.setAddError('COMMITMENT_ALREADY_TRACKED', 'These charges are already tracked as Acme.');
+    expect(state.addErrorDetail()).toBe('These charges are already tracked as Acme.');
+
+    methods.setAddError(null);
+    expect(state.addErrorDetail()).toBeNull();
   });
 
   it('setSummary stores the summary', () => {

@@ -1,5 +1,6 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
-import {of} from 'rxjs';
+import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
@@ -28,6 +29,7 @@ const SUBSCRIPTION: Subscription = {
   startDate: null,
   remainingPayments: null,
   isManual: false,
+  isTracked: true,
 };
 
 const LIST_RESPONSE: SubscriptionsListResponse = {
@@ -68,6 +70,7 @@ function buildStore() {
     setSummary: vi.fn(),
     dismissSubscription: vi.fn(),
     restoreSubscription: vi.fn(),
+    setAddError: vi.fn(),
   };
 }
 
@@ -77,6 +80,8 @@ function buildService() {
     getSummary: vi.fn(),
     dismiss: vi.fn(),
     restore: vi.fn(),
+    add: vi.fn(),
+    link: vi.fn(),
   };
 }
 
@@ -133,5 +138,135 @@ describe('subscriptionsEffects', () => {
     expect(store.restoreSubscription).toHaveBeenCalledWith('sub-1');
     expect(service.getSummary).toHaveBeenCalled();
     expect(store.setSummary).toHaveBeenCalledWith(SUMMARY);
+  });
+
+  it('addCommitment: posts the pick and reloads the list', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.add.mockReturnValue(of({id: 'new'}));
+    service.getSubscriptions.mockReturnValue(of(LIST_RESPONSE));
+    service.getSummary.mockReturnValue(of(SUMMARY));
+    configure(service);
+    const payload = {
+      transactionId: 'tx-1',
+      kind: 'subscription' as const,
+      merchant: 'Acme',
+      monthlyAmount: 10,
+      termCount: null,
+      cadence: 'monthly' as const,
+    };
+
+    TestBed.runInInjectionContext(() => subscriptionsEffects(store).addCommitment(payload));
+
+    expect(service.add).toHaveBeenCalledWith(payload);
+    expect(store.setAddError).toHaveBeenCalledWith(null);
+    expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
+  });
+
+  it('addCommitment: keeps the error code when the add is refused', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.add.mockReturnValue(
+      throwError(
+        () => new HttpErrorResponse({status: 409, error: {errorCode: 'COMMITMENT_ALREADY_TRACKED'}})
+      )
+    );
+    configure(service);
+
+    TestBed.runInInjectionContext(() =>
+      subscriptionsEffects(store).addCommitment({
+        transactionId: 'tx-1',
+        kind: 'installment',
+        merchant: 'Acme',
+        monthlyAmount: 10,
+        termCount: 12,
+        cadence: 'monthly',
+      })
+    );
+
+    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED', null);
+    expect(store.setData).not.toHaveBeenCalled();
+  });
+
+  it('addCommitment: keeps the server text that names the row holding the charges', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.add.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              errorCode: 'COMMITMENT_ALREADY_TRACKED',
+              error: 'These charges are already tracked as Acme.',
+            },
+          })
+      )
+    );
+    configure(service);
+
+    TestBed.runInInjectionContext(() =>
+      subscriptionsEffects(store).addCommitment({
+        transactionId: 'tx-1',
+        kind: 'subscription',
+        merchant: 'Acme',
+        monthlyAmount: 10,
+        termCount: null,
+        cadence: 'monthly',
+      })
+    );
+
+    expect(store.setAddError).toHaveBeenLastCalledWith(
+      'COMMITMENT_ALREADY_TRACKED',
+      'These charges are already tracked as Acme.'
+    );
+  });
+
+  it('linkCommitment: links the row to the pick and reloads the list', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.link.mockReturnValue(of(void 0));
+    service.getSubscriptions.mockReturnValue(of(LIST_RESPONSE));
+    service.getSummary.mockReturnValue(of(SUMMARY));
+    configure(service);
+
+    TestBed.runInInjectionContext(() =>
+      subscriptionsEffects(store).linkCommitment({
+        id: 'sub-1',
+        request: {transactionId: 'tx-1', cadence: 'monthly'},
+      })
+    );
+
+    expect(service.link).toHaveBeenCalledWith('sub-1', {transactionId: 'tx-1', cadence: 'monthly'});
+    expect(store.setAddError).toHaveBeenCalledWith(null);
+    expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
+  });
+
+  it('linkCommitment: keeps the error when another row already holds the charges', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.link.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {errorCode: 'COMMITMENT_ALREADY_TRACKED', error: 'Tracked as Acme.'},
+          })
+      )
+    );
+    configure(service);
+
+    TestBed.runInInjectionContext(() =>
+      subscriptionsEffects(store).linkCommitment({
+        id: 'sub-1',
+        request: {transactionId: 'tx-1', cadence: 'monthly'},
+      })
+    );
+
+    expect(store.setAddError).toHaveBeenLastCalledWith(
+      'COMMITMENT_ALREADY_TRACKED',
+      'Tracked as Acme.'
+    );
+    expect(store.setData).not.toHaveBeenCalled();
   });
 });

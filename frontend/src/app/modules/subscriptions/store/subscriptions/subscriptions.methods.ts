@@ -15,6 +15,9 @@ export function subscriptionsMethods(store: WritableStateSource<SubscriptionsSta
     setSummary(summary: SubscriptionSummary): void {
       patchState(store, {summary});
     },
+    setAddError(addErrorCode: Nullable<string>, addErrorDetail: Nullable<string> = null): void {
+      patchState(store, {addErrorCode, addErrorDetail});
+    },
     setSort(sort: SubscriptionSort): void {
       patchState(store, {sort});
     },

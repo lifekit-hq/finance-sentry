@@ -19,4 +19,5 @@ public record SubscriptionDto(
     DateOnly? EndDate,
     DateOnly? StartDate,
     int? RemainingPayments,
-    bool IsManual);
+    bool IsManual,
+    bool IsTracked);

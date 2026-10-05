@@ -58,7 +58,21 @@ public sealed class SubscriptionDetectionJob(
                 results.AddRange(SubscriptionDetectionAlgorithm.DetectSubscriptions(regularTxs));
                 results.AddRange(SubscriptionDetectionAlgorithm.DetectInstallments(installmentTxs));
 
+                // Every charge filed under the key a picked transaction would resolve to, so a
+                // commitment the user added by hand follows its transactions like a detected one.
+                var charges = txs
+                    .SelectMany(t => new[]
+                        {
+                            CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc),
+                            InstallmentCommitmentKey.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc),
+                        }
+                        .Distinct()
+                        .Select(key => new CommitmentCharge(
+                            key, DateOnly.FromDateTime(t.TransactionDate), t.Amount, t.Currency)))
+                    .ToList();
+
                 await resultService.UpsertDetectedSubscriptionsAsync(userId, results, ct);
+                await resultService.TrackManualCommitmentsAsync(userId, charges, ct);
                 await resultService.MarkStaleAsPotentiallyCancelledAsync(userId, ct);
             }
             catch (Exception ex)

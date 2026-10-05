@@ -75,4 +75,14 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
             .Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active)
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<DetectedSubscription>> GetLiveManualUnscopedAsync(
+        string userId, CancellationToken ct = default)
+    {
+        return await AllUsers
+            .Where(s => s.UserId == userId
+                     && s.IsManual
+                     && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.PotentiallyCancelled))
+            .ToListAsync(ct);
+    }
 }

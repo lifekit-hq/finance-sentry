@@ -39,6 +39,7 @@ public class SubscriptionsDbContext(DbContextOptions<SubscriptionsDbContext> opt
         sb.Property(s => s.TermCount);
         sb.Property(s => s.IsManual).HasDefaultValue(false);
         sb.Ignore(s => s.RemainingPayments);
+        sb.Ignore(s => s.IsTracked);
         sb.Property(s => s.DetectedAt).HasDefaultValueSql("now()");
         sb.Property(s => s.UpdatedAt).HasDefaultValueSql("now()");
 

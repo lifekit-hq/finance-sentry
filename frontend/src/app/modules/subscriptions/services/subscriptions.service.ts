@@ -2,9 +2,11 @@ import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
+import {type CommitmentAnchor} from '../models/commitment-candidate/commitment-candidate.model';
 import {
-  type AddInstallmentRequest,
-  type AddSubscriptionRequest,
+  type AddCommitmentRequest,
+  type LinkCommitmentRequest,
+  type SubscriptionKind,
   type SubscriptionsListResponse,
   type SubscriptionSummary,
 } from '../models/subscription/subscription.model';
@@ -24,6 +26,13 @@ export class SubscriptionsService extends ApiService {
 
   public getSummary(): Observable<SubscriptionSummary> {
     return this.get<SubscriptionSummary>('summary');
+  }
+
+  public getCommitmentAnchor(
+    transactionId: string,
+    kind: SubscriptionKind
+  ): Observable<CommitmentAnchor> {
+    return this.get<CommitmentAnchor>(`candidates/${transactionId}`, {kind});
   }
 
   public dismiss(id: string): Observable<void> {
@@ -46,11 +55,11 @@ export class SubscriptionsService extends ApiService {
     return this.delete<void>(`installments/${id}`);
   }
 
-  public addInstallment(payload: AddInstallmentRequest): Observable<{id: string}> {
-    return this.post<{id: string}>('installments', payload);
+  public add(payload: AddCommitmentRequest): Observable<{id: string}> {
+    return this.post<{id: string}>('', payload);
   }
 
-  public addSubscription(payload: AddSubscriptionRequest): Observable<{id: string}> {
-    return this.post<{id: string}>('manual-subscription', payload);
+  public link(id: string, payload: LinkCommitmentRequest): Observable<void> {
+    return this.post<void>(`${id}/link`, payload);
   }
 }

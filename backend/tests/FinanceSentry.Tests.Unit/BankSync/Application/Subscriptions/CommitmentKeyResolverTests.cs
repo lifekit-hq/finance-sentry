@@ -102,4 +102,18 @@ public class CommitmentKeyResolverTests
         storedKeys.Should().NotBeEmpty();
         resolvedKeys.Should().BeEquivalentTo(storedKeys);
     }
+
+    [Fact]
+    public void InstallmentKey_MerchantShapedCharge_IsKeyedByMerchantAndRoundedAmount()
+    {
+        InstallmentCommitmentKey.Resolve("Apple Store", "APPLE STORE", 599.8m, 5732)
+            .Should().Be("installment:apple store:600");
+    }
+
+    [Fact]
+    public void InstallmentKey_AlreadyInstallmentShaped_IsKept()
+    {
+        InstallmentCommitmentKey.Resolve(null, "Щомісячний платіж telemart - monomarket", 6499.84m, null)
+            .Should().Be("installment:telemart:6500");
+    }
 }

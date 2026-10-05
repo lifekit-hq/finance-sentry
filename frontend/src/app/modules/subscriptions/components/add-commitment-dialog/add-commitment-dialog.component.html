@@ -1,0 +1,97 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-4">
+  @if (!isLinking) {
+    <div class="flex items-center gap-cmn-1" role="group" aria-label="Type">
+      @for (opt of kindOptions; track opt.value) {
+        <cmn-chip
+          [selected]="form.controls.kind.value === opt.value"
+          (clicked)="setKind(opt.value)"
+        >
+          {{ opt.label }}
+        </cmn-chip>
+      }
+    </div>
+  }
+
+  <cmn-form-field
+    [control]="form.controls.transactionId"
+    label="Transaction"
+    hint="Pick one charge; later charges like it keep this up to date"
+  >
+    <cmn-input [formControl]="searchControl" placeholder="Search by merchant or description" />
+  </cmn-form-field>
+
+  @if (picker.errorMessage()) {
+    <cmn-alert variant="error">{{ picker.errorMessage() }}</cmn-alert>
+  }
+
+  <div class="max-h-64 space-y-cmn-1 overflow-y-auto">
+    @for (tx of picker.candidates(); track tx.transactionId) {
+      <cmn-selectable-card
+        [selected]="picker.selected()?.transactionId === tx.transactionId"
+        (clicked)="pick(tx)"
+        orientation="horizontal"
+      >
+        <div class="min-w-0 text-left">
+          <div class="truncate text-cmn-sm font-medium text-text-primary">
+            {{ tx.merchantName || tx.description }}
+          </div>
+          <div class="truncate text-cmn-xs text-text-secondary">
+            {{ tx.bankName }} · {{ tx.date | date: 'd MMM y' }}
+          </div>
+        </div>
+        <span trailing class="font-mono text-cmn-sm font-semibold text-text-primary">
+          {{ tx.amount | money: tx.currency }}
+        </span>
+      </cmn-selectable-card>
+    } @empty {
+      @if (!picker.isLoading() && !picker.errorMessage()) {
+        <cmn-empty-state message="No matching outgoing transactions" variant="bare" icon="Search" />
+      }
+    }
+  </div>
+
+  @if (picker.anchor(); as anchor) {
+    <p class="text-cmn-xs text-text-secondary">
+      Latest matching charge {{ anchor.amount | money: anchor.currency }} on
+      {{ anchor.date | date: 'd MMM y' }}
+    </p>
+  }
+
+  @if (picker.selected()) {
+    <div class="flex items-center gap-cmn-1" role="group" aria-label="Billed">
+      @for (opt of cadenceOptions; track opt.value) {
+        <cmn-chip
+          [selected]="form.controls.cadence.value === opt.value"
+          (clicked)="setCadence(opt.value)"
+        >
+          {{ opt.label }}
+        </cmn-chip>
+      }
+    </div>
+  }
+
+  @if (picker.selected() && !isLinking) {
+    <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
+      <cmn-form-field [control]="form.controls.merchant" label="Name" class="sm:col-span-2">
+        <cmn-input formControlName="merchant" />
+      </cmn-form-field>
+      <cmn-form-field [control]="form.controls.monthlyAmount" label="Amount per charge">
+        <cmn-input formControlName="monthlyAmount" type="number" />
+      </cmn-form-field>
+      @if (form.controls.kind.value === 'installment') {
+        <cmn-form-field
+          [control]="form.controls.termCount"
+          label="Total payments"
+          hint="Leave empty if the plan has no fixed term"
+        >
+          <cmn-input formControlName="termCount" type="number" placeholder="e.g. 12" />
+        </cmn-form-field>
+      }
+    </div>
+  }
+
+  <cmn-dialog-actions align="end">
+    <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
+    <cmn-button type="submit" variant="primary">{{ isLinking ? 'Link' : 'Add' }}</cmn-button>
+  </cmn-dialog-actions>
+</form>

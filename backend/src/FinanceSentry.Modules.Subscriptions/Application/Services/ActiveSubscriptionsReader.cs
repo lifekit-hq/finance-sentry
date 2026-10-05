@@ -41,7 +41,7 @@ public class ActiveSubscriptionsReader(IDetectedSubscriptionRepository repositor
         var subscriptions = await _repository.GetActiveByUserIdUnscopedAsync(userId.ToString(), ct);
 
         return subscriptions
-            .Where(s => s.IsManual)
+            .Where(s => s.IsManual && !s.IsTracked)
             .Select(s => s.MerchantNameDisplay)
             .ToList();
     }

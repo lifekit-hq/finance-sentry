@@ -172,7 +172,7 @@ public class CommittedOutflowPolicy(
         var manualMerchantNames = await _activeSubscriptions.GetActiveManualCommitmentMerchantNamesAsync(userId, ct);
         var pinnedKeys = await _pins.GetPinnedKeysAsync(userId, ct);
 
-        // A manual row's stored key (manual:{kind}:{merchant}) never matches a transaction-
+        // A legacy hand-typed row's stored key (manual:{kind}:{merchant}) never matches a transaction-
         // derived key, so it is re-keyed here the same way an automatically detected row already
         // is at detection time: by normalized merchant name. This does not touch the stored
         // MerchantNameNormalized — that form is how a manual row is found and re-used on the

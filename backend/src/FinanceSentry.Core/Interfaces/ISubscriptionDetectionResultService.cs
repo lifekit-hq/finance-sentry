@@ -7,6 +7,16 @@ public interface ISubscriptionDetectionResultService
         IReadOnlyList<DetectedSubscriptionData> results,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Advances every manual row added from a transaction by the user's later charges under the
+    /// same key; detection never updates a manual row, and a commitment with too few charges for
+    /// detection to own would otherwise keep the dates it was added with.
+    /// </summary>
+    Task TrackManualCommitmentsAsync(
+        string userId,
+        IReadOnlyList<CommitmentCharge> charges,
+        CancellationToken ct = default);
+
     Task MarkStaleAsPotentiallyCancelledAsync(
         string userId,
         CancellationToken ct = default);
@@ -40,4 +50,13 @@ public static class SubscriptionKinds
 {
     public const string Subscription = "subscription";
     public const string Installment = "installment";
+}
+
+/// <summary>How often a commitment is charged; the detection job only recognises these two.</summary>
+public static class SubscriptionCadences
+{
+    public const string Monthly = "monthly";
+    public const string Annual = "annual";
+
+    public static bool IsValid(string? cadence) => cadence is Monthly or Annual;
 }

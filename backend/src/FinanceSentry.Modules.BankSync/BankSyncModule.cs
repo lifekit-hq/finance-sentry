@@ -204,6 +204,7 @@ public static class BankSyncModule
 
         services.AddScoped<IBankingAccountsReader, BankingAccountsReader>();
         services.AddScoped<IBankingTransactionReader, BankingTransactionReader>();
+        services.AddScoped<ICommitmentTransactionReader, CommitmentTransactionReader>();
         services.AddScoped<IBankingTotalsReader, BankingTotalsReader>();
         services.AddScoped<IMerchantSpendingReader, MerchantSpendingReader>();
         services.AddScoped<IHonestMonthlyFlowReader, HonestMonthlyFlowReader>();

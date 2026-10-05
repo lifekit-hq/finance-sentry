@@ -50,6 +50,11 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   INVALID_CATEGORY: 'One of the selected categories is not recognized.',
   INVALID_TRANSACTION_TYPE: 'Invalid transaction type. Use debit or credit.',
   INVALID_SEARCH: 'Search text is too long.',
+  COMMITMENT_TRANSACTION_NOT_FOUND: 'That transaction is no longer available. Pick another one.',
+  COMMITMENT_ALREADY_TRACKED: 'Charges like this one are already tracked on this page.',
+  COMMITMENT_ALREADY_LINKED: 'This row already follows its transactions.',
+  INVALID_COMMITMENT_KIND: 'Choose subscription or installment.',
+  INVALID_COMMITMENT_CADENCE: 'Choose monthly or yearly.',
   // Feature 040 agent error codes are lowercase snake_case by contract (chat-endpoint.md).
   /* eslint-disable @typescript-eslint/naming-convention */
   agent_not_configured:

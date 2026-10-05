@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Subscriptions.API.Controllers;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.API.Responses;
 using FinanceSentry.Modules.Subscriptions.Application.Commands;
 using FinanceSentry.Modules.Subscriptions.Application.Queries;
@@ -15,13 +16,14 @@ public class SubscriptionsController(
     IQueryHandler<GetSubscriptionsQuery, SubscriptionsListResponse> getSubscriptions,
     IQueryHandler<GetSubscriptionSummaryQuery, SubscriptionSummaryResponse> getSummary,
     IQueryHandler<GetInstallmentFxImpactQuery, InstallmentFxImpactResponse> getFxImpact,
+    IQueryHandler<GetCommitmentAnchorQuery, CommitmentAnchorResponse> getCommitmentAnchor,
     ICommandHandler<DismissSubscriptionCommand, bool> dismiss,
     ICommandHandler<RestoreSubscriptionCommand, bool> restore,
     ICommandHandler<SetInstallmentTermCommand, bool> setTerm,
     ICommandHandler<CompleteInstallmentCommand, bool> completeInstallment,
     ICommandHandler<DeleteInstallmentCommand, bool> deleteInstallment,
-    ICommandHandler<AddManualInstallmentCommand, Guid> addInstallment,
-    ICommandHandler<AddManualSubscriptionCommand, Guid> addSubscription) : ControllerBase
+    ICommandHandler<AddCommitmentCommand, Guid> addCommitment,
+    ICommandHandler<LinkCommitmentCommand, bool> linkCommitment) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetSubscriptions(
@@ -50,6 +52,21 @@ public class SubscriptionsController(
     {
         var result = await getFxImpact.Handle(
             new GetInstallmentFxImpactQuery(User.RequireUserId().ToString()), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// The latest charge under the picked transaction's commitment key, which an added or linked
+    /// row anchors on; the Add dialog pre-fills its amount from it.
+    /// </summary>
+    [HttpGet("candidates/{transactionId:guid}")]
+    public async Task<IActionResult> GetCommitmentAnchor(
+        Guid transactionId,
+        [FromQuery] string kind = SubscriptionKinds.Subscription,
+        CancellationToken ct = default)
+    {
+        var result = await getCommitmentAnchor.Handle(
+            new GetCommitmentAnchorQuery(User.RequireUserId(), transactionId, kind), ct);
         return Ok(result);
     }
 
@@ -89,43 +106,44 @@ public class SubscriptionsController(
         return NoContent();
     }
 
-    [HttpPost("installments")]
-    public async Task<IActionResult> AddInstallment([FromBody] AddInstallmentRequest body, CancellationToken ct = default)
+    /// <summary>
+    /// Adds a subscription or installment from one of the user's transactions; the row then
+    /// follows that transaction's later charges.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Add([FromBody] AddCommitmentRequest body, CancellationToken ct = default)
     {
-        var id = await addInstallment.Handle(new AddManualInstallmentCommand(
-            User.RequireUserId().ToString(),
+        var id = await addCommitment.Handle(new AddCommitmentCommand(
+            User.RequireUserId(),
+            body.TransactionId,
+            body.Kind,
             body.Merchant,
             body.MonthlyAmount,
-            body.Currency,
-            body.StartDate,
-            body.TermCount), ct);
+            body.TermCount,
+            body.Cadence), ct);
         return Ok(new { id });
     }
 
-    [HttpPost("manual-subscription")]
-    public async Task<IActionResult> AddSubscription([FromBody] AddSubscriptionRequest body, CancellationToken ct = default)
+    /// <summary>
+    /// Links a legacy hand-typed row to one of the user's transactions; the row then follows
+    /// that transaction's later charges.
+    /// </summary>
+    [HttpPost("{id:guid}/link")]
+    public async Task<IActionResult> Link(Guid id, [FromBody] LinkCommitmentRequest body, CancellationToken ct = default)
     {
-        var id = await addSubscription.Handle(new AddManualSubscriptionCommand(
-            User.RequireUserId().ToString(),
-            body.Merchant,
-            body.MonthlyAmount,
-            body.Currency,
-            body.StartDate), ct);
-        return Ok(new { id });
+        await linkCommitment.Handle(new LinkCommitmentCommand(User.RequireUserId(), id, body.TransactionId, body.Cadence), ct);
+        return NoContent();
     }
 }
 
 public record SetTermRequest(int? TermCount, DateOnly? EndDate = null, DateOnly? StartDate = null);
 
-public record AddSubscriptionRequest(
-    string Merchant,
-    decimal MonthlyAmount,
-    string Currency,
-    DateOnly StartDate);
+public record AddCommitmentRequest(
+    Guid TransactionId,
+    string Kind,
+    string? Merchant = null,
+    decimal? MonthlyAmount = null,
+    int? TermCount = null,
+    string? Cadence = null);
 
-public record AddInstallmentRequest(
-    string Merchant,
-    decimal MonthlyAmount,
-    string Currency,
-    DateOnly StartDate,
-    int? TermCount);
+public record LinkCommitmentRequest(Guid TransactionId, string? Cadence = null);

@@ -396,15 +396,41 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   keeps the stored key and the matched key from drifting apart. A plan's identity includes its
   rounded monthly amount, so concurrent plans at one shop stay distinct and only the plan the
   user actually holds is claimed.
-  A manual row (`DetectedSubscription.CreateManual`, `IsManual`) is stored under
-  `manual:{kind}:{merchant}` — a form no transaction ever derives, by design: that key is how
-  the row is found and re-used on the next manual edit, and detection never re-keys or
-  overwrites a manual row (`SubscriptionDetectionResultService.ShouldUpdate`). Rule (a) still
-  claims its debits: `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual
-  rows' display names via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync`
-  and folds `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same
-  key set rule (a) matches against — the stored key is untouched, only the match set is widened
-  (#560).
+  A manual row (`IsManual`) is added from a picked transaction
+  (`DetectedSubscription.CreateFromTransaction`, `POST /subscriptions`) and stored under that
+  transaction's `CommitmentKeyResolver` key, so rule (a) matches its debits directly. Detection
+  never re-keys or overwrites a manual row (`SubscriptionDetectionResultService.ShouldUpdate`);
+  instead `SubscriptionDetectionJob` hands every charge to
+  `TrackManualCommitmentsAsync`, which advances the row's last and next charge dates from
+  charges under its key (`DetectedSubscription.RecordCharge`), so a commitment with too few
+  charges for detection still follows its transactions, and the stale sweep lapses it like a
+  detected row when they stop. An older hand-typed row is stored under
+  `manual:{kind}:{merchant}`, a form no transaction ever derives, and is neither tracked nor
+  swept (`DetectedSubscription.IsTracked`) until the user links it to a transaction
+  (`POST /subscriptions/{id}/link`, `LinkCommitmentCommand`), which re-keys it to that
+  transaction's key and turns tracking on; nothing re-keys it automatically and no migration
+  does. A pick anchors the row on the latest same-key charge, not the picked one
+  (`ICommitmentTransactionReader`; `GET /subscriptions/candidates/{transactionId}` exposes that
+  anchor so the Add dialog pre-fills its amount from the latest charge, the user may edit it, and
+  the amount they confirm is what is stored): that charge's date, amount and account currency become the
+  last charge, so the row is current at once instead of waiting for the daily job, and
+  `OccurrenceCount` is the number of same-key charges on distinct dates up to it, so an
+  installment starts with the payments already made. Cadence is not forced to monthly: the
+  reader infers it from the median gap between distinct same-key charge dates (a median over
+  200 days is annual, otherwise monthly; none with fewer than two charges) and the anchor lookup
+  returns it so the Add dialog pre-selects it, monthly when there is no history. The server
+  always stores the cadence the user submits (`cadence`, monthly or annual, anything else is a
+  400 `INVALID_COMMITMENT_CADENCE`, absent means monthly) for a new, restored or linked row. An installment is stored under `installment:{merchant}:{roundedAmount}` built from the picked charge's amount (`InstallmentCommitmentKey`, reusing `InstallmentPlanRecognizer.PlanKey`; a key that is already installment-shaped is kept), so its anchor, charge count and cadence cover only charges of that amount and unrelated purchases at the same merchant (an Apple Store installment among other Apple purchases) neither start it part-way through its term nor advance it; subscriptions keep the merchant-shaped key. The reader exposes both reads (`FindAsync`, `FindInstallmentAsync`), `GET /subscriptions/candidates/{transactionId}` takes a `kind` query parameter to choose between them, and `SubscriptionDetectionJob` offers each charge to `TrackManualCommitmentsAsync` under both its resolved key and its installment-shaped key, without changing `CommitmentKeyResolver`. `CommittedOutflowPolicy` is unchanged, so an installment added at a merchant the recognizer does not know does not claim that merchant's debits as committed outflow. An installment's `StartDate`
+  stays null on add and restore so `GetInstallmentFxImpactQuery` estimates the baseline from the
+  last charge and occurrence count; a link keeps the legacy row's typed start. Adding or linking onto a key held by a dismissed,
+  completed or potentially cancelled row, or a detected row of the other kind, restores that
+  row from the pick (`DetectedSubscription.TrackFromTransaction`); only an active row of the
+  same kind answers 409, naming that row. Rule (a) still claims a legacy row's debits:
+  `CommittedOutflowPolicy.LoadForUserAsync` separately reads active legacy rows' display names
+  via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync` and folds
+  `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same key set rule
+  (a) matches against; the stored key is untouched, only the match set is widened (#560). A
+  row keyed by a transaction is left out of that read, since its own key already matches.
 - **(b) a committed category** — `RENT_AND_UTILITIES` or `LOAN_PAYMENTS`. Rent is the largest
   fixed outflow in the book and the detector can never see it: the same payee for the same
   amount every month is not a merchant recurrence signature. A loan payment is a debt
@@ -450,11 +476,11 @@ the total.
   detector uses payoffs only to mark a plan completed, and a completed plan is no longer
   `active` — so a payoff reads as discretionary unless its category carries it. Ordinary spend
   — groceries, restaurants, clothes — is discretionary by construction, which is the point.
-- **Known under-count, narrow**: a manual commitment (see rule (a) above) still cannot match a
+- **Known under-count, narrow**: a legacy hand-typed commitment (see rule (a) above; a row added from a transaction matches by its stored key) still cannot match a
   debit whose statement carries no `MerchantName` and names the merchant only inside its free-text
   `Description` in a form `MerchantNameNormalizer.Normalize` cannot recover verbatim from the
   merchant's display name — the same shape of gap rule (d) documents for pins. This is now the
-  only case a manual row cannot match; every other debit for a manually pinned merchant is
+  only case a legacy row cannot match; every other debit for a manually pinned merchant is
   committed (#560).
 - **Known over-claim**: rule (b) inherits whatever the ingest ladder (#553) put in its two
   keys, and `RENT_AND_UTILITIES` is wider than rent — the telecom MCC range 4812–4900 and the
