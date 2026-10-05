@@ -34,14 +34,14 @@ export interface AddCommitmentRequest {
   merchant: string;
   monthlyAmount: number;
   termCount: Nullable<number>;
-  /** Used only when earlier charges under the key are too few to show how often it bills. */
+  /** Stored as given; the dialog pre-selects the cadence read from the charge history. */
   cadence: SubscriptionCadence;
 }
 
 /** Links a legacy hand-typed row to a picked transaction; later charges like it keep it current. */
 export interface LinkCommitmentRequest {
   transactionId: string;
-  /** Used only when earlier charges under the key are too few to show how often it bills. */
+  /** Stored as given; the dialog pre-selects the cadence read from the charge history. */
   cadence: SubscriptionCadence;
 }
 

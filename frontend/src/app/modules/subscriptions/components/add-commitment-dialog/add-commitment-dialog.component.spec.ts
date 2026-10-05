@@ -4,8 +4,8 @@ import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
 import {type Observable, of, Subject} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
-import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
 import {SubscriptionsService} from '../../services/subscriptions.service';
 import {AddCommitmentDialogComponent} from './add-commitment-dialog.component';
@@ -82,7 +82,13 @@ describe('AddCommitmentDialogComponent', () => {
   it('pre-fills the amount from the latest same-key charge, not the older pick', () => {
     const {component} = setup(
       undefined,
-      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 3, cadence: 'monthly'})
+      of({
+        amount: LATEST_AMOUNT,
+        currency: 'EUR',
+        date: '2026-10-05',
+        chargeCount: 3,
+        cadence: 'monthly',
+      })
     );
     component.pick(CANDIDATE);
     expect(component.form.controls.monthlyAmount.value).toBe(LATEST_AMOUNT);
@@ -129,7 +135,13 @@ describe('AddCommitmentDialogComponent', () => {
   it('stores the amount the user confirmed over the latest charge', () => {
     const {component, close} = setup(
       undefined,
-      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 3, cadence: 'monthly'})
+      of({
+        amount: LATEST_AMOUNT,
+        currency: 'EUR',
+        date: '2026-10-05',
+        chargeCount: 3,
+        cadence: 'monthly',
+      })
     );
     component.pick(CANDIDATE);
     component.form.controls.monthlyAmount.setValue(11);
@@ -177,7 +189,13 @@ describe('AddCommitmentDialogComponent', () => {
   it('pre-selects the cadence read from the charge history', () => {
     const {component, close} = setup(
       undefined,
-      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 2, cadence: 'annual'})
+      of({
+        amount: LATEST_AMOUNT,
+        currency: 'EUR',
+        date: '2026-10-05',
+        chargeCount: 2,
+        cadence: 'annual',
+      })
     );
     component.pick(CANDIDATE);
     expect(component.form.controls.cadence.value).toBe('annual');

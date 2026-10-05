@@ -180,6 +180,7 @@ describe('subscriptionsEffects', () => {
         merchant: 'Acme',
         monthlyAmount: 10,
         termCount: 12,
+        cadence: 'monthly',
       })
     );
 
@@ -230,7 +231,10 @@ describe('subscriptionsEffects', () => {
     configure(service);
 
     TestBed.runInInjectionContext(() =>
-      subscriptionsEffects(store).linkCommitment({id: 'sub-1', request: {transactionId: 'tx-1', cadence: 'monthly'}})
+      subscriptionsEffects(store).linkCommitment({
+        id: 'sub-1',
+        request: {transactionId: 'tx-1', cadence: 'monthly'},
+      })
     );
 
     expect(service.link).toHaveBeenCalledWith('sub-1', {transactionId: 'tx-1', cadence: 'monthly'});
@@ -253,10 +257,16 @@ describe('subscriptionsEffects', () => {
     configure(service);
 
     TestBed.runInInjectionContext(() =>
-      subscriptionsEffects(store).linkCommitment({id: 'sub-1', request: {transactionId: 'tx-1', cadence: 'monthly'}})
+      subscriptionsEffects(store).linkCommitment({
+        id: 'sub-1',
+        request: {transactionId: 'tx-1', cadence: 'monthly'},
+      })
     );
 
-    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED', 'Tracked as Acme.');
+    expect(store.setAddError).toHaveBeenLastCalledWith(
+      'COMMITMENT_ALREADY_TRACKED',
+      'Tracked as Acme.'
+    );
     expect(store.setData).not.toHaveBeenCalled();
   });
 });
