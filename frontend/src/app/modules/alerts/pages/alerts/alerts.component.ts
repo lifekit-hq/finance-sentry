@@ -3,6 +3,7 @@ import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
+  ButtonComponent,
   ChipComponent,
   EmptyStateComponent,
   type LucideIconName,
@@ -10,21 +11,18 @@ import {
   ToastService,
 } from '@lifekit-hq/ui';
 
-import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
-import {
-  ALERT_TYPE_META_REGISTRY,
-  type AlertTypeMeta,
-  DEFAULT_ALERT_TYPE_META,
-} from '../../constants/alert-type-meta.constants';
 import {
   type Alert,
   type AlertFilter,
   type AlertSeverity,
   type AlertType,
 } from '../../models/alert/alert.model';
+import {AlertCaptionPipe} from '../../pipes/alert-caption.pipe';
 import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
-import {AlertMessageUtils} from '../../utils/alert-message.utils';
+import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
+import {AlertTypeUtils} from '../../utils/alert-type.utils';
+import {ALERT_PAGE_SIZE_OPTIONS} from './alerts.constants';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -40,8 +38,10 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
 @Component({
   selector: 'fns-alerts',
   imports: [
+    AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,
+    ButtonComponent,
     ChipComponent,
     EmptyStateComponent,
     PageHeaderComponent,
@@ -72,24 +72,6 @@ export class AlertsComponent {
     this.store.filter() === 'all' ? 'All your accounts are healthy.' : 'Try a different filter.'
   );
 
-  public readonly filtered = computed(() => {
-    const f = this.store.filter();
-    const all = this.store.alerts();
-    if (f === 'unread') {
-      return all.filter(a => !a.isRead);
-    }
-    if (f === 'error') {
-      return all.filter(a => a.severity === 'Error');
-    }
-    if (f === 'warning') {
-      return all.filter(a => a.severity === 'Warning');
-    }
-    if (f === 'info') {
-      return all.filter(a => a.severity === 'Info');
-    }
-    return all;
-  });
-
   public readonly filterOptions: {id: AlertFilter; label: () => string}[] = [
     {id: 'all', label: () => 'All'},
     {
@@ -102,19 +84,19 @@ export class AlertsComponent {
     {id: 'info', label: () => 'Info'},
   ];
 
+  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS;
+
+  // Everything fits on one page of the smallest size → no pager to show.
+  public readonly showPager = computed(
+    () => this.store.totalCount() > Math.min(...ALERT_PAGE_SIZE_OPTIONS)
+  );
+
   public iconFor(type: AlertType): LucideIconName {
-    return this.metaFor(type).icon;
+    return AlertTypeUtils.meta(type).icon;
   }
 
   public typeLabel(type: AlertType): string {
-    return this.metaFor(type).label;
-  }
-
-  // Tolerate alert types the backend added before this registry did (e.g. PolicyViolation,
-  // Opportunity) — an unmapped type must not crash the whole alerts page.
-  private metaFor(type: AlertType): AlertTypeMeta {
-    const registry = ALERT_TYPE_META_REGISTRY as Record<string, AlertTypeMeta | undefined>;
-    return registry[type] ?? DEFAULT_ALERT_TYPE_META;
+    return AlertTypeUtils.meta(type).label;
   }
 
   public severityFor(severity: AlertSeverity): AlertItemSeverity {
@@ -143,13 +125,11 @@ export class AlertsComponent {
     if (!item.isRead) {
       this.store.markRead(item.id);
     }
-    const filingUrl =
-      item.type === 'FilingLanded' ? AlertMessageUtils.filingUrl(item.message) : null;
-    if (filingUrl) {
-      window.open(filingUrl, '_blank', 'noopener,noreferrer');
-      return;
+    const navigation = AlertDestinationUtils.resolve(item);
+    if (navigation?.kind === 'external') {
+      window.open(navigation.url, '_blank', 'noopener,noreferrer');
+    } else if (navigation) {
+      void this.router.navigate(navigation.commands);
     }
-    const target = item.type === 'UnusualSpend' ? AppRoute.Transactions : AppRoute.AccountsList;
-    void this.router.navigateByUrl(target);
   }
 }
