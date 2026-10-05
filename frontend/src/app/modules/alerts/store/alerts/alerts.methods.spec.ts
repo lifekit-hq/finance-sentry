@@ -72,6 +72,41 @@ describe('alertsMethods', () => {
     expect(state.unreadCount()).toBe(5);
   });
 
+  it('markReadLocal drops the row from the Unread filter and shrinks the total', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'}), makeAlert({id: 'b'})], 2, {
+      filter: 'unread',
+    });
+    methods.markReadLocal('a');
+    expect(state.alerts().map(a => a.id)).toEqual(['b']);
+    expect(state.totalCount()).toBe(1);
+    expect(state.unreadCount()).toBe(1);
+  });
+
+  it('markReadLocal steps back a page when it empties a later Unread page', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'})], 1, {filter: 'unread', currentPage: 2});
+    methods.markReadLocal('a');
+    expect(state.currentPage()).toBe(1);
+  });
+
+  it('markAllReadLocal empties the Unread filter', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'}), makeAlert({id: 'b'})], 2, {
+      filter: 'unread',
+      currentPage: 2,
+    });
+    methods.markAllReadLocal();
+    expect(state.alerts()).toEqual([]);
+    expect(state.totalCount()).toBe(0);
+    expect(state.unreadCount()).toBe(0);
+    expect(state.currentPage()).toBe(1);
+  });
+
+  it('markAllReadLocal keeps rows, marked read, on other filters', () => {
+    const {state, methods} = setup([makeAlert({id: 'a'})], 1);
+    methods.markAllReadLocal();
+    expect(state.alerts().map(a => a.isRead)).toEqual([true]);
+    expect(state.totalCount()).toBe(1);
+  });
+
   it('dismissLocal drops the row and lowers the badge only for an open unread alert', () => {
     const {state, methods} = setup(
       [makeAlert({id: 'open'}), makeAlert({id: 'done', isResolved: true})],

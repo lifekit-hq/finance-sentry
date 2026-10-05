@@ -29,16 +29,27 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
       patchState(store, {pageSize, currentPage: 1});
     },
     markReadLocal(id: string): void {
-      patchState(store, (s: AlertsState) => ({
-        alerts: s.alerts.map(a => (a.id === id ? {...a, isRead: true} : a)),
-        unreadCount: Math.max(0, s.unreadCount - unreadWeight(s.alerts.find(a => a.id === id))),
-      }));
+      patchState(store, (s: AlertsState) => {
+        const target = s.alerts.find(a => a.id === id);
+        const unreadCount = Math.max(0, s.unreadCount - unreadWeight(target));
+        if (s.filter === 'unread') {
+          const alerts = s.alerts.filter(a => a.id !== id);
+          return {
+            alerts,
+            unreadCount,
+            totalCount: target && !target.isRead ? Math.max(0, s.totalCount - 1) : s.totalCount,
+            currentPage: alerts.length === 0 ? Math.max(1, s.currentPage - 1) : s.currentPage,
+          };
+        }
+        return {alerts: s.alerts.map(a => (a.id === id ? {...a, isRead: true} : a)), unreadCount};
+      });
     },
     markAllReadLocal(): void {
-      patchState(store, (s: AlertsState) => ({
-        alerts: s.alerts.map(a => ({...a, isRead: true})),
-        unreadCount: 0,
-      }));
+      patchState(store, (s: AlertsState) =>
+        s.filter === 'unread'
+          ? {alerts: [], totalCount: 0, unreadCount: 0, currentPage: 1}
+          : {alerts: s.alerts.map(a => ({...a, isRead: true})), unreadCount: 0}
+      );
     },
     dismissLocal(id: string): void {
       patchState(store, (s: AlertsState) => {
