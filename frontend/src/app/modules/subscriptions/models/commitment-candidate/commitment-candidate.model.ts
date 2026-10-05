@@ -23,3 +23,12 @@ export interface CommitmentCadenceOption {
   value: SubscriptionCadence;
   label: string;
 }
+
+/** The latest charge under a picked transaction's key: what an added row anchors on. */
+export interface CommitmentAnchor {
+  amount: number;
+  currency: string;
+  date: string;
+  chargeCount: number;
+  cadence: Nullable<SubscriptionCadence>;
+}

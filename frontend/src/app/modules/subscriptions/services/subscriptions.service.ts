@@ -2,6 +2,7 @@ import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
+import {type CommitmentAnchor} from '../models/commitment-candidate/commitment-candidate.model';
 import {
   type AddCommitmentRequest,
   type LinkCommitmentRequest,
@@ -24,6 +25,10 @@ export class SubscriptionsService extends ApiService {
 
   public getSummary(): Observable<SubscriptionSummary> {
     return this.get<SubscriptionSummary>('summary');
+  }
+
+  public getCommitmentAnchor(transactionId: string): Observable<CommitmentAnchor> {
+    return this.get<CommitmentAnchor>(`candidates/${transactionId}`);
   }
 
   public dismiss(id: string): Observable<void> {

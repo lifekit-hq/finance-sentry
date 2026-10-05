@@ -1,12 +1,13 @@
 import {DialogRef} from '@angular/cdk/dialog';
 import {TestBed} from '@angular/core/testing';
 import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
-import {of} from 'rxjs';
+import {type Observable, of, Subject} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
 import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
+import {SubscriptionsService} from '../../services/subscriptions.service';
 import {AddCommitmentDialogComponent} from './add-commitment-dialog.component';
 
 const CANDIDATE: CommitmentCandidate = {
@@ -19,12 +20,30 @@ const CANDIDATE: CommitmentCandidate = {
   merchantName: 'Acme Hosting',
 };
 
-function setup(data?: CommitmentDialogData) {
+const LATEST_AMOUNT = 12.99;
+
+function setup(data?: CommitmentDialogData, anchor$: Observable<unknown> | null = null) {
   const close = vi.fn();
   TestBed.configureTestingModule({
     providers: [
       {provide: DialogRef, useValue: {close}},
       {provide: CMN_DIALOG_DATA, useValue: data},
+      {
+        provide: SubscriptionsService,
+        useValue: {
+          getCommitmentAnchor: vi.fn(
+            () =>
+              anchor$ ??
+              of({
+                amount: CANDIDATE.amount,
+                currency: 'EUR',
+                date: '2026-09-21',
+                chargeCount: 1,
+                cadence: null,
+              })
+          ),
+        },
+      },
       {
         provide: CommitmentCandidatesService,
         useValue: {
@@ -58,6 +77,43 @@ describe('AddCommitmentDialogComponent', () => {
       merchant: 'Acme Hosting',
       monthlyAmount: 16.19,
     });
+  });
+
+  it('pre-fills the amount from the latest same-key charge, not the older pick', () => {
+    const {component} = setup(
+      undefined,
+      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 3, cadence: 'monthly'})
+    );
+    component.pick(CANDIDATE);
+    expect(component.form.controls.monthlyAmount.value).toBe(LATEST_AMOUNT);
+    expect(component.picker.anchor()?.amount).toBe(LATEST_AMOUNT);
+  });
+
+  it('keeps an amount the user edited before the latest charge arrived', () => {
+    const lookup = new Subject<unknown>();
+    const {component} = setup(undefined, lookup);
+    component.pick(CANDIDATE);
+    component.form.controls.monthlyAmount.setValue(11);
+    component.form.controls.monthlyAmount.markAsDirty();
+    lookup.next({
+      amount: LATEST_AMOUNT,
+      currency: 'EUR',
+      date: '2026-10-05',
+      chargeCount: 3,
+      cadence: null,
+    });
+    expect(component.form.controls.monthlyAmount.value).toBe(11);
+  });
+
+  it('stores the amount the user confirmed over the latest charge', () => {
+    const {component, close} = setup(
+      undefined,
+      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 3, cadence: 'monthly'})
+    );
+    component.pick(CANDIDATE);
+    component.form.controls.monthlyAmount.setValue(11);
+    component.submit();
+    expect(close).toHaveBeenCalledWith(expect.objectContaining({monthlyAmount: 11}));
   });
 
   it('falls back to the description when the transaction has no merchant', () => {

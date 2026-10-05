@@ -43,6 +43,21 @@ describe('commitmentPickerMethods', () => {
     expect(state.search()).toBe('acme');
   });
 
+  it('setAnchor stores the latest charge and a new pick clears it', () => {
+    const state = signalState(initialCommitmentPickerState);
+    const methods = commitmentPickerMethods(state);
+    methods.setAnchor({
+      amount: 12.99,
+      currency: 'EUR',
+      date: '2026-10-05',
+      chargeCount: 3,
+      cadence: 'monthly',
+    });
+    expect(state.anchor()?.amount).toBe(12.99);
+    methods.select(CANDIDATE);
+    expect(state.anchor()).toBeNull();
+  });
+
   it('select keeps the pick even when the list changes', () => {
     const state = signalState(initialCommitmentPickerState);
     const methods = commitmentPickerMethods(state);

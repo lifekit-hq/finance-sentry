@@ -5,8 +5,12 @@ import {of, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {CANDIDATE_SEARCH_DEBOUNCE_MS} from '../../constants/commitment-candidate/commitment-candidate.constants';
-import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {
+  type CommitmentAnchor,
+  type CommitmentCandidate,
+} from '../../models/commitment-candidate/commitment-candidate.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
+import {SubscriptionsService} from '../../services/subscriptions.service';
 import {commitmentPickerEffects} from './commitment-picker.effects';
 
 const CANDIDATE: CommitmentCandidate = {
@@ -29,17 +33,33 @@ function buildStore() {
     setLoading: vi.fn(),
     setCandidates: vi.fn(),
     setError: vi.fn(),
+    setAnchor: vi.fn(),
   };
 }
 
-function setup(result: ReturnType<CommitmentCandidatesService['search']>) {
+const ANCHOR: CommitmentAnchor = {
+  amount: 12.99,
+  currency: 'EUR',
+  date: '2026-10-05',
+  chargeCount: 3,
+  cadence: 'monthly',
+};
+
+function setup(
+  result: ReturnType<CommitmentCandidatesService['search']>,
+  anchor: ReturnType<SubscriptionsService['getCommitmentAnchor']> = of(ANCHOR)
+) {
   const service = {search: vi.fn().mockReturnValue(result)};
+  const subscriptions = {getCommitmentAnchor: vi.fn().mockReturnValue(anchor)};
   TestBed.configureTestingModule({
-    providers: [{provide: CommitmentCandidatesService, useValue: service}],
+    providers: [
+      {provide: CommitmentCandidatesService, useValue: service},
+      {provide: SubscriptionsService, useValue: subscriptions},
+    ],
   });
   const store = buildStore();
   const effects = TestBed.runInInjectionContext(() => commitmentPickerEffects(store));
-  return {service, store, effects};
+  return {service, subscriptions, store, effects};
 }
 
 describe('commitmentPickerEffects', () => {
@@ -64,6 +84,26 @@ describe('commitmentPickerEffects', () => {
     effects.load();
 
     expect(store.setError).toHaveBeenCalledWith('INVALID_SEARCH');
+  });
+
+  it('loadAnchor: stores the latest charge and hands it to the caller', () => {
+    const {subscriptions, store, effects} = setup(of(PAGE));
+    const onLoaded = vi.fn();
+    effects.loadAnchor({transactionId: 'tx-1', onLoaded});
+    expect(subscriptions.getCommitmentAnchor).toHaveBeenCalledWith('tx-1');
+    expect(store.setAnchor).toHaveBeenCalledWith(ANCHOR);
+    expect(onLoaded).toHaveBeenCalledWith(ANCHOR);
+  });
+
+  it('loadAnchor: leaves the pick as it is when the lookup fails', () => {
+    const {store, effects} = setup(
+      of(PAGE),
+      throwError(() => new HttpErrorResponse({status: 404}))
+    );
+    const onLoaded = vi.fn();
+    effects.loadAnchor({transactionId: 'tx-1', onLoaded});
+    expect(store.setAnchor).not.toHaveBeenCalled();
+    expect(onLoaded).not.toHaveBeenCalled();
   });
 
   it('applySearch: debounces, then reloads with the new term', () => {

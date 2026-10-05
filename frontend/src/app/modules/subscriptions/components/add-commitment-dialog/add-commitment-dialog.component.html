@@ -50,6 +50,13 @@
     }
   </div>
 
+  @if (picker.anchor(); as anchor) {
+    <p class="text-cmn-xs text-text-secondary">
+      Latest matching charge {{ anchor.amount | money: anchor.currency }} on
+      {{ anchor.date | date: 'd MMM y' }}
+    </p>
+  }
+
   @if (picker.selected()) {
     <div class="flex items-center gap-cmn-1" role="group" aria-label="Billed">
       @for (opt of cadenceOptions; track opt.value) {

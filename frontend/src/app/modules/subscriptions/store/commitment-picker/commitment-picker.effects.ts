@@ -4,8 +4,12 @@ import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, debounceTime, EMPTY, filter, pipe, switchMap, tap} from 'rxjs';
 
 import {CANDIDATE_SEARCH_DEBOUNCE_MS} from '../../constants/commitment-candidate/commitment-candidate.constants';
-import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {
+  type CommitmentAnchor,
+  type CommitmentCandidate,
+} from '../../models/commitment-candidate/commitment-candidate.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
+import {SubscriptionsService} from '../../services/subscriptions.service';
 
 interface EffectsStore {
   search: Signal<string>;
@@ -13,10 +17,12 @@ interface EffectsStore {
   setLoading: () => void;
   setCandidates: (candidates: CommitmentCandidate[]) => void;
   setError: (errorCode: Nullable<string>) => void;
+  setAnchor: (anchor: CommitmentAnchor) => void;
 }
 
 export function commitmentPickerEffects(store: EffectsStore) {
   const service = inject(CommitmentCandidatesService);
+  const subscriptions = inject(SubscriptionsService);
 
   const load = rxMethod<void>(
     pipe(
@@ -35,6 +41,19 @@ export function commitmentPickerEffects(store: EffectsStore) {
 
   return {
     load,
+    loadAnchor: rxMethod<{transactionId: string; onLoaded: (anchor: CommitmentAnchor) => void}>(
+      pipe(
+        switchMap(({transactionId, onLoaded}) =>
+          subscriptions.getCommitmentAnchor(transactionId).pipe(
+            tap(anchor => {
+              store.setAnchor(anchor);
+              onLoaded(anchor);
+            }),
+            catchError(() => EMPTY)
+          )
+        )
+      )
+    ),
     applySearch: rxMethod<string>(
       pipe(
         debounceTime(CANDIDATE_SEARCH_DEBOUNCE_MS),

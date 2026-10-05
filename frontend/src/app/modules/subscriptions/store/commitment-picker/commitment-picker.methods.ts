@@ -1,6 +1,9 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
-import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {
+  type CommitmentAnchor,
+  type CommitmentCandidate,
+} from '../../models/commitment-candidate/commitment-candidate.model';
 import {type CommitmentPickerState} from './commitment-picker.state';
 
 export function commitmentPickerMethods(store: WritableStateSource<CommitmentPickerState>) {
@@ -18,7 +21,10 @@ export function commitmentPickerMethods(store: WritableStateSource<CommitmentPic
       patchState(store, {status: 'error', errorCode});
     },
     select(candidate: CommitmentCandidate): void {
-      patchState(store, {selected: candidate});
+      patchState(store, {selected: candidate, anchor: null});
+    },
+    setAnchor(anchor: CommitmentAnchor): void {
+      patchState(store, {anchor});
     },
   };
 }

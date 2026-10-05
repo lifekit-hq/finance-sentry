@@ -15,6 +15,7 @@ public class SubscriptionsController(
     IQueryHandler<GetSubscriptionsQuery, SubscriptionsListResponse> getSubscriptions,
     IQueryHandler<GetSubscriptionSummaryQuery, SubscriptionSummaryResponse> getSummary,
     IQueryHandler<GetInstallmentFxImpactQuery, InstallmentFxImpactResponse> getFxImpact,
+    IQueryHandler<GetCommitmentAnchorQuery, CommitmentAnchorResponse> getCommitmentAnchor,
     ICommandHandler<DismissSubscriptionCommand, bool> dismiss,
     ICommandHandler<RestoreSubscriptionCommand, bool> restore,
     ICommandHandler<SetInstallmentTermCommand, bool> setTerm,
@@ -50,6 +51,18 @@ public class SubscriptionsController(
     {
         var result = await getFxImpact.Handle(
             new GetInstallmentFxImpactQuery(User.RequireUserId().ToString()), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// The latest charge under the picked transaction's commitment key, which an added or linked
+    /// row anchors on; the Add dialog pre-fills its amount from it.
+    /// </summary>
+    [HttpGet("candidates/{transactionId:guid}")]
+    public async Task<IActionResult> GetCommitmentAnchor(Guid transactionId, CancellationToken ct = default)
+    {
+        var result = await getCommitmentAnchor.Handle(
+            new GetCommitmentAnchorQuery(User.RequireUserId(), transactionId), ct);
         return Ok(result);
     }
 

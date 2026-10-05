@@ -23,7 +23,10 @@ import {
   MIN_TERM_COUNT,
 } from '../../constants/commitment-candidate/commitment-candidate.constants';
 import {MIN_MONTHLY_AMOUNT} from '../../constants/subscription/subscription-form.constants';
-import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {
+  type CommitmentAnchor,
+  type CommitmentCandidate,
+} from '../../models/commitment-candidate/commitment-candidate.model';
 import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {
   type AddCommitmentRequest,
@@ -98,6 +101,11 @@ export class AddCommitmentDialogComponent {
       merchant: candidate.merchantName || candidate.description,
       monthlyAmount: candidate.amount,
     });
+    this.form.controls.monthlyAmount.markAsPristine();
+    this.picker.loadAnchor({
+      transactionId: candidate.transactionId,
+      onLoaded: anchor => this.applyAnchor(anchor),
+    });
   }
 
   public submit(): void {
@@ -129,5 +137,11 @@ export class AddCommitmentDialogComponent {
 
   public cancel(): void {
     this.dialogRef.close();
+  }
+
+  private applyAnchor(anchor: CommitmentAnchor): void {
+    if (!this.form.controls.monthlyAmount.dirty) {
+      this.form.patchValue({monthlyAmount: anchor.amount});
+    }
   }
 }
