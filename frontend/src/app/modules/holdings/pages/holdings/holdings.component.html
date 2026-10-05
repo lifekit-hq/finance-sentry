@@ -18,12 +18,12 @@
     <cmn-alert variant="error">{{ store.positionsErrorMessage() }}</cmn-alert>
   } @else if (store.positionsByAssetClass().length === 0) {
     <cmn-card>
-      @if (connectStore.status() === 'success' && connectStore.selectedProvider() === 'ibkr') {
+      @if (connectStore.importPending()) {
         <div
           class="py-cmn-8 text-center text-text-secondary text-cmn-sm"
           data-testid="holdings-importing"
         >
-          Importing your IBKR positions - this can take a few minutes.
+          Your IBKR positions are being imported - refresh this page in a few minutes.
         </div>
       } @else {
         <div class="py-cmn-8 text-center text-text-secondary text-cmn-sm">

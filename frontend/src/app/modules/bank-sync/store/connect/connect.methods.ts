@@ -45,6 +45,7 @@ export function connectMethods(store: WritableStateSource<ConnectState>) {
         errorCode: null,
         statusMessage: null,
         institutionType: null,
+        importPending: false,
         selectedProvider: 'truelayer',
       });
     },
@@ -104,9 +105,10 @@ export function connectMethods(store: WritableStateSource<ConnectState>) {
     setPolling(message: string): void {
       patchState(store, {status: 'polling', statusMessage: message});
     },
-    setSuccess(): void {
+    setSuccess(importPending = false): void {
       patchState(store, {
         status: 'success',
+        importPending,
         statusMessage: null,
         errorCode: null,
         modalStep: 'closed',

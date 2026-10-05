@@ -17,7 +17,7 @@ import {type ConnectStatus} from './connect.state';
 interface EffectsStore {
   setSyncing: (msg: string) => void;
   setPolling: (msg: string) => void;
-  setSuccess: () => void;
+  setSuccess: (importPending?: boolean) => void;
   setError: (code: Nullable<string>) => void;
   setInstitutionType: (type: InstitutionType) => void;
   selectProvider: (provider: Provider) => void;
@@ -104,7 +104,7 @@ export function connectEffects(store: EffectsStore) {
             if (outcome.successCode === 'POLLING' && outcome.institutionType === 'bank') {
               pollForActive();
             } else {
-              store.setSuccess();
+              store.setSuccess(outcome.importPending);
               accountsStore?.load();
             }
           }),

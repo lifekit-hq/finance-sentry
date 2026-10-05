@@ -23,6 +23,7 @@ export class IbkrConnectStrategy implements ConnectStrategy {
           successCode: 'CONNECTED' as const,
           count: 0,
           institutionType: 'broker' as const,
+          importPending: true,
         }))
       );
     }

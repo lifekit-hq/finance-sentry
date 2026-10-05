@@ -103,7 +103,7 @@ describe('InvestmentsComponent — positions view', () => {
             {provide: HoldingsStore, useValue: mockStore},
             {
               provide: ConnectStore,
-              useValue: {status: signal('idle'), selectedProvider: signal('truelayer')},
+              useValue: {importPending: signal(false)},
             },
           ],
         },

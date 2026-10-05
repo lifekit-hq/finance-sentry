@@ -51,7 +51,12 @@ describe('IbkrConnectStrategy', () => {
 
     expect(ibkr.connectFlex).toHaveBeenCalledWith(payload);
     expect(ibkr.connect).not.toHaveBeenCalled();
-    expect(outcome).toEqual({successCode: 'CONNECTED', count: 0, institutionType: 'broker'});
+    expect(outcome).toEqual({
+      successCode: 'CONNECTED',
+      count: 0,
+      institutionType: 'broker',
+      importPending: true,
+    });
   });
 
   it('exposes slug "ibkr"', () => {
