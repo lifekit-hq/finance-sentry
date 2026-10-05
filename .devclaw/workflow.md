@@ -55,8 +55,8 @@ Gates that are not yours to edit: `.github/workflows/**`, `AGENTS.md`,
   run and its result (`.github/PULL_REQUEST_TEMPLATE.md` scaffolds it).
 - Main is protected; everything lands via squash-merge PR with CI green.
 - Releases are release-please's job — never hand-bump a version or tag. The
-  pre-commit hook deliberately does **not** gate on a version bump (`.husky/pre-commit`
-  explains why it was removed); AGENTS.md still claims it does, and is stale there.
+  pre-commit hook deliberately does **not** gate on a version bump; it runs
+  lint-staged only, and the full lint and format check run in CI.
 - Infrastructure changes (container, cron, workflow, external service, secret)
   need a companion PR to `lifekit-dashboard/backend/infra.json`.
 - No new markdown files at the repo root — only `README.md` and `CLAUDE.md`.
