@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Fails when the age recipients .sops.yaml names differ from the ones docker/.env.sops is
 # actually encrypted to. A recipient added to .sops.yaml only takes effect once someone who
-# already holds a key runs `sops updatekeys -y --input-type dotenv docker/.env.sops`, so the two
-# can drift apart: this keeps the config honest about who can decrypt the file.
+# already holds a key re-keys the file (`sops updatekeys`; the .sops.yaml header has the exact
+# form), so the two can drift apart: this keeps the config honest about who can decrypt the file.
 #
 # Reads only the plaintext sops metadata; decrypts nothing and needs no key or sops binary.
 #
@@ -23,7 +23,7 @@ fi
 
 if [ "$configured" != "$encrypted" ]; then
   echo "error: docker/.env.sops recipients differ from .sops.yaml" >&2
-  echo "  only in .sops.yaml (run sops updatekeys -y --input-type dotenv docker/.env.sops):" >&2
+  echo "  only in .sops.yaml (re-key the file as the .sops.yaml header describes):" >&2
   comm -23 <(echo "$configured") <(echo "$encrypted") | sed 's/^/    /' >&2
   echo "  only in docker/.env.sops:" >&2
   comm -13 <(echo "$configured") <(echo "$encrypted") | sed 's/^/    /' >&2
