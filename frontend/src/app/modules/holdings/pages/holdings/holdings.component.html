@@ -18,9 +18,18 @@
     <cmn-alert variant="error">{{ store.positionsErrorMessage() }}</cmn-alert>
   } @else if (store.positionsByAssetClass().length === 0) {
     <cmn-card>
-      <div class="py-cmn-8 text-center text-text-secondary text-cmn-sm">
-        No positions yet. Connect a brokerage or crypto account to see holdings.
-      </div>
+      @if (connectStore.status() === 'success' && connectStore.selectedProvider() === 'ibkr') {
+        <div
+          class="py-cmn-8 text-center text-text-secondary text-cmn-sm"
+          data-testid="holdings-importing"
+        >
+          Importing your IBKR positions - this can take a few minutes.
+        </div>
+      } @else {
+        <div class="py-cmn-8 text-center text-text-secondary text-cmn-sm">
+          No positions yet. Connect a brokerage or crypto account to see holdings.
+        </div>
+      }
     </cmn-card>
   } @else {
     <cmn-card class="block">

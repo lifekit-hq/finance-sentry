@@ -1,9 +1,14 @@
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
+using FinanceSentry.Modules.BrokerageSync.Application.Services;
+using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FluentAssertions;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -15,11 +20,39 @@ public class IbkrFlexConnectorPreviewTests
     private static readonly Guid UserId = Guid.NewGuid();
     private readonly Mock<IIbkrFlexClient> _flexClient = new(MockBehavior.Strict);
 
+    private readonly Mock<IIBKRFlexCredentialRepository> _credentials = new(MockBehavior.Strict);
+    private readonly Mock<ICredentialEncryptionService> _encryption = new(MockBehavior.Strict);
+    private readonly Mock<IBackgroundJobClient> _jobs = new(MockBehavior.Strict);
+
     private IbkrFlexConnector CreateConnector() => new(
-        new Mock<IIBKRFlexCredentialRepository>(MockBehavior.Strict).Object,
-        new Mock<ICredentialEncryptionService>(MockBehavior.Strict).Object,
+        _credentials.Object,
+        _encryption.Object,
         _flexClient.Object,
+        _jobs.Object,
         NullLogger<IbkrFlexConnector>.Instance);
+
+    [Fact]
+    public async Task ConnectAsync_EnqueuesOneOffFlexSyncForTheConnectingUser()
+    {
+        _encryption.Setup(e => e.Encrypt("tok")).Returns(new EncryptionResult([1], [2], [3], 1));
+        _credentials.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IBKRFlexCredential?)null);
+        _credentials.Setup(r => r.AddAsync(It.IsAny<IBKRFlexCredential>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _credentials.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        Job? enqueued = null;
+        _jobs.Setup(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Callback<Job, IState>((job, _) => enqueued = job)
+            .Returns("1");
+
+        await CreateConnector().ConnectAsync(UserId, new ConnectIbkrFlexArtifacts("tok", "123456"), CancellationToken.None);
+
+        enqueued.Should().NotBeNull();
+        enqueued!.Type.Should().Be(typeof(IIbkrFlexTradeSyncService));
+        enqueued.Method.Name.Should().Be(nameof(IIbkrFlexTradeSyncService.SyncAsync));
+        enqueued.Args[0].Should().Be(UserId);
+        enqueued.Args[1].Should().BeNull();
+    }
 
     [Fact]
     public async Task PreviewAsync_SummarisesStatement_AndPersistsNothing()

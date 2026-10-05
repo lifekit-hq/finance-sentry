@@ -3,6 +3,7 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it} from 'vitest';
 
+import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {type Position} from '../../models/position/position.model';
 import {type AllocationBreakdownRow, type PositionAssetGroup} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
@@ -97,7 +98,15 @@ describe('InvestmentsComponent — positions view', () => {
       providers: [DecimalPipe],
     })
       .overrideComponent(InvestmentsComponent, {
-        set: {providers: [{provide: HoldingsStore, useValue: mockStore}]},
+        set: {
+          providers: [
+            {provide: HoldingsStore, useValue: mockStore},
+            {
+              provide: ConnectStore,
+              useValue: {status: signal('idle'), selectedProvider: signal('truelayer')},
+            },
+          ],
+        },
       })
       .compileComponents();
   });

@@ -1,8 +1,10 @@
 using System.Globalization;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
+using Hangfire;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Modules.BrokerageSync.Application.Connect;
@@ -11,6 +13,7 @@ public sealed class IbkrFlexConnector(
     IIBKRFlexCredentialRepository credentialRepository,
     ICredentialEncryptionService encryption,
     IIbkrFlexClient flexClient,
+    IBackgroundJobClient backgroundJobs,
     ILogger<IbkrFlexConnector> logger) : IIbkrFlexConnector
 {
     private const string WireDateFormat = "yyyyMMdd";
@@ -36,6 +39,8 @@ public sealed class IbkrFlexConnector(
         }
 
         await credentialRepository.SaveChangesAsync(ct);
+        backgroundJobs.Enqueue<IIbkrFlexTradeSyncService>(
+            sync => sync.SyncAsync(userId, null, CancellationToken.None));
         logger.LogInformation("IBKR Flex credential persisted for user {UserId}", userId);
     }
 
