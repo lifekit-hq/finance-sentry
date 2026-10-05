@@ -129,9 +129,76 @@ public class IbkrFlexHoldingsSyncServiceTests
     {
         var rig = new Rig();
         var statement = Parse(Xml(Today()));
-        statement.OpenPositions.Clear();
-        statement.CashReport.Clear();
+        statement.OpenPositions = null;
+        statement.CashReport = null;
 
         (await rig.Service.ApplyAsync(UserId, statement)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_CashSectionOnly_KeepsExistingStockHoldings()
+    {
+        var rig = new Rig();
+        rig.Persisted.Add(new BrokerageHolding(UserId, "AAPL", "STK", 3m, 600m, "ibkr"));
+        rig.Persisted.Add(new BrokerageHolding(UserId, "EUR Cash", "CASH", 10m, 11m, "ibkr"));
+        var statement = Parse(Xml(Today()));
+        statement.OpenPositions = null;
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Persisted.Select(h => h.Symbol).Should().BeEquivalentTo("AAPL", "USD Cash");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_PositionsSectionOnly_KeepsExistingCashHoldings()
+    {
+        var rig = new Rig();
+        rig.Persisted.Add(new BrokerageHolding(UserId, "AAPL", "STK", 3m, 600m, "ibkr"));
+        rig.Persisted.Add(new BrokerageHolding(UserId, "EUR Cash", "CASH", 10m, 11m, "ibkr"));
+        var statement = Parse(Xml(Today()));
+        statement.CashReport = null;
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Persisted.Select(h => h.Symbol).Should().BeEquivalentTo("ZZZQ", "EUR Cash");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_EmptyPositionsSection_RemovesSoldHoldings()
+    {
+        var rig = new Rig();
+        rig.Persisted.Add(new BrokerageHolding(UserId, "AAPL", "STK", 3m, 600m, "ibkr"));
+        var statement = Parse(Xml(Today()));
+        statement.OpenPositions = [];
+        statement.CashReport = null;
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        rig.Persisted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ApplyAsync_SameSymbolInSeveralAccounts_PublishesOneAggregatedRow()
+    {
+        var rig = new Rig();
+        var statement = Parse(Xml(Today()));
+        statement.OpenPositions!.Add(new FlexOpenPositionXml
+        {
+            AccountId = "U0000002", Currency = "USD", AssetCategory = "STK", Symbol = "ZZZQ",
+            Conid = "900000001", Position = "30", PositionValue = "1500", CostBasisPrice = "60", LevelOfDetail = "SUMMARY",
+        });
+        statement.CashReport!.Add(new FlexCashReportCurrencyXml
+        {
+            AccountId = "U0000002", Currency = "USD", EndingCash = "74.5", LevelOfDetail = "Currency",
+        });
+
+        var count = await rig.Service.ApplyAsync(UserId, statement);
+
+        count.Should().Be(2);
+        var stock = rig.Persisted.Single(h => h.Symbol == "ZZZQ");
+        stock.Quantity.Should().Be(40m);
+        stock.UsdValue.Should().Be(2000m);
+        stock.AverageCostUsd.Should().Be(55m);
+        rig.Persisted.Single(h => h.Symbol == "USD Cash").Quantity.Should().Be(200m);
     }
 }

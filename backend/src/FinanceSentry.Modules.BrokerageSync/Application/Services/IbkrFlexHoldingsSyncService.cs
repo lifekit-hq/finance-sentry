@@ -41,16 +41,19 @@ public sealed class IbkrFlexHoldingsSyncService(
 
     public async Task<int> ApplyAsync(Guid userId, FlexStatementXml statement, CancellationToken ct = default)
     {
-        var positions = statement.OpenPositions
-            .Where(p => !string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var cash = statement.CashReport
-            .Where(c => !string.Equals(c.Currency, BaseSummaryCurrency, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var positionsPresent = statement.OpenPositions is not null;
+        var cashPresent = statement.CashReport is not null;
 
         // A statement without these sections (the user has not ticked them) must never wipe holdings.
-        if (positions.Count == 0 && cash.Count == 0)
+        if (!positionsPresent && !cashPresent)
             return 0;
+
+        var positions = (statement.OpenPositions ?? [])
+            .Where(p => !string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var cash = (statement.CashReport ?? [])
+            .Where(c => !string.Equals(c.Currency, BaseSummaryCurrency, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
         var asOf = ParseDate(statement.ToDate);
         if (asOf is null || asOf.Value < DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-MaxStatementAgeDays))
@@ -68,7 +71,7 @@ public sealed class IbkrFlexHoldingsSyncService(
             return 0;
         }
 
-        var brokerPositions = new List<(string Symbol, string Type, decimal Qty, decimal Usd, decimal? AvgCostUsd, long? Conid, string? Isin)>();
+        var rows = new List<(string Symbol, string Type, decimal Qty, decimal Usd, decimal? AvgCostUsd, long? Conid, string? Isin)>();
         foreach (var p in positions)
         {
             var qty = ParseDecimal(p.Position);
@@ -77,7 +80,7 @@ public sealed class IbkrFlexHoldingsSyncService(
             var currency = p.Currency ?? "USD";
             var value = ParseDecimal(p.PositionValue) ?? 0m;
             var avg = ParseDecimal(p.CostBasisPrice);
-            brokerPositions.Add((
+            rows.Add((
                 p.Symbol!, p.AssetCategory ?? string.Empty, qty.Value, CurrencyConverter.ToUsd(value, currency),
                 avg.HasValue ? CurrencyConverter.ToUsd(avg.Value, currency) : null,
                 IbkrFlexMapper.ParseConid(p.Conid), p.Isin));
@@ -88,9 +91,11 @@ public sealed class IbkrFlexHoldingsSyncService(
             var balance = ParseDecimal(c.EndingCash);
             if (balance is null or 0m || string.IsNullOrWhiteSpace(c.Currency))
                 continue;
-            brokerPositions.Add(($"{c.Currency} Cash", CashInstrumentType, balance.Value,
+            rows.Add(($"{c.Currency} Cash", CashInstrumentType, balance.Value,
                 CurrencyConverter.ToUsd(balance.Value, c.Currency!), null, null, null));
         }
+
+        var brokerPositions = rows.GroupBy(r => r.Symbol, StringComparer.Ordinal).Select(Aggregate).ToList();
 
         var instrumentByConid = await UpsertInstrumentsAsync(userId, brokerPositions, ct);
 
@@ -109,7 +114,10 @@ public sealed class IbkrFlexHoldingsSyncService(
         // Same reconcile as the live sync: drop holdings the statement no longer reports.
         var keys = brokerPositions.Select(p => p.Symbol).ToHashSet(StringComparer.Ordinal);
         var persisted = await holdingRepository.GetByUserIdUnscopedAsync(userId, ct);
-        var stale = persisted.Where(h => h.Provider == Provider && !keys.Contains(h.Symbol)).ToList();
+        var stale = persisted
+            .Where(h => h.Provider == Provider && !keys.Contains(h.Symbol)
+                && (h.InstrumentType == CashInstrumentType ? cashPresent : positionsPresent))
+            .ToList();
         if (stale.Count > 0)
             holdingRepository.RemoveRange(stale);
 
@@ -124,6 +132,20 @@ public sealed class IbkrFlexHoldingsSyncService(
         logger.LogInformation(
             "Applied Flex holdings for user {UserId}: {Count} rows as of {AsOf}.", userId, holdings.Count, asOf);
         return holdings.Count;
+    }
+
+    private static (string Symbol, string Type, decimal Qty, decimal Usd, decimal? AvgCostUsd, long? Conid, string? Isin) Aggregate(
+        IGrouping<string, (string Symbol, string Type, decimal Qty, decimal Usd, decimal? AvgCostUsd, long? Conid, string? Isin)> group)
+    {
+        var first = group.First();
+        var qty = group.Sum(r => r.Qty);
+        var costed = group.Where(r => r.AvgCostUsd.HasValue && r.Qty != 0m).ToList();
+        var costedQty = costed.Sum(r => r.Qty);
+        decimal? avgCost = costed.Count > 0 && costedQty != 0m
+            ? costed.Sum(r => r.AvgCostUsd!.Value * r.Qty) / costedQty
+            : null;
+        return (group.Key, first.Type, qty, group.Sum(r => r.Usd), avgCost,
+            group.Select(r => r.Conid).FirstOrDefault(c => c.HasValue), group.Select(r => r.Isin).FirstOrDefault(i => i is not null));
     }
 
     private async Task<Dictionary<long, BrokerageInstrument>> UpsertInstrumentsAsync(

@@ -79,13 +79,14 @@ public sealed class FlexStatementXml
     [XmlArrayItem("FinancialInstrument")]
     public List<FlexFinancialInstrumentXml> FinancialInstruments { get; set; } = [];
 
+    /// <summary>Null when the query does not include the section; empty when it does and nothing is held.</summary>
     [XmlArray("OpenPositions")]
     [XmlArrayItem("OpenPosition")]
-    public List<FlexOpenPositionXml> OpenPositions { get; set; } = [];
+    public List<FlexOpenPositionXml>? OpenPositions { get; set; }
 
     [XmlArray("CashReport")]
     [XmlArrayItem("CashReportCurrency")]
-    public List<FlexCashReportCurrencyXml> CashReport { get; set; } = [];
+    public List<FlexCashReportCurrencyXml>? CashReport { get; set; }
 }
 
 /// <summary>One row of the Open Positions section. Raw wire strings, like the other Flex rows.
