@@ -14,30 +14,28 @@ public class CommitmentTransactionReader(
         if (transaction is null || transaction.UserId != userId || !transaction.IsActive)
             return null;
 
-        var account = await accounts.GetByIdAsync(transaction.AccountId, ct);
-        if (account is null)
-            return null;
-
         var key = CommitmentKeyResolver.Resolve(transaction.MerchantName, transaction.Description, transaction.Amount, transaction.Mcc);
-        var date = DateOnly.FromDateTime(transaction.TransactionDate);
 
-        var chargeCount = (await transactions.GetByUserIdAsync(userId, ct))
+        var charges = (await transactions.GetByUserIdAsync(userId, ct))
             .Where(t => t.IsActive
                      && !t.IsPending
                      && t.Amount != 0m
                      && (t.TransactionType == null || t.TransactionType == "debit")
                      && CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc) == key)
-            .Select(t => DateOnly.FromDateTime(t.TransactionDate))
-            .Where(d => d <= date)
-            .Distinct()
-            .Count();
+            .Append(transaction)
+            .ToList();
+        var latest = charges.MaxBy(t => t.TransactionDate)!;
+
+        var account = await accounts.GetByIdAsync(latest.AccountId, ct);
+        if (account is null)
+            return null;
 
         return new CommitmentTransaction(
             key,
             string.IsNullOrWhiteSpace(transaction.MerchantName) ? transaction.Description : transaction.MerchantName,
-            transaction.Amount,
+            latest.Amount,
             account.Currency,
-            date,
-            Math.Max(1, chargeCount));
+            DateOnly.FromDateTime(latest.TransactionDate),
+            charges.Select(t => DateOnly.FromDateTime(t.TransactionDate)).Distinct().Count());
     }
 }

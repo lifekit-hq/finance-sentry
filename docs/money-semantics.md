@@ -409,9 +409,11 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   swept (`DetectedSubscription.IsTracked`) until the user links it to a transaction
   (`POST /subscriptions/{id}/link`, `LinkCommitmentCommand`), which re-keys it to that
   transaction's key and turns tracking on; nothing re-keys it automatically and no migration
-  does. A pick sets the row's `OccurrenceCount` to the number of same-key charges on distinct
-  dates up to and including the picked one (`ICommitmentTransactionReader`), so an installment
-  starts with the payments already made. Adding or linking onto a key held by a dismissed,
+  does. A pick anchors the row on the latest same-key charge, not the picked one
+  (`ICommitmentTransactionReader`): that charge's date, amount and account currency become the
+  last charge, so the row is current at once instead of waiting for the daily job, and
+  `OccurrenceCount` is the number of same-key charges on distinct dates up to it, so an
+  installment starts with the payments already made. Adding or linking onto a key held by a dismissed,
   completed or potentially cancelled row, or a detected row of the other kind, restores that
   row from the pick (`DetectedSubscription.TrackFromTransaction`); only an active row of the
   same kind answers 409, naming that row. Rule (a) still claims its debits:

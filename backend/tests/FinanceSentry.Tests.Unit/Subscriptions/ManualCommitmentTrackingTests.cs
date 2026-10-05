@@ -313,6 +313,25 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
+    public async Task Add_PickedOlderCharge_AnchorsTheRowOnTheLatestSameKeyCharge()
+    {
+        var latest = new CommitmentTransaction(Key, "ACME HOSTING GMBH", 17.5m, "USD", new DateOnly(2026, 6, 22), 3);
+        var (sut, repo) = AddHandler(latest);
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null), default);
+
+        saved!.LastChargeDate.Should().Be(new DateOnly(2026, 6, 22));
+        saved.NextExpectedDate.Should().Be(new DateOnly(2026, 7, 22));
+        saved.LastKnownAmount.Should().Be(17.5m);
+        saved.Currency.Should().Be("USD");
+        saved.OccurrenceCount.Should().Be(3);
+    }
+
+    [Fact]
     public async Task Add_UnknownKind_Throws400()
     {
         var (sut, _) = AddHandler(Picked);
@@ -364,6 +383,22 @@ public class ManualCommitmentTrackingTests
         legacy.OccurrenceCount.Should().Be(3);
         legacy.Status.Should().Be(SubscriptionStatus.Active);
         repo.Verify(r => r.UpsertAsync(legacy, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Link_PickedOlderCharge_AnchorsTheRowOnTheLatestSameKeyCharge()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var latest = new CommitmentTransaction(Key, "ACME HOSTING GMBH", 17.5m, "USD", new DateOnly(2026, 6, 22), 3);
+        var (sut, _) = LinkHandler(legacy, latest);
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        legacy.LastChargeDate.Should().Be(new DateOnly(2026, 6, 22));
+        legacy.NextExpectedDate.Should().Be(new DateOnly(2026, 7, 22));
+        legacy.LastKnownAmount.Should().Be(17.5m);
+        legacy.Currency.Should().Be("USD");
+        legacy.OccurrenceCount.Should().Be(3);
     }
 
     [Fact]

@@ -8,8 +8,8 @@ using Moq;
 using Xunit;
 
 /// <summary>
-/// The picked transaction's charge count is how many charges under its key the person has made
-/// up to and including it, so a plan started from a later payment starts at the right place.
+/// A picked transaction is read as the latest charge under its key and the number of charges made
+/// up to it, so a plan started from an older payment is current and starts at the right place.
 /// </summary>
 public class CommitmentTransactionReaderTests
 {
@@ -40,19 +40,55 @@ public class CommitmentTransactionReaderTests
     }
 
     [Fact]
-    public async Task FindAsync_CountsSameKeyChargesUpToAndIncludingThePickedOne()
+    public async Task FindAsync_PickedOlderCharge_AnchorsOnTheLatestSameKeyCharge()
+    {
+        var first = Charge(new DateTime(2026, 1, 5));
+        var picked = Charge(new DateTime(2026, 2, 5));
+        var third = Charge(new DateTime(2026, 3, 5));
+        var latest = Charge(new DateTime(2026, 4, 5), tweak: t => t.Amount = 12.5m);
+        var other = Charge(new DateTime(2026, 5, 6), merchant: "Other Shop");
+
+        var result = await Reader(picked, first, picked, third, latest, other).FindAsync(UserId, Guid.NewGuid());
+
+        result!.Date.Should().Be(new DateOnly(2026, 4, 5));
+        result.Amount.Should().Be(12.5m);
+        result.ChargeCount.Should().Be(4);
+        result.Currency.Should().Be("EUR");
+        result.DisplayName.Should().Be(Merchant);
+    }
+
+    [Fact]
+    public async Task FindAsync_PickedLatestCharge_CountsEverySameKeyCharge()
     {
         var first = Charge(new DateTime(2026, 1, 5));
         var second = Charge(new DateTime(2026, 2, 5));
         var picked = Charge(new DateTime(2026, 3, 5));
-        var later = Charge(new DateTime(2026, 4, 5));
-        var other = Charge(new DateTime(2026, 2, 6), merchant: "Other Shop");
 
-        var result = await Reader(picked, first, second, picked, later, other).FindAsync(UserId, Guid.NewGuid());
+        var result = await Reader(picked, first, second, picked).FindAsync(UserId, Guid.NewGuid());
 
-        result!.ChargeCount.Should().Be(3);
-        result.Date.Should().Be(new DateOnly(2026, 3, 5));
-        result.Currency.Should().Be("EUR");
+        result!.Date.Should().Be(new DateOnly(2026, 3, 5));
+        result.ChargeCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task FindAsync_LatestChargeOnAnotherAccount_UsesThatAccountsCurrency()
+    {
+        var otherAccount = Guid.NewGuid();
+        var picked = Charge(new DateTime(2026, 2, 5));
+        var latest = Charge(new DateTime(2026, 3, 5), tweak: t => t.AccountId = otherAccount);
+        var accounts = new Mock<IBankAccountRepository>();
+        accounts.Setup(r => r.GetByIdAsync(AccountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BankAccount { Currency = "EUR" });
+        accounts.Setup(r => r.GetByIdAsync(otherAccount, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BankAccount { Currency = "USD" });
+        var transactions = new Mock<ITransactionRepository>();
+        transactions.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(picked);
+        transactions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([picked, latest]);
+
+        var result = await new CommitmentTransactionReader(accounts.Object, transactions.Object)
+            .FindAsync(UserId, Guid.NewGuid());
+
+        result!.Currency.Should().Be("USD");
     }
 
     [Fact]

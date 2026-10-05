@@ -3,7 +3,7 @@ namespace FinanceSentry.Core.Interfaces;
 /// <summary>
 /// Reads one of the person's transactions in the shape a recurring commitment is tracked by, so a
 /// subscription or installment the user adds by picking a transaction is keyed exactly as the
-/// detection job keys that transaction's charges.
+/// detection job keys that transaction's charges and starts from the latest of them.
 /// </summary>
 public interface ICommitmentTransactionReader
 {
@@ -19,12 +19,13 @@ public interface ICommitmentTransactionReader
 /// stored with it is advanced by every later charge that resolves to the same key.
 /// </param>
 /// <param name="DisplayName">The merchant name as the bank reported it, falling back to the description.</param>
-/// <param name="Amount">Native amount in the account's own currency.</param>
-/// <param name="Currency">ISO code of the account the transaction belongs to.</param>
-/// <param name="ChargeCount">
-/// Charges the person has made under <paramref name="Key"/> up to and including this one (one per
-/// day), so a plan started from a later payment still knows how many it has paid.
+/// <param name="Amount">Native amount of the latest charge under <paramref name="Key"/>, in its account's currency.</param>
+/// <param name="Currency">ISO code of the account the latest charge belongs to.</param>
+/// <param name="Date">
+/// Date of the latest charge under <paramref name="Key"/>, which may be later than the picked one:
+/// a row started from it is already current instead of waiting for the next detection run.
 /// </param>
+/// <param name="ChargeCount">Charges the person has made under <paramref name="Key"/> up to <paramref name="Date"/> (one per day).</param>
 public record CommitmentTransaction(
     string Key,
     string DisplayName,
