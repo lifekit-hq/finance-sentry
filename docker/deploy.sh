@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Deploy finance-sentry on the VPS.
 #
-# - Decrypts docker/.env.sops → docker/.env (requires age key at SOPS_AGE_KEY_FILE
-#   or ~/.config/sops/age/keys.txt).
+# - Decrypts docker/.env.sops → docker/.env with the age key at SOPS_AGE_KEY_FILE, by default
+#   firstmate's ~/.config/sops/age/firstmate.agekey (a recipient beside the captain in .sops.yaml),
+#   so the deploy never uses the captain's own key.
 # - Persists the non-secret hostname/edge values (JWT_ISSUER, FRONTEND_BASE_URL,
 #   TRUELAYER_FRONTEND_REDIRECT_BASE, EDGE_SUBNET, EDGE_IP_RANGE, EDGE_BRIDGE_IP, EDGE_GATEWAY_IP)
 #   to the gitignored docker/.env.deploy. The deploy workflow supplies them from repository
@@ -41,9 +42,9 @@ if ! [[ $IMAGE_TAG =~ ^[0-9a-f]{40}$ ]]; then
 fi
 export IMAGE_TAG
 
-KEYFILE="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}"
+KEYFILE="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/firstmate.agekey}"
 if [[ ! -f "$KEYFILE" ]]; then
-  echo "error: no age key at $KEYFILE — cannot decrypt docker/.env.sops" >&2
+  echo "error: no age key at $KEYFILE — cannot decrypt docker/.env.sops (set SOPS_AGE_KEY_FILE to another recipient's key)" >&2
   exit 1
 fi
 

@@ -1,3 +1,17 @@
+# Recipients of docker/.env.sops (age public keys), in order:
+#   1. captain   - ~/.config/sops/age/keys.txt; edits secrets by hand (docker/secrets-edit.sh).
+#   2. firstmate - ~/.config/sops/age/firstmate.agekey; docker/deploy.sh decrypts with it.
+# Either key decrypts the file on its own. To add or remove a recipient, edit the list below,
+# re-key the file with a key that is already a recipient, and commit the re-keyed file in the same
+# change: .github/scripts/check-sops-recipients.sh fails CI when this list and the file's sops
+# metadata disagree. sops 3.9 `updatekeys` ignores --input-type and parses a .sops-named file as
+# JSON, so re-key a dotenv-named copy that the rule below matches, then copy it back:
+#
+#   tmp=$(mktemp -d) && mkdir "$tmp/docker" && cp docker/.env.sops "$tmp/docker/.env" \
+#     && sops --config .sops.yaml updatekeys -y "$tmp/docker/.env" \
+#     && cp "$tmp/docker/.env" docker/.env.sops; rm -rf "$tmp"
 creation_rules:
   - path_regex: docker/\.env(\.sops)?$
-    age: age146hmku2m4667lmx63ysge7szjlyc48a6x7r5zg8ur56wxlq4t3pqsyv390
+    age: >-
+      age146hmku2m4667lmx63ysge7szjlyc48a6x7r5zg8ur56wxlq4t3pqsyv390,
+      age13jychju36cwhxh9lwtu0zd8kr08deqr25pnawu2639cfs6m7uaksdjkhrl

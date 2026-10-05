@@ -36,6 +36,10 @@ jobs:
       id: areas
       run: .github/scripts/changed-areas.sh docker-build.yml
 
+    # The prod secrets file must be encrypted to exactly the recipients .sops.yaml names.
+    - name: Check sops recipients
+      run: .github/scripts/check-sops-recipients.sh
+
     - name: Select images to build
       id: matrix
       env:
