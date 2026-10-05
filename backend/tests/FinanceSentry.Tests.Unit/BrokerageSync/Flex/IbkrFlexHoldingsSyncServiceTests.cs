@@ -201,4 +201,25 @@ public class IbkrFlexHoldingsSyncServiceTests
         stock.AverageCostUsd.Should().Be(55m);
         rig.Persisted.Single(h => h.Symbol == "USD Cash").Quantity.Should().Be(200m);
     }
+
+    [Fact]
+    public async Task ApplyAsync_LotOnlyOpenPositions_PublishesAggregatedLots_AndKeepsHolding()
+    {
+        var rig = new Rig();
+        rig.Persisted.Add(new BrokerageHolding(UserId, "ZZZQ", "STK", 1m, 1m, "ibkr"));
+        var statement = Parse(Xml(Today()));
+        statement.CashReport = null;
+        statement.OpenPositions = statement.OpenPositions!.Where(p => p.LevelOfDetail == "LOT").ToList();
+        statement.OpenPositions.Add(new FlexOpenPositionXml
+        {
+            AccountId = "U0000001", Currency = "USD", AssetCategory = "STK", Symbol = "ZZZQ",
+            Conid = "900000001", Position = "6", PositionValue = "300", CostBasisPrice = "30", LevelOfDetail = "LOT",
+        });
+
+        await rig.Service.ApplyAsync(UserId, statement);
+
+        var stock = rig.Persisted.Single(h => h.Symbol == "ZZZQ" && h.Quantity != 1m);
+        stock.Quantity.Should().Be(10m);
+        stock.UsdValue.Should().Be(500m);
+    }
 }

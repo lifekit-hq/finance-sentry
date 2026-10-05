@@ -48,8 +48,13 @@ public sealed class IbkrFlexHoldingsSyncService(
         if (!positionsPresent && !cashPresent)
             return 0;
 
-        var positions = (statement.OpenPositions ?? [])
-            .Where(p => !string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase))
+        var openPositions = statement.OpenPositions ?? [];
+        var summarisedSymbols = openPositions
+            .Where(p => !IsLot(p))
+            .Select(p => p.Symbol)
+            .ToHashSet(StringComparer.Ordinal);
+        var positions = openPositions
+            .Where(p => !IsLot(p) || !summarisedSymbols.Contains(p.Symbol))
             .ToList();
         var cash = (statement.CashReport ?? [])
             .Where(c => !string.Equals(c.Currency, BaseSummaryCurrency, StringComparison.OrdinalIgnoreCase))
@@ -178,6 +183,9 @@ public sealed class IbkrFlexHoldingsSyncService(
             await instrumentRepository.SaveChangesAsync(ct);
         return result;
     }
+
+    private static bool IsLot(FlexOpenPositionXml p) =>
+        string.Equals(p.LevelOfDetail, LotLevel, StringComparison.OrdinalIgnoreCase);
 
     private static decimal? ParseDecimal(string? value) =>
         decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var r) ? r : null;
