@@ -27,12 +27,13 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
-              "src/favicon.ico",
               "src/assets",
-              {"glob": "**/*", "input": "public"}
+              {"glob": "**/*", "input": "public"},
+              {"glob": "*", "input": "node_modules/@lifekit-hq/tokens/brand/dist/fs"}
             ],
             "styles": [
               "src/styles.scss",
+              "node_modules/@lifekit-hq/tokens/fonts.css",
               "node_modules/@lifekit-hq/tokens/theme.css"
             ],
             "browser": "src/main.ts"
