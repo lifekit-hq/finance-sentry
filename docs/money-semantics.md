@@ -94,6 +94,30 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   and fails the sync after the other holdings are walked (`CryptoTradeHistoryException`), so it
   reaches the job-failure Telegram alert (#023) instead of freezing cost basis silently.
 
+### Brokerage holdings (`FinanceSentry.Modules.BrokerageSync`)
+
+A `BrokerageHolding` is one symbol for one user, provider `ibkr`, unique on
+`(UserId, Symbol, Provider)`; `UsdValue` is already USD (converted once at ingest via
+`CurrencyConverter.ToUsd`, §3), so sums over holdings are USD sums. Two sources write the same
+rows, so every reader sees one set:
+
+- **Live OAuth feed** — a credential that synced successfully within the last 2h always wins.
+- **Flex fallback** (`IbkrFlexHoldingsSyncService`, run after each Flex statement sync) — fills in
+  only when the live feed is absent or unhealthy. Open Positions → one stock row per symbol
+  (per-symbol rows; `LOT` rows only for symbols with no per-symbol row; quantity and value summed,
+  average cost quantity-weighted when a symbol repeats across accounts or exchanges). Cash
+  Report → one `<CCY> Cash` row per currency (`endingCash`, `CASH` type; the `BASE_SUMMARY` total
+  row is skipped so cash is not double counted). Flex rows carry `FlexAsOfDate` (the statement
+  `toDate`); statements without a parseable `toDate`, or more than 5 days old (backfill
+  windows), are not applied.
+- **Reconcile**: after a Flex apply, `ibkr` rows absent from the statement are deleted — stock
+  rows only when the statement contains the Open Positions section, `CASH` rows only when it
+  contains the Cash Report section. A statement with neither section never changes holdings.
+- **Staleness** (`GetBrokerageHoldingsQuery`): live holdings are stale after 1h; Flex-sourced
+  holdings are daily by nature, so they are stale only when the newest `FlexAsOfDate` is more than
+  4 calendar days before today (UTC), and the response reports `FlexAsOfDate` so the UI states the
+  statement date.
+
 ### Failure behaviour
 
 A failed balance fetch **keeps the prior stored balance** — never zeroes it. Both the
