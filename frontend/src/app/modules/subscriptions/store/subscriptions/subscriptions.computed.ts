@@ -15,7 +15,11 @@ interface StateSignals {
   sort: Signal<SubscriptionSort>;
   summary: Signal<Nullable<SubscriptionSummary>>;
   addErrorCode: Signal<Nullable<string>>;
+  addErrorDetail: Signal<Nullable<string>>;
 }
+
+/** The only add error whose server text (it names the row that holds the charges) is shown. */
+const ALREADY_TRACKED_CODE = 'COMMITMENT_ALREADY_TRACKED';
 
 function sortBy(items: Subscription[], sort: SubscriptionSort): Subscription[] {
   return [...items].sort((a, b) => {
@@ -45,7 +49,11 @@ export function subscriptionsComputed(store: StateSignals) {
   return {
     addErrorMessage: computed(() => {
       const code = store.addErrorCode();
-      return code === null ? '' : (errorMessages.resolve(code) ?? 'Failed to add.');
+      if (code === null) {
+        return '';
+      }
+      const detail = code === ALREADY_TRACKED_CODE ? store.addErrorDetail() : null;
+      return detail ?? errorMessages.resolve(code) ?? 'Failed to add.';
     }),
     activeSubscriptions: computed(() =>
       store.subscriptions().filter(s => s.status === 'active' && isSubscription(s))
@@ -64,13 +72,16 @@ export function subscriptionsComputed(store: StateSignals) {
     ),
     /**
      * Active subscriptions split into "Due this week", "Charge missed" (the expected date passed
-     * without a charge) and "Later". An overdue row is never "due this week".
+     * without a charge) and "Later", plus the legacy hand-typed rows that follow no charges: their
+     * dates are only what was typed, so they are never "due" or "missed". An overdue row is never
+     * "due this week".
      */
     activeSections: computed((): SubscriptionSection[] => {
-      const active = sortBy(
+      const all = sortBy(
         store.subscriptions().filter(s => s.status === 'active' && isSubscription(s)),
         store.sort()
       );
+      const active = all.filter(s => s.isTracked);
       return (
         [
           {id: 'due', label: 'Due this week', items: active.filter(isDueThisWeek)},
@@ -79,6 +90,11 @@ export function subscriptionsComputed(store: StateSignals) {
             id: 'later',
             label: 'Later',
             items: active.filter(s => !isDueThisWeek(s) && !isMissed(s)),
+          },
+          {
+            id: 'unlinked',
+            label: 'Not linked to transactions',
+            items: all.filter(s => !s.isTracked),
           },
         ] satisfies SubscriptionSection[]
       ).filter(section => section.items.length > 0);

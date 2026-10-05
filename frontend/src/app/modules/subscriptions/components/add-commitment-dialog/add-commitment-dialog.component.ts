@@ -7,6 +7,7 @@ import {
   AlertComponent,
   ButtonComponent,
   ChipComponent,
+  CMN_DIALOG_DATA,
   DialogActionsComponent,
   EmptyStateComponent,
   FormFieldComponent,
@@ -21,8 +22,10 @@ import {
 } from '../../constants/commitment-candidate/commitment-candidate.constants';
 import {MIN_MONTHLY_AMOUNT} from '../../constants/subscription/subscription-form.constants';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
+import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {
   type AddCommitmentRequest,
+  type LinkCommitmentRequest,
   type SubscriptionKind,
 } from '../../models/subscription/subscription.model';
 import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
@@ -47,7 +50,12 @@ import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-pi
   templateUrl: './add-commitment-dialog.component.html',
 })
 export class AddCommitmentDialogComponent {
-  private readonly dialogRef = inject<DialogRef<AddCommitmentRequest>>(DialogRef);
+  private readonly dialogRef =
+    inject<DialogRef<AddCommitmentRequest | LinkCommitmentRequest>>(DialogRef);
+  private readonly data = inject<Nullable<CommitmentDialogData>>(CMN_DIALOG_DATA, {optional: true});
+
+  /** Linking an existing row only needs the transaction; the row keeps its own name and plan. */
+  public readonly isLinking = (this.data?.linkTo ?? null) !== null;
 
   public readonly picker = inject(CommitmentPickerStore);
   public readonly kindOptions = COMMITMENT_KIND_OPTIONS;
@@ -84,6 +92,13 @@ export class AddCommitmentDialogComponent {
   }
 
   public submit(): void {
+    if (this.isLinking) {
+      this.form.controls.transactionId.markAsTouched();
+      if (this.form.controls.transactionId.valid) {
+        this.dialogRef.close({transactionId: this.form.controls.transactionId.value});
+      }
+      return;
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;

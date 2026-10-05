@@ -22,6 +22,8 @@ export interface Subscription {
   startDate: Nullable<string>;
   remainingPayments: Nullable<number>;
   isManual: boolean;
+  /** False for a legacy hand-typed row: it matches no charge, so its dates are only what was typed. */
+  isTracked: boolean;
 }
 
 /** Adds a commitment from a picked transaction; later charges like it keep it current. */
@@ -31,6 +33,11 @@ export interface AddCommitmentRequest {
   merchant: string;
   monthlyAmount: number;
   termCount: Nullable<number>;
+}
+
+/** Links a legacy hand-typed row to a picked transaction; later charges like it keep it current. */
+export interface LinkCommitmentRequest {
+  transactionId: string;
 }
 
 export interface SpendBucket {
@@ -63,8 +70,8 @@ export interface SubscriptionsListResponse {
 }
 
 export interface SubscriptionSection {
-  /** `missed`: the expected charge date has passed without a matching charge. */
-  id: 'due' | 'missed' | 'later';
+  /** `missed`: the expected date passed without a charge. `unlinked`: no charges to judge by. */
+  id: 'due' | 'missed' | 'later' | 'unlinked';
   label: Nullable<string>;
   items: Subscription[];
 }

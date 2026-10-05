@@ -77,9 +77,11 @@
               <cmn-list-item-row
                 [label]="sub.merchantName || 'Unknown'"
                 [sublabel]="
-                  cadenceLabels[sub.cadence] +
-                  (section.id === 'missed' ? ' · expected ' : ' · next ') +
-                  (sub.nextExpectedDate | date: 'd MMM')
+                  section.id === 'unlinked'
+                    ? cadenceLabels[sub.cadence]
+                    : cadenceLabels[sub.cadence] +
+                      (section.id === 'missed' ? ' · expected ' : ' · next ') +
+                      (sub.nextExpectedDate | date: 'd MMM')
                 "
               >
                 <div
@@ -98,7 +100,7 @@
                 </div>
                 <div actions class="flex shrink-0 gap-cmn-1">
                   <cmn-menu
-                    [items]="subscriptionMenuItems"
+                    [items]="subscriptionMenuItems(sub)"
                     (itemSelect)="onSubscriptionAction($event.id, sub)"
                     ariaLabel="Subscription actions"
                     triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
@@ -137,7 +139,10 @@
             <cmn-list-item-row
               [label]="item.merchantName || 'Unknown'"
               [sublabel]="
-                (item | installmentProgress) + ' · next ' + (item.nextExpectedDate | date: 'd MMM')
+                (item | installmentProgress) +
+                (item.isTracked
+                  ? ' · next ' + (item.nextExpectedDate | date: 'd MMM')
+                  : ' · not linked to transactions')
               "
             >
               <div
@@ -155,7 +160,7 @@
               </div>
               <div actions class="flex shrink-0 gap-cmn-1">
                 <cmn-menu
-                  [items]="installmentMenuItems"
+                  [items]="installmentMenuItems(item)"
                   (itemSelect)="onInstallmentAction($event.id, item)"
                   ariaLabel="Installment actions"
                   triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"

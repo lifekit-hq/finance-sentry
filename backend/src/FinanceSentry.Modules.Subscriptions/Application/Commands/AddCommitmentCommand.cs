@@ -33,18 +33,21 @@ public class AddCommitmentCommandHandler(
             ?? throw new CommitmentTransactionNotFoundException();
 
         var userId = command.UserId.ToString();
-        if (await repository.FindByUserAndMerchantUnscopedAsync(userId, transaction.Key, ct) is not null)
-            throw new CommitmentAlreadyTrackedException();
+        var display = string.IsNullOrWhiteSpace(command.Merchant) ? transaction.DisplayName : command.Merchant.Trim();
+        var amount = command.MonthlyAmount is > 0 ? command.MonthlyAmount.Value : transaction.Amount;
 
-        var item = DetectedSubscription.CreateFromTransaction(
-            userId,
-            transaction.Key,
-            string.IsNullOrWhiteSpace(command.Merchant) ? transaction.DisplayName : command.Merchant.Trim(),
-            command.MonthlyAmount is > 0 ? command.MonthlyAmount.Value : transaction.Amount,
-            transaction.Currency,
-            transaction.Date,
-            command.TermCount,
-            command.Kind);
+        var existing = await repository.FindByUserAndMerchantUnscopedAsync(userId, transaction.Key, ct);
+        if (existing is { Status: SubscriptionStatus.Active } && existing.Kind == command.Kind)
+            throw new CommitmentAlreadyTrackedException(existing.MerchantNameDisplay);
+
+        // A dismissed, completed or lapsed row (or a detected one of the other kind) already holds
+        // the key, which is unique per person: the pick brings that row back instead of adding a twin.
+        var item = existing ?? DetectedSubscription.CreateFromTransaction(
+            userId, transaction.Key, display, amount, transaction.Currency, transaction.Date,
+            transaction.ChargeCount, command.TermCount, command.Kind);
+        existing?.TrackFromTransaction(
+            transaction.Key, display, amount, transaction.Currency, transaction.Date,
+            transaction.ChargeCount, command.TermCount, transaction.Date, null, command.Kind);
 
         await repository.UpsertAsync(item, ct);
         return item.Id;

@@ -3,8 +3,10 @@ import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, forkJoin, type Observable, pipe, switchMap, tap} from 'rxjs';
 
+import {ErrorUtils} from '../../../../shared/utils/error.utils';
 import {
   type AddCommitmentRequest,
+  type LinkCommitmentRequest,
   type Subscription,
   type SubscriptionSummary,
 } from '../../models/subscription/subscription.model';
@@ -15,7 +17,7 @@ interface EffectsStore {
   setSummary: (summary: SubscriptionSummary) => void;
   dismissSubscription: (id: string) => void;
   restoreSubscription: (id: string) => void;
-  setAddError: (errorCode: Nullable<string>) => void;
+  setAddError: (errorCode: Nullable<string>, errorDetail?: Nullable<string>) => void;
 }
 
 export function subscriptionsEffects(store: EffectsStore) {
@@ -31,6 +33,11 @@ export function subscriptionsEffects(store: EffectsStore) {
         store.setSummary(summary$);
       })
     );
+
+  const reportAddError = (err: unknown): Observable<never> => {
+    store.setAddError(extractErrorCode(err), ErrorUtils.extractMessage(err));
+    return EMPTY;
+  };
 
   const refreshSummary = (): Observable<SubscriptionSummary> =>
     service.getSummary().pipe(tap(summary => store.setSummary(summary)));
@@ -76,10 +83,18 @@ export function subscriptionsEffects(store: EffectsStore) {
         switchMap(payload =>
           service.add(payload).pipe(
             switchMap(() => refresh()),
-            catchError((err: unknown) => {
-              store.setAddError(extractErrorCode(err));
-              return EMPTY;
-            })
+            catchError(reportAddError)
+          )
+        )
+      )
+    ),
+    linkCommitment: rxMethod<{id: string; request: LinkCommitmentRequest}>(
+      pipe(
+        tap(() => store.setAddError(null)),
+        switchMap(({id, request}) =>
+          service.link(id, request).pipe(
+            switchMap(() => refresh()),
+            catchError(reportAddError)
           )
         )
       )

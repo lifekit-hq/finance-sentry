@@ -1,8 +1,10 @@
 import {DialogRef} from '@angular/cdk/dialog';
 import {TestBed} from '@angular/core/testing';
+import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
 import {AddCommitmentDialogComponent} from './add-commitment-dialog.component';
@@ -17,11 +19,12 @@ const CANDIDATE: CommitmentCandidate = {
   merchantName: 'Acme Hosting',
 };
 
-function setup() {
+function setup(data?: CommitmentDialogData) {
   const close = vi.fn();
   TestBed.configureTestingModule({
     providers: [
       {provide: DialogRef, useValue: {close}},
+      {provide: CMN_DIALOG_DATA, useValue: data},
       {
         provide: CommitmentCandidatesService,
         useValue: {
@@ -90,6 +93,22 @@ describe('AddCommitmentDialogComponent', () => {
       monthlyAmount: 20,
       termCount: 12,
     });
+  });
+
+  it('links with only the picked transaction when opened for a legacy row', () => {
+    const {component, close} = setup({linkTo: 'NetCup'});
+    expect(component.isLinking).toBe(true);
+    component.pick(CANDIDATE);
+    component.form.patchValue({merchant: '', monthlyAmount: null});
+    component.submit();
+    expect(close).toHaveBeenCalledWith({transactionId: 'tx-1'});
+  });
+
+  it('does not link until a transaction is picked', () => {
+    const {component, close} = setup({linkTo: 'NetCup'});
+    component.submit();
+    expect(close).not.toHaveBeenCalled();
+    expect(component.form.controls.transactionId.touched).toBe(true);
   });
 
   it('closes without a value on cancel', () => {

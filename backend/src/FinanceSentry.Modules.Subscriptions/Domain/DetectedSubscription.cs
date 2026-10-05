@@ -158,30 +158,55 @@ public class DetectedSubscription
         decimal monthlyAmount,
         string currency,
         DateOnly chargeDate,
+        int chargeCount,
         int? termCount,
         string kind)
     {
-        var entity = new DetectedSubscription
-        {
-            UserId = userId,
-            MerchantNameNormalized = trackingKey,
-            MerchantNameDisplay = merchantNameDisplay,
-            Cadence = "monthly",
-            AverageAmount = monthlyAmount,
-            LastKnownAmount = monthlyAmount,
-            Currency = currency,
-            LastChargeDate = chargeDate,
-            NextExpectedDate = chargeDate.AddMonths(1),
-            OccurrenceCount = 1,
-            ConfidenceScore = 100,
-            Category = null,
-            Kind = kind,
-            TermCount = kind == SubscriptionKinds.Installment && termCount is > 0 ? termCount : null,
-            StartDate = kind == SubscriptionKinds.Installment ? chargeDate : null,
-            IsManual = true,
-        };
-        entity.EvaluateCompletion(false);
+        var entity = new DetectedSubscription { UserId = userId };
+        entity.TrackFromTransaction(
+            trackingKey, merchantNameDisplay, monthlyAmount, currency, chargeDate, chargeCount,
+            termCount, kind == SubscriptionKinds.Installment ? chargeDate : null, null, kind);
         return entity;
+    }
+
+    /// <summary>
+    /// Points the row at one of the user's transactions and makes it theirs: keyed by that
+    /// transaction's charges (so later ones advance it), active again, and no longer something
+    /// detection may overwrite. <paramref name="chargeCount"/> is how many charges under the key
+    /// the picked one is, so installment progress starts from the payments already made.
+    /// </summary>
+    public void TrackFromTransaction(
+        string trackingKey,
+        string merchantNameDisplay,
+        decimal monthlyAmount,
+        string currency,
+        DateOnly chargeDate,
+        int chargeCount,
+        int? termCount,
+        DateOnly? startDate,
+        DateOnly? endDate,
+        string kind)
+    {
+        MerchantNameNormalized = trackingKey;
+        MerchantNameDisplay = merchantNameDisplay;
+        Cadence = "monthly";
+        AverageAmount = monthlyAmount;
+        LastKnownAmount = monthlyAmount;
+        PreviousAmount = null;
+        Currency = currency;
+        LastChargeDate = chargeDate;
+        NextExpectedDate = chargeDate.AddMonths(1);
+        OccurrenceCount = chargeCount;
+        ConfidenceScore = 100;
+        Kind = kind;
+        TermCount = kind == SubscriptionKinds.Installment && termCount is > 0 ? termCount : null;
+        StartDate = kind == SubscriptionKinds.Installment ? startDate : null;
+        EndDate = kind == SubscriptionKinds.Installment ? endDate : null;
+        IsManual = true;
+        Status = SubscriptionStatus.Active;
+        DismissedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        EvaluateCompletion(false);
     }
 
     /// <summary>

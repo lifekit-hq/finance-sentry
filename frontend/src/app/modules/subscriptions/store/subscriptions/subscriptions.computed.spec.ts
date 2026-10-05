@@ -31,6 +31,7 @@ function sub(id: string, nextExpectedDate: string, overrides: Partial<Subscripti
     startDate: null,
     remainingPayments: null,
     isManual: false,
+    isTracked: true,
     ...overrides,
   } satisfies Subscription;
 }
@@ -42,6 +43,7 @@ function build(subscriptions: Subscription[], sort: SubscriptionSort = 'date') {
       sort: signal(sort),
       summary: signal(null),
       addErrorCode: signal(null),
+      addErrorDetail: signal(null),
     })
   );
 }
@@ -103,6 +105,21 @@ describe('subscriptionsComputed activeSections', () => {
     expect(sections).toEqual([]);
   });
 
+  // Regression: a legacy hand-typed row keeps the dates it was typed with, so it read as due or
+  // missed although the plan is paid; it now sits in a neutral group until it is linked.
+  it('puts an unlinked row in a neutral group, never due or missed', () => {
+    const sections = build([
+      sub('typed-overdue', '2026-08-24', {isTracked: false}),
+      sub('typed-soon', '2026-09-25', {isTracked: false}),
+      sub('followed', '2026-10-20'),
+    ]).activeSections();
+
+    expect(sections.map(s => [s.id, s.label, s.items.map(i => i.id)])).toEqual([
+      ['later', 'Later', ['followed']],
+      ['unlinked', 'Not linked to transactions', ['typed-overdue', 'typed-soon']],
+    ]);
+  });
+
   it('sorts each section by the selected sort', () => {
     const sections = build(
       [
@@ -124,13 +141,14 @@ describe('subscriptionsComputed addErrorMessage', () => {
     });
   });
 
-  function withError(addErrorCode: Nullable<string>) {
+  function withError(addErrorCode: Nullable<string>, addErrorDetail: Nullable<string> = null) {
     return TestBed.runInInjectionContext(() =>
       subscriptionsComputed({
         subscriptions: signal([]),
         sort: signal('date'),
         summary: signal(null),
         addErrorCode: signal(addErrorCode),
+        addErrorDetail: signal(addErrorDetail),
       })
     ).addErrorMessage();
   }
@@ -142,6 +160,18 @@ describe('subscriptionsComputed addErrorMessage', () => {
   it('resolves a registered code', () => {
     expect(withError('COMMITMENT_ALREADY_TRACKED')).toBe(
       ERROR_MESSAGES_REGISTRY['COMMITMENT_ALREADY_TRACKED']
+    );
+  });
+
+  it('names the row that already holds the charges using the server text', () => {
+    expect(
+      withError('COMMITMENT_ALREADY_TRACKED', 'These charges are already tracked as Acme Hosting.')
+    ).toBe('These charges are already tracked as Acme Hosting.');
+  });
+
+  it('ignores the server text for any other code', () => {
+    expect(withError('COMMITMENT_ALREADY_LINKED', 'Something else')).toBe(
+      ERROR_MESSAGES_REGISTRY['COMMITMENT_ALREADY_LINKED']
     );
   });
 

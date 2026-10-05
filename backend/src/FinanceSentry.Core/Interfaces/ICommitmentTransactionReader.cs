@@ -21,12 +21,17 @@ public interface ICommitmentTransactionReader
 /// <param name="DisplayName">The merchant name as the bank reported it, falling back to the description.</param>
 /// <param name="Amount">Native amount in the account's own currency.</param>
 /// <param name="Currency">ISO code of the account the transaction belongs to.</param>
+/// <param name="ChargeCount">
+/// Charges the person has made under <paramref name="Key"/> up to and including this one (one per
+/// day), so a plan started from a later payment still knows how many it has paid.
+/// </param>
 public record CommitmentTransaction(
     string Key,
     string DisplayName,
     decimal Amount,
     string Currency,
-    DateOnly Date);
+    DateOnly Date,
+    int ChargeCount);
 
 /// <summary>One posted debit as the detection job sees it, filed under its commitment key.</summary>
 /// <param name="Amount">Native amount in <paramref name="Currency"/>, the charging account's currency.</param>

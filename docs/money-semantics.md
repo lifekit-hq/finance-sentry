@@ -406,7 +406,15 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   charges for detection still follows its transactions, and the stale sweep lapses it like a
   detected row when they stop. An older hand-typed row is stored under
   `manual:{kind}:{merchant}`, a form no transaction ever derives, and is neither tracked nor
-  swept (`DetectedSubscription.IsTracked`). Rule (a) still claims its debits:
+  swept (`DetectedSubscription.IsTracked`) until the user links it to a transaction
+  (`POST /subscriptions/{id}/link`, `LinkCommitmentCommand`), which re-keys it to that
+  transaction's key and turns tracking on; nothing re-keys it automatically and no migration
+  does. A pick sets the row's `OccurrenceCount` to the number of same-key charges on distinct
+  dates up to and including the picked one (`ICommitmentTransactionReader`), so an installment
+  starts with the payments already made. Adding or linking onto a key held by a dismissed,
+  completed or potentially cancelled row, or a detected row of the other kind, restores that
+  row from the pick (`DetectedSubscription.TrackFromTransaction`); only an active row of the
+  same kind answers 409, naming that row. Rule (a) still claims its debits:
   `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual rows' display names
   via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync` and folds
   `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same key set rule

@@ -20,7 +20,8 @@ public class SubscriptionsController(
     ICommandHandler<SetInstallmentTermCommand, bool> setTerm,
     ICommandHandler<CompleteInstallmentCommand, bool> completeInstallment,
     ICommandHandler<DeleteInstallmentCommand, bool> deleteInstallment,
-    ICommandHandler<AddCommitmentCommand, Guid> addCommitment) : ControllerBase
+    ICommandHandler<AddCommitmentCommand, Guid> addCommitment,
+    ICommandHandler<LinkCommitmentCommand, bool> linkCommitment) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetSubscriptions(
@@ -104,6 +105,17 @@ public class SubscriptionsController(
             body.TermCount), ct);
         return Ok(new { id });
     }
+
+    /// <summary>
+    /// Links a legacy hand-typed row to one of the user's transactions; the row then follows
+    /// that transaction's later charges.
+    /// </summary>
+    [HttpPost("{id:guid}/link")]
+    public async Task<IActionResult> Link(Guid id, [FromBody] LinkCommitmentRequest body, CancellationToken ct = default)
+    {
+        await linkCommitment.Handle(new LinkCommitmentCommand(User.RequireUserId(), id, body.TransactionId), ct);
+        return NoContent();
+    }
 }
 
 public record SetTermRequest(int? TermCount, DateOnly? EndDate = null, DateOnly? StartDate = null);
@@ -114,3 +126,5 @@ public record AddCommitmentRequest(
     string? Merchant = null,
     decimal? MonthlyAmount = null,
     int? TermCount = null);
+
+public record LinkCommitmentRequest(Guid TransactionId);

@@ -4,6 +4,7 @@ import {type Observable} from 'rxjs';
 
 import {
   type AddCommitmentRequest,
+  type LinkCommitmentRequest,
   type SubscriptionsListResponse,
   type SubscriptionSummary,
 } from '../models/subscription/subscription.model';
@@ -47,5 +48,9 @@ export class SubscriptionsService extends ApiService {
 
   public add(payload: AddCommitmentRequest): Observable<{id: string}> {
     return this.post<{id: string}>('', payload);
+  }
+
+  public link(id: string, payload: LinkCommitmentRequest): Observable<void> {
+    return this.post<void>(`${id}/link`, payload);
   }
 }

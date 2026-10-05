@@ -52,6 +52,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   INVALID_SEARCH: 'Search text is too long.',
   COMMITMENT_TRANSACTION_NOT_FOUND: 'That transaction is no longer available. Pick another one.',
   COMMITMENT_ALREADY_TRACKED: 'Charges like this one are already tracked on this page.',
+  COMMITMENT_ALREADY_LINKED: 'This row already follows its transactions.',
   INVALID_COMMITMENT_KIND: 'Choose subscription or installment.',
   // Feature 040 agent error codes are lowercase snake_case by contract (chat-endpoint.md).
   /* eslint-disable @typescript-eslint/naming-convention */

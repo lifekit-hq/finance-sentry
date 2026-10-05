@@ -1,11 +1,16 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-4">
-  <div class="flex items-center gap-cmn-1" role="group" aria-label="Type">
-    @for (opt of kindOptions; track opt.value) {
-      <cmn-chip [selected]="form.controls.kind.value === opt.value" (clicked)="setKind(opt.value)">
-        {{ opt.label }}
-      </cmn-chip>
-    }
-  </div>
+  @if (!isLinking) {
+    <div class="flex items-center gap-cmn-1" role="group" aria-label="Type">
+      @for (opt of kindOptions; track opt.value) {
+        <cmn-chip
+          [selected]="form.controls.kind.value === opt.value"
+          (clicked)="setKind(opt.value)"
+        >
+          {{ opt.label }}
+        </cmn-chip>
+      }
+    </div>
+  }
 
   <cmn-form-field
     [control]="form.controls.transactionId"
@@ -45,7 +50,7 @@
     }
   </div>
 
-  @if (picker.selected()) {
+  @if (picker.selected() && !isLinking) {
     <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
       <cmn-form-field [control]="form.controls.merchant" label="Name" class="sm:col-span-2">
         <cmn-input formControlName="merchant" />
@@ -67,6 +72,6 @@
 
   <cmn-dialog-actions align="end">
     <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>
-    <cmn-button type="submit" variant="primary">Add</cmn-button>
+    <cmn-button type="submit" variant="primary">{{ isLinking ? 'Link' : 'Add' }}</cmn-button>
   </cmn-dialog-actions>
 </form>

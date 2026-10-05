@@ -18,11 +18,26 @@ public class CommitmentTransactionReader(
         if (account is null)
             return null;
 
+        var key = CommitmentKeyResolver.Resolve(transaction.MerchantName, transaction.Description, transaction.Amount, transaction.Mcc);
+        var date = DateOnly.FromDateTime(transaction.TransactionDate);
+
+        var chargeCount = (await transactions.GetByUserIdAsync(userId, ct))
+            .Where(t => t.IsActive
+                     && !t.IsPending
+                     && t.Amount != 0m
+                     && (t.TransactionType == null || t.TransactionType == "debit")
+                     && CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc) == key)
+            .Select(t => DateOnly.FromDateTime(t.TransactionDate))
+            .Where(d => d <= date)
+            .Distinct()
+            .Count();
+
         return new CommitmentTransaction(
-            CommitmentKeyResolver.Resolve(transaction.MerchantName, transaction.Description, transaction.Amount, transaction.Mcc),
+            key,
             string.IsNullOrWhiteSpace(transaction.MerchantName) ? transaction.Description : transaction.MerchantName,
             transaction.Amount,
             account.Currency,
-            DateOnly.FromDateTime(transaction.TransactionDate));
+            date,
+            Math.Max(1, chargeCount));
     }
 }

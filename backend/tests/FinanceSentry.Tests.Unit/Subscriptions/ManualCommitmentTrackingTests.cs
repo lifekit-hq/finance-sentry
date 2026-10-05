@@ -24,9 +24,12 @@ public class ManualCommitmentTrackingTests
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
 
     private static DetectedSubscription Tracked(
-        DateOnly chargeDate, string kind = SubscriptionKinds.Subscription, int? termCount = null) =>
+        DateOnly chargeDate, string kind = SubscriptionKinds.Subscription, int? termCount = null, int chargeCount = 1) =>
         DetectedSubscription.CreateFromTransaction(
-            UserId, Key, "Acme Hosting", 10m, "EUR", chargeDate, termCount, kind);
+            UserId, Key, "Acme Hosting", 10m, "EUR", chargeDate, chargeCount, termCount, kind);
+
+    private static DetectedSubscription Legacy(DateOnly startDate, string kind = SubscriptionKinds.Subscription, int? termCount = null) =>
+        DetectedSubscription.CreateManual(UserId, "Acme Hosting", 10m, "EUR", startDate, termCount, kind);
 
     private static (SubscriptionDetectionResultService sut, Mock<IDetectedSubscriptionRepository> repo) ResultService(
         params DetectedSubscription[] rows)
@@ -55,8 +58,7 @@ public class ManualCommitmentTrackingTests
     [Fact]
     public void LegacyHandTypedRow_IsNotTracked()
     {
-        var legacy = DetectedSubscription.CreateManual(
-            UserId, "Acme Hosting", 10m, "EUR", new DateOnly(2026, 5, 21), null, SubscriptionKinds.Subscription);
+        var legacy = Legacy(new DateOnly(2026, 5, 21));
 
         legacy.IsTracked.Should().BeFalse();
     }
@@ -132,8 +134,7 @@ public class ManualCommitmentTrackingTests
     [Fact]
     public async Task TrackManualCommitments_LeavesLegacyHandTypedRowAlone()
     {
-        var legacy = DetectedSubscription.CreateManual(
-            UserId, "Acme Hosting", 10m, "EUR", Today.AddDays(-70), null, SubscriptionKinds.Subscription);
+        var legacy = Legacy(Today.AddDays(-70));
         var (sut, repo) = ResultService(legacy);
 
         await sut.TrackManualCommitmentsAsync(UserId,
@@ -159,8 +160,7 @@ public class ManualCommitmentTrackingTests
     [Fact]
     public async Task MarkStale_LegacyHandTypedRow_StaysActive()
     {
-        var legacy = DetectedSubscription.CreateManual(
-            UserId, "Acme Hosting", 10m, "EUR", Today.AddDays(-105), null, SubscriptionKinds.Subscription);
+        var legacy = Legacy(Today.AddDays(-105));
         var (sut, _) = ResultService(legacy);
 
         await sut.MarkStaleAsPotentiallyCancelledAsync(UserId);
@@ -184,7 +184,7 @@ public class ManualCommitmentTrackingTests
     }
 
     private static readonly CommitmentTransaction Picked =
-        new(Key, "ACME HOSTING GMBH", 16.19m, "EUR", new DateOnly(2026, 6, 22));
+        new(Key, "ACME HOSTING GMBH", 16.19m, "EUR", new DateOnly(2026, 6, 22), 1);
 
     [Fact]
     public async Task Add_FromTransaction_StoresRowKeyedByTheTransaction()
@@ -235,14 +235,81 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
-    public async Task Add_ChargesAlreadyTracked_Throws409()
+    public async Task Add_ActiveRowOfSameKindHoldsTheKey_Throws409NamingIt()
     {
         var (sut, _) = AddHandler(Picked, existing: Tracked(new DateOnly(2026, 6, 22)));
 
         var act = () => sut.Handle(new AddCommitmentCommand(
             UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null), default);
 
-        await act.Should().ThrowAsync<CommitmentAlreadyTrackedException>();
+        (await act.Should().ThrowAsync<CommitmentAlreadyTrackedException>())
+            .Which.Message.Should().Contain("Acme Hosting");
+    }
+
+    [Theory]
+    [InlineData(SubscriptionStatus.Dismissed)]
+    [InlineData(SubscriptionStatus.Completed)]
+    [InlineData(SubscriptionStatus.PotentiallyCancelled)]
+    public async Task Add_InactiveRowHoldsTheKey_RestoresItFromThePick(string status)
+    {
+        var existing = Tracked(new DateOnly(2026, 1, 21));
+        SetStatus(existing, status);
+        var (sut, repo) = AddHandler(Picked, existing);
+
+        var id = await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, "Acme", 20m, null), default);
+
+        id.Should().Be(existing.Id);
+        existing.Status.Should().Be(SubscriptionStatus.Active);
+        existing.DismissedAt.Should().BeNull();
+        existing.MerchantNameDisplay.Should().Be("Acme");
+        existing.LastKnownAmount.Should().Be(20m);
+        existing.LastChargeDate.Should().Be(new DateOnly(2026, 6, 22));
+        repo.Verify(r => r.UpsertAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Add_ActiveRowOfOtherKindHoldsTheKey_ReKindsItFromThePick()
+    {
+        var existing = Tracked(new DateOnly(2026, 5, 22));
+        var (sut, _) = AddHandler(Picked, existing);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Installment, null, null, 12), default);
+
+        existing.Kind.Should().Be(SubscriptionKinds.Installment);
+        existing.TermCount.Should().Be(12);
+        existing.IsManual.Should().BeTrue();
+        existing.Status.Should().Be(SubscriptionStatus.Active);
+    }
+
+    [Fact]
+    public async Task Add_PickedLaterPayment_StartsOccurrencesAtItsChargeCount()
+    {
+        var (sut, repo) = AddHandler(Picked with { ChargeCount = 5 });
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Installment, null, null, 12), default);
+
+        saved!.OccurrenceCount.Should().Be(5);
+        saved.RemainingPayments.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Add_PickedFinalPayment_CompletesTheInstallment()
+    {
+        var (sut, repo) = AddHandler(Picked with { ChargeCount = 12 });
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Installment, null, null, 12), default);
+
+        saved!.Status.Should().Be(SubscriptionStatus.Completed);
     }
 
     [Fact]
@@ -254,5 +321,124 @@ public class ManualCommitmentTrackingTests
             UserGuid, TransactionId, "loan", null, null, null), default);
 
         await act.Should().ThrowAsync<InvalidCommitmentKindException>();
+    }
+
+    private static void SetStatus(DetectedSubscription row, string status)
+    {
+        switch (status)
+        {
+            case SubscriptionStatus.Dismissed: row.MarkDismissed(); break;
+            case SubscriptionStatus.Completed: row.MarkCompleted(); break;
+            default: row.MarkPotentiallyCancelled(); break;
+        }
+    }
+
+    // --- Link a legacy row to a transaction ---
+
+    private static (LinkCommitmentCommandHandler sut, Mock<IDetectedSubscriptionRepository> repo) LinkHandler(
+        DetectedSubscription? row, CommitmentTransaction? transaction, DetectedSubscription? holder = null)
+    {
+        var repo = new Mock<IDetectedSubscriptionRepository>();
+        repo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(row);
+        repo.Setup(r => r.FindByUserAndMerchantUnscopedAsync(UserId, Key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(holder);
+        var reader = new Mock<ICommitmentTransactionReader>();
+        reader.Setup(r => r.FindAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
+        return (new LinkCommitmentCommandHandler(repo.Object, reader.Object), repo);
+    }
+
+    [Fact]
+    public async Task Link_LegacyRow_ReKeysItAndTakesTheTransactionAsItsLastCharge()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, repo) = LinkHandler(legacy, Picked with { ChargeCount = 3 });
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        legacy.IsTracked.Should().BeTrue();
+        legacy.MerchantNameNormalized.Should().Be(Key);
+        legacy.MerchantNameDisplay.Should().Be("Acme Hosting");
+        legacy.LastChargeDate.Should().Be(new DateOnly(2026, 6, 22));
+        legacy.NextExpectedDate.Should().Be(new DateOnly(2026, 7, 22));
+        legacy.LastKnownAmount.Should().Be(16.19m);
+        legacy.OccurrenceCount.Should().Be(3);
+        legacy.Status.Should().Be(SubscriptionStatus.Active);
+        repo.Verify(r => r.UpsertAsync(legacy, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Link_LegacyInstallment_KeepsItsKindTermAndStart()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21), SubscriptionKinds.Installment, termCount: 12);
+        var (sut, _) = LinkHandler(legacy, Picked with { ChargeCount = 6 });
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        legacy.Kind.Should().Be(SubscriptionKinds.Installment);
+        legacy.TermCount.Should().Be(12);
+        legacy.StartDate.Should().Be(new DateOnly(2026, 1, 21));
+        legacy.RemainingPayments.Should().Be(6);
+    }
+
+    [Fact]
+    public async Task Link_ActiveRowAlreadyHoldsTheKey_Throws409NamingIt()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, repo) = LinkHandler(legacy, Picked, holder: Tracked(new DateOnly(2026, 6, 22)));
+
+        var act = () => sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        (await act.Should().ThrowAsync<CommitmentAlreadyTrackedException>())
+            .Which.Message.Should().Contain("Acme Hosting");
+        legacy.IsTracked.Should().BeFalse();
+        repo.Verify(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Link_InactiveRowHoldsTheKey_SupersedesIt()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var dismissed = Tracked(new DateOnly(2026, 2, 21));
+        dismissed.MarkDismissed();
+        var (sut, repo) = LinkHandler(legacy, Picked, holder: dismissed);
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        repo.Verify(r => r.DeleteAsync(dismissed, It.IsAny<CancellationToken>()), Times.Once);
+        legacy.MerchantNameNormalized.Should().Be(Key);
+    }
+
+    [Fact]
+    public async Task Link_RowAlreadyTracked_Throws409()
+    {
+        var tracked = Tracked(new DateOnly(2026, 6, 22));
+        var (sut, _) = LinkHandler(tracked, Picked);
+
+        var act = () => sut.Handle(new LinkCommitmentCommand(UserGuid, tracked.Id, TransactionId), default);
+
+        await act.Should().ThrowAsync<CommitmentAlreadyLinkedException>();
+    }
+
+    [Fact]
+    public async Task Link_OtherUsersRow_Throws404()
+    {
+        var foreign = DetectedSubscription.CreateManual(
+            Guid.NewGuid().ToString(), "Acme Hosting", 10m, "EUR", new DateOnly(2026, 1, 21), null, SubscriptionKinds.Subscription);
+        var (sut, _) = LinkHandler(foreign, Picked);
+
+        var act = () => sut.Handle(new LinkCommitmentCommand(UserGuid, foreign.Id, TransactionId), default);
+
+        await act.Should().ThrowAsync<SubscriptionNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Link_TransactionNotFound_Throws404()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, _) = LinkHandler(legacy, null);
+
+        var act = () => sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId), default);
+
+        await act.Should().ThrowAsync<CommitmentTransactionNotFoundException>();
     }
 }
