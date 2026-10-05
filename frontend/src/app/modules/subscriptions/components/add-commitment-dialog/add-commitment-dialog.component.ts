@@ -17,7 +17,9 @@ import {
 
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {
+  COMMITMENT_CADENCE_OPTIONS,
   COMMITMENT_KIND_OPTIONS,
+  DEFAULT_COMMITMENT_CADENCE,
   MIN_TERM_COUNT,
 } from '../../constants/commitment-candidate/commitment-candidate.constants';
 import {MIN_MONTHLY_AMOUNT} from '../../constants/subscription/subscription-form.constants';
@@ -26,6 +28,7 @@ import {type CommitmentDialogData} from '../../models/commitment-candidate/commi
 import {
   type AddCommitmentRequest,
   type LinkCommitmentRequest,
+  type SubscriptionCadence,
   type SubscriptionKind,
 } from '../../models/subscription/subscription.model';
 import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
@@ -59,10 +62,12 @@ export class AddCommitmentDialogComponent {
 
   public readonly picker = inject(CommitmentPickerStore);
   public readonly kindOptions = COMMITMENT_KIND_OPTIONS;
+  public readonly cadenceOptions = COMMITMENT_CADENCE_OPTIONS;
   public readonly searchControl = new FormControl('', {nonNullable: true});
 
   public readonly form = new FormGroup({
     kind: new FormControl<SubscriptionKind>('subscription', {nonNullable: true}),
+    cadence: new FormControl<SubscriptionCadence>(DEFAULT_COMMITMENT_CADENCE, {nonNullable: true}),
     transactionId: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
     merchant: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
     monthlyAmount: new FormControl<number | null>(null, {
@@ -81,6 +86,10 @@ export class AddCommitmentDialogComponent {
     this.form.controls.kind.setValue(kind);
   }
 
+  public setCadence(cadence: SubscriptionCadence): void {
+    this.form.controls.cadence.setValue(cadence);
+  }
+
   /** Picking a charge pre-fills the name and amount; both stay editable. */
   public pick(candidate: CommitmentCandidate): void {
     this.picker.select(candidate);
@@ -95,7 +104,10 @@ export class AddCommitmentDialogComponent {
     if (this.isLinking) {
       this.form.controls.transactionId.markAsTouched();
       if (this.form.controls.transactionId.valid) {
-        this.dialogRef.close({transactionId: this.form.controls.transactionId.value});
+        this.dialogRef.close({
+          transactionId: this.form.controls.transactionId.value,
+          cadence: this.form.controls.cadence.value,
+        });
       }
       return;
     }
@@ -111,6 +123,7 @@ export class AddCommitmentDialogComponent {
       merchant: value.merchant.trim(),
       monthlyAmount: Number(value.monthlyAmount),
       termCount: isInstallment && value.termCount ? Number(value.termCount) : null,
+      cadence: value.cadence,
     });
   }
 

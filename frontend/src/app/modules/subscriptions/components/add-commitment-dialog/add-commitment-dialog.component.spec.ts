@@ -77,6 +77,7 @@ describe('AddCommitmentDialogComponent', () => {
       merchant: 'Acme',
       monthlyAmount: 16.19,
       termCount: null,
+      cadence: 'monthly',
     });
   });
 
@@ -92,7 +93,16 @@ describe('AddCommitmentDialogComponent', () => {
       merchant: 'Acme Hosting',
       monthlyAmount: 20,
       termCount: 12,
+      cadence: 'monthly',
     });
+  });
+
+  it('carries the chosen yearly cadence', () => {
+    const {component, close} = setup();
+    component.pick(CANDIDATE);
+    component.setCadence('annual');
+    component.submit();
+    expect(close).toHaveBeenCalledWith(expect.objectContaining({cadence: 'annual'}));
   });
 
   it('links with only the picked transaction when opened for a legacy row', () => {
@@ -101,7 +111,15 @@ describe('AddCommitmentDialogComponent', () => {
     component.pick(CANDIDATE);
     component.form.patchValue({merchant: '', monthlyAmount: null});
     component.submit();
-    expect(close).toHaveBeenCalledWith({transactionId: 'tx-1'});
+    expect(close).toHaveBeenCalledWith({transactionId: 'tx-1', cadence: 'monthly'});
+  });
+
+  it('links with the chosen cadence', () => {
+    const {component, close} = setup({linkTo: 'NetCup'});
+    component.pick(CANDIDATE);
+    component.setCadence('annual');
+    component.submit();
+    expect(close).toHaveBeenCalledWith({transactionId: 'tx-1', cadence: 'annual'});
   });
 
   it('does not link until a transaction is picked', () => {

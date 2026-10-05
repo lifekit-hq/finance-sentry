@@ -11,7 +11,7 @@ using FinanceSentry.Modules.Subscriptions.Domain.Repositories;
 /// transaction's charges, which become its last charge, and from then on it follows them like any
 /// tracked row. The row keeps the name, kind and plan the user typed.
 /// </summary>
-public record LinkCommitmentCommand(Guid UserId, Guid Id, Guid TransactionId) : ICommand<bool>;
+public record LinkCommitmentCommand(Guid UserId, Guid Id, Guid TransactionId, string? Cadence = null) : ICommand<bool>;
 
 public class LinkCommitmentCommandHandler(
     IDetectedSubscriptionRepository repository,
@@ -19,6 +19,9 @@ public class LinkCommitmentCommandHandler(
 {
     public async Task<bool> Handle(LinkCommitmentCommand command, CancellationToken ct)
     {
+        if (command.Cadence is not null && !SubscriptionCadences.IsValid(command.Cadence))
+            throw new InvalidCommitmentCadenceException();
+
         var userId = command.UserId.ToString();
         var item = await repository.GetByIdAsync(command.Id, ct);
         if (item is null || item.UserId != userId)
@@ -47,7 +50,8 @@ public class LinkCommitmentCommandHandler(
             item.TermCount,
             item.StartDate ?? item.LastChargeDate,
             item.EndDate,
-            item.Kind);
+            item.Kind,
+            transaction.Cadence ?? command.Cadence ?? item.Cadence);
         await repository.UpsertAsync(item, ct);
         return true;
     }

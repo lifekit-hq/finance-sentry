@@ -1,5 +1,5 @@
 import {type PagedResponse} from '../../../../shared/models/api/api.model';
-import {type SubscriptionKind} from '../subscription/subscription.model';
+import {type SubscriptionCadence, type SubscriptionKind} from '../subscription/subscription.model';
 
 /** A charge the user can pick to start tracking a subscription or installment from. */
 export interface CommitmentCandidate {
@@ -16,5 +16,10 @@ export type CommitmentCandidatesResponse = PagedResponse<CommitmentCandidate>;
 
 export interface CommitmentKindOption {
   value: SubscriptionKind;
+  label: string;
+}
+
+export interface CommitmentCadenceOption {
+  value: SubscriptionCadence;
   label: string;
 }

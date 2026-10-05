@@ -54,6 +54,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   COMMITMENT_ALREADY_TRACKED: 'Charges like this one are already tracked on this page.',
   COMMITMENT_ALREADY_LINKED: 'This row already follows its transactions.',
   INVALID_COMMITMENT_KIND: 'Choose subscription or installment.',
+  INVALID_COMMITMENT_CADENCE: 'Choose monthly or yearly.',
   // Feature 040 agent error codes are lowercase snake_case by contract (chat-endpoint.md).
   /* eslint-disable @typescript-eslint/naming-convention */
   agent_not_configured:

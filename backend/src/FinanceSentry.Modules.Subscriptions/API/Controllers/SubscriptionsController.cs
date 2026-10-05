@@ -102,7 +102,8 @@ public class SubscriptionsController(
             body.Kind,
             body.Merchant,
             body.MonthlyAmount,
-            body.TermCount), ct);
+            body.TermCount,
+            body.Cadence), ct);
         return Ok(new { id });
     }
 
@@ -113,7 +114,7 @@ public class SubscriptionsController(
     [HttpPost("{id:guid}/link")]
     public async Task<IActionResult> Link(Guid id, [FromBody] LinkCommitmentRequest body, CancellationToken ct = default)
     {
-        await linkCommitment.Handle(new LinkCommitmentCommand(User.RequireUserId(), id, body.TransactionId), ct);
+        await linkCommitment.Handle(new LinkCommitmentCommand(User.RequireUserId(), id, body.TransactionId, body.Cadence), ct);
         return NoContent();
     }
 }
@@ -125,6 +126,7 @@ public record AddCommitmentRequest(
     string Kind,
     string? Merchant = null,
     decimal? MonthlyAmount = null,
-    int? TermCount = null);
+    int? TermCount = null,
+    string? Cadence = null);
 
-public record LinkCommitmentRequest(Guid TransactionId);
+public record LinkCommitmentRequest(Guid TransactionId, string? Cadence = null);

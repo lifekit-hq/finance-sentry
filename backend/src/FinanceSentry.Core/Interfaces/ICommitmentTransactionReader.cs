@@ -26,13 +26,18 @@ public interface ICommitmentTransactionReader
 /// a row started from it is already current instead of waiting for the next detection run.
 /// </param>
 /// <param name="ChargeCount">Charges the person has made under <paramref name="Key"/> up to <paramref name="Date"/> (one per day).</param>
+/// <param name="Cadence">
+/// <see cref="SubscriptionCadences"/> value read from the median gap between those charges, or null
+/// when there are fewer than two and the history says nothing about it.
+/// </param>
 public record CommitmentTransaction(
     string Key,
     string DisplayName,
     decimal Amount,
     string Currency,
     DateOnly Date,
-    int ChargeCount);
+    int ChargeCount,
+    string? Cadence = null);
 
 /// <summary>One posted debit as the detection job sees it, filed under its commitment key.</summary>
 /// <param name="Amount">Native amount in <paramref name="Currency"/>, the charging account's currency.</param>

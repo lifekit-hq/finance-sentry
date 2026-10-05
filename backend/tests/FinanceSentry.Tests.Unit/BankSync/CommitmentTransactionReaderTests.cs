@@ -92,6 +92,56 @@ public class CommitmentTransactionReaderTests
     }
 
     [Fact]
+    public async Task FindAsync_ChargesAboutAYearApart_InfersAnnualCadence()
+    {
+        var first = Charge(new DateTime(2024, 6, 5));
+        var second = Charge(new DateTime(2025, 6, 6));
+        var picked = Charge(new DateTime(2026, 6, 5));
+
+        var result = await Reader(picked, first, second, picked).FindAsync(UserId, Guid.NewGuid());
+
+        result!.Cadence.Should().Be("annual");
+    }
+
+    [Fact]
+    public async Task FindAsync_ChargesAboutAMonthApart_InfersMonthlyCadence()
+    {
+        var first = Charge(new DateTime(2026, 1, 5));
+        var second = Charge(new DateTime(2026, 2, 6));
+        var picked = Charge(new DateTime(2026, 3, 5));
+
+        var result = await Reader(picked, first, second, picked).FindAsync(UserId, Guid.NewGuid());
+
+        result!.Cadence.Should().Be("monthly");
+    }
+
+    [Fact]
+    public async Task FindAsync_OneOddGapAmongMonthlyCharges_StaysMonthly()
+    {
+        var charges = new[]
+        {
+            Charge(new DateTime(2025, 6, 5)),
+            Charge(new DateTime(2026, 1, 5)),
+            Charge(new DateTime(2026, 2, 5)),
+            Charge(new DateTime(2026, 3, 5)),
+        };
+
+        var result = await Reader(charges[^1], charges).FindAsync(UserId, Guid.NewGuid());
+
+        result!.Cadence.Should().Be("monthly");
+    }
+
+    [Fact]
+    public async Task FindAsync_SingleCharge_HasNoCadence()
+    {
+        var picked = Charge(new DateTime(2026, 3, 5));
+
+        var result = await Reader(picked, picked).FindAsync(UserId, Guid.NewGuid());
+
+        result!.Cadence.Should().BeNull();
+    }
+
+    [Fact]
     public async Task FindAsync_IgnoresPendingZeroAmountCreditAndInactiveCharges()
     {
         var picked = Charge(new DateTime(2026, 3, 5));

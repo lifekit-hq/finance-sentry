@@ -24,9 +24,10 @@ public class ManualCommitmentTrackingTests
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
 
     private static DetectedSubscription Tracked(
-        DateOnly chargeDate, string kind = SubscriptionKinds.Subscription, int? termCount = null, int chargeCount = 1) =>
+        DateOnly chargeDate, string kind = SubscriptionKinds.Subscription, int? termCount = null, int chargeCount = 1,
+        string cadence = SubscriptionCadences.Monthly) =>
         DetectedSubscription.CreateFromTransaction(
-            UserId, Key, "Acme Hosting", 10m, "EUR", chargeDate, chargeCount, termCount, kind);
+            UserId, Key, "Acme Hosting", 10m, "EUR", chargeDate, chargeCount, termCount, kind, cadence);
 
     private static DetectedSubscription Legacy(DateOnly startDate, string kind = SubscriptionKinds.Subscription, int? termCount = null) =>
         DetectedSubscription.CreateManual(UserId, "Acme Hosting", 10m, "EUR", startDate, termCount, kind);
@@ -53,6 +54,28 @@ public class ManualCommitmentTrackingTests
         row.IsTracked.Should().BeTrue();
         row.LastChargeDate.Should().Be(new DateOnly(2026, 5, 21));
         row.NextExpectedDate.Should().Be(new DateOnly(2026, 6, 21));
+    }
+
+    [Fact]
+    public void CreateFromTransaction_AnnualCadence_ExpectsNextChargeAYearOnAndAdvancesByAYear()
+    {
+        var row = Tracked(new DateOnly(2026, 5, 21), cadence: SubscriptionCadences.Annual);
+
+        row.Cadence.Should().Be(SubscriptionCadences.Annual);
+        row.NextExpectedDate.Should().Be(new DateOnly(2027, 5, 21));
+
+        row.RecordCharge(new DateOnly(2027, 5, 22), 10m, "EUR");
+
+        row.NextExpectedDate.Should().Be(new DateOnly(2028, 5, 22));
+    }
+
+    [Fact]
+    public void CreateFromTransaction_Installment_LeavesStartDateForTheEstimate()
+    {
+        var row = Tracked(new DateOnly(2026, 5, 21), SubscriptionKinds.Installment, termCount: 12, chargeCount: 5);
+
+        row.StartDate.Should().BeNull();
+        row.OccurrenceCount.Should().Be(5);
     }
 
     [Fact]
@@ -207,7 +230,7 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
-    public async Task Add_Installment_KeepsTermAndPlanStart()
+    public async Task Add_Installment_KeepsTermAndLeavesPlanStartForTheEstimate()
     {
         var (sut, repo) = AddHandler(Picked);
         DetectedSubscription? saved = null;
@@ -218,7 +241,7 @@ public class ManualCommitmentTrackingTests
             UserGuid, TransactionId, SubscriptionKinds.Installment, null, 20m, 12), default);
 
         saved!.TermCount.Should().Be(12);
-        saved.StartDate.Should().Be(new DateOnly(2026, 6, 22));
+        saved.StartDate.Should().BeNull();
         saved.MerchantNameDisplay.Should().Be("ACME HOSTING GMBH");
         saved.LastKnownAmount.Should().Be(20m);
     }
@@ -332,6 +355,89 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
+    public async Task Add_SingleChargeHistory_UsesTheRequestedCadence()
+    {
+        var (sut, repo) = AddHandler(Picked);
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Annual), default);
+
+        saved!.Cadence.Should().Be(SubscriptionCadences.Annual);
+        saved.NextExpectedDate.Should().Be(new DateOnly(2027, 6, 22));
+    }
+
+    [Fact]
+    public async Task Add_NoHistoryAndNoRequestedCadence_DefaultsToMonthly()
+    {
+        var (sut, repo) = AddHandler(Picked);
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null), default);
+
+        saved!.Cadence.Should().Be(SubscriptionCadences.Monthly);
+    }
+
+    [Fact]
+    public async Task Add_ChargeHistoryShowsAYearlyGap_HistoryWinsOverTheRequestedCadence()
+    {
+        var (sut, repo) = AddHandler(Picked with { ChargeCount = 2, Cadence = SubscriptionCadences.Annual });
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Monthly), default);
+
+        saved!.Cadence.Should().Be(SubscriptionCadences.Annual);
+    }
+
+    [Fact]
+    public async Task Add_UnknownCadence_Throws400()
+    {
+        var (sut, _) = AddHandler(Picked);
+
+        var act = () => sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, "weekly"), default);
+
+        await act.Should().ThrowAsync<InvalidCommitmentCadenceException>();
+    }
+
+    [Fact]
+    public async Task Add_RestoringAnAnnualRow_KeepsItsStoredCadence()
+    {
+        var existing = Tracked(new DateOnly(2025, 6, 22), cadence: SubscriptionCadences.Annual);
+        existing.MarkDismissed();
+        var (sut, _) = AddHandler(Picked with { Cadence = SubscriptionCadences.Monthly }, existing);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Monthly), default);
+
+        existing.Cadence.Should().Be(SubscriptionCadences.Annual);
+        existing.NextExpectedDate.Should().Be(new DateOnly(2027, 6, 22));
+    }
+
+    [Fact]
+    public async Task Add_PickedAmongSeveralCharges_LeavesInstallmentStartForTheEstimate()
+    {
+        var (sut, repo) = AddHandler(Picked with { ChargeCount = 5, Cadence = SubscriptionCadences.Monthly });
+        DetectedSubscription? saved = null;
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<DetectedSubscription, CancellationToken>((s, _) => saved = s);
+
+        await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Installment, null, null, 12), default);
+
+        saved!.StartDate.Should().BeNull();
+        saved.OccurrenceCount.Should().Be(5);
+    }
+
+    [Fact]
     public async Task Add_UnknownKind_Throws400()
     {
         var (sut, _) = AddHandler(Picked);
@@ -399,6 +505,40 @@ public class ManualCommitmentTrackingTests
         legacy.LastKnownAmount.Should().Be(17.5m);
         legacy.Currency.Should().Be("USD");
         legacy.OccurrenceCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Link_SingleChargeHistory_UsesTheRequestedCadence()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, _) = LinkHandler(legacy, Picked);
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId, SubscriptionCadences.Annual), default);
+
+        legacy.Cadence.Should().Be(SubscriptionCadences.Annual);
+        legacy.NextExpectedDate.Should().Be(new DateOnly(2027, 6, 22));
+    }
+
+    [Fact]
+    public async Task Link_ChargeHistoryShowsAYearlyGap_HistoryWinsOverTheRequestedCadence()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, _) = LinkHandler(legacy, Picked with { ChargeCount = 2, Cadence = SubscriptionCadences.Annual });
+
+        await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId, SubscriptionCadences.Monthly), default);
+
+        legacy.Cadence.Should().Be(SubscriptionCadences.Annual);
+    }
+
+    [Fact]
+    public async Task Link_UnknownCadence_Throws400()
+    {
+        var legacy = Legacy(new DateOnly(2026, 1, 21));
+        var (sut, _) = LinkHandler(legacy, Picked);
+
+        var act = () => sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId, "weekly"), default);
+
+        await act.Should().ThrowAsync<InvalidCommitmentCadenceException>();
     }
 
     [Fact]

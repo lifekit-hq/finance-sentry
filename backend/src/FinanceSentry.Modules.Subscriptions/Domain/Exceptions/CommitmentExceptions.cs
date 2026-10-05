@@ -11,5 +11,8 @@ public class CommitmentAlreadyTrackedException(string trackedAs)
 public class CommitmentAlreadyLinkedException()
     : ApiException(409, "COMMITMENT_ALREADY_LINKED", "This row already follows its transactions.");
 
+public class InvalidCommitmentCadenceException()
+    : ApiException(400, "INVALID_COMMITMENT_CADENCE", "Cadence must be monthly or annual.");
+
 public class InvalidCommitmentKindException()
     : ApiException(400, "INVALID_COMMITMENT_KIND", "Kind must be subscription or installment.");

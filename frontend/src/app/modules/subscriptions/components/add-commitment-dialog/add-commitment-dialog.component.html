@@ -50,12 +50,25 @@
     }
   </div>
 
+  @if (picker.selected()) {
+    <div class="flex items-center gap-cmn-1" role="group" aria-label="Billed">
+      @for (opt of cadenceOptions; track opt.value) {
+        <cmn-chip
+          [selected]="form.controls.cadence.value === opt.value"
+          (clicked)="setCadence(opt.value)"
+        >
+          {{ opt.label }}
+        </cmn-chip>
+      }
+    </div>
+  }
+
   @if (picker.selected() && !isLinking) {
     <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
       <cmn-form-field [control]="form.controls.merchant" label="Name" class="sm:col-span-2">
         <cmn-input formControlName="merchant" />
       </cmn-form-field>
-      <cmn-form-field [control]="form.controls.monthlyAmount" label="Monthly amount">
+      <cmn-form-field [control]="form.controls.monthlyAmount" label="Amount per charge">
         <cmn-input formControlName="monthlyAmount" type="number" />
       </cmn-form-field>
       @if (form.controls.kind.value === 'installment') {

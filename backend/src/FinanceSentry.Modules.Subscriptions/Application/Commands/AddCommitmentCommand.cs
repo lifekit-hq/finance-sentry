@@ -18,7 +18,8 @@ public record AddCommitmentCommand(
     string Kind,
     string? Merchant,
     decimal? MonthlyAmount,
-    int? TermCount) : ICommand<Guid>;
+    int? TermCount,
+    string? Cadence = null) : ICommand<Guid>;
 
 public class AddCommitmentCommandHandler(
     IDetectedSubscriptionRepository repository,
@@ -28,6 +29,8 @@ public class AddCommitmentCommandHandler(
     {
         if (command.Kind is not (SubscriptionKinds.Subscription or SubscriptionKinds.Installment))
             throw new InvalidCommitmentKindException();
+        if (command.Cadence is not null && !SubscriptionCadences.IsValid(command.Cadence))
+            throw new InvalidCommitmentCadenceException();
 
         var transaction = await transactions.FindAsync(command.UserId, command.TransactionId, ct)
             ?? throw new CommitmentTransactionNotFoundException();
@@ -44,10 +47,11 @@ public class AddCommitmentCommandHandler(
         // the key, which is unique per person: the pick brings that row back instead of adding a twin.
         var item = existing ?? DetectedSubscription.CreateFromTransaction(
             userId, transaction.Key, display, amount, transaction.Currency, transaction.Date,
-            transaction.ChargeCount, command.TermCount, command.Kind);
+            transaction.ChargeCount, command.TermCount, command.Kind,
+            transaction.Cadence ?? command.Cadence ?? SubscriptionCadences.Monthly);
         existing?.TrackFromTransaction(
             transaction.Key, display, amount, transaction.Currency, transaction.Date,
-            transaction.ChargeCount, command.TermCount, transaction.Date, null, command.Kind);
+            transaction.ChargeCount, command.TermCount, null, null, command.Kind, existing.Cadence);
 
         await repository.UpsertAsync(item, ct);
         return item.Id;

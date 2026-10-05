@@ -30,12 +30,28 @@ public class CommitmentTransactionReader(
         if (account is null)
             return null;
 
+        var dates = charges.Select(t => DateOnly.FromDateTime(t.TransactionDate)).Distinct().Order().ToList();
+
         return new CommitmentTransaction(
             key,
             string.IsNullOrWhiteSpace(transaction.MerchantName) ? transaction.Description : transaction.MerchantName,
             latest.Amount,
             account.Currency,
             DateOnly.FromDateTime(latest.TransactionDate),
-            charges.Select(t => DateOnly.FromDateTime(t.TransactionDate)).Distinct().Count());
+            dates.Count,
+            CadenceOf(dates));
     }
+
+    private static string? CadenceOf(List<DateOnly> dates)
+    {
+        if (dates.Count < 2)
+            return null;
+
+        var gaps = dates.Zip(dates.Skip(1), (a, b) => b.DayNumber - a.DayNumber).Order().ToList();
+        var middle = gaps.Count / 2;
+        var median = gaps.Count % 2 == 1 ? gaps[middle] : (gaps[middle - 1] + gaps[middle]) / 2.0;
+        return median > AnnualCadenceMinMedianDays ? SubscriptionCadences.Annual : SubscriptionCadences.Monthly;
+    }
+
+    private const int AnnualCadenceMinMedianDays = 200;
 }

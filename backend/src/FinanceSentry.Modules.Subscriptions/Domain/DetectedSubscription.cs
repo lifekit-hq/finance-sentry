@@ -160,12 +160,13 @@ public class DetectedSubscription
         DateOnly chargeDate,
         int chargeCount,
         int? termCount,
-        string kind)
+        string kind,
+        string cadence = SubscriptionCadences.Monthly)
     {
         var entity = new DetectedSubscription { UserId = userId };
         entity.TrackFromTransaction(
             trackingKey, merchantNameDisplay, monthlyAmount, currency, chargeDate, chargeCount,
-            termCount, kind == SubscriptionKinds.Installment ? chargeDate : null, null, kind);
+            termCount, null, null, kind, cadence);
         return entity;
     }
 
@@ -185,17 +186,18 @@ public class DetectedSubscription
         int? termCount,
         DateOnly? startDate,
         DateOnly? endDate,
-        string kind)
+        string kind,
+        string cadence = SubscriptionCadences.Monthly)
     {
         MerchantNameNormalized = trackingKey;
         MerchantNameDisplay = merchantNameDisplay;
-        Cadence = "monthly";
+        Cadence = cadence;
         AverageAmount = monthlyAmount;
         LastKnownAmount = monthlyAmount;
         PreviousAmount = null;
         Currency = currency;
         LastChargeDate = chargeDate;
-        NextExpectedDate = chargeDate.AddMonths(1);
+        NextExpectedDate = NextChargeAfter(chargeDate);
         OccurrenceCount = chargeCount;
         ConfidenceScore = 100;
         Kind = kind;
@@ -220,7 +222,7 @@ public class DetectedSubscription
             return false;
 
         LastChargeDate = chargeDate;
-        NextExpectedDate = Cadence == "annual" ? chargeDate.AddYears(1) : chargeDate.AddMonths(1);
+        NextExpectedDate = NextChargeAfter(chargeDate);
         LastKnownAmount = amount;
         AverageAmount = amount;
         // The unit the amounts above are in: billing moved to another account restates them.
@@ -232,6 +234,9 @@ public class DetectedSubscription
         EvaluateCompletion(false);
         return true;
     }
+
+    private DateOnly NextChargeAfter(DateOnly chargeDate) =>
+        Cadence == SubscriptionCadences.Annual ? chargeDate.AddYears(1) : chargeDate.AddMonths(1);
 
     public void UpdateFromDetection(
         string merchantNameDisplay,

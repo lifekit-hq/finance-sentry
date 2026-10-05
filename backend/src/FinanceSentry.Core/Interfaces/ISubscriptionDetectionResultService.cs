@@ -51,3 +51,12 @@ public static class SubscriptionKinds
     public const string Subscription = "subscription";
     public const string Installment = "installment";
 }
+
+/// <summary>How often a commitment is charged; the detection job only recognises these two.</summary>
+public static class SubscriptionCadences
+{
+    public const string Monthly = "monthly";
+    public const string Annual = "annual";
+
+    public static bool IsValid(string? cadence) => cadence is Monthly or Annual;
+}

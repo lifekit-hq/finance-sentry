@@ -2,11 +2,12 @@ export type SubscriptionStatus = 'active' | 'dismissed' | 'potentially_cancelled
 export type SubscriptionSort = 'date' | 'amount' | 'name';
 export type DismissedSubscription = Extract<SubscriptionStatus, 'dismissed'>;
 export type SubscriptionKind = 'subscription' | 'installment';
+export type SubscriptionCadence = 'monthly' | 'annual';
 
 export interface Subscription {
   id: string;
   merchantName: string;
-  cadence: 'monthly' | 'annual';
+  cadence: SubscriptionCadence;
   averageAmount: number;
   lastKnownAmount: number;
   monthlyEquivalent: number;
@@ -33,11 +34,15 @@ export interface AddCommitmentRequest {
   merchant: string;
   monthlyAmount: number;
   termCount: Nullable<number>;
+  /** Used only when earlier charges under the key are too few to show how often it bills. */
+  cadence: SubscriptionCadence;
 }
 
 /** Links a legacy hand-typed row to a picked transaction; later charges like it keep it current. */
 export interface LinkCommitmentRequest {
   transactionId: string;
+  /** Used only when earlier charges under the key are too few to show how often it bills. */
+  cadence: SubscriptionCadence;
 }
 
 export interface SpendBucket {
