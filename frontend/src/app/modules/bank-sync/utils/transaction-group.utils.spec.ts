@@ -24,10 +24,10 @@ function tx(id: string, date: string, postedDate: string | null = date): GlobalT
 }
 
 describe('TransactionGroupUtils.dayKey', () => {
-  // A bank reports a booking day as its local midnight. In any zone ahead of UTC (Dublin is
-  // UTC+1 in October) that instant is the previous evening in UTC, so slicing the UTC text puts
-  // the row a day early. The fixture is local midnight, so the expectation holds in every zone.
-  const bankMidnight = new Date(2026, 9, 2, 0, 0, 0).toISOString();
+  // A bank reports a booking day as its local midnight: 2026-10-02 00:00 in Dublin (UTC+1) is
+  // 2026-10-01T23:00Z, so slicing the UTC text puts the row a day early. The test scripts pin
+  // TZ=Europe/Dublin so this fixture resolves to Oct 2 for the viewer.
+  const bankMidnight = '2026-10-01T23:00:00.000Z';
 
   it("keeps a bank's local midnight on its own day (booked row)", () => {
     expect(TransactionGroupUtils.dayKey(tx('atm', bankMidnight, bankMidnight))).toBe('2026-10-02');
