@@ -38,6 +38,7 @@ public class AddCommitmentCommandHandler(
         var userId = command.UserId.ToString();
         var display = string.IsNullOrWhiteSpace(command.Merchant) ? transaction.DisplayName : command.Merchant.Trim();
         var amount = command.MonthlyAmount is > 0 ? command.MonthlyAmount.Value : transaction.Amount;
+        var cadence = command.Cadence ?? SubscriptionCadences.Monthly;
 
         var existing = await repository.FindByUserAndMerchantUnscopedAsync(userId, transaction.Key, ct);
         if (existing is { Status: SubscriptionStatus.Active } && existing.Kind == command.Kind)
@@ -47,11 +48,10 @@ public class AddCommitmentCommandHandler(
         // the key, which is unique per person: the pick brings that row back instead of adding a twin.
         var item = existing ?? DetectedSubscription.CreateFromTransaction(
             userId, transaction.Key, display, amount, transaction.Currency, transaction.Date,
-            transaction.ChargeCount, command.TermCount, command.Kind,
-            transaction.Cadence ?? command.Cadence ?? SubscriptionCadences.Monthly);
+            transaction.ChargeCount, command.TermCount, command.Kind, cadence);
         existing?.TrackFromTransaction(
             transaction.Key, display, amount, transaction.Currency, transaction.Date,
-            transaction.ChargeCount, command.TermCount, null, null, command.Kind, existing.Cadence);
+            transaction.ChargeCount, command.TermCount, null, null, command.Kind, cadence);
 
         await repository.UpsertAsync(item, ct);
         return item.Id;

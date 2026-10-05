@@ -51,7 +51,7 @@ public class LinkCommitmentCommandHandler(
             item.StartDate ?? item.LastChargeDate,
             item.EndDate,
             item.Kind,
-            transaction.Cadence ?? command.Cadence ?? item.Cadence);
+            command.Cadence ?? SubscriptionCadences.Monthly);
         await repository.UpsertAsync(item, ct);
         return true;
     }

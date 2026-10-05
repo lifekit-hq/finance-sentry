@@ -384,7 +384,7 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
-    public async Task Add_ChargeHistoryShowsAYearlyGap_HistoryWinsOverTheRequestedCadence()
+    public async Task Add_StoresTheSubmittedCadenceEvenWhenHistorySuggestsAnother()
     {
         var (sut, repo) = AddHandler(Picked with { ChargeCount = 2, Cadence = SubscriptionCadences.Annual });
         DetectedSubscription? saved = null;
@@ -394,7 +394,7 @@ public class ManualCommitmentTrackingTests
         await sut.Handle(new AddCommitmentCommand(
             UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Monthly), default);
 
-        saved!.Cadence.Should().Be(SubscriptionCadences.Annual);
+        saved!.Cadence.Should().Be(SubscriptionCadences.Monthly);
     }
 
     [Fact]
@@ -409,14 +409,14 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
-    public async Task Add_RestoringAnAnnualRow_KeepsItsStoredCadence()
+    public async Task Add_RestoringARow_StoresTheSubmittedCadence()
     {
-        var existing = Tracked(new DateOnly(2025, 6, 22), cadence: SubscriptionCadences.Annual);
+        var existing = Tracked(new DateOnly(2025, 6, 22));
         existing.MarkDismissed();
-        var (sut, _) = AddHandler(Picked with { Cadence = SubscriptionCadences.Monthly }, existing);
+        var (sut, _) = AddHandler(Picked, existing);
 
         await sut.Handle(new AddCommitmentCommand(
-            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Monthly), default);
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, null, null, null, SubscriptionCadences.Annual), default);
 
         existing.Cadence.Should().Be(SubscriptionCadences.Annual);
         existing.NextExpectedDate.Should().Be(new DateOnly(2027, 6, 22));
@@ -520,14 +520,14 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
-    public async Task Link_ChargeHistoryShowsAYearlyGap_HistoryWinsOverTheRequestedCadence()
+    public async Task Link_StoresTheSubmittedCadenceEvenWhenHistorySuggestsAnother()
     {
         var legacy = Legacy(new DateOnly(2026, 1, 21));
         var (sut, _) = LinkHandler(legacy, Picked with { ChargeCount = 2, Cadence = SubscriptionCadences.Annual });
 
         await sut.Handle(new LinkCommitmentCommand(UserGuid, legacy.Id, TransactionId, SubscriptionCadences.Monthly), default);
 
-        legacy.Cadence.Should().Be(SubscriptionCadences.Annual);
+        legacy.Cadence.Should().Be(SubscriptionCadences.Monthly);
     }
 
     [Fact]

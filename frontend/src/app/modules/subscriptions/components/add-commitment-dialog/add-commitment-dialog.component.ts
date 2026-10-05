@@ -91,6 +91,7 @@ export class AddCommitmentDialogComponent {
 
   public setCadence(cadence: SubscriptionCadence): void {
     this.form.controls.cadence.setValue(cadence);
+    this.form.controls.cadence.markAsDirty();
   }
 
   /** Picking a charge pre-fills the name and amount; both stay editable. */
@@ -100,8 +101,10 @@ export class AddCommitmentDialogComponent {
       transactionId: candidate.transactionId,
       merchant: candidate.merchantName || candidate.description,
       monthlyAmount: candidate.amount,
+      cadence: DEFAULT_COMMITMENT_CADENCE,
     });
     this.form.controls.monthlyAmount.markAsPristine();
+    this.form.controls.cadence.markAsPristine();
     this.picker.loadAnchor({
       transactionId: candidate.transactionId,
       onLoaded: anchor => this.applyAnchor(anchor),
@@ -142,6 +145,9 @@ export class AddCommitmentDialogComponent {
   private applyAnchor(anchor: CommitmentAnchor): void {
     if (!this.form.controls.monthlyAmount.dirty) {
       this.form.patchValue({monthlyAmount: anchor.amount});
+    }
+    if (anchor.cadence && !this.form.controls.cadence.dirty) {
+      this.form.patchValue({cadence: anchor.cadence});
     }
   }
 }

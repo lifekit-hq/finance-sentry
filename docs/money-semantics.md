@@ -415,12 +415,12 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   the amount they confirm is what is stored): that charge's date, amount and account currency become the
   last charge, so the row is current at once instead of waiting for the daily job, and
   `OccurrenceCount` is the number of same-key charges on distinct dates up to it, so an
-  installment starts with the payments already made. Cadence is not forced to monthly: with two
-  or more same-key charges the reader infers it from the median gap between distinct charge
-  dates (a median over 200 days is annual, otherwise monthly) and that wins; with fewer, the
-  request's optional `cadence` (monthly or annual, anything else is a 400
-  `INVALID_COMMITMENT_CADENCE`) is used, defaulting to monthly, and a link falls back to the
-  row's stored cadence. A restore keeps the row's stored cadence. An installment's `StartDate`
+  installment starts with the payments already made. Cadence is not forced to monthly: the
+  reader infers it from the median gap between distinct same-key charge dates (a median over
+  200 days is annual, otherwise monthly; none with fewer than two charges) and the anchor lookup
+  returns it so the Add dialog pre-selects it, monthly when there is no history. The server
+  always stores the cadence the user submits (`cadence`, monthly or annual, anything else is a
+  400 `INVALID_COMMITMENT_CADENCE`, absent means monthly) for a new, restored or linked row. An installment's `StartDate`
   stays null on add and restore so `GetInstallmentFxImpactQuery` estimates the baseline from the
   last charge and occurrence count; a link keeps the legacy row's typed start. Adding or linking onto a key held by a dismissed,
   completed or potentially cancelled row, or a detected row of the other kind, restores that

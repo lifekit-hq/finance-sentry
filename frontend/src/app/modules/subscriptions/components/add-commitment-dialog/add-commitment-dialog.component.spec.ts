@@ -153,6 +153,38 @@ describe('AddCommitmentDialogComponent', () => {
     });
   });
 
+  it('pre-selects the cadence read from the charge history', () => {
+    const {component, close} = setup(
+      undefined,
+      of({amount: LATEST_AMOUNT, currency: 'EUR', date: '2026-10-05', chargeCount: 2, cadence: 'annual'})
+    );
+    component.pick(CANDIDATE);
+    expect(component.form.controls.cadence.value).toBe('annual');
+    component.submit();
+    expect(close).toHaveBeenCalledWith(expect.objectContaining({cadence: 'annual'}));
+  });
+
+  it('keeps monthly when the history has too few charges to tell', () => {
+    const {component} = setup();
+    component.pick(CANDIDATE);
+    expect(component.form.controls.cadence.value).toBe('monthly');
+  });
+
+  it('keeps a cadence the user chose before the history arrived', () => {
+    const lookup = new Subject<unknown>();
+    const {component} = setup(undefined, lookup);
+    component.pick(CANDIDATE);
+    component.setCadence('monthly');
+    lookup.next({
+      amount: LATEST_AMOUNT,
+      currency: 'EUR',
+      date: '2026-10-05',
+      chargeCount: 2,
+      cadence: 'annual',
+    });
+    expect(component.form.controls.cadence.value).toBe('monthly');
+  });
+
   it('carries the chosen yearly cadence', () => {
     const {component, close} = setup();
     component.pick(CANDIDATE);
