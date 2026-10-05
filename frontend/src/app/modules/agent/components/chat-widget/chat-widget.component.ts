@@ -1,8 +1,10 @@
+import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {NavigationEnd, Router} from '@angular/router';
 import {
   ChatComponent,
+  CMN_MEDIA_MD,
   type CmnChatStreamFn,
   IconComponent,
   type LucideIconName,
@@ -29,10 +31,19 @@ export class ChatWidgetComponent {
     {initialValue: this.router.url}
   );
 
+  private readonly breakpoints = inject(BreakpointObserver);
+  // The shared layout swaps the sidebar for the bottom tab bar below md; the FAB is desktop-only.
+  private readonly isDesktop = toSignal(
+    this.breakpoints.observe(CMN_MEDIA_MD).pipe(map(state => state.matches)),
+    {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
+  );
+
   public readonly store = inject(AgentChatStore);
   public readonly isOpen = signal(false);
   // The full-page Ledger already hosts a chat — the floating widget would be redundant there.
-  public readonly isHidden = computed(() => this.routerUrl().startsWith(AppRoute.Ledger));
+  public readonly isHidden = computed(
+    () => !this.isDesktop() || this.routerUrl().startsWith(AppRoute.Ledger)
+  );
 
   protected readonly openIcon: LucideIconName = 'Sparkles';
   protected readonly closeIcon: LucideIconName = 'X';
