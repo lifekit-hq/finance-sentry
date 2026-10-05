@@ -86,8 +86,21 @@ public sealed class BrokerageController(
     public async Task<IActionResult> ConnectFlex([FromBody] ConnectIbkrFlexRequest request, CancellationToken ct)
     {
         await flexConnector.ConnectAsync(
-            User.RequireUserId(), new ConnectIbkrFlexArtifacts(request.Token, request.QueryId), ct);
+            User.RequireUserId(), new ConnectIbkrFlexArtifacts(request.Token.Trim(), request.QueryId.Trim()), ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Runs the entered Flex token + query id against IBKR without saving anything and returns
+    /// the account id and what the query contained, so the user can confirm before connecting.
+    /// </summary>
+    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
+    [HttpPost("ibkr/flex/validate")]
+    public async Task<IActionResult> ValidateFlex([FromBody] ConnectIbkrFlexRequest request, CancellationToken ct)
+    {
+        var preview = await flexConnector.PreviewAsync(
+            User.RequireUserId(), new ConnectIbkrFlexArtifacts(request.Token.Trim(), request.QueryId.Trim()), ct);
+        return Ok(preview);
     }
 
     /// <summary>Clears the caller's IBKR Flex credential. 404s if none is active.</summary>

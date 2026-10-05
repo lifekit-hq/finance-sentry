@@ -7,30 +7,51 @@ import {IbkrConnectStrategy} from './ibkr.strategy';
 
 describe('IbkrConnectStrategy', () => {
   let strategy: IbkrConnectStrategy;
-  let ibkr: {connect: ReturnType<typeof vi.fn>};
+  let ibkr: {connect: ReturnType<typeof vi.fn>; connectFlex: ReturnType<typeof vi.fn>};
 
   beforeEach(() => {
-    ibkr = {connect: vi.fn()};
+    ibkr = {connect: vi.fn(), connectFlex: vi.fn()};
     TestBed.configureTestingModule({
       providers: [{provide: IBKRService, useValue: ibkr}, IbkrConnectStrategy],
     });
     strategy = TestBed.inject(IbkrConnectStrategy);
   });
 
-  it('forwards the username/password payload to IBKRService.connect', () => {
+  const oauth = {
+    consumerKey: 'FINSENTRY',
+    accessToken: 'a',
+    accessTokenSecret: 's',
+    signatureKey: 'sig',
+    encryptionKey: 'enc',
+    dhParam: 'dh',
+  };
+
+  it('forwards the OAuth payload to IBKRService.connect', () => {
     ibkr.connect.mockReturnValue(of({holdingsCount: 4, accountId: 'DU123', connectedAt: 'now'}));
-    const payload = {username: 'ibkr-user', password: 'ibkr-pass'};
 
-    strategy.submit(payload).subscribe();
+    strategy.submit({kind: 'oauth', payload: oauth}).subscribe();
 
-    expect(ibkr.connect).toHaveBeenCalledWith(payload);
+    expect(ibkr.connect).toHaveBeenCalledWith(oauth);
+    expect(ibkr.connectFlex).not.toHaveBeenCalled();
   });
 
-  it('maps the holdingsCount into a broker/CONNECTED outcome', () => {
+  it('maps the OAuth holdingsCount into a broker/CONNECTED outcome', () => {
     ibkr.connect.mockReturnValue(of({holdingsCount: 4, accountId: 'DU123', connectedAt: 'now'}));
     let outcome: unknown;
-    strategy.submit({username: 'u', password: 'p'}).subscribe(o => (outcome = o));
+    strategy.submit({kind: 'oauth', payload: oauth}).subscribe(o => (outcome = o));
     expect(outcome).toEqual({successCode: 'CONNECTED', count: 4, institutionType: 'broker'});
+  });
+
+  it('forwards the Flex pair to IBKRService.connectFlex and reports a broker/CONNECTED outcome', () => {
+    ibkr.connectFlex.mockReturnValue(of(undefined));
+    const payload = {token: 'tok', queryId: '123456'};
+    let outcome: unknown;
+
+    strategy.submit({kind: 'flex', payload}).subscribe(o => (outcome = o));
+
+    expect(ibkr.connectFlex).toHaveBeenCalledWith(payload);
+    expect(ibkr.connect).not.toHaveBeenCalled();
+    expect(outcome).toEqual({successCode: 'CONNECTED', count: 0, institutionType: 'broker'});
   });
 
   it('exposes slug "ibkr"', () => {

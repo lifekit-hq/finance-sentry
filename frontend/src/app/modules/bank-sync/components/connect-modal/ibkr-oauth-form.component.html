@@ -1,0 +1,92 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-cmn-6">
+  <cmn-form-field
+    [control]="form.controls.consumerKey"
+    label="Consumer key"
+    hint="The 9-character key you chose on IBKR's self-service OAuth portal."
+  >
+    <cmn-input formControlName="consumerKey" type="text" placeholder="e.g. FINSENTRY" />
+  </cmn-form-field>
+
+  <cmn-form-field [control]="form.controls.accessToken" label="Access token">
+    <cmn-input
+      formControlName="accessToken"
+      type="text"
+      placeholder="Access token from the portal"
+    />
+  </cmn-form-field>
+
+  <cmn-form-field
+    [control]="form.controls.accessTokenSecret"
+    label="Access token secret"
+    hint="Shown only once on the portal. Stored encrypted at rest."
+  >
+    <cmn-input
+      formControlName="accessTokenSecret"
+      type="password"
+      placeholder="Access token secret"
+    />
+  </cmn-form-field>
+
+  <cmn-form-field
+    [control]="form.controls.signatureKey"
+    label="Signature key (private_signature.pem)"
+    hint="RSA key that signs the daily session-token request."
+  >
+    <input
+      (change)="onFileSelected($event, 'signatureKey')"
+      type="file"
+      accept=".pem"
+      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
+    />
+  </cmn-form-field>
+
+  <cmn-form-field
+    [control]="form.controls.encryptionKey"
+    label="Encryption key (private_encryption.pem)"
+    hint="RSA key that decrypts the access token secret."
+  >
+    <input
+      (change)="onFileSelected($event, 'encryptionKey')"
+      type="file"
+      accept=".pem"
+      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
+    />
+  </cmn-form-field>
+
+  <cmn-form-field
+    [control]="form.controls.dhParam"
+    label="DH parameters (dhparam.pem)"
+    hint="Diffie-Hellman parameters seeding the session-token exchange."
+  >
+    <input
+      (change)="onFileSelected($event, 'dhParam')"
+      type="file"
+      accept=".pem"
+      class="text-cmn-sm file:mr-cmn-3 file:rounded-cmn-md file:border-0 file:bg-cmn-surface-raised file:px-cmn-3 file:py-cmn-1"
+    />
+  </cmn-form-field>
+
+  @if (showsError()) {
+    @if (isDuplicateError()) {
+      <cmn-alert variant="error">
+        <div class="flex flex-col gap-cmn-2">
+          <span>{{ store.errorMessage() }}</span>
+          <cmn-button (clicked)="disconnectExisting()" variant="secondary" size="sm">
+            Disconnect existing
+          </cmn-button>
+        </div>
+      </cmn-alert>
+    } @else if (store.errorMessage()) {
+      <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
+    }
+  }
+
+  <cmn-button
+    [loading]="store.isBusy()"
+    [disabled]="form.invalid || store.isBusy()"
+    variant="secondary"
+    type="submit"
+  >
+    Connect with OAuth
+  </cmn-button>
+</form>
