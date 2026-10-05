@@ -29,7 +29,9 @@ public class LinkCommitmentCommandHandler(
         if (item.IsTracked)
             throw new CommitmentAlreadyLinkedException();
 
-        var transaction = await transactions.FindAsync(command.UserId, command.TransactionId, ct)
+        var transaction = (item.Kind == SubscriptionKinds.Installment
+                ? await transactions.FindInstallmentAsync(command.UserId, command.TransactionId, ct)
+                : await transactions.FindAsync(command.UserId, command.TransactionId, ct))
             ?? throw new CommitmentTransactionNotFoundException();
 
         var holder = await repository.FindByUserAndMerchantUnscopedAsync(userId, transaction.Key, ct);

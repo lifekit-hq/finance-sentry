@@ -8,6 +8,7 @@ import {
   type CommitmentAnchor,
   type CommitmentCandidate,
 } from '../../models/commitment-candidate/commitment-candidate.model';
+import {type SubscriptionKind} from '../../models/subscription/subscription.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
 import {SubscriptionsService} from '../../services/subscriptions.service';
 
@@ -41,10 +42,14 @@ export function commitmentPickerEffects(store: EffectsStore) {
 
   return {
     load,
-    loadAnchor: rxMethod<{transactionId: string; onLoaded: (anchor: CommitmentAnchor) => void}>(
+    loadAnchor: rxMethod<{
+      transactionId: string;
+      kind: SubscriptionKind;
+      onLoaded: (anchor: CommitmentAnchor) => void;
+    }>(
       pipe(
-        switchMap(({transactionId, onLoaded}) =>
-          subscriptions.getCommitmentAnchor(transactionId).pipe(
+        switchMap(({transactionId, kind, onLoaded}) =>
+          subscriptions.getCommitmentAnchor(transactionId, kind).pipe(
             tap(anchor => {
               store.setAnchor(anchor);
               onLoaded(anchor);

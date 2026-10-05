@@ -69,7 +69,9 @@ export class AddCommitmentDialogComponent {
   public readonly searchControl = new FormControl('', {nonNullable: true});
 
   public readonly form = new FormGroup({
-    kind: new FormControl<SubscriptionKind>('subscription', {nonNullable: true}),
+    kind: new FormControl<SubscriptionKind>(this.data?.kind ?? 'subscription', {
+      nonNullable: true,
+    }),
     cadence: new FormControl<SubscriptionCadence>(DEFAULT_COMMITMENT_CADENCE, {nonNullable: true}),
     transactionId: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
     merchant: new FormControl('', {nonNullable: true, validators: [Validators.required]}),
@@ -87,6 +89,10 @@ export class AddCommitmentDialogComponent {
 
   public setKind(kind: SubscriptionKind): void {
     this.form.controls.kind.setValue(kind);
+    const transactionId = this.form.controls.transactionId.value;
+    if (transactionId) {
+      this.loadAnchor(transactionId);
+    }
   }
 
   public setCadence(cadence: SubscriptionCadence): void {
@@ -105,10 +111,7 @@ export class AddCommitmentDialogComponent {
     });
     this.form.controls.monthlyAmount.markAsPristine();
     this.form.controls.cadence.markAsPristine();
-    this.picker.loadAnchor({
-      transactionId: candidate.transactionId,
-      onLoaded: anchor => this.applyAnchor(anchor),
-    });
+    this.loadAnchor(candidate.transactionId);
   }
 
   public submit(): void {
@@ -140,6 +143,14 @@ export class AddCommitmentDialogComponent {
 
   public cancel(): void {
     this.dialogRef.close();
+  }
+
+  private loadAnchor(transactionId: string): void {
+    this.picker.loadAnchor({
+      transactionId,
+      kind: this.form.controls.kind.value,
+      onLoaded: anchor => this.applyAnchor(anchor),
+    });
   }
 
   private applyAnchor(anchor: CommitmentAnchor): void {

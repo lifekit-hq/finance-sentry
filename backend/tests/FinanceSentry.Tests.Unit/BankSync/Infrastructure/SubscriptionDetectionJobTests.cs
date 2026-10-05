@@ -89,11 +89,15 @@ public class SubscriptionDetectionJobTests
         await new SubscriptionDetectionJob(db, _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
-        var expectedKey = CommitmentKeyResolver.Resolve("Acme Hosting", "ACME HOSTING", 16.19m, null);
+        var merchantKey = CommitmentKeyResolver.Resolve("Acme Hosting", "ACME HOSTING", 16.19m, null);
+        var installmentKey = InstallmentPlanRecognizer.PlanKey(merchantKey, 16.19m);
         _results.Verify(r => r.TrackManualCommitmentsAsync(
             user.ToString(),
             It.Is<IReadOnlyList<CommitmentCharge>>(c =>
-                c.Count == 2 && c.All(x => x.Key == expectedKey && x.Amount == 16.19m && x.Currency == "EUR")),
+                c.Count == 4
+                && c.Count(x => x.Key == merchantKey) == 2
+                && c.Count(x => x.Key == installmentKey) == 2
+                && c.All(x => x.Amount == 16.19m && x.Currency == "EUR")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

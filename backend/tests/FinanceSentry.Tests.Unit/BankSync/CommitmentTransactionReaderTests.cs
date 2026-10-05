@@ -178,4 +178,59 @@ public class CommitmentTransactionReaderTests
 
         result.Should().BeNull();
     }
+
+    [Fact]
+    public async Task FindInstallmentAsync_StartsFromSameAmountChargesNotEveryPurchaseAtTheMerchant()
+    {
+        var earlier = new[]
+        {
+            Charge(new DateTime(2026, 1, 5), merchant: "Apple Store", tweak: t => t.Amount = 35m),
+            Charge(new DateTime(2026, 2, 5), merchant: "Apple Store", tweak: t => t.Amount = 12m),
+            Charge(new DateTime(2026, 3, 5), merchant: "Apple Store", tweak: t => t.Amount = 80m),
+            Charge(new DateTime(2026, 4, 5), merchant: "Apple Store", tweak: t => t.Amount = 9m),
+        };
+        var picked = Charge(new DateTime(2026, 5, 5), merchant: "Apple Store", tweak: t => t.Amount = 600m);
+        var unrelatedLater = Charge(new DateTime(2026, 6, 1), merchant: "Apple Store", tweak: t => t.Amount = 20m);
+        var reader = Reader(picked, [.. earlier, picked, unrelatedLater]);
+
+        var installment = await reader.FindInstallmentAsync(UserId, Guid.NewGuid());
+        var subscription = await reader.FindAsync(UserId, Guid.NewGuid());
+
+        installment!.Key.Should().Be("installment:apple store:600");
+        installment.ChargeCount.Should().Be(1);
+        installment.Amount.Should().Be(600m);
+        installment.Date.Should().Be(new DateOnly(2026, 5, 5));
+        subscription!.Key.Should().Be("apple store");
+        subscription.ChargeCount.Should().Be(6);
+    }
+
+    [Fact]
+    public async Task FindInstallmentAsync_CountsOnlyChargesOfTheRoundedSameAmount()
+    {
+        var first = Charge(new DateTime(2026, 1, 5), merchant: "Apple Store", tweak: t => t.Amount = 600.2m);
+        var picked = Charge(new DateTime(2026, 2, 5), merchant: "Apple Store", tweak: t => t.Amount = 599.8m);
+        var other = Charge(new DateTime(2026, 3, 5), merchant: "Apple Store", tweak: t => t.Amount = 700m);
+
+        var result = await Reader(picked, first, picked, other).FindInstallmentAsync(UserId, Guid.NewGuid());
+
+        result!.ChargeCount.Should().Be(2);
+        result.Key.Should().Be("installment:apple store:600");
+    }
+
+    [Fact]
+    public async Task FindInstallmentAsync_RecognizedPlanRepayment_KeepsItsPlanKey()
+    {
+        var picked = Charge(
+            new DateTime(2026, 2, 5),
+            merchant: "Rozetka",
+            tweak: t =>
+            {
+                t.Description = "Погашення наступного платежу Rozetka";
+                t.Amount = 1200m;
+            });
+
+        var result = await Reader(picked, picked).FindInstallmentAsync(UserId, Guid.NewGuid());
+
+        result!.Key.Should().Be("installment:rozetka:1200");
+    }
 }

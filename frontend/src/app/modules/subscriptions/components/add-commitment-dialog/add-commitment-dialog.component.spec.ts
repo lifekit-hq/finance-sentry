@@ -24,25 +24,24 @@ const LATEST_AMOUNT = 12.99;
 
 function setup(data?: CommitmentDialogData, anchor$: Observable<unknown> | null = null) {
   const close = vi.fn();
+  const getCommitmentAnchor = vi.fn(
+    () =>
+      anchor$ ??
+      of({
+        amount: CANDIDATE.amount,
+        currency: 'EUR',
+        date: '2026-09-21',
+        chargeCount: 1,
+        cadence: null,
+      })
+  );
   TestBed.configureTestingModule({
     providers: [
       {provide: DialogRef, useValue: {close}},
       {provide: CMN_DIALOG_DATA, useValue: data},
       {
         provide: SubscriptionsService,
-        useValue: {
-          getCommitmentAnchor: vi.fn(
-            () =>
-              anchor$ ??
-              of({
-                amount: CANDIDATE.amount,
-                currency: 'EUR',
-                date: '2026-09-21',
-                chargeCount: 1,
-                cadence: null,
-              })
-          ),
-        },
+        useValue: {getCommitmentAnchor},
       },
       {
         provide: CommitmentCandidatesService,
@@ -57,6 +56,7 @@ function setup(data?: CommitmentDialogData, anchor$: Observable<unknown> | null 
   return {
     component: TestBed.createComponent(AddCommitmentDialogComponent).componentInstance,
     close,
+    getCommitmentAnchor,
   };
 }
 
@@ -87,6 +87,27 @@ describe('AddCommitmentDialogComponent', () => {
     component.pick(CANDIDATE);
     expect(component.form.controls.monthlyAmount.value).toBe(LATEST_AMOUNT);
     expect(component.picker.anchor()?.amount).toBe(LATEST_AMOUNT);
+  });
+
+  it('reads the anchor for the kind being added', () => {
+    const {component, getCommitmentAnchor} = setup();
+    component.setKind('installment');
+    component.pick(CANDIDATE);
+    expect(getCommitmentAnchor).toHaveBeenCalledWith('tx-1', 'installment');
+  });
+
+  it('re-reads the anchor when the kind changes after a pick', () => {
+    const {component, getCommitmentAnchor} = setup();
+    component.pick(CANDIDATE);
+    expect(getCommitmentAnchor).toHaveBeenLastCalledWith('tx-1', 'subscription');
+    component.setKind('installment');
+    expect(getCommitmentAnchor).toHaveBeenLastCalledWith('tx-1', 'installment');
+  });
+
+  it('does not read an anchor on a kind change before a pick', () => {
+    const {component, getCommitmentAnchor} = setup();
+    component.setKind('installment');
+    expect(getCommitmentAnchor).not.toHaveBeenCalled();
   });
 
   it('keeps an amount the user edited before the latest charge arrived', () => {
@@ -200,6 +221,12 @@ describe('AddCommitmentDialogComponent', () => {
     component.form.patchValue({merchant: '', monthlyAmount: null});
     component.submit();
     expect(close).toHaveBeenCalledWith({transactionId: 'tx-1', cadence: 'monthly'});
+  });
+
+  it('reads the anchor for the kind of the row being linked', () => {
+    const {component, getCommitmentAnchor} = setup({linkTo: 'Apple Store', kind: 'installment'});
+    component.pick(CANDIDATE);
+    expect(getCommitmentAnchor).toHaveBeenCalledWith('tx-1', 'installment');
   });
 
   it('links with the chosen cadence', () => {

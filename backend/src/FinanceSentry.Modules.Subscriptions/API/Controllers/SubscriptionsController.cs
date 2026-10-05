@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Subscriptions.API.Controllers;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.API.Responses;
 using FinanceSentry.Modules.Subscriptions.Application.Commands;
 using FinanceSentry.Modules.Subscriptions.Application.Queries;
@@ -59,10 +60,13 @@ public class SubscriptionsController(
     /// row anchors on; the Add dialog pre-fills its amount from it.
     /// </summary>
     [HttpGet("candidates/{transactionId:guid}")]
-    public async Task<IActionResult> GetCommitmentAnchor(Guid transactionId, CancellationToken ct = default)
+    public async Task<IActionResult> GetCommitmentAnchor(
+        Guid transactionId,
+        [FromQuery] string kind = SubscriptionKinds.Subscription,
+        CancellationToken ct = default)
     {
         var result = await getCommitmentAnchor.Handle(
-            new GetCommitmentAnchorQuery(User.RequireUserId(), transactionId), ct);
+            new GetCommitmentAnchorQuery(User.RequireUserId(), transactionId, kind), ct);
         return Ok(result);
     }
 

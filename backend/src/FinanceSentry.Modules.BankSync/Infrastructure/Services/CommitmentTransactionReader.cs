@@ -8,20 +8,27 @@ public class CommitmentTransactionReader(
     IBankAccountRepository accounts,
     ITransactionRepository transactions) : ICommitmentTransactionReader
 {
-    public async Task<CommitmentTransaction?> FindAsync(Guid userId, Guid transactionId, CancellationToken ct = default)
+    public Task<CommitmentTransaction?> FindAsync(Guid userId, Guid transactionId, CancellationToken ct = default) =>
+        ReadAsync(userId, transactionId, CommitmentKeyResolver.Resolve, ct);
+
+    public Task<CommitmentTransaction?> FindInstallmentAsync(Guid userId, Guid transactionId, CancellationToken ct = default) =>
+        ReadAsync(userId, transactionId, InstallmentCommitmentKey.Resolve, ct);
+
+    private async Task<CommitmentTransaction?> ReadAsync(
+        Guid userId, Guid transactionId, Func<string?, string?, decimal, int?, string> keyOf, CancellationToken ct)
     {
         var transaction = await transactions.GetByIdAsync(transactionId, ct);
         if (transaction is null || transaction.UserId != userId || !transaction.IsActive)
             return null;
 
-        var key = CommitmentKeyResolver.Resolve(transaction.MerchantName, transaction.Description, transaction.Amount, transaction.Mcc);
+        var key = keyOf(transaction.MerchantName, transaction.Description, transaction.Amount, transaction.Mcc);
 
         var charges = (await transactions.GetByUserIdAsync(userId, ct))
             .Where(t => t.IsActive
                      && !t.IsPending
                      && t.Amount != 0m
                      && (t.TransactionType == null || t.TransactionType == "debit")
-                     && CommitmentKeyResolver.Resolve(t.MerchantName, t.Description, t.Amount, t.Mcc) == key)
+                     && keyOf(t.MerchantName, t.Description, t.Amount, t.Mcc) == key)
             .Append(transaction)
             .ToList();
         var latest = charges.MaxBy(t => t.TransactionDate)!;

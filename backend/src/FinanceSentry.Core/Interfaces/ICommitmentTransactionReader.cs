@@ -12,6 +12,12 @@ public interface ICommitmentTransactionReader
     /// request path, so it reads under the Owner query filter.
     /// </summary>
     Task<CommitmentTransaction?> FindAsync(Guid userId, Guid transactionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The same read for an installment: keyed by merchant and the picked charge's amount, so the
+    /// charge count, latest charge and cadence cover only charges of that amount.
+    /// </summary>
+    Task<CommitmentTransaction?> FindInstallmentAsync(Guid userId, Guid transactionId, CancellationToken ct = default);
 }
 
 /// <param name="Key">

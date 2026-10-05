@@ -89,8 +89,8 @@ describe('commitmentPickerEffects', () => {
   it('loadAnchor: stores the latest charge and hands it to the caller', () => {
     const {subscriptions, store, effects} = setup(of(PAGE));
     const onLoaded = vi.fn();
-    effects.loadAnchor({transactionId: 'tx-1', onLoaded});
-    expect(subscriptions.getCommitmentAnchor).toHaveBeenCalledWith('tx-1');
+    effects.loadAnchor({transactionId: 'tx-1', kind: 'installment', onLoaded});
+    expect(subscriptions.getCommitmentAnchor).toHaveBeenCalledWith('tx-1', 'installment');
     expect(store.setAnchor).toHaveBeenCalledWith(ANCHOR);
     expect(onLoaded).toHaveBeenCalledWith(ANCHOR);
   });
@@ -101,7 +101,7 @@ describe('commitmentPickerEffects', () => {
       throwError(() => new HttpErrorResponse({status: 404}))
     );
     const onLoaded = vi.fn();
-    effects.loadAnchor({transactionId: 'tx-1', onLoaded});
+    effects.loadAnchor({transactionId: 'tx-1', kind: 'subscription', onLoaded});
     expect(store.setAnchor).not.toHaveBeenCalled();
     expect(onLoaded).not.toHaveBeenCalled();
   });

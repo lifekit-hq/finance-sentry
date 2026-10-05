@@ -114,11 +114,11 @@ export class SubscriptionsComponent {
       });
   }
 
-  public openLink(item: Pick<Subscription, 'id' | 'merchantName'>): void {
+  public openLink(item: Pick<Subscription, 'id' | 'merchantName' | 'kind'>): void {
     this.dialog
       .open<LinkCommitmentRequest>(AddCommitmentDialogComponent, {
         title: `Link ${item.merchantName} to a transaction`,
-        data: {linkTo: item.merchantName} satisfies CommitmentDialogData,
+        data: {linkTo: item.merchantName, kind: item.kind} satisfies CommitmentDialogData,
         size: 'md',
         viewContainerRef: this.viewContainerRef,
       })

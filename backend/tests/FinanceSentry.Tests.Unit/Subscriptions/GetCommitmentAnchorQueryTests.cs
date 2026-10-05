@@ -12,10 +12,13 @@ public class GetCommitmentAnchorQueryTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid TransactionId = Guid.NewGuid();
 
-    private static GetCommitmentAnchorQueryHandler Handler(CommitmentTransaction? transaction)
+    private static GetCommitmentAnchorQueryHandler Handler(
+        CommitmentTransaction? transaction, CommitmentTransaction? installment = null)
     {
         var reader = new Mock<ICommitmentTransactionReader>();
         reader.Setup(r => r.FindAsync(UserId, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
+        reader.Setup(r => r.FindInstallmentAsync(UserId, TransactionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(installment);
         return new GetCommitmentAnchorQueryHandler(reader.Object);
     }
 
@@ -32,6 +35,22 @@ public class GetCommitmentAnchorQueryTests
         result.Date.Should().Be(new DateOnly(2026, 9, 5));
         result.ChargeCount.Should().Be(3);
         result.Cadence.Should().Be(SubscriptionCadences.Monthly);
+    }
+
+    [Fact]
+    public async Task Handle_InstallmentKind_ReadsOnlySameAmountCharges()
+    {
+        var subscription = new CommitmentTransaction(
+            "apple store", "Apple Store", 20m, "EUR", new DateOnly(2026, 6, 1), 6, SubscriptionCadences.Monthly);
+        var installment = new CommitmentTransaction(
+            "installment:apple store:600", "Apple Store", 600m, "EUR", new DateOnly(2026, 5, 5), 1, null);
+
+        var result = await Handler(subscription, installment)
+            .Handle(new GetCommitmentAnchorQuery(UserId, TransactionId, SubscriptionKinds.Installment), default);
+
+        result.Amount.Should().Be(600m);
+        result.ChargeCount.Should().Be(1);
+        result.Date.Should().Be(new DateOnly(2026, 5, 5));
     }
 
     [Fact]

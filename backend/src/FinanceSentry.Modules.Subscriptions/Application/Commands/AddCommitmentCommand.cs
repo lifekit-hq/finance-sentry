@@ -32,7 +32,9 @@ public class AddCommitmentCommandHandler(
         if (command.Cadence is not null && !SubscriptionCadences.IsValid(command.Cadence))
             throw new InvalidCommitmentCadenceException();
 
-        var transaction = await transactions.FindAsync(command.UserId, command.TransactionId, ct)
+        var transaction = (command.Kind == SubscriptionKinds.Installment
+                ? await transactions.FindInstallmentAsync(command.UserId, command.TransactionId, ct)
+                : await transactions.FindAsync(command.UserId, command.TransactionId, ct))
             ?? throw new CommitmentTransactionNotFoundException();
 
         var userId = command.UserId.ToString();

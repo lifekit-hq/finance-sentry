@@ -155,6 +155,33 @@ public class ManualCommitmentTrackingTests
     }
 
     [Fact]
+    public async Task TrackManualCommitments_InstallmentRowAdvancesOnlyOnItsOwnAmount()
+    {
+        const string planKey = "installment:apple store:600";
+        var row = DetectedSubscription.CreateFromTransaction(
+            UserId, planKey, "Apple Store", 600m, "EUR", Today.AddDays(-70), 1, 12, SubscriptionKinds.Installment,
+            SubscriptionCadences.Monthly);
+        var (sut, repo) = ResultService(row);
+
+        await sut.TrackManualCommitmentsAsync(UserId,
+        [
+            new CommitmentCharge("apple store", Today.AddDays(-40), 20m, "EUR"),
+            new CommitmentCharge("installment:apple store:20", Today.AddDays(-40), 20m, "EUR"),
+            new CommitmentCharge("apple store", Today.AddDays(-10), 600m, "EUR"),
+        ]);
+
+        row.OccurrenceCount.Should().Be(1);
+        row.LastChargeDate.Should().Be(Today.AddDays(-70));
+        repo.Verify(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        await sut.TrackManualCommitmentsAsync(UserId,
+            [new CommitmentCharge(planKey, Today.AddDays(-10), 600m, "EUR")]);
+
+        row.OccurrenceCount.Should().Be(2);
+        row.LastChargeDate.Should().Be(Today.AddDays(-10));
+    }
+
+    [Fact]
     public async Task TrackManualCommitments_LeavesLegacyHandTypedRowAlone()
     {
         var legacy = Legacy(Today.AddDays(-70));
@@ -203,6 +230,7 @@ public class ManualCommitmentTrackingTests
             .ReturnsAsync(existing);
         var reader = new Mock<ICommitmentTransactionReader>();
         reader.Setup(r => r.FindAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
+        reader.Setup(r => r.FindInstallmentAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
         return (new AddCommitmentCommandHandler(repo.Object, reader.Object), repo);
     }
 
@@ -469,6 +497,7 @@ public class ManualCommitmentTrackingTests
             .ReturnsAsync(holder);
         var reader = new Mock<ICommitmentTransactionReader>();
         reader.Setup(r => r.FindAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
+        reader.Setup(r => r.FindInstallmentAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
         return (new LinkCommitmentCommandHandler(repo.Object, reader.Object), repo);
     }
 

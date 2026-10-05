@@ -5,14 +5,16 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Subscriptions.API.Responses;
 using FinanceSentry.Modules.Subscriptions.Domain.Exceptions;
 
-public record GetCommitmentAnchorQuery(Guid UserId, Guid TransactionId) : IQuery<CommitmentAnchorResponse>;
+public record GetCommitmentAnchorQuery(Guid UserId, Guid TransactionId, string Kind = SubscriptionKinds.Subscription) : IQuery<CommitmentAnchorResponse>;
 
 public class GetCommitmentAnchorQueryHandler(ICommitmentTransactionReader transactions)
     : IQueryHandler<GetCommitmentAnchorQuery, CommitmentAnchorResponse>
 {
     public async Task<CommitmentAnchorResponse> Handle(GetCommitmentAnchorQuery request, CancellationToken cancellationToken)
     {
-        var transaction = await transactions.FindAsync(request.UserId, request.TransactionId, cancellationToken)
+        var transaction = (request.Kind == SubscriptionKinds.Installment
+                ? await transactions.FindInstallmentAsync(request.UserId, request.TransactionId, cancellationToken)
+                : await transactions.FindAsync(request.UserId, request.TransactionId, cancellationToken))
             ?? throw new CommitmentTransactionNotFoundException();
 
         return new CommitmentAnchorResponse(

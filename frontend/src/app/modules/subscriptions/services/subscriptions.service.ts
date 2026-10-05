@@ -6,6 +6,7 @@ import {type CommitmentAnchor} from '../models/commitment-candidate/commitment-c
 import {
   type AddCommitmentRequest,
   type LinkCommitmentRequest,
+  type SubscriptionKind,
   type SubscriptionsListResponse,
   type SubscriptionSummary,
 } from '../models/subscription/subscription.model';
@@ -27,8 +28,11 @@ export class SubscriptionsService extends ApiService {
     return this.get<SubscriptionSummary>('summary');
   }
 
-  public getCommitmentAnchor(transactionId: string): Observable<CommitmentAnchor> {
-    return this.get<CommitmentAnchor>(`candidates/${transactionId}`);
+  public getCommitmentAnchor(
+    transactionId: string,
+    kind: SubscriptionKind
+  ): Observable<CommitmentAnchor> {
+    return this.get<CommitmentAnchor>(`candidates/${transactionId}`, {kind});
   }
 
   public dismiss(id: string): Observable<void> {
