@@ -143,6 +143,13 @@ workflow, external service, bot, or secret — updates that catalog in the same
 change** (companion PR to lifekit-dashboard). `creds` entries name where a
 secret lives, never its value.
 
+## Platform first
+
+Use the framework's or platform's standard mechanism before writing a bespoke one, and name the mechanism in the PR. Already in use here, so never reimplement:
+
+- **Backend**: ASP.NET Core Identity (users, roles, claims, lockout); the stock JwtBearer handler and authorization policies; Options binding (`Configure<T>(config.GetSection(...))`); FluentValidation (Auth command validators) and DataAnnotations (BankSync request validators); EF Core migrations; Hangfire jobs; the YARP gateway (`FinanceSentry.Gateway`).
+- **Frontend**: Angular router (`provideRouter`); reactive forms; functional HTTP interceptors (`authInterceptor`); signals; `@ngrx/signals` stores.
+
 ## Collaboration Style
 
 - Responses must be short and direct. No trailing summaries — Denys can read the diff.
