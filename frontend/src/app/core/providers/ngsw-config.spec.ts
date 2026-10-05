@@ -26,8 +26,8 @@ const BUILD_OUTPUT = [
   '/manifest.webmanifest',
   '/main-ABC123.js',
   '/styles-DEF456.css',
-  '/icons/icon-192.png',
-  '/icons/apple-touch-icon.png',
+  '/icon-192.png',
+  '/apple-touch-icon.png',
   '/api/v1/accounts.png',
   '/api/v1/portfolio.js',
 ];

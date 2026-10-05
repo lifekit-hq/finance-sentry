@@ -5,9 +5,13 @@
     <title>Finance Sentry</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <link rel="icon" href="data:," />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1120" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <!-- The CSP admits this inline script by its sha256 (docker/nginx.security-headers.conf):
          any edit to it, whitespace included, needs the new hash there or the browser blocks it. -->
     <script>
@@ -22,7 +26,6 @@
         document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>
-    <meta name="theme-color" content="#4f46e5" />
     <!-- Installed iOS PWA: draw under the status bar instead of an opaque system band above the app. -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
