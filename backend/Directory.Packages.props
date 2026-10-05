@@ -52,7 +52,7 @@
     <PackageVersion Include="Hangfire.InMemory" Version="1.0.0" />
 
     <!-- Off-host backups (feature 024): Cloudflare R2 via the S3-compatible API -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.103.4" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.1" />
 
     <!-- Serilog -->
     <PackageVersion Include="Serilog" Version="4.4.0" />
@@ -96,7 +96,7 @@
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
 
     <!-- HTML parsing (companion data layer — MarketBeat / TrendForce) -->
-    <PackageVersion Include="AngleSharp" Version="1.8.2" />
+    <PackageVersion Include="AngleSharp" Version="1.8.3" />
 
     <!-- MCP -->
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
