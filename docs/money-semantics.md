@@ -416,11 +416,12 @@ and ask it; none of them re-derives a rule. An outflow is **committed** when ANY
   installment starts with the payments already made. Adding or linking onto a key held by a dismissed,
   completed or potentially cancelled row, or a detected row of the other kind, restores that
   row from the pick (`DetectedSubscription.TrackFromTransaction`); only an active row of the
-  same kind answers 409, naming that row. Rule (a) still claims its debits:
-  `CommittedOutflowPolicy.LoadForUserAsync` separately reads active manual rows' display names
+  same kind answers 409, naming that row. Rule (a) still claims a legacy row's debits:
+  `CommittedOutflowPolicy.LoadForUserAsync` separately reads active legacy rows' display names
   via `IActiveSubscriptionsReader.GetActiveManualCommitmentMerchantNamesAsync` and folds
   `MerchantNameNormalizer.NormalizeDetectionKey(name, null)` for each into the same key set rule
-  (a) matches against; the stored key is untouched, only the match set is widened (#560).
+  (a) matches against; the stored key is untouched, only the match set is widened (#560). A
+  row keyed by a transaction is left out of that read, since its own key already matches.
 - **(b) a committed category** — `RENT_AND_UTILITIES` or `LOAN_PAYMENTS`. Rent is the largest
   fixed outflow in the book and the detector can never see it: the same payee for the same
   amount every month is not a merchant recurrence signature. A loan payment is a debt

@@ -17,11 +17,9 @@ public interface IActiveSubscriptionsReader
         Guid userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Display names of ACTIVE manual commitments only (<c>DetectedSubscription.IsManual</c>,
-    /// any kind) — subscriptions and installments the user added by hand rather than the
-    /// detector finding them. A row added from a picked transaction is stored under that
-    /// transaction's key, so it already appears in <see cref="GetActiveCommitmentMerchantKeysAsync"/>.
-    /// An older hand-typed row is stored as <c>manual:{kind}:{merchant}</c> (see
+    /// Display names of ACTIVE legacy hand-typed commitments only (any kind). A row added from a
+    /// picked transaction is stored under that transaction's key, so it is left out here: it
+    /// already appears in <see cref="GetActiveCommitmentMerchantKeysAsync"/>. A legacy row is stored as <c>manual:{kind}:{merchant}</c> (see
     /// <c>DetectedSubscription.CreateManual</c>), a form no transaction-derived key ever takes, so
     /// callers derive a transaction-matching key themselves from the display name returned here
     /// (<c>MerchantNameNormalizer.NormalizeDetectionKey</c>).

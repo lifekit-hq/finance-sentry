@@ -145,6 +145,22 @@ public class ActiveSubscriptionsReaderTests
     }
 
     [Fact]
+    public async Task GetActiveManualCommitmentMerchantNames_LeavesOutRowsKeyedByATransaction()
+    {
+        var legacy = DetectedSubscription.CreateManual(
+            UserId.ToString(), "Claude.ai", 20m, "USD",
+            DateOnly.FromDateTime(DateTime.UtcNow), termCount: null, kind: SubscriptionKinds.Subscription);
+        var picked = DetectedSubscription.CreateFromTransaction(
+            UserId.ToString(), "installment:rozetka:1200", "Rozetka", 1200m, "UAH",
+            DateOnly.FromDateTime(DateTime.UtcNow), 1, 6, SubscriptionKinds.Installment);
+        var (reader, _) = MakeSut(legacy, picked);
+
+        var names = await reader.GetActiveManualCommitmentMerchantNamesAsync(UserId);
+
+        names.Should().BeEquivalentTo(["Claude.ai"]);
+    }
+
+    [Fact]
     public async Task GetActiveManualCommitmentMerchantNames_ReadsOnlyActiveRows()
     {
         var manual = DetectedSubscription.CreateManual(
