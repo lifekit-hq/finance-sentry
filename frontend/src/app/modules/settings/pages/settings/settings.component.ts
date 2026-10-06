@@ -17,7 +17,14 @@ import {take} from 'rxjs';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
+import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {
+  REAL_ANNUAL_RETURN_MAX_PERCENT,
+  REAL_ANNUAL_RETURN_MIN_PERCENT,
+  SAFE_WITHDRAWAL_RATE_MAX_PERCENT,
+  SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
+} from '../../constants/fire/fire-assumptions.constants';
 import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -67,6 +74,9 @@ export class SettingsComponent {
   public readonly currencyOptions = CURRENCY_OPTIONS;
   public readonly themeOptions = THEME_OPTIONS;
   public readonly canManageUsers = this.authStore.canManageUsers;
+  public readonly percentText = PercentUtils.fromFraction;
+  public readonly withdrawalRateHint = `Between ${SAFE_WITHDRAWAL_RATE_MIN_PERCENT}% and ${SAFE_WITHDRAWAL_RATE_MAX_PERCENT}%. The classic rule is 4%.`;
+  public readonly realReturnHint = `Between ${REAL_ANNUAL_RETURN_MIN_PERCENT}% and ${REAL_ANNUAL_RETURN_MAX_PERCENT}%, after inflation.`;
 
   public readonly pwCurrent = signal('');
   public readonly pwNext = signal('');
@@ -86,8 +96,34 @@ export class SettingsComponent {
       lowBalanceAlerts: p.lowBalanceAlerts,
       lowBalanceThreshold: p.lowBalanceThreshold,
       syncFailureAlerts: p.syncFailureAlerts,
+      safeWithdrawalRate: p.safeWithdrawalRate,
+      realAnnualReturn: p.realAnnualReturn,
     });
     this.toast.show('Profile saved successfully', 'success');
+  }
+
+  // A typed rate outside its bounds (or not a number) is ignored, so a typo never reaches the
+  // saved profile; the hint under the field states the range.
+  public setWithdrawalRate(text: string): void {
+    const rate = PercentUtils.toFraction(
+      text,
+      SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
+      SAFE_WITHDRAWAL_RATE_MAX_PERCENT
+    );
+    if (rate !== null) {
+      this.store.updateProfile({safeWithdrawalRate: rate});
+    }
+  }
+
+  public setRealReturn(text: string): void {
+    const rate = PercentUtils.toFraction(
+      text,
+      REAL_ANNUAL_RETURN_MIN_PERCENT,
+      REAL_ANNUAL_RETURN_MAX_PERCENT
+    );
+    if (rate !== null) {
+      this.store.updateProfile({realAnnualReturn: rate});
+    }
   }
 
   public changePassword(): void {

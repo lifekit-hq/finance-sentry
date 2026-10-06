@@ -225,6 +225,47 @@
         </div>
       </div>
 
+      <!-- ── Financial independence ── -->
+      <div
+        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      >
+        <div>
+          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">
+            Financial independence
+          </h2>
+          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
+            The two assumptions behind the dashboard's financial independence date. Save the profile
+            to apply them.
+          </p>
+        </div>
+        <div class="space-y-cmn-4">
+          <cmn-form-field
+            [hint]="withdrawalRateHint"
+            label="Safe withdrawal rate (% a year)"
+            fieldId="s-swr"
+          >
+            <cmn-input
+              [ngModel]="percentText(profile.safeWithdrawalRate)"
+              (ngModelChange)="setWithdrawalRate($event)"
+              id="s-swr"
+              type="text"
+            />
+          </cmn-form-field>
+          <cmn-form-field
+            [hint]="realReturnHint"
+            label="Real annual return (% a year)"
+            fieldId="s-real-return"
+          >
+            <cmn-input
+              [ngModel]="percentText(profile.realAnnualReturn)"
+              (ngModelChange)="setRealReturn($event)"
+              id="s-real-return"
+              type="text"
+            />
+          </cmn-form-field>
+        </div>
+      </div>
+
       <!-- ── Security ── -->
       <div
         class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
