@@ -46,6 +46,6 @@ describe('AppShellComponent FAB clearance', () => {
 
   it('shows the store avatar initials in the top bar', async () => {
     const fixture = await setup(AppRoute.Settings);
-    expect(fixture.componentInstance.avatarLabel()).toBe('DT');
+    expect(fixture.componentInstance.account().label).toBe('DT');
   });
 });

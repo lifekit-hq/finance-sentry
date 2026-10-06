@@ -1,18 +1,13 @@
-import {ChangeDetectionStrategy, Component, computed, HostListener, inject} from '@angular/core';
-import {toSignal} from '@angular/core/rxjs-interop';
-import {NavigationEnd, Router, RouterOutlet} from '@angular/router';
+import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {Router, RouterOutlet} from '@angular/router';
 import {
+  AppLayoutAccount,
   AppLayoutComponent,
-  CmnDialogBareContainerComponent,
-  CmnDialogService,
-  CommandPaletteComponent,
-  type CommandPaletteItem,
+  CommandPaletteItem,
   type MenuItem,
   type NavItem,
-  type PaletteResult,
-  ThemeService,
+  PALETTE_THEME_ACTION,
 } from '@lifekit-hq/ui';
-import {filter, map} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
@@ -39,7 +34,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
   {id: AppRoute.SettingsPeople, label: 'People', icon: 'Users', group: 'Pages'},
   {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
-  {id: '_theme', label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
+  {id: PALETTE_THEME_ACTION, label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
   {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},
 ];
 
@@ -55,18 +50,16 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
   template: `
     <cmn-app-layout
       [navItems]="navItems()"
-      [activeRoute]="activeRoute()"
-      [isDark]="isDark()"
+      [paletteItems]="paletteItems()"
+      [account]="account()"
       [showThemeToggle]="false"
-      [avatarMenuItems]="avatarMenuItems"
       [versionLabel]="versionLabel"
       [tabRoutes]="tabRoutes"
       [phoneOverlay]="true"
-      [avatarLabel]="avatarLabel()"
       (navClick)="navigate($event)"
-      (themeToggle)="themeService.toggle()"
-      (searchClick)="openPalette()"
+      (paletteAction)="handlePaletteAction($event)"
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
+      brand="Finance Sentry"
     >
       <router-outlet />
     </cmn-app-layout>
@@ -79,18 +72,6 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
 export class AppShellComponent {
   private readonly router = inject(Router);
   private readonly authStore = inject(AuthStore);
-  private readonly dialog = inject(CmnDialogService);
-  private readonly theme = toSignal(inject(ThemeService).activeTheme$, {
-    initialValue: 'light' as const,
-  });
-  private readonly routerUrl = toSignal(
-    this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
-      map(e => e.urlAfterRedirects)
-    ),
-    {initialValue: this.router.url}
-  );
-
   private readonly alertsStore = inject(AlertsStore);
   private readonly allNavItems: NavItem[] = [
     {label: 'Home', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
@@ -110,28 +91,18 @@ export class AppShellComponent {
   ];
 
   public readonly canUseAi = this.authStore.canUseAi;
-  public readonly themeService = inject(ThemeService);
-  public readonly avatarMenuItems: MenuItem[] = AVATAR_MENU_ITEMS;
   public readonly versionLabel = `v${APP_VERSION}`;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );
-  public readonly avatarLabel = this.authStore.avatarInitials;
-  public readonly isDark = computed(() => this.theme() === 'dark');
-  public readonly activeRoute = computed(() => {
-    const url = this.routerUrl();
-    const match = this.navItems().find(item => url.startsWith(item.route));
-    return match?.route ?? '';
-  });
-
-  @HostListener('window:keydown', ['$event'])
-  public onGlobalKeyDown(e: KeyboardEvent): void {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      this.openPalette();
-    }
-  }
+  public readonly paletteItems = computed(() =>
+    PALETTE_ITEMS.filter(item => this.isPermitted(item.id))
+  );
+  public readonly account = computed<AppLayoutAccount>(() => ({
+    label: this.authStore.avatarInitials(),
+    menuItems: AVATAR_MENU_ITEMS,
+  }));
 
   public navigate(item: NavItem): void {
     void this.router.navigateByUrl(item.route);
@@ -147,41 +118,16 @@ export class AppShellComponent {
     }
   }
 
-  public openPalette(): void {
-    this.dialog
-      .open<PaletteResult>(CommandPaletteComponent, {
-        data: PALETTE_ITEMS.filter(item => this.isPermitted(item.id)),
-        container: CmnDialogBareContainerComponent,
-        hasBackdrop: false,
-        panelClass: [],
-        autoFocus: false,
-        disableClose: true,
-      })
-      .afterClosed()
-      .subscribe(result => {
-        if (!result) {
-          return;
-        }
-        if (result.type === 'navigate') {
-          void this.router.navigateByUrl(result.id);
-        } else {
-          this.handleAction(result.id);
-        }
-      });
+  public handlePaletteAction(id: string): void {
+    if (id === '_logout') {
+      this.authStore.logout();
+    } else if (id === CONNECT_ACTION_ID) {
+      void this.router.navigateByUrl(AppRoute.AccountsList);
+    }
   }
 
   private isPermitted(entry: string): boolean {
     const permission = PERMISSION_BY_ENTRY[entry];
     return permission === undefined || this.authStore.permissions().includes(permission);
-  }
-
-  private handleAction(id: string): void {
-    if (id === '_theme') {
-      this.themeService.toggle();
-    } else if (id === '_logout') {
-      this.authStore.logout();
-    } else if (id === CONNECT_ACTION_ID) {
-      void this.router.navigateByUrl(AppRoute.AccountsList);
-    }
   }
 }
