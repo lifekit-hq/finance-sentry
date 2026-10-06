@@ -245,14 +245,17 @@ convention above is unchanged — only the label differs. Net worth totals stay 
 
 - **Fetch window**: month-aligned — `MonthWindow.StartOfMonthsAgo(months)`, i.e. UTC
   midnight on the first of the month N back. `months` comes from the dashboard's selected
-  range (3M/6M/1Y/All). So "3M" spans **three complete calendar months plus the one in
-  progress**, and no bucket is ever a fragment of a month. (It used to be a raw
+  range (`DashboardRangeUtils.months`: 1M=1, 3M=3, 6M=6, 1Y=12, All=120; YTD = the closed
+  months since January, at least 1). So "3M" spans **three complete calendar months plus the
+  one in progress** — the backend always returns N closed months and the current one, so a
+  range's *tile totals* (§7) are cut back to the exact window client-side by month key — and
+  no bucket is ever a fragment of a month. (It used to be a raw
   `UtcNow.AddMonths(-n)`, which started mid-month and left the oldest bucket holding a
   handful of days — it charted as a collapsed bar and yielded a savings rate computed
   from a single day.)
 - **Bucketing**: calendar UTC month on `PostedDate ?? TransactionDate`. The trailing
   bucket is month-to-date and is returned deliberately: it feeds the dashboard's
-  month-to-date tiles. Callers must keep it out of month-over-month comparisons
+  range-total tiles. Callers must keep it out of month-over-month comparisons
   (see §7).
 - **Included**: active transactions, **pending included** — a card hold is committed
   spending (excluding it made the month's outflow a fraction of reality).
@@ -526,50 +529,46 @@ the total.
 `MerchantCategoryStatisticsService`: same filters as monthly flow (active, pending
 included, transfers excluded, debits only, USD-converted) over the same month-aligned
 window (`MonthWindow.StartOfMonthsAgo`), but **flat — not month-bucketed**. Displayed as
-"Top Spending Categories (3M)" etc., following the dashboard's selected range.
+"Top Spending Categories (3M)" etc., following the dashboard's selected range. The dashboard
+endpoint takes an optional `windowMonths` (calendar months, in-progress one included, clamped
+to `1..months+1`) that moves the window start to the first of that month, so the donut covers
+exactly the range the tiles total (§7) while the charts still get their `months` of closed
+history. Family-support outflow is narrowed to the same start month.
 
 Unlike the bar charts (§7) this **includes the in-progress month**. A composition is not a
 period-over-period comparison, so a partial month does not distort it the way it distorts
 a bar sitting next to complete ones — and dropping the freshest spending from "where does
 my money go" would be a real loss.
 
-## 7. Month-bucketed charts vs. month-to-date tiles
+## 7. Month-bucketed charts vs. range-total tiles
 
-Frontend-only (`dashboard.computed.ts`). The in-progress month appears in exactly one
-place, and the split is deliberate.
+Frontend-only (`dashboard.computed.ts`). The in-progress month is kept out of the bar
+charts and included in the range-total tiles, and the split is deliberate.
 
 **Charts plot complete calendar months only** — the *Income vs Spending* chart reads the
 `completeMonths` window. A partial month as a bar next to complete ones is an
 apples-to-oranges comparison: income reads as collapsing, and a savings rate would swing to
 absurd magnitudes (the since-removed savings-rate chart read -500,000%), because salary posts
 once — often on the last day — so until then the month holds a full run of spending against
-stray small credits. The savings-rate baseline therefore drops completed months with zero
-inflow, for the same divide-by-near-zero reason.
+stray small credits.
 
-**The "This month" card carries the in-progress month** — one card with Income, Spending
-and Savings columns, month-to-date by construction:
+**The Income / Spending / Savings card totals the selected range, in-progress month
+included** — one range, one story across the hero, tiles, charts and top categories. The
+heading names the window (`HISTORY_RANGE_TILE_HEADINGS`: "This month", "Last 3 months",
+"Year to date", … "All time"). The window is `DashboardRangeUtils.windowMonths` calendar
+months ending with the current one (YTD = months since January), and the tiles sum only the
+`monthlyFlow` buckets from `windowStartKey` on.
 
-- *Income*: current-month total, **no pace delta** — income is lumpy (salary posts once,
-  often on the last day), so prorating it against a baseline is wrong at any point in the
-  month. The only chip is the neutral "No income yet" once there is history.
-- *Spending*: current-month total, compared against the average of the trailing 3 complete
-  months **prorated by day-of-month elapsed** — without proration a figure two days into the
-  month always reads as a collapse. The pace is **null (no chip) before day 7** of the month
-  (UTC), where the prorated baseline is a few percent of a month and one rent payment reads as
-  four-digit "over pace". The displayed magnitude is **capped at 200%** and worded `>200%`
-  beyond it (the colour/sign delta is capped the same way).
-- *Savings*: month-to-date savings rate, withheld (shows `—`) until month-to-date inflow reaches
-  `INCOME_LANDED_FRACTION` (50%) of a normal month's income. Below that the raw rate is
-  technically correct and completely misleading. Compared in **percentage points** against
-  the trailing complete months, since a rate is scale-free and is not prorated.
-- The delta colour and arrow follow its **sign** (`paceClass`), so the number passed is "how
-  good is this", not "which direction did it move" — for spending those are opposites, and
-  the wording (`over pace` / `under pace`) carries the direction instead.
-- A month with no inflow yet shows neutral "No income yet" rather than a red
-  "100% below pace".
+- *Income* / *Spending*: the summed USD inflow / outflow over the window, with no pace
+  comparison against earlier months.
+- *Savings*: `(inflow − outflow) / inflow` over the window, `—` when the window has no
+  inflow. On the **1M** range only, it is also withheld until inflow reaches
+  `INCOME_LANDED_FRACTION` (50%) of outflow: salary posts once, often on the last day, so
+  early in the month the raw rate is technically correct and completely misleading. Longer
+  windows hold whole months of income and need no gate.
 
-This is the same split Binance and IBKR use: the current period is a tile with a
-comparison; the bars are closed periods.
+This is the same split Binance and IBKR use: the current period feeds the tiles; the bars
+are closed periods.
 
 ## 8. Net worth
 
@@ -650,11 +649,6 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
 - A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
   balance read is seen by the balance first, so the ledger books it as unpriced quantity and
   that holding's cost basis stays null until the position is next closed.
-- The month-to-date spending pace baseline (§7) prorates a monthly average linearly by elapsed
-  days, and is withheld before day 7 and capped at `>200%` for display; income is not paced
-  at all. Real spending is lumpy — rent lands on the 1st, salary on the last day — so pace
-  is directionally right rather than exact. A true same-day-last-month comparison would
-  need day-level cumulative flow from the backend, which is not built.
 
 ## 10. Benchmark-relative track record
 
