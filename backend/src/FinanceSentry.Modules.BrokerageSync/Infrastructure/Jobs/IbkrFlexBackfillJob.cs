@@ -54,7 +54,7 @@ public sealed class IbkrFlexBackfillJob(
     {
         try
         {
-            credential.RecordUseError(ex.Message);
+            credential.RecordUseError(ex.GetBaseException().Message);
             await credentialRepository.SaveLastErrorUnscopedAsync(credential);
         }
         catch (Exception saveEx)

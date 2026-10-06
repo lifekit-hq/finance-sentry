@@ -39,7 +39,7 @@ public sealed class IbkrFlexCredentialLastErrorPostgresTests : IAsyncLifetime
             new FixedCurrentUser(null));
 
     [DockerRequiredFact]
-    public async Task SaveLastErrorUnscoped_AfterFailedSaveChangesOnSameContext_PersistsLastError()
+    public async Task SaveLastErrorUnscoped_AfterFailedSaveChangesOnSameContext_PersistsLastError_AndLeavesContextUsable()
     {
         var userId = Guid.NewGuid();
         var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
@@ -64,8 +64,14 @@ public sealed class IbkrFlexCredentialLastErrorPostgresTests : IAsyncLifetime
         tracked.RecordUseError("persist blew up");
         await repo.SaveLastErrorUnscopedAsync(tracked);
 
+        // The next user in the same sweep shares this context: its save must not replay the failed insert.
+        var nextUser = Guid.NewGuid();
+        await repo.AddAsync(new IBKRFlexCredential(nextUser, "777777", [1], [2], [3], 1));
+        await repo.Invoking(r => r.SaveChangesAsync()).Should().NotThrowAsync();
+
         await using var verify = CreateContext();
-        var stored = await new IBKRFlexCredentialRepository(verify).GetByUserIdUnscopedAsync(userId);
-        stored!.LastError.Should().Be("persist blew up");
+        var verifyRepo = new IBKRFlexCredentialRepository(verify);
+        (await verifyRepo.GetByUserIdUnscopedAsync(userId))!.LastError.Should().Be("persist blew up");
+        (await verifyRepo.GetByUserIdUnscopedAsync(nextUser)).Should().NotBeNull();
     }
 }

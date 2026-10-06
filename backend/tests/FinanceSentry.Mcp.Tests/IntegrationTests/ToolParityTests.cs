@@ -714,6 +714,27 @@ public sealed class ToolParityTests
     }
 
     [Fact]
+    public async Task GetSyncHealth_TrueLayerExpiredConnectionWithNoAccounts_ReportsError_NotNeverSynced()
+    {
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var bankDb = svc.GetRequiredService<BankSyncDbContext>();
+        var connection = new TrueLayerConnection(userId, "ob-chase", "Chase", "ref-2");
+        connection.MarkExpired();
+        bankDb.TrueLayerConnections.Add(connection);
+        await bankDb.SaveChangesAsync();
+
+        var result = await svc.GetRequiredService<GetSyncHealthTool>().ExecuteAsync();
+
+        var entry = result.Single(e => e.Provider == "truelayer");
+        entry.Status.Should().Be("error");
+        entry.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task GetTaxLots_ReturnsCostBasisAndPnl_WhenBrokerageHoldingSeededWithAvgCost()
     {
         var userId = Guid.NewGuid();

@@ -93,9 +93,6 @@ public sealed class GetSyncHealthTool(
                 .Select(a => new { a.SyncStatus, a.LastSyncError, a.UpdatedAt })
                 .ToListAsync(ct);
 
-            if (accounts.Count == 0 || accounts.All(a => a.SyncStatus == "pending"))
-                return new SyncHealthEntry("truelayer", null, "never_synced", null);
-
             var syncedAccounts = accounts.Where(a => a.SyncStatus is "active" or "failed").ToList();
             DateTime? lastSyncAt = syncedAccounts.Count > 0 ? syncedAccounts.Max(a => a.UpdatedAt) : null;
 
@@ -108,14 +105,19 @@ public sealed class GetSyncHealthTool(
                 return new SyncHealthEntry("truelayer", lastSyncAt, "error", latestFailed.LastSyncError);
 
             // A lapsed consent surfaces as reauth_required accounts and/or an EXPIRED connection;
-            // neither is "active" or "failed", so check them explicitly.
+            // neither is "active" or "failed", so check them explicitly. A connection can expire
+            // before its first discovery leaves any account behind, so this precedes never_synced.
             var hasExpiredConnection = await _bankSync.TrueLayerConnections
                 .AsNoTracking()
                 .AnyAsync(c => c.UserId == userId && c.Status == ExpiredConnectionStatus, ct);
 
-            return hasExpiredConnection || accounts.Any(a => a.SyncStatus == ReauthRequiredStatus)
-                ? new SyncHealthEntry("truelayer", lastSyncAt, "error", ReauthRequiredMessage)
-                : new SyncHealthEntry("truelayer", lastSyncAt, "ok", null);
+            if (hasExpiredConnection || accounts.Any(a => a.SyncStatus == ReauthRequiredStatus))
+                return new SyncHealthEntry("truelayer", lastSyncAt, "error", ReauthRequiredMessage);
+
+            if (accounts.Count == 0 || accounts.All(a => a.SyncStatus == "pending"))
+                return new SyncHealthEntry("truelayer", null, "never_synced", null);
+
+            return new SyncHealthEntry("truelayer", lastSyncAt, "ok", null);
         }
         catch (Exception ex)
         {

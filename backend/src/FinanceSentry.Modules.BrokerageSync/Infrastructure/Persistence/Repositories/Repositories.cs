@@ -113,6 +113,7 @@ public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
         await _context.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.Id == credential.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastError, lastError), ct);
+        _context.ChangeTracker.Clear();
     }
 }
 

@@ -6,6 +6,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -48,7 +49,8 @@ public class IbkrFlexJobsTests
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
             .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("persist blew up"));
+            .ThrowsAsync(new DbUpdateException("An error occurred while saving the entity changes.",
+                new InvalidOperationException("persist blew up")));
         syncService
             .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
