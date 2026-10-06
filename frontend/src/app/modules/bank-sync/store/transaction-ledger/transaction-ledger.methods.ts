@@ -1,9 +1,10 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {EMPTY_TRANSACTION_FILTERS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
+import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
@@ -44,17 +45,16 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
     setMonthlyOutflowUsd(value: number | null): void {
       patchState(store, {monthlyOutflowUsd: value});
     },
-    setAccountId(accountId: Nullable<string>): void {
-      patchState(store, {accountId, offset: 0});
+    /** Any filter change restarts paging from the first page. */
+    setFilters(patch: Partial<TransactionFilters>): void {
+      patchState(store, state => ({filters: {...state.filters, ...patch}, offset: 0}));
     },
-    setTransactionType(transactionType: Nullable<TransactionType>): void {
-      patchState(store, {transactionType, offset: 0});
+    resetFilters(): void {
+      patchState(store, {filters: EMPTY_TRANSACTION_FILTERS, offset: 0});
     },
-    setDateRange(from: Nullable<string>, to: Nullable<string>): void {
-      patchState(store, {from, to, offset: 0});
-    },
-    setSearch(search: string): void {
-      patchState(store, {search, offset: 0});
+    /** A first-page load replaces the list, so the previous filter's rows never linger. */
+    startFirstPage(): void {
+      patchState(store, {offset: 0, transactions: [], totalCount: 0, hasMore: false});
     },
     setAccounts(accounts: TransactionAccountOption[]): void {
       patchState(store, {accounts});

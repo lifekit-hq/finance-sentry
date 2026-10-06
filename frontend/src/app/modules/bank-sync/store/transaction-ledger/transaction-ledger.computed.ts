@@ -1,12 +1,14 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
+import {TransactionFiltersUtils} from '../../../../shared/utils/transaction-filters.utils';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
+import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 interface StateSignals {
   transactions: Signal<GlobalTransactionDto[]>;
@@ -15,9 +17,7 @@ interface StateSignals {
   status: Signal<AsyncStatus>;
   errorCode: Signal<Nullable<string>>;
   monthlyOutflowUsd: Signal<number | null>;
-  accountId: Signal<Nullable<string>>;
-  transactionType: Signal<Nullable<TransactionType>>;
-  search: Signal<string>;
+  filters: Signal<TransactionFilters>;
   accounts: Signal<TransactionAccountOption[]>;
 }
 
@@ -29,18 +29,18 @@ export function transactionLedgerComputed(store: StateSignals) {
   return {
     isLoading: computed(() => store.status() === 'loading'),
     isEmpty: computed(() => store.status() === 'idle' && store.transactions().length === 0),
-    hasActiveFilter: computed(
-      () =>
-        store.accountId() !== null ||
-        store.transactionType() !== null ||
-        store.search().trim() !== ''
+    hasActiveFilter: computed(() => TransactionFiltersUtils.isActive(store.filters())),
+    accountOptions: computed(() =>
+      store.accounts().map(account => ({value: account.accountId, label: account.label}))
     ),
+    dateRange: computed(() => ({from: store.filters().from, to: store.filters().to})),
     errorMessage: computed(() => {
       if (store.status() !== 'error') {
         return '';
       }
       return errorMessages.resolve(store.errorCode()) ?? DEFAULT_ERROR;
     }),
+    dayGroups: computed(() => TransactionGroupUtils.groupByDay(store.transactions())),
     monthlyOutflow: computed(() => store.monthlyOutflowUsd()),
     topCategory: computed(() => {
       const counts: Record<string, number> = {};

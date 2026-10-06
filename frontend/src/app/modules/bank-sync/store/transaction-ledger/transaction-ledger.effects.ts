@@ -1,21 +1,22 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, debounceTime, filter, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
+import {catchError, debounceTime, filter, forkJoin, map, of, pipe, switchMap, tap} from 'rxjs';
 
+import {TRANSACTION_FILTER_DEBOUNCE_MS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
+import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
+import {TransactionFiltersUtils} from '../../../../shared/utils/transaction-filters.utils';
 import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
 import {
   type GetAllTransactionsParams,
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 const MONTH_KEY_PAD = 2;
-export const SEARCH_DEBOUNCE_MS = 300;
 
 function currentUtcMonthKey(): string {
   const now = new Date();
@@ -29,15 +30,9 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 
 interface EffectsStore {
   offset: Signal<number>;
-  accountId: Signal<Nullable<string>>;
-  transactionType: Signal<Nullable<TransactionType>>;
-  from: Signal<Nullable<string>>;
-  to: Signal<Nullable<string>>;
-  search: Signal<string>;
-  setAccountId: (accountId: Nullable<string>) => void;
-  setTransactionType: (transactionType: Nullable<TransactionType>) => void;
-  setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
-  setSearch: (search: string) => void;
+  filters: Signal<TransactionFilters>;
+  setFilters: (patch: Partial<TransactionFilters>) => void;
+  startFirstPage: () => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: () => void;
   setTransactions: (
@@ -55,16 +50,38 @@ interface EffectsStore {
   setMonthlyOutflowUsd: (value: number | null) => void;
 }
 
-function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
-  return {
-    offset,
-    limit: PAGE_SIZE,
-    accountId: store.accountId() ?? undefined,
-    transactionType: store.transactionType() ?? undefined,
-    from: store.from() ?? undefined,
-    to: store.to() ?? undefined,
-    search: store.search().trim() || undefined,
-  };
+/** Maps the filters onto `GET accounts/transactions`; inactive dimensions are left out. */
+export function toTransactionParams(
+  filters: TransactionFilters,
+  offset: number
+): GetAllTransactionsParams {
+  const params: GetAllTransactionsParams = {offset, limit: PAGE_SIZE};
+  if (filters.accountIds.length > 0) {
+    params.accountId = filters.accountIds;
+  }
+  if (filters.categories.length > 0) {
+    params.category = filters.categories;
+  }
+  if (filters.transactionType !== null) {
+    params.transactionType = filters.transactionType;
+  }
+  if (filters.from !== null) {
+    params.from = filters.from;
+  }
+  if (filters.to !== null) {
+    params.to = filters.to;
+  }
+  if (filters.minAmount !== null && Number.isFinite(filters.minAmount)) {
+    params.minAmountUsd = filters.minAmount;
+  }
+  if (filters.maxAmount !== null && Number.isFinite(filters.maxAmount)) {
+    params.maxAmountUsd = filters.maxAmount;
+  }
+  const search = filters.search.trim();
+  if (search !== '') {
+    params.search = search;
+  }
+  return params;
 }
 
 export function transactionLedgerEffects(store: EffectsStore) {
@@ -75,12 +92,14 @@ export function transactionLedgerEffects(store: EffectsStore) {
       tap(page => {
         if (page === 'next') {
           store.nextPage();
+        } else {
+          store.startFirstPage();
         }
         store.setLoading();
       }),
       switchMap(page =>
         bankSyncService
-          .getAllTransactions(pageParams(store, page === 'next' ? store.offset() : 0))
+          .getAllTransactions(toTransactionParams(store.filters(), store.offset()))
           .pipe(
             tap(res =>
               page === 'next'
@@ -119,48 +138,36 @@ export function transactionLedgerEffects(store: EffectsStore) {
     loadMore: (): void => {
       fetchPage('next');
     },
-    /** Follows the `account` query param: a changed value re-queries from the first page. */
-    applyAccount: rxMethod<Nullable<string>>(
-      pipe(
-        filter(accountId => accountId !== store.accountId()),
-        tap(accountId => store.setAccountId(accountId)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the `type` query param (In / Out): a changed value re-queries from the first page. */
-    applyType: rxMethod<Nullable<TransactionType>>(
-      pipe(
-        filter(transactionType => transactionType !== store.transactionType()),
-        tap(transactionType => store.setTransactionType(transactionType)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the `from`/`to` query params (ISO dates): a changed bound re-queries from the first page. */
-    applyDateRange: rxMethod<{from: Nullable<string>; to: Nullable<string>}>(
-      pipe(
-        filter(({from, to}) => from !== store.from() || to !== store.to()),
-        tap(({from, to}) => store.setDateRange(from, to)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the search box: debounced, then re-queries from the first page. */
+    /** Re-queries from the first page whenever the filters change (URL, controls or reset). */
+    reloadOnFilterChange: rxMethod<TransactionFilters>(pipe(tap(() => load()))),
+    /** Search box: waits for typing to pause, then applies the term. */
     applySearch: rxMethod<string>(
       pipe(
-        debounceTime(SEARCH_DEBOUNCE_MS),
-        filter(search => search.trim() !== store.search().trim()),
-        tap(search => store.setSearch(search)),
-        tap(() => load())
+        debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS),
+        filter(search => search.trim() !== store.filters().search.trim()),
+        tap(search => store.setFilters({search}))
+      )
+    ),
+    /** Amount inputs (USD): wait for typing to pause, then apply the parsed bound. */
+    applyAmount: rxMethod<{bound: 'minAmount' | 'maxAmount'; raw: Nullable<string>}>(
+      pipe(
+        debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS),
+        map(({bound, raw}) => ({bound, value: TransactionFiltersUtils.parseAmount(raw)})),
+        filter(({bound, value}) => value !== store.filters()[bound]),
+        tap(({bound, value}) => store.setFilters({[bound]: value}))
       )
     ),
   };
 }
 
 interface HookStore {
-  load: () => void;
+  filters: Signal<TransactionFilters>;
+  reloadOnFilterChange: (filters: Signal<TransactionFilters>) => void;
   loadSummary: () => void;
 }
 
 export function transactionLedgerHooks(store: HookStore): void {
-  store.load();
+  // The first emission is the initial load (filters already hydrated from the URL).
+  store.reloadOnFilterChange(store.filters);
   store.loadSummary();
 }

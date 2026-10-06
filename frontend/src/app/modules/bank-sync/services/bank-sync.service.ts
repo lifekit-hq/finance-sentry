@@ -1,3 +1,4 @@
+import {HttpParams} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {Observable, timer} from 'rxjs';
@@ -54,7 +55,16 @@ export class BankSyncService extends ApiService {
   public getAllTransactions(
     params?: GetAllTransactionsParams
   ): Observable<GlobalTransactionsResponse> {
-    return this.get<GlobalTransactionsResponse>('transactions', params);
+    // ApiService.get drops array values; HttpParams serialises them as repeated params.
+    const fromObject: Record<string, string | number | readonly string[]> = {};
+    for (const [key, value] of Object.entries(params ?? {})) {
+      if (value !== undefined) {
+        fromObject[key] = value as string | number | readonly string[];
+      }
+    }
+    return this.http.get<GlobalTransactionsResponse>(`${this.baseUrl}/transactions`, {
+      params: new HttpParams({fromObject}),
+    });
   }
 
   public triggerSync(accountId: string): Observable<TriggerSyncResponse> {
