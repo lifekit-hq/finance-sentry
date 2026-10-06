@@ -41,8 +41,8 @@ public sealed class SyncFailureCaptureTests
             DateTimeOffset watermark, int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<MaterialAlertRecord>>([alert]);
 
-        public Task<IReadOnlySet<Guid>> GetResolvedIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
+        public Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<Guid>>(alertIds.ToHashSet());
     }
 
     private sealed class NoAnalystActions : IAnalystActionFeedReader

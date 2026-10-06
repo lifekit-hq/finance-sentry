@@ -10,9 +10,10 @@ public interface IMaterialAlertReader
     Task<IReadOnlyList<MaterialAlertRecord>> GetNewSinceAsync(
         DateTimeOffset watermark, int limit, CancellationToken ct = default);
 
-    /// <summary>The subset of <paramref name="alertIds"/> whose alert has been resolved (<c>ResolvedAt</c> set),
-    /// so a relay can drop a failure that has since cleared.</summary>
-    Task<IReadOnlySet<Guid>> GetResolvedIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
+    /// <summary>The subset of <paramref name="alertIds"/> that is still live: the row exists, is not dismissed and has
+    /// no <c>ResolvedAt</c>. A relay drops a failure whose id is absent, since it has cleared, been dismissed or been
+    /// deleted with its account.</summary>
+    Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
 }
 
 /// <summary>A lightweight projection of an alert for companion capture.</summary>

@@ -58,8 +58,8 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
     private SyncFailureReconciler Reconciler(CompanionDbContext ctx)
     {
         var alerts = new Mock<IMaterialAlertReader>();
-        alerts.Setup(a => a.GetResolvedIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<Guid>());
+        alerts.Setup(a => a.GetOpenIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyCollection<Guid> ids, CancellationToken _) => (IReadOnlySet<Guid>)ids.ToHashSet());
         return new SyncFailureReconciler(alerts.Object, Settings(ctx), new CompanionEventRepository(ctx), _policy);
     }
 

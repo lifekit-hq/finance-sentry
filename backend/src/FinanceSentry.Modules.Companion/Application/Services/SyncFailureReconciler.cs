@@ -21,17 +21,17 @@ public sealed class SyncFailureReconciler(
             return candidates;
         }
 
-        var resolved = await alerts.GetResolvedIdsAsync(
+        var open = await alerts.GetOpenIdsAsync(
             [.. syncFailures.Select(e => policy.AlertIdFromDedupKey(e.DedupKey)!.Value).Distinct()], ct);
 
         var now = DateTimeOffset.UtcNow;
         var expired = new HashSet<Guid>();
         foreach (var evt in syncFailures)
         {
-            if (resolved.Contains(policy.AlertIdFromDedupKey(evt.DedupKey)!.Value))
+            if (!open.Contains(policy.AlertIdFromDedupKey(evt.DedupKey)!.Value))
             {
                 evt.Disposition = EventDisposition.Expired;
-                evt.LastError = "alert resolved before delivery";
+                evt.LastError = "alert no longer open before delivery";
                 await events.UpdateAsync(evt, ct);
                 expired.Add(evt.Id);
             }
@@ -40,10 +40,9 @@ public sealed class SyncFailureReconciler(
                 // The alert is a single row that stays open for the whole outage, so its age is how long the source
                 // has been failing; capture-time staleness only saw bank accounts and never looked again.
                 var mode = (await settings.GetOrDefaultUnscopedAsync(evt.UserId, ct)).Mode;
-                var escalated = policy.DispositionFor(mode, evt.Kind, now - evt.OccurredAt);
-                if (escalated != EventDisposition.HeldForDigest)
+                if (policy.DispositionFor(mode, evt.Kind, now - evt.OccurredAt) == EventDisposition.Pending)
                 {
-                    evt.Disposition = escalated;
+                    evt.Disposition = EventDisposition.Pending;
                     await events.UpdateAsync(evt, ct);
                 }
             }

@@ -23,14 +23,15 @@ public sealed class SyncFailureReconcilerTests
     private static readonly Guid User = Guid.Parse("99999999-9999-9999-9999-999999999999");
     private static readonly MaterialityPolicy Policy = new();
 
-    private sealed class Alerts(params Guid[] resolved) : IMaterialAlertReader
+    /// <summary>Every alert is open except the ones named: resolved, dismissed and deleted all look the same here.</summary>
+    private sealed class Alerts(params Guid[] notOpen) : IMaterialAlertReader
     {
         public Task<IReadOnlyList<MaterialAlertRecord>> GetNewSinceAsync(
             DateTimeOffset watermark, int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<MaterialAlertRecord>>([]);
 
-        public Task<IReadOnlySet<Guid>> GetResolvedIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlySet<Guid>>(resolved.ToHashSet());
+        public Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<Guid>>(alertIds.Except(notOpen).ToHashSet());
     }
 
     private sealed class Settings(NotificationMode mode) : INotificationSettingRepository
@@ -96,8 +97,8 @@ public sealed class SyncFailureReconcilerTests
     };
 
     private static SyncFailureReconciler NewReconciler(
-        CompanionEventRepository events, NotificationMode mode, params Guid[] resolved)
-        => new(new Alerts(resolved), new Settings(mode), events, Policy);
+        CompanionEventRepository events, NotificationMode mode, params Guid[] notOpen)
+        => new(new Alerts(notOpen), new Settings(mode), events, Policy);
 
     [Fact]
     public async Task A_held_failure_whose_alert_resolved_is_expired_and_not_relayed_by_the_digest()
@@ -191,6 +192,36 @@ public sealed class SyncFailureReconcilerTests
         await NewReconciler(events, NotificationMode.Digest).ReconcileAsync([evt]);
 
         (await outbox.DispositionOfAsync(evt.Id)).Should().Be(EventDisposition.HeldForDigest);
+    }
+
+    [Fact]
+    public async Task A_stale_failure_held_before_a_switch_to_quiet_stays_held_instead_of_being_suppressed()
+    {
+        var outbox = new Outbox();
+        var events = outbox.Repository;
+        var evt = SyncFailure(Guid.NewGuid(), TimeSpan.FromDays(3), EventDisposition.HeldForDigest);
+        await events.InsertIfNewAsync(evt);
+
+        var remaining = await NewReconciler(events, NotificationMode.Quiet).ReconcileAsync([evt]);
+
+        remaining.Should().ContainSingle().Which.Disposition.Should().Be(EventDisposition.HeldForDigest);
+        (await outbox.DispositionOfAsync(evt.Id)).Should().Be(EventDisposition.HeldForDigest);
+    }
+
+    [Fact]
+    public async Task A_held_failure_under_quiet_still_reaches_the_digest()
+    {
+        var outbox = new Outbox();
+        var events = outbox.Repository;
+        await events.InsertIfNewAsync(SyncFailure(Guid.NewGuid(), TimeSpan.FromDays(3), EventDisposition.HeldForDigest));
+        var dispatcher = new RecordingDispatcher();
+
+        await new CompanionDigestJob(
+            new Settings(NotificationMode.Quiet), events, NewReconciler(events, NotificationMode.Quiet),
+            dispatcher, NullLogger<CompanionDigestJob>.Instance).ExecuteAsync();
+
+        dispatcher.DigestWakes.Should().Be(1, "a mode switch after capture must not silence what was already held");
+        dispatcher.LastHeldCount.Should().Be(1);
     }
 
     [Fact]
