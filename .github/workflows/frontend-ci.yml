@@ -116,8 +116,8 @@ jobs:
     - name: Measure cold /login LCP
       run: |
         docker run -d --name frontend-lcp --add-host api:127.0.0.1 -p 4290:4200 finance-sentry-frontend:lcp
-        trap 'docker rm -f frontend-lcp' EXIT
-        for _ in $(seq 1 30); do curl -sf http://localhost:4290/readyz && break; sleep 1; done
+        trap 'status=$?; [ "$status" -eq 0 ] || docker logs frontend-lcp; docker rm -f frontend-lcp' EXIT
+        timeout 30 sh -c 'until curl -sf http://localhost:4290/readyz; do sleep 1; done'
         node scripts/measure-lcp.mjs http://localhost:4290
       working-directory: frontend
 

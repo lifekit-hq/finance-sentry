@@ -7,6 +7,9 @@ import {chromium} from '@playwright/test';
 
 const GOOD_LCP_MS = 2500;
 const RUNS = 5;
+const MEASURED_CONTENT = 'form';
+const LCP_SETTLE_MS = 1000;
+const SETTLE_POLL_MS = 100;
 const VIEWPORT = {width: 390, height: 844};
 const DEVICE_SCALE_FACTOR = 3;
 const CPU_SLOWDOWN = 4;
@@ -43,11 +46,21 @@ for (let run = 0; run < RUNS; run += 1) {
   await cdp.send('Emulation.setCPUThrottlingRate', {rate: CPU_SLOWDOWN});
   await page.addInitScript(() => {
     window.__lcp = null;
+    window.__lcpObservedAt = 0;
     new PerformanceObserver(list => {
-      for (const entry of list.getEntries()) window.__lcp = entry.startTime;
+      for (const entry of list.getEntries()) {
+        window.__lcp = entry.startTime;
+        window.__lcpObservedAt = performance.now();
+      }
     }).observe({type: 'largest-contentful-paint', buffered: true});
   });
   await page.goto(`${baseUrl}/login`, {waitUntil: 'networkidle'});
+  await page.locator(MEASURED_CONTENT).waitFor();
+  await page.waitForFunction(
+    settleMs => performance.now() - window.__lcpObservedAt >= settleMs,
+    LCP_SETTLE_MS,
+    {polling: SETTLE_POLL_MS}
+  );
   samples.push(await page.evaluate(() => window.__lcp));
   await context.close();
 }
