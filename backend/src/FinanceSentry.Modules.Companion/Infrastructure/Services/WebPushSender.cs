@@ -69,6 +69,11 @@ public sealed class WebPushSender(
             logger.LogWarning(ex, "Web Push to subscription {SubscriptionId} failed in transport", subscription.Id);
             return new PushSendResult(PushSendOutcome.Transient);
         }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Web Push to subscription {SubscriptionId} could not be built or encrypted", subscription.Id);
+            return new PushSendResult(PushSendOutcome.Rejected);
+        }
     }
 
     /// <summary>The status-code matrix (spec 859 FR-007).</summary>

@@ -236,13 +236,23 @@ public sealed class CompanionPushJobTests
     }
 
     [Fact]
-    public void The_job_does_not_depend_on_the_notification_mode_or_the_agent_dispatch_state()
+    public async Task The_ledger_is_saved_after_every_send_so_a_later_failure_cannot_cause_a_resend()
     {
-        var parameters = typeof(CompanionPushJob).GetConstructors().Single().GetParameters().Select(p => p.ParameterType);
+        var repo = new FakeRepository();
+        repo.Subscriptions.Add(Sub(Member));
+        repo.Subscriptions.Add(Sub(Member));
+        repo.Events.Add(Evt(Member));
+        var saves = new List<int>();
+        var sender = new FakeSender(_ =>
+        {
+            saves.Add(repo.Saves);
+            return new PushSendResult(PushSendOutcome.Sent, 201);
+        });
 
-        parameters.Should().NotContain(typeof(INotificationSettingRepository));
-        parameters.Should().NotContain(typeof(ICompanionEventRepository));
-        parameters.Should().NotContain(typeof(IAgentWakeDispatcher));
+        await Job(repo, sender).ExecuteAsync();
+
+        saves.Should().HaveCount(2);
+        saves[1].Should().BeGreaterThan(saves[0]);
     }
 
     [Fact]

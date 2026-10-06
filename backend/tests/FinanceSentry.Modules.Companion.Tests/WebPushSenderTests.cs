@@ -125,6 +125,19 @@ public sealed class WebPushSenderTests
     }
 
     [Fact]
+    public async Task A_malformed_subscription_key_is_Rejected_instead_of_throwing()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Created));
+        var subscription = Subscription();
+        subscription.P256dh = "not-a-valid-key!";
+
+        var result = await Sender(handler).SendAsync(subscription, "{}");
+
+        result.Outcome.Should().Be(PushSendOutcome.Rejected);
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Without_VAPID_keys_nothing_is_sent()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Created));

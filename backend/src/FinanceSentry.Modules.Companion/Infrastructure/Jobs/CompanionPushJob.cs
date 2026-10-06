@@ -85,6 +85,7 @@ public sealed class CompanionPushJob(
                     && !await IsOpsAdminAsync(subscription.UserId, opsByUser, ct)))
             {
                 delivery.Status = PushDeliveryStatus.Expired;
+                await repository.SaveAsync(ct);
                 continue;
             }
 
@@ -92,9 +93,9 @@ public sealed class CompanionPushJob(
             Apply(delivery, subscription, result, now);
             if (result.Outcome == PushSendOutcome.Gone)
                 goneSubscriptions.Add(subscription.Id);
-        }
 
-        await repository.SaveAsync(ct);
+            await repository.SaveAsync(ct);
+        }
 
         foreach (var id in goneSubscriptions)
             await repository.RemoveSubscriptionUnscopedAsync(id, ct);
