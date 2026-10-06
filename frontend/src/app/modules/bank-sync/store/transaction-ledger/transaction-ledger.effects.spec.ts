@@ -3,14 +3,19 @@ import {TestBed} from '@angular/core/testing';
 import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {
+  EMPTY_TRANSACTION_FILTERS,
+  TRANSACTION_FILTER_DEBOUNCE_MS,
+} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
+import {
+  type TransactionFilterInputText,
+  type TransactionFilters,
+} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {type AccountsResponse} from '../../models/bank-account/bank-account.model';
 import {type DashboardData} from '../../models/dashboard/dashboard.model';
-import {
-  type GlobalTransactionDto,
-  type TransactionType,
-} from '../../models/transaction/transaction.model';
+import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
-import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
+import {toTransactionParams, transactionLedgerEffects} from './transaction-ledger.effects';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 // Mirrors the private helper in effects.ts so test data stays in sync with the runtime.
@@ -113,21 +118,17 @@ const ACCOUNTS: AccountsResponse = {
 function buildStore(initialOffset = 0) {
   return {
     offset: signal(initialOffset),
-    accountId: signal<string | null>(null),
-    transactionType: signal<TransactionType | null>(null),
-    from: signal<string | null>(null),
-    to: signal<string | null>(null),
-    search: signal(''),
+    filters: signal<TransactionFilters>(EMPTY_TRANSACTION_FILTERS),
+    inputText: signal<TransactionFilterInputText>({minAmount: '', maxAmount: '', search: ''}),
+    setFilters: vi.fn(),
+    resetFilters: vi.fn(),
+    startFirstPage: vi.fn(),
     setLoading: vi.fn(),
     setTransactions: vi.fn(),
     appendTransactions: vi.fn(),
     nextPage: vi.fn(),
     setError: vi.fn(),
     setMonthlyOutflowUsd: vi.fn(),
-    setAccountId: vi.fn(),
-    setTransactionType: vi.fn(),
-    setDateRange: vi.fn(),
-    setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
 }
@@ -165,27 +166,24 @@ describe('transactionLedgerEffects', () => {
       expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
     });
 
-    it('sends the active account and a trimmed search to the server', () => {
+    it('restarts paging from the first page before fetching', () => {
       const store = buildStore();
-      store.accountId.set('acc-1');
-      store.search.set('  coffee ');
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
 
-      expect(service.getAllTransactions).toHaveBeenCalledWith({
-        offset: 0,
-        limit: PAGE_SIZE,
-        accountId: 'acc-1',
-        search: 'coffee',
-      });
+      expect(store.startFirstPage).toHaveBeenCalled();
     });
 
-    it('sends the active type filter to the server', () => {
+    it('sends the active filters to the server', () => {
       const store = buildStore();
-      store.transactionType.set('credit');
+      store.filters.set({
+        ...EMPTY_TRANSACTION_FILTERS,
+        categories: ['FOOD_AND_DRINK'],
+        transactionType: 'credit',
+      });
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
@@ -195,6 +193,7 @@ describe('transactionLedgerEffects', () => {
       expect(service.getAllTransactions).toHaveBeenCalledWith({
         offset: 0,
         limit: PAGE_SIZE,
+        category: ['FOOD_AND_DRINK'],
         transactionType: 'credit',
       });
     });
@@ -300,7 +299,7 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => {
         const effects = transactionLedgerEffects(store);
         effects.loadMore();
-        effects.applyAccount('acc-1');
+        effects.load();
       });
       stalePage.next({
         items: [TX_ITEM],
@@ -315,85 +314,6 @@ describe('transactionLedgerEffects', () => {
     });
   });
 
-  describe('applyAccount', () => {
-    it('stores a changed account and reloads from the first page', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount('acc-1'));
-
-      expect(store.setAccountId).toHaveBeenCalledWith('acc-1');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-    });
-
-    it('ignores a value the store already holds', () => {
-      const store = buildStore();
-      const service = buildService();
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount(null));
-
-      expect(store.setAccountId).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('applyType', () => {
-    it('stores a changed type and reloads from the first page', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType('debit'));
-
-      expect(store.setTransactionType).toHaveBeenCalledWith('debit');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-    });
-
-    it('ignores a value the store already holds', () => {
-      const store = buildStore();
-      const service = buildService();
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType(null));
-
-      expect(store.setTransactionType).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('applyDateRange', () => {
-    it('stores changed bounds and reloads with them as from/to', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
-
-      TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyDateRange({from: '2026-06-01', to: '2026-08-31'})
-      );
-
-      expect(store.setDateRange).toHaveBeenCalledWith('2026-06-01', '2026-08-31');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-    });
-
-    it('ignores bounds the store already holds', () => {
-      const store = buildStore();
-      const service = buildService();
-      configure(service);
-
-      TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyDateRange({from: null, to: null})
-      );
-
-      expect(store.setDateRange).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-    });
-  });
-
   describe('applySearch', () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -403,35 +323,165 @@ describe('transactionLedgerEffects', () => {
       vi.useRealTimers();
     });
 
-    it('waits for typing to pause, then stores the term and reloads once', () => {
+    it('waits for typing to pause, then applies the term once', () => {
       const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
+      configure(buildService());
       const typed = new Subject<string>();
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applySearch(typed));
       typed.next('co');
       typed.next('coffee');
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      expect(store.setFilters).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
 
-      expect(store.setSearch).toHaveBeenCalledTimes(1);
-      expect(store.setSearch).toHaveBeenCalledWith('coffee');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+      expect(store.setFilters).toHaveBeenCalledTimes(1);
+      expect(store.setFilters).toHaveBeenCalledWith({search: 'coffee'});
     });
 
-    it('does not reload when the term is unchanged', () => {
+    it('ignores a term equal to the current one', () => {
       const store = buildStore();
-      const service = buildService();
-      configure(service);
+      configure(buildService());
       const typed = new Subject<string>();
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applySearch(typed));
       typed.next('  ');
-      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
 
-      expect(store.setSearch).not.toHaveBeenCalled();
+      expect(store.setFilters).not.toHaveBeenCalled();
     });
+
+    it('drops a pending term when the filters are cleared before it lands', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applySearch('coffee');
+      effects.clearFilters();
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.setFilters).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyAmount', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('applies the parsed bound after typing pauses', () => {
+      const store = buildStore();
+      configure(buildService());
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).applyAmount({bound: 'minAmount', raw: '50'})
+      );
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.setFilters).toHaveBeenCalledWith({minAmount: 50});
+    });
+
+    it('debounces each bound independently', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applyAmount({bound: 'minAmount', raw: '50'});
+      effects.applyAmount({bound: 'maxAmount', raw: '90'});
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.setFilters).toHaveBeenCalledWith({minAmount: 50});
+      expect(store.setFilters).toHaveBeenCalledWith({maxAmount: 90});
+    });
+
+    it('records the typed text immediately so the box keeps what was typed', () => {
+      const store = buildStore();
+      configure(buildService());
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).applyAmount({bound: 'minAmount', raw: '1.0'})
+      );
+
+      expect(store.inputText().minAmount).toBe('1.0');
+    });
+
+    it('drops a pending bound when the filters are cleared before it lands', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applyAmount({bound: 'minAmount', raw: '50'});
+      effects.clearFilters();
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.resetFilters).toHaveBeenCalledTimes(1);
+      expect(store.setFilters).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reloadOnFilterChange', () => {
+    it('reloads the first page when the filters change', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).reloadOnFilterChange({
+          ...EMPTY_TRANSACTION_FILTERS,
+          search: 'rent',
+        })
+      );
+
+      expect(store.startFirstPage).toHaveBeenCalled();
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('toTransactionParams', () => {
+  it('sends only paging for the empty filters', () => {
+    expect(toTransactionParams(EMPTY_TRANSACTION_FILTERS, 0)).toEqual({
+      offset: 0,
+      limit: PAGE_SIZE,
+    });
+  });
+
+  it('maps every dimension onto the global endpoint names', () => {
+    expect(
+      toTransactionParams(
+        {
+          accountIds: ['acc-1', 'acc-2'],
+          categories: ['FOOD_AND_DRINK', 'TRAVEL'],
+          transactionType: 'debit',
+          from: '2026-06-01',
+          to: '2026-08-31',
+          minAmount: 10,
+          maxAmount: 200,
+          search: '  coffee ',
+        },
+        PAGE_SIZE
+      )
+    ).toEqual({
+      offset: PAGE_SIZE,
+      limit: PAGE_SIZE,
+      accountId: ['acc-1', 'acc-2'],
+      category: ['FOOD_AND_DRINK', 'TRAVEL'],
+      transactionType: 'debit',
+      from: '2026-06-01',
+      to: '2026-08-31',
+      minAmountUsd: 10,
+      maxAmountUsd: 200,
+      search: 'coffee',
+    });
+  });
+
+  it('keeps a zero bound and drops a non-numeric one', () => {
+    expect(
+      toTransactionParams({...EMPTY_TRANSACTION_FILTERS, minAmount: 0, maxAmount: Number.NaN}, 0)
+    ).toEqual({offset: 0, limit: PAGE_SIZE, minAmountUsd: 0});
   });
 });

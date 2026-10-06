@@ -12,77 +12,94 @@
         }
       </p>
     </div>
-    <div class="flex w-full flex-wrap items-center gap-cmn-2 md:w-auto">
-      <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
-        <cmn-chip [selected]="!activeType()" (clicked)="selectType(null)" data-testid="type-all">
-          All
-        </cmn-chip>
-        <cmn-chip
-          [selected]="activeType() === 'credit'"
-          (clicked)="selectType('credit')"
-          data-testid="type-in"
-        >
-          In
-        </cmn-chip>
-        <cmn-chip
-          [selected]="activeType() === 'debit'"
-          (clicked)="selectType('debit')"
-          data-testid="type-out"
-        >
-          Out
-        </cmn-chip>
-      </div>
-      <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
-        <cmn-input
-          [formControl]="searchControl"
-          type="search"
-          placeholder="Search transactions"
-          autocomplete="off"
-        />
-      </div>
+    <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
+      <cmn-chip
+        [selected]="!store.filters().transactionType"
+        (clicked)="selectType(null)"
+        data-testid="type-all"
+      >
+        All
+      </cmn-chip>
+      <cmn-chip
+        [selected]="store.filters().transactionType === 'credit'"
+        (clicked)="selectType('credit')"
+        data-testid="type-in"
+      >
+        In
+      </cmn-chip>
+      <cmn-chip
+        [selected]="store.filters().transactionType === 'debit'"
+        (clicked)="selectType('debit')"
+        data-testid="type-out"
+      >
+        Out
+      </cmn-chip>
     </div>
   </div>
 
-  @if (store.accounts().length > 1) {
-    <div
-      class="mb-cmn-4 -mx-cmn-4 flex gap-cmn-2 overflow-x-auto px-cmn-4 pb-cmn-1 md:mx-0 md:flex-wrap md:px-0"
-      role="group"
-      aria-label="Account filter"
-    >
-      <cmn-chip [selected]="!activeAccount()" (clicked)="selectAccount(null)" class="shrink-0">
-        All accounts
-      </cmn-chip>
-      @for (account of store.accounts(); track account.accountId) {
-        <cmn-chip
-          [selected]="activeAccount() === account.accountId"
-          (clicked)="selectAccount(account.accountId)"
-          class="shrink-0"
-        >
-          {{ account.label }}
-        </cmn-chip>
-      }
-    </div>
-  }
-
-  @if (activeCategoryLabel() || activeDateRangeLabel()) {
-    <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2">
-      <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >Filter</span
+  <div
+    class="mb-cmn-4 flex flex-wrap items-end gap-cmn-2"
+    role="group"
+    aria-label="Transaction filters"
+    data-testid="ledger-filters"
+  >
+    <cmn-search-input
+      [ngModel]="store.inputText().search"
+      (ngModelChange)="store.applySearch($event)"
+      class="w-full md:w-64"
+      placeholder="Search transactions"
+      ariaLabel="Search transactions"
+    />
+    @if (store.accountOptions().length > 1) {
+      <cmn-multi-select
+        [ngModel]="store.filters().accountIds"
+        [options]="store.accountOptions()"
+        (ngModelChange)="selectAccounts($event)"
+        placeholder="All accounts"
+        ariaLabel="Accounts"
+        data-testid="account-filter"
+      />
+    }
+    <cmn-multi-select
+      [ngModel]="store.filters().categories"
+      [options]="categories.filterOptions()"
+      (ngModelChange)="selectCategories($event)"
+      placeholder="All categories"
+      ariaLabel="Categories"
+      data-testid="category-filter"
+    />
+    <cmn-date-range
+      [ngModel]="store.dateRange()"
+      (ngModelChange)="selectDateRange($event)"
+      groupLabel="Dates"
+      data-testid="date-filter"
+    />
+    <cmn-input
+      [ngModel]="store.inputText().minAmount"
+      (ngModelChange)="store.applyAmount({bound: 'minAmount', raw: $event})"
+      class="w-28"
+      type="number"
+      placeholder="Min $"
+      data-testid="min-amount-filter"
+    />
+    <cmn-input
+      [ngModel]="store.inputText().maxAmount"
+      (ngModelChange)="store.applyAmount({bound: 'maxAmount', raw: $event})"
+      class="w-28"
+      type="number"
+      placeholder="Max $"
+      data-testid="max-amount-filter"
+    />
+    @if (store.hasActiveFilter()) {
+      <cmn-button
+        (clicked)="store.clearFilters()"
+        variant="secondary"
+        size="sm"
+        data-testid="clear-filters"
+        >Clear filters</cmn-button
       >
-      @if (activeCategoryLabel(); as label) {
-        <cmn-chip [selected]="true" (clicked)="clearCategory()">
-          Category: {{ label }}
-          <cmn-icon name="X" size="sm" />
-        </cmn-chip>
-      }
-      @if (activeDateRangeLabel(); as range) {
-        <cmn-chip [selected]="true" (clicked)="clearDateRange()" data-testid="date-range-chip">
-          Dates: {{ range }}
-          <cmn-icon name="X" size="sm" />
-        </cmn-chip>
-      }
-    </div>
-  }
+    }
+  </div>
 
   @if (store.errorMessage()) {
     <cmn-alert variant="error" class="mb-cmn-6 block">
@@ -106,9 +123,9 @@
         }
       </div>
     </cmn-card>
-  } @else if (store.isEmpty() || displayedTransactions().length === 0) {
-    <div class="flex min-h-0 flex-1 items-center justify-center">
-      @if (store.hasActiveFilter() || activeCategoryLabel() || activeDateRangeLabel()) {
+  } @else if (store.isEmpty()) {
+    <div class="flex min-h-0 flex-1 items-center justify-center" data-testid="ledger-empty">
+      @if (store.hasActiveFilter()) {
         <cmn-empty-state
           message="No matching transactions"
           subMessage="Try a different search or filter."
@@ -122,7 +139,10 @@
     </div>
   } @else {
     <div class="md:min-h-0 md:flex-1 md:overflow-auto">
-      @for (group of dayGroups(); track group.dayKey) {
+      <p class="mb-cmn-2 px-cmn-1 text-cmn-xs text-text-secondary" data-testid="ledger-count">
+        Showing {{ store.transactions().length }} of {{ store.totalCount() }}
+      </p>
+      @for (group of store.dayGroups(); track group.dayKey) {
         <section [attr.aria-label]="group.label" class="mb-cmn-4">
           <h2
             class="px-cmn-1 pb-cmn-2 text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"

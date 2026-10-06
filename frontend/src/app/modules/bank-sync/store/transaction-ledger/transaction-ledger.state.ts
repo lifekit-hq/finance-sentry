@@ -1,26 +1,21 @@
+import {EMPTY_TRANSACTION_FILTERS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
+import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
+  /** Server total over the filtered set. */
   totalCount: number;
   hasMore: boolean;
   offset: number;
   status: AsyncStatus;
   errorCode: Nullable<string>;
   monthlyOutflowUsd: number | null;
-  /** Server-side filter: a single account, or null for all. */
-  accountId: Nullable<string>;
-  /** Server-side filter: credits (In), debits (Out), or null for all. */
-  transactionType: Nullable<TransactionType>;
-  /** Server-side filter: inclusive `YYYY-MM-DD` date bounds, or null for open-ended. */
-  from: Nullable<string>;
-  to: Nullable<string>;
-  /** Server-side free-text filter (description / merchant). */
-  search: string;
+  /** Server-side filters, synced to the query string; amount bounds are USD. */
+  filters: TransactionFilters;
   accounts: TransactionAccountOption[];
 }
 
@@ -34,10 +29,6 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   status: 'idle',
   errorCode: null,
   monthlyOutflowUsd: null,
-  accountId: null,
-  transactionType: null,
-  from: null,
-  to: null,
-  search: '',
+  filters: EMPTY_TRANSACTION_FILTERS,
   accounts: [],
 };
