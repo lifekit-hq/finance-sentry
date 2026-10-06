@@ -56,4 +56,28 @@ describe('DashboardRangeUtils', () => {
       expect(DashboardRangeUtils.windowStartKey('6m', january)).toBe('2025-08');
     });
   });
+
+  describe('windowDates', () => {
+    it('spans the first day of the window start month through the last day of this month', () => {
+      expect(DashboardRangeUtils.windowDates('3m', now)).toEqual({
+        from: '2026-06-01',
+        to: '2026-08-31',
+      });
+      expect(DashboardRangeUtils.windowDates('1m', now)).toEqual({
+        from: '2026-08-01',
+        to: '2026-08-31',
+      });
+    });
+
+    it('starts year-to-date in January and handles leap-year month ends', () => {
+      expect(DashboardRangeUtils.windowDates('ytd', now).from).toBe('2026-01-01');
+      expect(DashboardRangeUtils.windowDates('1m', new Date('2028-02-10T00:00:00.000Z')).to).toBe(
+        '2028-02-29'
+      );
+    });
+
+    it('is unbounded for all', () => {
+      expect(DashboardRangeUtils.windowDates('all', now)).toEqual({});
+    });
+  });
 });

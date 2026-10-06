@@ -26,6 +26,7 @@ import {
 } from '../../constants/dashboard/dashboard.constants';
 import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
+import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
 const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   {label: '1M', value: '1m'},
@@ -319,7 +320,9 @@ export class DashboardComponent {
   }
 
   public goToIncome(): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {type: 'credit'}});
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {type: 'credit', ...this.rangeDates()},
+    });
   }
 
   public goToBreakdown(): void {
@@ -327,10 +330,19 @@ export class DashboardComponent {
   }
 
   public goToSpending(): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {type: 'debit'}});
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {type: 'debit', ...this.rangeDates()},
+    });
   }
 
   public onCategoryClick(row: CategoryStat): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {category: row.category}});
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {category: row.category, ...this.rangeDates()},
+    });
+  }
+
+  // The selected range's date bounds, so a drill-down lists the same window the tile totals.
+  private rangeDates(): {from?: string; to?: string} {
+    return DashboardRangeUtils.windowDates(this.store.historyRange());
   }
 }

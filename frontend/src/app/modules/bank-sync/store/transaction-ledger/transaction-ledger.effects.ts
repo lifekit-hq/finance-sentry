@@ -31,9 +31,12 @@ interface EffectsStore {
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
+  from: Signal<Nullable<string>>;
+  to: Signal<Nullable<string>>;
   search: Signal<string>;
   setAccountId: (accountId: Nullable<string>) => void;
   setTransactionType: (transactionType: Nullable<TransactionType>) => void;
+  setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: () => void;
@@ -58,6 +61,8 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
     limit: PAGE_SIZE,
     accountId: store.accountId() ?? undefined,
     transactionType: store.transactionType() ?? undefined,
+    from: store.from() ?? undefined,
+    to: store.to() ?? undefined,
     search: store.search().trim() || undefined,
   };
 }
@@ -127,6 +132,14 @@ export function transactionLedgerEffects(store: EffectsStore) {
       pipe(
         filter(transactionType => transactionType !== store.transactionType()),
         tap(transactionType => store.setTransactionType(transactionType)),
+        tap(() => load())
+      )
+    ),
+    /** Follows the `from`/`to` query params (ISO dates): a changed bound re-queries from the first page. */
+    applyDateRange: rxMethod<{from: Nullable<string>; to: Nullable<string>}>(
+      pipe(
+        filter(({from, to}) => from !== store.from() || to !== store.to()),
+        tap(({from, to}) => store.setDateRange(from, to)),
         tap(() => load())
       )
     ),

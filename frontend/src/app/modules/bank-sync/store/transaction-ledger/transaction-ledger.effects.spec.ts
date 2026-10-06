@@ -115,6 +115,8 @@ function buildStore(initialOffset = 0) {
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
+    from: signal<string | null>(null),
+    to: signal<string | null>(null),
     search: signal(''),
     setLoading: vi.fn(),
     setTransactions: vi.fn(),
@@ -124,6 +126,7 @@ function buildStore(initialOffset = 0) {
     setMonthlyOutflowUsd: vi.fn(),
     setAccountId: vi.fn(),
     setTransactionType: vi.fn(),
+    setDateRange: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
@@ -358,6 +361,35 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType(null));
 
       expect(store.setTransactionType).not.toHaveBeenCalled();
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyDateRange', () => {
+    it('stores changed bounds and reloads with them as from/to', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).applyDateRange({from: '2026-06-01', to: '2026-08-31'})
+      );
+
+      expect(store.setDateRange).toHaveBeenCalledWith('2026-06-01', '2026-08-31');
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores bounds the store already holds', () => {
+      const store = buildStore();
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).applyDateRange({from: null, to: null})
+      );
+
+      expect(store.setDateRange).not.toHaveBeenCalled();
       expect(service.getAllTransactions).not.toHaveBeenCalled();
     });
   });

@@ -2,6 +2,7 @@ import {HISTORY_RANGE_MONTHS} from '../constants/dashboard/dashboard.constants';
 import {type HistoryRange} from '../models/dashboard/dashboard.model';
 
 const MONTH_KEY_PAD = 2;
+const ISO_DATE_LENGTH = 10;
 
 export class DashboardRangeUtils {
   /**
@@ -31,5 +32,21 @@ export class DashboardRangeUtils {
       )
     );
     return `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(MONTH_KEY_PAD, '0')}`;
+  }
+
+  /**
+   * Inclusive `YYYY-MM-DD` bounds of the range's window, matching the months the dashboard
+   * tiles total (first day of the window's first month through the last day of the current
+   * month). `all` is unbounded, so it yields no bounds.
+   */
+  public static windowDates(range: HistoryRange, now = new Date()): {from?: string; to?: string} {
+    if (range === 'all') {
+      return {};
+    }
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    return {
+      from: `${DashboardRangeUtils.windowStartKey(range, now)}-01`,
+      to: monthEnd.toISOString().slice(0, ISO_DATE_LENGTH),
+    };
   }
 }

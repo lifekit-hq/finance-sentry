@@ -64,7 +64,7 @@
     </div>
   }
 
-  @if (activeCategoryLabel()) {
+  @if (activeCategoryLabel() || activeDateRangeLabel()) {
     <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2">
       <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
         >Filter</span
@@ -72,6 +72,12 @@
       @if (activeCategoryLabel(); as label) {
         <cmn-chip [selected]="true" (clicked)="clearCategory()">
           Category: {{ label }}
+          <cmn-icon name="X" size="sm" />
+        </cmn-chip>
+      }
+      @if (activeDateRangeLabel(); as range) {
+        <cmn-chip [selected]="true" (clicked)="clearDateRange()" data-testid="date-range-chip">
+          Dates: {{ range }}
           <cmn-icon name="X" size="sm" />
         </cmn-chip>
       }
@@ -102,7 +108,7 @@
     </cmn-card>
   } @else if (store.isEmpty() || displayedTransactions().length === 0) {
     <div class="flex min-h-0 flex-1 items-center justify-center">
-      @if (store.hasActiveFilter() || activeCategoryLabel()) {
+      @if (store.hasActiveFilter() || activeCategoryLabel() || activeDateRangeLabel()) {
         <cmn-empty-state
           message="No matching transactions"
           subMessage="Try a different search or filter."
