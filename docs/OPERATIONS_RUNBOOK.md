@@ -6,7 +6,7 @@
 
 **Steps:**
 1. Check `sync_jobs` table for `error_message` and `error_code`.
-2. If `error_code = 'MONOBANK_RATE_LIMITED'` / `RATE_LIMIT_EXCEEDED`: the provider is throttling. Wait and let the next scheduled cycle retry (there is no inline retry; the scheduled cycle is the retry).
+2. If `error_code = 'MONOBANK_RATE_LIMITED'`, `MONOBANK_SERVER_ERROR`, `MONOBANK_UNAVAILABLE` / `TRUELAYER_UNAVAILABLE` (network or timeout), or a TrueLayer 429/5xx: the provider is throttling or down. These are classified transient from the typed exception (`ScheduledSyncService.Classify`): the account is not marked failed and no alert fires. Wait and let the next scheduled cycle retry (there is no inline retry; the scheduled cycle is the retry). A failure that is not transient keeps its code in `LastSyncError` (Monobank also its status and response body) and alerts the user.
 3. If `error_code = 'ITEM_LOGIN_REQUIRED'`: User must re-link (expired TrueLayer consent or revoked Monobank token). Account status = `reauth_required`. Notify user.
 4. If `error_code = 'DATABASE_ERROR'`: Check DB connectivity. Run `SELECT 1` against PostgreSQL.
 5. `error_code = 'STALE_JOB_REAPED'` on a `sync_jobs` row: a sync was orphaned by a restart or crash and reaped by `StaleSyncReaperJob`. The account returns to `active` with no error (not a provider failure); the next cycle re-runs it. No action.

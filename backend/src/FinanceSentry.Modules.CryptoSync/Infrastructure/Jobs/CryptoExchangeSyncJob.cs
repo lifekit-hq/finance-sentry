@@ -18,7 +18,9 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 /// A user whose sync fails does not cost the others their sync, and gets an in-app sync-failure
 /// alert at once when the venue rejected the credential, but only after
 /// <see cref="TransientFailureAlertThreshold"/> consecutive ticks when it was a throttle, 5xx,
-/// timeout or network failure (the same per-user streak shape as <c>IBKRSyncJob</c>). A run in which EVERY user failed produced nothing, so it fails the job: that is what
+/// timeout or network failure (the same per-user streak shape as <c>IBKRSyncJob</c>).
+///
+/// A run in which EVERY user failed produced nothing, so it fails the job: that is what
 /// <c>ConsecutiveFailureAlertFilter</c> watches to raise the Telegram alert (#023). Swallowing it
 /// would make a dead key or a venue outage indistinguishable from a quiet run.
 ///
