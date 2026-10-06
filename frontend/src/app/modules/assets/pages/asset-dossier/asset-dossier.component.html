@@ -272,24 +272,30 @@
 
             <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
               @if (valuation.metrics.trailingPe.value !== null) {
-                <cmn-stat-card
-                  [value]="(valuation.metrics.trailingPe.value | number: '1.1-1') + 'x'"
-                  [delta]="valuation.metrics.trailingPe.fiveYearAvg === null ? null : 0"
-                  [deltaLabel]="
-                    '5Y avg ' + (valuation.metrics.trailingPe.fiveYearAvg | number: '1.1-1') + 'x'
-                  "
-                  label="Trailing P/E"
-                />
+                <div>
+                  <cmn-stat-card
+                    [value]="(valuation.metrics.trailingPe.value | number: '1.1-1') + 'x'"
+                    label="Trailing P/E"
+                  />
+                  @if (valuation.metrics.trailingPe.fiveYearAvg !== null) {
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                      5Y avg {{ valuation.metrics.trailingPe.fiveYearAvg | number: '1.1-1' }}x
+                    </p>
+                  }
+                </div>
               }
               @if (valuation.metrics.forwardPe.value !== null) {
-                <cmn-stat-card
-                  [value]="(valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'"
-                  [delta]="valuation.metrics.forwardPe.fiveYearAvg === null ? null : 0"
-                  [deltaLabel]="
-                    '5Y avg ' + (valuation.metrics.forwardPe.fiveYearAvg | number: '1.1-1') + 'x'
-                  "
-                  label="Forward P/E"
-                />
+                <div>
+                  <cmn-stat-card
+                    [value]="(valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'"
+                    label="Forward P/E"
+                  />
+                  @if (valuation.metrics.forwardPe.fiveYearAvg !== null) {
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                      5Y avg {{ valuation.metrics.forwardPe.fiveYearAvg | number: '1.1-1' }}x
+                    </p>
+                  }
+                </div>
               }
               @if (valuation.metrics.evToEbitda.value !== null) {
                 <cmn-stat-card
@@ -382,12 +388,12 @@
                       Hold <span class="font-mono">{{ trend.hold }}</span>
                     </ng-template>
                   </cmn-column>
-                  <cmn-column key="sell" listSlot="secondary">
+                  <cmn-column key="sell" listSlot="trailing-secondary">
                     <ng-template let-trend cmnCell>
                       Sell <span class="font-mono text-status-error">{{ trend.sell }}</span>
                     </ng-template>
                   </cmn-column>
-                  <cmn-column key="strongSell" listSlot="secondary">
+                  <cmn-column key="strongSell" listSlot="trailing-secondary">
                     <ng-template let-trend cmnCell>
                       Strong sell
                       <span class="font-mono text-status-error">{{ trend.strongSell }}</span>
