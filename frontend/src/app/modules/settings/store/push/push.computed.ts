@@ -50,13 +50,14 @@ export function pushComputed(store: StateSignals) {
         ? 'Push notifications are not set up on this server yet.'
         : ''
     ),
-    /** The toggle needs a server that can send and either a registered device or a browser able to register one. */
+    /** Turning push off needs nothing from this browser; turning it on needs a server that can send and a browser able to register. */
     canToggle: computed(
       () =>
-        store.available() &&
         store.action() === 'idle' &&
-        (thisDeviceRegistered() ||
-          (push.isSupported() && !push.requiresInstall() && push.permission() !== 'denied'))
+        (store.pushEnabled() ||
+          (store.available() &&
+            (thisDeviceRegistered() ||
+              (push.isSupported() && !push.requiresInstall() && push.permission() !== 'denied'))))
     ),
     loadErrorMessage: computed(() =>
       store.status() === 'error'

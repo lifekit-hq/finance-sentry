@@ -94,6 +94,25 @@ describe('pushComputed', () => {
     expect(computed().canToggle()).toBe(true);
   });
 
+  it.each([
+    ['the server has push off', () => state.available.set(false)],
+    ['the browser cannot do push', () => browser.isSupported.set(false)],
+    ['iOS needs the app installed', () => browser.requiresInstall.set(true)],
+    ['permission is blocked', () => browser.permission.set('denied')],
+  ])('still allows turning push off when %s and no device is registered', (_label, arrange) => {
+    state.pushEnabled.set(true);
+    arrange();
+
+    expect(computed().canToggle()).toBe(true);
+  });
+
+  it('blocks the toggle while an action is running even when push is on', () => {
+    state.pushEnabled.set(true);
+    state.action.set('saving');
+
+    expect(computed().canToggle()).toBe(false);
+  });
+
   it('explains why the browser cannot subscribe', () => {
     const c = computed();
     expect(c.browserNotice()).toBe('');
