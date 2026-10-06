@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Exceptions;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Logging;
@@ -444,6 +445,16 @@ public class ScheduledSyncService(
     }
 
     private const int ServerErrorStatus = 500;
+
+    private static readonly HashSet<string> LocalFailureCodes =
+    [
+        "MONOBANK_PARSE_ERROR",
+        "TRUELAYER_PARSE_ERROR",
+        "TRUELAYER_NOT_CONFIGURED",
+    ];
+
+    private static bool IsUpstreamServerError(ApiException ex) =>
+        ex.StatusCode >= ServerErrorStatus && !LocalFailureCodes.Contains(ex.ErrorCode);
     private const int MaxLastSyncErrorLength = 500;
 
     /// <summary>
@@ -461,7 +472,7 @@ public class ScheduledSyncService(
                 {
                     "MONOBANK_TOKEN_INVALID" => (mono.ErrorCode, FailureKind.Reauth),
                     "MONOBANK_RATE_LIMITED" => (mono.ErrorCode, FailureKind.Transient),
-                    _ when mono.StatusCode >= ServerErrorStatus => (mono.ErrorCode, FailureKind.Transient),
+                    _ when IsUpstreamServerError(mono) => (mono.ErrorCode, FailureKind.Transient),
                     _ => (mono.ErrorCode, FailureKind.Other),
                 };
 
@@ -474,9 +485,12 @@ public class ScheduledSyncService(
                     || tl.Message.Contains("has been revoked", StringComparison.OrdinalIgnoreCase))
                     return ("ITEM_LOGIN_REQUIRED", FailureKind.Reauth);
 
+                if (IsUpstreamServerError(tl))
+                    return (tl.ErrorCode, FailureKind.Transient);
+
                 return tl.StatusCode switch
                 {
-                    429 or >= ServerErrorStatus => (tl.ErrorCode, FailureKind.Transient),
+                    429 => (tl.ErrorCode, FailureKind.Transient),
                     401 or 403 => (tl.ErrorCode, FailureKind.CredentialSuspect),
                     _ => (tl.ErrorCode, FailureKind.Other),
                 };

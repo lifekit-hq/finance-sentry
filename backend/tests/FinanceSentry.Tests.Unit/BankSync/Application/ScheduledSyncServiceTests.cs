@@ -460,6 +460,30 @@ public class ScheduledSyncServiceTests
     public async Task Failure_TrueLayerThrottleOr5xx_IsTransient_NoAlert(int status, string code)
         => AssertSilentRetry(await FailWith(new TrueLayerException(code, $"TrueLayer API error ({status}) on /accounts", status)));
 
+    [Theory]
+    [InlineData("TRUELAYER_PARSE_ERROR", 500)]
+    [InlineData("TRUELAYER_NOT_CONFIGURED", 503)]
+    public async Task Failure_TrueLayerLocalFailure_IsNotTransient_MarksFailedAndAlerts(string code, int status)
+    {
+        var run = await FailWith(new TrueLayerException(code, "local failure", status));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), "truelayer", It.IsAny<Guid?>(), It.IsAny<string?>(),
+            code, SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_MonobankParseError_IsNotTransient_MarksFailedAndAlerts()
+    {
+        var run = await FailWith(new MonobankException("MONOBANK_PARSE_ERROR", "Failed to parse client info response."));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            "MONOBANK_PARSE_ERROR", SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task Failure_TrueLayerNetworkError_IsTransient_NoAlert()
         => AssertSilentRetry(await FailWith(new HttpRequestException(
