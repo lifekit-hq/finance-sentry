@@ -172,7 +172,8 @@ N consecutive failures → Telegram) remains the app-side slice.
 cd backend && dotnet test
 
 # Frontend unit tests (Vitest)
-cd frontend && npm test
+cd frontend && npm test              # headless Chromium by default
+cd frontend && npm test -- --no-headless   # visible browser, for debugging
 ```
 
 ## Architecture
