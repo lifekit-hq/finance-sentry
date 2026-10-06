@@ -26,11 +26,13 @@ RUN node scripts/precompress.mjs dist/finance-sentry/browser
 
 # ─── Stage 2: brotli module ────────────────────────────────────────────────────
 # nginx-unprivileged ships no brotli module and nginx dynamic modules must match the exact nginx
-# version, so build ngx_brotli against the source of the version the serve stage's base image runs.
+# version, so build ngx_brotli against the source of the version the serve stage runs — both stages
+# run `apk upgrade` first so they resolve the same nginx package.
 # Only the static module is built: it serves the build-time .br files and needs no brotli library.
 FROM nginxinc/nginx-unprivileged:alpine AS brotli-module
 USER root
-RUN apk add --no-cache build-base curl git linux-headers openssl-dev pcre2-dev zlib-dev
+RUN apk upgrade --no-cache \
+    && apk add --no-cache build-base curl git linux-headers openssl-dev pcre2-dev zlib-dev
 ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
 RUN set -eux; \
     version="$(nginx -v 2>&1 | sed 's|.*/||')"; \
