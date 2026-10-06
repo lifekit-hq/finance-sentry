@@ -5,8 +5,8 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 
 /// <summary>
 /// Hangfire job that triggers a scheduled (non-webhook) transaction sync for one account.
-/// AutomaticRetry is disabled at the Hangfire level — retry logic lives inside
-/// <see cref="ITransactionSyncCoordinator"/> / Polly if needed.
+/// AutomaticRetry is disabled at the Hangfire level and there is no inline retry:
+/// a failed run is retried by the next scheduled cycle (see <c>HangfireSetup.PerAccountCron</c>).
 /// </summary>
 public class ScheduledSyncJob(ITransactionSyncCoordinator coordinator)
 {
