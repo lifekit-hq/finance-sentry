@@ -60,14 +60,15 @@ public class StaleSyncReaperJob(
         }
 
         // 2. Release accounts wedged in "syncing" so the next scheduled cycle can re-run them.
-        //    MarkFailed transitions "syncing" -> "failed"; the scheduler then retries cleanly.
+        //    An orphaned sync says nothing about the provider, so the account goes back to "active"
+        //    with no error (MarkTransientRetry) instead of "failed", which would read as a provider failure.
         var stuck = await _accounts.GetBySyncStatusUnscopedAsync("syncing", cancellationToken);
         foreach (var account in stuck)
         {
             if (!startupSweep && account.UpdatedAt > cutoff)
                 continue;
 
-            account.MarkFailed(ReapedErrorCode);
+            account.MarkTransientRetry();
             await _accounts.UpdateAsync(account, cancellationToken);
             resetAccounts++;
         }

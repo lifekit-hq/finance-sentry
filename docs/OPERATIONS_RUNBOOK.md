@@ -6,10 +6,13 @@
 
 **Steps:**
 1. Check `sync_jobs` table for `error_message` and `error_code`.
-2. If `error_code = 'MONOBANK_RATE_LIMITED'` / `RATE_LIMIT_EXCEEDED`: the provider is throttling. Wait and let the next scheduled cycle retry.
+2. If `error_code = 'MONOBANK_RATE_LIMITED'` / `RATE_LIMIT_EXCEEDED`: the provider is throttling. Wait and let the next scheduled cycle retry (there is no inline retry; the scheduled cycle is the retry).
 3. If `error_code = 'ITEM_LOGIN_REQUIRED'`: User must re-link (expired TrueLayer consent or revoked Monobank token). Account status = `reauth_required`. Notify user.
 4. If `error_code = 'DATABASE_ERROR'`: Check DB connectivity. Run `SELECT 1` against PostgreSQL.
-5. Manually trigger re-sync once root cause resolved:
+5. `error_code = 'STALE_JOB_REAPED'` on a `sync_jobs` row: a sync was orphaned by a restart or crash and reaped by `StaleSyncReaperJob`. The account returns to `active` with no error (not a provider failure); the next cycle re-runs it. No action.
+6. IBKR Flex (`IBKRFlexCredentials.LastError`): the daily Flex sync and the dashboard-triggered backfill record any failure there; it raises no alert. Check the column if trades stop updating.
+7. MCP `get_sync_health` reports `reauth_required` accounts and EXPIRED TrueLayer connections as "error".
+8. Manually trigger re-sync once root cause resolved:
    ```
    POST /api/accounts/{accountId}/sync?userId={userId}
    ```

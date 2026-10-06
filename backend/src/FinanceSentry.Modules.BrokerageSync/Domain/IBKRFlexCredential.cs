@@ -14,6 +14,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// </summary>
 public sealed class IBKRFlexCredential
 {
+    /// <summary>Column width of <see cref="LastError"/>.</summary>
+    public const int LastErrorMaxLength = 1000;
+
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
     public bool IsActive { get; private set; }
@@ -75,7 +78,8 @@ public sealed class IBKRFlexCredential
         LastError = null;
     }
 
-    public void RecordUseError(string error) => LastError = error;
+    public void RecordUseError(string error)
+        => LastError = error.Length > LastErrorMaxLength ? error[..LastErrorMaxLength] : error;
 
     public void Deactivate() => IsActive = false;
 
