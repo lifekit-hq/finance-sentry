@@ -489,12 +489,12 @@ public class ScheduledSyncService(
     }
 
     /// <summary>
-    /// What <c>LastSyncError</c> records: the error code, plus the provider's status and body for a
-    /// typed provider failure so a persistently failing account carries its cause.
+    /// What <c>LastSyncError</c> records: the error code, plus Monobank's status and body, so a
+    /// persistently failing account carries its cause.
     /// </summary>
     private static string? DescribeFailure(string? errorCode, Exception ex)
     {
-        if (ex is not (MonobankException or TrueLayerException))
+        if (ex is not MonobankException)
             return errorCode;
 
         var detail = $"{errorCode}: {ex.Message}";

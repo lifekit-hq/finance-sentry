@@ -492,6 +492,16 @@ public class ScheduledSyncServiceTests
     }
 
     [Fact]
+    public async Task Failure_TrueLayerBadRequest_LastSyncErrorKeepsOnlyTheErrorCode()
+    {
+        var run = await FailWith(new TrueLayerException(
+            "TRUELAYER_BAD_REQUEST", "TrueLayer API error (400): {\"error\":\"invalid_request\"}", 400));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.H.Account.LastSyncError.Should().Be("TRUELAYER_BAD_REQUEST");
+    }
+
+    [Fact]
     public async Task Failure_MonobankTokenInvalid_FlagsReauthAndAlertsImmediatelyWithReconnectClass()
     {
         var run = await FailWith(new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400));

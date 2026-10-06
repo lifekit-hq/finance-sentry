@@ -1,3 +1,4 @@
+using System.Net;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -87,8 +88,7 @@ public abstract class CryptoExchangeSyncJob(
 
         if (shouldAlert && !streak.Alerted)
         {
-            await TryGenerateSyncFailureAsync(
-                userId, ex, transient ? SyncFailureClass.Outage : SyncFailureClass.Credential);
+            await TryGenerateSyncFailureAsync(userId, ex, transient ? SyncFailureClass.Outage : ClassifyPermanent(ex));
         }
     }
 
@@ -102,7 +102,26 @@ public abstract class CryptoExchangeSyncJob(
         // Binance keeps its status on the exception rather than as an HttpRequestException; a
         // Revolut X HTTP failure is already covered through its inner HttpRequestException.
         return ex is BinanceException { VenueStatusCode: { } status }
-            && RetryPolicies.IsTransientHttpError((System.Net.HttpStatusCode)status);
+            && RetryPolicies.IsTransientHttpError((HttpStatusCode)status);
+    }
+
+    // Binance codes for a key the venue will not honour: -1002 unauthorized, -1022 bad signature,
+    // -2008 unknown key id, -2014 malformed key, -2015 rejected key / IP / permissions.
+    private static readonly HashSet<int> BinanceCredentialErrorCodes = [-1002, -1022, -2008, -2014, -2015];
+
+    private static SyncFailureClass ClassifyPermanent(Exception ex)
+    {
+        var credentialRejected = ex switch
+        {
+            BinanceException binance =>
+                binance.VenueStatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden
+                || (binance.BinanceErrorCode is { } code && BinanceCredentialErrorCodes.Contains(code)),
+            RevolutXException revolut =>
+                revolut.VenueStatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden,
+            _ => false,
+        };
+
+        return credentialRejected ? SyncFailureClass.Credential : SyncFailureClass.Unknown;
     }
 
     private async Task TryResolveSyncFailureAsync(Guid userId)

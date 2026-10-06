@@ -245,6 +245,27 @@ public class IBKRSyncJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_NonCredentialFailure_AlertsImmediatelyWithUnknownClassNotReconnect()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Unexpected holdings payload."));
+
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, "ibkr", null, null, It.IsAny<string>(), SyncFailureClass.Unknown, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SuccessAfterFailure_ResetsStreakAndResolvesAlert()
     {
         var userId = Guid.NewGuid();

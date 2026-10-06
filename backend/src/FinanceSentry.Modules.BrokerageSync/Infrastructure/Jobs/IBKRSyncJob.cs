@@ -67,8 +67,7 @@ public sealed class IBKRSyncJob(
 
         if (shouldAlert && !streak.Alerted)
         {
-            await TryGenerateSyncFailureAsync(
-                userId, ex, transient ? SyncFailureClass.Outage : SyncFailureClass.Credential);
+            await TryGenerateSyncFailureAsync(userId, ex, transient ? SyncFailureClass.Outage : ClassifyPermanent(ex));
         }
     }
 
@@ -90,6 +89,11 @@ public sealed class IBKRSyncJob(
         return ex is BrokerAuthException { UpstreamStatusCode: HttpStatusCode.Unauthorized } auth
             && auth.Message.Contains(BackendDownMarker, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static SyncFailureClass ClassifyPermanent(Exception ex) =>
+        ex is BrokerAuthException { UpstreamStatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden }
+            ? SyncFailureClass.Credential
+            : SyncFailureClass.Unknown;
 
     private async Task TryResolveSyncFailureAsync(Guid userId)
     {

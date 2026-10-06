@@ -1,3 +1,4 @@
+using System.Net;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -172,7 +173,9 @@ public class CryptoExchangeSyncJobTests
             .ReturnsAsync(new UserAlertPreferences(false, 0m, SyncFailureAlerts: true));
         _syncHandler
             .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new RevolutXException("boom"));
+            .ThrowsAsync(new RevolutXException(
+                "Revolut X rejected the key.",
+                new HttpRequestException("401", inner: null, HttpStatusCode.Unauthorized)));
 
         await CreateRevolutXJob().Invoking(j => j.ExecuteAsync()).Should().ThrowAsync<AggregateException>();
 
@@ -272,6 +275,35 @@ public class CryptoExchangeSyncJobTests
         await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
 
         VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Credential, Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RevolutXLocalFailure_AlertsImmediatelyWithUnknownClassNotReconnect()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new RevolutXException("Revolut X returned an unreadable response for /balances."));
+
+        await RunTicks(() => CreateRevolutXJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.RevolutX, SyncFailureClass.Unknown, Times.Once());
+    }
+
+    [Theory]
+    [InlineData(-1021, 400)]
+    [InlineData(null, 418)]
+    public async Task ExecuteAsync_BinanceNonCredentialFailure_AlertsImmediatelyWithUnknownClassNotReconnect(
+        int? binanceCode, int status)
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new BinanceException("Binance refused the call.", binanceErrorCode: binanceCode, venueStatusCode: status));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Unknown, Times.Once());
     }
 
     [Fact]
