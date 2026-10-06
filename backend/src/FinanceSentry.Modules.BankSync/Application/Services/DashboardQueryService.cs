@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 /// <summary>
@@ -24,9 +25,11 @@ public interface IDashboardQueryService
     /// Returns the full dashboard payload for the given user. <paramref name="months"/> sets
     /// the window for the month-bucketed statistics (money flow, top categories) so every
     /// dashboard widget tells the same time-range story; point-in-time figures (net worth,
-    /// balances) are unaffected.
+    /// balances) are unaffected. <paramref name="windowMonths"/>, when given, is the number of
+    /// calendar months (in-progress one included) the top categories cover, so they can match
+    /// a range narrower than the <paramref name="months"/> history the charts plot.
     /// </summary>
-    Task<DashboardData> GetDashboardDataAsync(Guid userId, int months = 6, CancellationToken ct = default);
+    Task<DashboardData> GetDashboardDataAsync(Guid userId, int months = 6, int? windowMonths = null, CancellationToken ct = default);
 }
 
 /// <inheritdoc />
@@ -51,9 +54,12 @@ public class DashboardQueryService(
     private const int MaxMonths = 120;
 
     /// <inheritdoc />
-    public async Task<DashboardData> GetDashboardDataAsync(Guid userId, int months = 6, CancellationToken ct = default)
+    public async Task<DashboardData> GetDashboardDataAsync(Guid userId, int months = 6, int? windowMonths = null, CancellationToken ct = default)
     {
         months = Math.Clamp(months, MinMonths, MaxMonths);
+        DateTime? categoriesFrom = windowMonths is { } w
+            ? MonthWindow.StartOfMonthsAgo(Math.Clamp(w, MinMonths, months + 1) - 1)
+            : null;
 
         // Sequential — DbContext is scoped per request and not thread-safe.
         // Fan-out would require IDbContextFactory.
@@ -66,8 +72,9 @@ public class DashboardQueryService(
         // twice invites two answers for one month.
         var counterparties = await _counterpartyClassification.ClassifyForWindowAsync(userId, months, ct);
         var flow = await _moneyFlow.GetMonthlyFlowAsync(userId, counterparties, months, ct);
-        // Same window as the money-flow charts so the dashboard tells one story.
-        var topCats = await _categories.GetTopCategoriesAsync(userId, counterparties, limit: 10, months: months, ct);
+        // Same window as the money-flow charts unless a narrower one is asked for, so the
+        // dashboard tells one story.
+        var topCats = await _categories.GetTopCategoriesAsync(userId, counterparties, limit: 10, months: months, from: categoriesFrom, ct);
         var lastSync = await _syncJobs.GetLatestSuccessfulByUserIdAsync(userId, ct);
 
         var cryptoHoldings = _cryptoHoldingsReader is not null

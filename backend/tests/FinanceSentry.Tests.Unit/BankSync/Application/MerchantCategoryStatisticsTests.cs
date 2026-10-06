@@ -200,4 +200,32 @@ public class MerchantCategoryStatisticsTests
         capturedSince!.Value.Should().Be(MonthWindow.StartOfMonthsAgo(3));
         capturedSince!.Value.Day.Should().Be(1, "a window must start on a whole month");
     }
+
+    [Fact]
+    public async Task GetTopCategories_FromNarrowsTheQueryAndDropsEarlierFamilySupport()
+    {
+        var (account, accountId) = MakeAccount();
+        var from = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var txRepoMock = new Mock<ITransactionRepository>();
+        DateTime? capturedSince = null;
+        txRepoMock.Setup(r => r.GetByUserIdSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+                  .Callback<Guid, DateTime, CancellationToken>((_, since, _) => capturedSince = since)
+                  .ReturnsAsync([MakeTx(accountId, 100m, "debit", from.AddDays(3), category: "Food")]);
+        var acctRepoMock = new Mock<IBankAccountRepository>();
+        acctRepoMock.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync([account]);
+        var sut = new MerchantCategoryStatisticsService(
+            txRepoMock.Object, acctRepoMock.Object, new TransferDetectionService());
+
+        var classification = CounterpartyResults.WithFlows(
+            new CounterpartyMonthlyFlow("2026-07", "Mom", FlowRoles.FamilySupport, 0m, 300m),
+            new CounterpartyMonthlyFlow("2026-08", "Mom", FlowRoles.FamilySupport, 0m, 50m));
+
+        var result = await sut.GetTopCategoriesAsync(UserId, classification, limit: 10, months: 6, from: from);
+
+        capturedSince.Should().Be(from);
+        result.Should().ContainSingle(c => c.Category == CategoryKeys.FamilySupport)
+              .Which.TotalSpend.Should().Be(50m);
+    }
 }

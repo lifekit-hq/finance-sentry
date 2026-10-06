@@ -24,13 +24,16 @@ public interface IMerchantCategoryStatisticsService
     /// family support is visible in the category breakdown without mixing it into
     /// regular spend categories. The <paramref name="classification"/> is the same
     /// once-per-request result the money-flow reader uses, so a movement can never be
-    /// spend here and a transfer there.
+    /// spend here and a transfer there. A non-null <paramref name="from"/> narrows the window
+    /// to start at that instant (month start) instead of <paramref name="months"/> complete
+    /// months back, so the breakdown can match a range that begins mid-window.
     /// </summary>
     Task<IReadOnlyList<CategoryStat>> GetTopCategoriesAsync(
         Guid userId,
         CounterpartyClassificationResult classification,
         int limit = 10,
         int months = 6,
+        DateTime? from = null,
         CancellationToken ct = default);
 }
 
@@ -50,11 +53,13 @@ public class MerchantCategoryStatisticsService(
           CounterpartyClassificationResult classification,
           int limit = 10,
           int months = 6,
+          DateTime? from = null,
           CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(classification);
 
-        var since = MonthWindow.StartOfMonthsAgo(months);
+        var since = from ?? MonthWindow.StartOfMonthsAgo(months);
+        var sinceMonth = since.ToString("yyyy-MM");
         var txList = await _transactions.GetByUserIdSinceAsync(userId, since, ct);
 
         var accountList = await _accounts.GetByUserIdAsync(userId, ct);
@@ -81,7 +86,8 @@ public class MerchantCategoryStatisticsService(
         // that was income, not a refund. Only the family-support role is spend; investment
         // routing left the bank but not the user.
         var familySupportUsd = classification.MonthlyFlows
-            .Where(f => f.FlowRole == FlowRoles.FamilySupport)
+            .Where(f => f.FlowRole == FlowRoles.FamilySupport
+                        && (from is null || string.CompareOrdinal(f.Month, sinceMonth) >= 0))
             .Sum(f => f.OutflowUsd);
 
         var totalSpend = debits.Sum(ToUsd) + familySupportUsd;

@@ -5,13 +5,13 @@ import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap, timer} from 'rxjs';
 
-import {HISTORY_RANGE_MONTHS} from '../../constants/dashboard/dashboard.constants';
 import {
   type DashboardData,
   type HistoryRange,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
 interface EffectsStore {
   setLoading: () => void;
@@ -40,16 +40,21 @@ export function dashboardEffects(store: EffectsStore) {
       pipe(
         tap(() => store.setLoading()),
         switchMap(range =>
-          bankSyncService.getDashboardData(HISTORY_RANGE_MONTHS[range]).pipe(
-            tap(data => {
-              store.setData(data);
-              store.setSuccess();
-            }),
-            catchError((err: unknown) => {
-              store.setError(extractErrorCode(err));
-              return EMPTY;
-            })
-          )
+          bankSyncService
+            .getDashboardData(
+              DashboardRangeUtils.months(range),
+              DashboardRangeUtils.windowMonths(range)
+            )
+            .pipe(
+              tap(data => {
+                store.setData(data);
+                store.setSuccess();
+              }),
+              catchError((err: unknown) => {
+                store.setError(extractErrorCode(err));
+                return EMPTY;
+              })
+            )
         )
       )
     ),
@@ -83,7 +88,7 @@ interface HookStore extends EffectsStore {
   setHistoryRange: (range: HistoryRange) => void;
 }
 
-const HISTORY_RANGE_VALUES: readonly HistoryRange[] = ['3m', '6m', '1y', 'all'];
+const HISTORY_RANGE_VALUES: readonly HistoryRange[] = ['1m', '3m', '6m', 'ytd', '1y', 'all'];
 
 function isHistoryRange(value: string | null): value is HistoryRange {
   return value !== null && (HISTORY_RANGE_VALUES as readonly string[]).includes(value);
@@ -126,7 +131,10 @@ export function dashboardHooks(store: HookStore): void {
       switchMap(() =>
         timer(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS).pipe(
           switchMap(() =>
-            bankSyncService.getDashboardData(HISTORY_RANGE_MONTHS[untracked(store.historyRange)])
+            bankSyncService.getDashboardData(
+              DashboardRangeUtils.months(untracked(store.historyRange)),
+              DashboardRangeUtils.windowMonths(untracked(store.historyRange))
+            )
           ),
           tap(data => untracked(() => store.setData(data))),
           catchError((err: unknown) => {

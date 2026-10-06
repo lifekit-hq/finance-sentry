@@ -27,6 +27,6 @@ public class GetTopCategoriesQueryHandler(
             request.UserId, request.Months, cancellationToken);
 
         return await _service.GetTopCategoriesAsync(
-            request.UserId, counterparties, request.Limit, request.Months, cancellationToken);
+            request.UserId, counterparties, request.Limit, request.Months, ct: cancellationToken);
     }
 }
