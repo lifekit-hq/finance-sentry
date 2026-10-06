@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Sources;
 
+using System.Globalization;
 using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
@@ -190,7 +191,14 @@ public sealed class TrendForcePageSource(
         var raw = timeEl?.GetAttribute("datetime")
             ?? node.QuerySelector("time, .date, .time, h4.color-green, .bd-month, .block-data")?.TextContent;
 
-        return DateTimeOffset.TryParse(raw?.Trim(), out var parsed) ? parsed : DateTimeOffset.UtcNow;
+        // A date with no offset is UTC, never the host's local zone; one with an offset keeps its instant.
+        return DateTimeOffset.TryParse(
+            raw?.Trim(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var parsed)
+            ? parsed
+            : DateTimeOffset.UtcNow;
     }
 
     private static string? ExtractSummary(IElement node)
