@@ -1,4 +1,5 @@
 using System.Net;
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -7,6 +8,7 @@ using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
+using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -21,6 +23,7 @@ public class CryptoExchangeSyncJobTests
     private readonly Mock<IAlertGeneratorService> _alerts = new(MockBehavior.Loose);
     private readonly Mock<IUserAlertPreferencesReader> _userPrefs = new(MockBehavior.Loose);
     private readonly IJobFailureStreakStore _failureStreaks = new InMemoryJobFailureStreakStore();
+    private readonly Mock<IConnectionHealthShadow> _connectionHealth = new(MockBehavior.Loose);
 
     private sealed class InMemoryJobFailureStreakStore : IJobFailureStreakStore
     {
@@ -33,10 +36,10 @@ public class CryptoExchangeSyncJobTests
     }
 
     private BinanceSyncJob CreateBinanceJob() =>
-        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, NullLogger<BinanceSyncJob>.Instance);
+        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, _connectionHealth.Object, NullLogger<BinanceSyncJob>.Instance);
 
     private RevolutXSyncJob CreateRevolutXJob() =>
-        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, NullLogger<RevolutXSyncJob>.Instance);
+        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, _connectionHealth.Object, NullLogger<RevolutXSyncJob>.Instance);
 
     private static ExchangeCredential MakeCredential(Guid userId, string provider = CryptoExchangeProvider.Binance) =>
         ExchangeCredential.Create(userId, provider, [1], [2], [3], [4], [5], [6], 1);
@@ -351,5 +354,76 @@ public class CryptoExchangeSyncJobTests
         await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 5);
 
         VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
+    }
+
+    // ── Connection health, shadow mode (Option B, S1) ───────────────────────
+
+    public static TheoryData<Exception, FailureClass, FailureStrength> ShadowFailureCases => new()
+    {
+        { new BinanceException("Invalid API-key", binanceErrorCode: -2015, venueStatusCode: 401), FailureClass.Credential, FailureStrength.Definitive },
+        { new BinanceException("Unauthorized", venueStatusCode: 401), FailureClass.Credential, FailureStrength.Suspect },
+        { new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500), FailureClass.Transient, FailureStrength.Definitive },
+        { new CryptoTradeHistoryException(CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)), FailureClass.Transient, FailureStrength.Definitive },
+        { new BinanceException("Binance refused the call.", binanceErrorCode: -1021, venueStatusCode: 400), FailureClass.Unknown, FailureStrength.Definitive },
+    };
+
+    [Theory]
+    [MemberData(nameof(ShadowFailureCases))]
+    public async Task ExecuteAsync_Failure_RecordsTheJobsOwnClassificationWithTheShadow(
+        Exception ex, FailureClass expectedClass, FailureStrength expectedStrength)
+    {
+        var credential = MakeCredential(Guid.NewGuid());
+        GivenActive(CryptoExchangeProvider.Binance, credential);
+        GivenSyncFails(ex);
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        _connectionHealth.Verify(s => s.RecordFailureAsync(
+            It.Is<ConnectionHealthSubject>(subject =>
+                subject.Id == credential.Id && subject.Provider == CryptoExchangeProvider.Binance && subject.Kind == nameof(ExchangeCredential)),
+            It.IsAny<ConnectionHealth>(),
+            It.Is<ProviderFailure>(f => f.Class == expectedClass && f.Strength == expectedStrength),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Success_RecordsSuccessWithTheShadow()
+    {
+        var credential = MakeCredential(Guid.NewGuid(), CryptoExchangeProvider.RevolutX);
+        GivenActive(CryptoExchangeProvider.RevolutX, credential);
+
+        await CreateRevolutXJob().ExecuteAsync();
+
+        _connectionHealth.Verify(s => s.RecordSuccessAsync(
+            It.Is<ConnectionHealthSubject>(subject => subject.Id == credential.Id && subject.Provider == CryptoExchangeProvider.RevolutX),
+            It.IsAny<ConnectionHealth>(),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithTheRealShadow_AlertsExactlyAsBefore_WhileRecordingTheWouldBeState()
+    {
+        // Three quick 500s: today's streak gate alerts at the third tick; the policy, needing 2 h without
+        // success as well, would still hold the connection Degraded. That gap is what shadow mode measures.
+        var userId = Guid.NewGuid();
+        var credential = MakeCredential(userId);
+        GivenActive(CryptoExchangeProvider.Binance, credential);
+        GivenAlertsOn(userId);
+        GivenSyncFails(new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500));
+        var shadow = ShadowRecorders.Create();
+        BinanceSyncJob CreateJobWithShadow() =>
+            new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, shadow, NullLogger<BinanceSyncJob>.Instance);
+
+        await RunTicks(() => CreateJobWithShadow().ExecuteAsync(), 2);
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
+
+        await RunTicks(() => CreateJobWithShadow().ExecuteAsync(), 1);
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Outage, Times.Once());
+
+        credential.Health.State.Should().Be(ConnectionHealthState.Degraded);
+        credential.Health.ConsecutiveFailures.Should().Be(3);
+        _credentialRepo.Verify(r => r.SaveHealthUnscopedAsync(credential.Id, It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
     }
 }

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync;
 
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
@@ -136,6 +137,7 @@ public static class BankSyncModule
     public static IServiceCollection AddBankSyncModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddConnectionHealthShadow(config);
         var connectionString = config.GetConnectionString("Default")!;
 
         services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));

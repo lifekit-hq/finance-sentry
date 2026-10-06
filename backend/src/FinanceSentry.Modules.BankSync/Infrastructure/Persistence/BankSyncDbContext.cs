@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Connections;
 using Microsoft.EntityFrameworkCore;
 using FinanceSentry.Modules.BankSync.Domain;
 
@@ -52,6 +53,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         bab.HasMany(ba => ba.SyncJobs).WithOne(sj => sj.Account).HasForeignKey(sj => sj.AccountId).OnDelete(DeleteBehavior.Cascade);
         bab.HasOne(ba => ba.MonobankCredential).WithMany(mc => mc.BankAccounts).HasForeignKey(ba => ba.MonobankCredentialId).OnDelete(DeleteBehavior.SetNull).IsRequired(false);
         bab.HasOne(ba => ba.TrueLayerConnection).WithMany(tc => tc.BankAccounts).HasForeignKey(ba => ba.TrueLayerConnectionId).OnDelete(DeleteBehavior.SetNull).IsRequired(false);
+        bab.HasConnectionHealth(ba => ba.Health);
 
         var mcb = modelBuilder.Entity<MonobankCredential>();
         mcb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
@@ -63,6 +65,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         mcb.Property(mc => mc.AuthTag).IsRequired();
         mcb.Property(mc => mc.KeyVersion).HasDefaultValue(1);
         mcb.Property(mc => mc.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        mcb.HasConnectionHealth(mc => mc.Health);
 
         var tlb = modelBuilder.Entity<TrueLayerConnection>();
         tlb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
@@ -79,6 +82,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         tlb.Property(tc => tc.AuthTag).IsRequired();
         tlb.Property(tc => tc.KeyVersion).HasDefaultValue(1);
         tlb.Property(tc => tc.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        tlb.HasConnectionHealth(tc => tc.Health);
 
         var tb = modelBuilder.Entity<Transaction>();
         tb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);

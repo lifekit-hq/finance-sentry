@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BrokerageSync;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -50,6 +51,7 @@ public static class BrokerageSyncModule
     public static IServiceCollection AddBrokerageSyncModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddConnectionHealthShadow(config);
         services.AddDbContext<BrokerageSyncDbContext>(
             o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 

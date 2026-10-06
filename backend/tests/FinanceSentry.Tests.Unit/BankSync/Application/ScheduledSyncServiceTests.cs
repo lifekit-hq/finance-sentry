@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Infrastructure.Encryption;
 using Hangfire;
 using FinanceSentry.Infrastructure.Logging;
@@ -10,6 +11,7 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
+using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -39,12 +41,14 @@ public class ScheduledSyncServiceTests
         Mock<IBankProvider> Provider,
         Mock<FinanceSentry.Core.Cqrs.IEventBus> EventBus,
         Mock<ITrueLayerTokenRefreshService> TrueLayerTokenRefresh,
+        Mock<IConnectionHealthShadow> ConnectionHealth,
         BankAccount Account,
         TrueLayerConnection Connection);
 
     private static Harness BuildSut(
         Mock<FinanceSentry.Core.Interfaces.IAlertGeneratorService>? alertGen = null,
-        Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader>? userPrefs = null)
+        Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader>? userPrefs = null,
+        IConnectionHealthShadow? shadow = null)
     {
         var accountRepo = new Mock<IBankAccountRepository>();
         var txRepo = new Mock<ITransactionRepository>();
@@ -64,6 +68,7 @@ public class ScheduledSyncServiceTests
         userPrefs ??= new Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader>();
         var eventBus = new Mock<FinanceSentry.Core.Cqrs.IEventBus>();
         var trueLayerTokenRefresh = new Mock<ITrueLayerTokenRefreshService>();
+        var connectionHealth = new Mock<IConnectionHealthShadow>();
 
         var sut = new ScheduledSyncService(
             accountRepo.Object, txRepo.Object, jobRepo.Object,
@@ -72,7 +77,7 @@ public class ScheduledSyncServiceTests
             truelayerConnections.Object, truelayerClient.Object,
             monobankBalanceCache,
             alertGen.Object, userPrefs.Object, eventBus.Object,
-            trueLayerTokenRefresh.Object);
+            trueLayerTokenRefresh.Object, shadow ?? connectionHealth.Object);
 
         // Default TrueLayer wiring: a linked connection with a decryptable refresh token that
         // exchanges for an access token without rotating, and a provider resolvable by name.
@@ -114,7 +119,7 @@ public class ScheduledSyncServiceTests
 
         return new Harness(sut, accountRepo, txRepo, jobRepo, encryption, dedup,
             providerFactory, truelayerConnections, truelayerClient, provider, eventBus,
-            trueLayerTokenRefresh, account, connection);
+            trueLayerTokenRefresh, connectionHealth, account, connection);
     }
 
     private static void SetupProviderCandidates(Harness h, IReadOnlyList<TransactionCandidate> candidates)
@@ -421,14 +426,15 @@ public class ScheduledSyncServiceTests
 
     // ── Typed classification (one test per rule) ────────────────────────────
 
-    private static async Task<(Harness H, Mock<IAlertGeneratorService> Alerts, SyncResult Result)> FailWith(Exception ex)
+    private static async Task<(Harness H, Mock<IAlertGeneratorService> Alerts, SyncResult Result)> FailWith(
+        Exception ex, IConnectionHealthShadow? shadow = null)
     {
         var alertGen = new Mock<IAlertGeneratorService>();
         var userPrefs = new Mock<IUserAlertPreferencesReader>();
         userPrefs.Setup(p => p.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                  .ReturnsAsync(new UserAlertPreferences(false, 0m, true));
 
-        var h = BuildSut(alertGen, userPrefs);
+        var h = BuildSut(alertGen, userPrefs, shadow);
         h.Provider
             .Setup(p => p.SyncTransactionsAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
@@ -545,6 +551,85 @@ public class ScheduledSyncServiceTests
         run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
             It.IsAny<string?>(), SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Connection health, shadow mode (Option B, S1) ───────────────────────
+
+    public static TheoryData<Exception, FailureClass, FailureStrength> ShadowFailureCases => new()
+    {
+        { new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400), FailureClass.Credential, FailureStrength.Definitive },
+        { new TrueLayerException("TRUELAYER_UNAUTHORIZED", "TrueLayer API error (401)", 401), FailureClass.Credential, FailureStrength.Suspect },
+        { new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429), FailureClass.Transient, FailureStrength.Definitive },
+        { new MonobankException("MONOBANK_PARSE_ERROR", "Failed to parse client info response."), FailureClass.Internal, FailureStrength.Definitive },
+        { new InvalidOperationException("boom"), FailureClass.Unknown, FailureStrength.Definitive },
+    };
+
+    [Theory]
+    [MemberData(nameof(ShadowFailureCases))]
+    public async Task Failure_RecordsTheSyncsOwnClassificationWithTheShadow(
+        Exception ex, FailureClass expectedClass, FailureStrength expectedStrength)
+    {
+        var run = await FailWith(ex);
+
+        run.H.ConnectionHealth.Verify(s => s.RecordFailureAsync(
+            It.Is<ConnectionHealthSubject>(subject =>
+                subject.Id == run.H.Account.Id && subject.UserId == UserId && subject.Kind == nameof(BankAccount)),
+            It.IsAny<ConnectionHealth>(),
+            It.Is<ProviderFailure>(f => f.Class == expectedClass && f.Strength == expectedStrength),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        run.H.ConnectionHealth.Verify(s => s.RecordSuccessAsync(
+            It.IsAny<ConnectionHealthSubject>(), It.IsAny<ConnectionHealth>(),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Success_RecordsSuccessWithTheShadow()
+    {
+        var h = BuildSut();
+        SetupProviderCandidates(h, []);
+        h.Dedup.Setup(d => d.FilterDuplicates(It.IsAny<IEnumerable<TransactionCandidate>>(), It.IsAny<IReadOnlySet<string>>()))
+             .Returns([]);
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeTrue();
+        h.ConnectionHealth.Verify(s => s.RecordSuccessAsync(
+            It.Is<ConnectionHealthSubject>(subject => subject.Id == h.Account.Id && subject.Provider == "truelayer"),
+            It.IsAny<ConnectionHealth>(),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_WithTheRealShadow_StoresTheWouldBeStateAndLeavesTheAlertAsItWas()
+    {
+        var shadow = ShadowRecorders.Create();
+
+        var run = await FailWith(new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400), shadow);
+
+        run.H.Account.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        run.H.AccountRepo.Verify(r => r.SaveHealthUnscopedAsync(
+            run.H.Account.Id,
+            It.Is<ConnectionHealth>(health => health.State == ConnectionHealthState.ActionRequired),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // The same alert as without the shadow: one, immediately, with the reconnect class.
+        run.H.Account.SyncStatus.Should().Be("reauth_required");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            "MONOBANK_TOKEN_INVALID", SyncFailureClass.Credential, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task TransientFailure_WithTheRealShadow_StaysSilentAsBefore()
+    {
+        var shadow = ShadowRecorders.Create();
+
+        var run = await FailWith(new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429), shadow);
+
+        AssertSilentRetry(run);
+        run.H.Account.Health.State.Should().Be(ConnectionHealthState.Degraded);
+        run.H.Account.Health.ConsecutiveFailures.Should().Be(1);
     }
 
     // ── Balance refresh keeps the prior value when the endpoint trips ───────

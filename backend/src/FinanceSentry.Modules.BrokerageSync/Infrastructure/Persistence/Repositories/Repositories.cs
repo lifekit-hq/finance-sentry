@@ -1,4 +1,6 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +48,13 @@ public sealed class IBKRCredentialRepository : IIBKRCredentialRepository
         return await _context.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.IsActive)
             .ToListAsync(ct);
+    }
+
+    public async Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default)
+    {
+        await _context.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Id == credentialId)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), ct);
     }
 
     public void Update(IBKRCredential credential)
@@ -114,6 +123,13 @@ public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
             .Where(c => c.Id == credential.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastError, lastError), ct);
         _context.ChangeTracker.Clear();
+    }
+
+    public async Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default)
+    {
+        await _context.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Id == credentialId)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), ct);
     }
 }
 

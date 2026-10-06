@@ -2,6 +2,8 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Infrastructure.Connections;
 using Microsoft.EntityFrameworkCore;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -81,6 +83,13 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
         _context.BankAccounts.Update(account);
         await _context.SaveChangesAsync(cancellationToken);
         return account;
+    }
+
+    public async Task SaveHealthUnscopedAsync(Guid accountId, ConnectionHealth health, CancellationToken cancellationToken = default)
+    {
+        await AllUsers
+            .Where(ba => ba.Id == accountId)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(ba => ba.Health, health), cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)

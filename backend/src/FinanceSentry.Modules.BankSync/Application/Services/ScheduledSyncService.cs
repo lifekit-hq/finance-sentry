@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Exceptions;
 using FinanceSentry.Core.Interfaces;
@@ -52,7 +53,8 @@ public class ScheduledSyncService(
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
     IEventBus eventBus,
-    ITrueLayerTokenRefreshService trueLayerTokenRefresh) : IScheduledSyncService
+    ITrueLayerTokenRefreshService trueLayerTokenRefresh,
+    IConnectionHealthShadow connectionHealth) : IScheduledSyncService
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ITransactionRepository _transactions = transactions;
@@ -69,6 +71,7 @@ public class ScheduledSyncService(
     private readonly IUserAlertPreferencesReader _userPreferences = userPreferences;
     private readonly IEventBus _eventBus = eventBus;
     private readonly ITrueLayerTokenRefreshService _trueLayerTokenRefresh = trueLayerTokenRefresh;
+    private readonly IConnectionHealthShadow _connectionHealth = connectionHealth;
 
     /// <inheritdoc />
     public async Task<SyncResult> PerformFullSyncAsync(
@@ -107,6 +110,8 @@ public class ScheduledSyncService(
                     $"Unknown provider '{account.Provider}' for account {account.Id}.");
 
             await EvaluateAlertsAfterSuccessAsync(account, ct);
+            await _connectionHealth.RecordSuccessAsync(
+                HealthSubject(account), account.Health, (health, c) => SaveHealthAsync(account, health, c), ct);
             await PublishSyncCompletedAsync(account, result, ct);
 
             return result;
@@ -138,6 +143,13 @@ public class ScheduledSyncService(
             {
                 // best-effort
             }
+
+            await _connectionHealth.RecordFailureAsync(
+                HealthSubject(account),
+                account.Health,
+                ToProviderFailure(errorCode, failureClass),
+                (health, c) => SaveHealthAsync(account, health, c),
+                ct);
 
             _logger.SyncFailed(job.CorrelationId ?? job.Id.ToString(), accountId,
                 errorCode ?? "UNKNOWN", ex.Message, job.RetryCount);
@@ -443,6 +455,28 @@ public class ScheduledSyncService(
         /// <summary>Anything else: the account is marked failed and the user is told.</summary>
         Other,
     }
+
+    private static ConnectionHealthSubject HealthSubject(Domain.BankAccount account) =>
+        new(account.Provider, nameof(Domain.BankAccount), account.Id, account.UserId);
+
+    private Task SaveHealthAsync(Domain.BankAccount account, ConnectionHealth health, CancellationToken ct)
+    {
+        account.ApplyHealth(health);
+        return _accounts.SaveHealthUnscopedAsync(account.Id, health, ct);
+    }
+
+    /// <summary>
+    /// Shadow mode (Option B, S1): this sync's own failure decision, read into the policy's taxonomy so the
+    /// policy's verdict can be compared with the alert this sync raises. The provider classifiers (S2) replace it.
+    /// </summary>
+    private static ProviderFailure ToProviderFailure(string? code, FailureKind kind) => kind switch
+    {
+        FailureKind.Reauth => ProviderFailure.CredentialDefinitive(code),
+        FailureKind.CredentialSuspect => ProviderFailure.CredentialSuspect(code),
+        FailureKind.Transient => ProviderFailure.Transient(code),
+        _ when code is not null && LocalFailureCodes.Contains(code) => ProviderFailure.Internal(code),
+        _ => ProviderFailure.Unknown(code),
+    };
 
     private const int ServerErrorStatus = 500;
 

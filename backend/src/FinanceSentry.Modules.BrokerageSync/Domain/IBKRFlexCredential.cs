@@ -1,3 +1,5 @@
+using FinanceSentry.Core.Connections;
+
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
 /// <summary>
@@ -94,4 +96,12 @@ public sealed class IBKRFlexCredential
         TokenAuthTag = tokenAuthTag;
         KeyVersion = keyVersion;
     }
+
+    /// <summary>
+    /// Health of this connection by the connection-health policy. Shadow mode (Option B, S1): recorded on
+    /// each sync, read by nothing that alerts yet.
+    /// </summary>
+    public ConnectionHealth Health { get; private set; } = new();
+
+    public void ApplyHealth(ConnectionHealth health) => Health = health;
 }
