@@ -99,6 +99,9 @@ public class MonobankHttpClient(HttpClient http)
         await SendWithRetryAsync(request, token, ct);
     }
 
+    private const int MaxErrorBodyLength = 500;
+    private const int ServerErrorStatus = 500;
+
     private async Task<HttpResponseMessage> SendWithRetryAsync(
         HttpRequestMessage request, string token, CancellationToken ct)
     {
@@ -126,7 +129,20 @@ public class MonobankHttpClient(HttpClient http)
                 throw new MonobankException("MONOBANK_TOKEN_INVALID",
                     "Invalid or expired Monobank token.", 400);
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                // Keep the status and Monobank's own reason: EnsureSuccessStatusCode() threw both away,
+                // which left a persistently failing account with no recorded cause.
+                var status = (int)response.StatusCode;
+                var body = await response.Content.ReadAsStringAsync(ct);
+                if (body.Length > MaxErrorBodyLength)
+                    body = body[..MaxErrorBodyLength];
+                throw new MonobankException(
+                    status >= ServerErrorStatus ? "MONOBANK_SERVER_ERROR" : "MONOBANK_HTTP_ERROR",
+                    $"Monobank API error ({status}): {body}",
+                    status);
+            }
+
             return response;
         }
 

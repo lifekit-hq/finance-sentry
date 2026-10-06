@@ -143,7 +143,7 @@ public sealed class NewsIngestionJob(
         var userIds = await banking.GetActiveUserIdsAsync(ct);
         foreach (var userId in userIds)
         {
-            await alerts.GenerateSyncFailureAlertAsync(userId, provider, null, null, reason, ct);
+            await alerts.GenerateSyncFailureAlertAsync(userId, provider, null, null, reason, SyncFailureClass.Unknown, ct);
         }
     }
 }

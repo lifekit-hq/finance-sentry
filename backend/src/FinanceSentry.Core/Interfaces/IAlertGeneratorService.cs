@@ -40,6 +40,7 @@ public interface IAlertGeneratorService
         Guid? accountId,
         string? accountName,
         string? errorCode,
+        SyncFailureClass failureClass,
         CancellationToken ct = default);
 
     Task ResolveSyncFailureAlertAsync(
@@ -508,4 +509,21 @@ public static class EarningsAheadEventType
 {
     public const string Earnings = "earnings";
     public const string ExDividend = "ex_dividend";
+}
+
+/// <summary>
+/// What a sync failure says about the connection. Drives the alert copy: only
+/// <see cref="Credential"/> tells the user to reconnect, because telling them so about a provider
+/// outage sends them to fix something that is not broken.
+/// </summary>
+public enum SyncFailureClass
+{
+    /// <summary>The provider rejected the credential or consent; the user has to act.</summary>
+    Credential,
+
+    /// <summary>The provider or network is failing and persisted past the retry gate; the user need not act.</summary>
+    Outage,
+
+    /// <summary>The cause is not known to be either.</summary>
+    Unknown,
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Domain;
@@ -143,7 +144,7 @@ public class IBKRSyncJobTests
 
         _alerts.Verify(
             a => a.GenerateSyncFailureAlertAsync(
-                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -168,7 +169,56 @@ public class IBKRSyncJobTests
 
         _alerts.Verify(
             a => a.GenerateSyncFailureAlertAsync(
-                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Http401WithBackendDownBody_IsTransient_NoAlertOnFirstTick()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR live-session-token request failed (401): {\"error\":\"backend down\",\"statusCode\":401}",
+                "IBKR", HttpStatusCode.Unauthorized));
+
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BackendDownPersists_EscalatesWithOutageCopyNotReconnect()
+    {
+        var userId = Guid.NewGuid();
+
+        _credentialRepo
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MakeCredential(userId)]);
+
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BrokerAuthException(
+                "IBKR live-session-token request failed (401): {\"error\":\"backend down\",\"statusCode\":401}",
+                "IBKR", HttpStatusCode.Unauthorized));
+
+        await CreateJob().ExecuteAsync();
+        await CreateJob().ExecuteAsync();
+        await CreateJob().ExecuteAsync();
+
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, "ibkr", null, null, It.IsAny<string>(), SyncFailureClass.Outage, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -190,7 +240,7 @@ public class IBKRSyncJobTests
 
         _alerts.Verify(
             a => a.GenerateSyncFailureAlertAsync(
-                userId, "ibkr", null, null, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                userId, "ibkr", null, null, It.IsAny<string>(), SyncFailureClass.Credential, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

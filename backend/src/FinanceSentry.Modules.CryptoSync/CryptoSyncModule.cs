@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.CryptoSync;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
@@ -42,6 +43,7 @@ public static class CryptoSyncModule
             o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
 
         services.AddHttpClient<BinanceHttpClient>();
         services.AddSingleton<BinanceHoldingsAggregator>();

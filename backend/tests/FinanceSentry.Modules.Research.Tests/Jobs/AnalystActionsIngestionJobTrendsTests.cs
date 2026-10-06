@@ -70,13 +70,13 @@ public sealed class AnalystActionsIngestionJobTrendsTests
         await sut.ExecuteAsync();
         alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never,
+            It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Never,
             "first failure must not alert (2-strike rule)");
 
         await sut.ExecuteAsync();
         alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), "analyst-actions:finnhub", It.IsAny<Guid?>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class AnalystActionsIngestionJobTrendsTests
 
         alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), "analyst-actions:finnhub", It.IsAny<Guid?>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static AnalystActionsIngestionJob CreateSut(

@@ -119,7 +119,8 @@ public sealed class BinanceHttpClient
             catch (JsonException) { /* fall through with null */ }
             throw new BinanceException(
                 error?.Message ?? $"Binance API error: HTTP {(int)response.StatusCode}",
-                error?.Code);
+                error?.Code,
+                (int)response.StatusCode);
         }
 
         return JsonSerializer.Deserialize<T>(body)

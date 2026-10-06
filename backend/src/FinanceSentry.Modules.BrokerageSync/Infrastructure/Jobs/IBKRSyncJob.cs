@@ -1,3 +1,4 @@
+using System.Net;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -26,6 +27,8 @@ public sealed class IBKRSyncJob(
     // such blip shouldn't page anyone. Escalate only once it persists across several
     // consecutive ticks (~45 min) — that's a real, sticky failure, not a blip.
     private const int TransientFailureAlertThreshold = 3;
+
+    private const string BackendDownMarker = "backend down";
 
     public async Task ExecuteAsync()
     {
@@ -57,12 +60,16 @@ public sealed class IBKRSyncJob(
         var streak = failureStreaks.Get(key);
         var count = streak.Count + 1;
 
-        var shouldAlert = !IsTransient(ex) || count >= TransientFailureAlertThreshold;
+        var transient = IsTransient(ex);
+        var shouldAlert = !transient || count >= TransientFailureAlertThreshold;
         var alerted = streak.Alerted || shouldAlert;
         failureStreaks.Set(key, new JobFailureStreak(count, alerted));
 
         if (shouldAlert && !streak.Alerted)
-            await TryGenerateSyncFailureAsync(userId, ex);
+        {
+            await TryGenerateSyncFailureAsync(
+                userId, ex, transient ? SyncFailureClass.Outage : SyncFailureClass.Credential);
+        }
     }
 
     private static string StreakKey(Guid userId) => StreakKeyPrefix + userId;
@@ -75,7 +82,13 @@ public sealed class IBKRSyncJob(
         // BrokerAuthException always maps to the same 422 INVALID_CREDENTIALS API error
         // regardless of cause, so a genuine credential/consent failure (401/403) and an
         // upstream IBKR blip (5xx) are only distinguishable via the original status code.
-        return ex is BrokerAuthException { UpstreamStatusCode: { } status } && RetryPolicies.IsTransientHttpError(status);
+        if (ex is BrokerAuthException { UpstreamStatusCode: { } status } && RetryPolicies.IsTransientHttpError(status))
+            return true;
+
+        // During an outage IBKR answers the token request with 401 and {"error":"backend down"}, so
+        // the status alone cannot mark a credential failure; the body can.
+        return ex is BrokerAuthException { UpstreamStatusCode: HttpStatusCode.Unauthorized } auth
+            && auth.Message.Contains(BackendDownMarker, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task TryResolveSyncFailureAsync(Guid userId)
@@ -92,13 +105,13 @@ public sealed class IBKRSyncJob(
         }
     }
 
-    private async Task TryGenerateSyncFailureAsync(Guid userId, Exception ex)
+    private async Task TryGenerateSyncFailureAsync(Guid userId, Exception ex, SyncFailureClass failureClass)
     {
         try
         {
             var prefs = await userPreferences.GetAsync(userId);
             if (prefs is null || !prefs.SyncFailureAlerts) return;
-            await alerts.GenerateSyncFailureAlertAsync(userId, Provider, null, null, ex.GetType().Name);
+            await alerts.GenerateSyncFailureAlertAsync(userId, Provider, null, null, ex.GetType().Name, failureClass);
         }
         catch
         {

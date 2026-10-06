@@ -4,6 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Logging;
+using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Events;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
@@ -68,17 +69,6 @@ public class ScheduledSyncService(
     private readonly IEventBus _eventBus = eventBus;
     private readonly ITrueLayerTokenRefreshService _trueLayerTokenRefresh = trueLayerTokenRefresh;
 
-    /// <summary>
-    /// Error codes that represent a transient, self-healing condition (provider rate-limit /
-    /// 429). These must not mark the account failed or fire a SyncFailure alert — the next
-    /// scheduled cycle retries and clears the state on its own.
-    /// </summary>
-    private static readonly HashSet<string> TransientErrorCodes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "MONOBANK_RATE_LIMITED",
-        "RATE_LIMIT_EXCEEDED",
-    };
-
     /// <inheritdoc />
     public async Task<SyncResult> PerformFullSyncAsync(
           Guid accountId,
@@ -122,8 +112,8 @@ public class ScheduledSyncService(
         }
         catch (Exception ex)
         {
-            var errorCode = ExtractErrorCode(ex.Message, account.Provider);
-            var isTransient = errorCode is not null && TransientErrorCodes.Contains(errorCode);
+            var (errorCode, failureClass) = Classify(ex, account.Provider);
+            var isTransient = failureClass == FailureKind.Transient;
 
             job.MarkFailed(ex.Message, errorCode);
             await _syncJobs.UpdateAsync(job, ct);
@@ -133,12 +123,12 @@ public class ScheduledSyncService(
                 var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, ct);
                 if (freshAccount != null)
                 {
-                    if (errorCode is "ITEM_LOGIN_REQUIRED" or "MONOBANK_TOKEN_INVALID")
+                    if (failureClass == FailureKind.Reauth)
                         freshAccount.MarkReauthRequired();
                     else if (isTransient && freshAccount.SyncStatus == "syncing")
                         freshAccount.MarkTransientRetry();
                     else if (freshAccount.SyncStatus == "syncing")
-                        freshAccount.MarkFailed(errorCode);
+                        freshAccount.MarkFailed(DescribeFailure(errorCode, ex));
 
                     await _accounts.UpdateAsync(freshAccount, ct);
                 }
@@ -151,11 +141,18 @@ public class ScheduledSyncService(
             _logger.SyncFailed(job.CorrelationId ?? job.Id.ToString(), accountId,
                 errorCode ?? "UNKNOWN", ex.Message, job.RetryCount);
 
-            // Transient throttling (provider 429) is self-healing — the next scheduled
-            // cycle retries. Surfacing a "reconnect your credentials" alert here would be
+            // Throttling, provider 5xx, network and timeout failures are self-healing — the next
+            // scheduled cycle retries. Surfacing a "reconnect your credentials" alert here would be
             // a false alarm, so we skip it. A genuine failure still alerts the user.
             if (!isTransient)
-                await EvaluateSyncFailureAlertAsync(account, errorCode, ct);
+            {
+                await EvaluateSyncFailureAlertAsync(
+                    account, errorCode,
+                    failureClass is FailureKind.Reauth or FailureKind.CredentialSuspect
+                        ? SyncFailureClass.Credential
+                        : SyncFailureClass.Unknown,
+                    ct);
+            }
 
             return new SyncResult(false, 0, 0, errorCode, ex.Message);
         }
@@ -213,7 +210,8 @@ public class ScheduledSyncService(
         }
     }
 
-    private async Task EvaluateSyncFailureAlertAsync(Domain.BankAccount account, string? errorCode, CancellationToken ct)
+    private async Task EvaluateSyncFailureAlertAsync(
+        Domain.BankAccount account, string? errorCode, SyncFailureClass failureClass, CancellationToken ct)
     {
         try
         {
@@ -221,7 +219,7 @@ public class ScheduledSyncService(
             if (prefs is null || !prefs.SyncFailureAlerts) return;
 
             await _alerts.GenerateSyncFailureAlertAsync(
-                account.UserId, account.Provider, account.Id, account.BankName, errorCode, ct);
+                account.UserId, account.Provider, account.Id, account.BankName, errorCode, failureClass, ct);
         }
         catch
         {
@@ -427,46 +425,80 @@ public class ScheduledSyncService(
         return await _trueLayerTokenRefresh.AcquireAccessTokenAsync(connectionId, ct);
     }
 
-    private static string? ExtractErrorCode(string message, string provider)
+    private enum FailureKind
     {
-        if (provider == "monobank")
+        /// <summary>The provider rejected the credential or consent: flag the account for reconnection.</summary>
+        Reauth,
+
+        /// <summary>Throttle, provider 5xx, network or timeout: self-healing, no state change, no alert.</summary>
+        Transient,
+
+        /// <summary>
+        /// The provider refused a data call with 401/403. Not proof the consent is gone, so the account
+        /// is only marked failed, but the user is still pointed at the credential.
+        /// </summary>
+        CredentialSuspect,
+
+        /// <summary>Anything else: the account is marked failed and the user is told.</summary>
+        Other,
+    }
+
+    private const int ServerErrorStatus = 500;
+    private const int MaxLastSyncErrorLength = 500;
+
+    /// <summary>
+    /// Classifies a failed sync from the typed exception (<see cref="TrueLayerException"/> /
+    /// <see cref="MonobankException"/> status and code, then the shared network/timeout/5xx
+    /// classifier) rather than from message text. Only an expired/revoked TrueLayer consent is still
+    /// read from the message, because TrueLayer reports it as <c>invalid_grant</c> in the response body.
+    /// </summary>
+    private static (string? Code, FailureKind Kind) Classify(Exception ex, string provider)
+    {
+        switch (ex)
         {
-            if (message.Contains("MONOBANK_TOKEN_INVALID", StringComparison.OrdinalIgnoreCase))
-                return "MONOBANK_TOKEN_INVALID";
-            if (message.Contains("MONOBANK_RATE_LIMITED", StringComparison.OrdinalIgnoreCase))
-                return "MONOBANK_RATE_LIMITED";
-            return null;
+            case MonobankException mono:
+                return mono.ErrorCode switch
+                {
+                    "MONOBANK_TOKEN_INVALID" => (mono.ErrorCode, FailureKind.Reauth),
+                    "MONOBANK_RATE_LIMITED" => (mono.ErrorCode, FailureKind.Transient),
+                    _ when mono.StatusCode >= ServerErrorStatus => (mono.ErrorCode, FailureKind.Transient),
+                    _ => (mono.ErrorCode, FailureKind.Other),
+                };
+
+            case TrueLayerException tl:
+                // Expired/revoked consent is a re-consent condition, not a transient failure. Map it to
+                // the canonical reauth code so the account is flagged for reconnection and the scheduler
+                // stops retrying it every cycle.
+                if (tl.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase)
+                    || tl.Message.Contains("consent has expired", StringComparison.OrdinalIgnoreCase)
+                    || tl.Message.Contains("has been revoked", StringComparison.OrdinalIgnoreCase))
+                    return ("ITEM_LOGIN_REQUIRED", FailureKind.Reauth);
+
+                return tl.StatusCode switch
+                {
+                    429 or >= ServerErrorStatus => (tl.ErrorCode, FailureKind.Transient),
+                    401 or 403 => (tl.ErrorCode, FailureKind.CredentialSuspect),
+                    _ => (tl.ErrorCode, FailureKind.Other),
+                };
         }
 
-        if (provider == "truelayer")
-        {
-            // Expired/revoked consent is a re-consent condition, not a transient failure. Map it to the
-            // canonical reauth code so the account is flagged for reconnection and the scheduler stops
-            // retrying it every cycle (instead of logging errorCode=UNKNOWN forever).
-            if (message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("consent has expired", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("has been revoked", StringComparison.OrdinalIgnoreCase))
-                return "ITEM_LOGIN_REQUIRED";
-        }
+        if (JobFailureTransientClassifier.IsTransient(ex))
+            return (provider == "monobank" ? "MONOBANK_UNAVAILABLE" : "TRUELAYER_UNAVAILABLE", FailureKind.Transient);
 
-        string[] knownCodes =
-        [
-            "ITEM_LOGIN_REQUIRED",
-            "RATE_LIMIT_EXCEEDED",
-            "INVALID_REQUEST",
-            "SERVER_ERROR",
-            "INTERNAL_SERVER_ERROR",
-            "INVALID_CREDENTIALS",
-            "PRODUCT_NOT_READY"
-        ];
+        return (null, FailureKind.Other);
+    }
 
-        foreach (var code in knownCodes)
-        {
-            if (message.Contains(code, StringComparison.OrdinalIgnoreCase))
-                return code;
-        }
+    /// <summary>
+    /// What <c>LastSyncError</c> records: the error code, plus the provider's status and body for a
+    /// typed provider failure so a persistently failing account carries its cause.
+    /// </summary>
+    private static string? DescribeFailure(string? errorCode, Exception ex)
+    {
+        if (ex is not (MonobankException or TrueLayerException))
+            return errorCode;
 
-        return null;
+        var detail = $"{errorCode}: {ex.Message}";
+        return detail.Length <= MaxLastSyncErrorLength ? detail : detail[..MaxLastSyncErrorLength];
     }
 
     /// <summary>
