@@ -1,3 +1,4 @@
+using System.Net;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -19,12 +20,23 @@ public class CryptoExchangeSyncJobTests
     private readonly Mock<ICommandHandler<SyncExchangeHoldingsCommand, SyncExchangeHoldingsResult>> _syncHandler = new(MockBehavior.Loose);
     private readonly Mock<IAlertGeneratorService> _alerts = new(MockBehavior.Loose);
     private readonly Mock<IUserAlertPreferencesReader> _userPrefs = new(MockBehavior.Loose);
+    private readonly IJobFailureStreakStore _failureStreaks = new InMemoryJobFailureStreakStore();
+
+    private sealed class InMemoryJobFailureStreakStore : IJobFailureStreakStore
+    {
+        private readonly Dictionary<string, JobFailureStreak> _streaks = [];
+
+        public JobFailureStreak Get(string jobName) =>
+            _streaks.TryGetValue(jobName, out var streak) ? streak : JobFailureStreak.Empty;
+
+        public void Set(string jobName, JobFailureStreak streak) => _streaks[jobName] = streak;
+    }
 
     private BinanceSyncJob CreateBinanceJob() =>
-        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, NullLogger<BinanceSyncJob>.Instance);
+        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, NullLogger<BinanceSyncJob>.Instance);
 
     private RevolutXSyncJob CreateRevolutXJob() =>
-        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, NullLogger<RevolutXSyncJob>.Instance);
+        new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks, NullLogger<RevolutXSyncJob>.Instance);
 
     private static ExchangeCredential MakeCredential(Guid userId, string provider = CryptoExchangeProvider.Binance) =>
         ExchangeCredential.Create(userId, provider, [1], [2], [3], [4], [5], [6], 1);
@@ -161,14 +173,183 @@ public class CryptoExchangeSyncJobTests
             .ReturnsAsync(new UserAlertPreferences(false, 0m, SyncFailureAlerts: true));
         _syncHandler
             .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new RevolutXException("boom"));
+            .ThrowsAsync(new RevolutXException(
+                "Revolut X rejected the key.",
+                new HttpRequestException("401", inner: null, HttpStatusCode.Unauthorized)));
 
         await CreateRevolutXJob().Invoking(j => j.ExecuteAsync()).Should().ThrowAsync<AggregateException>();
 
         _alerts.Verify(
             a => a.GenerateSyncFailureAlertAsync(
                 userId, CryptoExchangeProvider.RevolutX, null, null, nameof(RevolutXException),
-                It.IsAny<CancellationToken>()),
+                SyncFailureClass.Credential, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    private void GivenAlertsOn(Guid userId) =>
+        _userPrefs
+            .Setup(p => p.GetAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserAlertPreferences(false, 0m, SyncFailureAlerts: true));
+
+    private void GivenSyncFails(Exception ex) =>
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(ex);
+
+    private void VerifyAlerts(Guid userId, string provider, SyncFailureClass failureClass, Times times) =>
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, provider, null, null, It.IsAny<string?>(), failureClass, It.IsAny<CancellationToken>()),
+            times);
+
+    private void VerifyAnyAlerts(Guid userId, string provider, Times times) =>
+        _alerts.Verify(
+            a => a.GenerateSyncFailureAlertAsync(
+                userId, provider, null, null, It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()),
+            times);
+
+    // The streak gate: a transient failure alerts only on the 3rd consecutive tick; an all-users failure
+    // throws an AggregateException every tick, which the job-failure filter handles separately.
+    private static async Task RunTicks(Func<Task> tick, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            try { await tick(); }
+            catch (AggregateException) { }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BinanceHttp500_IsTransient_AlertsOnlyAtThirdConsecutiveTick_WithOutageClass()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 2);
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Outage, Times.Once());
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 2);
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BinanceTradeHistory429_IsTransient_NoAlertOnFirstTick()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new CryptoTradeHistoryException(
+            CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BinanceTradeHistoryRejectedKey_AlertsImmediatelyWithCredentialClass()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new CryptoTradeHistoryException(
+            CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("Invalid API-key", binanceErrorCode: -2015, venueStatusCode: 401)));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Credential, Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RevolutXUnreachable_IsTransient_NoAlertOnFirstTick()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new RevolutXException(
+            "Revolut X is unreachable.", new HttpRequestException("Connection refused", new System.Net.Sockets.SocketException())));
+
+        await RunTicks(() => CreateRevolutXJob().ExecuteAsync(), 1);
+
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.RevolutX, Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RevolutXTimeout_IsTransient_NoAlertOnFirstTick()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new RevolutXException("Revolut X did not respond in time.", new TaskCanceledException("timeout")));
+
+        await RunTicks(() => CreateRevolutXJob().ExecuteAsync(), 1);
+
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.RevolutX, Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BinanceRejectedKey_AlertsImmediatelyWithReconnectClass()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new BinanceException("Invalid API-key, IP, or permissions for action.", binanceErrorCode: -2015, venueStatusCode: 401));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Credential, Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RevolutXLocalFailure_AlertsImmediatelyWithUnknownClassNotReconnect()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new RevolutXException("Revolut X returned an unreadable response for /balances."));
+
+        await RunTicks(() => CreateRevolutXJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.RevolutX, SyncFailureClass.Unknown, Times.Once());
+    }
+
+    [Theory]
+    [InlineData(-1021, 400)]
+    [InlineData(null, 418)]
+    public async Task ExecuteAsync_BinanceNonCredentialFailure_AlertsImmediatelyWithUnknownClassNotReconnect(
+        int? binanceCode, int status)
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new BinanceException("Binance refused the call.", binanceErrorCode: binanceCode, venueStatusCode: status));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Unknown, Times.Once());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SuccessBetweenTransientFailures_ResetsTheStreak()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        _syncHandler
+            .SetupSequence(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new BinanceException("HTTP 500", venueStatusCode: 500))
+            .ThrowsAsync(new BinanceException("HTTP 500", venueStatusCode: 500))
+            .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow))
+            .ThrowsAsync(new BinanceException("HTTP 500", venueStatusCode: 500))
+            .ThrowsAsync(new BinanceException("HTTP 500", venueStatusCode: 500));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 5);
+
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
     }
 }

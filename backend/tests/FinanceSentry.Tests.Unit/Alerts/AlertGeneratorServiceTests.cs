@@ -102,11 +102,31 @@ public class AlertGeneratorServiceTests
                 _userId, AlertType.SyncFailure, _accountId, "Chase", It.IsAny<DateTimeOffset>(), default))
             .ReturnsAsync(false);
 
-        await _service.GenerateSyncFailureAlertAsync(_userId, "truelayer", _accountId, "Chase", "ITEM_LOGIN_REQUIRED");
+        await _service.GenerateSyncFailureAlertAsync(_userId, "truelayer", _accountId, "Chase", "ITEM_LOGIN_REQUIRED", SyncFailureClass.Credential);
 
         _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
             a.Type == AlertType.SyncFailure &&
             a.Severity == AlertSeverity.Error), default), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(SyncFailureClass.Credential, true)]
+    [InlineData(SyncFailureClass.Outage, false)]
+    [InlineData(SyncFailureClass.Unknown, false)]
+    public async Task GenerateSyncFailure_OnlyCredentialClassSaysReconnect(SyncFailureClass failureClass, bool saysReconnect)
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, _accountId, default))
+            .ReturnsAsync((Alert?)null);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.SyncFailure, _accountId, "Chase", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateSyncFailureAlertAsync(_userId, "truelayer", _accountId, "Chase", "SOME_CODE", failureClass);
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Message.Contains("reconnect", StringComparison.OrdinalIgnoreCase) == saysReconnect &&
+            a.Message.Contains("SOME_CODE") &&
+            (failureClass != SyncFailureClass.Outage || a.Message.Contains("not responding"))), default), Times.Once);
     }
 
     [Fact]
@@ -139,8 +159,8 @@ public class AlertGeneratorServiceTests
             .Callback((Guid id, CancellationToken _) => store.First(a => a.Id == id).IsResolved = true)
             .Returns(Task.CompletedTask);
 
-        await _service.GenerateSyncFailureAlertAsync(_userId, "binance", null, null, "ERR");
-        await _service.GenerateSyncFailureAlertAsync(_userId, "ibkr", null, null, "ERR");
+        await _service.GenerateSyncFailureAlertAsync(_userId, "binance", null, null, "ERR", SyncFailureClass.Credential);
+        await _service.GenerateSyncFailureAlertAsync(_userId, "ibkr", null, null, "ERR", SyncFailureClass.Credential);
 
         Assert.Equal(2, store.Count);
 
@@ -159,7 +179,7 @@ public class AlertGeneratorServiceTests
                 _userId, AlertType.SyncFailure, _accountId, "Chase", It.IsAny<DateTimeOffset>(), default))
             .ReturnsAsync(true);
 
-        await _service.GenerateSyncFailureAlertAsync(_userId, "truelayer", _accountId, "Chase", "ITEM_LOGIN_REQUIRED");
+        await _service.GenerateSyncFailureAlertAsync(_userId, "truelayer", _accountId, "Chase", "ITEM_LOGIN_REQUIRED", SyncFailureClass.Credential);
 
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
     }

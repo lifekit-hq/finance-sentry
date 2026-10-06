@@ -5,10 +5,14 @@ public class BinanceException : CryptoExchangeException
 {
     public int? BinanceErrorCode { get; }
 
-    public BinanceException(string message, int? binanceErrorCode = null)
+    /// <summary>The HTTP status Binance answered with, when the failure was an HTTP response.</summary>
+    public int? VenueStatusCode { get; }
+
+    public BinanceException(string message, int? binanceErrorCode = null, int? venueStatusCode = null)
         : base(message)
     {
         BinanceErrorCode = binanceErrorCode;
+        VenueStatusCode = venueStatusCode;
     }
 
     public BinanceException(string message, Exception innerException, int? binanceErrorCode = null)

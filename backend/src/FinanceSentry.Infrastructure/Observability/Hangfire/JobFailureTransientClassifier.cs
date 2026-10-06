@@ -34,6 +34,12 @@ public static class JobFailureTransientClassifier
             && RetryPolicies.IsTransientHttpError(status))
             return true;
 
+        // A connect or DNS failure has no status code and, depending on the runtime path, no
+        // SocketException inner either; the request error names it.
+        if (exception is HttpRequestException { StatusCode: null } net
+            && net.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError)
+            return true;
+
         return IsTransient(exception.InnerException);
     }
 }

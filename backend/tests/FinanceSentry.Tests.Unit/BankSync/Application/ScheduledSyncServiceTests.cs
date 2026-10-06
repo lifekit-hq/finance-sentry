@@ -7,6 +7,8 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FluentAssertions;
 using Moq;
@@ -369,17 +371,18 @@ public class ScheduledSyncServiceTests
             .Setup(p => p.SyncTransactionsAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
                 It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new HttpRequestException("INVALID_CREDENTIALS: bad token"));
+            .ThrowsAsync(new MonobankException("MONOBANK_HTTP_ERROR", "Monobank API error (400): {\"errorDescription\":\"Unknown account\"}", 400));
 
         var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
 
         result.Success.Should().BeFalse();
-        result.ErrorCode.Should().Be("INVALID_CREDENTIALS");
+        result.ErrorCode.Should().Be("MONOBANK_HTTP_ERROR");
+        h.Account.LastSyncError.Should().Contain("400").And.Contain("Unknown account");
         h.JobRepo.Verify(r => r.UpdateAsync(It.Is<SyncJob>(j => j.Status == "failed"), It.IsAny<CancellationToken>()), Times.Once);
         h.Account.SyncStatus.Should().Be("failed");
         alertGen.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(),
-            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── T313-4b: Transient throttle (429) does not fail the account or alert ────
@@ -400,12 +403,12 @@ public class ScheduledSyncServiceTests
             .Setup(p => p.SyncTransactionsAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
                 It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new HttpRequestException("RATE_LIMIT_EXCEEDED: too many requests"));
+            .ThrowsAsync(new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429));
 
         var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
 
         result.Success.Should().BeFalse();
-        result.ErrorCode.Should().Be("RATE_LIMIT_EXCEEDED");
+        result.ErrorCode.Should().Be("TRUELAYER_RATE_LIMITED");
         // Job still records the failure for observability...
         h.JobRepo.Verify(r => r.UpdateAsync(It.Is<SyncJob>(j => j.Status == "failed"), It.IsAny<CancellationToken>()), Times.Once);
         // ...but the account self-heals to active and no false alarm is raised.
@@ -413,7 +416,135 @@ public class ScheduledSyncServiceTests
         h.Account.LastSyncError.Should().BeNull();
         alertGen.Verify(a => a.GenerateSyncFailureAlertAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(),
-            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── Typed classification (one test per rule) ────────────────────────────
+
+    private static async Task<(Harness H, Mock<IAlertGeneratorService> Alerts, SyncResult Result)> FailWith(Exception ex)
+    {
+        var alertGen = new Mock<IAlertGeneratorService>();
+        var userPrefs = new Mock<IUserAlertPreferencesReader>();
+        userPrefs.Setup(p => p.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(new UserAlertPreferences(false, 0m, true));
+
+        var h = BuildSut(alertGen, userPrefs);
+        h.Provider
+            .Setup(p => p.SyncTransactionsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(ex);
+
+        return (h, alertGen, await h.Sut.PerformFullSyncAsync(h.Account.Id));
+    }
+
+    private static void AssertSilentRetry((Harness H, Mock<IAlertGeneratorService> Alerts, SyncResult Result) run)
+    {
+        run.Result.Success.Should().BeFalse();
+        run.H.Account.SyncStatus.Should().Be("active");
+        run.H.Account.LastSyncError.Should().BeNull();
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Failure_MonobankHttp500_IsTransient_NoAlert()
+        => AssertSilentRetry(await FailWith(new MonobankException(
+            "MONOBANK_SERVER_ERROR", "Monobank API error (500): {\"errorDescription\":\"Unknown error\"}", 500)));
+
+    [Theory]
+    [InlineData(429, "TRUELAYER_RATE_LIMITED")]
+    [InlineData(500, "TRUELAYER_ERROR")]
+    [InlineData(503, "TRUELAYER_ERROR")]
+    public async Task Failure_TrueLayerThrottleOr5xx_IsTransient_NoAlert(int status, string code)
+        => AssertSilentRetry(await FailWith(new TrueLayerException(code, $"TrueLayer API error ({status}) on /accounts", status)));
+
+    [Theory]
+    [InlineData("TRUELAYER_PARSE_ERROR", 500)]
+    [InlineData("TRUELAYER_NOT_CONFIGURED", 503)]
+    public async Task Failure_TrueLayerLocalFailure_IsNotTransient_MarksFailedAndAlerts(string code, int status)
+    {
+        var run = await FailWith(new TrueLayerException(code, "local failure", status));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), "truelayer", It.IsAny<Guid?>(), It.IsAny<string?>(),
+            code, SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_MonobankParseError_IsNotTransient_MarksFailedAndAlerts()
+    {
+        var run = await FailWith(new MonobankException("MONOBANK_PARSE_ERROR", "Failed to parse client info response."));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            "MONOBANK_PARSE_ERROR", SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_TrueLayerNetworkError_IsTransient_NoAlert()
+        => AssertSilentRetry(await FailWith(new HttpRequestException(
+            "Connection refused", new System.Net.Sockets.SocketException())));
+
+    [Fact]
+    public async Task Failure_TrueLayerTimeout_IsTransient_NoAlert()
+        => AssertSilentRetry(await FailWith(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout")));
+
+    [Fact]
+    public async Task Failure_PlaidStyleMessageText_IsNoLongerClassifiedFromTheMessage()
+    {
+        var run = await FailWith(new HttpRequestException("RATE_LIMIT_EXCEEDED: too many requests"));
+
+        run.Result.ErrorCode.Should().BeNull();
+        run.H.Account.SyncStatus.Should().Be("failed");
+    }
+
+    [Fact]
+    public async Task Failure_TrueLayerInvalidGrant_StillFlagsReauthAndAlertsImmediatelyWithReconnectClass()
+    {
+        var run = await FailWith(new TrueLayerException(
+            "TRUELAYER_BAD_REQUEST", "TrueLayer token endpoint error (400): {\"error\":\"invalid_grant\"}", 400));
+
+        run.Result.ErrorCode.Should().Be("ITEM_LOGIN_REQUIRED");
+        run.H.Account.SyncStatus.Should().Be("reauth_required");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), "truelayer", It.IsAny<Guid?>(), It.IsAny<string?>(),
+            "ITEM_LOGIN_REQUIRED", SyncFailureClass.Credential, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_TrueLayerBadRequest_LastSyncErrorKeepsOnlyTheErrorCode()
+    {
+        var run = await FailWith(new TrueLayerException(
+            "TRUELAYER_BAD_REQUEST", "TrueLayer API error (400): {\"error\":\"invalid_request\"}", 400));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.H.Account.LastSyncError.Should().Be("TRUELAYER_BAD_REQUEST");
+    }
+
+    [Fact]
+    public async Task Failure_MonobankTokenInvalid_FlagsReauthAndAlertsImmediatelyWithReconnectClass()
+    {
+        var run = await FailWith(new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400));
+
+        run.H.Account.SyncStatus.Should().Be("reauth_required");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            "MONOBANK_TOKEN_INVALID", SyncFailureClass.Credential, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Failure_UnclassifiedError_AlertsWithoutReconnectClass()
+    {
+        var run = await FailWith(new InvalidOperationException("boom"));
+
+        run.H.Account.SyncStatus.Should().Be("failed");
+        run.Alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), SyncFailureClass.Unknown, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── Balance refresh keeps the prior value when the endpoint trips ───────

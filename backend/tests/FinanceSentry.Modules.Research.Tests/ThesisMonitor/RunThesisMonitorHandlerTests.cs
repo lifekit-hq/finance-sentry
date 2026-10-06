@@ -360,7 +360,7 @@ public class RunThesisMonitorHandlerTests
             => Task.CompletedTask;
 
         public Task GenerateSyncFailureAlertAsync(
-            Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode, CancellationToken ct = default)
+            Guid userId, string provider, Guid? accountId, string? accountName, string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task ResolveSyncFailureAlertAsync(Guid userId, string provider, Guid? accountId, CancellationToken ct = default)

@@ -92,15 +92,21 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
     public Task GenerateSyncFailureAlertAsync(
         Guid userId, string provider, Guid? accountId, string? accountName,
-        string? errorCode, CancellationToken ct = default)
+        string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
     {
         var label = accountName ?? provider;
         var detail = errorCode is null ? string.Empty : $" (error: {errorCode})";
+        var advice = failureClass switch
+        {
+            SyncFailureClass.Credential => "Please reconnect or check your credentials.",
+            SyncFailureClass.Outage => "The provider is not responding. We are retrying automatically and will clear this once it recovers.",
+            _ => "We are retrying automatically. If this keeps happening, check the connection in settings.",
+        };
 
         return EmitAsync(userId, new AlertDraft(
             AlertType.SyncFailure, AlertSeverity.Error, SyncFailureReferenceId(provider, accountId), accountName,
             $"Sync failed for {label}",
-            $"We couldn't sync your {provider} account{detail}. Please reconnect or check your credentials."),
+            $"We couldn't sync your {provider} account{detail}. {advice}"),
             ct);
     }
 
