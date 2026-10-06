@@ -203,7 +203,7 @@ describe('AssetDossierComponent', () => {
     expect(text).not.toContain('should not render');
   });
 
-  it('renders the recommendation trend as a list for phones', () => {
+  it('renders the recommendation trend as a list', () => {
     fixture.detectChanges();
 
     const list = byTestId('trend-list');

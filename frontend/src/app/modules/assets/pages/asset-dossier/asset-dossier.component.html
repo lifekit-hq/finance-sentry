@@ -124,43 +124,23 @@
           <p class="text-cmn-xs text-text-secondary">{{ position.provider | providerLabel }}</p>
 
           <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
-            <div>
-              <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Quantity</p>
-              <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                {{ position.quantity | number: '1.0-8' }}
-              </p>
-            </div>
-            <div>
-              <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Current Value</p>
-              <p class="mt-cmn-1 font-mono font-semibold tabular-nums text-text-primary">
-                {{ position.currentValueUsd | money }}
-              </p>
-            </div>
+            <cmn-stat-card
+              [value]="(position.quantity | number: '1.0-8') ?? '—'"
+              label="Quantity"
+            />
+            <cmn-stat-card [value]="position.currentValueUsd | money" label="Current Value" />
             @if (position.costBasisUsd !== null) {
-              <div>
-                <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Cost Basis</p>
-                <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                  {{ position.costBasisUsd | money }}
-                </p>
-              </div>
+              <cmn-stat-card [value]="position.costBasisUsd | money" label="Cost Basis" />
             }
             @if (position.unrealizedPnlPercent !== null) {
-              <div>
-                <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
-                  Unrealized P&L
-                </p>
-                <p
-                  [class]="position.unrealizedPnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                  class="mt-cmn-1 font-mono tabular-nums font-semibold"
-                >
-                  {{ position.unrealizedPnlPercent | number: '1.2-2' }}%
-                  @if (position.unrealizedPnlUsd !== null) {
-                    <span class="text-cmn-xs font-normal"
-                      >({{ position.unrealizedPnlUsd | money }})</span
-                    >
-                  }
-                </p>
-              </div>
+              <cmn-stat-card
+                [value]="(position.unrealizedPnlPercent | number: '1.2-2') + '%'"
+                [delta]="position.unrealizedPnlPercent"
+                [deltaLabel]="
+                  position.unrealizedPnlUsd !== null ? (position.unrealizedPnlUsd | money) : ''
+                "
+                label="Unrealized P&L"
+              />
             }
           </div>
 
@@ -293,14 +273,12 @@
             <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
               @if (valuation.metrics.trailingPe.value !== null) {
                 <div>
-                  <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
-                    Trailing P/E
-                  </p>
-                  <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                    {{ valuation.metrics.trailingPe.value | number: '1.1-1' }}x
-                  </p>
+                  <cmn-stat-card
+                    [value]="(valuation.metrics.trailingPe.value | number: '1.1-1') + 'x'"
+                    label="Trailing P/E"
+                  />
                   @if (valuation.metrics.trailingPe.fiveYearAvg !== null) {
-                    <p class="text-cmn-xs text-text-secondary">
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
                       5Y avg {{ valuation.metrics.trailingPe.fiveYearAvg | number: '1.1-1' }}x
                     </p>
                   }
@@ -308,44 +286,34 @@
               }
               @if (valuation.metrics.forwardPe.value !== null) {
                 <div>
-                  <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Forward P/E</p>
-                  <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                    {{ valuation.metrics.forwardPe.value | number: '1.1-1' }}x
-                  </p>
+                  <cmn-stat-card
+                    [value]="(valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'"
+                    label="Forward P/E"
+                  />
                   @if (valuation.metrics.forwardPe.fiveYearAvg !== null) {
-                    <p class="text-cmn-xs text-text-secondary">
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
                       5Y avg {{ valuation.metrics.forwardPe.fiveYearAvg | number: '1.1-1' }}x
                     </p>
                   }
                 </div>
               }
               @if (valuation.metrics.evToEbitda.value !== null) {
-                <div>
-                  <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">EV/EBITDA</p>
-                  <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                    {{ valuation.metrics.evToEbitda.value | number: '1.1-1' }}x
-                  </p>
-                </div>
+                <cmn-stat-card
+                  [value]="(valuation.metrics.evToEbitda.value | number: '1.1-1') + 'x'"
+                  label="EV/EBITDA"
+                />
               }
               @if (valuation.consensusTarget !== null) {
-                <div>
-                  <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
-                    Consensus Target
-                  </p>
-                  <p class="mt-cmn-1 font-mono tabular-nums text-text-primary">
-                    {{ valuation.consensusTarget | money }}
-                  </p>
-                  @if (valuation.impliedUpsidePct !== null) {
-                    <p
-                      [class]="
-                        valuation.impliedUpsidePct >= 0 ? pnlPositiveClass : pnlNegativeClass
-                      "
-                      class="text-cmn-xs tabular-nums font-mono"
-                    >
-                      {{ valuation.impliedUpsidePct | number: '1.1-1' }}% upside
-                    </p>
-                  }
-                </div>
+                <cmn-stat-card
+                  [value]="valuation.consensusTarget | money"
+                  [delta]="valuation.impliedUpsidePct"
+                  [deltaLabel]="
+                    valuation.impliedUpsidePct === null
+                      ? ''
+                      : (valuation.impliedUpsidePct | number: '1.1-1') + '% upside'
+                  "
+                  label="Consensus Target"
+                />
               }
             </div>
           </cmn-card>
@@ -395,78 +363,43 @@
           @if (analysts.trends.length > 0) {
             <div class="mt-cmn-5 border-t border-border-default pt-cmn-4">
               <p class="mb-cmn-3 text-cmn-sm font-medium text-text-primary">Recommendation Trend</p>
-              <ul class="space-y-cmn-3 sm:hidden" data-testid="trend-list">
-                @for (trend of analysts.trends; track trend.period) {
-                  <li class="border-t border-border-default pt-cmn-2 first:border-0 first:pt-0">
-                    <p class="font-mono text-cmn-xs text-text-secondary">
-                      {{ trend.period | date: 'MMM yyyy' }}
-                    </p>
-                    <dl class="mt-cmn-1 grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-1 text-cmn-sm">
-                      <div class="flex justify-between">
-                        <dt class="text-text-secondary">Strong buy</dt>
-                        <dd class="font-mono tabular-nums text-status-success">
-                          {{ trend.strongBuy }}
-                        </dd>
-                      </div>
-                      <div class="flex justify-between">
-                        <dt class="text-text-secondary">Buy</dt>
-                        <dd class="font-mono tabular-nums text-status-success">{{ trend.buy }}</dd>
-                      </div>
-                      <div class="flex justify-between">
-                        <dt class="text-text-secondary">Hold</dt>
-                        <dd class="font-mono tabular-nums text-text-secondary">{{ trend.hold }}</dd>
-                      </div>
-                      <div class="flex justify-between">
-                        <dt class="text-text-secondary">Sell</dt>
-                        <dd class="font-mono tabular-nums text-status-error">{{ trend.sell }}</dd>
-                      </div>
-                      <div class="flex justify-between">
-                        <dt class="text-text-secondary">Strong sell</dt>
-                        <dd class="font-mono tabular-nums text-status-error">
-                          {{ trend.strongSell }}
-                        </dd>
-                      </div>
-                    </dl>
-                  </li>
-                }
-              </ul>
-              <div class="hidden overflow-x-auto sm:block">
-                <table class="w-full text-cmn-xs" aria-label="Recommendation trends">
-                  <thead>
-                    <tr class="text-text-secondary uppercase tracking-wide">
-                      <th class="pb-cmn-2 text-left font-normal">Period</th>
-                      <th class="pb-cmn-2 text-center font-normal">Strong Buy</th>
-                      <th class="pb-cmn-2 text-center font-normal">Buy</th>
-                      <th class="pb-cmn-2 text-center font-normal">Hold</th>
-                      <th class="pb-cmn-2 text-center font-normal">Sell</th>
-                      <th class="pb-cmn-2 text-center font-normal">Strong Sell</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (trend of analysts.trends; track trend.period) {
-                      <tr class="border-t border-border-default">
-                        <td class="py-cmn-2 font-mono text-text-secondary">
-                          {{ trend.period | date: 'MMM yyyy' }}
-                        </td>
-                        <td class="py-cmn-2 text-center font-mono tabular-nums text-status-success">
-                          {{ trend.strongBuy }}
-                        </td>
-                        <td class="py-cmn-2 text-center font-mono tabular-nums text-status-success">
-                          {{ trend.buy }}
-                        </td>
-                        <td class="py-cmn-2 text-center font-mono tabular-nums text-text-secondary">
-                          {{ trend.hold }}
-                        </td>
-                        <td class="py-cmn-2 text-center font-mono tabular-nums text-status-error">
-                          {{ trend.sell }}
-                        </td>
-                        <td class="py-cmn-2 text-center font-mono tabular-nums text-status-error">
-                          {{ trend.strongSell }}
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+              <div data-testid="trend-list">
+                <cmn-data-table [rows]="analysts.trends" mode="list">
+                  <cmn-column key="period" listSlot="primary">
+                    <ng-template let-trend cmnCell>
+                      <span class="font-mono text-text-secondary">{{
+                        trend.period | date: 'MMM yyyy'
+                      }}</span>
+                    </ng-template>
+                  </cmn-column>
+                  <cmn-column key="strongBuy" listSlot="secondary">
+                    <ng-template let-trend cmnCell>
+                      Strong buy
+                      <span class="font-mono text-status-success">{{ trend.strongBuy }}</span>
+                    </ng-template>
+                  </cmn-column>
+                  <cmn-column key="buy" listSlot="secondary">
+                    <ng-template let-trend cmnCell>
+                      Buy <span class="font-mono text-status-success">{{ trend.buy }}</span>
+                    </ng-template>
+                  </cmn-column>
+                  <cmn-column key="hold" listSlot="secondary">
+                    <ng-template let-trend cmnCell>
+                      Hold <span class="font-mono">{{ trend.hold }}</span>
+                    </ng-template>
+                  </cmn-column>
+                  <cmn-column key="sell" listSlot="trailing-secondary">
+                    <ng-template let-trend cmnCell>
+                      Sell <span class="font-mono text-status-error">{{ trend.sell }}</span>
+                    </ng-template>
+                  </cmn-column>
+                  <cmn-column key="strongSell" listSlot="trailing-secondary">
+                    <ng-template let-trend cmnCell>
+                      Strong sell
+                      <span class="font-mono text-status-error">{{ trend.strongSell }}</span>
+                    </ng-template>
+                  </cmn-column>
+                </cmn-data-table>
               </div>
             </div>
           }
