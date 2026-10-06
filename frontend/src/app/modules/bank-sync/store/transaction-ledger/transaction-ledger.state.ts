@@ -16,6 +16,9 @@ export interface TransactionLedgerState {
   accountId: Nullable<string>;
   /** Server-side filter: credits (In), debits (Out), or null for all. */
   transactionType: Nullable<TransactionType>;
+  /** Server-side filter: inclusive `YYYY-MM-DD` date bounds, or null for open-ended. */
+  from: Nullable<string>;
+  to: Nullable<string>;
   /** Server-side free-text filter (description / merchant). */
   search: string;
   accounts: TransactionAccountOption[];
@@ -33,6 +36,8 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   monthlyOutflowUsd: null,
   accountId: null,
   transactionType: null,
+  from: null,
+  to: null,
   search: '',
   accounts: [],
 };

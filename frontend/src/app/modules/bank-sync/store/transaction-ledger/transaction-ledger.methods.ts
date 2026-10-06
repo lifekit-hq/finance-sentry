@@ -50,6 +50,9 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
     setTransactionType(transactionType: Nullable<TransactionType>): void {
       patchState(store, {transactionType, offset: 0});
     },
+    setDateRange(from: Nullable<string>, to: Nullable<string>): void {
+      patchState(store, {from, to, offset: 0});
+    },
     setSearch(search: string): void {
       patchState(store, {search, offset: 0});
     },

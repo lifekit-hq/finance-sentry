@@ -6,8 +6,8 @@ import {BehaviorSubject} from 'rxjs';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
 
-function setup(type: string | null) {
-  const params$ = new BehaviorSubject(convertToParamMap(type ? {type} : {}));
+function setup(type: string | null, extra: Record<string, string> = {}) {
+  const params$ = new BehaviorSubject(convertToParamMap({...(type ? {type} : {}), ...extra}));
   const store = {
     accounts: signal([]),
     monthlyOutflow: signal(null),
@@ -20,6 +20,7 @@ function setup(type: string | null) {
     transactions: signal([]),
     applyAccount: () => undefined,
     applyType: vi.fn(),
+    applyDateRange: vi.fn(),
     applySearch: () => undefined,
   };
   TestBed.overrideComponent(TransactionLedgerComponent, {
@@ -89,5 +90,24 @@ describe('TransactionLedgerComponent type control', () => {
     expect(selected('type-in')).toBe('true');
     expect(selected('type-all')).toBe('false');
     expect(selected('type-out')).toBe('false');
+  });
+});
+
+describe('TransactionLedgerComponent date range', () => {
+  it('shows a clearable chip and drives the store from from/to query params', () => {
+    const {root, store, navigate} = setup(null, {from: '2026-06-01', to: '2026-08-31'});
+    const chip = root.querySelector('[data-testid="date-range-chip"]') as HTMLElement;
+    expect(chip.textContent).toContain('2026-06-01 – 2026-08-31');
+    expect(store.applyDateRange).toHaveBeenCalled();
+    chip.querySelector('button')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {from: null, to: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('ignores malformed dates', () => {
+    const {root} = setup(null, {from: 'garbage', to: '2026-8-1'});
+    expect(root.querySelector('[data-testid="date-range-chip"]')).toBeNull();
   });
 });

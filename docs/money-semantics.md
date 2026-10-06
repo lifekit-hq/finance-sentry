@@ -567,6 +567,13 @@ months ending with the current one (YTD = months since January), and the tiles s
   early in the month the raw rate is technically correct and completely misleading. Longer
   windows hold whole months of income and need no gate.
 
+**Drill-downs carry the window.** Clicking the Income / Spending tile or a top-category row
+opens Transactions with `type` / `category` plus `from` / `to` (`DashboardRangeUtils.windowDates`):
+inclusive `YYYY-MM-DD` bounds from the first day of the window's first month (`windowStartKey`)
+through the last day of the current month, so the list covers the months the tile totals.
+`All` is unbounded and sends no bounds. The ledger shows the active bounds as a removable
+"Dates" chip and ignores malformed values.
+
 This is the same split Binance and IBKR use: the current period feeds the tiles; the bars
 are closed periods.
 

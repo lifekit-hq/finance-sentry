@@ -32,6 +32,11 @@ import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isoDateOrNull(value: string | null): Nullable<string> {
+  return value !== null && ISO_DATE.test(value) ? value : null;
+}
 const DRAWER_WIDTH = '480px';
 
 @Component({
@@ -88,6 +93,21 @@ export class TransactionLedgerComponent {
     {initialValue: null}
   );
 
+  public readonly activeDateRange = toSignal(
+    this.route.queryParamMap.pipe(
+      map(p => ({from: isoDateOrNull(p.get('from')), to: isoDateOrNull(p.get('to'))}))
+    ),
+    {initialValue: {from: null, to: null}}
+  );
+
+  public readonly activeDateRangeLabel = computed(() => {
+    const {from, to} = this.activeDateRange();
+    if (!from && !to) {
+      return null;
+    }
+    return from && to ? `${from} – ${to}` : from ? `from ${from}` : `until ${to}`;
+  });
+
   public readonly activeCategoryLabel = computed(() => {
     const cat = this.activeCategory();
     return cat ? MerchantCategoryUtils.format(cat) : null;
@@ -111,6 +131,7 @@ export class TransactionLedgerComponent {
   constructor() {
     this.store.applyAccount(this.activeAccount);
     this.store.applyType(this.activeType);
+    this.store.applyDateRange(this.activeDateRange);
     this.store.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
   }
 
@@ -131,6 +152,13 @@ export class TransactionLedgerComponent {
 
   public clearCategory(): void {
     void this.router.navigate([], {queryParams: {category: null}, queryParamsHandling: 'merge'});
+  }
+
+  public clearDateRange(): void {
+    void this.router.navigate([], {
+      queryParams: {from: null, to: null},
+      queryParamsHandling: 'merge',
+    });
   }
 
   public selectType(type: Nullable<TransactionType>): void {
