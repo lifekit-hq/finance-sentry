@@ -122,7 +122,7 @@ public sealed class TrendForcePageContractTests
         articles.Should().ContainSingle("the hero/list duplicate for one permalink must collapse by URL");
         articles[0].Title.Should().Contain("DRAM Supply to Remain Tight");
         articles[0].Url.Should().Be("https://www.trendforce.com/presscenter/news/20260804-13166.html");
-        articles[0].PublishedAt.Should().Be(DateTimeOffset.Parse("4 August 2026"));
+        articles[0].PublishedAt.Should().Be(new DateTimeOffset(2026, 8, 4, 0, 0, 0, TimeSpan.Zero));
         articles[0].Summary.Should().Contain("HBM absorbs wafer capacity");
     }
 
@@ -154,7 +154,7 @@ public sealed class TrendForcePageContractTests
         articles.Should().ContainSingle();
         articles[0].Title.Should().Contain("Server DRAM Contract Prices");
         articles[0].Url.Should().Be("https://www.trendforce.com/presscenter/news/20260709-13140.html");
-        articles[0].PublishedAt.Should().Be(DateTimeOffset.Parse("9 July 2026"));
+        articles[0].PublishedAt.Should().Be(new DateTimeOffset(2026, 7, 9, 0, 0, 0, TimeSpan.Zero));
         articles[0].Summary.Should().Contain("memory pricing");
     }
 
