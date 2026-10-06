@@ -40,6 +40,13 @@ public static class WealthModule
                 "net-worth-snapshot",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(1));
+
+            // First of the month, after the daily snapshot (01:00) and the FX refresh, so the brief
+            // reads that day's net worth (#433 S7).
+            mgr.AddOrUpdate<FireBriefJob>(
+                "fire-brief",
+                job => job.ExecuteAsync(CancellationToken.None),
+                "0 9 1 * *");
         }
     }
 
@@ -59,6 +66,7 @@ public static class WealthModule
         services.AddScoped<IWealthAggregationService, WealthAggregationService>();
 
         services.AddScoped<NetWorthSnapshotJob>();
+        services.AddScoped<FireBriefJob>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

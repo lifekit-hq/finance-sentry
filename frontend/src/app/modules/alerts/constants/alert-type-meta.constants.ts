@@ -122,6 +122,11 @@ export const ALERT_TYPE_META_REGISTRY = {
     label: 'family statement',
     destination: AppRoute.AccountsList,
   },
+  ['FireBrief']: {
+    icon: 'Flame',
+    label: 'FIRE brief',
+    destination: AppRoute.Dashboard,
+  },
   ['PolicyReview']: {
     icon: 'ClipboardCheck',
     label: 'policy review',

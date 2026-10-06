@@ -21,6 +21,7 @@ export type AlertType =
   | 'NewsCluster'
   | 'BudgetBreach'
   | 'FamilyStatement'
+  | 'FireBrief'
   | 'PolicyReview'
   | 'PolicyReviewMissed'
   | 'RelativeUnderperformance';

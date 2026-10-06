@@ -22,6 +22,7 @@ public sealed class MaterialityPolicyTests
     [InlineData("PerformanceBrief", CompanionEventKind.PerformanceBrief)]
     [InlineData("BudgetBreach", CompanionEventKind.BudgetBreach)]
     [InlineData("FamilyStatement", CompanionEventKind.FamilyStatement)]
+    [InlineData("FireBrief", CompanionEventKind.FireBrief)]
     [InlineData("PolicyReview", CompanionEventKind.PolicyReview)]
     [InlineData("PolicyReviewMissed", CompanionEventKind.PolicyReviewMissed)]
     [InlineData("RelativeUnderperformance", CompanionEventKind.RelativeUnderperformance)]

@@ -39,6 +39,7 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "NewsCluster" => CompanionEventKind.NewsCluster,
         "BudgetBreach" => CompanionEventKind.BudgetBreach,
         "FamilyStatement" => CompanionEventKind.FamilyStatement,
+        "FireBrief" => CompanionEventKind.FireBrief,
         "PolicyReview" => CompanionEventKind.PolicyReview,
         "PolicyReviewMissed" => CompanionEventKind.PolicyReviewMissed,
         "RelativeUnderperformance" => CompanionEventKind.RelativeUnderperformance,
