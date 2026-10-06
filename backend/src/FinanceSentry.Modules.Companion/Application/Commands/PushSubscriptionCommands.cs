@@ -21,8 +21,7 @@ public class RegisterPushSubscriptionCommandHandler(
     {
         if (!options.Value.IsConfigured) throw new PushUnavailableException();
 
-        // Push services are reached over HTTPS only; anything else is a malformed or hostile endpoint.
-        if (!Uri.TryCreate(cmd.Endpoint, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        if (!PushEndpointPolicy.IsAllowed(cmd.Endpoint))
             throw new PushSubscriptionInvalidException();
 
         var saved = await subscriptions.UpsertByEndpointAsync(

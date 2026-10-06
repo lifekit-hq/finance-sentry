@@ -17,6 +17,15 @@ public class PushSubscriptionRepository(CompanionDbContext db) : IPushSubscripti
     {
         var existing = await db.PushSubscriptions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .FirstOrDefaultAsync(s => s.Endpoint == subscription.Endpoint, ct);
+        if (existing is null || existing.UserId != subscription.UserId)
+        {
+            var owned = await db.PushSubscriptions.IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .Where(s => s.UserId == subscription.UserId)
+                .OrderBy(s => s.CreatedAt)
+                .ToListAsync(ct);
+            db.PushSubscriptions.RemoveRange(owned.Take(owned.Count - (PushSubscriptionLimits.MaxPerUser - 1)));
+        }
+
         if (existing is null)
         {
             db.PushSubscriptions.Add(subscription);
@@ -25,9 +34,10 @@ public class PushSubscriptionRepository(CompanionDbContext db) : IPushSubscripti
         }
 
         // Deliveries queued for the previous owner must not leak to the new one.
-        await db.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .Where(d => d.SubscriptionId == existing.Id && d.UserId != subscription.UserId)
-            .ExecuteDeleteAsync(ct);
+        if (existing.UserId != subscription.UserId)
+            await db.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .Where(d => d.SubscriptionId == existing.Id && d.UserId != subscription.UserId)
+                .ExecuteDeleteAsync(ct);
 
         existing.UserId = subscription.UserId;
         existing.P256dh = subscription.P256dh;

@@ -22,7 +22,7 @@ public class PushNotificationsContractTests(PushApiFactory factory) : IClassFixt
 {
     private const string Route = "/api/v1/notifications/push";
 
-    private static object Body(string endpoint = "https://push.example/abc") =>
+    private static object Body(string endpoint = "https://fcm.googleapis.com/fcm/send/abc") =>
         new { endpoint, keys = new { p256dh = "BPk", auth = "secret" } };
 
     [Fact]
@@ -80,14 +80,22 @@ public class PushNotificationsContractTests(PushApiFactory factory) : IClassFixt
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         stored!.UserId.Should().Be(factory.TestUserId);
-        stored.Endpoint.Should().Be("https://push.example/abc");
+        stored.Endpoint.Should().Be("https://fcm.googleapis.com/fcm/send/abc");
         stored.DeviceLabel.Should().Be("Chrome on Android");
     }
 
     [Theory]
-    [InlineData("http://push.example/abc")]
+    [InlineData("http://fcm.googleapis.com/fcm/send/abc")]
     [InlineData("not a url")]
-    public async Task Subscribe_rejects_a_non_https_endpoint(string endpoint)
+    [InlineData("https://push.example/abc")]
+    [InlineData("https://fcm.googleapis.com.evil.example/abc")]
+    [InlineData("https://evilnotify.windows.com/abc")]
+    [InlineData("https://127.0.0.1/abc")]
+    [InlineData("https://[::1]/abc")]
+    [InlineData("https://localhost/abc")]
+    [InlineData("https://user:pw@fcm.googleapis.com/abc")]
+    [InlineData("https://fcm.googleapis.com:8443/abc")]
+    public async Task Subscribe_rejects_an_endpoint_outside_the_push_service_allowlist(string endpoint)
     {
         var response = await factory.CreateAuthenticatedClient().PostAsJsonAsync($"{Route}/subscriptions", Body(endpoint));
 
@@ -95,11 +103,30 @@ public class PushNotificationsContractTests(PushApiFactory factory) : IClassFixt
         (await response.Content.ReadAsStringAsync()).Should().Contain("PUSH_SUBSCRIPTION_INVALID");
     }
 
+    [Theory]
+    [InlineData("https://fcm.googleapis.com/fcm/send/abc")]
+    [InlineData("https://updates.push.services.mozilla.com/wpush/v2/abc")]
+    [InlineData("https://eu.push.services.mozilla.com/wpush/v2/abc")]
+    [InlineData("https://wns2-par02p.notify.windows.com/w/?token=abc")]
+    [InlineData("https://web.push.apple.com/abc")]
+    [InlineData("https://api.push.apple.com/3/device/abc")]
+    [InlineData("https://FCM.googleapis.com:443/fcm/send/abc")]
+    public async Task Subscribe_accepts_known_push_service_hosts(string endpoint)
+    {
+        factory.Subscriptions
+            .Setup(r => r.UpsertByEndpointAsync(It.IsAny<PushSubscription>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PushSubscription s, CancellationToken _) => s);
+
+        var response = await factory.CreateAuthenticatedClient().PostAsJsonAsync($"{Route}/subscriptions", Body(endpoint));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task Subscribe_rejects_a_body_without_keys()
     {
         var response = await factory.CreateAuthenticatedClient()
-            .PostAsJsonAsync($"{Route}/subscriptions", new { endpoint = "https://push.example/abc" });
+            .PostAsJsonAsync($"{Route}/subscriptions", new { endpoint = "https://fcm.googleapis.com/fcm/send/abc" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
