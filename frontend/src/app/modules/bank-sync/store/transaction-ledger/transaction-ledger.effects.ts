@@ -1,6 +1,18 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, debounceTime, filter, forkJoin, map, of, pipe, switchMap, tap} from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  filter,
+  forkJoin,
+  groupBy,
+  map,
+  mergeMap,
+  of,
+  pipe,
+  switchMap,
+  tap,
+} from 'rxjs';
 
 import {TRANSACTION_FILTER_DEBOUNCE_MS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
 import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
@@ -151,7 +163,9 @@ export function transactionLedgerEffects(store: EffectsStore) {
     /** Amount inputs (USD): wait for typing to pause, then apply the parsed bound. */
     applyAmount: rxMethod<{bound: 'minAmount' | 'maxAmount'; raw: Nullable<string>}>(
       pipe(
-        debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS),
+        // Each bound debounces on its own, so typing max never swallows a pending min.
+        groupBy(({bound}) => bound),
+        mergeMap(group$ => group$.pipe(debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS))),
         map(({bound, raw}) => ({bound, value: TransactionFiltersUtils.parseAmount(raw)})),
         filter(({bound, value}) => value !== store.filters()[bound]),
         tap(({bound, value}) => store.setFilters({[bound]: value}))

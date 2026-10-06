@@ -366,6 +366,19 @@ describe('transactionLedgerEffects', () => {
 
       expect(store.setFilters).toHaveBeenCalledWith({minAmount: 50});
     });
+
+    it('debounces each bound independently', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applyAmount({bound: 'minAmount', raw: '50'});
+      effects.applyAmount({bound: 'maxAmount', raw: '90'});
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.setFilters).toHaveBeenCalledWith({minAmount: 50});
+      expect(store.setFilters).toHaveBeenCalledWith({maxAmount: 90});
+    });
   });
 
   describe('reloadOnFilterChange', () => {
