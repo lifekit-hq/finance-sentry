@@ -134,18 +134,30 @@ describe('dashboardComputed', () => {
   });
 
   describe('tiles total the selected window', () => {
-    it('sums every month in the window, in-progress month included', () => {
+    it('sums the window months, in-progress month included, and drops older buckets', () => {
+      // 3M in August spans June–August; the backend also sends May.
       const c = computedFor(steadyHistory(500, 900));
 
-      expect(c.windowInflowFormatted()).toBe('$12,500.00');
-      expect(c.windowSpendingFormatted()).toBe('$6,900.00');
+      expect(c.windowInflowFormatted()).toBe('$8,500.00');
+      expect(c.windowSpendingFormatted()).toBe('$4,900.00');
     });
 
     it('reports just the current month for the one-month window', () => {
-      const c = computedFor([flow('2026-08', 500, 169.42)], '1m');
+      // The backend always returns the previous month alongside the current one.
+      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 500, 169.42)], '1m');
 
       expect(c.windowInflowFormatted()).toBe('$500.00');
       expect(c.windowSpendingFormatted()).toBe('$169.42');
+    });
+
+    it('starts year-to-date at January', () => {
+      const c = computedFor(
+        [flow('2025-12', 9000, 9000), flow('2026-01', 100, 40), flow('2026-08', 200, 60)],
+        'ytd'
+      );
+
+      expect(c.windowInflowFormatted()).toBe('$300.00');
+      expect(c.windowSpendingFormatted()).toBe('$100.00');
     });
 
     it('falls back to an em dash when the window has no rows', () => {
@@ -165,6 +177,12 @@ describe('dashboardComputed', () => {
       expect(c.windowSavingsRateFormatted()).toBe('—');
     });
 
+    it("ignores last month's income when gating the one-month rate", () => {
+      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 200, 900)], '1m');
+
+      expect(c.windowSavingsRateFormatted()).toBe('—');
+    });
+
     it('reports the one-month rate once income has substantially landed', () => {
       const c = computedFor([flow('2026-08', 4000, 1000)], '1m');
 
@@ -172,10 +190,10 @@ describe('dashboardComputed', () => {
     });
 
     it('reports the rate over a longer window without gating', () => {
-      // (12000 + 200 - 6000 - 900) / (12200) ≈ 43%.
+      // (4000 + 4000 + 200 - 2000 - 2000 - 900) / 8200 ≈ 40%.
       const c = computedFor(steadyHistory(200, 900));
 
-      expect(c.windowSavingsRateFormatted()).toBe('43%');
+      expect(c.windowSavingsRateFormatted()).toBe('40%');
     });
 
     it('withholds the rate when the window has no income', () => {

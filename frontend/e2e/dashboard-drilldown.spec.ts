@@ -270,17 +270,15 @@ async function mockApisWithLedger(page: Page): Promise<void> {
       body: JSON.stringify(AUTH_RESPONSE),
     })
   );
-  // Like the backend, a one-month window carries only the current month's flow.
-  await page.route(`${API}/dashboard/aggregated**`, route => {
-    const months = Number(new URL(route.request().url()).searchParams.get('months'));
-    const monthlyFlow =
-      months === 1 ? DASHBOARD_DATA.monthlyFlow.slice(-1) : DASHBOARD_DATA.monthlyFlow;
-    return route.fulfill({
+  // Like the backend, months=N returns N complete months plus the in-progress one, so even the
+  // 1M window arrives with the previous month — the dashboard trims it by month key.
+  await page.route(`${API}/dashboard/aggregated**`, route =>
+    route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({...DASHBOARD_DATA, monthlyFlow}),
-    });
-  });
+      body: JSON.stringify(DASHBOARD_DATA),
+    })
+  );
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill({
       status: 200,

@@ -14,6 +14,7 @@ import {
   type MonthlyFlow,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
+import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
 interface StateSignals {
   data: Signal<Nullable<DashboardData>>;
@@ -153,7 +154,12 @@ export function dashboardComputed(store: StateSignals) {
 
   // The tiles total every month in the selected window, in-progress month included: one
   // range, one story across the whole dashboard. (The charts still plot closed months only.)
-  const windowTotals = computed(() => sumTotals(groupMonthly(store.data()?.monthlyFlow ?? [])));
+  // The backend always returns the month before the window's first one too (its `months` clamps
+  // to at least 1), so earlier buckets are cut here by month key.
+  const windowTotals = computed(() => {
+    const start = DashboardRangeUtils.windowStartKey(store.historyRange());
+    return sumTotals(groupMonthly(store.data()?.monthlyFlow ?? []).filter(([key]) => key >= start));
+  });
 
   const windowSavingsRate = computed((): number | null => {
     const totals = windowTotals();
