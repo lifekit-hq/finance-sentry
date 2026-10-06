@@ -17,7 +17,8 @@ using Xunit;
 /// Every category the statistics can show must come back from the ledger query with exactly the
 /// transactions it counted — including the computed <c>FAMILY_SUPPORT</c> bucket (never stored on a
 /// row) and <c>UNCATEGORIZED</c>, which the statistics also use for a null category column. Both
-/// sides run over the real repositories and services against one in-memory book.
+/// sides run over the real repositories and services against one in-memory book. The ledger may
+/// list more than the row counted (see <see cref="Ledger_AlsoListsCounterpartyClaimedDebits_OnTheirStoredCategory"/>).
 /// </summary>
 public class TopCategoryDrillDownTests
 {
@@ -25,7 +26,7 @@ public class TopCategoryDrillDownTests
 
     private sealed record Book(BankSyncDbContext Context, Guid FamilyDebitId);
 
-    private static async Task<Book> SeedAsync()
+    private static async Task<Book> SeedAsync(Action<BankSyncDbContext, BankAccount>? extra = null)
     {
         var context = new BankSyncDbContext(
             new DbContextOptionsBuilder<BankSyncDbContext>()
@@ -57,6 +58,7 @@ public class TopCategoryDrillDownTests
             Tx(uah, 1000m, "credit", "From Mom rent", CategoryKeys.TransferIn),
             Tx(uah, 800m, "debit", "Top-up to own card", CategoryKeys.TransferOut),
             deleted);
+        extra?.Invoke(context, uah);
         await context.SaveChangesAsync();
 
         return new Book(context, familyDebit.Id);
@@ -125,6 +127,46 @@ public class TopCategoryDrillDownTests
 
         page.Transactions.Select(t => t.Description).Should().BeEquivalentTo(
             ["Card payment without a category", "IBKR market data fee"]);
+    }
+
+    [Fact]
+    public async Task Ledger_AlsoListsCounterpartyClaimedDebits_OnTheirStoredCategory()
+    {
+        // Documented superset (money-semantics §6): Top spendings sets aside debits a non-family
+        // counterparty claimed, but the ledger's category filter still matches their stored category.
+        var book = await SeedAsync((context, uah) =>
+        {
+            var broker = new Counterparty { UserId = UserId, Name = "Broker", FlowRole = FlowRoles.Investment };
+            broker.Rules.Add(new CounterpartyRule { CounterpartyId = broker.Id, MatchType = "description_contains", Pattern = "Broker deposit" });
+            var bank = new Counterparty { UserId = UserId, Name = "Mortgage", FlowRole = FlowRoles.Household };
+            bank.Rules.Add(new CounterpartyRule { CounterpartyId = bank.Id, MatchType = "description_contains", Pattern = "Mortgage" });
+            context.Counterparties.AddRange(broker, bank);
+            context.Transactions.AddRange(
+                Tx(uah, 4000m, "debit", "Broker deposit", category: null),
+                Tx(uah, 9000m, "debit", "Mortgage October", "LOAN_PAYMENTS"));
+        });
+        var from = MonthWindow.StartOfMonthsAgo(2);
+        var transactions = new TransactionRepository(book.Context);
+        var accounts = new BankAccountRepository(book.Context);
+        var classification = new CounterpartyClassificationService(
+            new CounterpartyRepository(book.Context), transactions, accounts);
+        var topCategories = await new MerchantCategoryStatisticsService(transactions, accounts, new TransferDetectionService())
+            .GetTopCategoriesAsync(
+                UserId, await classification.ClassifyForWindowAsync(UserId, 2), limit: 10, months: 2, from: from);
+        var ledger = new GetAllTransactionsQueryHandler(transactions, accounts, classification);
+
+        async Task<IEnumerable<string>> DrillDownAsync(string category) =>
+            (await ledger.Handle(
+                new GetAllTransactionsQuery(
+                    UserId, new PagedRequest(0, 100), From: from, TransactionType: "debit", Categories: [category]),
+                CancellationToken.None)).Transactions.Select(t => t.Description);
+
+        topCategories.Select(c => c.Category).Should().NotContain("LOAN_PAYMENTS");
+        (await DrillDownAsync("LOAN_PAYMENTS")).Should().Equal("Mortgage October");
+        var uncategorized = topCategories.Single(c => c.Category == CategoryKeys.Uncategorized);
+        (await DrillDownAsync(CategoryKeys.Uncategorized)).Should().BeEquivalentTo(
+            ["Card payment without a category", "IBKR market data fee", "Broker deposit"],
+            "the broker deposit is listed although the {0} USD Uncategorized total leaves it out", uncategorized.TotalSpend);
     }
 
     private static BankAccount Account(string bankName, string currency) =>
