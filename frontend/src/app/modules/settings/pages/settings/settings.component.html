@@ -156,6 +156,72 @@
               label="Sync failure alerts"
             />
           </div>
+
+          <!-- Push notifications -->
+          <div class="space-y-cmn-4 border-t border-border-default pt-cmn-4">
+            <div class="flex items-start justify-between gap-cmn-4">
+              <div>
+                <div class="font-label text-cmn-sm font-medium text-text-primary">
+                  Push notifications
+                </div>
+                <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
+                  Get a headline on your device when something needs attention. Details stay in the
+                  app.
+                </div>
+              </div>
+              <cmn-toggle
+                [checked]="push.pushEnabled()"
+                [disabled]="!push.canToggle()"
+                (toggled)="push.togglePush($event)"
+                label="Push notifications"
+              />
+            </div>
+            @if (push.serverNotice() || push.browserNotice()) {
+              <p class="text-cmn-xs text-text-secondary leading-relaxed">
+                {{ push.serverNotice() || push.browserNotice() }}
+              </p>
+            }
+            @if (push.loadErrorMessage() || push.actionErrorMessage()) {
+              <p class="text-cmn-xs text-status-error" role="alert">
+                {{ push.loadErrorMessage() || push.actionErrorMessage() }}
+              </p>
+            }
+            @if (push.rows().length > 0) {
+              <ul class="divide-y divide-border-default">
+                @for (device of push.rows(); track device.id) {
+                  <li class="flex items-center justify-between gap-cmn-3 py-cmn-2">
+                    <div class="min-w-0">
+                      <div
+                        class="flex items-center gap-cmn-2 font-label text-cmn-sm text-text-primary"
+                      >
+                        <span class="truncate">{{ device.deviceLabel ?? 'Unknown device' }}</span>
+                        @if (device.isThisDevice) {
+                          <cmn-tag variant="info">This device</cmn-tag>
+                        }
+                        @if (device.disabled) {
+                          <cmn-tag variant="warning">Paused</cmn-tag>
+                        }
+                      </div>
+                      <div class="text-cmn-xs text-text-secondary">
+                        @if (device.lastSuccessAt) {
+                          Last notified {{ device.lastSuccessAt | relativeTime }}
+                        } @else {
+                          Not notified yet
+                        }
+                      </div>
+                    </div>
+                    <cmn-button
+                      [disabled]="push.isBusy()"
+                      [loading]="push.removingId() === device.id"
+                      (clicked)="push.remove(device.id)"
+                      variant="secondary"
+                      >Remove</cmn-button
+                    >
+                  </li>
+                }
+              </ul>
+            }
+          </div>
         </div>
       </div>
 

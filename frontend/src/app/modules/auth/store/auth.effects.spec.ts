@@ -9,6 +9,7 @@ import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
+import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
 import {type AuthResponse} from '../models/auth/auth.model';
@@ -59,6 +60,8 @@ function buildRouter(url = '/login') {
   };
 }
 
+const pushSession = {release: vi.fn().mockReturnValue(EMPTY)};
+
 function configure(
   service: ReturnType<typeof buildService>,
   router: ReturnType<typeof buildRouter>
@@ -67,6 +70,7 @@ function configure(
     providers: [
       {provide: AuthService, useValue: service},
       {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
+      {provide: PushSessionService, useValue: pushSession},
       {provide: Router, useValue: router},
       {
         provide: ErrorMessageService,
@@ -208,6 +212,7 @@ describe('authEffects', () => {
         authEffects(store).logout();
       });
 
+      expect(pushSession.release).toHaveBeenCalled();
       expect(service.logout).toHaveBeenCalled();
       expect(store.clearSession).toHaveBeenCalled();
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
