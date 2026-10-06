@@ -1,4 +1,5 @@
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
+using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using Microsoft.Extensions.Logging;
@@ -43,8 +44,22 @@ public sealed class IbkrFlexBackfillJob(
                         ex,
                         "Failed to backfill IBKR Flex trades for user {UserId}, window {FromDate}-{ToDate}",
                         credential.UserId, window.FromDateWire, window.ToDateWire);
+                    await RecordFailureAsync(credential, ex);
                 }
             }
+        }
+    }
+
+    private async Task RecordFailureAsync(IBKRFlexCredential credential, Exception ex)
+    {
+        try
+        {
+            credential.RecordUseError(ex.Message);
+            await credentialRepository.SaveLastErrorUnscopedAsync(credential);
+        }
+        catch (Exception saveEx)
+        {
+            logger.LogWarning(saveEx, "Failed to record IBKR Flex error for user {UserId}", credential.UserId);
         }
     }
 

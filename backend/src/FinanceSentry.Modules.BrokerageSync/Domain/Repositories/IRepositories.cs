@@ -31,6 +31,13 @@ public interface IIBKRFlexCredentialRepository
     Task<IReadOnlyList<IBKRFlexCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default);
     void Update(IBKRFlexCredential credential);
     Task SaveChangesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes the credential's <see cref="IBKRFlexCredential.LastError"/> straight to the row, bypassing the
+    /// change tracker, so a sync job can record a persist-stage failure on the same context whose
+    /// <c>SaveChanges</c> just threw. The sweep has no person in scope. Opts out of the Owner query filter.
+    /// </summary>
+    Task SaveLastErrorUnscopedAsync(IBKRFlexCredential credential, CancellationToken ct = default);
 }
 
 public interface IBrokerageHoldingRepository

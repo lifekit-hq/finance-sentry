@@ -88,8 +88,6 @@
 
     <!-- Polly / HTTP / JSON -->
     <PackageVersion Include="Polly" Version="8.8.0" />
-    <PackageVersion Include="Polly.Core" Version="8.8.0" />
-    <PackageVersion Include="Polly.Extensions.Http" Version="3.0.0" />
 
     <!-- Swagger -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />

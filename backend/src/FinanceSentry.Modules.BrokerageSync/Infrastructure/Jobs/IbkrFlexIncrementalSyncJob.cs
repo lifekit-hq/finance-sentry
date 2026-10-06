@@ -55,8 +55,7 @@ public sealed class IbkrFlexIncrementalSyncJob(
         try
         {
             credential.RecordUseError(ex.Message);
-            credentialRepository.Update(credential);
-            await credentialRepository.SaveChangesAsync();
+            await credentialRepository.SaveLastErrorUnscopedAsync(credential);
         }
         catch (Exception saveEx)
         {

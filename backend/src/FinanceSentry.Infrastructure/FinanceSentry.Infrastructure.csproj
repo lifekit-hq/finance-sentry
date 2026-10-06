@@ -16,8 +16,6 @@
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" />
     <PackageReference Include="FluentResults" />
-    <PackageReference Include="Polly.Core" />
-    <PackageReference Include="Polly.Extensions.Http" />
     <PackageReference Include="Hangfire.Core" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />

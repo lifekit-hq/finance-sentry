@@ -106,6 +106,14 @@ public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
     {
         await _context.SaveChangesAsync(ct);
     }
+
+    public async Task SaveLastErrorUnscopedAsync(IBKRFlexCredential credential, CancellationToken ct = default)
+    {
+        var lastError = credential.LastError;
+        await _context.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Id == credential.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.LastError, lastError), ct);
+    }
 }
 
 public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
