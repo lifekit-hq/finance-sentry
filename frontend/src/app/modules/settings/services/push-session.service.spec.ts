@@ -40,13 +40,16 @@ describe('PushSessionService', () => {
     expect(browser.unsubscribe).toHaveBeenCalled();
   });
 
-  it('still drops the browser subscription when the API call fails', async () => {
+  it('keeps the browser subscription and the stored id when the API call fails', async () => {
     localStorage.setItem(PUSH_DEVICE_STORAGE_KEY, 'd-1');
-    api.remove.mockReturnValue(throwError(() => new Error('offline')));
+    api.remove.mockReturnValue(throwError(() => new Error('session expired')));
 
-    await firstValueFrom(TestBed.inject(PushSessionService).release(), {defaultValue: undefined});
+    await expect(
+      firstValueFrom(TestBed.inject(PushSessionService).release(), {defaultValue: undefined})
+    ).resolves.toBeUndefined();
 
-    expect(browser.unsubscribe).toHaveBeenCalled();
+    expect(browser.unsubscribe).not.toHaveBeenCalled();
+    expect(localStorage.getItem(PUSH_DEVICE_STORAGE_KEY)).toBe('d-1');
   });
 
   it('never errors, even if the browser refuses to unsubscribe', async () => {

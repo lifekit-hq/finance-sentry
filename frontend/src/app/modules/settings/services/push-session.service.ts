@@ -17,8 +17,7 @@ export class PushSessionService {
       const api = this.injector.get(PushNotificationsService);
       const push = this.injector.get(PushSubscriptionService);
       const id = PushDeviceUtils.readId();
-      const remove$ =
-        id === null ? of(undefined) : api.remove(id).pipe(catchError(() => of(undefined)));
+      const remove$ = id === null ? of(undefined) : api.remove(id);
       return remove$.pipe(
         switchMap(() => from(push.unsubscribe())),
         tap(() => PushDeviceUtils.clearId())
