@@ -42,7 +42,7 @@ for (let run = 0; run < RUNS; run += 1) {
   await cdp.send('Network.emulateNetworkConditions', SLOW_4G);
   await cdp.send('Emulation.setCPUThrottlingRate', {rate: CPU_SLOWDOWN});
   await page.addInitScript(() => {
-    window.__lcp = 0;
+    window.__lcp = null;
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) window.__lcp = entry.startTime;
     }).observe({type: 'largest-contentful-paint', buffered: true});
@@ -53,21 +53,32 @@ for (let run = 0; run < RUNS; run += 1) {
 }
 await browser.close();
 
-const sorted = [...samples].sort((a, b) => a - b);
-const median = sorted[Math.floor(sorted.length / 2)];
+const unpainted = samples.filter(sample => !(sample > 0)).length;
+const sorted = samples.filter(sample => sample > 0).sort((a, b) => a - b);
+const median = sorted[Math.floor(sorted.length / 2)] ?? NaN;
 const verdict = median <= GOOD_LCP_MS ? 'within' : 'above';
+const formatMs = ms => (ms > 0 ? `${Math.round(ms)} ms` : 'no paint');
 const lines = [
-  `Cold /login LCP, 390px, Slow 4G, ${CPU_SLOWDOWN}x CPU: median ${Math.round(median)} ms`,
-  `runs: ${samples.map(s => Math.round(s)).join(', ')} ms`,
+  `Cold /login LCP, 390px, Slow 4G, ${CPU_SLOWDOWN}x CPU: median ${formatMs(median)}`,
+  `runs: ${samples.map(formatMs).join(', ')}`,
   `Core Web Vitals "good" mark: ${GOOD_LCP_MS} ms - ${verdict} (${(median / GOOD_LCP_MS).toFixed(2)}x)`,
   `regression budget: ${lcpRegressionBudgetMs} ms`,
 ];
+if (unpainted > 0) {
+  lines.push(`FAILED: ${unpainted} of ${RUNS} runs produced no largest-contentful-paint entry`);
+}
 console.log(lines.join('\n'));
 if (process.env['GITHUB_STEP_SUMMARY']) {
   appendFileSync(
     process.env['GITHUB_STEP_SUMMARY'],
     `### Cold /login LCP\n\n${lines.map(l => `- ${l}`).join('\n')}\n`
   );
+}
+if (unpainted > 0) {
+  console.error(
+    `LCP not observed: ${unpainted} of ${RUNS} runs produced no largest-contentful-paint entry`
+  );
+  process.exit(1);
 }
 if (median > lcpRegressionBudgetMs) {
   console.error(
