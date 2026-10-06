@@ -1,4 +1,4 @@
-node_modules
+**/node_modules
 npm-debug.log
 .git
 .gitignore
@@ -10,9 +10,12 @@ npm-debug.log
 .env.local
 .DS_Store
 Thumbs.db
-coverage
+**/coverage
 .nyc_output
-dist
+**/dist
+**/.angular
+**/playwright-report
+**/test-results
 build
 **/bin
 **/obj
