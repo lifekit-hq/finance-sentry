@@ -14,16 +14,18 @@ public record GetBudgetSummaryQuery(Guid UserId, int? Year = null, int? Month = 
 public class GetBudgetSummaryQueryHandler(
     IBudgetRepository budgets,
     ICategoryNormalizationService normalization,
-    IMerchantSpendingReader merchantSpending)
+    IMerchantSpendingReader merchantSpending,
+    TimeProvider? clock = null)
     : IQueryHandler<GetBudgetSummaryQuery, BudgetSummaryResponse>
 {
     private readonly IBudgetRepository _budgets = budgets;
     private readonly ICategoryNormalizationService _normalization = normalization;
     private readonly IMerchantSpendingReader _merchantSpending = merchantSpending;
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     public async Task<BudgetSummaryResponse> Handle(GetBudgetSummaryQuery request, CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.GetUtcNow();
         var year = request.Year ?? now.Year;
         var month = request.Month ?? now.Month;
 
@@ -32,6 +34,11 @@ public class GetBudgetSummaryQueryHandler(
 
         var from = new DateOnly(year, month, 1);
         var to = from.AddMonths(1).AddDays(-1);
+
+        // A month still in progress is read as of today; a past (or future) month reads as
+        // complete, so its pace ratio collapses to the plain spent / limit ratio.
+        var isCurrentMonth = year == now.Year && month == now.Month;
+        var asOf = isCurrentMonth ? now.UtcDateTime.Date : new DateTime(year, month, DateTime.DaysInMonth(year, month));
 
         var userBudgets = await _budgets.GetByUserIdAsync(request.UserId, cancellationToken);
 
@@ -53,6 +60,14 @@ public class GetBudgetSummaryQueryHandler(
             var limitUsd = CurrencyConverter.ToUsd(b.MonthlyLimit, b.Currency);
             var spent = spentByCategory.GetValueOrDefault(b.Category, 0m);
             var remaining = limitUsd - spent;
+            var pace = BudgetPace.Calculate(spent, limitUsd, asOf);
+            var isOverBudget = spent > limitUsd;
+            // Already over the limit is the louder signal; pace is for "heading there".
+            var isOffPace = isCurrentMonth
+                && !isOverBudget
+                && asOf.Day >= BudgetPace.WindowStartDay
+                && asOf.Day <= BudgetPace.WindowEndDay
+                && pace.PaceRatio >= BudgetPace.Tolerance;
             return new BudgetSummaryItemDto(
                 b.Id,
                 b.Category,
@@ -60,8 +75,11 @@ public class GetBudgetSummaryQueryHandler(
                 limitUsd,
                 spent,
                 remaining,
-                spent > limitUsd,
-                "USD");
+                isOverBudget,
+                "USD",
+                pace.PaceRatio,
+                pace.ProjectedMonthEndSpend,
+                isOffPace);
         }).ToList();
 
         return new BudgetSummaryResponse(

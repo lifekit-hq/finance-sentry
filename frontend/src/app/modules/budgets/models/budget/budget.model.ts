@@ -16,6 +16,9 @@ export interface BudgetSummaryItem {
   remaining: number;
   isOverBudget: boolean;
   currency: string;
+  paceRatio: number;
+  projectedMonthEndSpend: number;
+  isOffPace: boolean;
 }
 
 export interface CreateBudgetRequest {

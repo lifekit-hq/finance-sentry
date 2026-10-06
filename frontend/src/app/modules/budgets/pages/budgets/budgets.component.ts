@@ -73,6 +73,10 @@ export class BudgetsComponent {
     return Math.min((spent / limit) * PCT_MAX, PCT_MAX);
   }
 
+  public pacePct(paceRatio: number): number {
+    return Math.round(paceRatio * PCT_MAX);
+  }
+
   public barColor(spent: number, limit: number, category: string): string {
     const pct = (spent / limit) * PCT_MAX;
     if (spent > limit) {
