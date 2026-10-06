@@ -26,5 +26,8 @@ public sealed class CompanionNotificationSetting
     /// <summary>Local hour (0–23) the daily digest is produced.</summary>
     public int DigestHourLocal { get; set; }
 
+    /// <summary>Web Push opt-in (spec 859). Independent of <see cref="Mode"/>; off until the user turns it on.</summary>
+    public bool PushEnabled { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

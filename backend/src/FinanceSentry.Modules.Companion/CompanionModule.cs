@@ -50,6 +50,9 @@ public static class CompanionModule
 
         services.Configure<CompanionOptions>(config.GetSection(CompanionOptions.SectionName));
 
+        services.Configure<WebPushOptions>(config.GetSection(WebPushOptions.SectionName));
+
+        services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
         services.AddScoped<INotificationSettingRepository, NotificationSettingRepository>();
         services.AddScoped<ICompanionEventRepository, CompanionEventRepository>();
         services.AddScoped<ICompanionCaptureStateRepository, CompanionCaptureStateRepository>();

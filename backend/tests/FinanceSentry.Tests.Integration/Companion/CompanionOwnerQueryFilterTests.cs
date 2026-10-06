@@ -93,10 +93,70 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(2);
+        perUser.Should().HaveCount(4);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
+    }
+
+    private static PushSubscription NewSubscription(Guid userId, string? endpoint = null) => new()
+    {
+        UserId = userId,
+        Endpoint = endpoint ?? $"https://push.example/{Guid.NewGuid():N}",
+        P256dh = "p256dh-key",
+        Auth = "auth-secret",
+    };
+
+    [DockerRequiredFact]
+    public async Task Push_rows_are_scoped_to_their_owner()
+    {
+        var subA = NewSubscription(_userA);
+        var subB = NewSubscription(_userB);
+        var evtA = NewEvent(_userA, EventDisposition.Pending);
+        await SeedAsync(
+            subA, subB, evtA,
+            new PushDelivery { EventId = evtA.Id, SubscriptionId = subA.Id, UserId = _userA });
+
+        await using (var asA = CreateContext(_userA))
+        {
+            (await new PushSubscriptionRepository(asA).ListAsync(_userA)).Select(s => s.Id).Should().Equal(subA.Id);
+            (await asA.PushDeliveries.CountAsync()).Should().Be(1);
+        }
+
+        await using (var asB = CreateContext(_userB))
+        {
+            (await new PushSubscriptionRepository(asB).ListAsync(_userA)).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+            (await asB.PushDeliveries.AnyAsync()).Should().BeFalse();
+            (await new PushSubscriptionRepository(asB).RemoveAsync(_userB, subA.Id)).Should().BeFalse(
+                "a person cannot remove another person's device");
+        }
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.PushSubscriptions.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+        (await asNoOne.PushDeliveries.AnyAsync()).Should().BeFalse();
+    }
+
+    [DockerRequiredFact]
+    public async Task Registering_a_known_endpoint_moves_it_to_the_new_owner_without_a_duplicate()
+    {
+        var shared = NewSubscription(_userA);
+        var evt = NewEvent(_userA, EventDisposition.Pending);
+        await SeedAsync(shared, evt, new PushDelivery { EventId = evt.Id, SubscriptionId = shared.Id, UserId = _userA });
+
+        await using (var asB = CreateContext(_userB))
+        {
+            var moved = await new PushSubscriptionRepository(asB).UpsertByEndpointAsync(
+                NewSubscription(_userB, shared.Endpoint));
+            moved.Id.Should().Be(shared.Id);
+        }
+
+        await using (var asA = CreateContext(_userA))
+            (await asA.PushSubscriptions.AnyAsync()).Should().BeFalse("the previous owner no longer holds the device");
+
+        await using var asBAgain = CreateContext(_userB);
+        (await asBAgain.PushSubscriptions.CountAsync()).Should().Be(1);
+        (await asBAgain.PushDeliveries.AnyAsync()).Should().BeFalse("deliveries queued for the old owner are dropped");
     }
 
     [DockerRequiredFact]
@@ -248,6 +308,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         await using (var asA = CreateContext(_userA))
         {
+            (await asA.NotificationSettings.SingleAsync()).PushEnabled.Should().BeFalse("push is opt-in");
             (await asA.NotificationSettings.SingleAsync()).Mode.Should().Be(NotificationMode.Realtime,
                 "the existence check found A's row instead of inserting a duplicate default");
         }

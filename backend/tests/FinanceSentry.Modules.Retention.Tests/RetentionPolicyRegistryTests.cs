@@ -104,6 +104,7 @@ public sealed class RetentionPolicyRegistryTests
     [InlineData("bank_sync", "SyncJobs", "CreatedAt")]
     [InlineData("analytics", "query_audit", "CreatedAt")]
     [InlineData("companion", "companion_events", "CapturedAt")]
+    [InlineData("companion", "push_deliveries", "CreatedAt")]
     [InlineData("research", "candidate_scores", "ScoredAt")]
     [InlineData("research", "valuation_snapshots", "CapturedAt")]
     [InlineData("risk", "holding_snapshots", "CapturedAt")]
@@ -119,7 +120,7 @@ public sealed class RetentionPolicyRegistryTests
     public void Generic_purge_set_matches_expected_count()
     {
         // Guards against accidental additions/removals to the actively-purged set.
-        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(13);
+        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(14);
     }
 
     [Fact]
