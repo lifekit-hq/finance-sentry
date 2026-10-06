@@ -4,7 +4,6 @@ import {ThemeService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
-import {applyThemePreference} from '../../../../core/providers/theme.provider';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
 import {type ChangePasswordRequest, SettingsService} from '../../services/settings.service';
@@ -48,7 +47,7 @@ export function settingsEffects(store: EffectsStore) {
             tap(profile => {
               store.setProfile(profile);
               authStore.setProfileName(profile.firstName, profile.lastName);
-              applyThemePreference(themeService, profile.theme);
+              themeService.setPreference(profile.theme);
               store.setProfileSaving(false);
             }),
             catchError(err => {

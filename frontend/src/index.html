@@ -12,20 +12,21 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <!-- The CSP admits this inline script by its sha256 (docker/nginx.security-headers.conf):
-         any edit to it, whitespace included, needs the new hash there or the browser blocks it. -->
-    <script>
-      // Apply the stored/OS theme before first paint so guest pages never flash light.
-      (function () {
-        var theme = 'light';
-        try {
-          var stored = localStorage.getItem('cmn-theme');
-          if (stored === 'dark' || stored === 'light') theme = stored;
-          else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
-        } catch (e) {}
-        document.documentElement.setAttribute('data-theme', theme);
-      })();
-    </script>
+    <!-- theme-init:start - generated from @lifekit-hq/tokens by scripts/sync-theme-script.mjs; do not edit.
+         The CSP admits this inline script by its sha256 (docker/nginx.security-headers.conf). -->
+    <!-- prettier-ignore -->
+    <script>// Apply the stored/OS theme before first paint so pages never flash light.
+(function () {
+  var theme = 'light';
+  try {
+    var stored = localStorage.getItem('cmn-theme');
+    if (stored === 'dark' || stored === 'light') theme = stored;
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+    <!-- theme-init:end -->
     <!-- Installed iOS PWA: draw under the status bar instead of an opaque system band above the app. -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
