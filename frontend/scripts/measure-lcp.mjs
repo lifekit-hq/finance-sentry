@@ -1,11 +1,12 @@
 // Cold /login LCP at a 390px viewport on Slow 4G with a 4x CPU slowdown - the Core Web Vitals
 // field-test shape, in headless Chromium. Reports the median of RUNS cold loads against the 2.5 s
-// "good" mark and fails only when the median exceeds the regression budget in perf-budget.json.
+// "good" mark and fails only when the median exceeds LCP_REGRESSION_BUDGET_MS.
 // Usage: node scripts/measure-lcp.mjs <base-url>
-import {appendFileSync, readFileSync} from 'node:fs';
+import {appendFileSync} from 'node:fs';
 import {chromium} from '@playwright/test';
 
 const GOOD_LCP_MS = 2500;
+const LCP_REGRESSION_BUDGET_MS = 4500;
 const RUNS = 5;
 const MEASURED_CONTENT = 'form';
 const LCP_SETTLE_MS = 1000;
@@ -24,9 +25,6 @@ const SLOW_4G = {
 
 const baseUrl = process.argv[2];
 if (!baseUrl) throw new Error('usage: node scripts/measure-lcp.mjs <base-url>');
-const {lcpRegressionBudgetMs} = JSON.parse(
-  readFileSync(new URL('../perf-budget.json', import.meta.url), 'utf8')
-);
 
 const browser = await chromium.launch({args: ['--no-sandbox', '--disable-dev-shm-usage']});
 const samples = [];
@@ -75,7 +73,7 @@ const lines = [
   `Cold /login LCP, 390px, Slow 4G, ${CPU_SLOWDOWN}x CPU: median ${formatMs(median)}`,
   `runs: ${samples.map(formatMs).join(', ')}`,
   `Core Web Vitals "good" mark: ${GOOD_LCP_MS} ms - ${verdict} (${(median / GOOD_LCP_MS).toFixed(2)}x)`,
-  `regression budget: ${lcpRegressionBudgetMs} ms`,
+  `regression budget: ${LCP_REGRESSION_BUDGET_MS} ms`,
 ];
 if (unpainted > 0) {
   lines.push(`FAILED: ${unpainted} of ${RUNS} runs produced no largest-contentful-paint entry`);
@@ -93,9 +91,9 @@ if (unpainted > 0) {
   );
   process.exit(1);
 }
-if (median > lcpRegressionBudgetMs) {
+if (median > LCP_REGRESSION_BUDGET_MS) {
   console.error(
-    `LCP regression: ${Math.round(median)} ms exceeds the ${lcpRegressionBudgetMs} ms budget`
+    `LCP regression: ${Math.round(median)} ms exceeds the ${LCP_REGRESSION_BUDGET_MS} ms budget`
   );
   process.exit(1);
 }

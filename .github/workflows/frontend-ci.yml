@@ -103,9 +103,9 @@ jobs:
 
     # Builds the production image (precompressed assets, the shipped nginx config) and loads
     # /login cold at 390px on Slow 4G with a 4x CPU slowdown. The median is reported against the
-    # 2.5 s Core Web Vitals "good" mark; the step fails only past the regression budget in
-    # frontend/perf-budget.json. `--add-host api:...` lets nginx resolve its /api upstream - the
-    # login page renders without a backend.
+    # 2.5 s Core Web Vitals "good" mark; the step fails only past the regression budget declared
+    # in frontend/scripts/measure-lcp.mjs. `--add-host api:...` lets nginx resolve its /api
+    # upstream - the login page renders without a backend.
     - name: Build production frontend image
       env:
         NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
