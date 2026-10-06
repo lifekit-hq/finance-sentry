@@ -205,6 +205,11 @@ export class AccountsListComponent implements OnInit {
     }
   }
 
+  /** Drill-down: opens the ledger with this account preselected in the filter bar. */
+  public viewTransactions(accountId: string): void {
+    void this.router.navigate([AppRoute.Transactions], {queryParams: {account: accountId}});
+  }
+
   public navigateToDossier(symbol: string): void {
     void this.router.navigate([AppRoute.AssetDossier, symbol]);
   }

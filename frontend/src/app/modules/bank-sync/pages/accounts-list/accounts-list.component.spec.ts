@@ -1,9 +1,10 @@
 import {BreakpointObserver, type BreakpointState} from '@angular/cdk/layout';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, provideRouter} from '@angular/router';
+import {ActivatedRoute, provideRouter, Router} from '@angular/router';
 import {of} from 'rxjs';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -101,5 +102,32 @@ describe('AccountsListComponent sync status text', () => {
     const text = setup(false).textContent ?? '';
     expect(text).toContain('0 accounts');
     expect(text).not.toContain('0 accounts · Sync failed');
+  });
+});
+
+describe('AccountsListComponent transactions drill-down', () => {
+  const account = {
+    accountId: 'acc-1',
+    provider: 'truelayer',
+    category: 'banking',
+    accountType: 'current',
+    accountNumberLast4: '1234',
+    currency: 'EUR',
+    currentBalance: 10,
+    balanceInBaseCurrency: 11,
+    syncStatus: 'synced',
+    lastSyncTimestamp: null,
+  } as unknown as Institution['accounts'][number];
+
+  it('opens the ledger with the account preselected when an account row is clicked', () => {
+    const element = setup(false, {accounts: [account]});
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    const row = element.querySelector<HTMLButtonElement>('[data-testid="account-row"]');
+    row?.click();
+
+    expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+      queryParams: {account: 'acc-1'},
+    });
   });
 });
