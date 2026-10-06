@@ -27,7 +27,7 @@ The current runtime surface contains 68 tools. The canonical list is the `Agreed
 |---|---|---|---|---|
 | `get_account_summary` | Read | Portfolio | — | Consolidated banking, crypto, and brokerage balances |
 | `list_transactions` | Read | Banking | `accountId?`, `fromDate?`, `toDate?`, `category?`, `page`, `pageSize` | Paginated transaction listing |
-| `get_budget_status` | Read | Budgets | `year?`, `month?` | Budget utilization for a period |
+| `get_budget_status` | Read | Budgets | `year?`, `month?` | Budget utilization and month-end pace for a period |
 | `list_active_alerts` | Read | Alerts | — | Only unread unresolved alerts |
 | `get_portfolio_snapshot` | Read | Portfolio | — | Unified brokerage + crypto holdings; cash split into banking / brokerage / crypto-venue fiat |
 | `list_subscriptions` | Read | Subscriptions | — | Detected recurring charges |

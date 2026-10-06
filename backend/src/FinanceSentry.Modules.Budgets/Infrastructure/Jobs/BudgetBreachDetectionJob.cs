@@ -56,14 +56,10 @@ public sealed class BudgetBreachDetectionJob(
     /// are the better signal — a pace alert that late would be a second notification about the
     /// same thing.
     /// </summary>
-    private const int PaceWindowStartDay = 7;
+    private const int PaceWindowStartDay = BudgetPace.WindowStartDay;
     private const int PaceWindowEndDay = 21;
 
-    /// <summary>
-    /// 15% slack over the plain projection so ordinary lumpiness (a monthly shop, an annual
-    /// renewal) does not fire — a budget is not a schedule.
-    /// </summary>
-    private const decimal PaceTolerance = 1.15m;
+    private const decimal PaceTolerance = BudgetPace.Tolerance;
 
     /// <summary>The daily UTC slot this job is scheduled for (see <c>BudgetsModule</c>).</summary>
     public static readonly TimeOnly ScheduledSlotUtc = new(23, 55);

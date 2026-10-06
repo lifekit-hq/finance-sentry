@@ -5,7 +5,7 @@ namespace FinanceSentry.Core.Utils;
 /// month, pace ratio, and projected month-end spend.
 /// </summary>
 /// <param name="ElapsedFraction">Day-of-month ÷ days-in-month (UTC). 1.0 when
-/// <paramref name="AsOfDate"/> lands on the last day of its month — the way a past month
+/// the as-of date lands on the last day of its month — the way a past month
 /// (evaluated as of its own last day) collapses <see cref="PaceRatio"/> to the plain
 /// <c>spent / limit</c> ratio.</param>
 /// <param name="PaceRatio">How fast the budget is burning relative to the limit:
@@ -29,6 +29,18 @@ public readonly record struct BudgetPaceResult(
 /// </summary>
 public static class BudgetPace
 {
+    /// <summary>
+    /// 15% slack over the plain projection so ordinary lumpiness (a monthly shop, an annual
+    /// renewal) does not fire — a budget is not a schedule.
+    /// </summary>
+    public const decimal Tolerance = 1.15m;
+
+    /// <summary>
+    /// First day of the month on which pace is trusted: before it the elapsed-fraction
+    /// denominator is small enough that one large charge invents a crisis.
+    /// </summary>
+    public const int WindowStartDay = 7;
+
     /// <summary>
     /// Computes elapsed fraction, pace ratio, and projected month-end spend for
     /// <paramref name="asOfDate"/>'s month. Pure; callers pass the day they want evaluated as

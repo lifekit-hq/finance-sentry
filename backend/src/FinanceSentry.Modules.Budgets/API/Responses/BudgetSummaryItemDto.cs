@@ -8,4 +8,7 @@ public record BudgetSummaryItemDto(
     decimal Spent,
     decimal Remaining,
     bool IsOverBudget,
-    string Currency);
+    string Currency,
+    decimal PaceRatio,
+    decimal ProjectedMonthEndSpend,
+    bool IsOffPace);

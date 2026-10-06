@@ -89,6 +89,8 @@
               <div class="flex shrink-0 items-center gap-cmn-1">
                 @if (b.isOverBudget) {
                   <cmn-tag variant="error">Over</cmn-tag>
+                } @else if (b.isOffPace) {
+                  <cmn-tag variant="warning">Off pace</cmn-tag>
                 } @else if (nearOver) {
                   <cmn-tag variant="warning">Near limit</cmn-tag>
                 }
@@ -141,6 +143,13 @@
               ></div>
             </div>
             <div class="mt-cmn-1 text-cmn-xs text-text-secondary">{{ b.spent | money }} spent</div>
+            @if (b.isOffPace) {
+              <div class="mt-cmn-1 text-cmn-xs text-status-warning">
+                On track to finish the month at {{ pacePct(b.paceRatio) }}% of the limit ({{
+                  b.projectedMonthEndSpend | money
+                }})
+              </div>
+            }
           </cmn-card>
         }
       </div>

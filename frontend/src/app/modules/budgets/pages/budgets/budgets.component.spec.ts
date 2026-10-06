@@ -106,7 +106,7 @@ describe('BudgetsComponent actions', () => {
 });
 
 describe('BudgetsComponent hero copy', () => {
-  function render(spent: number, budget: number): string {
+  function render(spent: number, budget: number, isOffPace = false): string {
     const store = {
       editingId: signal<string | null>(null),
       monthName: signal('September'),
@@ -123,6 +123,10 @@ describe('BudgetsComponent hero copy', () => {
           spent,
           remaining: budget - spent,
           isOverBudget: spent > budget,
+          currency: 'USD',
+          paceRatio: 1.71,
+          projectedMonthEndSpend: spent * 1.71,
+          isOffPace,
         },
       ]),
       totalBudget: signal(budget),
@@ -151,5 +155,15 @@ describe('BudgetsComponent hero copy', () => {
 
   it('reads "<amount> left of <limit>" when under budget', () => {
     expect(render(100, 150)).toContain('$50.00 left of $150.00');
+  });
+
+  it('says where an off-pace budget is heading', () => {
+    const text = render(100, 150, true);
+    expect(text).toContain('Off pace');
+    expect(text).toContain('On track to finish the month at 171% of the limit');
+  });
+
+  it('says nothing about pace when the budget is on pace', () => {
+    expect(render(100, 150)).not.toContain('On track to finish');
   });
 });
