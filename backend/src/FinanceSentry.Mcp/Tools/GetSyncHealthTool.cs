@@ -24,6 +24,10 @@ public sealed class GetSyncHealthTool(
     private readonly IIdentityResolver _identity = identity;
     private readonly ILogger<GetSyncHealthTool> _logger = logger;
 
+    private const string ReauthRequiredStatus = "reauth_required";
+    private const string ExpiredConnectionStatus = "EXPIRED";
+    private const string ReauthRequiredMessage = "Reconnection required.";
+
     [McpServerTool(Name = "get_sync_health")]
     [Description("Returns the last sync timestamp, status, and error for each provider (Monobank, TrueLayer, Binance, Revolut X, IBKR).")]
     public async Task<IReadOnlyList<SyncHealthEntry>> ExecuteAsync(
@@ -57,12 +61,15 @@ public sealed class GetSyncHealthTool(
             // MonobankCredential has no LastSyncError; derive error state from associated accounts.
             var failedAccount = await _bankSync.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.UserId == userId && a.Provider == "monobank" && a.SyncStatus == "failed" && a.IsActive)
-                .Select(a => new { a.LastSyncError })
+                .Where(a => a.UserId == userId && a.Provider == "monobank" && a.IsActive
+                    && (a.SyncStatus == "failed" || a.SyncStatus == ReauthRequiredStatus))
+                .Select(a => new { a.SyncStatus, a.LastSyncError })
                 .FirstOrDefaultAsync(ct);
 
             if (failedAccount is not null)
-                return new SyncHealthEntry("monobank", credential.LastSyncAt, "error", failedAccount.LastSyncError);
+                return new SyncHealthEntry(
+                    "monobank", credential.LastSyncAt, "error",
+                    failedAccount.LastSyncError ?? (failedAccount.SyncStatus == ReauthRequiredStatus ? ReauthRequiredMessage : null));
 
             if (credential.LastSyncAt is null)
                 return new SyncHealthEntry("monobank", null, "never_synced", null);
@@ -97,8 +104,17 @@ public sealed class GetSyncHealthTool(
                 .OrderByDescending(a => a.UpdatedAt)
                 .FirstOrDefault();
 
-            return latestFailed is not null
-                ? new SyncHealthEntry("truelayer", lastSyncAt, "error", latestFailed.LastSyncError)
+            if (latestFailed is not null)
+                return new SyncHealthEntry("truelayer", lastSyncAt, "error", latestFailed.LastSyncError);
+
+            // A lapsed consent surfaces as reauth_required accounts and/or an EXPIRED connection;
+            // neither is "active" or "failed", so check them explicitly.
+            var hasExpiredConnection = await _bankSync.TrueLayerConnections
+                .AsNoTracking()
+                .AnyAsync(c => c.UserId == userId && c.Status == ExpiredConnectionStatus, ct);
+
+            return hasExpiredConnection || accounts.Any(a => a.SyncStatus == ReauthRequiredStatus)
+                ? new SyncHealthEntry("truelayer", lastSyncAt, "error", ReauthRequiredMessage)
                 : new SyncHealthEntry("truelayer", lastSyncAt, "ok", null);
         }
         catch (Exception ex)

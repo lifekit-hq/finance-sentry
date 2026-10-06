@@ -1,27 +1,13 @@
 namespace FinanceSentry.Infrastructure.Retry;
 
 using System.Net;
-using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Retry;
 
 /// <summary>
-/// Polly retry policies for outbound provider/API calls.
-///
-/// FR-005: Max 3 attempts with exponential backoff delays: 5 min → 15 min → 1 hour.
-/// Transient errors (timeout, rate limit, 5xx) are retried.
-/// Permanent errors (auth failure 401/403, validation 400) fail immediately.
+/// Classifies provider HTTP status codes as transient (429, 5xx) or permanent
+/// (400, 401, 403, 404, 422). Retry is handled by the scheduled sync cycle, not inline.
 /// </summary>
 public static class RetryPolicies
 {
-    /// <summary>Delay sequence per FR-005: 5 min, 15 min, 1 hour.</summary>
-    public static readonly TimeSpan[] TransientRetryDelays =
-    [
-        TimeSpan.FromMinutes(5),
-        TimeSpan.FromMinutes(15),
-        TimeSpan.FromHours(1)
-    ];
-
     /// <summary>
     /// HTTP status codes that indicate a permanent failure — never retry these.
     /// </summary>
@@ -33,46 +19,6 @@ public static class RetryPolicies
         HttpStatusCode.NotFound,             // 404 — resource not found
         HttpStatusCode.UnprocessableEntity,  // 422 — semantic validation error
     ];
-
-    /// <summary>
-    /// Simplified retry pipeline for operations that don't return HttpResponseMessage
-    /// (e.g., database calls, internal service calls).
-    /// Uses same 3-attempt / FR-005 delays pattern.
-    /// </summary>
-    public static ResiliencePipeline CreateTransientRetryPipeline(
-        ILogger logger,
-        string correlationId,
-        int maxAttempts = 3)
-    {
-        return new ResiliencePipelineBuilder()
-            .AddRetry(new RetryStrategyOptions
-            {
-                MaxRetryAttempts = maxAttempts,
-                DelayGenerator = args =>
-                {
-                    var delay = args.AttemptNumber < TransientRetryDelays.Length
-                        ? TransientRetryDelays[args.AttemptNumber]
-                        : TransientRetryDelays[^1];
-                    return ValueTask.FromResult<TimeSpan?>(delay);
-                },
-                ShouldHandle = new PredicateBuilder()
-                    .Handle<HttpRequestException>()
-                    .Handle<TaskCanceledException>()
-                    .Handle<TimeoutException>(),
-                OnRetry = args =>
-                {
-                    logger.LogWarning(
-                        "[{CorrelationId}] Transient retry {Attempt}/{Max} after {Delay}: {Error}",
-                        correlationId,
-                        args.AttemptNumber + 1,
-                        maxAttempts,
-                        args.RetryDelay,
-                        args.Outcome.Exception?.Message);
-                    return ValueTask.CompletedTask;
-                }
-            })
-            .Build();
-    }
 
     /// <summary>
     /// Returns true for HTTP status codes that indicate a transient (retryable) error.

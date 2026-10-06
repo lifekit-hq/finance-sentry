@@ -45,7 +45,8 @@ public class StaleSyncReaperJobTests
 
         job.Status.Should().Be("failed");
         job.ErrorCode.Should().Be("STALE_JOB_REAPED");
-        account.SyncStatus.Should().Be("failed");
+        account.SyncStatus.Should().Be("active");
+        account.LastSyncError.Should().BeNull("a reaped sync is not a provider failure");
         _jobs.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
         _accounts.Verify(r => r.UpdateAsync(account, It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -82,7 +83,8 @@ public class StaleSyncReaperJobTests
         await MakeReaper().ExecuteAsync(startupSweep: false);
 
         job.Status.Should().Be("failed");
-        account.SyncStatus.Should().Be("failed");
+        account.SyncStatus.Should().Be("active");
+        account.LastSyncError.Should().BeNull("a reaped sync is not a provider failure");
         _jobs.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
         _accounts.Verify(r => r.UpdateAsync(account, It.IsAny<CancellationToken>()), Times.Once);
     }

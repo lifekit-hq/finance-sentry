@@ -1,4 +1,5 @@
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
+using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using Microsoft.Extensions.Logging;
@@ -41,7 +42,25 @@ public sealed class IbkrFlexIncrementalSyncJob(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to sync IBKR Flex trades for user {UserId}", credential.UserId);
+                await RecordFailureAsync(credential, ex);
             }
+        }
+    }
+
+    // The fetcher records fetch failures itself; this covers everything after the fetch (parse,
+    // persist) so any Flex failure leaves LastError behind. Best effort: it must not stop the
+    // sweep for the remaining users.
+    private async Task RecordFailureAsync(IBKRFlexCredential credential, Exception ex)
+    {
+        try
+        {
+            credential.RecordUseError(ex.Message);
+            credentialRepository.Update(credential);
+            await credentialRepository.SaveChangesAsync();
+        }
+        catch (Exception saveEx)
+        {
+            logger.LogWarning(saveEx, "Failed to record IBKR Flex error for user {UserId}", credential.UserId);
         }
     }
 }

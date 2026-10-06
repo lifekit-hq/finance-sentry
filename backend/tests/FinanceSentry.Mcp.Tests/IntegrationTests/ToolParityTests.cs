@@ -668,6 +668,52 @@ public sealed class ToolParityTests
     }
 
     [Fact]
+    public async Task GetSyncHealth_TrueLayerReauthRequiredAccount_ReportsError()
+    {
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var bankDb = svc.GetRequiredService<BankSyncDbContext>();
+        var account = new BankAccount(userId, "ext-tl-002", "Chase", "checking", "9999", "Test", "USD", userId, "truelayer");
+        account.BeginSync();
+        account.MarkActive(10_000m);
+        account.MarkReauthRequired();
+        bankDb.BankAccounts.Add(account);
+        await bankDb.SaveChangesAsync();
+
+        var result = await svc.GetRequiredService<GetSyncHealthTool>().ExecuteAsync();
+
+        var entry = result.Single(e => e.Provider == "truelayer");
+        entry.Status.Should().Be("error");
+        entry.ErrorMessage.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task GetSyncHealth_TrueLayerExpiredConnection_ReportsError()
+    {
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var bankDb = svc.GetRequiredService<BankSyncDbContext>();
+        var account = new BankAccount(userId, "ext-tl-003", "Chase", "checking", "9999", "Test", "USD", userId, "truelayer");
+        account.BeginSync();
+        account.MarkActive(10_000m);
+        bankDb.BankAccounts.Add(account);
+        var connection = new TrueLayerConnection(userId, "ob-chase", "Chase", "ref-1");
+        connection.MarkExpired();
+        bankDb.TrueLayerConnections.Add(connection);
+        await bankDb.SaveChangesAsync();
+
+        var result = await svc.GetRequiredService<GetSyncHealthTool>().ExecuteAsync();
+
+        result.Single(e => e.Provider == "truelayer").Status.Should().Be("error");
+    }
+
+    [Fact]
     public async Task GetTaxLots_ReturnsCostBasisAndPnl_WhenBrokerageHoldingSeededWithAvgCost()
     {
         var userId = Guid.NewGuid();
