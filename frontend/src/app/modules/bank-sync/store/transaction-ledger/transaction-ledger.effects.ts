@@ -1,4 +1,4 @@
-import {inject, type Signal} from '@angular/core';
+import {inject, type Signal, type WritableSignal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {
   catchError,
@@ -15,7 +15,10 @@ import {
 } from 'rxjs';
 
 import {TRANSACTION_FILTER_DEBOUNCE_MS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
-import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
+import {
+  type TransactionFilterInputText,
+  type TransactionFilters,
+} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {TransactionFiltersUtils} from '../../../../shared/utils/transaction-filters.utils';
 import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
@@ -29,6 +32,7 @@ import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 const MONTH_KEY_PAD = 2;
+const EMPTY_INPUT_TEXT: TransactionFilterInputText = {minAmount: '', maxAmount: '', search: ''};
 
 function currentUtcMonthKey(): string {
   const now = new Date();
@@ -43,7 +47,9 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 interface EffectsStore {
   offset: Signal<number>;
   filters: Signal<TransactionFilters>;
+  inputText: WritableSignal<TransactionFilterInputText>;
   setFilters: (patch: Partial<TransactionFilters>) => void;
+  resetFilters: () => void;
   startFirstPage: () => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: () => void;
@@ -152,10 +158,17 @@ export function transactionLedgerEffects(store: EffectsStore) {
     },
     /** Re-queries from the first page whenever the filters change (URL, controls or reset). */
     reloadOnFilterChange: rxMethod<TransactionFilters>(pipe(tap(() => load()))),
+    /** Clearing also drops typed text still waiting on its debounce, so it cannot re-apply. */
+    clearFilters: (): void => {
+      store.resetFilters();
+      store.inputText.set(EMPTY_INPUT_TEXT);
+    },
     /** Search box: waits for typing to pause, then applies the term. */
     applySearch: rxMethod<string>(
       pipe(
+        tap(search => store.inputText.update(text => ({...text, search}))),
         debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS),
+        filter(search => search === store.inputText().search),
         filter(search => search.trim() !== store.filters().search.trim()),
         tap(search => store.setFilters({search}))
       )
@@ -163,9 +176,11 @@ export function transactionLedgerEffects(store: EffectsStore) {
     /** Amount inputs (USD): wait for typing to pause, then apply the parsed bound. */
     applyAmount: rxMethod<{bound: 'minAmount' | 'maxAmount'; raw: Nullable<string>}>(
       pipe(
+        tap(({bound, raw}) => store.inputText.update(text => ({...text, [bound]: raw ?? ''}))),
         // Each bound debounces on its own, so typing max never swallows a pending min.
         groupBy(({bound}) => bound),
         mergeMap(group$ => group$.pipe(debounceTime(TRANSACTION_FILTER_DEBOUNCE_MS))),
+        filter(({bound, raw}) => (raw ?? '') === store.inputText()[bound]),
         map(({bound, raw}) => ({bound, value: TransactionFiltersUtils.parseAmount(raw)})),
         filter(({bound, value}) => value !== store.filters()[bound]),
         tap(({bound, value}) => store.setFilters({[bound]: value}))

@@ -44,7 +44,7 @@
     data-testid="ledger-filters"
   >
     <cmn-search-input
-      [ngModel]="store.filters().search"
+      [ngModel]="store.inputText().search"
       (ngModelChange)="store.applySearch($event)"
       class="w-full md:w-64"
       placeholder="Search transactions"
@@ -75,7 +75,7 @@
       data-testid="date-filter"
     />
     <cmn-input
-      [ngModel]="store.filters().minAmount"
+      [ngModel]="store.inputText().minAmount"
       (ngModelChange)="store.applyAmount({bound: 'minAmount', raw: $event})"
       class="w-28"
       type="number"
@@ -83,7 +83,7 @@
       data-testid="min-amount-filter"
     />
     <cmn-input
-      [ngModel]="store.filters().maxAmount"
+      [ngModel]="store.inputText().maxAmount"
       (ngModelChange)="store.applyAmount({bound: 'maxAmount', raw: $event})"
       class="w-28"
       type="number"
@@ -92,7 +92,7 @@
     />
     @if (store.hasActiveFilter()) {
       <cmn-button
-        (clicked)="store.resetFilters()"
+        (clicked)="store.clearFilters()"
         variant="secondary"
         size="sm"
         data-testid="clear-filters"

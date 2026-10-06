@@ -23,7 +23,8 @@ function setup(filters: Partial<TransactionFilters> = {}, overrides: {hasMore?: 
     transactions: signal([]),
     totalCount: signal(0),
     setFilters: vi.fn(),
-    resetFilters: vi.fn(),
+    inputText: signal({minAmount: '', maxAmount: '', search: ''}),
+    clearFilters: vi.fn(),
     applySearch: vi.fn(),
     applyAmount: vi.fn(),
     load: vi.fn(),
@@ -82,6 +83,6 @@ describe('TransactionLedgerComponent empty state', () => {
   it('offers to clear active filters', () => {
     const {byTestId, store} = setup({search: 'rent'});
     byTestId('clear-filters').querySelector('button')?.click();
-    expect(store.resetFilters).toHaveBeenCalled();
+    expect(store.clearFilters).toHaveBeenCalled();
   });
 });

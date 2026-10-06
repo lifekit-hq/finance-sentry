@@ -7,7 +7,10 @@ import {
   EMPTY_TRANSACTION_FILTERS,
   TRANSACTION_FILTER_DEBOUNCE_MS,
 } from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
-import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
+import {
+  type TransactionFilterInputText,
+  type TransactionFilters,
+} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {type AccountsResponse} from '../../models/bank-account/bank-account.model';
 import {type DashboardData} from '../../models/dashboard/dashboard.model';
 import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
@@ -116,7 +119,9 @@ function buildStore(initialOffset = 0) {
   return {
     offset: signal(initialOffset),
     filters: signal<TransactionFilters>(EMPTY_TRANSACTION_FILTERS),
+    inputText: signal<TransactionFilterInputText>({minAmount: '', maxAmount: '', search: ''}),
     setFilters: vi.fn(),
+    resetFilters: vi.fn(),
     startFirstPage: vi.fn(),
     setLoading: vi.fn(),
     setTransactions: vi.fn(),
@@ -344,6 +349,18 @@ describe('transactionLedgerEffects', () => {
 
       expect(store.setFilters).not.toHaveBeenCalled();
     });
+
+    it('drops a pending term when the filters are cleared before it lands', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applySearch('coffee');
+      effects.clearFilters();
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.setFilters).not.toHaveBeenCalled();
+    });
   });
 
   describe('applyAmount', () => {
@@ -378,6 +395,30 @@ describe('transactionLedgerEffects', () => {
 
       expect(store.setFilters).toHaveBeenCalledWith({minAmount: 50});
       expect(store.setFilters).toHaveBeenCalledWith({maxAmount: 90});
+    });
+
+    it('records the typed text immediately so the box keeps what was typed', () => {
+      const store = buildStore();
+      configure(buildService());
+
+      TestBed.runInInjectionContext(() =>
+        transactionLedgerEffects(store).applyAmount({bound: 'minAmount', raw: '1.0'})
+      );
+
+      expect(store.inputText().minAmount).toBe('1.0');
+    });
+
+    it('drops a pending bound when the filters are cleared before it lands', () => {
+      const store = buildStore();
+      configure(buildService());
+      const effects = TestBed.runInInjectionContext(() => transactionLedgerEffects(store));
+
+      effects.applyAmount({bound: 'minAmount', raw: '50'});
+      effects.clearFilters();
+      vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+      expect(store.resetFilters).toHaveBeenCalledTimes(1);
+      expect(store.setFilters).not.toHaveBeenCalled();
     });
   });
 

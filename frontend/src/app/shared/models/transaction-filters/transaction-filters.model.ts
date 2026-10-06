@@ -20,3 +20,6 @@ export interface TransactionFilters {
   /** Free text over description and merchant. */
   search: string;
 }
+
+/** Raw text of the debounced filter inputs, kept apart from the committed filters so typing is never overwritten. */
+export type TransactionFilterInputText = Record<'minAmount' | 'maxAmount' | 'search', string>;
