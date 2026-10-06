@@ -118,12 +118,12 @@
             ],
             "browsers": [
               "chromium"
-            ]
+            ],
+            "headless": true
           },
           "configurations": {
             "ci": {
               "watch": false,
-              "headless": true,
               "runnerConfig": "vitest.config.ts",
               "coverage": true,
               "coverageThresholds": {
