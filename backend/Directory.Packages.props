@@ -51,6 +51,9 @@
     <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageVersion Include="Hangfire.InMemory" Version="1.0.0" />
 
+    <!-- Web Push (VAPID) sender -->
+    <PackageVersion Include="Lib.Net.Http.WebPush" Version="3.3.1" />
+
     <!-- Off-host backups (feature 024): Cloudflare R2 via the S3-compatible API -->
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104.1" />
 
