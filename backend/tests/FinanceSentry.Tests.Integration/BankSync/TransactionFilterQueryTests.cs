@@ -114,6 +114,37 @@ public sealed class TransactionFilterQueryTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task GetFilteredByUserIdAsync_CategoryFilter_MatchesNullAsUncategorized_AndClassifiedIds()
+    {
+        await using (var setup = CreateContext())
+            await setup.Database.EnsureCreatedAsync();
+
+        var userId = Guid.NewGuid();
+        var account = NewAccount(userId);
+        var noCategory = NewTransaction(account.Id, userId, 10m, DateTime.UtcNow, "No category", "hash-null");
+        var stored = NewTransaction(account.Id, userId, 10m, DateTime.UtcNow, "Stored", "hash-stored", merchantCategory: "UNCATEGORIZED");
+        var familyLeg = NewTransaction(account.Id, userId, 10m, DateTime.UtcNow, "To Mom", "hash-family", merchantCategory: "TRANSFER_OUT");
+        var food = NewTransaction(account.Id, userId, 10m, DateTime.UtcNow, "Food", "hash-food", merchantCategory: "FOOD_AND_DRINK");
+
+        await using (var seed = CreateContext())
+        {
+            seed.BankAccounts.Add(account);
+            seed.Transactions.AddRange(noCategory, stored, familyLeg, food);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var ctx = CreateContext(userId);
+        var repo = new TransactionRepository(ctx);
+        var (uncategorized, _) = await repo.GetFilteredByUserIdAsync(
+            userId, new TransactionFilter(Categories: ["UNCATEGORIZED"]), 0, 50);
+        var (familySupport, _) = await repo.GetFilteredByUserIdAsync(
+            userId, new TransactionFilter(Categories: ["FAMILY_SUPPORT"], CategoryTransactionIds: [familyLeg.Id]), 0, 50);
+
+        uncategorized.Select(t => t.Description).Should().BeEquivalentTo(["No category", "Stored"]);
+        familySupport.Select(t => t.Description).Should().Equal("To Mom");
+    }
+
+    [DockerRequiredFact]
     public async Task GetFilteredByUserIdAsync_FiltersByCategory()
     {
         await using (var setup = CreateContext())
