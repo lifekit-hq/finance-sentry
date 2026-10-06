@@ -66,6 +66,7 @@ public class GetBudgetSummaryQueryHandler(
             var isOffPace = isCurrentMonth
                 && !isOverBudget
                 && asOf.Day >= BudgetPace.WindowStartDay
+                && asOf.Day <= BudgetPace.WindowEndDay
                 && pace.PaceRatio >= BudgetPace.Tolerance;
             return new BudgetSummaryItemDto(
                 b.Id,

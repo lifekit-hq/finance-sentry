@@ -56,6 +56,16 @@ public sealed class GetBudgetSummaryPaceTests
     }
 
     [Fact]
+    public async Task CurrentMonth_AfterPaceWindow_IsNotOffPaceButKeepsPaceRatio()
+    {
+        // Day 22 of 30: 85 spent → ratio 85 / (100 × 22/30) ≈ 1.159, past the job's day-21 alert window.
+        var item = (await Run(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero), 85m)).Items.Single();
+
+        Assert.False(item.IsOffPace);
+        Assert.Equal(1.159m, Math.Round(item.PaceRatio, 3));
+    }
+
+    [Fact]
     public async Task CurrentMonth_Day3_IsNeverOffPace()
     {
         var item = (await Run(new DateTimeOffset(2026, 9, 3, 12, 0, 0, TimeSpan.Zero), 90m)).Items.Single();

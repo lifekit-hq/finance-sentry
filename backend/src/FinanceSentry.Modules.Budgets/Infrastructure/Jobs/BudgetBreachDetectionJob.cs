@@ -57,7 +57,7 @@ public sealed class BudgetBreachDetectionJob(
     /// same thing.
     /// </summary>
     private const int PaceWindowStartDay = BudgetPace.WindowStartDay;
-    private const int PaceWindowEndDay = 21;
+    private const int PaceWindowEndDay = BudgetPace.WindowEndDay;
 
     private const decimal PaceTolerance = BudgetPace.Tolerance;
 

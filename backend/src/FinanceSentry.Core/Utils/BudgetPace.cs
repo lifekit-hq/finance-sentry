@@ -42,6 +42,12 @@ public static class BudgetPace
     public const int WindowStartDay = 7;
 
     /// <summary>
+    /// Last day of the month on which pace is flagged: late in the month the remaining days
+    /// are too few for a projection to be actionable.
+    /// </summary>
+    public const int WindowEndDay = 21;
+
+    /// <summary>
     /// Computes elapsed fraction, pace ratio, and projected month-end spend for
     /// <paramref name="asOfDate"/>'s month. Pure; callers pass the day they want evaluated as
     /// of — a past month reads as complete by passing its last day, where elapsed fraction is 1
