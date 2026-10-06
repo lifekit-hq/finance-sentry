@@ -1,0 +1,59 @@
+@if (store.visible()) {
+  <cmn-card data-testid="fire-tile">
+    <div class="space-y-cmn-3">
+      <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+        <span
+          class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+        >
+          Financial independence
+        </span>
+        <a
+          [routerLink]="settingsRoute"
+          class="text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+          aria-label="Change the financial independence assumptions in settings"
+          >Change assumptions →</a
+        >
+      </div>
+
+      <p
+        class="font-headline text-cmn-xl font-semibold text-text-primary"
+        data-testid="fire-headline"
+      >
+        {{ store.headline() }}
+      </p>
+      @if (store.runway(); as runway) {
+        <p class="font-label text-cmn-sm text-text-secondary" data-testid="fire-runway">
+          {{ runway }}
+        </p>
+      }
+
+      <div
+        [attr.aria-valuenow]="store.progressPercent()"
+        aria-label="Progress toward the financial independence target"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        class="h-2 w-full overflow-hidden rounded-cmn-full bg-surface-hover"
+        role="progressbar"
+      >
+        <div
+          [style.width.%]="store.progressPercent()"
+          class="h-full rounded-cmn-full bg-accent-default"
+        ></div>
+      </div>
+      <p class="text-cmn-xs text-text-secondary" data-testid="fire-progress">
+        {{ store.progressPercent() }}% of the target
+      </p>
+
+      @if (store.hasStaleSleeves()) {
+        <cmn-alert variant="warning"
+          >Some account data is stale — carried forward from the last successful sync, so this date
+          is an estimate.</cmn-alert
+        >
+      }
+
+      <p class="text-cmn-xs leading-relaxed text-text-secondary" data-testid="fire-assumptions">
+        {{ store.assumptions() }}
+      </p>
+    </div>
+  </cmn-card>
+}

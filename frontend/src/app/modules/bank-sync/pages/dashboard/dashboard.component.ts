@@ -20,6 +20,7 @@ import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {
   HISTORY_RANGE_LABELS,
   HISTORY_RANGE_TILE_HEADINGS,
@@ -51,6 +52,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     CmnColumnComponent,
     DataTableComponent,
     DonutChartComponent,
+    FireTileComponent,
     IconComponent,
     MerchantCategoryPipe,
     MoneyPipe,
@@ -178,6 +180,12 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               }
             }
           </div>
+
+          <!--
+            Computed on read from the same honest monthly flow as the savings rate, with both
+            assumptions stated in the tile. Renders nothing below three complete months.
+          -->
+          <fns-fire-tile />
 
           <!--
             Totals for the selected range, in-progress month included, so the tiles tell the same

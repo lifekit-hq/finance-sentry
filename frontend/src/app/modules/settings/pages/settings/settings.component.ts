@@ -1,4 +1,11 @@
-import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  ViewContainerRef,
+} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
@@ -17,7 +24,14 @@ import {take} from 'rxjs';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
+import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {
+  REAL_ANNUAL_RETURN_MAX_PERCENT,
+  REAL_ANNUAL_RETURN_MIN_PERCENT,
+  SAFE_WITHDRAWAL_RATE_MAX_PERCENT,
+  SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
+} from '../../constants/fire/fire-assumptions.constants';
 import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -61,12 +75,32 @@ export class SettingsComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly withdrawalDraft = signal<string | null>(null);
+  private readonly realReturnDraft = signal<string | null>(null);
 
   public readonly store = inject(SettingsStore);
   public readonly push = inject(PushStore);
   public readonly currencyOptions = CURRENCY_OPTIONS;
   public readonly themeOptions = THEME_OPTIONS;
   public readonly canManageUsers = this.authStore.canManageUsers;
+  public readonly withdrawalRateHint = `Between ${SAFE_WITHDRAWAL_RATE_MIN_PERCENT}% and ${SAFE_WITHDRAWAL_RATE_MAX_PERCENT}%. The classic rule is 4%.`;
+  public readonly realReturnHint = `Between ${REAL_ANNUAL_RETURN_MIN_PERCENT}% and ${REAL_ANNUAL_RETURN_MAX_PERCENT}%, after inflation.`;
+
+  public readonly withdrawalRateError = computed(() => {
+    const draft = this.withdrawalDraft();
+    return draft !== null && this.parseWithdrawalRate(draft) === null
+      ? `Enter a number from ${SAFE_WITHDRAWAL_RATE_MIN_PERCENT} to ${SAFE_WITHDRAWAL_RATE_MAX_PERCENT}.`
+      : '';
+  });
+  public readonly realReturnError = computed(() => {
+    const draft = this.realReturnDraft();
+    return draft !== null && this.parseRealReturn(draft) === null
+      ? `Enter a number from ${REAL_ANNUAL_RETURN_MIN_PERCENT} to ${REAL_ANNUAL_RETURN_MAX_PERCENT}.`
+      : '';
+  });
+  public readonly assumptionsInvalid = computed(
+    () => this.withdrawalRateError() !== '' || this.realReturnError() !== ''
+  );
 
   public readonly pwCurrent = signal('');
   public readonly pwNext = signal('');
@@ -74,7 +108,7 @@ export class SettingsComponent {
 
   public saveProfile(): void {
     const p = this.store.profile();
-    if (!p) {
+    if (!p || this.assumptionsInvalid()) {
       return;
     }
     this.store.saveProfile({
@@ -86,8 +120,52 @@ export class SettingsComponent {
       lowBalanceAlerts: p.lowBalanceAlerts,
       lowBalanceThreshold: p.lowBalanceThreshold,
       syncFailureAlerts: p.syncFailureAlerts,
+      safeWithdrawalRate: p.safeWithdrawalRate,
+      realAnnualReturn: p.realAnnualReturn,
     });
     this.toast.show('Profile saved successfully', 'success');
+  }
+
+  // The typed text is kept as a draft so a rejected value stays visible beside its error; only a
+  // value inside its bounds ever reaches the profile, and Save stays off until both are valid.
+  public setWithdrawalRate(text: string): void {
+    this.withdrawalDraft.set(text);
+    const rate = this.parseWithdrawalRate(text);
+    if (rate !== null) {
+      this.store.updateProfile({safeWithdrawalRate: rate});
+    }
+  }
+
+  public setRealReturn(text: string): void {
+    this.realReturnDraft.set(text);
+    const rate = this.parseRealReturn(text);
+    if (rate !== null) {
+      this.store.updateProfile({realAnnualReturn: rate});
+    }
+  }
+
+  public withdrawalRateText(storedFraction: number): string {
+    return this.withdrawalDraft() ?? PercentUtils.fromFraction(storedFraction);
+  }
+
+  public realReturnText(storedFraction: number): string {
+    return this.realReturnDraft() ?? PercentUtils.fromFraction(storedFraction);
+  }
+
+  private parseWithdrawalRate(text: string): number | null {
+    return PercentUtils.toFraction(
+      text,
+      SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
+      SAFE_WITHDRAWAL_RATE_MAX_PERCENT
+    );
+  }
+
+  private parseRealReturn(text: string): number | null {
+    return PercentUtils.toFraction(
+      text,
+      REAL_ANNUAL_RETURN_MIN_PERCENT,
+      REAL_ANNUAL_RETURN_MAX_PERCENT
+    );
   }
 
   public changePassword(): void {

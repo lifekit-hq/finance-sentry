@@ -11,6 +11,8 @@ export interface UserProfile {
   lowBalanceAlerts: boolean;
   lowBalanceThreshold: number;
   syncFailureAlerts: boolean;
+  safeWithdrawalRate: number;
+  realAnnualReturn: number;
   twoFactor: boolean;
 }
 
@@ -23,6 +25,8 @@ export interface UpdateProfileRequest {
   lowBalanceAlerts: boolean;
   lowBalanceThreshold: number;
   syncFailureAlerts: boolean;
+  safeWithdrawalRate: number;
+  realAnnualReturn: number;
 }
 
 export interface PasswordForm {

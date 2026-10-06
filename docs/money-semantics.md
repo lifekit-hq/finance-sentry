@@ -4,7 +4,7 @@ Source of truth for Finance Sentry's money math. **Any PR that changes one of th
 behaviours must update this document in the same diff.** File references point at the
 implementing code; when they disagree, the code is the bug or this doc is stale — fix one.
 
-Last verified: 2026-10-01 (UI plan phase 5 — liability presentation on the Accounts page).
+Last verified: 2026-10-06 (§11 FIRE projection).
 
 ---
 
@@ -710,3 +710,30 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   raise no alert, because a thesis-level relative breach is what a `relative_return`
   invalidation trigger is for. Settings:
   `ThesisTrackRecord:RelativePerformance` (`ThresholdPct`, `SustainedRuns`, `Window`).
+
+## 11. FIRE projection (#433)
+
+`GET /wealth/fire` (`GetFireProjectionQuery`, math in `FireCalculator`) projects the date net worth
+reaches the financial-independence target. Computed on read; nothing is persisted.
+
+- **Inputs.** The latest net-worth snapshot (§8) and the per-user monthly flow from
+  `IHonestMonthlyFlowReader` (the counterparty- and transfer-corrected flows of §5/§5.1, USD per §3).
+  Only COMPLETE months in the trailing six count (the in-progress month is dropped); fewer than 3
+  gives `InsufficientHistory` and no projection.
+- **Annual spend** = 12 × the median of the complete months' `OutflowUsd` (total honest outflow, the
+  same figure the savings rate uses). **Monthly savings** = the median of their `NetUsd`. Even-length
+  samples average the two middle values.
+- **Target** = annual spend ÷ safe withdrawal rate. A non-positive rate is guarded to a zero target
+  (reads as already reached).
+- **Assumptions** are per-user (`IUserFireAssumptionsReader`), defaulting to a 4% safe withdrawal rate
+  and a 5% real annual return. The Settings form bounds them to 0.5-10% and 0-15%; the API itself
+  does not.
+- **Outcome.** Net worth ≥ target → `AlreadyReached`; else savings ≤ 0 → `NotSaving` (no date); else
+  `Projected`. Months to target solve the future value of the current balance plus level monthly
+  contributions, both compounding at the real return converted to a monthly rate
+  (`(1 + r)^(1/12) − 1`): `ln((target·rm + c) / (NW·rm + c)) / ln(1 + rm)`. A zero return, or a
+  non-positive denominator (deeply negative net worth), falls back to `(target − NW) / c`. The date is
+  today plus the months rounded up.
+- Unlike the 12-month net-worth projection tile, contributions compound here, because at a FIRE
+  horizon (years to decades) ignoring compounding is most of the answer.
+- `HasStaleSleeves` mirrors the snapshot's `StaleSleeves` (§8): the figure is shown, with a notice.

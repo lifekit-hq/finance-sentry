@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
+using System.Text.Json.Serialization;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
@@ -8,8 +9,10 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// <summary>
 /// A FIRE (financial independence) date is reachable, already reached, not reachable at the
 /// current savings rate, or not yet computable for lack of history — each its own state so the
-/// tile renders a sentence rather than a number the reader has to interpret.
+/// tile renders a sentence rather than a number the reader has to interpret. Serialized by name
+/// so the wire contract is the state, not an ordinal.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FireProjectionStatus>))]
 public enum FireProjectionStatus
 {
     Projected,
