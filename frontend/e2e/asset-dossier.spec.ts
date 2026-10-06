@@ -84,13 +84,13 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByText('Revenue growth (YoY) falls below 5.0%')).toBeVisible();
   });
 
-  test('dossier page renders recommendation trend table', async ({page}) => {
+  test('dossier page renders recommendation trend list', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Recommendation Trend')).toBeVisible();
-    const table = page.getByRole('table', {name: 'Recommendation trends'});
-    await expect(table.getByRole('columnheader', {name: 'Strong Buy'})).toBeVisible();
+    const trends = page.getByTestId('trend-list');
+    await expect(trends.getByTestId('list-row').first()).toContainText('Strong buy');
     // Verify a trend row is rendered
-    await expect(table.getByRole('cell', {name: '18'})).toBeVisible();
+    await expect(trends.getByTestId('list-row').first()).toContainText('18');
   });
 
   test('dossier page renders radar sparkline SVG for multiple signals', async ({page}) => {
