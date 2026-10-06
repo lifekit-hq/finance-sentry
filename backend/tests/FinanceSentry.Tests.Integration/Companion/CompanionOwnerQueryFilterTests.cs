@@ -160,6 +160,54 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task The_push_sender_reads_across_users_with_no_person_in_scope_and_honours_opt_in_and_audience()
+    {
+        var optedIn = NewSetting(_userA, NotificationMode.Quiet);
+        optedIn.PushEnabled = true;
+        var optedOut = NewSetting(_userB, NotificationMode.Realtime);
+        var subA = NewSubscription(_userA);
+        var subADisabled = NewSubscription(_userA);
+        subADisabled.DisabledAt = DateTimeOffset.UtcNow.AddDays(-40);
+        var subB = NewSubscription(_userB);
+        var plain = NewEvent(_userA, EventDisposition.DeferredQuietHours);
+        var operational = NewEvent(_userA, EventDisposition.Pending);
+        operational.Kind = CompanionEventKind.OperationalFailure;
+        var delivered = NewEvent(_userA, EventDisposition.Delivered);
+        await SeedAsync(
+            optedIn, optedOut, subA, subADisabled, subB, plain, operational, delivered, NewEvent(_userB, EventDisposition.Pending),
+            new PushDelivery { EventId = delivered.Id, SubscriptionId = subA.Id, UserId = _userA });
+
+        await using var job = CreateContext();
+        var repo = new PushDeliveryRepository(job);
+        var since = DateTimeOffset.UtcNow.AddHours(-1);
+
+        (await repo.ListActiveSubscriptionsUnscopedAsync()).Select(s => s.Id).Should().Equal(subA.Id);
+
+        (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: false, 50))
+            .Select(e => e.Id).Should().Equal(plain.Id);
+        (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: true, 50))
+            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, operational.Id]);
+        (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, DateTimeOffset.UtcNow.AddMinutes(1), includeOperational: true, 50))
+            .Should().BeEmpty();
+
+        var fresh = new PushDelivery { EventId = plain.Id, SubscriptionId = subA.Id, UserId = _userA };
+        await repo.AddDeliveriesAsync([fresh]);
+        await repo.AddDeliveriesAsync([new PushDelivery { EventId = plain.Id, SubscriptionId = subA.Id, UserId = _userA }]);
+        (await job.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name]).CountAsync(d => d.EventId == plain.Id)).Should().Be(1);
+
+        (await repo.ListDueUnscopedAsync(DateTimeOffset.UtcNow, 50)).Select(d => d.EventId)
+            .Should().BeEquivalentTo([delivered.Id, plain.Id]);
+        (await repo.GetEventsUnscopedAsync([plain.Id, operational.Id])).Keys.Should().BeEquivalentTo([plain.Id, operational.Id]);
+        (await repo.GetSubscriptionsUnscopedAsync([subA.Id, subB.Id])).Keys.Should().BeEquivalentTo([subA.Id, subB.Id]);
+
+        (await repo.PruneDisabledSubscriptionsUnscopedAsync(DateTimeOffset.UtcNow.AddDays(-30))).Should().Be(1);
+        await repo.RemoveSubscriptionUnscopedAsync(subA.Id);
+        await using var after = CreateContext();
+        (await after.PushSubscriptions.IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(s => s.Id).ToListAsync()).Should().Equal(subB.Id);
+        (await after.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name]).AnyAsync()).Should().BeFalse("deliveries go with their subscription");
+    }
+
+    [DockerRequiredFact]
     public async Task Each_person_sees_only_their_own_rows_and_no_person_sees_none()
     {
         await SeedAsync(
