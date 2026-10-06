@@ -52,8 +52,28 @@ for (let run = 0; run < RUNS; run += 1) {
       }
     }).observe({type: 'largest-contentful-paint', buffered: true});
   });
+  // Everything the browser saw, printed only when the page never renders the measured content:
+  // nginx logs its static assets with access_log off, so this is the only record of them in CI.
+  const observed = [];
+  page.on('response', res =>
+    observed.push(`${res.status()} ${res.headers()['content-encoding'] ?? '-'} ${res.url()}`)
+  );
+  page.on('requestfailed', req =>
+    observed.push(`failed ${req.failure()?.errorText ?? '?'} ${req.url()}`)
+  );
+  page.on('console', msg => {
+    if (msg.type() === 'error') observed.push(`console: ${msg.text()}`);
+  });
+  page.on('pageerror', err => observed.push(`pageerror: ${err.message}`));
   await page.goto(`${baseUrl}/login`, {waitUntil: 'networkidle'});
-  await page.locator(MEASURED_CONTENT).waitFor();
+  try {
+    await page.locator(MEASURED_CONTENT).waitFor();
+  } catch (err) {
+    console.error(
+      `run ${run + 1}: "${MEASURED_CONTENT}" never rendered; the browser observed:\n${observed.join('\n')}`
+    );
+    throw err;
+  }
   await page.waitForFunction(
     settleMs => performance.now() - window.__lcpObservedAt >= settleMs,
     LCP_SETTLE_MS,
