@@ -20,20 +20,23 @@ describe('DashboardRangeUtils', () => {
   });
 
   describe('months', () => {
-    it('requests complete months only, since the backend adds the in-progress one', () => {
-      expect(DashboardRangeUtils.months('3m', now)).toBe(2);
-      expect(DashboardRangeUtils.months('6m', now)).toBe(5);
-      expect(DashboardRangeUtils.months('1y', now)).toBe(11);
+    it('requests N complete months of chart history for the fixed ranges', () => {
+      expect(DashboardRangeUtils.months('1m', now)).toBe(1);
+      expect(DashboardRangeUtils.months('3m', now)).toBe(3);
+      expect(DashboardRangeUtils.months('6m', now)).toBe(6);
+      expect(DashboardRangeUtils.months('1y', now)).toBe(12);
+    });
+
+    it('requests the closed months since January for year-to-date', () => {
       expect(DashboardRangeUtils.months('ytd', now)).toBe(7);
     });
 
-    it('stays at the backend minimum of one for the current-month windows', () => {
-      expect(DashboardRangeUtils.months('1m', now)).toBe(1);
+    it('stays at the backend minimum of one for January year-to-date', () => {
       expect(DashboardRangeUtils.months('ytd', january)).toBe(1);
     });
 
-    it('stays within the backend maximum for all', () => {
-      expect(DashboardRangeUtils.months('all', now)).toBe(119);
+    it('requests the backend maximum for all', () => {
+      expect(DashboardRangeUtils.months('all', now)).toBe(120);
     });
   });
 

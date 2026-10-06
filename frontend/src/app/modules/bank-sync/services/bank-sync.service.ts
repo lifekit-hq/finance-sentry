@@ -88,8 +88,15 @@ export class BankSyncService extends ApiService {
     return this.delete<void>(`institutions/${provider}/${institutionId}`);
   }
 
-  public getDashboardData(months?: number): Observable<DashboardData> {
-    const options = months === undefined ? {} : {params: {months}};
+  public getDashboardData(months?: number, windowMonths?: number): Observable<DashboardData> {
+    const params: Record<string, number> = {};
+    if (months !== undefined) {
+      params['months'] = months;
+    }
+    if (windowMonths !== undefined) {
+      params['windowMonths'] = windowMonths;
+    }
+    const options = {params};
     return this.http.get<DashboardData>(`${environment.apiBaseUrl}/dashboard/aggregated`, options);
   }
 

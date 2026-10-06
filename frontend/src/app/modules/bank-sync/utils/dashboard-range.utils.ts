@@ -13,12 +13,12 @@ export class DashboardRangeUtils {
   }
 
   /**
-   * Value for the backend's `months` parameter, which counts COMPLETE months before the
-   * in-progress one and clamps to at least 1. A one-month window (or January year-to-date)
-   * therefore still returns the previous month; `windowStartKey` cuts it off client-side.
+   * Value for the backend's `months` parameter: how many COMPLETE months of history the charts
+   * plot (the backend adds the in-progress one and clamps to at least 1). Year-to-date needs
+   * the closed months since January.
    */
   public static months(range: HistoryRange, now = new Date()): number {
-    return Math.max(DashboardRangeUtils.windowMonths(range, now) - 1, 1);
+    return range === 'ytd' ? Math.max(now.getUTCMonth(), 1) : HISTORY_RANGE_MONTHS[range];
   }
 
   /** First `YYYY-MM` bucket inside the range's window (lexicographically comparable). */

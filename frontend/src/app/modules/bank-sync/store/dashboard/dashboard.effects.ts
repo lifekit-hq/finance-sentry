@@ -40,16 +40,21 @@ export function dashboardEffects(store: EffectsStore) {
       pipe(
         tap(() => store.setLoading()),
         switchMap(range =>
-          bankSyncService.getDashboardData(DashboardRangeUtils.months(range)).pipe(
-            tap(data => {
-              store.setData(data);
-              store.setSuccess();
-            }),
-            catchError((err: unknown) => {
-              store.setError(extractErrorCode(err));
-              return EMPTY;
-            })
-          )
+          bankSyncService
+            .getDashboardData(
+              DashboardRangeUtils.months(range),
+              DashboardRangeUtils.windowMonths(range)
+            )
+            .pipe(
+              tap(data => {
+                store.setData(data);
+                store.setSuccess();
+              }),
+              catchError((err: unknown) => {
+                store.setError(extractErrorCode(err));
+                return EMPTY;
+              })
+            )
         )
       )
     ),
@@ -127,7 +132,8 @@ export function dashboardHooks(store: HookStore): void {
         timer(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS).pipe(
           switchMap(() =>
             bankSyncService.getDashboardData(
-              DashboardRangeUtils.months(untracked(store.historyRange))
+              DashboardRangeUtils.months(untracked(store.historyRange)),
+              DashboardRangeUtils.windowMonths(untracked(store.historyRange))
             )
           ),
           tap(data => untracked(() => store.setData(data))),

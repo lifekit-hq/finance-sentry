@@ -26,9 +26,12 @@ public class DashboardController(
     // ── GET /api/dashboard/aggregated ── T408 ─────────────────────────────────
 
     [HttpGet("aggregated")]
-    public async Task<IActionResult> GetAggregated([FromQuery] int months = 6, CancellationToken ct = default)
+    public async Task<IActionResult> GetAggregated(
+        [FromQuery] int months = 6,
+        [FromQuery] int? windowMonths = null,
+        CancellationToken ct = default)
     {
-        var data = await _dashboard.GetDashboardDataAsync(User.RequireUserId(), months, ct);
+        var data = await _dashboard.GetDashboardDataAsync(User.RequireUserId(), months, windowMonths, ct);
         return Ok(data);
     }
 

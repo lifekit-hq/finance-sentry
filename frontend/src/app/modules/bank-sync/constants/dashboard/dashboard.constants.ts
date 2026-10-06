@@ -4,7 +4,7 @@ import {type HistoryRange} from '../../models/dashboard/dashboard.model';
  * One selected range drives every dashboard widget — the net-worth chart via from/to
  * dates, the month-bucketed statistics (income vs spending, savings rate, top
  * categories) via this month count. 'ytd' is calendar-dependent, so it resolves through
- * `DashboardRangeUtils.months`. 'all' maps to the backend's maximum window.
+ * `DashboardRangeUtils`. 'all' maps to the backend's maximum window.
  */
 export const HISTORY_RANGE_MONTHS: Record<Exclude<HistoryRange, 'ytd'>, number> = {
   '1m': 1,
