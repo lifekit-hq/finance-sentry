@@ -6,6 +6,8 @@ on:
     paths:
       - 'frontend/**'
       - 'docker/nginx.security-headers.conf'
+      - 'docker/nginx.frontend.conf'
+      - 'docker/Dockerfile.frontend.prod'
       - '.github/workflows/frontend-ci.yml'
   # No `paths:` filter on PRs: the required check must always report. Path filtering
   # happens inside the workflow instead (changes job + aggregate job below).
@@ -97,6 +99,26 @@ jobs:
       run: |
         mkdir -p playwright-report
         npx playwright test --reporter=list,json
+      working-directory: frontend
+
+    # Builds the production image (precompressed assets, the shipped nginx config) and loads
+    # /login cold at 390px on Slow 4G with a 4x CPU slowdown. The median is reported against the
+    # 2.5 s Core Web Vitals "good" mark; the step fails only past the regression budget declared
+    # in frontend/scripts/measure-lcp.mjs. `--add-host api:...` lets nginx resolve its /api
+    # upstream - the login page renders without a backend.
+    - name: Build production frontend image
+      env:
+        NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        docker build -f docker/Dockerfile.frontend.prod \
+          --secret id=npm_token,env=NPM_TOKEN -t finance-sentry-frontend:lcp .
+
+    - name: Measure cold /login LCP
+      run: |
+        docker run -d --name frontend-lcp --add-host api:127.0.0.1 -p 4290:4200 finance-sentry-frontend:lcp
+        trap 'status=$?; [ "$status" -eq 0 ] || docker logs frontend-lcp; docker rm -f frontend-lcp' EXIT
+        timeout 30 sh -c 'until curl -sf http://localhost:4290/readyz; do sleep 1; done'
+        node scripts/measure-lcp.mjs http://localhost:4290
       working-directory: frontend
 
     - name: Upload Playwright report

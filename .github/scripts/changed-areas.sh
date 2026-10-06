@@ -38,9 +38,10 @@ while IFS= read -r f; do
     frontend/*) frontend=true docker_frontend=true ;;
     backend/*|agent/*|global.json|.config/*) backend=true docker=true ;;
     docker/Dockerfile|docker/Dockerfile.mcp|docker/Dockerfile.gateway) docker=true ;;
-    # Shared by the frontend image and the e2e server (frontend/e2e/serve.mjs).
-    docker/nginx.security-headers.conf) frontend=true docker_frontend=true ;;
-    docker/Dockerfile.frontend.prod|docker/nginx.*) docker_frontend=true ;;
+    # Shared by the frontend image and the e2e server (frontend/e2e/serve.mjs); the nginx config and
+    # image recipe also decide what the cold-load LCP check measures.
+    docker/nginx.security-headers.conf|docker/nginx.frontend.conf|docker/Dockerfile.frontend.prod) frontend=true docker_frontend=true ;;
+    docker/nginx.*) docker_frontend=true ;;
     .dockerignore) docker=true docker_frontend=true ;;
     .github/workflows/"$own_workflow") backend=true frontend=true docker=true docker_frontend=true ;;
     .github/scripts/*) backend=true frontend=true docker=true docker_frontend=true ;;
