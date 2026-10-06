@@ -124,7 +124,10 @@
           <p class="text-cmn-xs text-text-secondary">{{ position.provider | providerLabel }}</p>
 
           <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
-            <cmn-stat-card [value]="position.quantity | number: '1.0-8'" label="Quantity" />
+            <cmn-stat-card
+              [value]="(position.quantity | number: '1.0-8') ?? '—'"
+              label="Quantity"
+            />
             <cmn-stat-card [value]="position.currentValueUsd | money" label="Current Value" />
             @if (position.costBasisUsd !== null) {
               <cmn-stat-card [value]="position.costBasisUsd | money" label="Cost Basis" />

@@ -11,6 +11,8 @@ const FROZEN_NOW = new Date('2026-09-01T12:30:00Z');
 // the viewports are tall enough to hold the whole dossier.
 const DESKTOP = {width: 1280, height: 2800};
 const PHONE = {width: 375, height: 2400};
+// The library stat cards are bordered tiles, so the full dossier outgrows PHONE on a phone.
+const PHONE_FULL = {width: 375, height: 3000};
 const SCREENSHOT_OPTIONS = {
   animations: 'disabled',
   // Glyph anti-aliasing differs a little between the machines that render these baselines.
@@ -39,7 +41,7 @@ test.describe('Asset dossier visual baseline', () => {
   });
 
   test('full dossier on a phone', async ({page}) => {
-    await page.setViewportSize(PHONE);
+    await page.setViewportSize(PHONE_FULL);
     await openDossier(page, 'AAPL');
     await expect(page.getByTestId('trend-list')).toBeVisible();
     await expect(page).toHaveScreenshot('dossier-phone.png', SCREENSHOT_OPTIONS);
