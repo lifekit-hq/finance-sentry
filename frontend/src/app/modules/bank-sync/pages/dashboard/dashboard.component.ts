@@ -20,13 +20,18 @@ import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {HISTORY_RANGE_LABELS} from '../../constants/dashboard/dashboard.constants';
+import {
+  HISTORY_RANGE_LABELS,
+  HISTORY_RANGE_TILE_HEADINGS,
+} from '../../constants/dashboard/dashboard.constants';
 import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
 
 const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
+  {label: '1M', value: '1m'},
   {label: '3M', value: '3m'},
   {label: '6M', value: '6m'},
+  {label: 'YTD', value: 'ytd'},
   {label: '1Y', value: '1y'},
   {label: 'All', value: 'all'},
 ];
@@ -174,14 +179,13 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
           </div>
 
           <!--
-            The in-progress month lives here and nowhere else. The charts below plot closed
-            months only, so a partial figure never sits next to a complete one pretending to
-            be comparable; here it is labelled month-to-date and paced against the trailing
-            complete months, which is the comparison that actually means something mid-month.
+            Totals for the selected range, in-progress month included, so the tiles tell the same
+            story as the hero and the charts. The charts below plot closed months only, so a
+            partial figure never sits next to a complete one pretending to be comparable.
           -->
           <div>
             <div class="mb-cmn-3 flex items-baseline justify-between">
-              <span class="text-cmn-sm font-medium text-text-secondary">This month</span>
+              <span class="text-cmn-sm font-medium text-text-secondary">{{ tileHeading() }}</span>
               <a
                 [routerLink]="breakdownRoute"
                 class="text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
@@ -209,13 +213,6 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                         class="block truncate font-mono text-cmn-lg font-semibold tabular-nums text-text-primary sm:text-cmn-2xl"
                         >{{ tile.value() }}</span
                       >
-                      @if (tile.deltaLabel()) {
-                        <span
-                          [class]="paceClass(tile.delta())"
-                          class="block font-label text-cmn-xs font-medium"
-                          >{{ tile.deltaLabel() }}</span
-                        >
-                      }
                     }
                   </button>
                 }
@@ -277,37 +274,34 @@ export class DashboardComponent {
     () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
   );
   public readonly rangeLabel = computed(() => HISTORY_RANGE_LABELS[this.store.historyRange()]);
+  public readonly tileHeading = computed(
+    () => HISTORY_RANGE_TILE_HEADINGS[this.store.historyRange()]
+  );
   public readonly topCategoriesLabel = computed(
     () => `Top Spending Categories (${this.rangeLabel()})`
   );
   public readonly changeClass = computed(() =>
     this.paceClass(this.store.netWorthChangeDirection())
   );
-  // The three month-to-date figures read as one card. Savings opens the audit view, which
+  // The three window figures read as one card. Savings opens the audit view, which
   // shows every money bucket at once.
   public readonly monthTiles = [
     {
       label: 'Income',
       ariaLabel: 'View income details',
-      value: this.store.monthlyInflowFormatted,
-      delta: this.store.inflowPaceDelta,
-      deltaLabel: this.store.inflowPaceLabel,
+      value: this.store.windowInflowFormatted,
       open: (): void => this.goToIncome(),
     },
     {
       label: 'Spending',
       ariaLabel: 'View spending details',
-      value: this.store.monthlySpendingFormatted,
-      delta: this.store.spendingPaceDelta,
-      deltaLabel: this.store.spendingPaceLabel,
+      value: this.store.windowSpendingFormatted,
       open: (): void => this.goToSpending(),
     },
     {
       label: 'Savings',
-      ariaLabel: "View this month's savings breakdown",
-      value: this.store.savingsRateMonthToDateFormatted,
-      delta: this.store.savingsRatePaceDelta,
-      deltaLabel: this.store.savingsRatePaceLabel,
+      ariaLabel: 'View the savings breakdown',
+      value: this.store.windowSavingsRateFormatted,
       open: (): void => this.goToBreakdown(),
     },
   ] as const;

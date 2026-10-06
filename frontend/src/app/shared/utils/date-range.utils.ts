@@ -3,7 +3,7 @@ export interface DateRange {
   to: string;
 }
 
-export type RelativeRange = '3m' | '6m' | '1y' | 'all';
+export type RelativeRange = '1m' | '3m' | '6m' | 'ytd' | '1y' | 'all';
 
 const ISO_DATE_LENGTH = 10;
 const MONTHS_3 = 3;
@@ -18,7 +18,11 @@ export class DateRangeUtils {
     const to = DateRangeUtils.toIsoDate(now);
     const d = new Date(now);
 
-    if (range === '3m') {
+    if (range === '1m') {
+      d.setMonth(d.getMonth() - 1);
+    } else if (range === 'ytd') {
+      return {from: `${now.getUTCFullYear()}-01-01`, to};
+    } else if (range === '3m') {
       d.setMonth(d.getMonth() - MONTHS_3);
     } else if (range === '6m') {
       d.setMonth(d.getMonth() - MONTHS_6);

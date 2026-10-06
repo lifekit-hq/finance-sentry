@@ -270,13 +270,17 @@ async function mockApisWithLedger(page: Page): Promise<void> {
       body: JSON.stringify(AUTH_RESPONSE),
     })
   );
-  await page.route(`${API}/dashboard/aggregated**`, route =>
-    route.fulfill({
+  // Like the backend, a one-month window carries only the current month's flow.
+  await page.route(`${API}/dashboard/aggregated**`, route => {
+    const months = Number(new URL(route.request().url()).searchParams.get('months'));
+    const monthlyFlow =
+      months === 1 ? DASHBOARD_DATA.monthlyFlow.slice(-1) : DASHBOARD_DATA.monthlyFlow;
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(DASHBOARD_DATA),
-    })
-  );
+      body: JSON.stringify({...DASHBOARD_DATA, monthlyFlow}),
+    });
+  });
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill({
       status: 200,
@@ -314,8 +318,8 @@ test.describe('Dashboard drill-downs', () => {
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
     // Stat cards should render (not empty state)
     await expect(page.getByText('Connect your first account')).not.toBeVisible();
-    // The in-progress month lives on the month-to-date tiles and nowhere else.
-    await expect(page.getByText('This month')).toBeVisible();
+    // The in-progress month is totalled in the range tiles, labelled by the selected range.
+    await expect(page.getByText('Last 3 months')).toBeVisible();
     await expect(page.getByRole('button', {name: /view income details/i})).toBeVisible();
     await expect(page.getByRole('button', {name: /view spending details/i})).toBeVisible();
     await expect(page.getByRole('button', {name: /savings breakdown/i})).toBeVisible();
@@ -461,7 +465,8 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
 test.describe('Dashboard → Ledger spending consistency', () => {
   test('the Spending tile and Monthly Outflow show the same underlying number', async ({page}) => {
     await mockApisWithLedger(page);
-    await page.goto('/dashboard');
+    // The ledger summary is the current month's outflow, so compare it with the 1M window.
+    await page.goto('/dashboard?range=1m');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
     // Read the Spending tile value from the dashboard.

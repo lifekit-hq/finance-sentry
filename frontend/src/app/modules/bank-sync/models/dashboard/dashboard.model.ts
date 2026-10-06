@@ -1,4 +1,4 @@
-export type HistoryRange = '3m' | '6m' | '1y' | 'all';
+export type HistoryRange = '1m' | '3m' | '6m' | 'ytd' | '1y' | 'all';
 
 export interface NetWorthSnapshotDto {
   snapshotDate: string;

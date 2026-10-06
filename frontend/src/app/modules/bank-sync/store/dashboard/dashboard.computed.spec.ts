@@ -7,15 +7,14 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
   type DashboardData,
+  type HistoryRange,
   type MonthlyFlow,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {dashboardComputed} from './dashboard.computed';
 
-// Frozen mid-month so "the current month" is genuinely partial: 12 of 31 days elapsed.
-// Every pace assertion below is anchored to that 12/31 fraction.
+// Frozen mid-month so "the current month" is genuinely partial.
 const NOW = new Date('2026-08-12T00:00:00.000Z');
-const ELAPSED_FRACTION = 12 / 31;
 
 function flow(month: string, inflow: number, outflow: number): MonthlyFlow {
   return {
@@ -36,7 +35,10 @@ interface Fixture {
   netWorthHistory?: NetWorthSnapshotDto[];
 }
 
-function build({monthlyFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture) {
+function build(
+  {monthlyFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture,
+  historyRange: HistoryRange = '3m'
+) {
   const data: DashboardData = {
     aggregatedBalance: {USD: 0},
     totalNetWorthUsd,
@@ -49,14 +51,15 @@ function build({monthlyFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixtur
 
   return {
     data: signal<Nullable<DashboardData>>(data),
+    historyRange: signal<HistoryRange>(historyRange),
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
   };
 }
 
-function computedFor(monthlyFlow: MonthlyFlow[]) {
-  return TestBed.runInInjectionContext(() => dashboardComputed(build({monthlyFlow})));
+function computedFor(monthlyFlow: MonthlyFlow[], range: HistoryRange = '3m') {
+  return TestBed.runInInjectionContext(() => dashboardComputed(build({monthlyFlow}, range)));
 }
 
 function projectionFor(fixture: Fixture) {
@@ -130,137 +133,55 @@ describe('dashboardComputed', () => {
     });
   });
 
-  describe('month-to-date tiles carry the in-progress month', () => {
-    it('reports month-to-date income and spending, not the closed months', () => {
+  describe('tiles total the selected window', () => {
+    it('sums every month in the window, in-progress month included', () => {
       const c = computedFor(steadyHistory(500, 900));
 
-      expect(c.monthlyInflowFormatted()).toBe('$500.00');
-      expect(c.monthlySpendingFormatted()).toBe('$900.00');
+      expect(c.windowInflowFormatted()).toBe('$12,500.00');
+      expect(c.windowSpendingFormatted()).toBe('$6,900.00');
     });
 
-    it('keeps cents on the month-to-date tiles', () => {
-      const c = computedFor(steadyHistory(500, 169.42));
+    it('reports just the current month for the one-month window', () => {
+      const c = computedFor([flow('2026-08', 500, 169.42)], '1m');
 
-      expect(c.monthlySpendingFormatted()).toBe('$169.42');
+      expect(c.windowInflowFormatted()).toBe('$500.00');
+      expect(c.windowSpendingFormatted()).toBe('$169.42');
     });
 
-    it('falls back to an em dash when the current month has no rows yet', () => {
-      const c = computedFor([flow('2026-07', 4000, 2000)]);
+    it('falls back to an em dash when the window has no rows', () => {
+      const c = computedFor([]);
 
-      expect(c.monthlyInflowFormatted()).toBe('—');
-      expect(c.monthlySpendingFormatted()).toBe('—');
-    });
-
-    it('paces spending against the prorated average of the closed months', () => {
-      // Exactly on pace: 2000 * 12/31 ≈ 774.
-      const onPace = computedFor(steadyHistory(4000, 2000 * ELAPSED_FRACTION));
-
-      expect(onPace.spendingPaceLabel()).toBe('0% over pace');
-    });
-
-    it('colours overspending red by inverting the delta the card reads', () => {
-      const c = computedFor(steadyHistory(4000, 2000 * ELAPSED_FRACTION * 1.5));
-
-      expect(c.spendingPaceLabel()).toBe('50% over pace');
-      // The card renders delta >= 0 as green; spending above pace must not be green.
-      expect(c.spendingPaceDelta()).toBeLessThan(0);
-    });
-
-    it('colours underspending green', () => {
-      const c = computedFor(steadyHistory(4000, 2000 * ELAPSED_FRACTION * 0.5));
-
-      expect(c.spendingPaceLabel()).toBe('50% under pace');
-      expect(c.spendingPaceDelta()).toBeGreaterThan(0);
-    });
-
-    it('never paces income: it is lumpy, so no delta at any point in the month', () => {
-      const c = computedFor(steadyHistory(4000 * ELAPSED_FRACTION * 1.2, 0));
-
-      expect(c.inflowPaceDelta()).toBeNull();
-      expect(c.inflowPaceLabel()).toBe('');
-    });
-
-    it('caps a huge spending overshoot instead of printing four digits', () => {
-      const c = computedFor(steadyHistory(4000, 2000 * ELAPSED_FRACTION * 12));
-
-      expect(c.spendingPaceLabel()).toBe('>200% over pace');
-      expect(c.spendingPaceDelta()).toBe(-200);
-    });
-
-    describe.each([
-      {day: 1, paced: false},
-      {day: 2, paced: false},
-      {day: 6, paced: false},
-      {day: 7, paced: true},
-      {day: 15, paced: true},
-    ])('spending pace on day $day', ({day, paced}) => {
-      it(paced ? 'shows a pace chip' : 'stays neutral', () => {
-        vi.setSystemTime(new Date(Date.UTC(2026, 7, day)));
-        // Rent-sized outflow already posted against a 2000/month baseline.
-        const c = computedFor(steadyHistory(4580, 1312));
-
-        if (paced) {
-          expect(c.spendingPaceDelta()).not.toBeNull();
-          expect(c.spendingPaceLabel()).toMatch(/over pace$/);
-        } else {
-          expect(c.spendingPaceDelta()).toBeNull();
-          expect(c.spendingPaceLabel()).toBe('');
-        }
-        expect(c.inflowPaceDelta()).toBeNull();
-      });
-    });
-
-    it('reads a month with no income yet as neutral rather than a red shortfall', () => {
-      const c = computedFor(steadyHistory(0, 300));
-
-      expect(c.inflowPaceLabel()).toBe('No income yet');
-      expect(c.inflowPaceDelta()).toBe(0);
-    });
-
-    it('shows no pace chip when there are no closed months to compare against', () => {
-      const c = computedFor([flow('2026-08', 500, 900)]);
-
-      expect(c.inflowPaceDelta()).toBeNull();
-      expect(c.spendingPaceDelta()).toBeNull();
-      expect(c.inflowPaceLabel()).toBe('');
+      expect(c.windowInflowFormatted()).toBe('—');
+      expect(c.windowSpendingFormatted()).toBe('—');
     });
   });
 
-  describe('month-to-date savings rate waits for income to land', () => {
-    it('withholds the rate while this month is mostly spending against stray credits', () => {
-      // $200 against a normal $4000 month — salary has not posted, so the raw rate would
+  describe('window savings rate', () => {
+    it('withholds the one-month rate while income has not landed', () => {
+      // $200 against $900 of spending — salary has not posted, so the raw rate would
       // read about -350% and mean nothing.
+      const c = computedFor([flow('2026-08', 200, 900)], '1m');
+
+      expect(c.windowSavingsRateFormatted()).toBe('—');
+    });
+
+    it('reports the one-month rate once income has substantially landed', () => {
+      const c = computedFor([flow('2026-08', 4000, 1000)], '1m');
+
+      expect(c.windowSavingsRateFormatted()).toBe('75%');
+    });
+
+    it('reports the rate over a longer window without gating', () => {
+      // (12000 + 200 - 6000 - 900) / (12200) ≈ 43%.
       const c = computedFor(steadyHistory(200, 900));
 
-      expect(c.savingsRateMonthToDateFormatted()).toBe('—');
-      expect(c.savingsRatePaceDelta()).toBeNull();
+      expect(c.windowSavingsRateFormatted()).toBe('43%');
     });
 
-    it('reports the rate once income has substantially landed', () => {
-      const c = computedFor(steadyHistory(4000, 1000));
+    it('withholds the rate when the window has no income', () => {
+      const c = computedFor([flow('2026-08', 0, 300)]);
 
-      expect(c.savingsRateMonthToDateFormatted()).toBe('75%');
-    });
-
-    it('compares the rate in percentage points against the usual closed months', () => {
-      // Closed months run at 50%; this month is at 75%.
-      const c = computedFor(steadyHistory(4000, 1000));
-
-      expect(c.savingsRatePaceLabel()).toBe('25 pts above usual');
-      expect(c.savingsRatePaceDelta()).toBeGreaterThan(0);
-    });
-
-    it('flags a rate below the usual months as negative', () => {
-      const c = computedFor(steadyHistory(4000, 3000));
-
-      expect(c.savingsRatePaceLabel()).toBe('25 pts below usual');
-      expect(c.savingsRatePaceDelta()).toBeLessThan(0);
-    });
-
-    it('withholds the rate when the current month has no rows at all', () => {
-      const c = computedFor([flow('2026-07', 4000, 2000)]);
-
-      expect(c.savingsRateMonthToDateFormatted()).toBe('—');
+      expect(c.windowSavingsRateFormatted()).toBe('—');
     });
   });
 
