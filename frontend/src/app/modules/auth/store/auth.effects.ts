@@ -8,6 +8,7 @@ import {catchError, EMPTY, filter, pipe, startWith, switchMap, tap} from 'rxjs';
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {ErrorUtils} from '../../../shared/utils/error.utils';
+import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
 import {
@@ -59,6 +60,7 @@ export function authEffects(store: EffectsStore) {
   const authService = inject(AuthService);
   const router = inject(Router);
   const settingsService = inject(SettingsService);
+  const pushSession = inject(PushSessionService);
   const doc = inject(DOCUMENT);
 
   return {
@@ -133,6 +135,9 @@ export function authEffects(store: EffectsStore) {
       )
     ),
     logout(): void {
+      if (store.isAuthenticated()) {
+        pushSession.release().subscribe();
+      }
       authService.logout().subscribe({error: () => undefined});
       store.clearSession();
       void router.navigate([AppRoute.Login]);

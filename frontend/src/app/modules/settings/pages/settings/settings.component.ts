@@ -9,14 +9,17 @@ import {
   InputComponent,
   PageHeaderComponent,
   SelectComponent,
+  TagComponent,
   ToastService,
   ToggleComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
+import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 
 const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
@@ -43,11 +46,13 @@ const MIN_PASSWORD_LENGTH = 8;
     FormsModule,
     InputComponent,
     PageHeaderComponent,
+    RelativeTimePipe,
     SelectComponent,
+    TagComponent,
     ToggleComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [SettingsStore],
+  providers: [SettingsStore, PushStore],
   templateUrl: './settings.component.html',
 })
 export class SettingsComponent {
@@ -58,6 +63,7 @@ export class SettingsComponent {
   private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(SettingsStore);
+  public readonly push = inject(PushStore);
   public readonly currencyOptions = CURRENCY_OPTIONS;
   public readonly themeOptions = THEME_OPTIONS;
   public readonly canManageUsers = this.authStore.canManageUsers;

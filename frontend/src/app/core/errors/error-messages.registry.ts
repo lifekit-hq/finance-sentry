@@ -50,6 +50,9 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   PUSH_UNAVAILABLE: 'Push notifications are not available right now.',
   PUSH_SUBSCRIPTION_INVALID: 'This device could not be registered for push notifications.',
   PUSH_SUBSCRIPTION_NOT_FOUND: 'That device is no longer registered.',
+  PUSH_PERMISSION_DENIED:
+    'Notifications are blocked for this site. Allow them in your browser settings, then try again.',
+  PUSH_SUBSCRIBE_FAILED: 'This browser could not be set up for push notifications. Try again.',
   ALERT_LOAD_FAILED: 'Failed to load alerts.',
   EVENTS_WINDOW_INVALID: 'The events window is invalid. Pick a range of at most a year.',
   EVENTS_KINDS_INVALID: 'One of the requested event kinds is not recognised.',
