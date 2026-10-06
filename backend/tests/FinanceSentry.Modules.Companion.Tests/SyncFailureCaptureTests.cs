@@ -40,6 +40,9 @@ public sealed class SyncFailureCaptureTests
         public Task<IReadOnlyList<MaterialAlertRecord>> GetNewSinceAsync(
             DateTimeOffset watermark, int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<MaterialAlertRecord>>([alert]);
+
+        public Task<IReadOnlySet<Guid>> GetResolvedIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
     }
 
     private sealed class NoAnalystActions : IAnalystActionFeedReader

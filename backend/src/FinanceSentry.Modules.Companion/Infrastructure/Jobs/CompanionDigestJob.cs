@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 
 using FinanceSentry.Modules.Companion.Application.Services;
+using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using Hangfire;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ using Microsoft.Extensions.Logging;
 public sealed class CompanionDigestJob(
     INotificationSettingRepository settings,
     ICompanionEventRepository events,
+    ISyncFailureReconciler reconciler,
     IAgentWakeDispatcher dispatcher,
     ILogger<CompanionDigestJob> logger)
 {
@@ -35,7 +37,10 @@ public sealed class CompanionDigestJob(
                 continue;
             }
 
-            var held = await events.ListHeldForDigestUnscopedAsync(userId, ct);
+            // Resolved failures expire here and long-open ones escalate out of the digest, so only live held events count.
+            var held = (await reconciler.ReconcileAsync(await events.ListHeldForDigestUnscopedAsync(userId, ct), ct))
+                .Where(e => e.Disposition == EventDisposition.HeldForDigest)
+                .ToList();
             if (held.Count == 0)
             {
                 continue;

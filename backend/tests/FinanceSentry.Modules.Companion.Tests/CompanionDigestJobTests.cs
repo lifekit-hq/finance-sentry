@@ -90,7 +90,7 @@ public sealed class CompanionDigestJobTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDigestJob(
-            new FixedSettings(setting), events, dispatcher, NullLogger<CompanionDigestJob>.Instance);
+            new FixedSettings(setting), events, PassThroughReconciler.Instance, dispatcher, NullLogger<CompanionDigestJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -115,7 +115,7 @@ public sealed class CompanionDigestJobTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDigestJob(
-            new FixedSettings(setting), events, dispatcher, NullLogger<CompanionDigestJob>.Instance);
+            new FixedSettings(setting), events, PassThroughReconciler.Instance, dispatcher, NullLogger<CompanionDigestJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -138,7 +138,7 @@ public sealed class CompanionDigestJobTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDigestJob(
-            new FixedSettings(setting), events, dispatcher, NullLogger<CompanionDigestJob>.Instance);
+            new FixedSettings(setting), events, PassThroughReconciler.Instance, dispatcher, NullLogger<CompanionDigestJob>.Instance);
 
         await job.ExecuteAsync();
 

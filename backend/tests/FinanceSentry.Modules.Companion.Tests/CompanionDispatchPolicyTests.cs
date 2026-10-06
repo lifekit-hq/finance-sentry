@@ -92,7 +92,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -129,7 +129,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -158,7 +158,7 @@ public sealed class CompanionDispatchPolicyTests
         var dispatcher = new RecordingDispatcher();
         var authorization = new StubUserAuthorizationChecker(User);
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, authorization,
+            events, PassThroughReconciler.Instance, new FixedSettings(setting), dispatcher, authorization,
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -197,7 +197,7 @@ public sealed class CompanionDispatchPolicyTests
 
         var dispatcher = new RecordingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(setting), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
