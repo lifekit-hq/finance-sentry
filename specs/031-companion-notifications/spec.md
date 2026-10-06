@@ -108,7 +108,7 @@ In **digest** mode, material events are withheld from immediate push and rolled 
 
 **Boundary**
 
-- **FR-015**: Finance Sentry MUST NOT deliver to any user-facing channel itself (no Telegram/email/SMS in FS). It only records events and dispatches a wake to the agent runtime, which owns delivery, formatting, and channel. (Consistent with the "no new push channels" posture.)
+- **FR-015**: On the agent path, Finance Sentry MUST NOT deliver to any user-facing channel itself (no Telegram/email/SMS in FS). It only records events and dispatches a wake to the agent runtime, which owns delivery, formatting, and channel. *Amended by [spec 859](../859-web-push-notifications/spec.md): Finance Sentry additionally owns a Web Push channel to the user's own installed app, independent of this path.*
 - **FR-016**: The dispatch payload MUST NOT embed secrets or full sensitive detail; it carries identifiers/references the agent resolves through existing authenticated tools.
 
 ### Key Entities *(include if feature involves data)*
@@ -127,7 +127,7 @@ In **digest** mode, material events are withheld from immediate push and rolled 
 - **SC-004**: Correlated duplicate detections of one logical event produce **at most one** outreach.
 - **SC-005**: **100%** of material events are recorded with a disposition — none are lost — regardless of mode or agent-runtime availability.
 - **SC-006**: In `digest` mode, proactive outreach volume is **at most one message per day**, and it covers that day's material events with no repeats.
-- **SC-007**: Finance Sentry adds **no** new outbound user-facing channel; all user delivery continues to flow through the agent runtime.
+- **SC-007**: The agent path adds **no** new outbound user-facing channel; all agent-driven delivery continues to flow through the agent runtime. *Amended by [spec 859](../859-web-push-notifications/spec.md): the Web Push channel is a separate, parallel channel and does not change this criterion for the agent path.*
 
 ## Assumptions
 
