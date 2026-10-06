@@ -144,5 +144,5 @@ description: "Task list for Companion Notification Modes + Event-Driven Push"
 ## Notes
 - Constitution gates per file: `dotnet build backend/` zero warnings; unit tests for business logic.
 - M001 MUST carry its `.Designer.cs` (M007/M008 lesson) — verify via the quickstart migration-history check.
-- No new FS push channel (FR-015): the only outbound is the configurable webhook carrying ids/refs.
+- No new FS push channel on the agent path (FR-015, amended by spec 859 for Web Push): the only outbound is the configurable webhook carrying ids/refs.
 - Cross-module reads go through `Core.Interfaces` contracts (constitution I) — no concrete cross-module references.

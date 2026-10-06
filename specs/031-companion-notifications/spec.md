@@ -3,7 +3,7 @@
 **Feature Branch**: `031-companion-notifications`
 **Created**: 2026-07-22
 **Status**: Implemented
-**Input**: User description: "Companion notification modes + event-driven push. Finance Sentry owns the policy (materiality, mode preference, dedup/rate-limit/quiet-hours) and dispatches material events to the companion agent; the agent triages and delivers. No new push channels in FS."
+**Input**: User description: "Companion notification modes + event-driven push. Finance Sentry owns the policy (materiality, mode preference, dedup/rate-limit/quiet-hours) and dispatches material events to the companion agent; the agent triages and delivers. No new push channels in FS on the agent path (Web Push added later by spec 859)."
 
 ## Overview
 
@@ -12,7 +12,7 @@ The companion advisor agent (Ledger) currently reaches Denys only by scheduled p
 1. **Control over how proactive the agent is.** Denys wants to dial the agent between silent, once-a-day, periodic, and immediate — cheaply and reversibly, ideally just by telling the agent.
 2. **Real-time reach for things that actually matter.** When a material event happens (a risk rule trips, a thesis breaks, a held name gets a notable street action), Denys wants it to reach him *then* — not on the next poll.
 
-Finance Sentry owns the **policy**: the mode preference, which events are material, dedup/rate-limiting/quiet-hours, and the decision to dispatch. It hands a triage-ready event to the agent runtime, which owns **delivery** (channel, formatting, voice). Finance Sentry itself gains **no** user-facing push channel.
+Finance Sentry owns the **policy**: the mode preference, which events are material, dedup/rate-limiting/quiet-hours, and the decision to dispatch. It hands a triage-ready event to the agent runtime, which owns **delivery** (channel, formatting, voice). On the agent path Finance Sentry gains **no** user-facing push channel (a separate Web Push channel is added by [spec 859](../859-web-push-notifications/spec.md)).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -141,7 +141,7 @@ In **digest** mode, material events are withheld from immediate push and rolled 
 ## Notes
 
 - **[DECISION] Policy in Finance Sentry, delivery in the agent runtime**: FS owns the mode preference, materiality classification, dedup, rate-limiting, quiet-hours, and the dispatch decision. The agent runtime owns channel, formatting, voice, and the actual send. Rationale: the domain (what matters, and the user's preference) is FS's responsibility as the core; the agent stays a thin consumer. This is the explicit reason the feature lives in FS rather than the OpenClaw agent layer.
-- **[DECISION] No new FS push channel**: FS triggers the agent (a wake) and never sends to Telegram/email itself, keeping channel ownership in one place and matching the prior "no new push channels" posture.
+- **[DECISION] No new FS push channel on the agent path**: FS triggers the agent (a wake) and never sends to Telegram/email itself, keeping channel ownership in one place on that path. *Amended by [spec 859](../859-web-push-notifications/spec.md): FS additionally owns a separate Web Push channel.*
 - **[OUT OF SCOPE] Delivery/formatting/channel-account**: how the agent phrases and where it sends the message lives in the agent runtime, not this feature.
 - **[OUT OF SCOPE] Agent-as-code**: moving the agent's persona/jobs/config into this repo and deploying it is a separate feature; this one is only the notification policy + event system.
 - **[DEFERRED] Multi-channel fan-out**: if Denys later wants the same policy to also drive an in-app or email notification, the FS-owned mode/materiality is the right seam to extend — deferred to a future feature.
