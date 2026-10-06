@@ -58,6 +58,11 @@ services:
       Backup__R2SecretKey: ${BACKUP_R2_SECRET_KEY:-}
       Backup__AgeRecipient: ${BACKUP_AGE_RECIPIENT:-}
       Backup__AgeIdentity: ${BACKUP_AGE_IDENTITY:-}
+      # Web Push (spec 859). VAPID keypair for in-app push; empty = push disabled (keyless-graceful:
+      # the public-key endpoint reports unavailable and the sender job no-ops). Subject is a mailto: or https: contact.
+      WebPush__PublicKey: ${WEBPUSH_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${WEBPUSH_PRIVATE_KEY:-}
+      WebPush__Subject: ${WEBPUSH_SUBJECT:-}
       TrueLayer__Scopes: "info accounts balance transactions cards offline_access"
       Jwt__Secret: ${JWT_SECRET:-your-secret-key-change-in-production}
       Jwt__Issuer: "https://finance-sentry.local"

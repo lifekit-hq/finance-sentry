@@ -101,6 +101,11 @@ services:
       Backup__R2SecretKey: ${BACKUP_R2_SECRET_KEY:-}
       Backup__AgeRecipient: ${BACKUP_AGE_RECIPIENT:-}
       Backup__AgeIdentity: ${BACKUP_AGE_IDENTITY:-}
+      # Web Push (spec 859). VAPID keypair for in-app push; empty = push disabled (keyless-graceful:
+      # the public-key endpoint reports unavailable and the sender job no-ops). Subject is a mailto: or https: contact.
+      WebPush__PublicKey: ${WEBPUSH_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${WEBPUSH_PRIVATE_KEY:-}
+      WebPush__Subject: ${WEBPUSH_SUBJECT:-}
       # Public base of the API itself — used to build the OAuth redirect_uri TrueLayer sends the
       # browser back to after consent. This MUST exactly match a redirect URI registered in the
       # TrueLayer console (<origin>/api/v1/accounts/truelayer/callback), or consent is rejected.
