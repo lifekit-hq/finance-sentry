@@ -85,7 +85,7 @@ describe('TransactionFiltersUtils.parseAmount', () => {
 });
 
 describe('TransactionFiltersUtils.syncInputText', () => {
-  const committed = {minAmount: null, maxAmount: null, search: ''};
+  const empty = {minAmount: null, maxAmount: null, search: ''};
   const typed = {minAmount: '1.0', maxAmount: '', search: ' coffee'};
 
   it('starts from the committed filters', () => {
@@ -94,17 +94,30 @@ describe('TransactionFiltersUtils.syncInputText', () => {
     ).toEqual({minAmount: '5', maxAmount: '', search: 'tea'});
   });
 
-  it('keeps text that still means the committed value', () => {
+  it('keeps text that still means a changed committed value', () => {
     expect(
-      TransactionFiltersUtils.syncInputText({...committed, minAmount: 1, search: 'coffee'}, typed)
+      TransactionFiltersUtils.syncInputText(
+        {...empty, minAmount: 1, search: 'coffee'},
+        {committed: empty, text: typed}
+      )
     ).toEqual(typed);
   });
 
-  it('follows the filters when they changed under the text', () => {
-    expect(TransactionFiltersUtils.syncInputText(committed, typed)).toEqual({
-      minAmount: '',
-      maxAmount: '',
-      search: '',
-    });
+  it('follows the filters when a committed value changed under the text', () => {
+    expect(
+      TransactionFiltersUtils.syncInputText(
+        {...empty, minAmount: 2},
+        {committed: {...empty, minAmount: 1}, text: typed}
+      )
+    ).toEqual({minAmount: '2', maxAmount: '', search: ' coffee'});
+  });
+
+  it('leaves a field still waiting on its debounce when another field commits', () => {
+    expect(
+      TransactionFiltersUtils.syncInputText(
+        {...empty, minAmount: 5},
+        {committed: empty, text: {minAmount: '5', maxAmount: '100', search: 'rent'}}
+      )
+    ).toEqual({minAmount: '5', maxAmount: '100', search: 'rent'});
   });
 });

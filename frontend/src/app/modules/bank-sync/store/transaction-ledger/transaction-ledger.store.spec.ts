@@ -108,4 +108,17 @@ describe('TransactionLedgerStore', () => {
     expect(store.filters().minAmount).toBeNull();
     expect(store.inputText().minAmount).toBe('');
   });
+
+  it('applies a bound typed while another field commits', () => {
+    const store = createStore({});
+
+    store.applyAmount({bound: 'minAmount', raw: '5'});
+    vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS / 2);
+    store.applyAmount({bound: 'maxAmount', raw: '100'});
+    vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS / 2);
+    TestBed.tick();
+    vi.advanceTimersByTime(TRANSACTION_FILTER_DEBOUNCE_MS);
+
+    expect(store.filters()).toMatchObject({minAmount: 5, maxAmount: 100});
+  });
 });

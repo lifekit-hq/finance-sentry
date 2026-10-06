@@ -11,10 +11,12 @@ import {
 
 import {
   type TransactionFilterInputText,
-  type TransactionFilters,
   type TransactionType,
 } from '../../../../shared/models/transaction-filters/transaction-filters.model';
-import {TransactionFiltersUtils} from '../../../../shared/utils/transaction-filters.utils';
+import {
+  type CommittedInputFilters,
+  TransactionFiltersUtils,
+} from '../../../../shared/utils/transaction-filters.utils';
 import {transactionLedgerComputed} from './transaction-ledger.computed';
 import {transactionLedgerEffects, transactionLedgerHooks} from './transaction-ledger.effects';
 import {transactionLedgerMethods} from './transaction-ledger.methods';
@@ -62,13 +64,13 @@ export const TransactionLedgerStore = signalStore(
       }
     );
     return {
-      inputText: linkedSignal<
-        Pick<TransactionFilters, 'minAmount' | 'maxAmount' | 'search'>,
-        TransactionFilterInputText
-      >({
+      inputText: linkedSignal<CommittedInputFilters, TransactionFilterInputText>({
         source: committed,
         computation: (filters, previous) =>
-          TransactionFiltersUtils.syncInputText(filters, previous?.value),
+          TransactionFiltersUtils.syncInputText(
+            filters,
+            previous && {committed: previous.source, text: previous.value}
+          ),
       }),
     };
   }),

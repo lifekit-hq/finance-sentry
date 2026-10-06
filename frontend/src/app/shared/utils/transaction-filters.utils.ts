@@ -4,6 +4,8 @@ import {
   type TransactionType,
 } from '../models/transaction-filters/transaction-filters.model';
 
+export type CommittedInputFilters = Pick<TransactionFilters, 'minAmount' | 'maxAmount' | 'search'>;
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export class TransactionFiltersUtils {
@@ -45,24 +47,36 @@ export class TransactionFiltersUtils {
   }
 
   /**
-   * Input text after the committed filters changed: text that still means the committed value is
-   * kept verbatim (so "1.0" is not rewritten to "1" mid-edit), anything else follows the filters.
+   * Input text after the committed filters changed. Only a field whose committed value changed is
+   * touched: text that still means it is kept verbatim (so "1.0" is not rewritten to "1" mid-edit),
+   * anything else follows the filters. Fields still waiting on their own debounce keep their text.
    */
   public static syncInputText(
-    committed: Pick<TransactionFilters, 'minAmount' | 'maxAmount' | 'search'>,
-    previous?: TransactionFilterInputText
+    committed: CommittedInputFilters,
+    previous?: {committed: CommittedInputFilters; text: TransactionFilterInputText}
   ): TransactionFilterInputText {
-    const amountText = (bound: 'minAmount' | 'maxAmount'): string =>
-      previous && TransactionFiltersUtils.parseAmount(previous[bound]) === committed[bound]
-        ? previous[bound]
+    const amountText = (bound: 'minAmount' | 'maxAmount'): string => {
+      if (!previous || previous.committed[bound] === committed[bound]) {
+        return previous
+          ? previous.text[bound]
+          : TransactionFiltersUtils.formatAmount(committed[bound]);
+      }
+      return TransactionFiltersUtils.parseAmount(previous.text[bound]) === committed[bound]
+        ? previous.text[bound]
         : TransactionFiltersUtils.formatAmount(committed[bound]);
+    };
+    const searchText = (): string => {
+      if (!previous || previous.committed.search === committed.search) {
+        return previous ? previous.text.search : committed.search;
+      }
+      return previous.text.search.trim() === committed.search.trim()
+        ? previous.text.search
+        : committed.search;
+    };
     return {
       minAmount: amountText('minAmount'),
       maxAmount: amountText('maxAmount'),
-      search:
-        previous && previous.search.trim() === committed.search.trim()
-          ? previous.search
-          : committed.search,
+      search: searchText(),
     };
   }
 }
