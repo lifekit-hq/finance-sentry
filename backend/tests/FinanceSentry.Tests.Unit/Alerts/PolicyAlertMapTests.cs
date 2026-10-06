@@ -41,6 +41,7 @@ public class PolicyAlertMapTests
         AlertType.NewsCluster,
         AlertType.BudgetBreach,
         AlertType.FamilyStatement,
+        AlertType.FireBrief,
         AlertType.PolicyReview, // measured against the policy statement's bands, not a Risk rule
         AlertType.PolicyReviewMissed,
         AlertType.RelativeUnderperformance,

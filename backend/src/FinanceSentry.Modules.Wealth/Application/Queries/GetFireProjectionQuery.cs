@@ -67,7 +67,9 @@ public class GetFireProjectionQueryHandler(
     {
         var userAssumptions = await _assumptions.GetAsync(query.UserId, cancellationToken) ?? DefaultAssumptions;
 
-        var snapshot = await _snapshots.GetLatestByUserIdAsync(query.UserId, cancellationToken);
+        // Unscoped read, keyed on the caller's own id: the monthly brief job runs with no principal, so the
+        // owner-filtered read would find no snapshot there. Requests pass the id of their own principal.
+        var snapshot = await _snapshots.GetLatestByUserIdUnscopedAsync(query.UserId, cancellationToken);
         var flows = await _monthlyFlow.GetMonthlyFlowAsync(query.UserId, FlowLookbackMonths, cancellationToken);
 
         var currentMonthKey = _clock.GetUtcNow().ToString("yyyy-MM");

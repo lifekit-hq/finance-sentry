@@ -308,6 +308,38 @@ public class AlertGeneratorServiceTests
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
     }
 
+    [Fact]
+    public async Task GenerateFireBrief_NoRecent_AddsInfoAlert()
+    {
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.FireBrief, null, "monthly", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(false);
+
+        await _service.GenerateFireBriefAlertAsync(
+            _userId, "FIRE brief: projected March 2041", "[██░░░░░░░░] 25% of target");
+
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.FireBrief &&
+            a.Severity == AlertSeverity.Info &&
+            a.UserId == _userId &&
+            a.ReferenceId == null &&
+            a.ReferenceLabel == "monthly" &&
+            a.Title.Contains("FIRE brief")), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateFireBrief_WithinTwentySevenDaySilenceWindow_SkipsCreation()
+    {
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.FireBrief, null, "monthly", It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(true);
+
+        await _service.GenerateFireBriefAlertAsync(
+            _userId, "FIRE brief: projected March 2041", "[██░░░░░░░░] 25% of target");
+
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
+    }
+
     /// <summary>
     /// A second failure streak for the same job while the first JobFailure alert is still open must
     /// supersede it (resolve the old, insert the new) rather than collide with idx_alert_dedup and

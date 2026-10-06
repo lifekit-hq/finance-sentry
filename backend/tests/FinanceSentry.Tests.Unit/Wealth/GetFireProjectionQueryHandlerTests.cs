@@ -42,7 +42,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_UsesLatestSnapshot_AndFlagsStaleSleeves()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Snapshot(100_000m, staleSleeves: "crypto"));
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));
@@ -59,7 +59,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_NoStaleSleeves_ReportsFalse()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Snapshot(100_000m, staleSleeves: null));
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));
@@ -74,7 +74,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_ExcludesCurrentInProgressMonth_FromTheMedianWindow()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Snapshot(100_000m));
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HonestMonthlyFlow>)
@@ -94,7 +94,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_FewerThanThreeCompleteMonths_ReturnsInsufficientHistory()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Snapshot(100_000m));
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<HonestMonthlyFlow>)
@@ -114,7 +114,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_NoSnapshotYet_ReturnsInsufficientHistoryWithZeroNetWorth()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((NetWorthSnapshot?)null);
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));
@@ -131,7 +131,7 @@ public class GetFireProjectionQueryHandlerTests
     [Fact]
     public async Task Handle_MissingUserAssumptions_FallsBackToDefaultRates()
     {
-        _snapshots.Setup(r => r.GetLatestByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Snapshot(100_000m));
         _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));

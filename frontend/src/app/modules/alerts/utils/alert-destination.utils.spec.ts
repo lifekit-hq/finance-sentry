@@ -52,6 +52,7 @@ describe('AlertDestinationUtils.resolve', () => {
     ['CashShortfall', AppRoute.AccountsList],
     ['ConsentExpiring', AppRoute.AccountsList],
     ['FamilyStatement', AppRoute.AccountsList],
+    ['FireBrief', AppRoute.Dashboard],
     ['UnusualSpend', AppRoute.Transactions],
     ['CategorySpike', AppRoute.Transactions],
     ['DuplicateCharge', AppRoute.Transactions],

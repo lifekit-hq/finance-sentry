@@ -475,6 +475,16 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Raises the monthly FIRE brief Info alert (433 S7): the FIRE date gauge with every assumption
+    /// behind it spelled out. Silenced so the monthly cron doesn't repeat on a re-run within the month.
+    /// </summary>
+    Task GenerateFireBriefAlertAsync(
+        Guid userId,
+        string headline,
+        string body,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Raises a Warning alert that the book or a sleeve (<paramref name="scope"/>/<paramref name="scopeKey"/>)
     /// has trailed its benchmark by at least <paramref name="thresholdPct"/> points over
     /// <paramref name="window"/> for <paramref name="runs"/> consecutive weekly track-record runs

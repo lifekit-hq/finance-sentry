@@ -488,6 +488,10 @@ public class RunThesisMonitorHandlerTests
             Guid userId, string headline, string body, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateFireBriefAlertAsync(
+            Guid userId, string headline, string body, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task GenerateRelativeUnderperformanceAlertAsync(
             Guid userId, string scope, string scopeKey, string label, string window, string benchmarkTicker,
             decimal excessReturnPct, int runs, decimal thresholdPct, CancellationToken ct = default)

@@ -64,6 +64,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         // 27 days: shorter than the shortest calendar month, so a manual dismiss still lets next
         // month's statement through, but a same-month rerun of the cron never double-alerts.
         [AlertType.FamilyStatement] = TimeSpan.FromDays(27),
+        // 27 days: monthly cron fires on the 1st; absorbs a re-run or drift without double-alerting.
+        [AlertType.FireBrief] = TimeSpan.FromDays(27),
         // 20 days: backstop against a manual dismiss re-opening on the next weekly run, yet shorter
         // than the quickest genuine relapse (a recovering run, then four trailing weekly runs).
         [AlertType.RelativeUnderperformance] = TimeSpan.FromDays(20),
@@ -268,6 +270,16 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             AlertType.FamilyStatement, AlertSeverity.Info, null, "monthly", headline, body)
         {
             // Every month's statement is its own row — an unread one must not swallow the next.
+            Dedup = AlertDedup.SilenceOnly,
+        },
+            ct);
+
+    public Task GenerateFireBriefAlertAsync(
+        Guid userId, string headline, string body, CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.FireBrief, AlertSeverity.Info, null, "monthly", headline, body)
+        {
+            // Every month's brief is its own row — an unread one must not swallow the next.
             Dedup = AlertDedup.SilenceOnly,
         },
             ct);

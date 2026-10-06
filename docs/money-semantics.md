@@ -737,3 +737,7 @@ reaches the financial-independence target. Computed on read; nothing is persiste
 - Unlike the 12-month net-worth projection tile, contributions compound here, because at a FIRE
   horizon (years to decades) ignoring compounding is most of the answer.
 - `HasStaleSleeves` mirrors the snapshot's `StaleSleeves` (§8): the figure is shown, with a notice.
+- **Monthly brief.** `FireBriefJob` (1st of the month, 09:00 UTC) reads this same projection per user and
+  raises an Info alert with a 10-cell gauge (`NetWorth ÷ Target`, clamped to 0-100%) plus the same
+  assumptions in words. `InsufficientHistory` sends nothing; the job reads the snapshot with no person
+  in scope, so the query uses the `…Unscoped…` snapshot read keyed on the user id.
