@@ -82,13 +82,14 @@ public abstract class CryptoExchangeSyncJob(
         var streak = failureStreaks.Get(key);
         var count = streak.Count + 1;
 
-        var transient = IsTransient(ex);
+        var cause = ex is CryptoTradeHistoryException { InnerException: { } inner } ? inner : ex;
+        var transient = IsTransient(cause);
         var shouldAlert = !transient || count >= TransientFailureAlertThreshold;
         failureStreaks.Set(key, new JobFailureStreak(count, streak.Alerted || shouldAlert));
 
         if (shouldAlert && !streak.Alerted)
         {
-            await TryGenerateSyncFailureAsync(userId, ex, transient ? SyncFailureClass.Outage : ClassifyPermanent(ex));
+            await TryGenerateSyncFailureAsync(userId, ex, transient ? SyncFailureClass.Outage : ClassifyPermanent(cause));
         }
     }
 

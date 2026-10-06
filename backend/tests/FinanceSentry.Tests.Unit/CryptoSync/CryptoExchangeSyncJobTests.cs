@@ -238,6 +238,34 @@ public class CryptoExchangeSyncJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_BinanceTradeHistory429_IsTransient_NoAlertOnFirstTick()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new CryptoTradeHistoryException(
+            CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAnyAlerts(userId, CryptoExchangeProvider.Binance, Times.Never());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BinanceTradeHistoryRejectedKey_AlertsImmediatelyWithCredentialClass()
+    {
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.Binance, MakeCredential(userId));
+        GivenAlertsOn(userId);
+        GivenSyncFails(new CryptoTradeHistoryException(
+            CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("Invalid API-key", binanceErrorCode: -2015, venueStatusCode: 401)));
+
+        await RunTicks(() => CreateBinanceJob().ExecuteAsync(), 1);
+
+        VerifyAlerts(userId, CryptoExchangeProvider.Binance, SyncFailureClass.Credential, Times.Once());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_RevolutXUnreachable_IsTransient_NoAlertOnFirstTick()
     {
         var userId = Guid.NewGuid();
