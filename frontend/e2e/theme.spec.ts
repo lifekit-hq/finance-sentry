@@ -91,8 +91,7 @@ test.describe('Theme bootstrap', () => {
   test('the served inline script is the one the CSP pins', async ({page}) => {
     await stubGuestApi(page);
     const response = await page.goto('/login');
-    const html = (await response?.text()) ?? '';
-    const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    const inline = await page.locator('script:not([src])').allTextContents();
     const themeScript = inline.find(source => source.includes("setAttribute('data-theme'"));
     expect(themeScript).toBeDefined();
     const hash = `'sha256-${createHash('sha256')
