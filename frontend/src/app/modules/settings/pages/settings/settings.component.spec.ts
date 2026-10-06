@@ -77,4 +77,31 @@ describe('SettingsComponent financial independence assumptions', () => {
     expect(store.updateProfile).toHaveBeenCalledTimes(1);
     expect(store.updateProfile).toHaveBeenCalledWith({realAnnualReturn: 0.06});
   });
+
+  it('flags 12 in the withdrawal-rate field and blocks Save until it is corrected', () => {
+    const {store, component} = create();
+    component.setWithdrawalRate('12');
+    expect(component.withdrawalRateError()).toContain('1');
+    expect(component.assumptionsInvalid()).toBe(true);
+    component.saveProfile();
+    expect(store.saveProfile).not.toHaveBeenCalled();
+    component.setWithdrawalRate('4');
+    expect(component.withdrawalRateError()).toBe('');
+    expect(component.assumptionsInvalid()).toBe(false);
+    component.saveProfile();
+    expect(store.saveProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps showing what the user typed after a rejected value', () => {
+    const {component} = create();
+    component.setWithdrawalRate('12');
+    expect(component.withdrawalRateText(0.04)).toBe('12');
+  });
+
+  it('flags a non-numeric real return', () => {
+    const {component} = create();
+    component.setRealReturn('abc');
+    expect(component.realReturnError()).not.toBe('');
+    expect(component.assumptionsInvalid()).toBe(true);
+  });
 });
