@@ -135,7 +135,9 @@ export function authEffects(store: EffectsStore) {
       )
     ),
     logout(): void {
-      pushSession.release().subscribe();
+      if (store.isAuthenticated()) {
+        pushSession.release().subscribe();
+      }
       authService.logout().subscribe({error: () => undefined});
       store.clearSession();
       void router.navigate([AppRoute.Login]);

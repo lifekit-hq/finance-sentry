@@ -203,7 +203,7 @@ describe('authEffects', () => {
 
   describe('logout', () => {
     it('calls service.logout, clears session, and navigates to login', () => {
-      const store = buildStore();
+      const store = buildStore({isAuthenticated: true});
       const service = buildService();
       const router = buildRouter();
       configure(service, router);
@@ -216,6 +216,19 @@ describe('authEffects', () => {
       expect(service.logout).toHaveBeenCalled();
       expect(store.clearSession).toHaveBeenCalled();
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
+    });
+
+    it('does not release push when the session is already cleared', () => {
+      const store = buildStore({isAuthenticated: false});
+      pushSession.release.mockClear();
+      configure(buildService(), buildRouter());
+
+      TestBed.runInInjectionContext(() => {
+        authEffects(store).logout();
+      });
+
+      expect(pushSession.release).not.toHaveBeenCalled();
+      expect(store.clearSession).toHaveBeenCalled();
     });
 
     it('does not throw when logout HTTP fails', () => {
