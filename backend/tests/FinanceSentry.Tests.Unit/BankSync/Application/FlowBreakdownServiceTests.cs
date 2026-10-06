@@ -209,4 +209,35 @@ public class FlowBreakdownServiceTests
     }
 
     private static string CategoryKeysTransferIn() => "TRANSFER_IN";
+
+    [Fact]
+    public async Task RangeBreakdown_IncludesBothEdgeDaysAndNothingOutsideThem()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var before = MakeTx(accountId, 1m, "debit", new DateTime(2026, 5, 9, 23, 59, 59, DateTimeKind.Utc));
+        var firstDay = MakeTx(accountId, 2m, "debit", new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc));
+        var lastDay = MakeTx(accountId, 4m, "credit", new DateTime(2026, 5, 12, 23, 59, 59, DateTimeKind.Utc));
+        var after = MakeTx(accountId, 8m, "debit", new DateTime(2026, 5, 13, 0, 0, 0, DateTimeKind.Utc));
+
+        var result = await Sut([before, firstDay, lastDay, after], account, CounterpartyResults.None)
+            .GetRangeBreakdownAsync(UserId, new DateOnly(2026, 5, 10), new DateOnly(2026, 5, 12));
+
+        result.Items.Select(i => i.TransactionId).Should().BeEquivalentTo([firstDay.Id, lastDay.Id]);
+        result.Month.Should().BeEmpty();
+        result.From.Should().Be(new DateOnly(2026, 5, 10));
+        result.To.Should().Be(new DateOnly(2026, 5, 12));
+    }
+
+    [Fact]
+    public async Task RangeBreakdown_CrossesAMonthBoundary()
+    {
+        var (account, accountId) = MakeAccount("USD");
+        var april = MakeTx(accountId, 3m, "debit", new DateTime(2026, 4, 30, 12, 0, 0, DateTimeKind.Utc));
+        var may = MakeTx(accountId, 5m, "debit", new DateTime(2026, 5, 1, 12, 0, 0, DateTimeKind.Utc));
+
+        var result = await Sut([april, may], account, CounterpartyResults.None)
+            .GetRangeBreakdownAsync(UserId, new DateOnly(2026, 4, 28), new DateOnly(2026, 5, 2));
+
+        result.Items.Should().HaveCount(2);
+    }
 }

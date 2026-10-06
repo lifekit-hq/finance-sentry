@@ -31,12 +31,13 @@ function flow(month: string, inflow: number, outflow: number): MonthlyFlow {
 
 interface Fixture {
   monthlyFlow: MonthlyFlow[];
+  windowFlow?: MonthlyFlow[];
   totalNetWorthUsd?: number;
   netWorthHistory?: NetWorthSnapshotDto[];
 }
 
 function build(
-  {monthlyFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture,
+  {monthlyFlow, windowFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
   const data: DashboardData = {
@@ -45,6 +46,7 @@ function build(
     accountCount: 1,
     accountsByType: {},
     monthlyFlow,
+    windowFlow,
     topCategories: [],
     lastSyncTimestamp: null,
   } as unknown as DashboardData;
@@ -60,6 +62,16 @@ function build(
 
 function computedFor(monthlyFlow: MonthlyFlow[], range: HistoryRange = '3m') {
   return TestBed.runInInjectionContext(() => dashboardComputed(build({monthlyFlow}, range)));
+}
+
+function computedForWindow(
+  monthlyFlow: MonthlyFlow[],
+  windowFlow: MonthlyFlow[] | undefined,
+  range: HistoryRange
+) {
+  return TestBed.runInInjectionContext(() =>
+    dashboardComputed(build({monthlyFlow, windowFlow}, range))
+  );
 }
 
 function projectionFor(fixture: Fixture) {
@@ -142,12 +154,46 @@ describe('dashboardComputed', () => {
       expect(c.windowSpendingFormatted()).toBe('$4,900.00');
     });
 
-    it('reports just the current month for the one-month window', () => {
+    it('reports just the current month for month to date', () => {
       // The backend always returns the previous month alongside the current one.
-      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 500, 169.42)], '1m');
+      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 500, 169.42)], 'mtd');
 
       expect(c.windowInflowFormatted()).toBe('$500.00');
       expect(c.windowSpendingFormatted()).toBe('$169.42');
+    });
+
+    it.each(['1w', 'mtd', '1m'] as const)(
+      'totals the backend day-window flow, not whole-month buckets, for %s',
+      range => {
+        // Whole-month history would say 4000 in / 2000 out for July and 500 / 200 for August;
+        // the day window is a slice of it and is what the tiles must show.
+        const c = computedForWindow(
+          [flow('2026-07', 4000, 2000), flow('2026-08', 500, 200)],
+          [flow('2026-07', 100, 40), flow('2026-08', 50, 10)],
+          range
+        );
+
+        expect(c.windowInflowFormatted()).toBe('$150.00');
+        expect(c.windowSpendingFormatted()).toBe('$50.00');
+      }
+    );
+
+    it('falls back to the month buckets for a day window the backend sent no flow for', () => {
+      const c = computedForWindow([flow('2026-08', 500, 200)], undefined, 'mtd');
+
+      expect(c.windowInflowFormatted()).toBe('$500.00');
+    });
+
+    it('ignores the day-window flow for month-based ranges', () => {
+      const c = computedForWindow(steadyHistory(500, 900), [flow('2026-08', 1, 1)], '3m');
+
+      expect(c.windowInflowFormatted()).toBe('$8,500.00');
+    });
+
+    it('gates the savings rate on every day window while income has not landed', () => {
+      const c = computedForWindow([], [flow('2026-08', 200, 900)], '1w');
+
+      expect(c.windowSavingsRateFormatted()).toBe('—');
     });
 
     it('starts year-to-date at January', () => {
@@ -169,22 +215,22 @@ describe('dashboardComputed', () => {
   });
 
   describe('window savings rate', () => {
-    it('withholds the one-month rate while income has not landed', () => {
+    it('withholds the month-to-date rate while income has not landed', () => {
       // $200 against $900 of spending — salary has not posted, so the raw rate would
       // read about -350% and mean nothing.
-      const c = computedFor([flow('2026-08', 200, 900)], '1m');
+      const c = computedFor([flow('2026-08', 200, 900)], 'mtd');
 
       expect(c.windowSavingsRateFormatted()).toBe('—');
     });
 
-    it("ignores last month's income when gating the one-month rate", () => {
-      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 200, 900)], '1m');
+    it("ignores last month's income when gating the month-to-date rate", () => {
+      const c = computedFor([flow('2026-07', 4000, 2000), flow('2026-08', 200, 900)], 'mtd');
 
       expect(c.windowSavingsRateFormatted()).toBe('—');
     });
 
-    it('reports the one-month rate once income has substantially landed', () => {
-      const c = computedFor([flow('2026-08', 4000, 1000)], '1m');
+    it('reports the month-to-date rate once income has substantially landed', () => {
+      const c = computedFor([flow('2026-08', 4000, 1000)], 'mtd');
 
       expect(c.windowSavingsRateFormatted()).toBe('75%');
     });

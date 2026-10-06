@@ -54,8 +54,16 @@ public record FlowBreakdownItem(
     string? CounterpartyName,
     string? FlowRole);
 
-/// <summary>A month's transactions, each labelled with the bucket it landed in.</summary>
-public record FlowBreakdown(string Month, IReadOnlyList<FlowBreakdownItem> Items);
+/// <summary>
+/// A month's — or, for the dashboard's day-level windows, a date range's — transactions, each
+/// labelled with the bucket it landed in. <see cref="Month"/> is empty for a range, which
+/// echoes its UTC calendar days in <see cref="From"/> / <see cref="To"/> instead.
+/// </summary>
+public record FlowBreakdown(
+    string Month,
+    IReadOnlyList<FlowBreakdownItem> Items,
+    DateOnly? From = null,
+    DateOnly? To = null);
 
 /// <summary>
 /// Explains a month of the money-flow statistics transaction by transaction.
@@ -74,6 +82,21 @@ public interface IFlowBreakdownService
     Task<FlowBreakdown> GetBreakdownAsync(
         Guid userId,
         string month,
+        int months = 6,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The day-level form of <see cref="GetBreakdownAsync"/>: every credit/debit dated from
+    /// <paramref name="from"/> through <paramref name="to"/> (UTC calendar days, both
+    /// inclusive), labelled exactly as the dashboard's windowed tiles labelled them. The
+    /// classification and pair detection still run over the whole
+    /// <paramref name="months"/> window, so a pair straddling the range's edge is paired the
+    /// same way. The range is held inside that window's loaded days.
+    /// </summary>
+    Task<FlowBreakdown> GetRangeBreakdownAsync(
+        Guid userId,
+        DateOnly from,
+        DateOnly to,
         int months = 6,
         CancellationToken ct = default);
 }
@@ -100,6 +123,32 @@ public class FlowBreakdownService(
         int months = 6,
         CancellationToken ct = default)
     {
+        var items = await BuildItemsAsync(
+            userId, months, d => d.ToString("yyyy-MM") == month, ct);
+        return new FlowBreakdown(month, items);
+    }
+
+    /// <inheritdoc />
+    public async Task<FlowBreakdown> GetRangeBreakdownAsync(
+        Guid userId,
+        DateOnly from,
+        DateOnly to,
+        int months = 6,
+        CancellationToken ct = default)
+    {
+        var start = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        // `to` is a whole day: everything before the next midnight.
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var items = await BuildItemsAsync(userId, months, d => d >= start && d < end, ct);
+        return new FlowBreakdown(string.Empty, items, from, to);
+    }
+
+    private async Task<List<FlowBreakdownItem>> BuildItemsAsync(
+        Guid userId,
+        int months,
+        Func<DateTime, bool> inRange,
+        CancellationToken ct)
+    {
         // Mirrors MoneyFlowStatisticsService step for step: same window, same account-currency
         // map, same shared classification entry point (memoized per request), same transfer
         // detection over the non-counterparty remainder.
@@ -120,7 +169,7 @@ public class FlowBreakdownService(
         var items = txList
             .Where(t => t.IsActive
                         && (t.TransactionType == CreditType || t.TransactionType == DebitType)
-                        && (t.PostedDate ?? t.TransactionDate).ToString("yyyy-MM") == month)
+                        && inRange(t.PostedDate ?? t.TransactionDate))
             .Select(t =>
             {
                 var isCredit = t.TransactionType == CreditType;
@@ -148,7 +197,7 @@ public class FlowBreakdownService(
             .OrderByDescending(i => i.Date)
             .ToList();
 
-        return new FlowBreakdown(month, items);
+        return items;
     }
 
     private static (string Bucket, CounterpartyMatch? Counterparty) Classify(

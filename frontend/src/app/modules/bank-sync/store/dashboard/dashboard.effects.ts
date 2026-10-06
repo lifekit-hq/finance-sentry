@@ -43,7 +43,8 @@ export function dashboardEffects(store: EffectsStore) {
           bankSyncService
             .getDashboardData(
               DashboardRangeUtils.months(range),
-              DashboardRangeUtils.windowMonths(range)
+              DashboardRangeUtils.windowMonths(range),
+              DashboardRangeUtils.windowFrom(range)
             )
             .pipe(
               tap(data => {
@@ -88,7 +89,7 @@ interface HookStore extends EffectsStore {
   setHistoryRange: (range: HistoryRange) => void;
 }
 
-const HISTORY_RANGE_VALUES: readonly HistoryRange[] = ['1m', '3m', '6m', 'ytd', '1y', 'all'];
+const HISTORY_RANGE_VALUES: readonly HistoryRange[] = ['1w', 'mtd', '1m', '3m', 'ytd', '1y', 'all'];
 
 function isHistoryRange(value: string | null): value is HistoryRange {
   return value !== null && (HISTORY_RANGE_VALUES as readonly string[]).includes(value);
@@ -133,7 +134,8 @@ export function dashboardHooks(store: HookStore): void {
           switchMap(() =>
             bankSyncService.getDashboardData(
               DashboardRangeUtils.months(untracked(store.historyRange)),
-              DashboardRangeUtils.windowMonths(untracked(store.historyRange))
+              DashboardRangeUtils.windowMonths(untracked(store.historyRange)),
+              DashboardRangeUtils.windowFrom(untracked(store.historyRange))
             )
           ),
           tap(data => untracked(() => store.setData(data))),

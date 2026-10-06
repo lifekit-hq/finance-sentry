@@ -1,4 +1,4 @@
-export type HistoryRange = '1m' | '3m' | '6m' | 'ytd' | '1y' | 'all';
+export type HistoryRange = '1w' | 'mtd' | '1m' | '3m' | 'ytd' | '1y' | 'all';
 
 export interface NetWorthSnapshotDto {
   snapshotDate: string;
@@ -49,6 +49,12 @@ export interface DashboardData {
   accountCount: number;
   accountsByType: Record<string, number>;
   monthlyFlow: MonthlyFlow[];
+  /**
+   * Flow for exactly the days of a day-resolution window (1W, MTD, 1M), still keyed by month
+   * (so the first bucket is partial). Present only when the request carried `windowFrom`;
+   * `monthlyFlow` stays the whole-month history the charts plot.
+   */
+  windowFlow?: MonthlyFlow[];
   topCategories: CategoryStat[];
   lastSyncTimestamp: Nullable<string>;
 }

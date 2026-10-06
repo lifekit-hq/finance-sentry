@@ -34,9 +34,13 @@ const GROUP = {
   ],
 };
 
-function render(group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP) {
+function render(
+  group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP,
+  range: Nullable<{from: Nullable<string>; to: string; months: number}> = null
+) {
   const store = {
     month: signal('2026-09'),
+    range: signal(range),
     isLoading: signal(false),
     isEmpty: signal(false),
     errorMessage: signal(null),
@@ -90,5 +94,31 @@ describe('FlowBreakdownComponent phone layout', () => {
     expect(el.firstElementChild?.className).toContain('page-container');
     expect(el.querySelector('.grid')?.className).toContain('grid-cols-2');
     expect(el.firstElementChild?.className).not.toContain('overflow-auto');
+  });
+});
+
+describe('FlowBreakdownComponent window mode', () => {
+  it('names the window and drops the month stepper', () => {
+    const el = render(GROUP, {from: '2026-10-01', to: '2026-10-17', months: 1});
+
+    expect(el.querySelector('[data-testid="breakdown-window"]')?.textContent).toContain(
+      'from Oct 1, 2026 to Oct 17, 2026'
+    );
+    expect(el.querySelector('cmn-month-stepper')).toBeNull();
+  });
+
+  it('words an all-time window as open-ended', () => {
+    const el = render(GROUP, {from: null, to: '2026-10-17', months: 120});
+
+    expect(el.querySelector('[data-testid="breakdown-window"]')?.textContent).toContain(
+      'up to Oct 17, 2026'
+    );
+  });
+
+  it('keeps the month stepper in month mode', () => {
+    const el = render();
+
+    expect(el.querySelector('cmn-month-stepper')).not.toBeNull();
+    expect(el.querySelector('[data-testid="breakdown-window"]')).toBeNull();
   });
 });

@@ -98,13 +98,24 @@ export class BankSyncService extends ApiService {
     return this.delete<void>(`institutions/${provider}/${institutionId}`);
   }
 
-  public getDashboardData(months?: number, windowMonths?: number): Observable<DashboardData> {
-    const params: Record<string, number> = {};
+  /**
+   * `windowFrom` (`YYYY-MM-DD`, UTC) is the day-resolution window start (1W, MTD, 1M); the
+   * backend then also returns `windowFlow` and scopes the top categories from that day.
+   */
+  public getDashboardData(
+    months?: number,
+    windowMonths?: number,
+    windowFrom?: string
+  ): Observable<DashboardData> {
+    const params: Record<string, number | string> = {};
     if (months !== undefined) {
       params['months'] = months;
     }
     if (windowMonths !== undefined) {
       params['windowMonths'] = windowMonths;
+    }
+    if (windowFrom !== undefined) {
+      params['windowFrom'] = windowFrom;
     }
     const options = {params};
     return this.http.get<DashboardData>(`${environment.apiBaseUrl}/dashboard/aggregated`, options);
@@ -113,6 +124,18 @@ export class BankSyncService extends ApiService {
   public getFlowBreakdown(month: string, months?: number): Observable<FlowBreakdown> {
     const params: Record<string, string | number> =
       months === undefined ? {month} : {month, months};
+    return this.http.get<FlowBreakdown>(`${environment.apiBaseUrl}/dashboard/flow-breakdown`, {
+      params,
+    });
+  }
+
+  /** A dashboard window's day range (UTC, inclusive); a null `from` is open-ended. */
+  public getFlowBreakdownRange(
+    from: Nullable<string>,
+    to: string,
+    months: number
+  ): Observable<FlowBreakdown> {
+    const params: Record<string, string | number> = from ? {from, to, months} : {to, months};
     return this.http.get<FlowBreakdown>(`${environment.apiBaseUrl}/dashboard/flow-breakdown`, {
       params,
     });
