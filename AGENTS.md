@@ -29,6 +29,14 @@ Commit hook rule: `.husky/pre-commit` (wired by `frontend`'s `prepare` script) r
 the full lint and format check run in CI. It never runs `npm ci` — it assumes `frontend/node_modules` exists for
 frontend commits — and is not something to bypass.
 
+CI-only load gate: Frontend CI also builds the production image (`docker/Dockerfile.frontend.prod` precompresses
+every text asset to `.br`/`.gz`, served by `brotli_static`/`gzip_static` in `docker/nginx.frontend.conf`) and runs
+`frontend/scripts/measure-lcp.mjs` against it: cold `/login` LCP at 390px on Slow 4G with a 4x CPU slowdown,
+reported against the 2.5 s Core Web Vitals mark and failed past the regression budget declared in that script.
+Changes to `docker/nginx.frontend.conf` or `docker/Dockerfile.frontend.prod` therefore trigger Frontend CI, and the
+`initial` bundle budget in `frontend/angular.json` is a ratchet set just above the measured size - raise it
+deliberately, never to silence a warning.
+
 > **Source of truth split**: For architecture principles, testing requirements, code quality gates, and branching rules — the constitution at [`.specify/memory/constitution.md`](.specify/memory/constitution.md) is authoritative. This file covers **current state only** (what's built, what's running, what's next). When in doubt, constitution wins.
 
 ## Project Overview
@@ -227,7 +235,7 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 - In-memory DB per test class: each `WebApplicationFactory` subclass uses a unique GUID database name to avoid cross-test state bleed.
 - `MockBehavior.Loose` is used in factory mocks; setup only what the specific test path needs.
 - `[Trait("Category","Integration")]` is the convention for skipping DB-live tests — don't change it.
-- `.dockerignore`'s bare `bin`/`obj` patterns do NOT exclude nested `backend/**/bin`/`backend/**/obj` in this BuildKit version (needs `**/bin`/`**/obj`). Only bites local `docker build` from a dirty worktree — CI always builds from a fresh checkout — but a stray local `obj/` can get copied over a freshly-restored one and produce a confusing NETSDK1064 "package not found" error that has nothing to do with the actual restore.
+- A bare `.dockerignore` pattern (`obj`, `node_modules`, `dist`) matches only at the context root in this BuildKit version, so every nested build output is listed as `**/<name>` (`**/bin`, `**/obj`, `**/node_modules`, `**/dist`, `**/.angular`, `**/coverage`, ...). A dirty build context is not only a local worktree problem: Frontend CI builds `docker/Dockerfile.frontend.prod` for the LCP gate in the same job as `npm ci`, the build and the test runs. A missing pattern shows up as a stray `obj/` copied over a freshly-restored one (a confusing NETSDK1064 "package not found" error unrelated to the restore) or as the runner's `frontend/node_modules` entering the image, where `npm install` then reconciles a foreign-platform tree instead of installing fresh.
 - `docker/Dockerfile`, `Dockerfile.mcp` and `Dockerfile.gateway` set `ENV NUGET_PACKAGES=/src/.nuget/packages` and restore straight into the build layer (csproj-first, then `build --no-restore` + `publish --no-build`) instead of a `--mount=type=cache` — a cache mount's contents aren't guaranteed to persist across the image's later `RUN` steps under BuildKit GC/concurrent-build pressure, which was silently dropping packages between restore and publish.
 - `dotnet tool restore` (used for `reportgenerator` in Backend CI) needs its manifest at `.config/dotnet-tools.json` at the **repo root**, not under `backend/` — CI steps run from repo root and `dotnet tool restore` only walks up from CWD.
 
