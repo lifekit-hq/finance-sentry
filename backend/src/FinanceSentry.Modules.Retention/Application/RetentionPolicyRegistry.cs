@@ -50,6 +50,7 @@ public static class RetentionPolicyRegistry
         Purge(BankSync, "SyncJobs", "CreatedAt", 90, "Per-sync run history; grows fast, low long-term value."),
         Purge(Analytics, "query_audit", "CreatedAt", 180, "Analytics query audit (feature 033)."),
         Purge(Companion, "companion_events", "CapturedAt", 90, "Dispatched outbox rows; watermark in companion_capture_state survives."),
+        Purge(Companion, "push_deliveries", "CreatedAt", 90, "Push delivery ledger; matches the 90d companion_events it points at."),
         Purge(Research, "candidate_scores", "ScoredAt", 180, "Opportunity scoring history."),
         Purge(Research, "valuation_snapshots", "CapturedAt", 365, "Point-in-time valuation observations."),
         Purge(Research, "macro_events", "EventDate", 365, "Past macro-calendar entries."),
@@ -92,6 +93,7 @@ public static class RetentionPolicyRegistry
 
         Keep(Companion, "companion_capture_state", "Capture watermark; tiny."),
         Keep(Companion, "companion_notification_settings", "User settings."),
+        Keep(Companion, "push_subscriptions", "User device state; the sender prunes dead endpoints itself."),
 
         Keep(Radar, "radar_universe_members", "Universe config."),
 

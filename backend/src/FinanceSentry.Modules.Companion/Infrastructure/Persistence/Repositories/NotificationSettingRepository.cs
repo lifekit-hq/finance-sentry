@@ -40,6 +40,7 @@ public class NotificationSettingRepository(CompanionDbContext db, IOptions<Compa
             existing.TimeZoneId = setting.TimeZoneId;
             existing.MaxProactivePerHour = setting.MaxProactivePerHour;
             existing.DigestHourLocal = setting.DigestHourLocal;
+            existing.PushEnabled = setting.PushEnabled;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
