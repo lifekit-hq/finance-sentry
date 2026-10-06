@@ -25,8 +25,10 @@ public enum EventDisposition
     SuppressedNonOwner,
 
     /// <summary>
-    /// Explicitly dropped without delivery (issue #686 migration): a held-for-digest event that
-    /// predated the notification settings backfill and had no scheduled delivery path.
+    /// Terminal: explicitly dropped without delivery. Either a <see cref="CompanionEventKind.SyncFailure"/> whose alert
+    /// was no longer open (resolved, dismissed or deleted) when a delivery read reconciled it
+    /// (<c>ISyncFailureReconciler</c>), or a held-for-digest event that predated the notification settings backfill
+    /// and had no scheduled delivery path (issue #686 migration).
     /// </summary>
     Expired,
 }

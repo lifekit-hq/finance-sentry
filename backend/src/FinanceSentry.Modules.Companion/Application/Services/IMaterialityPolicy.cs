@@ -26,7 +26,9 @@ public interface IMaterialityPolicy
     /// </param>
     EventDisposition DispositionFor(NotificationMode mode, CompanionEventKind kind, TimeSpan? sourceStaleness = null);
 
-    /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest.</summary>
+    /// <summary>How long a source may stay without a successful sync before a SyncFailure escalates past the digest:
+    /// at capture the source's time since its last successful sync, at delivery (<c>ISyncFailureReconciler</c>) how long
+    /// the alert has stayed open.</summary>
     TimeSpan SyncFailureEscalationAge { get; }
 
     string AlertDedupKey(Guid alertId);

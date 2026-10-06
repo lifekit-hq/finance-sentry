@@ -49,7 +49,7 @@ public sealed class DigestConsolidationTests
 
     private static GetPendingCompanionEventsQueryHandler NewHandler(
         ICompanionEventRepository events, ILogger<GetPendingCompanionEventsQueryHandler>? logger = null)
-        => new(events, new DigestModeSettings(), logger ?? NullLogger<GetPendingCompanionEventsQueryHandler>.Instance);
+        => new(events, PassThroughReconciler.Instance, new DigestModeSettings(), logger ?? NullLogger<GetPendingCompanionEventsQueryHandler>.Instance);
 
     private static CompanionDbContext NewDb() => new(
         new DbContextOptionsBuilder<CompanionDbContext>()

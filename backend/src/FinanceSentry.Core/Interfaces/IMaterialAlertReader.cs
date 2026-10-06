@@ -9,6 +9,11 @@ public interface IMaterialAlertReader
     /// <summary>Active (non-dismissed) alerts created after <paramref name="watermark"/>, oldest first.</summary>
     Task<IReadOnlyList<MaterialAlertRecord>> GetNewSinceAsync(
         DateTimeOffset watermark, int limit, CancellationToken ct = default);
+
+    /// <summary>The subset of <paramref name="alertIds"/> that is still live: the row exists, is not dismissed and has
+    /// no <c>ResolvedAt</c>. A relay drops a failure whose id is absent, since it has cleared, been dismissed or been
+    /// deleted with its account.</summary>
+    Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
 }
 
 /// <summary>A lightweight projection of an alert for companion capture.</summary>

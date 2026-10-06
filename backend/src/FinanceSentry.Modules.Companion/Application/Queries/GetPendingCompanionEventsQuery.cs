@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Companion.API.Responses;
+using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ public record GetPendingCompanionEventsQuery(
 
 public class GetPendingCompanionEventsQueryHandler(
     ICompanionEventRepository events,
+    ISyncFailureReconciler reconciler,
     INotificationSettingRepository settings,
     ILogger<GetPendingCompanionEventsQueryHandler> logger)
     : IQueryHandler<GetPendingCompanionEventsQuery, CompanionEventsResult>
@@ -49,7 +51,7 @@ public class GetPendingCompanionEventsQueryHandler(
             ? [.. Undelivered, EventDisposition.HeldForDigest]
             : Undelivered;
 
-        var rows = await events.ListByDispositionAsync(query.UserId, dispositions, query.Limit, ct);
+        var rows = await reconciler.ReconcileAsync(await events.ListByDispositionAsync(query.UserId, dispositions, query.Limit, ct), ct);
         var mode = (await settings.GetOrDefaultAsync(query.UserId, ct)).Mode;
 
         var dtos = rows

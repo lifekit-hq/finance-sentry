@@ -17,6 +17,7 @@ using Microsoft.Extensions.Options;
 [DisableConcurrentExecution(timeoutInSeconds: 120)]
 public sealed class CompanionDispatchJob(
     ICompanionEventRepository events,
+    ISyncFailureReconciler reconciler,
     INotificationSettingRepository settings,
     IAgentWakeDispatcher dispatcher,
     IUserAuthorizationChecker authorization,
@@ -30,7 +31,7 @@ public sealed class CompanionDispatchJob(
     [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var pending = await events.ListRealtimePendingUnscopedAsync(BatchLimit, ct);
+        var pending = await reconciler.ReconcileAsync(await events.ListRealtimePendingUnscopedAsync(BatchLimit, ct), ct);
         var now = DateTimeOffset.UtcNow;
         var aiUseByUser = new Dictionary<Guid, bool>();
 

@@ -25,4 +25,19 @@ public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader
                 a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlySet<Guid>> GetOpenIdsAsync(
+        IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+    {
+        if (alertIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var open = await db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(a => alertIds.Contains(a.Id) && !a.IsDismissed && a.ResolvedAt == null)
+            .Select(a => a.Id)
+            .ToListAsync(ct);
+        return open.ToHashSet();
+    }
 }

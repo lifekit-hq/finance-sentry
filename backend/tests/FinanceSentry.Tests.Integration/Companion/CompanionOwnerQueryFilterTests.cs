@@ -55,6 +55,14 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
     private static NotificationSettingRepository Settings(CompanionDbContext ctx) =>
         new(ctx, Options.Create(new CompanionOptions()));
 
+    private SyncFailureReconciler Reconciler(CompanionDbContext ctx)
+    {
+        var alerts = new Mock<IMaterialAlertReader>();
+        alerts.Setup(a => a.GetOpenIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyCollection<Guid> ids, CancellationToken _) => (IReadOnlySet<Guid>)ids.ToHashSet());
+        return new SyncFailureReconciler(alerts.Object, Settings(ctx), new CompanionEventRepository(ctx), _policy);
+    }
+
     private static CompanionNotificationSetting NewSetting(Guid userId, NotificationMode mode) => new()
     {
         UserId = userId,
@@ -306,7 +314,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         await using (var ctx = CreateContext())
         {
             await new CompanionDispatchJob(
-                new CompanionEventRepository(ctx), Settings(ctx), dispatcher.Object, authorization.Object,
+                new CompanionEventRepository(ctx), Reconciler(ctx), Settings(ctx), dispatcher.Object, authorization.Object,
                 Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance).ExecuteAsync();
         }
 
@@ -336,7 +344,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         await using var ctx = CreateContext();
         await new CompanionDigestJob(
-            Settings(ctx), new CompanionEventRepository(ctx), dispatcher.Object,
+            Settings(ctx), new CompanionEventRepository(ctx), Reconciler(ctx), dispatcher.Object,
             NullLogger<CompanionDigestJob>.Instance).ExecuteAsync();
 
         dispatcher.Verify(d => d.WakeDigestAsync(_userA, 2, It.IsAny<CancellationToken>()), Times.Once);

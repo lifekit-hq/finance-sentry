@@ -132,7 +132,7 @@ public sealed class CompanionDispatchCapTests
         events.Pending.Add(NewsClusterEvent("AAPL"));
         var dispatcher = new CountingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -148,7 +148,7 @@ public sealed class CompanionDispatchCapTests
         events.Pending.Add(NewsClusterEvent("AAPL"));
         var dispatcher = new CountingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();
@@ -166,7 +166,7 @@ public sealed class CompanionDispatchCapTests
         events.Pending.Add(NewsClusterEvent("TSM"));
         var dispatcher = new CountingDispatcher();
         var job = new CompanionDispatchJob(
-            events, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
+            events, PassThroughReconciler.Instance, new FixedSettings(maxProactivePerHour: 6), dispatcher, new StubUserAuthorizationChecker(User),
             Options.Create(new CompanionOptions()), NullLogger<CompanionDispatchJob>.Instance);
 
         await job.ExecuteAsync();

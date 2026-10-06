@@ -64,6 +64,7 @@ public static class CompanionModule
 
         services.AddSingleton<IMaterialityPolicy, MaterialityPolicy>();
         services.AddScoped<ICompanionEventCapture, CompanionEventCapture>();
+        services.AddScoped<ISyncFailureReconciler, SyncFailureReconciler>();
         // #673: published read port - the Integration adapter reaches the outbox only through it.
         services.AddScoped<IOutboxDeliveryReader, OutboxDeliveryReader>();
         services.AddScoped<IAgentWakeDispatcher, WebhookAgentWakeDispatcher>();
