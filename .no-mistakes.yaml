@@ -42,6 +42,10 @@
 # hosts limited to two (-m:2; unset it starts one per logical CPU), and
 # workstation GC (DOTNET_gcServer=0).
 #
+# Build parallelism: the backend build stays -m:1. Measured on the box under the 2 GB cap
+# with a warm NuGet volume, two runs each (box load ~12-15): -m:1 323 s / 391 s,
+# -m:2 374 s / 423 s, so -m:2 was not faster (no OOM either way).
+#
 # Not declared: the backend coverage ratchet step (a reportgenerator summary
 # gate over the test run, not a test; it stays a CI-only check) and the
 # CI-only ConnectionStrings__Default env (every integration test injects its
@@ -102,6 +106,7 @@ test:
   instructions: |
     Scale evidence to what the change touches; do not re-run suites GitHub CI already runs (the unit, module and Integration suites, the frontend lint/build/test jobs, and Playwright e2e).
     For a backend-only change, gather API-level evidence: start the local stack with `cd docker && docker compose -f docker-compose.dev.yml up -d --build postgres api`, then exercise the affected endpoints against http://localhost:5001/api/v1 using the QA test user from docs/claude/qa.md, and report the requests and responses.
+    Do not run `docker compose ... --build` (or any image build) when only `frontend/` changed: the API is unchanged, so reuse the deployed image instead. Take the tag the production container runs (`docker inspect finance-sentry-api --format '{{.Config.Image}}'`, read-only) and run it as a throwaway container on its own network with its own throwaway postgres, never the production compose project or its containers.
     Gather UI evidence only when files under `frontend/` changed, and only for the affected screens.
     Changes that touch neither `backend/` nor `frontend/` (docs, workflows, tooling) need no scenario run; the pre-check command is enough.
     Run scenarios only against the locally started stack and its throwaway database; never drive them against production data or a deployed environment.
