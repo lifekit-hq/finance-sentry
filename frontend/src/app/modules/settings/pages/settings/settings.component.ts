@@ -122,6 +122,7 @@ export class SettingsComponent {
       lowBalanceAlerts: p.lowBalanceAlerts,
       lowBalanceThreshold: p.lowBalanceThreshold,
       syncFailureAlerts: p.syncFailureAlerts,
+      watchlistAnalystAlerts: p.watchlistAnalystAlerts,
       safeWithdrawalRate: p.safeWithdrawalRate,
       realAnnualReturn: p.realAnnualReturn,
     });

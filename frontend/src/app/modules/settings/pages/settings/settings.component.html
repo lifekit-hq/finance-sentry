@@ -163,6 +163,22 @@
               label="Sync failure alerts"
             />
           </div>
+          <div class="flex items-start justify-between gap-cmn-4">
+            <div>
+              <div class="font-label text-cmn-sm font-medium text-text-primary">
+                Watchlist analyst alerts
+              </div>
+              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
+                Also alert on analyst upgrades and downgrades for watchlist names. Held names always
+                alert.
+              </div>
+            </div>
+            <cmn-toggle
+              [checked]="profile.watchlistAnalystAlerts"
+              (toggled)="store.updateProfile({watchlistAnalystAlerts: $event})"
+              label="Watchlist analyst alerts"
+            />
+          </div>
 
           <!-- Push notifications -->
           <div class="space-y-cmn-4 border-t border-border-default pt-cmn-4">

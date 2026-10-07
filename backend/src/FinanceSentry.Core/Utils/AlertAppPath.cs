@@ -25,6 +25,9 @@ public static partial class AlertAppPath
     public const string Transactions = "/transactions";
     public const string Subscriptions = "/subscriptions";
 
+    /// <summary>The element id of the dossier's Analyst Coverage card, which the dossier scrolls to when the URL carries it.</summary>
+    public const string AnalystCoverageFragment = "analyst-coverage";
+
     /// <summary>The detection job pairs a conversion's legs inside this many days (<c>FxSpreadLookbackDays</c>), so the
     /// debit sits that far back from the alert at most.</summary>
     private const int FxSpreadWindowDays = 3;
@@ -71,6 +74,8 @@ public static partial class AlertAppPath
             "ThesisBroken" or "MarketStructure" or "Opportunity" or "EarningsAhead" or "FilingLanded" or "NewsCluster"
                 => label is { } symbol && IsSymbol(symbol) ? Asset(symbol) : null,
 
+            "AnalystRatingChange" => ForAnalystCoverage(label),
+
             "PolicyViolation" or "RelativeUnderperformance" or "PerformanceBrief" or "RebalanceProposal"
                 or "CashSweepProposal" or "PolicyReview" or "PolicyReviewMissed" => AccountsInvestments,
 
@@ -88,6 +93,10 @@ public static partial class AlertAppPath
     /// <summary>A symbol's dossier. Null when <paramref name="symbol"/> is not shaped like one.</summary>
     public static string? ForSymbol(string? symbol)
         => symbol?.Trim() is { } trimmed && IsSymbol(trimmed) ? Asset(trimmed) : null;
+
+    /// <summary>A symbol's dossier, anchored on its Analyst Coverage card. Null when <paramref name="symbol"/> is not shaped like one.</summary>
+    public static string? ForAnalystCoverage(string? symbol)
+        => ForSymbol(symbol) is { } dossier ? $"{dossier}#{AnalystCoverageFragment}" : null;
 
     /// <summary>
     /// A policy violation opens the dossier when the rule is about one holding (an override always is: it is recorded

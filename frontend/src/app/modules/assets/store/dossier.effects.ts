@@ -1,4 +1,5 @@
-import {inject} from '@angular/core';
+import {DOCUMENT} from '@angular/common';
+import {afterNextRender, inject, Injector} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {pipe, switchMap, tap} from 'rxjs';
@@ -20,13 +21,32 @@ interface StoreMethods {
 
 export function dossierEffects(store: StoreMethods) {
   const dossierService = inject(DossierService);
+  const route = inject(ActivatedRoute);
+  const document = inject(DOCUMENT);
+  const injector = inject(Injector);
+
+  // An alert deep-links to a card (`/assets/NVDA#analyst-coverage`); the card only exists once the
+  // dossier has loaded, so the router's own fragment handling has nothing to land on. Scroll after
+  // the render that follows the dossier arriving.
+  const scrollToFragment = () => {
+    const fragment = route.snapshot.fragment;
+    if (!fragment) {
+      return;
+    }
+    afterNextRender(() => document.getElementById(fragment)?.scrollIntoView({block: 'start'}), {
+      injector,
+    });
+  };
 
   const loadDossier = rxMethod<string>(
     pipe(
       tap(() => store.setDossierLoading()),
       switchMap(symbol =>
         dossierService.getDossier(symbol).pipe(
-          tap(dossier => store.setDossier(dossier)),
+          tap(dossier => {
+            store.setDossier(dossier);
+            scrollToFragment();
+          }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setDossierError(code),
           })

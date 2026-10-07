@@ -34,6 +34,7 @@ public class ProfileController(
             request.LowBalanceAlerts,
             request.LowBalanceThreshold,
             request.SyncFailureAlerts,
+            request.WatchlistAnalystAlerts,
             request.SafeWithdrawalRate,
             request.RealAnnualReturn);
         var profile = await updateProfileHandler.Handle(command, ct);

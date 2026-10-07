@@ -84,6 +84,26 @@ public class AnalystActionRepository(ResearchDbContext db) : IAnalystActionRepos
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<AnalystAction>> ListRatingChangesAsync(
+        IReadOnlyCollection<string> tickers,
+        DateOnly since,
+        CancellationToken ct = default)
+    {
+        if (tickers.Count == 0)
+        {
+            return [];
+        }
+
+        var upper = tickers.Select(t => t.Trim().ToUpperInvariant()).Distinct().ToArray();
+        return await db.AnalystActions.AsNoTracking()
+            .Where(a => a.ActionDate >= since
+                && (a.ActionType == AnalystActionType.Upgrade || a.ActionType == AnalystActionType.Downgrade)
+                && upper.Contains(a.Ticker))
+            .OrderBy(a => a.ActionDate)
+            .ThenBy(a => a.Firm)
+            .ToListAsync(ct);
+    }
+
     public async Task<AnalystAction?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await db.AnalystActions.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
 

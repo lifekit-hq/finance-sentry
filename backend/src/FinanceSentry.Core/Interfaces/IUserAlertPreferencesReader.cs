@@ -8,4 +8,5 @@ public interface IUserAlertPreferencesReader
 public sealed record UserAlertPreferences(
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
-    bool SyncFailureAlerts);
+    bool SyncFailureAlerts,
+    bool WatchlistAnalystAlerts = false);

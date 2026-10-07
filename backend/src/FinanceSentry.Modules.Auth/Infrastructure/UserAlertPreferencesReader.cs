@@ -15,6 +15,7 @@ public class UserAlertPreferencesReader(UserManager<ApplicationUser> users) : IU
         return new UserAlertPreferences(
             user.LowBalanceAlerts,
             user.LowBalanceThreshold,
-            user.SyncFailureAlerts);
+            user.SyncFailureAlerts,
+            user.WatchlistAnalystAlerts);
     }
 }

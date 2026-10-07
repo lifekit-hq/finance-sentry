@@ -12,6 +12,7 @@ public record UpdateProfileCommand(
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
     bool SyncFailureAlerts,
+    bool WatchlistAnalystAlerts,
     decimal SafeWithdrawalRate,
     decimal RealAnnualReturn) : ICommand<UserProfileDto>;
 
@@ -24,5 +25,6 @@ public record UpdateProfileRequest(
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,
     bool SyncFailureAlerts,
+    bool WatchlistAnalystAlerts,
     decimal SafeWithdrawalRate,
     decimal RealAnnualReturn);

@@ -107,6 +107,11 @@ export const ALERT_TYPE_META_REGISTRY = {
     label: 'filing',
     destination: 'dossier',
   },
+  ['AnalystRatingChange']: {
+    icon: 'TrendingUp',
+    label: 'analyst rating',
+    destination: 'dossier',
+  },
   ['NewsCluster']: {
     icon: 'Newspaper',
     label: 'news',

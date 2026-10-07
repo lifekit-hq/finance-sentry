@@ -14,7 +14,7 @@ describe('AlertTypeUtils.meta', () => {
 
   it('covers every backend alert type with its own icon and label', () => {
     const types = Object.keys(ALERT_TYPE_META_REGISTRY);
-    expect(types).toHaveLength(26);
+    expect(types).toHaveLength(27);
     for (const type of types) {
       expect(AlertTypeUtils.meta(type as AlertType)).not.toBe(DEFAULT_ALERT_TYPE_META);
     }

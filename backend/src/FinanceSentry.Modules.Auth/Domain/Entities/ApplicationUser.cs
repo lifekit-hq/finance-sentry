@@ -18,6 +18,12 @@ public class ApplicationUser : IdentityUser
     public decimal LowBalanceThreshold { get; set; } = 500m;
     public bool SyncFailureAlerts { get; set; } = true;
 
+    /// <summary>
+    /// Also raise the daily analyst rating-change alert for watchlist names. Held names alert regardless;
+    /// this is the opt-in for the names the user only follows (pick 6 of #825).
+    /// </summary>
+    public bool WatchlistAnalystAlerts { get; set; }
+
     /// <summary>Fraction of the FIRE target withdrawn per year (the classic 4% rule default).</summary>
     public decimal SafeWithdrawalRate { get; set; } = 0.04m;
 

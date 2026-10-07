@@ -802,6 +802,67 @@ public class AlertGeneratorServiceTests
         VerifyNothingAdded();
     }
 
+    private static readonly DateOnly RatingDay = new(2026, 10, 6);
+
+    [Fact]
+    public async Task GenerateAnalystRatingChange_SeveralFirms_SummarisesInOneAlertLinkedToTheAnalystCard()
+    {
+        var ledger = TrackAlerts();
+
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "nvda", RatingDay,
+        [
+            new AnalystRatingChange("Goldman Sachs", true, "Neutral", "Buy"),
+            new AnalystRatingChange("Barclays", true, "Underweight", "Equal Weight"),
+        ]);
+
+        var alert = ledger.Should().ContainSingle().Subject;
+        alert.Type.Should().Be(AlertType.AnalystRatingChange);
+        alert.Severity.Should().Be(AlertSeverity.Info);
+        alert.ReferenceLabel.Should().Be("NVDA");
+        alert.Title.Should().Contain("upgrade").And.Contain("NVDA");
+        alert.Message.Should().Contain("Goldman Sachs").And.Contain("Barclays").And.Contain("2026-10-06");
+        alert.AppPath.Should().Be("/assets/NVDA#analyst-coverage");
+    }
+
+    [Fact]
+    public async Task GenerateAnalystRatingChange_MixedDirections_TitleIsNeutral()
+    {
+        var ledger = TrackAlerts();
+
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "NVDA", RatingDay,
+        [
+            new AnalystRatingChange("Goldman Sachs", true, "Neutral", "Buy"),
+            new AnalystRatingChange("Barclays", false, "Overweight", "Equal Weight"),
+        ]);
+
+        ledger.Single().Title.Should().Contain("rating changes");
+    }
+
+    [Fact]
+    public async Task GenerateAnalystRatingChange_SameTickerAndDayRunTwice_RaisesOnce()
+    {
+        var ledger = TrackAlerts();
+        var changes = new[] { new AnalystRatingChange("Barclays", false, "Overweight", "Equal Weight") };
+
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "NVDA", RatingDay, changes);
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "NVDA", RatingDay, changes);
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "NVDA", RatingDay.AddDays(1), changes);
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "AMD", RatingDay, changes);
+
+        ledger.Should().HaveCount(3);
+        ledger.Select(a => (a.ReferenceLabel, a.ReferenceId)).Distinct().Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task GenerateAnalystRatingChange_NoChanges_AddsNothing()
+    {
+        TrackAlerts();
+
+        await _service.GenerateAnalystRatingChangeAlertAsync(_userId, "NVDA", RatingDay, []);
+
+        VerifyNothingAdded();
+    }
+
     [Fact]
     public async Task GenerateDetectorSilent_NoExisting_AddsWarningOperationalAlert()
     {
@@ -1203,7 +1264,7 @@ public class AlertGeneratorServiceTests
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
         // Deduped once per reference, ever — no silence window applies.
-        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed };
+        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange };
 
         var declared = (Dictionary<string, TimeSpan>)typeof(AlertGeneratorService)
             .GetField("SilenceWindows", BindingFlags.NonPublic | BindingFlags.Static)!
