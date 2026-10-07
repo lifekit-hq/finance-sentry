@@ -127,7 +127,7 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 
 A region that swaps between loading, error, empty and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[errorPlacement]`, `[isEmpty]`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Each page derives an `AsyncStateStatus` computed (`loading` > `error` > `success`) and projects into the primitive's slots: `[skeleton]` (a placeholder shaped like the content), `[empty]` (rich empty state), `[error-action]` (e.g. Retry). `errorPlacement="above"` keeps content under a persistent banner; the default replaces it.
 
-Adopters: all eight surfaces - `events`, `truelayer-picker`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`.
+Adopters: `events`, `truelayer-picker`, `inzhur-form`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`.
 
 When the primitive wraps several children, put the parent's spacing (`space-y-cmn-5` of `cmn-page-container`, or the page's own `space-y-*`) on the `cmn-async-state` host: the children are no longer direct children of the old parent.
 
