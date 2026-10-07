@@ -51,7 +51,9 @@ export const APP_ROUTES: Routes = [
         runGuardsAndResolvers: 'paramsOrQueryParamsChange',
         resolve: {
           title: (route: ActivatedRouteSnapshot) =>
-            route.queryParamMap.has('from') ? 'Window breakdown' : 'Month breakdown',
+            route.queryParamMap.has('from') || route.queryParamMap.has('to')
+              ? 'Window breakdown'
+              : 'Month breakdown',
         },
       },
       {
