@@ -69,6 +69,16 @@ export function authEffects(store: EffectsStore) {
   const settingsService = inject(SettingsService);
   const pushSession = inject(PushSessionService);
   const doc = inject(DOCUMENT);
+  let signingOut = false;
+
+  const releasePush = (): void => {
+    if (store.isAuthenticated()) {
+      pushSession.release().subscribe();
+    }
+  };
+  const goToLogin = (): void => {
+    void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+  };
 
   return {
     login: rxMethod<AuthRequest>(
@@ -129,10 +139,13 @@ export function authEffects(store: EffectsStore) {
         )
       )
     ),
+    /** The person's own Sign out: ends the identity provider's session too, so the next sign-in asks for credentials. */
     logout(): void {
-      if (store.isAuthenticated()) {
-        pushSession.release().subscribe();
+      if (signingOut) {
+        return;
       }
+      signingOut = true;
+      releasePush();
       // Navigate only once the API has answered: /login forwards straight to the identity provider, so landing
       // there before the provider's session is ended would sign the person right back in.
       authService
@@ -143,9 +156,20 @@ export function authEffects(store: EffectsStore) {
           if (res?.endSessionUrl) {
             doc.location.assign(res.endSessionUrl);
           } else {
-            void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+            signingOut = false;
+            goToLogin();
           }
         });
+    },
+    /** A lost or revoked app session: clears it and returns to /login, which re-enters through the provider. */
+    expireSession(): void {
+      if (signingOut) {
+        return;
+      }
+      releasePush();
+      authService.logout().subscribe({error: () => undefined});
+      store.clearSession();
+      goToLogin();
     },
   };
 }

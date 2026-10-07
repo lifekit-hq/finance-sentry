@@ -41,7 +41,7 @@ export const authInterceptor: HttpInterceptorFn = (
             return next(authReq);
           }),
           catchError(() => {
-            authStore.logout();
+            authStore.expireSession();
             return throwError(() => err);
           })
         );
@@ -50,7 +50,7 @@ export const authInterceptor: HttpInterceptorFn = (
       // An anonymous visitor's session-restore probe is expected to 401; logging out would
       // navigate to /login and clobber guest routes such as /accept-invite.
       if (isUnauthorized && isAuthEndpoint(req) && !isSessionProbe(req)) {
-        authStore.logout();
+        authStore.expireSession();
       }
 
       return throwError(() => err);

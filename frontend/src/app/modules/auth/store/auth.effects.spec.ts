@@ -253,6 +253,81 @@ describe('authEffects', () => {
     });
   });
 
+  describe('logout and expireSession', () => {
+    const endSession = {endSessionUrl: 'https://idp.test/oidc/session/end?x=1'};
+
+    it('a repeated sign-out while one is in flight calls the API once', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      configure(service, buildRouter());
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledTimes(1);
+    });
+
+    it('an expired session after a sign-out cannot navigate away from the end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.expireSession();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledWith(endSession.endSessionUrl);
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('an expired session clears the app session and goes to /login without an end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).expireSession());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
+        queryParams: {info: 'signed_out'},
+      });
+    });
+
+    it('a sign-out can be retried after the API answered without an end-session URL', () => {
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      const router = buildRouter();
+      configure(service, router);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('startOidcSignIn', () => {
     it('navigates the browser to the API start endpoint with the return path', () => {
       const assign = vi.fn();

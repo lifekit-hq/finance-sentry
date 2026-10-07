@@ -15,18 +15,18 @@ import {AuthStore} from '../store/auth.store';
 import {authInterceptor} from './auth.interceptor';
 
 describe('authInterceptor', () => {
-  const logout = vi.fn();
+  const expireSession = vi.fn();
   let http: HttpClient;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
-    logout.mockReset();
+    expireSession.mockReset();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         {provide: AuthService, useValue: {}},
-        {provide: AuthStore, useValue: {logout, applyAuthResponse: vi.fn()}},
+        {provide: AuthStore, useValue: {expireSession, applyAuthResponse: vi.fn()}},
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -41,7 +41,7 @@ describe('authInterceptor', () => {
       .expectOne('/api/v1/auth/me')
       .flush(null, {status: HttpStatusCode.Unauthorized, statusText: 'Unauthorized'});
 
-    expect(logout).not.toHaveBeenCalled();
+    expect(expireSession).not.toHaveBeenCalled();
   });
 
   it('logs out when another auth endpoint answers 401', () => {
@@ -50,7 +50,7 @@ describe('authInterceptor', () => {
       .expectOne('/api/v1/auth/refresh')
       .flush(null, {status: HttpStatusCode.Unauthorized, statusText: 'Unauthorized'});
 
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(expireSession).toHaveBeenCalledTimes(1);
   });
 
   it('lets a request issued while AuthStore is still being constructed through', () => {
@@ -68,7 +68,7 @@ describe('authInterceptor', () => {
             inject(HttpClient)
               .get('/api/v1/auth/methods')
               .subscribe({error: (err: unknown) => (storeRequestError = err)});
-            return {logout, applyAuthResponse: vi.fn()};
+            return {expireSession, applyAuthResponse: vi.fn()};
           },
         },
       ],
