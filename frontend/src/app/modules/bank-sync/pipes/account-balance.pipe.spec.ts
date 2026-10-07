@@ -35,7 +35,7 @@ describe('AccountBalancePipe', () => {
   it('labels the equivalent with the base currency, not dollars', () => {
     const result = pipe.transform(
       account({currency: 'UAH', currentBalance: 40000, balanceInBaseCurrency: 900}),
-      'EUR',
+      'EUR'
     );
 
     expect(result.equivalent).toBe('~ €900');
@@ -44,7 +44,7 @@ describe('AccountBalancePipe', () => {
   it('shows the equivalent of a USD account when the base currency is not USD', () => {
     const result = pipe.transform(
       account({currency: 'USD', currentBalance: 1000, balanceInBaseCurrency: 920}),
-      'EUR',
+      'EUR'
     );
 
     expect(result.equivalent).toBe('~ €920');
@@ -53,7 +53,7 @@ describe('AccountBalancePipe', () => {
   it('omits the equivalent for an account already in the base currency', () => {
     const result = pipe.transform(
       account({currency: 'EUR', currentBalance: 1200, balanceInBaseCurrency: 1199.99}),
-      'EUR',
+      'EUR'
     );
 
     expect(result).toEqual({native: '€1,200.00', equivalent: null, owed: false});

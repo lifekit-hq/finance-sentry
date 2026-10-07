@@ -17,7 +17,7 @@ const LIABILITY_ACCOUNT_TYPE = 'credit';
 export class AccountBalancePipe implements PipeTransform {
   public transform(
     {accountType, currentBalance, currency, balanceInBaseCurrency}: AccountBalanceItem,
-    baseCurrency: string,
+    baseCurrency: string
   ): FormattedBalance {
     const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && currentBalance > 0;
     const native = owed
