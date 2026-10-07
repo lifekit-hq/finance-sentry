@@ -1,14 +1,16 @@
-import {DatePipe, DecimalPipe} from '@angular/common';
+import {DatePipe, DecimalPipe, formatDate} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
   CardComponent,
+  type ChartPoint,
   CmnCellDirective,
   CmnColumnComponent,
   DataTableComponent,
   EmptyStateComponent,
+  LineChartComponent,
   RelativeTimePipe,
   SkeletonComponent,
   StatCardComponent,
@@ -27,11 +29,9 @@ import {DossierStore} from '../../store/dossier.store';
 
 const SEVERITY_VALUE: Record<string, number> = {high: 25, medium: 15, low: 5};
 const SEVERITY_DEFAULT = 5;
-const SPARKLINE_WIDTH = 96;
-const SPARKLINE_MARGIN = 2;
-const SPARKLINE_HEIGHT = 30;
-const SPARKLINE_RIGHT_X = SPARKLINE_WIDTH + SPARKLINE_MARGIN;
-const SPARKLINE_MIN_POINTS = 2;
+const TREND_MIN_POINTS = 2;
+const TREND_LABEL_FORMAT = 'mediumDate';
+const TREND_LOCALE = 'en-US';
 
 @Component({
   selector: 'fns-asset-dossier',
@@ -53,6 +53,7 @@ const SPARKLINE_MIN_POINTS = 2;
     SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,
+    LineChartComponent,
     StatCardComponent,
     TagComponent,
     TriggerSentencePipe,
@@ -69,30 +70,18 @@ export class AssetDossierComponent {
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
 
-  public readonly radarSparklinePoints = computed(() => {
+  public readonly radarTrendPoints = computed((): ChartPoint[] | null => {
     const signals = this.store.dossier()?.radarSignals ?? [];
-    if (signals.length < SPARKLINE_MIN_POINTS) {
+    if (signals.length < TREND_MIN_POINTS) {
       return null;
     }
-    const sorted = [...signals].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-    const times = sorted.map(s => new Date(s.timestamp).getTime());
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times);
-    const timeRange = maxTime - minTime || 1;
-    return sorted
-      .map(s => {
-        const x =
-          ((new Date(s.timestamp).getTime() - minTime) / timeRange) * SPARKLINE_WIDTH +
-          SPARKLINE_MARGIN;
-        const y = SPARKLINE_HEIGHT - (SEVERITY_VALUE[s.severity] ?? SEVERITY_DEFAULT);
-        return `${x.toFixed(1)},${y}`;
-      })
-      .join(' ');
+    return [...signals]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .map(s => ({
+        label: formatDate(s.timestamp, TREND_LABEL_FORMAT, TREND_LOCALE),
+        value: SEVERITY_VALUE[s.severity] ?? SEVERITY_DEFAULT,
+      }));
   });
-
-  public readonly sparklineFillClose = ` ${SPARKLINE_RIGHT_X},${SPARKLINE_HEIGHT} ${SPARKLINE_MARGIN},${SPARKLINE_HEIGHT}`;
 
   public readonly latestSignal = computed((): DossierSignalItem | null => {
     const signals = this.store.dossier()?.radarSignals ?? [];

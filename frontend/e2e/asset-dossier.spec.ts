@@ -93,12 +93,11 @@ test.describe('Asset Dossier', () => {
     await expect(trends.getByTestId('list-row').first()).toContainText('18');
   });
 
-  test('dossier page renders radar sparkline SVG for multiple signals', async ({page}) => {
+  test('dossier page renders the radar trend sparkline for multiple signals', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Radar Signals')).toBeVisible();
-    // Sparkline SVG is rendered when there are >= 2 signals
-    const sparkline = page.locator('svg[aria-hidden="true"]');
-    await expect(sparkline).toBeVisible();
+    // The sparkline is rendered when there are >= 2 signals
+    await expect(page.locator('cmn-line-chart canvas')).toBeVisible();
     // Latest reading is shown in the header
     await expect(page.getByText('Latest')).toBeVisible();
   });
