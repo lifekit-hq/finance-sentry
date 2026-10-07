@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
 using Hangfire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -20,6 +21,7 @@ public sealed class BookPerformanceBriefJob(
     IRadarSignalRepository signals,
     ITrackRecordSource trackRecord,
     IAlertGeneratorService alerts,
+    IConfiguration configuration,
     ILogger<BookPerformanceBriefJob> logger)
 {
     private static readonly IReadOnlyList<BookPerformancePeriod> DefaultPeriods =
@@ -31,6 +33,9 @@ public sealed class BookPerformanceBriefJob(
     ];
 
     private static readonly TimeSpan SignalLookback = TimeSpan.FromDays(30);
+
+    /// <summary>Public origin the brief's bullets link onto (<c>Companion:PublicBaseUrl</c>); empty = no links.</summary>
+    private string? AppBaseUrl => configuration["Companion:PublicBaseUrl"];
 
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
@@ -81,7 +86,7 @@ public sealed class BookPerformanceBriefJob(
 
             var delta = await trackRecord.GetDeltaAsync(userId, ct);
 
-            var brief = PerformanceBriefComposer.Compose(result, portfolioSignals, delta);
+            var brief = PerformanceBriefComposer.Compose(result, portfolioSignals, delta, AppBaseUrl);
             await alerts.GeneratePerformanceBriefAlertAsync(userId, brief.Headline, brief.Body, ct);
             return null;
         }

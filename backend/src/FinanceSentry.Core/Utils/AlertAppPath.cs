@@ -81,6 +81,10 @@ public static partial class AlertAppPath
         };
     }
 
+    /// <summary>The ledger narrowed to the transactions whose text contains <paramref name="query"/> (<c>?q=</c>), or null when blank.</summary>
+    public static string? ForLedgerSearch(string? query)
+        => query?.Trim() is { Length: > 0 } q ? Ledger(("q", q)) : null;
+
     /// <summary>A symbol's dossier. Null when <paramref name="symbol"/> is not shaped like one.</summary>
     public static string? ForSymbol(string? symbol)
         => symbol?.Trim() is { } trimmed && IsSymbol(trimmed) ? Asset(trimmed) : null;

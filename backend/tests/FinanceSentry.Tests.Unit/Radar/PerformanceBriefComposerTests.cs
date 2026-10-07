@@ -117,10 +117,10 @@ public sealed class PerformanceBriefComposerTests
     {
         var lines = BodyLines(PerformanceBriefComposer.Compose(FourPeriodResult(), [], null));
 
-        lines.Should().Contain(l => l.StartsWith("1W:"));
-        lines.Should().Contain(l => l.StartsWith("1M:"));
-        lines.Should().Contain(l => l.StartsWith("3M:"));
-        lines.Should().Contain(l => l.StartsWith("1Y:"));
+        lines.Should().Contain(l => l.StartsWith("• 1W:"));
+        lines.Should().Contain(l => l.StartsWith("• 1M:"));
+        lines.Should().Contain(l => l.StartsWith("• 3M:"));
+        lines.Should().Contain(l => l.StartsWith("• 1Y:"));
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class PerformanceBriefComposerTests
         var newer = DriftSignal("Equity", "UnderBand", -12m, DateTimeOffset.UtcNow.AddDays(-1));
 
         var driftLines = BodyLines(PerformanceBriefComposer.Compose(OneWeekResult(), [older, newer], null))
-            .Where(l => l.StartsWith("Drift:")).ToList();
+            .Where(l => l.StartsWith("• Drift:")).ToList();
 
         driftLines.Should().HaveCount(1);
         driftLines[0].Should().Contain("UnderBand");
@@ -159,7 +159,7 @@ public sealed class PerformanceBriefComposerTests
         var large = DriftSignal("Equity", "OverBand", 15m);
 
         var lines = BodyLines(PerformanceBriefComposer.Compose(OneWeekResult(), [small, large], null))
-            .Where(l => l.StartsWith("Drift:")).ToList();
+            .Where(l => l.StartsWith("• Drift:")).ToList();
 
         lines.Should().HaveCount(2);
         lines[0].Should().Contain("Equity");
@@ -288,7 +288,7 @@ public sealed class PerformanceBriefComposerTests
         };
 
         var actionLines = BodyLines(PerformanceBriefComposer.Compose(OneWeekResult(), signals, null))
-            .Where(l => l.StartsWith("Action:")).ToList();
+            .Where(l => l.StartsWith("• Action:")).ToList();
 
         actionLines.Should().HaveCount(1);
         actionLines[0].Should().Contain("Trim Equity");
@@ -335,5 +335,56 @@ public sealed class PerformanceBriefComposerTests
 
         PerformanceBriefComposer.Compose(OneWeekResult(), signals, null)
             .Body.Should().NotContain("Action:");
+    }
+
+    private const string AppBase = "https://app.example.com";
+
+    [Fact]
+    public void Bullets_LinkToTheirEntity_WhenAppBaseUrlIsSet()
+    {
+        var signals = new[]
+        {
+            DriftSignal("Equity", "OverBand", 8.3m),
+            ConcentrationSignal("AAPL", 22.4m, 15m, overLimit: true),
+        };
+        var record = new TrackRecordDelta(IsTerminal: true, Count: 12, 58m, 3.2m, LowSample: false);
+
+        var lines = BodyLines(PerformanceBriefComposer.Compose(OneWeekResult(), signals, record, AppBase));
+
+        lines.Should().Contain(l => l.StartsWith("• 1W:") && l.EndsWith(" → " + AppBase + "/accounts/investments"));
+        lines.Should().Contain(l => l.StartsWith("• Drift: Equity") && l.EndsWith(AppBase + "/accounts/investments"));
+        lines.Should().Contain(l => l.StartsWith("• Calls:") && !l.Contains("http"));
+        lines.Should().Contain(l => l.StartsWith("• Action: Trim Equity") && l.EndsWith("/accounts/investments"));
+    }
+
+    [Fact]
+    public void ConcentrationAction_LinksToTheSymbolDossier()
+    {
+        var brief = PerformanceBriefComposer.Compose(
+            OneWeekResult(), [ConcentrationSignal("AAPL", 22.4m, 15m, overLimit: true)], null, AppBase);
+
+        brief.Body.Should().Contain("• Action: Trim AAPL to the 15% cap — now 22.4% of the book. → " + AppBase + "/assets/AAPL");
+    }
+
+    [Fact]
+    public void Bullets_StayPlain_WhenNoAppBaseUrl()
+        => PerformanceBriefComposer.Compose(OneWeekResult(), [DriftSignal("Equity", "OverBand", 8.3m)], null)
+            .Body.Should().NotContain("http").And.NotContain("→");
+
+    [Fact]
+    public void Body_StaysWithinTheAlertColumn_WhenLinksOnAWorstCaseBriefWouldOverflowIt()
+    {
+        const string longHost = "https://finance-sentry.some-very-long-deployment-hostname.example.com/finance";
+        var signals = Enumerable.Range(1, 6)
+            .Select(i => DriftSignal($"Long-named asset class sleeve number {i}", i % 2 == 0 ? "OverBand" : "UnderBand", 6m + i))
+            .ToList();
+        var record = new TrackRecordDelta(IsTerminal: true, Count: 12, 58m, 3.2m, LowSample: true);
+
+        var unlinked = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record);
+        var linked = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record, longHost);
+
+        linked.Body.Length.Should().BeLessOrEqualTo(FinanceSentry.Core.Utils.AppUrl.MaxDigestLength);
+        linked.Body.Split('\n').Select(l => l.Split(" → ")[0]).Should().Equal(unlinked.Body.Split('\n'));
+        linked.Body.Should().Contain(" → " + longHost, "the links that still fit stay");
     }
 }

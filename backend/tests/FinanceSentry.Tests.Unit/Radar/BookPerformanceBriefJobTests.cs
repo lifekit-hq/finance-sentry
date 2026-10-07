@@ -9,6 +9,7 @@ using FinanceSentry.Modules.Radar.Domain.Repositories;
 using FinanceSentry.Modules.Radar.Infrastructure.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 
@@ -49,6 +50,7 @@ public sealed class BookPerformanceBriefJobTests
             _signals.Object,
             _trackRecord.Object,
             _alerts.Object,
+            new ConfigurationBuilder().Build(),
             NullLogger<BookPerformanceBriefJob>.Instance);
     }
 
