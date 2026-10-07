@@ -71,6 +71,12 @@ jobs:
       run: npm run format:check
       working-directory: frontend
 
+    # Source scan for what bypasses the @lifekit-hq/tokens contract (font, colour, text size, radius,
+    # root font size, layout transitions); fails on any finding.
+    - name: Design drift check
+      run: npm run drift
+      working-directory: frontend
+
     - name: Build application
       run: npm run build
       working-directory: frontend

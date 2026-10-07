@@ -14,7 +14,7 @@
       <cmn-button (clicked)="goBack()" variant="secondary" size="sm" data-testid="dossier-back">
         ← Investments
       </cmn-button>
-      <h1 class="mt-cmn-3 font-headline text-cmn-3xl font-bold text-text-primary">
+      <h1 class="mt-cmn-3 font-headline text-cmn-2xl font-bold text-text-primary">
         {{ dossier.symbol }}
       </h1>
       <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
@@ -40,7 +40,7 @@
           <cmn-card class="block" data-testid="ledger-read-card">
             <div class="flex flex-wrap items-center justify-between gap-cmn-3">
               <div>
-                <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                   Ledger's read
                 </h2>
                 @if (store.ledgerRead()?.generatedAt; as generatedAt) {
@@ -120,7 +120,7 @@
       <!-- Position & P&L -->
       @if (dossier.position; as position) {
         <cmn-card class="block">
-          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Position</h2>
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Position</h2>
           <p class="text-cmn-xs text-text-secondary">
             <a
               [routerLink]="accountsRoute"
@@ -206,7 +206,7 @@
       @if (dossier.thesis; as thesis) {
         <cmn-card class="block">
           <div class="flex items-start justify-between gap-cmn-3">
-            <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
               Investment Thesis
             </h2>
             @if (thesis.brokenAt) {
@@ -271,7 +271,7 @@
         @if (!valuation.notApplicable) {
           <cmn-card class="block">
             <div class="flex items-center justify-between gap-cmn-3">
-              <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Valuation</h2>
+              <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Valuation</h2>
               @if (valuation.isStale) {
                 <cmn-tag variant="warning">Stale</cmn-tag>
               }
@@ -331,7 +331,7 @@
       @if (dossier.analysts; as analysts) {
         <cmn-card class="block">
           <div class="flex items-center justify-between gap-cmn-3">
-            <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
               Analyst Coverage
             </h2>
             <span class="text-cmn-xs text-text-secondary">{{
@@ -427,9 +427,9 @@
       <!-- Next Earnings -->
       @if (dossier.nextEarnings; as earnings) {
         <cmn-card class="block">
-          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Next Earnings</h2>
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Next Earnings</h2>
           <div class="mt-cmn-3 flex flex-wrap items-center gap-cmn-4">
-            <span class="font-mono text-cmn-xl font-semibold tabular-nums text-text-primary">
+            <span class="font-mono text-cmn-lg font-semibold tabular-nums text-text-primary">
               {{ earnings.eventDate }}
             </span>
             <span class="text-cmn-sm text-text-secondary">{{ earnings.eventType }}</span>
@@ -443,7 +443,7 @@
       <!-- Recent News -->
       @if (dossier.recentNews.length > 0) {
         <cmn-card class="block">
-          <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Recent News</h2>
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Recent News</h2>
           <ul class="mt-cmn-4 space-y-cmn-4">
             @for (article of dossier.recentNews; track article.id) {
               <li class="border-b border-border-default pb-cmn-3 last:border-0 last:pb-0">
@@ -469,7 +469,7 @@
         <cmn-card class="block">
           <div class="flex items-start justify-between gap-cmn-3">
             <div>
-              <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
+              <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                 Radar Signals
               </h2>
               <p class="mt-cmn-1 text-cmn-xs text-text-secondary">

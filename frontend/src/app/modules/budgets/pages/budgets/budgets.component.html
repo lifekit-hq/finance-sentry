@@ -45,7 +45,7 @@
           <span
             [class.text-status-error]="over"
             [class.text-text-primary]="!over"
-            class="font-mono text-2xl font-bold"
+            class="font-mono text-cmn-xl font-bold"
           >
             {{ heroAmount | money }}
           </span>
@@ -62,7 +62,7 @@
             [style.width.%]="store.overallPct()"
             [class.bg-status-error]="over"
             [class.bg-accent-default]="!over"
-            class="h-full rounded-full transition-[width] duration-500"
+            class="h-full rounded-full"
           ></div>
         </div>
       </cmn-card>
@@ -115,7 +115,7 @@
               <span
                 [class.text-status-error]="b.isOverBudget"
                 [class.text-text-primary]="!b.isOverBudget"
-                class="font-mono text-lg font-bold"
+                class="font-mono text-cmn-md font-bold"
               >
                 {{ leftAmount | money }}
               </span>
@@ -146,7 +146,7 @@
               <div
                 [style.width.%]="pct"
                 [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
-                class="h-full rounded-full transition-[width] duration-500"
+                class="h-full rounded-full"
               ></div>
             </div>
             <div class="mt-cmn-1 text-cmn-xs text-text-secondary">{{ b.spent | money }} spent</div>
