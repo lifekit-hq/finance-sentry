@@ -133,7 +133,9 @@ Everything Inzhur reports is in UAH and is converted to USD once, at ingest (§3
   type), the way IBKR's cash ledger lands; a zero balance writes no row.
 - **Reconcile** — after a successful read, `inzhur` rows Inzhur no longer returns are deleted
   (sold fund, redeemed bond); rows of other providers are never touched. A failed read changes
-  nothing: the previous day's rows stay, and go stale.
+  nothing: the previous day's rows stay, and go stale. A read whose assets carry a nonzero invested
+  or total amount but none of which yields a position (a moved quantity field) is refused the same
+  way; assets with no amounts (a sold-out account) reconcile to empty.
 - **Staleness** — each provider is judged on its own cadence; Inzhur's rows are stale 36 h after
   their last sync (`BrokerageFreshness.Daily`), so one missed daily run is not yet stale.
 - **Net worth** — the rows are ordinary brokerage holdings, so they enter the brokerage total

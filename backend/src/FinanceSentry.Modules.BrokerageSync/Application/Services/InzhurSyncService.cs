@@ -53,6 +53,7 @@ public sealed class InzhurSyncService(
             LogUnmodelledAssetFields(portfolio);
 
             var positions = InzhurHoldingsMapper.Map(portfolio);
+            RefuseWhenFundedAssetsAllDropped(portfolio, positions);
             await StoreHoldingsAsync(userId, positions, ct);
 
             credential.RecordSyncSuccess(Now);
@@ -79,6 +80,19 @@ public sealed class InzhurSyncService(
             await credentialRepository.SaveChangesAsync(ct);
             throw;
         }
+    }
+
+    // Assets that carry money but none of which became a position mean the cabinet moved a field, not that the owner
+    // sold out: refuse the read so the stored rows are kept. Assets with no amounts (a sold-out account) still clear.
+    private static void RefuseWhenFundedAssetsAllDropped(InzhurPortfolio portfolio, IReadOnlyList<InzhurPosition> positions)
+    {
+        var funded = portfolio.Assets
+            .Where(a => a.Details is { TotalAmountUah: not (null or 0m) } or { InvestedUah: not (null or 0m) })
+            .Select(InzhurHoldingsMapper.SymbolFor)
+            .ToHashSet(StringComparer.Ordinal);
+        if (funded.Count > 0 && !positions.Any(p => funded.Contains(p.Symbol)))
+            throw new InzhurApiException(
+                InzhurFailureKind.Unexpected, "Inzhur user-assets listed assets with amounts but none could be read as a position.");
     }
 
     private DateTime Now => clock.GetUtcNow().UtcDateTime;

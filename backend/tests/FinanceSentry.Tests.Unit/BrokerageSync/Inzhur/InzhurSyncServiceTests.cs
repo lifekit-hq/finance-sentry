@@ -175,4 +175,50 @@ public class InzhurSyncServiceTests
         credential.Status.Should().Be(InzhurConnectionStatus.Active);
         credential.LastSyncError.Should().NotBeNullOrEmpty();
     }
+
+    [Fact]
+    public async Task Assets_with_amounts_but_no_readable_quantity_are_refused_and_stored_rows_stay()
+    {
+        var credential = ActiveCredential();
+        _persisted = [new BrokerageHolding(_userId, "Fund A", "REIT", 1m, 1m, "inzhur")];
+        var quantityMoved = new
+        {
+            id = 1,
+            type = "fund",
+            name = "Fund A",
+            prices = new { sellUAH = 100m },
+            details = new { totalAmountUAH = 1_200m, investedUAH = 1_000m },
+        };
+        CabinetAnswersWith(InzhurFakes.UserAssets(quantityMoved), InzhurFakes.BrokerAccount(500m, 0m));
+
+        var act = () => Service().SyncAsync(_userId);
+
+        (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.Unexpected);
+        _upserted.Should().BeEmpty();
+        _removed.Should().BeEmpty();
+        credential.LastSyncAt.Should().BeNull();
+        credential.LastSyncError.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task A_sold_out_account_with_only_zero_amount_assets_clears_to_empty()
+    {
+        var credential = ActiveCredential();
+        var sold = new BrokerageHolding(_userId, "Fund A", "REIT", 1m, 1m, "inzhur");
+        _persisted = [sold];
+        var soldOut = new
+        {
+            id = 1,
+            type = "fund",
+            name = "Fund A",
+            details = new { certificatesOwnedQuantity = 0m, totalAmountUAH = 0m, investedUAH = 0m },
+        };
+        CabinetAnswersWith(InzhurFakes.UserAssets(soldOut), InzhurFakes.BrokerAccount(0m, 0m));
+
+        (await Service().SyncAsync(_userId)).Should().Be(InzhurSyncOutcome.Synced);
+
+        _upserted.Should().BeEmpty();
+        _removed.Should().ContainSingle().Which.Should().BeSameAs(sold);
+        credential.LastSyncAt.Should().Be(Now.UtcDateTime);
+    }
 }
