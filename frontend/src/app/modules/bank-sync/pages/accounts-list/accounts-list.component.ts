@@ -209,6 +209,10 @@ export class AccountsListComponent implements OnInit {
     void this.router.navigate([AppRoute.AssetDossier, symbol]);
   }
 
+  public navigateToTransactions(accountId: string): void {
+    void this.router.navigate([AppRoute.Transactions], {queryParams: {account: accountId}});
+  }
+
   public disconnectInstitution(institution: Institution): void {
     const ref = this.dialog.open<boolean>(DisconnectDialogComponent, {
       title: `Disconnect ${institution.name}`,

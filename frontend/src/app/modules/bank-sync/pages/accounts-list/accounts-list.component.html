@@ -206,13 +206,18 @@
 </div>
 
 <ng-template #accountRow let-account let-title="title">
-  <div class="flex items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4">
+  <button
+    (click)="navigateToTransactions(account.accountId)"
+    class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
+    data-testid="account-row"
+    type="button"
+  >
     <div class="min-w-0">
       <p class="text-cmn-sm text-text-primary">{{ title }}</p>
       <p class="text-cmn-xs text-text-secondary">•••• {{ account.accountNumberLast4 }}</p>
     </div>
     <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
-  </div>
+  </button>
 </ng-template>
 
 <ng-template #amountCell let-account>
