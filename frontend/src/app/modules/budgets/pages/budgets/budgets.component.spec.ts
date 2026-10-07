@@ -18,6 +18,8 @@ function setup() {
     create: vi.fn(),
     remove: vi.fn(),
     navigateToPeriod: vi.fn(),
+    selectedYear: signal(2026),
+    selectedMonth: signal(7),
   };
   const dialogResult = signal<unknown>(undefined);
   const dialog = {open: vi.fn(() => ({afterClosed: () => of(dialogResult())}))};
@@ -89,6 +91,14 @@ describe('BudgetsComponent actions', () => {
     expect(router.navigate).toHaveBeenCalled();
     component.onBudgetAction('remove', budget);
     expect(store.remove).toHaveBeenCalledWith('b1');
+  });
+
+  it('opens the debit transactions of the category within the selected month', () => {
+    const {component, router} = setup();
+    component.viewTransactions('groceries');
+    expect(router.navigate).toHaveBeenCalledWith(['/transactions'], {
+      queryParams: {category: 'groceries', type: 'debit', from: '2026-07-01', to: '2026-07-31'},
+    });
   });
 
   it('navigates the store to the stepped month', () => {

@@ -21,6 +21,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {CATEGORY_COLOR_FALLBACK} from '../../../../shared/store/categories/categories.computed';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
 import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
 import {BUDGET_NEAR_LIMIT_PCT} from '../../constants/budget/budget.constants';
 import {type CreateBudgetRequest} from '../../models/budget/budget.model';
@@ -141,7 +142,13 @@ export class BudgetsComponent {
   }
 
   public viewTransactions(category: string): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {category}});
+    const year = this.store.selectedYear();
+    const month = this.store.selectedMonth();
+    const from = DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month - 1, 1)));
+    const to = DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month, 0)));
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {category, type: 'debit', from, to},
+    });
   }
 
   public onMonthChange(month: Date): void {

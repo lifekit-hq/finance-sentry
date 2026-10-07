@@ -96,6 +96,12 @@ describe('DashboardComponent range presets', () => {
     expect(store['setHistoryRange']).toHaveBeenCalledWith('mtd');
   });
 
+  it('links the net-worth hero to the accounts list', () => {
+    const link = render().el.querySelector<HTMLAnchorElement>('[data-testid="net-worth-link"]');
+
+    expect(link?.getAttribute('href')).toBe('/accounts/list');
+  });
+
   it('carries the day window into the income and spending drill-downs', () => {
     const {fixture, navigate} = render('1w');
 

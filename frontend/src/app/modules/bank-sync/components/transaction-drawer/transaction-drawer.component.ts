@@ -1,7 +1,9 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {CMN_DRAWER_DATA, TagComponent} from '@lifekit-hq/ui';
+import {RouterLink} from '@angular/router';
+import {CMN_DRAWER_DATA, CmnDrawerRef, TagComponent} from '@lifekit-hq/ui';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {type GlobalTransactionDto} from '../../models/transaction/transaction.model';
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
@@ -14,6 +16,7 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
     TagComponent,
     DatePipe,
     MerchantCategoryPipe,
+    RouterLink,
     TransactionAmountClassPipe,
     TransactionAmountPipe,
   ],
@@ -40,7 +43,16 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
         <dd class="font-medium text-text-primary">{{ tx.description }}</dd>
 
         <dt class="text-text-secondary">Account</dt>
-        <dd class="text-text-primary">{{ tx.bankName }}</dd>
+        <dd>
+          <a
+            [routerLink]="transactionsRoute"
+            [queryParams]="{account: tx.accountId}"
+            (click)="drawerRef.close()"
+            class="text-accent-default hover:underline"
+            data-testid="drawer-account-link"
+            >{{ tx.bankName }}</a
+          >
+        </dd>
 
         <dt class="text-text-secondary">Status</dt>
         <dd>
@@ -54,7 +66,14 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
         @if (tx.merchantCategory) {
           <dt class="text-text-secondary">Category</dt>
           <dd>
-            <cmn-tag variant="neutral">{{ tx.merchantCategory | merchantCategory }}</cmn-tag>
+            <a
+              [routerLink]="transactionsRoute"
+              [queryParams]="{category: tx.merchantCategory}"
+              (click)="drawerRef.close()"
+              data-testid="drawer-category-link"
+            >
+              <cmn-tag variant="neutral">{{ tx.merchantCategory | merchantCategory }}</cmn-tag>
+            </a>
           </dd>
         }
 
@@ -82,4 +101,6 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
 })
 export class TransactionDrawerComponent {
   public readonly tx = inject<GlobalTransactionDto>(CMN_DRAWER_DATA);
+  public readonly drawerRef = inject(CmnDrawerRef);
+  public readonly transactionsRoute = AppRoute.Transactions;
 }
