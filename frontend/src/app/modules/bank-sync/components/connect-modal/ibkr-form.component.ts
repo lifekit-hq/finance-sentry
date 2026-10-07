@@ -9,6 +9,7 @@ import {
   InputComponent,
 } from '@lifekit-hq/ui';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {IbkrConnectStore} from '../../store/ibkr-connect/ibkr-connect.store';
 import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
@@ -21,6 +22,7 @@ import {IbkrOauthFormComponent} from './ibkr-oauth-form.component';
   selector: 'fns-ibkr-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InputHintsDirective,
     AlertComponent,
     ButtonComponent,
     DatePipe,

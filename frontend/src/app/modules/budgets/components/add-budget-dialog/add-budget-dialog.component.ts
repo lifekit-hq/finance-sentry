@@ -9,6 +9,7 @@ import {
   SelectComponent,
 } from '@lifekit-hq/ui';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MIN_BUDGET_LIMIT} from '../../constants/budget/budget.constants';
 import {type CreateBudgetRequest} from '../../models/budget/budget.model';
@@ -17,6 +18,7 @@ import {type CreateBudgetRequest} from '../../models/budget/budget.model';
   selector: 'fns-add-budget-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InputHintsDirective,
     ButtonComponent,
     DialogActionsComponent,
     FormFieldComponent,

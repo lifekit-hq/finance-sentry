@@ -12,6 +12,7 @@ import {
 } from '@lifekit-hq/ui';
 import {finalize, type Subscription} from 'rxjs';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {type TrueLayerProvider} from '../../models/truelayer/truelayer.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {ConnectStore} from '../../store/connect/connect.store';
@@ -22,6 +23,7 @@ import {TRUELAYER_COUNTRIES} from './connect-modal.constants';
   selector: 'fns-truelayer-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InputHintsDirective,
     AlertComponent,
     ButtonComponent,
     DialogActionsComponent,

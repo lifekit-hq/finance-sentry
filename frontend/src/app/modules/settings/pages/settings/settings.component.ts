@@ -22,6 +22,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
@@ -55,6 +56,7 @@ const MIN_PASSWORD_LENGTH = 8;
 @Component({
   selector: 'fns-settings',
   imports: [
+    InputHintsDirective,
     ButtonComponent,
     FormFieldComponent,
     FormsModule,

@@ -16,6 +16,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {CATEGORY_COLOR_FALLBACK} from '../../../../shared/store/categories/categories.computed';
@@ -36,6 +37,7 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
 @Component({
   selector: 'fns-budgets',
   imports: [
+    InputHintsDirective,
     AlertComponent,
     CardComponent,
     EmptyStateComponent,

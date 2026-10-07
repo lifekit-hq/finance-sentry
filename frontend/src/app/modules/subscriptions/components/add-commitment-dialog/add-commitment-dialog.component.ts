@@ -15,6 +15,7 @@ import {
   SelectableCardComponent,
 } from '@lifekit-hq/ui';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {
   COMMITMENT_CADENCE_OPTIONS,
@@ -40,6 +41,7 @@ import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-pi
   selector: 'fns-add-commitment-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InputHintsDirective,
     AlertComponent,
     ButtonComponent,
     ChipComponent,

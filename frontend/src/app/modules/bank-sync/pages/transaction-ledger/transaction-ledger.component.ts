@@ -18,6 +18,7 @@ import {
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
@@ -37,6 +38,7 @@ const DRAWER_WIDTH = '480px';
 @Component({
   selector: 'fns-transaction-ledger',
   imports: [
+    InputHintsDirective,
     AlertComponent,
     ButtonComponent,
     CardComponent,

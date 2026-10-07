@@ -17,7 +17,11 @@
     label="Transaction"
     hint="Pick one charge; later charges like it keep this up to date"
   >
-    <cmn-input [formControl]="searchControl" placeholder="Search by merchant or description" />
+    <cmn-input
+      [formControl]="searchControl"
+      enterkeyhint="search"
+      placeholder="Search by merchant or description"
+    />
   </cmn-form-field>
 
   @if (picker.errorMessage()) {
@@ -76,7 +80,12 @@
         <cmn-input formControlName="merchant" />
       </cmn-form-field>
       <cmn-form-field [control]="form.controls.monthlyAmount" label="Amount per charge">
-        <cmn-input formControlName="monthlyAmount" type="number" />
+        <cmn-input
+          formControlName="monthlyAmount"
+          type="number"
+          inputmode="decimal"
+          enterkeyhint="next"
+        />
       </cmn-form-field>
       @if (form.controls.kind.value === 'installment') {
         <cmn-form-field
@@ -84,7 +93,13 @@
           label="Total payments"
           hint="Leave empty if the plan has no fixed term"
         >
-          <cmn-input formControlName="termCount" type="number" placeholder="e.g. 12" />
+          <cmn-input
+            formControlName="termCount"
+            type="number"
+            inputmode="numeric"
+            enterkeyhint="done"
+            placeholder="e.g. 12"
+          />
         </cmn-form-field>
       }
     </div>
