@@ -250,6 +250,22 @@ public class GetFamilyClearingStatementQueryTests
         line.RentShortfall.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData("Від: ANNA K rent", "Anna K", "Anna K")]
+    [InlineData("Від: Людмила Сичова", "Людмила Сичова (Мама)", null)]
+    public async Task Handle_LedgerSearch_IsTheName_OnlyWhenAMatchRuleSpellsIt(
+        string rulePattern, string name, string? expected)
+    {
+        var classification = ClassificationReturning(
+            new CounterpartyMonthlyFlow(Month, name, FlowRoles.FamilySupport, 720m, 500m));
+        var counterparty = MakeCounterparty(name, FlowRoles.FamilySupport);
+        counterparty.Rules.Add(new CounterpartyRule { MatchType = "description_contains", Pattern = rulePattern });
+
+        var statement = await RunAsync(classification, counterparties: [counterparty]);
+
+        statement.Counterparties.Single().LedgerSearch.Should().Be(expected);
+    }
+
     [Fact]
     public async Task Handle_NoExpectationConfigured_AllRentFieldsNull()
     {

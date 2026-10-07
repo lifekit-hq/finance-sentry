@@ -10,6 +10,9 @@ public static class AppUrl
     private const string BulletMark = "• ";
     private const string LinkMark = " → ";
 
+    /// <summary>The persisted alert message column (<c>Alert.Message</c>): a longer digest body fails the insert.</summary>
+    public const int MaxDigestLength = 1000;
+
     public static string? For(string? publicBaseUrl, string? appPath)
     {
         if (string.IsNullOrWhiteSpace(publicBaseUrl)
@@ -36,4 +39,29 @@ public static class AppUrl
     /// </summary>
     public static string Bullet(string text, string? publicBaseUrl, string? appPath)
         => For(publicBaseUrl, appPath) is { } url ? $"{BulletMark}{text}{LinkMark}{url}" : BulletMark + text;
+
+    /// <summary>
+    /// The digest body: the lines joined by newlines. Over <paramref name="maxLength"/> it drops the link of the last
+    /// linked bullet, then the one before it, until the body fits, so a long origin costs the lowest links and never a
+    /// fact (or the whole alert, which the column would refuse).
+    /// </summary>
+    public static string Digest(IReadOnlyList<string> lines, int maxLength = MaxDigestLength)
+    {
+        var kept = lines.ToArray();
+        var length = kept.Sum(l => l.Length) + Math.Max(0, kept.Length - 1);
+
+        for (var i = kept.Length - 1; i >= 0 && length > maxLength; i--)
+        {
+            var at = kept[i].LastIndexOf(LinkMark, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                continue;
+            }
+
+            length -= kept[i].Length - at;
+            kept[i] = kept[i][..at];
+        }
+
+        return string.Join('\n', kept);
+    }
 }

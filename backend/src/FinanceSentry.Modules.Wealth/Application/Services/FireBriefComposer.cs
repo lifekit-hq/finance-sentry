@@ -52,7 +52,7 @@ public static class FireBriefComposer
                 "Some holdings have not synced recently, so net worth may lag.", appBaseUrl, AlertAppPath.AccountsList));
         }
 
-        return new FireBrief(BuildHeadline(projection), string.Join("\n", lines));
+        return new FireBrief(BuildHeadline(projection), AppUrl.Digest(lines));
     }
 
     private static string BuildHeadline(FireProjectionResponse projection) => projection.Status switch

@@ -370,4 +370,21 @@ public sealed class PerformanceBriefComposerTests
     public void Bullets_StayPlain_WhenNoAppBaseUrl()
         => PerformanceBriefComposer.Compose(OneWeekResult(), [DriftSignal("Equity", "OverBand", 8.3m)], null)
             .Body.Should().NotContain("http").And.NotContain("→");
+
+    [Fact]
+    public void Body_StaysWithinTheAlertColumn_WhenLinksOnAWorstCaseBriefWouldOverflowIt()
+    {
+        const string longHost = "https://finance-sentry.some-very-long-deployment-hostname.example.com/finance";
+        var signals = Enumerable.Range(1, 6)
+            .Select(i => DriftSignal($"Long-named asset class sleeve number {i}", i % 2 == 0 ? "OverBand" : "UnderBand", 6m + i))
+            .ToList();
+        var record = new TrackRecordDelta(IsTerminal: true, Count: 12, 58m, 3.2m, LowSample: true);
+
+        var unlinked = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record);
+        var linked = PerformanceBriefComposer.Compose(FourPeriodResult(), signals, record, longHost);
+
+        linked.Body.Length.Should().BeLessOrEqualTo(FinanceSentry.Core.Utils.AppUrl.MaxDigestLength);
+        linked.Body.Split('\n').Select(l => l.Split(" → ")[0]).Should().Equal(unlinked.Body.Split('\n'));
+        linked.Body.Should().Contain(" → " + longHost, "the links that still fit stay");
+    }
 }

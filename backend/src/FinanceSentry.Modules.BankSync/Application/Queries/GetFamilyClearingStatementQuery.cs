@@ -37,6 +37,10 @@ public record CounterpartyStatementCurrencySubtotal(string Currency, decimal Rec
 /// fields when no expectation applies.
 /// </param>
 /// <param name="RentShortfall">The positive gap when not confirmed; null otherwise.</param>
+/// <param name="LedgerSearch">
+/// The ledger search (<c>?q=</c>) that lands on this counterparty's transactions: its name, but only when one of its
+/// match rules spells that name, since the search reads transaction text and not counterparties. Null otherwise.
+/// </param>
 public record CounterpartyStatementLine(
     string Name,
     string FlowRole,
@@ -47,7 +51,8 @@ public record CounterpartyStatementLine(
     decimal? RentExpectedAmount = null,
     string? RentExpectedCurrency = null,
     bool? RentConfirmed = null,
-    decimal? RentShortfall = null);
+    decimal? RentShortfall = null,
+    string? LedgerSearch = null);
 
 /// <summary>
 /// One month's family clearing house: who sent/received what, gross, plus the month's
@@ -136,9 +141,18 @@ public class GetFamilyClearingStatementQueryHandler(
                 string? rentExpectedCurrency = null;
                 bool? rentConfirmed = null;
                 decimal? rentShortfall = null;
+                string? ledgerSearch = null;
 
-                if (expectedInflowByName.TryGetValue(f.CounterpartyName, out var counterparty)
-                    && counterparty.ExpectedMonthlyInflowAmount is { } expectedAmount
+                expectedInflowByName.TryGetValue(f.CounterpartyName, out var counterparty);
+
+                if (counterparty is not null
+                    && counterparty.Rules.Any(
+                        r => r.Pattern.Contains(f.CounterpartyName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    ledgerSearch = f.CounterpartyName;
+                }
+
+                if (counterparty?.ExpectedMonthlyInflowAmount is { } expectedAmount
                     && counterparty.ExpectedMonthlyInflowCurrency is { } expectedCurrency)
                 {
                     var nativeReceived = byCurrency
@@ -161,7 +175,8 @@ public class GetFamilyClearingStatementQueryHandler(
                     rentExpectedAmount,
                     rentExpectedCurrency,
                     rentConfirmed,
-                    rentShortfall);
+                    rentShortfall,
+                    ledgerSearch);
             })
             .ToList();
 

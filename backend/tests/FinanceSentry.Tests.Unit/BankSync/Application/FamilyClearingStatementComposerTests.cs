@@ -124,7 +124,7 @@ public sealed class FamilyClearingStatementComposerTests
     }
 
     [Fact]
-    public void TotalsBullet_LinksToTheAccountsList_AndCounterpartiesStayPlain()
+    public void TotalsBullet_LinksToTheAccountsList_AndCounterpartyWithoutSearchStaysPlain()
     {
         var statement = new FamilyClearingStatement(
             "2026-08", [Line("Mom", 500m, 200m, rentConfirmed: true)], SupportTotalUsd: 200m, ReceivedTotalUsd: 500m,
@@ -134,5 +134,20 @@ public sealed class FamilyClearingStatementComposerTests
 
         lines.Should().Contain(l => l.StartsWith("• Mom:") && !l.Contains("http"));
         lines.Should().Contain(l => l.StartsWith("• Total:") && l.EndsWith(" → https://app.example.com/accounts/list"));
+    }
+
+    [Fact]
+    public void CounterpartyBullet_LinksToTheLedgerSearch_WhenTheLineCarriesOne()
+    {
+        var mom = Line("Anna K", 500m, 200m) with { LedgerSearch = "Anna K" };
+        var statement = new FamilyClearingStatement(
+            "2026-08", [mom, Line("Dad", 0m, 300m)], SupportTotalUsd: 500m, ReceivedTotalUsd: 500m,
+            ExcludedRoutingLegs: 1);
+
+        var lines = FamilyClearingStatementComposer.Compose(statement, "https://app.example.com").Body.Split('\n');
+
+        lines.Should().Contain(l => l.StartsWith("• Anna K:") && l.EndsWith(" → https://app.example.com/transactions?q=Anna%20K"));
+        lines.Should().Contain(l => l.StartsWith("• Dad:") && !l.Contains("http"));
+        lines.Should().Contain(l => l.Contains("routing leg(s) excluded") && !l.Contains("http"));
     }
 }

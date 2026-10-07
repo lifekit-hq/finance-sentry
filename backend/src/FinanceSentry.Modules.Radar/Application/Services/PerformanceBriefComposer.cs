@@ -78,7 +78,7 @@ public static class PerformanceBriefComposer
             lines.Add(action);
         }
 
-        return new PerformanceBrief(headline, string.Join("\n", lines));
+        return new PerformanceBrief(headline, AppUrl.Digest(lines));
     }
 
     private static string BuildHeadline(BookPerformanceResult result)

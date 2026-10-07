@@ -42,8 +42,9 @@ public static class FamilyClearingStatementComposer
             var take = willTruncate ? Math.Max(0, budget - 1) : budget;
 
             var shown = statement.Counterparties.Take(take).ToList();
-            // A counterparty has no page of its own, so its bullet stays unlinked.
-            lines.AddRange(shown.Select(c => AppUrl.Bullet(BuildCounterpartyLine(c), appBaseUrl, null)));
+            // A counterparty has no page of its own: its bullet opens the ledger search for it, when there is one.
+            lines.AddRange(shown.Select(c => AppUrl.Bullet(
+                BuildCounterpartyLine(c), appBaseUrl, AlertAppPath.ForLedgerSearch(c.LedgerSearch))));
 
             var remaining = statement.Counterparties.Count - shown.Count;
             if (remaining > 0)
@@ -63,7 +64,7 @@ public static class FamilyClearingStatementComposer
                 $"{statement.ExcludedRoutingLegs} routing leg(s) excluded — not missing money.", appBaseUrl, null));
         }
 
-        return new FamilyStatementBrief(headline, string.Join("\n", lines));
+        return new FamilyStatementBrief(headline, AppUrl.Digest(lines));
     }
 
     private static string BuildHeadline(FamilyClearingStatement statement)
