@@ -161,3 +161,5 @@ From the cross-artifact analysis of `specs/001-bank-account-sync/`:
 - `tasks.md`: Add IBankProvider interface task (C2), Phase 4/5 contract test tasks (C3), migration task for `archived_reason` column (H4), re-auth frontend flow task (H5)
 
 ---
+
+**Palette entities (#825 pick 7, navigation A) — DONE (frontend only).** The command palette also lists held names (`/assets/:symbol`, venue cash excluded), watchlist names not already held (`GET research/watchlist`) and accounts (`/transactions?account=<id>`, the ledger's existing account filter) next to the static pages. `PaletteEntitiesStore` (`core/shell/store/`, provided on `AppShellComponent`) loads them once when the shell mounts from `PositionsService`, `BankSyncService.getAccounts` and the watchlist endpoint (a failed read yields no items); `PaletteEntityUtils.items` builds them into the `Holdings` / `Watchlist` / `Accounts` groups the palette's label/group filter searches. Budgets are not items. Reference: the #825 joint-triage report, pick 7.
