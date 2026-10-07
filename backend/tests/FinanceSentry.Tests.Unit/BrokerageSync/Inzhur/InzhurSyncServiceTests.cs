@@ -154,4 +154,25 @@ public class InzhurSyncServiceTests
         (await Service().SyncAsync(_userId)).Should().Be(InzhurSyncOutcome.Skipped);
         _cabinet.Requests.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task A_cabinet_answer_without_assets_keeps_the_stored_holdings_and_records_an_error()
+    {
+        var credential = ActiveCredential();
+        var held = new BrokerageHolding(_userId, "Fund A", "REIT", 1m, 1m, "inzhur");
+        _persisted = [held];
+        _cabinet
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new { accessToken = "fresh-token" }))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new { }))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.BrokerAccount(0m, 0m)));
+
+        var act = () => Service().SyncAsync(_userId);
+
+        (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.Unexpected);
+        _upserted.Should().BeEmpty();
+        _removed.Should().BeEmpty();
+        credential.LastSyncAt.Should().BeNull();
+        credential.Status.Should().Be(InzhurConnectionStatus.Active);
+        credential.LastSyncError.Should().NotBeNullOrEmpty();
+    }
 }

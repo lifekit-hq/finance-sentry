@@ -70,7 +70,15 @@ public sealed class InzhurApiClient(
     {
         var assets = await GetAsync<InzhurUserAssetsResponse>("api/v1/user-assets", session, ct);
         var account = await GetAsync<InzhurBrokerAccount>("api/v1/users/broker-account", session, ct);
-        return new InzhurPortfolio(assets?.Assets ?? [], account);
+
+        // A body without the portfolio containers is a changed cabinet, not an empty portfolio: failing here keeps
+        // the stored holdings, where reading it as empty would reconcile every Inzhur row away.
+        if (assets?.Assets is null)
+            throw new InzhurApiException(InzhurFailureKind.Unexpected, "Inzhur user-assets returned no assets list.");
+        if (account is null || (account.AvailableBalanceUah is null && account.BlockedBalanceUah is null))
+            throw new InzhurApiException(InzhurFailureKind.Unexpected, "Inzhur broker-account returned no balances.");
+
+        return new InzhurPortfolio(assets.Assets, account);
     }
 
     private async Task<T?> GetAsync<T>(string path, InzhurSession session, CancellationToken ct)

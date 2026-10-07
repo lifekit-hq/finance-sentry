@@ -85,4 +85,23 @@ public class InzhurApiClientTests
 
         (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.Unexpected);
     }
+
+    [Theory]
+    [InlineData("{}", "{\"availableBalanceUAH\":1}")]
+    [InlineData("{\"assets\":null}", "{\"availableBalanceUAH\":1}")]
+    [InlineData("{\"assets\":[]}", "null")]
+    [InlineData("{\"assets\":[]}", "{}")]
+    public async Task A_portfolio_without_its_containers_is_unexpected_not_empty(string assetsBody, string accountBody)
+    {
+        _handler
+            .Then(Raw(assetsBody))
+            .Then(Raw(accountBody));
+
+        var act = () => Client().GetPortfolioAsync(InzhurFakes.Session());
+
+        (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.Unexpected);
+    }
+
+    private static HttpResponseMessage Raw(string json)
+        => new(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
 }
