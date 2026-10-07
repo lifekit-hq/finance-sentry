@@ -115,7 +115,7 @@ describe('DashboardComponent range presets', () => {
     fixture.componentInstance.onCategoryClick({category: 'groceries'} as never);
 
     expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
-      queryParams: {category: 'groceries', from: '2026-08-01', to: '2026-08-12'},
+      queryParams: {type: 'debit', category: 'groceries', from: '2026-08-01', to: '2026-08-12'},
     });
   });
 
