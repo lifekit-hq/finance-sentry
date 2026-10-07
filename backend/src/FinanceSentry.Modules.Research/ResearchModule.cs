@@ -2,6 +2,8 @@ namespace FinanceSentry.Modules.Research;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Infrastructure.Jobs;
@@ -153,6 +155,38 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 "*/15 * * * *");
         }
+    }
+
+    /// <summary>
+    /// The fundamentals provider chain (#837): every <see cref="IFundamentalsSource"/> plus the
+    /// <see cref="IFundamentalsService"/> readers use, ordered by <c>Fundamentals:SourceOrder</c>.
+    /// Needs <see cref="ISecEdgarService"/> and a <see cref="TimeProvider"/> registered. A new source is
+    /// one more <see cref="IFundamentalsSource"/> registration here and a name in the order.
+    /// </summary>
+    public static IServiceCollection AddFundamentalsChain(this IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<FundamentalsOptions>(config.GetSection(FundamentalsOptions.SectionName));
+
+        // Key-less, no crumb or cookie for the timeseries endpoint; the plain app UA is accepted.
+        services.AddHttpClient(YahooFundamentalsSource.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(12);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.All,
+        });
+
+        // Singletons: each source keeps its own per-ticker cache across requests and jobs.
+        services.AddSingleton<IFundamentalsSource>(sp => new SecEdgarFundamentalsSource(
+            sp.GetRequiredService<ISecEdgarService>(), FundamentalFact.UsGaapTaxonomy));
+        services.AddSingleton<IFundamentalsSource>(sp => new SecEdgarFundamentalsSource(
+            sp.GetRequiredService<ISecEdgarService>(), FundamentalFact.IfrsTaxonomy));
+        services.AddSingleton<IFundamentalsSource, YahooFundamentalsSource>();
+        services.AddSingleton<IFundamentalsService, FundamentalsChainService>();
+        return services;
     }
 
     public static IServiceCollection AddResearchModule(
@@ -308,6 +342,7 @@ public static class ResearchModule
 
         // Singleton: caches the ticker->CIK map + per-ticker EDGAR results across requests.
         services.AddSingleton<ISecEdgarService, SecEdgarService>();
+        services.AddFundamentalsChain(config);
 
         // Analyst-actions sources. MarketBeat is the sole per-action source since the Yahoo
         // quoteSummary scraper was retired (feature 037, US2); the Enabled flag keeps its demotion a

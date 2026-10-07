@@ -3,14 +3,17 @@ namespace FinanceSentry.Modules.Research.Application.Services;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using Microsoft.Extensions.Logging;
 
 // Live SEC EDGAR access (data.sec.gov) — filings + XBRL fundamentals. Free and key-less, but SEC
 // policy requires a descriptive User-Agent (configured on the named client) and a 10 req/s ceiling,
 // which the concurrency cap + caches stay well under. Registered as a singleton so the ticker->CIK
-// map and per-ticker results are cached across requests. Nothing is persisted.
+// map and per-ticker results are cached across requests. Nothing is persisted. Fundamentals reach
+// readers through the provider chain (SecEdgarFundamentalsSource, one per taxonomy), never directly.
 public sealed class SecEdgarService(
     IHttpClientFactory httpFactory,
     ILogger<SecEdgarService> logger) : ISecEdgarService
@@ -20,6 +23,9 @@ public sealed class SecEdgarService(
     private const string TickerMapUrl = "https://www.sec.gov/files/company_tickers.json";
 
     private static readonly string[] DefaultFormTypes = ["10-K", "10-Q", "8-K"];
+
+    // Registered-fund filings: shareholder reports, portfolio holdings, prospectus updates, census.
+    private static readonly string[] FundFormPrefixes = ["N-CSR", "N-PORT", "NPORT", "N-CEN", "485BPOS", "497", "N-1A", "N-2"];
 
     private static readonly TimeSpan TickerMapTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan ResultTtl = TimeSpan.FromHours(12);
@@ -80,34 +86,86 @@ public sealed class SecEdgarService(
             .ToList();
     }
 
-    public async Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
-        string ticker, int maxPerConcept, CancellationToken ct = default)
+    public async Task<FundamentalsSourceResult> GetTaxonomyFundamentalsAsync(
+        string ticker, string taxonomy, CancellationToken ct = default)
     {
         var upper = ticker.Trim().ToUpperInvariant();
-        var perConcept = Math.Clamp(maxPerConcept, 1, 20);
-
-        if (fundamentalsCache.TryGetValue(upper, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < ResultTtl)
+        var concepts = taxonomy switch
         {
-            return Trim(hit.Facts, perConcept);
+            FundamentalFact.UsGaapTaxonomy => CoreConcepts,
+            FundamentalFact.IfrsTaxonomy => IfrsConcepts,
+            _ => throw new ArgumentOutOfRangeException(nameof(taxonomy), taxonomy, "Unsupported XBRL taxonomy."),
+        };
+
+        var cacheKey = $"{upper}|{taxonomy}";
+        if (fundamentalsCache.TryGetValue(cacheKey, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < ResultTtl)
+        {
+            return hit.Result;
         }
 
-        var (cik, _) = await ResolveCikAsync(upper, ct);
+        var (cik, mapFetchFailed) = await ResolveCikAsync(upper, ct);
         if (cik is null)
         {
-            return [];
+            return mapFetchFailed
+                ? FundamentalsSourceResult.Failed("EDGAR ticker->CIK map unavailable")
+                : FundamentalsSourceResult.NoData(
+                    "not in the SEC ticker map", FundamentalsIssuerType.NotSecRegistrant);
         }
 
-        var facts = await FetchTaxonomyAsync(upper, cik, FundamentalFact.UsGaapTaxonomy, CoreConcepts, ct);
-        if (facts.Count == 0)
+        var fetch = await FetchTaxonomyAsync(upper, cik, taxonomy, concepts, ct);
+
+        // A fetch that errored on every tag is an outage, not "this filer has no facts": report it as
+        // a failure and cache nothing, so the next call retries and the chain does not fall through to
+        // another taxonomy or provider on a bad night.
+        if (fetch.Facts.Count == 0 && fetch.Failures > 0)
         {
-            facts = await FetchTaxonomyAsync(upper, cik, FundamentalFact.IfrsTaxonomy, IfrsConcepts, ct);
+            return FundamentalsSourceResult.Failed($"EDGAR {taxonomy} concept fetches failed for {upper}");
         }
 
-        fundamentalsCache[upper] = new CachedFundamentals(DateTimeOffset.UtcNow, facts);
-        return Trim(facts, perConcept);
+        var issuerType = IssuerTypeFromForms(fetch.Facts.Select(f => f.Form))
+            ?? IssuerTypeFromForms((await GetAllFilingsAsync(upper, surfaceProviderFailure: false, ct)).Select(f => f.Form));
+
+        var result = fetch.Facts.Count > 0
+            ? FundamentalsSourceResult.WithFacts(fetch.Facts, issuerType)
+            : FundamentalsSourceResult.NoData($"no {taxonomy} facts filed", issuerType);
+
+        // Partial failures (some tags errored) still return what was read, but are not cached.
+        if (fetch.Failures == 0)
+        {
+            fundamentalsCache[cacheKey] = new CachedFundamentals(DateTimeOffset.UtcNow, result);
+        }
+
+        return result;
     }
 
-    private async Task<IReadOnlyList<FundamentalFact>> FetchTaxonomyAsync(
+    // The issuer kind told by what it files, newest form first (the submissions feed is newest-first;
+    // facts are classified by any periodic form among them). Null when nothing tells.
+    private static string? IssuerTypeFromForms(IEnumerable<string> forms)
+    {
+        foreach (var form in forms)
+        {
+            var upper = form.ToUpperInvariant();
+            if (upper.StartsWith("10-K", StringComparison.Ordinal) || upper.StartsWith("10-Q", StringComparison.Ordinal))
+            {
+                return FundamentalsIssuerType.DomesticFiler;
+            }
+
+            if (upper.StartsWith("20-F", StringComparison.Ordinal) || upper.StartsWith("40-F", StringComparison.Ordinal)
+                || upper.StartsWith("6-K", StringComparison.Ordinal))
+            {
+                return FundamentalsIssuerType.ForeignPrivateIssuer;
+            }
+
+            if (FundFormPrefixes.Any(p => upper.StartsWith(p, StringComparison.Ordinal)))
+            {
+                return FundamentalsIssuerType.InvestmentFund;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<TaxonomyFetch> FetchTaxonomyAsync(
         string ticker, string cik, string taxonomy, (string Concept, string[] Tags)[] concepts, CancellationToken ct)
     {
         using var throttle = new SemaphoreSlim(MaxConcurrentConceptFetches);
@@ -124,7 +182,8 @@ public sealed class SecEdgarService(
             }
         });
 
-        return (await Task.WhenAll(tasks)).SelectMany(f => f).ToList();
+        var fetched = await Task.WhenAll(tasks);
+        return new TaxonomyFetch(fetched.SelectMany(f => f.Facts).ToList(), fetched.Sum(f => f.Failures));
     }
 
     private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(
@@ -229,7 +288,7 @@ public sealed class SecEdgarService(
         }
     }
 
-    private async Task<IReadOnlyList<FundamentalFact>> FetchConceptAsync(
+    private async Task<ConceptFetch> FetchConceptAsync(
         string ticker, string cik, string taxonomy, string concept, string[] tags, CancellationToken ct)
     {
         var client = httpFactory.CreateClient(HttpClientName);
@@ -238,6 +297,7 @@ public sealed class SecEdgarService(
         // single tag can hold only an old slice. Merge datapoints from every candidate tag, then
         // collapse duplicate periods — this gives continuous coverage regardless of which tag is current.
         var merged = new List<FundamentalFact>();
+        var failures = 0;
         foreach (var tag in tags)
         {
             var url = $"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/{taxonomy}/{tag}.json";
@@ -253,25 +313,33 @@ public sealed class SecEdgarService(
                 await using var stream = await response.Content.ReadAsStreamAsync(ct);
                 using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-                merged.AddRange(ParseConcept(ticker, taxonomy, concept, doc.RootElement));
+                merged.AddRange(ParseConcept(ticker, cik, taxonomy, concept, url, doc.RootElement, DateTimeOffset.UtcNow));
             }
-            catch (Exception ex)
+            // An HttpClient timeout is a TaskCanceledException too: only the caller's own cancellation propagates.
+            catch (Exception ex) when (!ct.IsCancellationRequested)
             {
+                failures++;
                 logger.LogWarning(ex, "EDGAR concept {Tag} fetch failed for {Ticker}", tag, ticker);
             }
         }
 
         // Collapse restatements + cross-tag overlap: keep one row per (period, fiscal period), newest first.
-        return merged
+        var facts = merged
             .GroupBy(f => (f.PeriodEnd, f.FiscalPeriod))
             .Select(g => g.Last())
             .OrderByDescending(f => f.PeriodEnd)
             .ToList();
+        return new ConceptFetch(facts, failures);
     }
 
     private static IReadOnlyList<FundamentalFact> ParseConcept(
-        string ticker, string taxonomy, string concept, JsonElement root)
+        string ticker, string cik, string taxonomy, string concept, string conceptUrl, JsonElement root,
+        DateTimeOffset ingestedAt)
     {
+        var provider = taxonomy == FundamentalFact.IfrsTaxonomy
+            ? FundamentalsSourceNames.SecEdgarIfrs
+            : FundamentalsSourceNames.SecEdgarUsGaap;
+        var cikNoPad = cik.TrimStart('0');
         var label = root.TryGetProperty("label", out var labelProp) ? labelProp.GetString() ?? concept : concept;
 
         if (!root.TryGetProperty("units", out var units) || units.ValueKind != JsonValueKind.Object)
@@ -302,6 +370,13 @@ public sealed class SecEdgarService(
                 continue;
             }
 
+            // The filing the figure was read from: its EDGAR index page (from the datapoint's accession
+            // number), or the concept endpoint itself when EDGAR gives no accession.
+            var accession = point.TryGetProperty("accn", out var accn) ? accn.GetString() : null;
+            var documentUrl = string.IsNullOrEmpty(accession)
+                ? conceptUrl
+                : $"https://www.sec.gov/Archives/edgar/data/{cikNoPad}/{accession.Replace("-", string.Empty)}/{accession}-index.htm";
+
             facts.Add(new FundamentalFact(
                 ticker,
                 concept,
@@ -312,7 +387,8 @@ public sealed class SecEdgarService(
                 point.TryGetProperty("fp", out var fp) ? fp.GetString() : null,
                 point.TryGetProperty("fy", out var fy) && fy.ValueKind == JsonValueKind.Number ? fy.GetInt32() : null,
                 form,
-                taxonomy));
+                taxonomy,
+                new SourceProvenance(provider, documentUrl, ingestedAt)));
         }
 
         return facts;
@@ -327,14 +403,6 @@ public sealed class SecEdgarService(
             || form.StartsWith("10-Q", StringComparison.OrdinalIgnoreCase)
             || form.StartsWith("20-F", StringComparison.OrdinalIgnoreCase)
             || form.StartsWith("40-F", StringComparison.OrdinalIgnoreCase);
-
-    private static IReadOnlyList<FundamentalFact> Trim(IReadOnlyList<FundamentalFact> facts, int perConcept)
-        => facts
-            .GroupBy(f => f.Concept)
-            .SelectMany(g => g.OrderByDescending(f => f.PeriodEnd).Take(perConcept))
-            .OrderBy(f => f.Concept, StringComparer.Ordinal)
-            .ThenByDescending(f => f.PeriodEnd)
-            .ToList();
 
     // MapFetchFailed is true only when the ticker->CIK map was never fetched successfully (no
     // cached copy to fall back on) — a provider outage, distinct from the ticker legitimately
@@ -410,5 +478,9 @@ public sealed class SecEdgarService(
 
     private readonly record struct CachedFilings(DateTimeOffset FetchedAt, IReadOnlyList<EdgarFiling> Filings);
 
-    private readonly record struct CachedFundamentals(DateTimeOffset FetchedAt, IReadOnlyList<FundamentalFact> Facts);
+    private readonly record struct CachedFundamentals(DateTimeOffset FetchedAt, FundamentalsSourceResult Result);
+
+    private readonly record struct ConceptFetch(IReadOnlyList<FundamentalFact> Facts, int Failures);
+
+    private readonly record struct TaxonomyFetch(IReadOnlyList<FundamentalFact> Facts, int Failures);
 }

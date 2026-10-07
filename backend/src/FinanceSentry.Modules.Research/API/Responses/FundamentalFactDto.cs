@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Research.API.Responses;
 
+using FinanceSentry.Modules.Research.Domain;
+
 public record FundamentalFactDto(
     string Ticker,
     string Concept,
@@ -10,4 +12,5 @@ public record FundamentalFactDto(
     string? FiscalPeriod,
     int? FiscalYear,
     string Form,
-    string Taxonomy);
+    string Taxonomy,
+    SourceProvenance? SourceProvenance);

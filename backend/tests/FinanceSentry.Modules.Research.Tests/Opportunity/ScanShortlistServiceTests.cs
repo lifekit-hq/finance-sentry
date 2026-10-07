@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Tests.Opportunity;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
@@ -187,14 +188,15 @@ public sealed class ScanShortlistServiceTests
                     ? throw new InvalidOperationException("feed read failed")
                     : (IReadOnlyList<AnalystAction>)this.actions);
 
-            var edgar = new Mock<ISecEdgarService>();
+            var edgar = new Mock<IFundamentalsService>();
             edgar.Setup(e => e.GetFundamentalsAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string ticker, int _, CancellationToken _) =>
                 {
                     this.GradedTickers.Add(ticker);
                     return this.ungradable.Contains(ticker)
                         ? throw new HttpRequestException($"EDGAR has no answer for {ticker}")
-                        : Filings(ticker, this.revenueGrowth.TryGetValue(ticker, out var growth) ? growth : 0.05m);
+                        : FakeFundamentalsService.ResultFor(
+                            ticker, Filings(ticker, this.revenueGrowth.TryGetValue(ticker, out var growth) ? growth : 0.05m));
                 });
 
             this.Service = new ScanShortlistService(

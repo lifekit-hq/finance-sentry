@@ -1,17 +1,18 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// EDGAR fundamentals grade per ticker, the way every scan stage needs it: a ticker EDGAR cannot
-/// answer for — crypto, an ETF, a delisted filer, an upstream failure — grades null and keeps its
+/// Fundamentals grade per ticker, the way every scan stage needs it: a ticker the fundamentals chain
+/// cannot answer for — crypto, an ETF, a delisted filer, an upstream failure — grades null and keeps its
 /// momentum-only standing, and one bad ticker never aborts the run (019 FR-013).
 /// </summary>
 internal static class FundamentalsGrading
 {
     public static async Task<IReadOnlyDictionary<string, int?>> GradeAsync(
-        ISecEdgarService secEdgar,
+        IFundamentalsService fundamentals,
         ILogger logger,
         IEnumerable<string> tickers,
         CancellationToken ct)
@@ -26,7 +27,7 @@ internal static class FundamentalsGrading
 
             try
             {
-                var facts = await secEdgar.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct);
+                var facts = (await fundamentals.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct)).Facts;
                 grades[ticker] = FundamentalsScorer.Score(facts).Score;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

@@ -12,6 +12,7 @@ using FinanceSentry.Modules.Research.Domain.Scoring;
 public static class ThesisBreakEvaluator
 {
     private const string FiscalYearPeriod = FundamentalMath.FiscalYearPeriod;
+    private const string ThresholdCurrency = "USD";
 
     private static readonly IReadOnlyDictionary<string, string> RawConceptByMetric = FundamentalMath.RawConceptByMetric;
 
@@ -79,6 +80,14 @@ public static class ThesisBreakEvaluator
         }
 
         var window = periods.Take(trigger.ConsecutivePeriods).ToList();
+        var foreignCurrency = window
+            .Select(f => CurrencyOf(f.Unit))
+            .FirstOrDefault(c => !string.Equals(c, ThresholdCurrency, StringComparison.OrdinalIgnoreCase));
+        if (foreignCurrency is not null)
+        {
+            return new TriggerVerdict.NonEvaluable(NonEvaluableReason.CurrencyMismatch(foreignCurrency));
+        }
+
         var values = window.Select(f => f.Value).ToArray();
         var labels = window.Select(Label).ToArray();
 
@@ -311,4 +320,7 @@ public static class ThesisBreakEvaluator
         => FundamentalMath.SelectPeriods(facts, concept, periodType);
 
     private static string Label(FundamentalFact fact) => FundamentalMath.Label(fact);
+
+    // EPS units carry a per-share suffix ("USD/shares", "CNY/shares"): the currency is the part before it.
+    private static string CurrencyOf(string unit) => unit.Split('/')[0].Trim();
 }

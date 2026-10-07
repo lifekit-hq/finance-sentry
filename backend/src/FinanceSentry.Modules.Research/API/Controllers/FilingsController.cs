@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 [Route("research")]
 public class FilingsController(
     IQueryHandler<GetRecentFilingsQuery, IReadOnlyList<EdgarFilingDto>> filingsHandler,
-    IQueryHandler<GetFundamentalsQuery, IReadOnlyList<FundamentalFactDto>> fundamentalsHandler) : ControllerBase
+    IQueryHandler<GetFundamentalsQuery, FundamentalsDto> fundamentalsHandler) : ControllerBase
 {
     private const int DefaultFilingLimit = 10;
     private const int DefaultMaxPerConcept = 5;

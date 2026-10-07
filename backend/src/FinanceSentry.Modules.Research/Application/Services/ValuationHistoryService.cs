@@ -1,16 +1,17 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Builds a trailing-P/E average from EDGAR diluted-EPS quarters × Yahoo daily closes (feature 030,
+/// Builds a trailing-P/E average from reported diluted-EPS quarters (the fundamentals chain) × Yahoo daily closes (feature 030,
 /// R3). At each quarter-end we roll the trailing four quarters into a TTM EPS and price it against the
 /// close on/just before that date; the average of those points is the "5-year" trailing P/E, over
 /// whatever window the filings actually cover. Deterministic and source-grounded — no fabrication.
 /// </summary>
 public sealed class ValuationHistoryService(
-    ISecEdgarService edgar,
+    IFundamentalsService fundamentals,
     IMarketDataService marketData,
     ILogger<ValuationHistoryService> logger) : IValuationHistoryService
 {
@@ -25,7 +26,7 @@ public sealed class ValuationHistoryService(
     {
         var upper = ticker.Trim().ToUpperInvariant();
 
-        var facts = await edgar.GetFundamentalsAsync(upper, MaxQuartersPerConcept, ct);
+        var facts = (await fundamentals.GetFundamentalsAsync(upper, MaxQuartersPerConcept, ct)).Facts;
         var quarters = ExtractQuarterlyEps(facts);
         if (quarters.Count < TtmQuarters)
         {

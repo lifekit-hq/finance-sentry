@@ -25,6 +25,57 @@ public class ThesisBreakEvaluatorNonEvaluableTests
     }
 
     [Fact]
+    public void NonUsdRevenue_AgainstAnAbsoluteThreshold_IsNonEvaluableCurrencyMismatch()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("BABA", "Revenue", 236_000_000_000m, 2026, "3M", new DateOnly(2026, 6, 30)) with { Unit = "CNY" },
+            Fact("BABA", "Revenue", 230_000_000_000m, 2026, "3M", new DateOnly(2026, 3, 31)) with { Unit = "CNY" },
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.Revenue, "lessThan", 25_000_000_000m, ConsecutivePeriods: 2);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, facts, []);
+
+        var nonEvaluable = verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>().Subject;
+        nonEvaluable.Reason.Should().Be("currency_mismatch:CNY");
+    }
+
+    [Fact]
+    public void NonUsdEps_AgainstAnAbsoluteThreshold_IsNonEvaluableCurrencyMismatch()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("BABA", "DilutedEPS", 12m, 2026, "3M", new DateOnly(2026, 6, 30)) with { Unit = "CNY/shares" },
+        };
+
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.DilutedEps, "lessThan", 1m);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, facts, []);
+
+        verdict.Should().BeOfType<TriggerVerdict.NonEvaluable>()
+            .Which.Reason.Should().Be(NonEvaluableReason.CurrencyMismatch("CNY"));
+    }
+
+    [Fact]
+    public void UsdRevenue_AgainstAnAbsoluteThreshold_StillEvaluates()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("GRAB", "Revenue", 20_000_000_000m, 2026, "3M", new DateOnly(2026, 6, 30)),
+            Fact("GRAB", "Revenue", 21_000_000_000m, 2026, "3M", new DateOnly(2026, 3, 31)),
+        };
+
+        var trigger = new ThesisInvalidationTrigger(
+            ThesisMetric.Revenue, "lessThan", 25_000_000_000m, ConsecutivePeriods: 2);
+
+        var verdict = ThesisBreakEvaluator.Evaluate(trigger, CreatedAt, facts, []);
+
+        verdict.Should().BeOfType<TriggerVerdict.Breached>();
+    }
+
+    [Fact]
     public void InsufficientPeriods_IsNonEvaluableInsufficientPeriods()
     {
         var facts = new List<FundamentalFact>

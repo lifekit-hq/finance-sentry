@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 
 public interface ISecEdgarService
@@ -17,11 +18,13 @@ public interface ISecEdgarService
         bool surfaceProviderFailure = false);
 
     // Key reported fundamentals (revenue, gross profit, net income, diluted EPS, operating income,
-    // shareholders' equity) from EDGAR XBRL, newest first, up to maxPerConcept datapoints each.
-    // us-gaap first; a filer with no us-gaap facts (an IFRS foreign private issuer filing 20-F/40-F)
-    // is read from ifrs-full instead. Each fact names its taxonomy and form.
-    Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+    // shareholders' equity) from EDGAR XBRL in ONE taxonomy — us-gaap, or ifrs-full for an IFRS
+    // foreign private issuer filing 20-F/40-F — every periodic-statement datapoint, newest first, each
+    // naming its form, taxonomy and provenance (the filing's EDGAR index). A ticker outside the SEC
+    // map is NoData (not_sec_registrant); a fetch that failed on every tag is Failed, never NoData.
+    // Read through the fundamentals chain (IFundamentalsService), which decides between taxonomies.
+    Task<FundamentalsSourceResult> GetTaxonomyFundamentalsAsync(
         string ticker,
-        int maxPerConcept,
+        string taxonomy,
         CancellationToken ct = default);
 }

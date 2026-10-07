@@ -23,6 +23,8 @@
     <Content Include="Companion\Fixtures\*.html" CopyToOutputDirectory="PreserveNewest" />
     <!-- Recorded EDGAR companyconcept responses for the fundamentals tests (issue #837). -->
     <Content Include="Unit\Fixtures\Edgar\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Recorded Yahoo fundamentals-timeseries responses for the provider-chain tests (issue #837). -->
+    <Content Include="Unit\Fixtures\Yahoo\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

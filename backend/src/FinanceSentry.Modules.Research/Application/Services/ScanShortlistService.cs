@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.Scoring;
@@ -26,7 +27,7 @@ public sealed class ScanShortlistService(
     IIndexConstituentSource constituents,
     IMarketDataService marketData,
     IAnalystActionRepository analystActions,
-    ISecEdgarService secEdgar,
+    IFundamentalsService fundamentals,
     IOptions<OpportunityOptions> options,
     ILogger<ScanShortlistService> logger) : IScanShortlistSource
 {
@@ -58,7 +59,7 @@ public sealed class ScanShortlistService(
             return [];
         }
 
-        var graded = await FundamentalsGrading.GradeAsync(secEdgar, logger, slate.Select(e => e.Ticker), ct);
+        var graded = await FundamentalsGrading.GradeAsync(fundamentals, logger, slate.Select(e => e.Ticker), ct);
         var shortlist = ScanShortlistRules.Compose(slate, graded, _options);
 
         logger.LogInformation(

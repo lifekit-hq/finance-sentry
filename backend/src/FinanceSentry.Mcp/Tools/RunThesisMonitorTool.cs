@@ -18,8 +18,12 @@ public sealed class RunThesisMonitorTool(
     [Description(
         "Re-evaluates the caller's active theses now (same deterministic code path as the scheduled job; "
         + "persists break-state changes and raises/resolves alerts as a side effect) AND returns the "
-        + "resulting breaks in the same call. For a read-only view that does NOT re-evaluate or fire "
-        + "alerts, use list_thesis_breaks instead.")]
+        + "resulting breaks in the same call. summary.unmonitorable lists every thesis with a trigger the "
+        + "run could not evaluate: status UNMONITORABLE (no trigger evaluable) or PARTIALLY_MONITORABLE, and "
+        + "per blind trigger its metric, periodType, subject ticker, reason (e.g. no_fundamentals, "
+        + "insufficient_periods) and, for fundamentals metrics, the data coverage behind it. Such a thesis is "
+        + "NOT intact - it is unwatched on those triggers; say so. For a read-only view that does NOT "
+        + "re-evaluate or fire alerts, use list_thesis_breaks instead.")]
     public async Task<ThesisMonitorResult?> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {

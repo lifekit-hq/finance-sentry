@@ -17,7 +17,7 @@ public sealed class ValuationHistoryServiceTests
 
     private static ValuationHistoryService Build(
         IReadOnlyList<FundamentalFact> facts, IReadOnlyList<DailyClose> closes) => new(
-        new FakeSecEdgarService(facts),
+        new FakeFundamentalsService(facts),
         new FakeMarketDataService(closes),
         NullLogger<ValuationHistoryService>.Instance);
 

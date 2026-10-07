@@ -118,18 +118,6 @@ internal sealed class FakeBrokerageReader(IReadOnlyList<BrokerageHoldingSummary>
         => Task.FromResult(holdings ?? []);
 }
 
-internal sealed class FakeSecEdgarService(IReadOnlyList<FundamentalFact>? facts = null) : ISecEdgarService
-{
-    public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
-            bool surfaceProviderFailure = false)
-        => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
-
-    public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
-        string ticker, int maxPerConcept, CancellationToken ct = default)
-        => Task.FromResult(facts ?? []);
-}
-
 internal sealed class FakeMarketDataService(IReadOnlyList<DailyClose>? closes = null) : IMarketDataService
 {
     public Task<IReadOnlyDictionary<string, QuoteCacheEntry>> GetQuotesAsync(
