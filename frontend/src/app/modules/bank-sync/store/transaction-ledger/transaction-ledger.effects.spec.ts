@@ -347,6 +347,59 @@ describe('transactionLedgerEffects', () => {
     });
   });
 
+  describe('retry', () => {
+    it('re-fetches a failed next page at the same offset and appends it', () => {
+      const store = buildStore();
+      store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
+      const service = buildService();
+      const PAGE2 = {
+        items: [TX_ITEM],
+        totalCount: 99,
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+        hasMore: true,
+      };
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of(PAGE2));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.loadMore();
+        effects.retry();
+      });
+
+      expect(store.setError).toHaveBeenCalledTimes(1);
+      expect(service.getAllTransactions).toHaveBeenLastCalledWith({
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.appendTransactions).toHaveBeenCalledWith([TX_ITEM], 99, true);
+      expect(store.setTransactions).not.toHaveBeenCalled();
+      expect(store.offset()).toBe(PAGE_SIZE);
+    });
+
+    it('re-fetches a failed first page and replaces the rows', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.load();
+        effects.retry();
+      });
+
+      expect(service.getAllTransactions).toHaveBeenLastCalledWith({offset: 0, limit: PAGE_SIZE});
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.appendTransactions).not.toHaveBeenCalled();
+    });
+  });
+
   describe('applyAccount', () => {
     it('stores a changed account and reloads from the first page', () => {
       const store = buildStore();

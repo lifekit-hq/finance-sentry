@@ -81,18 +81,17 @@ export function transactionLedgerEffects(store: EffectsStore) {
         }
         store.setLoading(page !== 'first');
       }),
-      switchMap(page =>
-        bankSyncService
-          .getAllTransactions(pageParams(store, page === 'next' ? store.offset() : 0))
-          .pipe(
-            tap(res =>
-              page === 'next'
-                ? store.appendTransactions(res.items, res.totalCount, res.hasMore)
-                : store.setTransactions(res.items, res.totalCount, res.hasMore)
-            ),
-            StoreErrorUtils.catchAndSetError(store)
-          )
-      )
+      switchMap(page => {
+        const offset = page === 'first' ? 0 : store.offset();
+        return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
+          tap(res =>
+            offset > 0
+              ? store.appendTransactions(res.items, res.totalCount, res.hasMore)
+              : store.setTransactions(res.items, res.totalCount, res.hasMore)
+          ),
+          StoreErrorUtils.catchAndSetError(store)
+        );
+      })
     )
   );
 
