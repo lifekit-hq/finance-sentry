@@ -545,7 +545,7 @@ window (`MonthWindow.StartOfMonthsAgo`), but **flat — not month-bucketed**. Di
 endpoint takes an optional `windowMonths` (calendar months, in-progress one included, clamped
 to `1..months+1`) that moves the window start to the first of that month, so the donut covers
 exactly the range the tiles total (§7) while the charts still get their `months` of closed
-history. Family-support outflow is narrowed to the same start month.
+history (the day-level presets also pass `windowFrom`, which cuts the donut at that day — §5). Family-support outflow is narrowed to the same start month.
 
 Unlike the bar charts (§7) this **includes the in-progress month**. A composition is not a
 period-over-period comparison, so a partial month does not distort it the way it distorts
