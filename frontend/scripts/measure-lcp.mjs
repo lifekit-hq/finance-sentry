@@ -8,7 +8,9 @@ import {chromium} from '@playwright/test';
 const GOOD_LCP_MS = 2500;
 const LCP_REGRESSION_BUDGET_MS = 4500;
 const RUNS = 5;
-const MEASURED_CONTENT = 'form';
+// The card heading: rendered whatever auth/methods answers (the gate runs without a backend,
+// where /login shows the methods error and Retry, not the password form).
+const MEASURED_CONTENT = 'h1';
 const LCP_SETTLE_MS = 1000;
 const SETTLE_POLL_MS = 100;
 const VIEWPORT = {width: 390, height: 844};
