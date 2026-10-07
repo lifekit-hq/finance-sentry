@@ -1,10 +1,13 @@
 import {BreakpointObserver, type BreakpointState} from '@angular/cdk/layout';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, provideRouter} from '@angular/router';
+import {ActivatedRoute, provideRouter, Router} from '@angular/router';
 import {of} from 'rxjs';
 
-import {type Institution} from '../../../../shared/models/wealth/wealth.model';
+import {
+  type AccountBalanceItem,
+  type Institution,
+} from '../../../../shared/models/wealth/wealth.model';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {AccountsListComponent} from './accounts-list.component';
@@ -21,7 +24,7 @@ const baseInstitution: Institution = {
   accounts: [],
 };
 
-function setup(isPhone: boolean, overrides: Partial<Institution> = {}): HTMLElement {
+function setupFixture(isPhone: boolean, overrides: Partial<Institution> = {}) {
   const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
     isLoading: signal(false),
@@ -59,7 +62,11 @@ function setup(isPhone: boolean, overrides: Partial<Institution> = {}): HTMLElem
   });
   const fixture = TestBed.createComponent(AccountsListComponent);
   fixture.detectChanges();
-  return fixture.nativeElement as HTMLElement;
+  return fixture;
+}
+
+function setup(isPhone: boolean, overrides: Partial<Institution> = {}): HTMLElement {
+  return setupFixture(isPhone, overrides).nativeElement as HTMLElement;
 }
 
 describe('AccountsListComponent sync status text', () => {
@@ -101,5 +108,32 @@ describe('AccountsListComponent sync status text', () => {
     const text = setup(false).textContent ?? '';
     expect(text).toContain('0 accounts');
     expect(text).not.toContain('0 accounts · Sync failed');
+  });
+});
+
+describe('AccountsListComponent account row', () => {
+  it('opens the transactions page with that account preselected', () => {
+    const account: AccountBalanceItem = {
+      accountId: 'acc-1',
+      bankName: 'Test Bank',
+      accountType: 'current',
+      accountNumberLast4: '1234',
+      currency: 'EUR',
+      provider: 'truelayer',
+      category: 'banking',
+      currentBalance: 10,
+      balanceInBaseCurrency: 10,
+      syncStatus: 'synced',
+      lastSyncTimestamp: null,
+    };
+    const fixture = setupFixture(false, {accounts: [account]});
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    const row = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="account-row"]'
+    );
+    row?.click();
+
+    expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {account: 'acc-1'}});
   });
 });
