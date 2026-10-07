@@ -128,6 +128,8 @@ export class AlertsComponent {
     const navigation = AlertDestinationUtils.resolve(item);
     if (navigation?.kind === 'external') {
       window.open(navigation.url, '_blank', 'noopener,noreferrer');
+    } else if (navigation?.kind === 'url') {
+      void this.router.navigateByUrl(navigation.url);
     } else if (navigation) {
       void this.router.navigate(navigation.commands);
     }

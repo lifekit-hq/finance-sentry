@@ -28,6 +28,30 @@ const FILING_URL =
   'https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240630.htm';
 
 describe('AlertDestinationUtils.resolve', () => {
+  it('prefers the server appPath, query string included, over the type destination', () => {
+    const appPath = '/transactions?account=acc-1';
+    expect(AlertDestinationUtils.resolve(makeAlert({type: 'LowBalance', appPath}))).toEqual({
+      kind: 'url',
+      url: appPath,
+    });
+  });
+
+  it('uses appPath even for a type with no fallback destination', () => {
+    expect(
+      AlertDestinationUtils.resolve(makeAlert({type: 'JobFailure', appPath: '/dashboard'}))
+    ).toEqual({kind: 'url', url: '/dashboard'});
+  });
+
+  it.each([null, undefined, '', '  ', 'https://evil.example/x', '//evil.example/x'])(
+    'falls back to the type destination when appPath is %j',
+    appPath => {
+      expect(AlertDestinationUtils.resolve(makeAlert({type: 'PriceHike', appPath}))).toEqual({
+        kind: 'route',
+        commands: [AppRoute.Subscriptions],
+      });
+    }
+  );
+
   it("opens a filing alert's sec.gov document externally", () => {
     const target = AlertDestinationUtils.resolve(
       makeAlert({

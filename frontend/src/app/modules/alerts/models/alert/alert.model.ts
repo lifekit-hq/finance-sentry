@@ -43,6 +43,8 @@ export interface Alert {
   /** Times a suppressed repeat bumped this row; 1 for an alert that fired once. */
   occurrenceCount: number;
   lastOccurredAt: string;
+  /** Server-resolved in-app path (query string included) of what the alert is about; absent on older payloads. */
+  appPath?: Nullable<string>;
 }
 
 export interface AlertsPageResponse {
