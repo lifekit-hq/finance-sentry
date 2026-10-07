@@ -238,7 +238,7 @@ export function dashboardComputed(store: StateSignals) {
       let last = 0;
       return history.map(s => {
         const value = pick(s);
-        if (value > 0) {
+        if (value !== 0) {
           last = value;
         }
         return last;

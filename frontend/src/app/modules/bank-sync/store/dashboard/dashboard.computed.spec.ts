@@ -461,6 +461,19 @@ describe('dashboardComputed', () => {
         expect(c.netWorthChangeDirection()).toBe(0);
       });
 
+      it('keeps a negative sleeve in the scrubbed total and its delta', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 8_000,
+          netWorthHistory: [snapshot(1_000, 10_000, 0), snapshot(-2_000, 10_000, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$8,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('-$3,000');
+        expect(c.netWorthChangeDirection()).toBe(-1);
+      });
+
       it('ignores an index past the drawn history', () => {
         const c = projectionFor({
           monthlyFlow: [],
