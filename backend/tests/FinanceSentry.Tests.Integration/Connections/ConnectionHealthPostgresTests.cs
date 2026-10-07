@@ -26,7 +26,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -44,23 +43,22 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
 
     private static readonly DateTimeOffset At = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
 
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        // Only the per-module databases below are used; each context's Migrate() creates its own.
+        _database = await PostgresServer.Postgres16.ReserveDatabaseAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     // One database per module, so each context's migration history is its own.
-    private string ConnectionString(string database) =>
-        new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString()) { Database = database }.ConnectionString;
+    private string ConnectionString(string database) => _database!.CompanionConnectionString(database);
 
     private BankSyncDbContext BankSync() =>
         new(new DbContextOptionsBuilder<BankSyncDbContext>().UseNpgsql(ConnectionString("bank_sync_health")).Options,

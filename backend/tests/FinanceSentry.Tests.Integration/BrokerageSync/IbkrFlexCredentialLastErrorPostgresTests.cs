@@ -6,7 +6,6 @@ using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence.Repositorie
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -17,12 +16,11 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class IbkrFlexCredentialLastErrorPostgresTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
         await using var setup = CreateContext();
         await setup.Database.MigrateAsync();
@@ -30,12 +28,12 @@ public sealed class IbkrFlexCredentialLastErrorPostgresTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     private BrokerageSyncDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<BrokerageSyncDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<BrokerageSyncDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(null));
 
     [DockerRequiredFact]

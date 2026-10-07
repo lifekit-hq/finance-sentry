@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -44,12 +43,11 @@ public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
 
     private readonly Guid _userA = Guid.NewGuid();
     private readonly Guid _userB = Guid.NewGuid();
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
         await using var setup = CreateContext();
         await setup.Database.EnsureCreatedAsync();
@@ -57,13 +55,13 @@ public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     // Null acts as an anonymous request or a background job: no person in scope.
     private AuthDbContext CreateContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     // The real Auth module wiring (Identity, token services, stores) against the test database, acting for the
@@ -72,7 +70,7 @@ public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:Default"] = _postgres!.GetConnectionString(),
+            ["ConnectionStrings:Default"] = _database!.ConnectionString,
             ["Jwt:Secret"] = "auth-owner-query-filter-tests-signing-secret-0123456789",
         }).Build();
 

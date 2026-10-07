@@ -12,7 +12,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -25,29 +24,22 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
 {
-    private const long ContainerMemoryBytes = 2L * 1024 * 1024 * 1024;
     private const string CaptureJobLock = "lock:recurring-job:companion-capture";
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(90);
 
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
-    public async Task InitializeAsync()
-    {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithCreateParameterModifier(p => p.HostConfig?.Memory = ContainerMemoryBytes)
-            .Build();
-        await _postgres.StartAsync();
-    }
+    public async Task InitializeAsync() => _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     private IHost BuildHost(RecurringJobRegistrationOptions options)
     {
-        var connectionString = _postgres!.GetConnectionString();
+        var connectionString = _database!.ConnectionString;
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -74,7 +66,7 @@ public sealed class StartupJobRegistrationLockTests : IAsyncLifetime
 
     private async Task<long> CountEnqueuedAsync(string jobTypeName)
     {
-        await using var connection = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var connection = new NpgsqlConnection(_database!.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(
             "select count(*) from hangfire.job where invocationdata->>'Type' like @type", connection);

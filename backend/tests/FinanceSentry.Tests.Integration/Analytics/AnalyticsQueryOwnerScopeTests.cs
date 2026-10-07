@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -23,10 +22,11 @@ using Xunit;
 /// <c>fs_readonly</c> role the query runs as has no <c>EXECUTE</c> on <c>set_config</c>, so even a
 /// statement that reached the database cannot re-point the owner scope.
 ///
-/// The schema is built by the API's own startup migrations against a fresh container, the same path
+/// The schema is built by the API's own startup migrations against a fresh database, the same path
 /// production takes. Requires Docker (<see cref="DockerRequiredFactAttribute"/> skips otherwise; CI has it).
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(PostgresClusterStateCollection.Name)]
 public sealed class AnalyticsQueryOwnerScopeTests : IAsyncLifetime
 {
     private const string InsufficientPrivilege = "42501";
@@ -40,16 +40,15 @@ public sealed class AnalyticsQueryOwnerScopeTests : IAsyncLifetime
         + $"WHERE (SELECT set_config('app.current_user_id', '{OtherUser}', true)) IS NOT NULL "
         + "ORDER BY amount";
 
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
     private AnalyticsApiFactory? _factory;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:14-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres14.CreateDatabaseAsync(resetsClusterRoles: true);
 
         // Building the TestServer runs the ordinary startup migrations, Analytics included.
-        _factory = new AnalyticsApiFactory(_postgres.GetConnectionString());
+        _factory = new AnalyticsApiFactory(_database.ConnectionString);
         _factory.CreateClient().Dispose();
 
         await SeedAsync();
@@ -59,8 +58,8 @@ public sealed class AnalyticsQueryOwnerScopeTests : IAsyncLifetime
     {
         if (_factory is not null)
             await _factory.DisposeAsync();
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     [DockerRequiredFact]
@@ -108,7 +107,7 @@ public sealed class AnalyticsQueryOwnerScopeTests : IAsyncLifetime
     private ReadOnlyQueryExecutor Executor()
         => new(Options.Create(new AnalyticsOptions
         {
-            ReadOnlyConnectionString = _postgres!.GetConnectionString(),
+            ReadOnlyConnectionString = _database!.ConnectionString,
         }));
 
     private async Task SeedAsync()
