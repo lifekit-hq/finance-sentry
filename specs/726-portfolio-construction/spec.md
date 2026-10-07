@@ -4,8 +4,8 @@
 
 **Created**: 2026-10-07
 
-**Status**: Draft. Spec only: no product surface ships during the October consolidation phase. The build
-is planned for November.
+**Status**: Draft; open questions OQ-1..OQ-10 closed by the owner on 2026-10-07 (see [Decisions](#decisions-formerly-open-questions)).
+Spec only: no product surface ships during the October consolidation phase. The build is planned for November.
 
 **GitHub Issue**: #726
 
@@ -42,9 +42,10 @@ into the facts that produced it.
 
 1. **Serve the cold-start user.** A signed-in user with no holdings, no IPS and no risk rule set can pick an
    archetype and get a complete, explained target allocation.
-2. **Transparent one-word verdicts.** Each scored name carries one word for scanning. The word is a
-   deterministic, documented rendering of the per-axis scorecard. It never replaces the scorecard, and every
-   word answers "why?" from the data.
+2. **Transparent one-word verdicts.** Each scored name carries one word for scanning (`STRONG BUY / BUY / WAIT / AVOID`), a trade
+   call to the owner. The word is a deterministic, documented rendering of the per-axis scorecard. It never
+   replaces the scorecard, and every word answers "why?" from the data. The product recommends but never
+   places a trade.
 3. **Generic, not the operator's book.** Nothing assumes a particular user's holdings. Archetypes are data
    (configuration), not code.
 4. **Reuse before build.** The scorers, valuation read, IPS, allocation drift and risk evaluation are reused
@@ -172,7 +173,7 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 **Acceptance Scenarios**:
 
 1. **Given** a held name not in the target, **When** gap mode renders, **Then** the name is listed as "held,
-   not in target" with its verdict. Nothing tells the user to sell it.
+   not in target" with its verdict. The gap line only states the position; the verdict word is the call.
 2. **Given** a multi-currency book, **When** gap mode computes current weights, **Then** it uses the
    base-currency-converted figures of the existing book read, never native amounts summed across currencies.
 3. **Given** a user with no holdings, **When** they open gap mode, **Then** they are routed to US3. Every
@@ -197,7 +198,7 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 - **IPS targets an asset class the universe cannot fill** (bonds, real estate): the sleeve appears at its
   target weight with no names and a note "not built from the universe in v1".
 - **IPS sleeve targets do not sum to 100%**: allocation drift (`GetAllocationDriftQuery`) does not normalise
-  targets today, so construction needs its own rule. See OQ-10.
+  targets today, so construction needs its own rule (OQ-10: shortfall to cash).
 - **Two archetypes give the same names**: allowed, since the weights and reasons still differ by archetype.
 
 ## Requirements
@@ -214,7 +215,7 @@ missing names, the over- or under-weight on the held ones, and the cash differen
   `FormulaVersion`. No parallel scoring formula may exist.
 - **FR-003**: The universe MUST be bounded and MUST respect the broad-universe-scan rule that structure is
   never computed over the full constituent list (spec `20260910-001634-broad-universe-scan` FR-011). Its
-  composition is Open question OQ-1.
+  composition is OQ-1.
 - **FR-004**: The valuation axis MUST come from the existing valuation snapshot and MUST be shown as raw facts.
   No 0–100 valuation score may be introduced.
 
@@ -222,8 +223,8 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 
 - **FR-005**: Each scorecard MUST map to exactly one verdict word through a deterministic, versioned rule table
   over the four axes. The same inputs and the same rules version MUST always give the same word.
-- **FR-006**: The rule table MUST be published (in the drill-down payload and in this spec's verdict table once
-  OQ-3 and OQ-4 are settled). Each verdict MUST carry the rules version and the rule that fired.
+- **FR-006**: The rule table MUST be published (in the drill-down payload and in this spec's verdict table as
+  settled in OQ-3 and OQ-4). Each verdict MUST carry the rules version and the rule that fired.
 - **FR-007**: The verdict MUST NOT be stored or exposed as a number. No composite, weighted or rank score may be
   added anywhere (019 FR-007 as amended).
 - **FR-008**: A null axis MUST be handled by an explicit rule. It is never treated as a mid value.
@@ -234,8 +235,9 @@ missing names, the over- or under-weight on the held ones, and the cash differen
   radar, filled polygon or any single-shape summary is out of bounds.
 - **FR-010**: The strip MUST be one shared component, used by the universe screen drill-down and offered to
   #824 for the dossier header. Any new primitive it needs MUST land in lifekit-common first.
-- **FR-011**: Structure MUST show the raw score. A regime-adjusted value, when present, MUST appear beside the
-  raw one and never replace it.
+- **FR-011**: Structure MUST show the raw score. The regime-adjusted value, when present, MUST appear beside the
+  raw one and never replace it. The verdict and construction read the adjusted value (OQ-8), and the display
+  MUST say which value a fired rule used.
 
 **Archetypes and construction**
 
@@ -261,15 +263,16 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 - **FR-019**: Gap mode MUST diff the current book against the constructed target per name and per sleeve,
   using the existing base-currency book figures. It MUST NOT sum native amounts across currencies (see
   `docs/money-semantics.md`).
-- **FR-020**: Gap lines MUST be descriptive ("missing", "overweight by 3.1 pts") and MUST NOT be phrased as an
-  instruction to buy or sell.
+- **FR-020**: Gap lines MUST state the size of the gap in descriptive terms ("missing", "overweight by 3.1 pts").
+  The trade call is carried by the verdict word (OQ-3), not by an order-style instruction in the gap line. No
+  gap line creates or executes an order.
 
 **Surfaces and boundaries**
 
 - **FR-021**: Every read MUST be exposed as an authenticated REST endpoint and as an MCP tool: the universe
   screen, a single scorecard with its verdict, construction and gap mode. Names follow the domain concept,
   never a consumer (constitution VII.3). The MCP tool-count contract test is updated in the same PR.
-- **FR-022**: Per-user state (the selected archetype, if persisted per OQ-7) MUST be owner-scoped with the
+- **FR-022**: Per-user state (the selected archetype, stored as an IPS field per OQ-7) MUST be owner-scoped with the
   named owner query filter and ship an isolation test. Shared universe scorecards follow the shared-corpus
   pattern (`UserId == null` visible to all).
 - **FR-023**: The feature MUST be config-gated (off by default) so it can merge before it is announced.
@@ -304,23 +307,22 @@ missing names, the over- or under-weight on the held ones, and the cash differen
 - **SC-005**: Gap-mode current weights equal `get_allocation_vs_target`'s for the same multi-currency book.
 - **SC-006**: The scorecard strip has screenshot baselines at 390 px and desktop (the #467 rails) when it ships.
 
-## Open Questions
+## Decisions (formerly Open Questions)
 
-Each question below is a product choice #726 leaves open. The recommendation is the default the build follows
-unless it is overruled before November.
+All ten questions are closed by the owner's answers of 2026-10-07 (the #726 portfolio-construction board). Each row records the owner's 2026-10-07 answer; the build follows it.
 
-| #     | Question                                                                                       | Options                                                                                                                                    | Recommended                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OQ-1  | How is the universe defined?                                                                   | (a) fixed curated list; (b) index-derived (S&P 500); (c) user-configurable                                                                 | **(a) plus the existing feeds**: the broad-universe-scan stage-1 shortlist (bounded by its cap) ∪ a configured curated list ∪ the viewer's held and watchlist names. The full S&P 500 is reached only through the shortlist pre-filter, so structure is never computed index-wide (scan FR-011). User curation comes later and already partly exists through the watchlist.                                                                                                                                                                                                                                     |
-| OQ-2  | Which archetypes ship in v1?                                                                   | (a) growth + dividend + balanced; (b) growth + balanced, dividend next                                                                     | **(b).** A dividend archetype needs payout stability, and nothing reads dividend history today: the valuation snapshot has current yield with `HistoryUnavailable`, and fundamentals has no dividend concept. A yield-only income screen would steer a cold-start user toward yield traps. Dividend is the first follow-up once a dividend-history read exists. Value follows with the 019 v1.1 "what's priced in" section.                                                                                                                                                                                     |
-| OQ-3  | What is the verdict vocabulary?                                                                | (a) the competitor's (`STRONG BUY / BUY / WAIT / AVOID`); (b) our own scale                                                                | **(b): `STRONG / FAVOURABLE / WAIT / AVOID`, plus the non-verdict `NOT SCORED`.** The product is generic and multi-user and never places trades (019 FR-014). The word describes the evidence, not an instruction, so it carries no "buy". The four-step order keeps the at-a-glance read.                                                                                                                                                                                                                                                                                                                      |
-| OQ-4  | What shape does the verdict rule table take?                                                   | (a) an ordered decision list: first matching rule wins, each rule a conjunction of axis thresholds; (b) points per axis, summed into bands | **(a).** (b) is a composite score under another name and breaks 019 FR-007. Draft rules for calibration: `AVOID` if structure < 30 or (crowding `Extended` and valuation above its own 5y average); `STRONG` if structure ≥ 70, fundamentals ≥ 70, crowding not `Extended`, and valuation not above its 5y average by more than the configured premium; `FAVOURABLE` if structure ≥ 50 and fundamentals ≥ 50 (or null, capped here per FR-008); otherwise `WAIT`. Thresholds are configuration with a rules version, and the final table is fixed by a calibration task against stored scorecards before build. |
-| OQ-5  | Is the constructor rules-based or an optimiser?                                                | (a) rules-based tilts; (b) an optimiser (mean-variance or similar)                                                                         | **(a) for v1.** Gate by archetype, order by the archetype's axis keys (lexicographic, never a weighted sum, per OQ-4), take the top N, then equal-weight them, capped and with the remainder to cash. Every weight is explainable in one line. An optimiser needs covariance data and return estimates the platform does not hold, and its output is not explainable per name.                                                                                                                                                                                                                                  |
-| OQ-6  | How are weights set inside the equity sleeve?                                                  | (a) equal weight; (b) tiered by verdict (`STRONG` > `FAVOURABLE`); (c) inverse volatility                                                  | **(a).** It is the simplest rule a user can check by hand. Tiering by verdict turns the word into a sizing input and comes close to a composite. Inverse volatility needs bars, which only shortlist, held and watchlist names have.                                                                                                                                                                                                                                                                                                                                                                            |
-| OQ-7  | Is the selected archetype stored, and where?                                                   | (a) not stored, passed per request; (b) stored per user in the new module; (c) a new field on the IPS                                      | **(b).** Gap mode and the dashboard need a remembered choice. (c) changes the IPS schema and internals, which #726 rules out. An IPS field can follow if the archetype proves to be policy rather than preference.                                                                                                                                                                                                                                                                                                                                                                                              |
-| OQ-8  | What do the verdict and construction read for structure: the raw or the regime-adjusted score? | (a) raw; (b) regime-adjusted                                                                                                               | **(a) raw.** It is stable and auditable, matching how 021 keeps the raw score authoritative. The regime adjustment is shown beside it (FR-011).                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| OQ-9  | Does choosing an archetype write an IPS for a cold-start user?                                 | (a) yes, seed an IPS version; (b) no, construction reads archetype defaults                                                                | **(b).** Authoring an IPS stays the deliberate `save_ips` flow. The proposal shows "archetype default" as the source of each limit, which invites the user to write their own.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| OQ-10 | What happens when IPS sleeve targets do not sum to 100%?                                       | (a) scale them proportionally to 100%; (b) put the shortfall in cash; (c) refuse to construct                                              | **(b).** It never invents exposure the IPS did not ask for, and the proposal names the unallocated points as "cash: IPS targets sum to N%". An overshoot (over 100%) refuses with a reason, because the stated policy cannot be built as written.                                                                                                                                                                                                                                                                                                                                                               |
+| # | Question | Owner's 2026-10-07 answer |
+| - | - | - |
+| OQ-1 | How is the universe defined? | **(a) plus the existing feeds** (q1 a): the broad-universe-scan stage-1 shortlist (bounded by its cap) ∪ a configured curated list ∪ the viewer's held and watchlist names. The full S&P 500 is reached only through the shortlist pre-filter, so structure is never computed index-wide (scan FR-011). User curation comes later and already partly exists through the watchlist. |
+| OQ-2 | Which archetypes ship in v1? | **(b) growth + balanced** (q2 b); dividend is the first follow-up. A dividend archetype needs payout stability, and nothing reads dividend history today (the valuation snapshot has current yield with `HistoryUnavailable`; fundamentals has no dividend concept), so a yield-only screen would steer a cold-start user toward yield traps. Value follows with the 019 v1.1 "what's priced in" section. |
+| OQ-3 | What is the verdict vocabulary? | **(a) the competitor's: `STRONG BUY / BUY / WAIT / AVOID`, plus the non-verdict `NOT SCORED`** (q3 a). The owner's words: "I guess we keep verdict words as it tells to trade bro. Because this is the direction we are heading." The verdict is a trade call to the owner, a recommendation and the product's direction, not merely evidence wording. The product still never places trades (019 FR-014 is unchanged: it never executes an order or account action). Letter grades stay out (Out of Scope; fs-825 pick 5 A). |
+| OQ-4 | What shape does the verdict rule table take? | **(a) an ordered decision list** (q4 a): first matching rule wins, each rule a conjunction of axis thresholds. (b) points per axis is a composite score under another name and breaks 019 FR-007. Draft rules for calibration, over the **regime-adjusted** structure score (OQ-8): `AVOID` if structure < 30 or (crowding `Extended` and valuation above its own 5y average); `STRONG BUY` if structure ≥ 70, fundamentals ≥ 70, crowding not `Extended`, and valuation not above its 5y average by more than the configured premium; `BUY` if structure ≥ 50 and fundamentals ≥ 50 (or null, capped here per FR-008); otherwise `WAIT`. Thresholds apply to adjusted scores, are configuration with a rules version, and the final table is fixed by a calibration task against stored scorecards before build. |
+| OQ-5 | Is the constructor rules-based or an optimiser? | **(a) rules-based tilts for v1** (q5 a): gate by archetype, order by the archetype's axis keys (lexicographic, never a weighted sum, per OQ-4), take the top N, then equal-weight them, capped and with the remainder to cash. Every weight is explainable in one line. An optimiser needs covariance data and return estimates the platform does not hold, and its output is not explainable per name. |
+| OQ-6 | How are weights set inside the equity sleeve? | **(a) equal weight** (q6 a): the simplest rule a user can check by hand. Tiering by verdict would turn the word into a sizing input and comes close to a composite; inverse volatility needs bars, which only shortlist, held and watchlist names have. |
+| OQ-7 | Is the selected archetype stored, and where? | **(c) a new field on the IPS** (q7 c). Archetype is policy, so it lives with the IPS and is versioned with it. This **lifts** the earlier scope line that ruled out any IPS schema change: the IPS gains one archetype field (migration, `save_ips` / `get_ips` shape, MCP contract tests), and the owner-scoped IPS storage already covers isolation. Gap mode and the dashboard read the archetype from the IPS. A user with no IPS passes the archetype per request (OQ-9). |
+| OQ-8 | What do the verdict and construction read for structure? | **(b) the regime-adjusted score** (q8 b). **Divergence from spec 021**, which keeps the raw score authoritative and treats regime as presentation and ranking context only: here the adjusted structure score feeds the verdict (OQ-4) and the constructor's gates and ordering (OQ-5). The OQ-4 thresholds therefore apply to adjusted scores and are calibrated on them. The raw score stays stored and shown beside the adjusted value (FR-011), and the drill-down names which value fired the rule. 021's rule that the regime never auto-actions (no cash raise, no sell, no promotion block) is unchanged. |
+| OQ-9 | Does choosing an archetype write an IPS for a cold-start user? | **(b) no** (q9 b): construction reads archetype defaults. Authoring an IPS stays the deliberate `save_ips` flow, and the proposal shows "archetype default" as the source of each limit, which invites the user to write their own. |
+| OQ-10 | What happens when IPS sleeve targets do not sum to 100%? | **(b) put the shortfall in cash** (q10 b): it never invents exposure the IPS did not ask for, and the proposal names the unallocated points as "cash: IPS targets sum to N%". An overshoot (over 100%) refuses with a reason, because the stated policy cannot be built as written. |
 
 ## Out of Scope
 
@@ -340,4 +342,4 @@ unless it is overruled before November.
 - #837 (FPI fundamentals) keeps reducing null fundamentals, and this feature renders null-with-reason either
   way.
 - Archetype default constraints are illustrative until calibrated. They are configuration, and the build
-  ships them with a documented source (for example a common retail position-cap convention), never as advice.
+  ships them with a documented source (for example a common retail position-cap convention) and the label "archetype default".
