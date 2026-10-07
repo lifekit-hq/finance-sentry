@@ -569,7 +569,7 @@ category filter still matches those on their stored category.
 
 ## 7. Month-bucketed charts vs. range-total tiles
 
-Frontend-only (`dashboard.computed.ts`). The in-progress month is kept out of the bar
+Frontend (`dashboard.computed.ts`; the day-level `windowFlow` it totals comes from the backend, §5). The in-progress month is kept out of the bar
 charts and included in the range-total tiles, and the split is deliberate.
 
 **Charts plot complete calendar months only** — the *Income vs Spending* chart reads the
