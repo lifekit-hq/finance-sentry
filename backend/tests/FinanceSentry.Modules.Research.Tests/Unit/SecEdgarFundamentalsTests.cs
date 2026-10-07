@@ -56,9 +56,11 @@ public sealed class SecEdgarFundamentalsTests
 
         // Before this step the quarterly-only scorer returned a null score for GRAB.
         result.Basis.Should().Be(FundamentalsScorer.AnnualBasis);
-        result.Score.Should().Be(35);
+        // EPS went -0.03 -> +0.06: growth off a loss base is not evaluable, not -300%.
+        result.Score.Should().Be(70);
         result.RevenueYoy.Should().BeApproximately(0.2048623m, 0.0000001m);
-        result.EpsYoy.Should().Be(-3m);
+        result.EpsYoy.Should().BeNull();
+        result.NotEvaluableReasons.Should().Contain("eps_yoy_not_evaluable");
         result.NotEvaluableReasons.Should().Contain("gross_margin_not_evaluable");
     }
 

@@ -108,7 +108,15 @@ public static class FundamentalMath
 
         var latest = periods[0];
         var prior = PriorYearFact(latest, periods);
-        return prior is null ? null : SafeYoy(latest.Value, prior.Value);
+        if (prior is null)
+        {
+            return null;
+        }
+
+        // Growth off a loss-making base is meaningless ((cur - prior) / prior flips sign: a loss-to-profit
+        // turnaround reads as a collapse). Annual basis treats it as not evaluable; the quarterly path
+        // keeps its historical behaviour so domestic filers score exactly as before.
+        return periodType == ThesisPeriodType.Annual && prior.Value < 0 ? null : SafeYoy(latest.Value, prior.Value);
     }
 
     /// <summary>Latest margin (numerator/denominator) of the given cadence, or null when not evaluable.</summary>

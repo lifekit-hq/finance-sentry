@@ -137,6 +137,17 @@ public sealed class FundamentalsScorerTests
     }
 
     [Fact]
+    public void Evaluate_AnnualEpsTurnaroundFromLoss_IsNotEvaluable_NotACollapse()
+    {
+        var facts = new List<FundamentalFact> { Annual("DilutedEPS", 0.06m, 2025), Annual("DilutedEPS", -0.03m, 2024) };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.EpsYoy.Should().BeNull();
+        result.Score.Should().BeNull();
+    }
+
+    [Fact]
     public void Evaluate_SingleFiscalYear_IsNotEvaluableForYoyAndTrend()
     {
         var facts = new List<FundamentalFact> { Annual("Revenue", 120m, 2025), Annual("GrossProfit", 60m, 2025) };
