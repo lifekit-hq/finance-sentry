@@ -29,7 +29,7 @@ function setup() {
       {provide: BudgetsStore, useValue: store},
       {provide: Router, useValue: router},
       {provide: CmnDialogService, useValue: dialog},
-      {provide: CategoryStore, useValue: {categories: signal([]), colorMap: signal({})}},
+      {provide: CategoryStore, useValue: {categories: signal([])}},
     ],
   });
   TestBed.overrideComponent(BudgetsComponent, {
@@ -109,9 +109,9 @@ describe('BudgetsComponent actions', () => {
 
   it('colours the bar red over limit, amber near it, category colour otherwise', () => {
     const {component} = setup();
-    expect(component.barColor(120, 100, 'x')).toContain('error');
-    expect(component.barColor(85, 100, 'x')).toContain('warning');
-    expect(component.barColor(10, 100, 'x')).toBe('#94a3b8');
+    expect(component.barColor(120, 100, 0)).toContain('error');
+    expect(component.barColor(85, 100, 0)).toContain('warning');
+    expect(component.barColor(10, 100, 1)).toBe('var(--color-chart-series-2)');
   });
 });
 
@@ -146,7 +146,7 @@ describe('BudgetsComponent hero copy', () => {
       providers: [
         {provide: Router, useValue: {navigate: vi.fn()}},
         {provide: CmnDialogService, useValue: {open: vi.fn()}},
-        {provide: CategoryStore, useValue: {categories: signal([]), colorMap: signal({})}},
+        {provide: CategoryStore, useValue: {categories: signal([])}},
       ],
     });
     TestBed.overrideComponent(BudgetsComponent, {

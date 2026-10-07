@@ -1,11 +1,19 @@
 import {describe, expect, it} from 'vitest';
 
+import {MERCHANT_SERIES_STEPS} from '../constants/subscription/subscription.constants';
 import {SubscriptionUtils} from './subscription.utils';
 
 describe('SubscriptionUtils.getMerchantColor', () => {
-  it('returns a valid hsl string for a normal name', () => {
+  it('returns a chart-series token for a normal name', () => {
     const color = SubscriptionUtils.getMerchantColor('Netflix');
-    expect(color).toMatch(/^hsl\(\d+, 55%, 42%\)$/);
+    expect(color).toMatch(/^var\(--color-chart-series-\d\)$/);
+  });
+
+  it('keys only onto the steps white initials read on', () => {
+    const allowed = MERCHANT_SERIES_STEPS.map(step => `var(--color-chart-series-${step})`);
+    for (const name of ['Netflix', 'Spotify', 'Gym', 'iCloud', 'Disney+', 'Vodafone', 'Bolt']) {
+      expect(allowed).toContain(SubscriptionUtils.getMerchantColor(name));
+    }
   });
 
   it('returns the same color for the same name (deterministic)', () => {
@@ -16,12 +24,12 @@ describe('SubscriptionUtils.getMerchantColor', () => {
 
   it('returns different colors for different names', () => {
     expect(SubscriptionUtils.getMerchantColor('Netflix')).not.toBe(
-      SubscriptionUtils.getMerchantColor('Spotify')
+      SubscriptionUtils.getMerchantColor('Gym')
     );
   });
 
   it('returns fallback color for empty string', () => {
-    expect(SubscriptionUtils.getMerchantColor('')).toBe('hsl(220, 14%, 50%)');
+    expect(SubscriptionUtils.getMerchantColor('')).toBe('var(--color-chart-series-9)');
   });
 });
 

@@ -45,7 +45,7 @@
           <span
             [class.text-status-error]="over"
             [class.text-text-primary]="!over"
-            class="font-mono text-2xl font-bold"
+            class="font-mono text-cmn-xl font-bold"
           >
             {{ heroAmount | money }}
           </span>
@@ -62,7 +62,7 @@
             [style.width.%]="store.overallPct()"
             [class.bg-status-error]="over"
             [class.bg-accent-default]="!over"
-            class="h-full rounded-full transition-[width] duration-500"
+            class="h-full rounded-full"
           ></div>
         </div>
       </cmn-card>
@@ -79,7 +79,7 @@
             <div class="mb-cmn-3 flex items-center justify-between gap-cmn-2">
               <div class="flex min-w-0 items-center gap-cmn-2">
                 <div
-                  [style.background]="categoryColor(b.category)"
+                  [style.background]="categoryColor($index)"
                   class="h-2.5 w-2.5 shrink-0 rounded-sm"
                 ></div>
                 <button
@@ -115,7 +115,7 @@
               <span
                 [class.text-status-error]="b.isOverBudget"
                 [class.text-text-primary]="!b.isOverBudget"
-                class="font-mono text-lg font-bold"
+                class="font-mono text-cmn-md font-bold"
               >
                 {{ leftAmount | money }}
               </span>
@@ -145,8 +145,8 @@
             <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
               <div
                 [style.width.%]="pct"
-                [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
-                class="h-full rounded-full transition-[width] duration-500"
+                [style.background]="barColor(b.spent, b.monthlyLimit, $index)"
+                class="h-full rounded-full"
               ></div>
             </div>
             <div class="mt-cmn-1 text-cmn-xs text-text-secondary">{{ b.spent | money }} spent</div>

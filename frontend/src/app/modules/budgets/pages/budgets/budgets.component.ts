@@ -19,8 +19,7 @@ import {take} from 'rxjs';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {CATEGORY_COLOR_FALLBACK} from '../../../../shared/store/categories/categories.computed';
-import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
 import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
 import {BUDGET_NEAR_LIMIT_PCT} from '../../constants/budget/budget.constants';
@@ -57,7 +56,6 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
 })
 export class BudgetsComponent {
   private readonly router = inject(Router);
-  private readonly categoryStore = inject(CategoryStore);
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
 
@@ -68,8 +66,10 @@ export class BudgetsComponent {
   public readonly nearLimitPct = BUDGET_NEAR_LIMIT_PCT;
   public readonly currentMonth = new Date();
 
-  public categoryColor(category: string): string {
-    return this.categoryStore.colorMap()[category] ?? CATEGORY_COLOR_FALLBACK;
+  // By position in the grid, not by category: the colours repeat only every eight cards, so
+  // cards that sit side by side never share one.
+  public categoryColor(index: number): string {
+    return ChartColorUtils.categorical(index);
   }
 
   public barPct(spent: number, limit: number): number {
@@ -80,7 +80,7 @@ export class BudgetsComponent {
     return Math.round(paceRatio * PCT_MAX);
   }
 
-  public barColor(spent: number, limit: number, category: string): string {
+  public barColor(spent: number, limit: number, index: number): string {
     const pct = (spent / limit) * PCT_MAX;
     if (spent > limit) {
       return 'var(--color-status-error)';
@@ -88,7 +88,7 @@ export class BudgetsComponent {
     if (pct >= BUDGET_NEAR_LIMIT_PCT) {
       return 'var(--color-status-warning)';
     }
-    return this.categoryColor(category);
+    return this.categoryColor(index);
   }
 
   public onBudgetAction(

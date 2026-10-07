@@ -21,9 +21,14 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-size: 14px;
   color: var(--color-text-primary);
   background: var(--color-surface-bg);
+}
+
+/* The root stays at the browser's 16px, which the token rem scale assumes; unstyled text reads at
+   the ramp's body size (text-cmn-sm). */
+body {
+  font-size: 0.875rem;
 }
 
 * {

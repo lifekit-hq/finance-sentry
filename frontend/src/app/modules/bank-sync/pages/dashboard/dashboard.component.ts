@@ -85,7 +85,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 <cmn-icon name="Link" size="lg" />
               </div>
               <div class="space-y-cmn-2">
-                <h2 class="font-headline text-cmn-xl font-semibold text-text-primary">
+                <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">
                   Connect your first account
                 </h2>
                 <p class="max-w-md text-cmn-sm text-text-secondary">
@@ -131,7 +131,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 <cmn-skeleton height="2.25rem" width="50%" />
               } @else {
                 <p
-                  class="font-mono text-cmn-3xl font-semibold tabular-nums text-text-primary"
+                  class="font-mono text-cmn-2xl font-semibold tabular-nums text-text-primary"
                   data-testid="net-worth-value"
                 >
                   {{ store.totalBalanceFormatted() }}
@@ -228,7 +228,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       <cmn-skeleton height="1.5rem" width="70%" />
                     } @else {
                       <span
-                        class="block truncate font-mono text-cmn-lg font-semibold tabular-nums text-text-primary sm:text-cmn-2xl"
+                        class="block truncate font-mono text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
                         >{{ tile.value() }}</span
                       >
                     }

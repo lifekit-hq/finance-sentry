@@ -26,7 +26,7 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
       <div class="text-center">
         <p
           [class]="tx | transactionAmountClass"
-          class="font-mono text-cmn-4xl font-bold tabular-nums"
+          class="font-mono text-cmn-3xl font-bold tabular-nums"
         >
           {{ tx | transactionAmount }}
         </p>
