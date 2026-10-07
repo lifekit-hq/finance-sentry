@@ -29,7 +29,7 @@ frontend/
       handlers/http-error.handler.ts      # global ErrorHandler → toasts
     shared/
       enums/app-route.enum.ts             # route literals
-      utils/                               # cross-module pure helpers (e.g. getRelativeTime)
+      utils/                               # cross-module pure helpers (e.g. MoneyUtils)
     modules/auth/
       store/                              # auth.state/computed/methods/effects/store.ts + specs
       services/auth.service.ts            # HTTP-only (no state)
