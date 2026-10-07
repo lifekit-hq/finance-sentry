@@ -46,10 +46,10 @@ export class <Domain>Utils {
 Rules:
 - File name: `<domain>.utils.ts`. The `<domain>` is a noun (`error`, `time`, `currency`), not a verb. Singular.
 - Class name: `<Domain>Utils` (PascalCase). One class per file.
-- Methods: `public static`, named with imperative verbs (`extractCode`, `getRelativeTime`, `formatBalance`).
+- Methods: `public static`, named with imperative verbs (`extractCode`, `toIsoDate`, `formatBalance`).
 - No instance state. No constructor. No DI. No `inject()`.
 - No private instance fields — module-level `const`s for magic numbers (named, no inline literals).
-- Methods are pure: same input → same output, no clocks/randomness/IO unless the method *is* about that (e.g. `TimeUtils.getRelativeTime` reads `Date.now()` — that's the point of the method).
+- Methods are pure: same input → same output, no clocks/randomness/IO unless the method *is* about that (e.g. `DateRangeUtils.fromRelativeRange` defaults `now` to `new Date()` — that's the point of the method).
 - Multiple related helpers → group as static methods on the same class. Different domains → different files.
 
 ### 2. If the helper is consumed in a template: also create a pipe
@@ -115,10 +115,12 @@ If a util starts feature-local and gets reached for from a second module, **move
 
 | Concept | File | Class | Method |
 |---|---|---|---|
-| Format relative timestamps | `time.utils.ts` | `TimeUtils` | `getRelativeTime(timestamp)` |
+| Resolve a relative range to dates | `date-range.utils.ts` | `DateRangeUtils` | `fromRelativeRange(range)` |
 | Pull `errorCode` from an HTTP error | `error.utils.ts` | `ErrorUtils` | `extractCode(err)` |
 | Capitalize / titlecase strings | `string.utils.ts` | `StringUtils` | `capitalize(s)`, `truncate(s, max)` |
 | Currency math (no formatting — use a pipe for that) | `currency.utils.ts` | `CurrencyUtils` | `convertToBase(amount, rate)` |
+
+Relative timestamps ("5m ago") are not a local util: use `formatRelativeTime` from `@lifekit-hq/core/format`, or the `cmnRelativeTime` pipe from `@lifekit-hq/ui` in templates.
 
 ### Anti-patterns to refuse
 

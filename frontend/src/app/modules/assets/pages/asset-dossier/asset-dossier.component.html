@@ -18,7 +18,7 @@
         {{ dossier.symbol }}
       </h1>
       <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-        Updated {{ dossier.generatedAt | relativeTime }}
+        Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
       </p>
     </header>
 
@@ -48,7 +48,7 @@
                     class="mt-cmn-1 text-cmn-xs text-text-secondary"
                     data-testid="ledger-read-generated"
                   >
-                    Generated {{ generatedAt | relativeTime }}
+                    Generated {{ generatedAt | cmnRelativeTime: 'Never' }}
                   </p>
                 }
               </div>
@@ -456,7 +456,7 @@
                   {{ article.title }}
                 </a>
                 <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                  {{ article.source }} · {{ article.publishedAt | relativeTime }}
+                  {{ article.source }} · {{ article.publishedAt | cmnRelativeTime: 'Never' }}
                 </p>
               </li>
             }

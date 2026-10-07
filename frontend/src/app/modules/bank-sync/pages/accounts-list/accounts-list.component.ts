@@ -3,6 +3,7 @@ import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, OnInit, ViewContainerRef} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
+import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
   AlertComponent,
   ButtonComponent,
@@ -14,6 +15,7 @@ import {
   InstitutionAvatarComponent,
   MenuComponent,
   type MenuItem,
+  RelativeTimePipe,
   SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
@@ -25,10 +27,8 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
-import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
-import {TimeUtils} from '../../../../shared/utils/time.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
@@ -182,7 +182,7 @@ export class AccountsListComponent implements OnInit {
     if (!institution.lastSyncTimestamp) {
       return 'Not synced yet';
     }
-    return `synced ${TimeUtils.getRelativeTime(institution.lastSyncTimestamp).toLowerCase()}`;
+    return `synced ${formatRelativeTime(institution.lastSyncTimestamp)}`;
   }
 
   public needsAttention(institution: Institution): boolean {
