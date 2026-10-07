@@ -23,7 +23,10 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
-import {type DossierSignalItem} from '../../models/dossier/dossier.model';
+import {
+  type DossierDeltaDirection,
+  type DossierSignalItem,
+} from '../../models/dossier/dossier.model';
 import {CoverageLabelPipe, SignalTypeLabelPipe} from '../../pipes/dossier-label.pipe';
 import {MarkdownPipe} from '../../pipes/markdown.pipe';
 import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
@@ -72,6 +75,12 @@ export class AssetDossierComponent {
   public readonly accountsRoute = AppRoute.AccountsInvestments;
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
+  // Only the delta carries colour; the header itself stays neutral.
+  public readonly deltaClass: Record<DossierDeltaDirection, string> = {
+    up: 'text-status-success',
+    down: 'text-status-error',
+    flat: 'text-text-secondary',
+  };
 
   public readonly trendDomain: ChartDomain = {min: 0, max: TREND_SCALE_MAX};
 

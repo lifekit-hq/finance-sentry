@@ -2,12 +2,16 @@ import {DOCUMENT} from '@angular/common';
 import {afterNextRender, inject, Injector} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 
 interface StoreMethods {
@@ -17,6 +21,9 @@ interface StoreMethods {
   setLedgerReadLoading(): void;
   setLedgerRead(ledgerRead: AssetLedgerReadDto): void;
   setLedgerReadError(errorCode: Nullable<string>): void;
+  setQuoteLoading(): void;
+  setQuote(quote: Nullable<DossierQuoteDto>): void;
+  setQuoteError(): void;
 }
 
 export function dossierEffects(store: StoreMethods) {
@@ -55,6 +62,22 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
+  // Independent of the dossier: a slow or failed quote never delays or breaks the page.
+  const loadQuote = rxMethod<string>(
+    pipe(
+      tap(() => store.setQuoteLoading()),
+      switchMap(symbol =>
+        dossierService.getQuotes(symbol).pipe(
+          tap(quotes => store.setQuote(quotes[0] ?? null)),
+          catchError(() => {
+            store.setQuoteError();
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
   // Cached-only fetch — runs on page load so a previously generated read renders instantly.
   const loadLedgerRead = rxMethod<string>(
     pipe(
@@ -84,7 +107,7 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
-  return {loadDossier, loadLedgerRead, generateLedgerRead};
+  return {loadDossier, loadQuote, loadLedgerRead, generateLedgerRead};
 }
 
 export function dossierHooks(store: ReturnType<typeof dossierEffects>) {
@@ -96,6 +119,7 @@ export function dossierHooks(store: ReturnType<typeof dossierEffects>) {
       const symbol = route.snapshot.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM) ?? '';
       if (symbol) {
         store.loadDossier(symbol);
+        store.loadQuote(symbol);
         if (authStore.canUseAi()) {
           store.loadLedgerRead(symbol);
         }

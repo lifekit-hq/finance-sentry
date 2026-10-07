@@ -1,4 +1,8 @@
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
 
 export interface DossierState {
   dossier: Nullable<AssetDossierDto>;
@@ -8,6 +12,8 @@ export interface DossierState {
   ledgerReadStatus: AsyncStatus;
   ledgerReadErrorCode: Nullable<string>;
   isThesisExpanded: boolean;
+  quote: Nullable<DossierQuoteDto>;
+  quoteStatus: AsyncStatus;
 }
 
 export const initialDossierState: DossierState = {
@@ -18,4 +24,6 @@ export const initialDossierState: DossierState = {
   ledgerReadStatus: 'idle',
   ledgerReadErrorCode: null,
   isThesisExpanded: false,
+  quote: null,
+  quoteStatus: 'idle',
 };

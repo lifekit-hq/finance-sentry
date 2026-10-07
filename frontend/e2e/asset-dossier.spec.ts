@@ -30,6 +30,20 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
   });
 
+  test('dossier header shows price and the day change beside the symbol', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    await expect(page.getByTestId('dossier-price')).toHaveText('$189.30');
+    await expect(page.getByTestId('dossier-day-change')).toHaveText('+1.23%');
+  });
+
+  test('dossier header keeps its slot when there is no quote', async ({page}) => {
+    await page.goto('/assets/ZZZZ');
+    await expect(page.getByRole('heading', {name: 'ZZZZ', level: 1})).toBeVisible();
+    await expect(page.getByTestId('dossier-price')).toHaveCount(0);
+    const slot = await page.getByTestId('dossier-quote').boundingBox();
+    expect(slot?.height).toBeGreaterThanOrEqual(48);
+  });
+
   test('dossier page renders position section', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Position')).toBeVisible();

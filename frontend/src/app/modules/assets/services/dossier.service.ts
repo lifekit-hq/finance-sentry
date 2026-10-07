@@ -2,7 +2,11 @@ import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
 
 @Injectable({providedIn: 'root'})
 export class DossierService extends ApiService {
@@ -12,6 +16,11 @@ export class DossierService extends ApiService {
 
   public getDossier(symbol: string): Observable<AssetDossierDto> {
     return this.get<AssetDossierDto>(`research/assets/${encodeURIComponent(symbol)}/dossier`);
+  }
+
+  /** Live quote for one ticker; the endpoint answers with a list. */
+  public getQuotes(symbol: string): Observable<DossierQuoteDto[]> {
+    return this.get<DossierQuoteDto[]>(`research/quotes?tickers=${encodeURIComponent(symbol)}`);
   }
 
   /** Cached "Ledger's read" — instant, never runs the agent. */

@@ -9,10 +9,37 @@
   } @else if (store.dossierErrorMessage()) {
     <cmn-alert variant="error">{{ store.dossierErrorMessage() }}</cmn-alert>
   } @else if (store.dossier(); as dossier) {
-    <!-- The top bar owns the symbol and the way back (route data) -->
-    <p class="text-cmn-xs text-text-secondary">
-      Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
-    </p>
+    <!-- The top bar owns the symbol and the way back (route data); the quote sits right under it -->
+    <div class="flex items-start justify-between gap-cmn-3">
+      <p class="text-cmn-xs text-text-secondary">
+        Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
+      </p>
+      <!-- Reserved slot: same height whether the quote is loading, present or missing, so the page never jumps. -->
+      <div
+        class="flex min-h-[3rem] min-w-[7rem] flex-col items-end justify-center text-right"
+        data-testid="dossier-quote"
+      >
+        @if (store.quoteHeader(); as quote) {
+          <span
+            class="font-headline text-cmn-xl font-bold text-text-primary"
+            data-testid="dossier-price"
+          >
+            {{ quote.priceText }}
+          </span>
+          @if (quote.changeText) {
+            <span
+              [class]="deltaClass[quote.direction]"
+              class="text-cmn-sm font-medium"
+              data-testid="dossier-day-change"
+            >
+              {{ quote.changeText }}
+            </span>
+          }
+        } @else if (store.isQuoteLoading()) {
+          <cmn-skeleton height="1.75rem" width="6rem" />
+        }
+      </div>
+    </div>
 
     @if (!store.hasDossierSections()) {
       <cmn-card class="block" data-testid="dossier-no-data">

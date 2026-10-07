@@ -1,7 +1,12 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
+import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
 import {type DossierState} from './dossier.state';
 
 interface StateSignals {
@@ -12,6 +17,8 @@ interface StateSignals {
   ledgerReadStatus: Signal<DossierState['ledgerReadStatus']>;
   ledgerReadErrorCode: Signal<Nullable<string>>;
   isThesisExpanded: Signal<boolean>;
+  quote: Signal<Nullable<DossierQuoteDto>>;
+  quoteStatus: Signal<DossierState['quoteStatus']>;
 }
 
 const PARAGRAPH_BREAK = /\n\s*\n/;
@@ -56,6 +63,8 @@ export function dossierComputed(store: StateSignals) {
     visibleThesisParagraphs: computed(() =>
       store.isThesisExpanded() ? thesisParagraphs() : thesisParagraphs().slice(0, 1)
     ),
+    isQuoteLoading: computed(() => store.quoteStatus() === 'loading'),
+    quoteHeader: computed(() => DossierQuoteUtils.toHeader(store.quote())),
     isLedgerReadLoading: computed(() => store.ledgerReadStatus() === 'loading'),
     ledgerReadNarrative: computed(() => store.ledgerRead()?.narrative ?? ''),
     // The backend reports a missing cache as stale; only an actual narrative can be out of date.
