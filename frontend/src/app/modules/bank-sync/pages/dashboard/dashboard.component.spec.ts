@@ -1,4 +1,4 @@
-import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
@@ -47,7 +47,7 @@ function render(range: HistoryRange = '3m', data?: unknown) {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      provideHttpClient(),
+      provideHttpClient(withXhr()),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
     ],

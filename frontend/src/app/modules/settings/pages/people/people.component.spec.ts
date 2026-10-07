@@ -1,4 +1,4 @@
-import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
@@ -17,7 +17,7 @@ describe('PeopleComponent', () => {
       imports: [PeopleComponent],
       providers: [
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         {provide: API_BASE_URL, useValue: 'http://api.test'},
         {provide: PeopleService, useValue: {list: vi.fn()}},

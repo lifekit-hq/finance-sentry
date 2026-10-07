@@ -3,6 +3,7 @@ import {
   HttpStatusCode,
   provideHttpClient,
   withInterceptors,
+  withXhr,
 } from '@angular/common/http';
 import {HttpTestingController, provideHttpClientTesting} from '@angular/common/http/testing';
 import {inject} from '@angular/core';
@@ -22,7 +23,7 @@ describe('authInterceptor', () => {
     logout.mockReset();
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         {provide: AuthService, useValue: {}},
         {provide: AuthStore, useValue: {logout, applyAuthResponse: vi.fn()}},
@@ -57,7 +58,7 @@ describe('authInterceptor', () => {
     let storeRequestError: unknown = null;
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         {provide: AuthService, useValue: {}},
         {
