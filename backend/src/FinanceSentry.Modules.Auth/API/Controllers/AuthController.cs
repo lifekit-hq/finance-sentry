@@ -16,7 +16,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
 
 namespace FinanceSentry.Modules.Auth.API.Controllers;
@@ -38,7 +40,8 @@ public class AuthController(
     IQueryHandler<GetMeQuery, GetMeResult> getMeHandler,
     IWebHostEnvironment env,
     IOptions<AuthSignInOptions> signInOptions,
-    IOptions<OidcLoginOptions> oidcOptions) : ControllerBase
+    IOptions<OidcLoginOptions> oidcOptions,
+    ILogger<AuthController> logger) : ControllerBase
 {
     private const int RefreshTokenCookieDays = 30;
     private const string ReturnUrlItem = "returnUrl";
@@ -116,6 +119,8 @@ public class AuthController(
                 HttpContext.RequestAborted);
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
+            if (external.Properties?.GetTokenValue(OpenIdConnectParameterNames.IdToken) is { Length: > 0 } idToken)
+                SetOidcIdTokenCookie(idToken);
         }
         catch (ApiException ex)
         {
@@ -170,6 +175,8 @@ public class AuthController(
             var result = await refreshHandler.Handle(new RefreshCommand(rawToken), HttpContext.RequestAborted);
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
+            if (AuthCookies.Read(Request.Cookies, AuthCookies.OidcIdToken, SecureCookies) is { Length: > 0 } idToken)
+                SetOidcIdTokenCookie(idToken);
             return Ok(result.Response);
         }
         catch (InvalidRefreshTokenException)
@@ -250,9 +257,31 @@ public class AuthController(
         if (!string.IsNullOrWhiteSpace(rawToken))
             await logoutHandler.Handle(new LogoutCommand(rawToken), HttpContext.RequestAborted);
 
+        var idToken = AuthCookies.Read(Request.Cookies, AuthCookies.OidcIdToken, SecureCookies);
         DeleteRefreshTokenCookie();
         DeleteAccessTokenCookie();
-        return NoContent();
+        AuthCookies.Delete(Response, AuthCookies.OidcIdToken, SecureCookies);
+
+        // A session that came from the provider ends there too (RP-initiated logout); otherwise the next sign-in
+        // would re-enter silently on the provider's still-live session.
+        if (!oidcOptions.Value.IsConfigured || string.IsNullOrWhiteSpace(idToken))
+            return NoContent();
+
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens([new AuthenticationToken { Name = OpenIdConnectParameterNames.IdToken, Value = idToken }]);
+        try
+        {
+            await HttpContext.SignOutAsync(OidcLoginOptions.Scheme, properties);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not build the identity provider's end-session URL; the local sign-out still completed.");
+            return NoContent();
+        }
+
+        return HttpContext.Items[OidcLoginExtensions.EndSessionUrlItem] is string endSessionUrl
+            ? Ok(new LogoutResponse(endSessionUrl))
+            : NoContent();
     }
 
     private string? ReadRefreshTokenCookie() =>
@@ -260,6 +289,10 @@ public class AuthController(
 
     private void SetRefreshTokenCookie(string rawToken) =>
         AuthCookies.Write(Response, AuthCookies.RefreshToken, rawToken,
+            DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
+
+    private void SetOidcIdTokenCookie(string idToken) =>
+        AuthCookies.Write(Response, AuthCookies.OidcIdToken, idToken,
             DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
 
     private void SetAccessTokenCookie(string rawToken, DateTime expiresAt) =>

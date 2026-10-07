@@ -3,7 +3,7 @@ import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, filter, pipe, startWith, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
 
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
@@ -69,6 +69,16 @@ export function authEffects(store: EffectsStore) {
   const settingsService = inject(SettingsService);
   const pushSession = inject(PushSessionService);
   const doc = inject(DOCUMENT);
+  let signingOut = false;
+
+  const releasePush = (): void => {
+    if (store.isAuthenticated()) {
+      pushSession.release().subscribe();
+    }
+  };
+  const goToLogin = (): void => {
+    void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+  };
 
   return {
     login: rxMethod<AuthRequest>(
@@ -129,13 +139,37 @@ export function authEffects(store: EffectsStore) {
         )
       )
     ),
+    /** The person's own Sign out: ends the identity provider's session too, so the next sign-in asks for credentials. */
     logout(): void {
-      if (store.isAuthenticated()) {
-        pushSession.release().subscribe();
+      if (signingOut) {
+        return;
       }
+      signingOut = true;
+      releasePush();
+      // Navigate only once the API has answered: /login forwards straight to the identity provider, so landing
+      // there before the provider's session is ended would sign the person right back in.
+      authService
+        .logout()
+        .pipe(catchError(() => of(null)))
+        .subscribe(res => {
+          store.clearSession();
+          if (res?.endSessionUrl) {
+            doc.location.assign(res.endSessionUrl);
+          } else {
+            signingOut = false;
+            goToLogin();
+          }
+        });
+    },
+    /** A lost or revoked app session: clears it and returns to /login, which re-enters through the provider. */
+    expireSession(): void {
+      if (signingOut) {
+        return;
+      }
+      releasePush();
       authService.logout().subscribe({error: () => undefined});
       store.clearSession();
-      void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+      goToLogin();
     },
   };
 }

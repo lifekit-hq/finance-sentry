@@ -207,6 +207,22 @@ describe('authEffects', () => {
       });
     });
 
+    it('ends the identity provider session by navigating to the URL the API returns', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of({endSessionUrl: 'https://idp.test/oidc/session/end?x=1'}));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).logout());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).toHaveBeenCalledWith('https://idp.test/oidc/session/end?x=1');
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
     it('does not release push when the session is already cleared', () => {
       const store = buildStore({isAuthenticated: false});
       pushSession.release.mockClear();
@@ -234,6 +250,81 @@ describe('authEffects', () => {
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
         queryParams: {info: 'signed_out'},
       });
+    });
+  });
+
+  describe('logout and expireSession', () => {
+    const endSession = {endSessionUrl: 'https://idp.test/oidc/session/end?x=1'};
+
+    it('a repeated sign-out while one is in flight calls the API once', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      configure(service, buildRouter());
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledTimes(1);
+    });
+
+    it('an expired session after a sign-out cannot navigate away from the end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.expireSession();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledWith(endSession.endSessionUrl);
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('an expired session clears the app session and goes to /login without an end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).expireSession());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
+        queryParams: {info: 'signed_out'},
+      });
+    });
+
+    it('a sign-out can be retried after the API answered without an end-session URL', () => {
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      const router = buildRouter();
+      configure(service, router);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -12,3 +12,6 @@ public record MeResponse(UserDto User, DateTime ExpiresAt, UserProfileDto Profil
 
 /// <summary>The sign-in methods a deployment offers; the login page renders only these.</summary>
 public record SignInMethodsResponse(bool Oidc, bool PasswordLogin);
+
+/// <summary>Body of a sign-out that must also end the identity provider's session: the browser navigates to the URL.</summary>
+public record LogoutResponse(string EndSessionUrl);

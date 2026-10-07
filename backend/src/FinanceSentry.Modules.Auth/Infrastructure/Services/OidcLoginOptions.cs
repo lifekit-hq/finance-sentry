@@ -53,4 +53,11 @@ public class OidcLoginOptions
 
     /// <summary>The absolute redirect URI to register with the provider.</summary>
     public string RedirectUri => PublicBaseUrl.TrimEnd('/') + CallbackPath;
+
+    /// <summary>
+    /// Where the provider returns the browser after ending its session; register it exactly as the app's
+    /// post sign-out redirect URI. The <c>info</c> value holds the login page on its message instead of
+    /// forwarding straight back to the provider.
+    /// </summary>
+    public string PostLogoutRedirectUri => PublicBaseUrl.TrimEnd('/') + "/login?info=signed_out";
 }
