@@ -3,10 +3,10 @@ import {PaletteEntityUtils} from './palette-entity.utils';
 describe('PaletteEntityUtils', () => {
   const entities = {
     holdings: [
-      {symbol: 'AAPL', isVenueCash: false},
-      {symbol: 'AAPL', isVenueCash: false},
-      {symbol: 'EUR', isVenueCash: true},
-      {symbol: 'BRK.B', isVenueCash: false},
+      {symbol: 'AAPL', assetClass: 'equity'},
+      {symbol: 'AAPL', assetClass: 'equity'},
+      {symbol: 'EUR', assetClass: 'cash'},
+      {symbol: 'BRK.B', assetClass: 'equity'},
     ],
     watchlist: [{ticker: 'aapl'}, {ticker: 'NVDA'}],
     accounts: [
@@ -15,7 +15,7 @@ describe('PaletteEntityUtils', () => {
     ],
   };
 
-  it('opens each held name on its dossier, once, skipping venue cash', () => {
+  it('opens each held name on its dossier, once, skipping cash rows (venue or broker)', () => {
     const held = PaletteEntityUtils.items(entities).filter(i => i.group === 'Holdings');
     expect(held.map(i => [i.id, i.label])).toEqual([
       ['/assets/AAPL', 'AAPL'],

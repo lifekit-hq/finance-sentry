@@ -5,8 +5,7 @@ import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
-import {CRYPTO_PROVIDERS} from '../constants/position/position.constants';
-import {type Position} from '../models/position/position.model';
+import {type Position, type PositionAssetClass} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
 import {type HoldingsState} from './holdings.state';
 
@@ -20,7 +19,7 @@ interface StateSignals {
 const DEFAULT_POSITIONS_ERROR = 'Failed to load positions.';
 const WEIGHT_TO_PERCENT = 100;
 
-export type AssetClass = 'equity' | 'crypto' | 'venueCash';
+export type AssetClass = PositionAssetClass;
 
 export interface PositionRow {
   symbol: string;
@@ -51,27 +50,30 @@ export interface AllocationBreakdownRow {
   percent: number;
 }
 
-const ASSET_CLASS_ORDER: readonly AssetClass[] = ['equity', 'crypto', 'venueCash'];
+const ASSET_CLASS_ORDER: readonly AssetClass[] = [
+  'cash',
+  'bonds',
+  'realEstate',
+  'equity',
+  'crypto',
+];
 
 const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
+  cash: 'Cash',
+  bonds: 'Bonds',
+  realEstate: 'Real estate',
   equity: 'Equities',
   crypto: 'Crypto',
-  venueCash: 'Venue cash',
 };
 
 // Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
 const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
+  cash: CATEGORICAL_STEPS[2],
+  bonds: CATEGORICAL_STEPS[3],
+  realEstate: CATEGORICAL_STEPS[4],
   equity: CATEGORICAL_STEPS[0],
   crypto: CATEGORICAL_STEPS[1],
-  venueCash: CATEGORICAL_STEPS[2],
 };
-
-function resolveAssetClass(position: Position): AssetClass {
-  if (position.isVenueCash) {
-    return 'venueCash';
-  }
-  return CRYPTO_PROVIDERS.has(position.provider) ? 'crypto' : 'equity';
-}
 
 export function holdingsComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
@@ -87,7 +89,7 @@ export function holdingsComputed(store: StateSignals) {
     const groups = new Map<AssetClass, PositionRow[]>();
 
     for (const p of positions) {
-      const assetClass = resolveAssetClass(p);
+      const assetClass = p.assetClass;
       const dayChangePct = DayChangeUtils.isQuotable(p)
         ? (dayChanges[p.symbol.toUpperCase()] ?? null)
         : null;

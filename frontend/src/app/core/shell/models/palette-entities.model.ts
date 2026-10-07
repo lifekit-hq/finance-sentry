@@ -4,7 +4,8 @@ export interface WatchlistEntry {
 
 export interface PaletteHolding {
   symbol: string;
-  isVenueCash: boolean;
+  /** Cash rows (broker or venue) have no dossier, so they are not palette items. */
+  assetClass: string;
 }
 
 export interface PaletteAccount {

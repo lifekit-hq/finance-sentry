@@ -98,8 +98,8 @@
 
           <cmn-data-table
             [rows]="group.rows"
-            [rowsActionable]="true"
-            (rowClick)="navigateToDossier($event.symbol)"
+            [rowsActionable]="group.assetClass !== 'cash'"
+            (rowClick)="openDossier(group.assetClass, $event.symbol)"
           >
             <cmn-column key="symbol" listSlot="primary" header="Symbol">
               <ng-template let-row cmnCell>

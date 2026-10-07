@@ -18,6 +18,7 @@ const EQUITY: Position = {
   pnlPercent: null,
   pnlUsd: null,
   isVenueCash: false,
+  assetClass: 'equity',
 };
 
 function buildStore() {

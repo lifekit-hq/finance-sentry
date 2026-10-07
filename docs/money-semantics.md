@@ -65,7 +65,8 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   valued 1:1 and logged. It counts toward the venue's value and net worth, and in
   `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
   position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Holdings page
-  groups it as "Venue cash" with no unit price (`holdings.computed.ts`).
+  groups it in the **Cash** slice (with broker cash, below) with no unit price
+  (`holdings.computed.ts`).
 - **Cost basis — Binance** is reconstructed from the full fill history
   (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
   quote pair).
@@ -140,6 +141,15 @@ Everything Inzhur reports is in UAH and is converted to USD once, at ingest (§3
   their last sync (`BrokerageFreshness.Daily`), so one missed daily run is not yet stale.
 - **Net worth** — the rows are ordinary brokerage holdings, so they enter the brokerage total
   (§8) with no Inzhur-specific path.
+
+**Holdings page slices.** `GET /brokerage/holdings` tags each position with `assetClass`, the
+`AssetClassNormalizer` bucket of its `InstrumentType`. The Holdings page donut, allocation rows
+and weights slice **Cash, Bonds, Real estate, Equities, Crypto**: broker `CASH` rows (IBKR
+`<CCY> Cash`, Inzhur `UAH Cash`) and venue fiat share the Cash slice; Inzhur `BOND` and `REIT`
+rows are Bonds and Real estate; other classes (commodities, unclassified) stay with Equities;
+non-fiat crypto is Crypto. A row's weight is its share of the whole page total, cash included,
+so Cash is a slice and cash never inflates the Equities rows. Cash rows are not holdings with a
+dossier: they link nowhere, and the command palette omits them.
 
 ### Failure behaviour
 

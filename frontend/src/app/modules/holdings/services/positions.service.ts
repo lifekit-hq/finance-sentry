@@ -3,6 +3,7 @@ import {ApiService} from '@lifekit-hq/core';
 import {forkJoin, map, type Observable, of} from 'rxjs';
 import {catchError} from 'rxjs/operators';
 
+import {BROKERAGE_ASSET_CLASS} from '../constants/position/position.constants';
 import {
   type BrokerageHoldingsDto,
   type CryptoHoldingDto,
@@ -69,6 +70,7 @@ export class PositionsService extends ApiService {
             pnlPercent: providerPnlPercent(p.usdValue, costBasisUsd),
             pnlUsd: providerPnlUsd(p.usdValue, costBasisUsd),
             isVenueCash: false,
+            assetClass: BROKERAGE_ASSET_CLASS.get(p.assetClass ?? '') ?? 'equity',
           };
         });
 
@@ -84,6 +86,7 @@ export class PositionsService extends ApiService {
           pnlPercent: null,
           pnlUsd: null,
           isVenueCash: h.isFiat,
+          assetClass: h.isFiat ? 'cash' : 'crypto',
         }));
 
         return [...brokeragePositions, ...cryptoPositions];

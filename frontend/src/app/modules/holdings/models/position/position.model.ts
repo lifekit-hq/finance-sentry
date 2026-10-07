@@ -7,6 +7,8 @@ export interface BrokeragePositionDto {
   averageCostUsd: Nullable<number>;
   /** The broker this position is held with — holdings can span several. */
   provider?: string;
+  /** Backend `AssetClassNormalizer` bucket of `instrumentType` (`Cash`, `Bonds`, `RealEstate`, `Equities`, ...). */
+  assetClass?: string;
 }
 
 export interface BrokerageHoldingsDto {
@@ -37,6 +39,9 @@ export interface CryptoHoldingsDto {
   totalUsdValue: number;
 }
 
+/** Holdings slice a position belongs to. */
+export type PositionAssetClass = 'cash' | 'bonds' | 'realEstate' | 'equity' | 'crypto';
+
 export interface Position {
   symbol: string;
   provider: string;
@@ -48,6 +53,8 @@ export interface Position {
   currentPrice: Nullable<number>;
   /** Fiat cash held on a crypto venue — its own asset class, never crypto and never bank cash. */
   isVenueCash: boolean;
+  /** Slice the row counts in; broker and venue cash are both `cash`. */
+  assetClass: PositionAssetClass;
   // Provider-supplied P&L only (IBKR cost basis). Null when the provider gives
   // us no cost basis (crypto cost basis is reconstructed on our side, so we do
   // not surface a P&L we can't stand behind).
