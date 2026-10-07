@@ -94,13 +94,13 @@
                       @if (upcomingTarget(item); as target) {
                         <a
                           [routerLink]="target.commands"
-                          class="font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                          class="tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                           data-testid="event-link"
                         >
                           {{ item.subject }}
                         </a>
                       } @else {
-                        <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                        <span class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                           {{ item.subject }}
                         </span>
                       }
@@ -147,7 +147,7 @@
               @if (target?.kind === 'route') {
                 <a
                   [routerLink]="routeCommands(target)"
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                   data-testid="fired-link"
                 >
                   {{ event.subject }}
@@ -155,7 +155,7 @@
               } @else if (target?.kind === 'external') {
                 <a
                   [href]="externalUrl(target)"
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                   data-testid="fired-link"
                   rel="noopener noreferrer"
                   target="_blank"
@@ -164,7 +164,7 @@
                 </a>
               } @else {
                 <span
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary"
                 >
                   {{ event.subject }}
                 </span>

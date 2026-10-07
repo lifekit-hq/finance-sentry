@@ -40,7 +40,7 @@
           <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
             Total position value
           </p>
-          <p class="mt-cmn-1 font-mono text-cmn-2xl font-bold tabular-nums text-text-primary">
+          <p class="mt-cmn-1 text-cmn-2xl font-bold tabular-nums text-text-primary">
             {{ store.totalPositionsValue() | money }}
           </p>
           <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
@@ -62,7 +62,7 @@
                 <span class="text-cmn-xs tabular-nums text-text-secondary"
                   >{{ row.percent | number: '1.0-0' }}%</span
                 >
-                <span class="ml-auto font-mono text-cmn-sm tabular-nums text-text-primary">
+                <span class="ml-auto text-cmn-sm tabular-nums text-text-primary">
                   {{ row.value | money }}
                 </span>
               </div>
@@ -91,7 +91,7 @@
             <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
               {{ group.label }}
             </h2>
-            <span class="font-mono tabular-nums text-cmn-sm text-text-secondary">
+            <span class="tabular-nums text-cmn-sm text-text-secondary">
               {{ group.totalValue | money }}
             </span>
           </div>
@@ -124,11 +124,9 @@
             </cmn-column>
             <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">
               <ng-template let-row cmnCell>
-                <span class="font-mono tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
+                <span class="tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
                 @if (row.currentPrice !== null) {
-                  <span class="font-mono tabular-nums md:hidden">
-                    × {{ row.currentPrice | money }}</span
-                  >
+                  <span class="tabular-nums md:hidden"> × {{ row.currentPrice | money }}</span>
                 }
                 <span class="md:hidden" data-testid="holding-day-change-phone">
                   <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
@@ -138,9 +136,9 @@
             <cmn-column key="price" header="Price" align="right">
               <ng-template let-row cmnCell>
                 @if (row.currentPrice === null) {
-                  <span class="font-mono tabular-nums text-text-secondary">—</span>
+                  <span class="tabular-nums text-text-secondary">—</span>
                 } @else {
-                  <span class="font-mono tabular-nums">{{ row.currentPrice | money }}</span>
+                  <span class="tabular-nums">{{ row.currentPrice | money }}</span>
                 }
               </ng-template>
             </cmn-column>
@@ -151,23 +149,21 @@
             </cmn-column>
             <cmn-column key="value" listSlot="trailing" header="Value" align="right">
               <ng-template let-row cmnCell>
-                <span class="font-mono tabular-nums font-semibold">{{
-                  row.currentValue | money
-                }}</span>
+                <span class="tabular-nums font-semibold">{{ row.currentValue | money }}</span>
               </ng-template>
             </cmn-column>
             <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">
               <ng-template let-row cmnCell>
                 @if (row.pnlPercent === null) {
                   <span
-                    class="font-mono tabular-nums text-text-secondary"
+                    class="tabular-nums text-text-secondary"
                     title="No cost basis reported by provider"
                     >—</span
                   >
                 } @else {
                   <span
                     [class]="row.pnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass"
-                    class="font-mono tabular-nums"
+                    class="tabular-nums"
                     >{{ row.pnlUsd | money: 'USD' : {signed: true} }} ({{
                       row.pnlPercent | number: '1.2-2'
                     }}%)</span
@@ -177,7 +173,7 @@
             </cmn-column>
             <cmn-column key="weight" header="Weight" align="right">
               <ng-template let-row cmnCell>
-                <span class="font-mono tabular-nums text-text-secondary"
+                <span class="tabular-nums text-text-secondary"
                   >{{ row.weightPercent | number: '1.1-1' }}%</span
                 >
               </ng-template>
@@ -192,7 +188,7 @@
 <ng-template #dayChange let-row>
   @if (row.dayChangePct === null) {
     <span
-      class="inline-block min-w-[4.5rem] text-right font-mono tabular-nums text-text-secondary"
+      class="inline-block min-w-[4.5rem] text-right tabular-nums text-text-secondary"
       data-testid="holding-day-change"
       title="No quote for this holding"
       >—</span
@@ -201,7 +197,7 @@
     <span
       [class]="row.dayChangePct >= 0 ? pnlPositiveClass : pnlNegativeClass"
       [title]="'Today: ' + (row.dayChangeUsd | money: 'USD' : {signed: true})"
-      class="inline-block min-w-[4.5rem] text-right font-mono tabular-nums"
+      class="inline-block min-w-[4.5rem] text-right tabular-nums"
       data-testid="holding-day-change"
       >{{ row.dayChangePct > 0 ? '+' : '' }}{{ row.dayChangePct | number: '1.2-2' }}%</span
     >

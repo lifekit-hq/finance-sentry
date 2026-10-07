@@ -1,4 +1,5 @@
-import {OTHER_SERIES_STEP} from '../../../shared/constants/chart/chart.constants';
+import {NEUTRAL_STEP} from '@lifekit-hq/charts-core';
+
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {MERCHANT_SERIES_STEPS} from '../constants/subscription/subscription.constants';
 import {type Subscription} from '../models/subscription/subscription.model';
@@ -15,7 +16,7 @@ export class SubscriptionUtils {
 
   public static getMerchantColor(name: string): string {
     if (!name) {
-      return ChartColorUtils.series(OTHER_SERIES_STEP);
+      return ChartColorUtils.series(NEUTRAL_STEP);
     }
     let hash = 0;
     for (let i = 0; i < name.length; i++) {

@@ -43,7 +43,7 @@
             {{ tx.bankName }} · {{ tx.date | date: 'd MMM y' }}
           </div>
         </div>
-        <span trailing class="font-mono text-cmn-sm font-semibold text-text-primary">
+        <span trailing class="tabular-nums text-cmn-sm font-semibold text-text-primary">
           {{ tx.amount | money: tx.currency }}
         </span>
       </cmn-selectable-card>

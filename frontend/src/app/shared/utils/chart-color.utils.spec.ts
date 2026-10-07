@@ -1,6 +1,6 @@
+import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
 import {describe, expect, it} from 'vitest';
 
-import {CATEGORICAL_SERIES_STEPS} from '../constants/chart/chart.constants';
 import {ChartColorUtils} from './chart-color.utils';
 
 describe('ChartColorUtils.series', () => {
@@ -15,25 +15,25 @@ describe('ChartColorUtils.categorical', () => {
   });
 
   it('gives every mark in one cycle a distinct colour', () => {
-    const colors = CATEGORICAL_SERIES_STEPS.map((_, i) => ChartColorUtils.categorical(i));
-    expect(new Set(colors).size).toBe(CATEGORICAL_SERIES_STEPS.length);
+    const colors = CATEGORICAL_STEPS.map((_, i) => ChartColorUtils.categorical(i));
+    expect(new Set(colors).size).toBe(CATEGORICAL_STEPS.length);
   });
 
   it('wraps after the last categorical step', () => {
-    expect(ChartColorUtils.categorical(CATEGORICAL_SERIES_STEPS.length)).toBe(
+    expect(ChartColorUtils.categorical(CATEGORICAL_STEPS.length)).toBe(
       ChartColorUtils.categorical(0)
     );
   });
 
   it('never hands out the slate tail colour', () => {
-    expect(CATEGORICAL_SERIES_STEPS.map((_, i) => ChartColorUtils.categorical(i))).not.toContain(
+    expect(CATEGORICAL_STEPS.map((_, i) => ChartColorUtils.categorical(i))).not.toContain(
       'var(--color-chart-series-9)'
     );
   });
 
   it('maps a negative index into the cycle', () => {
     expect(ChartColorUtils.categorical(-1)).toBe(
-      ChartColorUtils.categorical(CATEGORICAL_SERIES_STEPS.length - 1)
+      ChartColorUtils.categorical(CATEGORICAL_STEPS.length - 1)
     );
   });
 });

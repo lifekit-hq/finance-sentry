@@ -87,7 +87,7 @@
                 </div>
                 <div amount class="min-w-[72px] text-right">
                   <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
-                  <div class="font-mono text-cmn-sm font-semibold text-text-primary">
+                  <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                     {{ sub.monthlyEquivalent | money: sub.currency }}
                   </div>
                   <div class="text-cmn-xs text-text-disabled">/ mo</div>
@@ -147,7 +147,7 @@
                 {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
               </div>
               <div amount class="min-w-[72px] text-right">
-                <div class="font-mono text-cmn-sm font-semibold text-text-primary">
+                <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                   {{ item.monthlyEquivalent | money: item.currency }}
                 </div>
                 <div class="text-cmn-xs text-text-disabled">/ mo</div>
@@ -190,7 +190,7 @@
                   {{ item.occurrenceCount }} payments · done
                 </div>
                 <div amount class="min-w-[72px] text-right">
-                  <div class="font-mono text-cmn-sm font-semibold text-text-secondary">
+                  <div class="tabular-nums text-cmn-sm font-semibold text-text-secondary">
                     {{ item.monthlyEquivalent | money: item.currency }}
                   </div>
                   <div class="text-cmn-xs text-text-disabled">/ mo</div>
@@ -231,7 +231,7 @@
                 {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
               </div>
               <div amount class="min-w-[72px] text-right">
-                <div class="font-mono text-cmn-sm font-semibold text-text-primary">
+                <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                   {{ sub.monthlyEquivalent | money: sub.currency }}
                 </div>
                 <div class="text-cmn-xs text-text-disabled">/ mo</div>

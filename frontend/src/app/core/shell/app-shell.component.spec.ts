@@ -1,7 +1,7 @@
-import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {CmnShellService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
@@ -25,8 +25,8 @@ describe('AppShellComponent FAB clearance', () => {
     TestBed.configureTestingModule({
       providers: [
         {
-          provide: BreakpointObserver,
-          useValue: {observe: () => of({matches: wide}), isMatched: () => wide},
+          provide: CmnShellService,
+          useValue: {mode: signal(wide ? 'sidebar' : 'phone'), isPhone: signal(!wide)},
         },
         provideRouter([{path: '**', children: []}]),
         {

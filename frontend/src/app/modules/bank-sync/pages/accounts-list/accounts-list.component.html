@@ -3,7 +3,7 @@
     <cmn-card class="block mb-cmn-8">
       <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
       <p
-        class="mt-cmn-1 font-mono text-cmn-2xl font-bold tabular-nums text-text-primary"
+        class="mt-cmn-1 text-cmn-2xl font-bold tabular-nums text-text-primary"
         data-testid="accounts-net-worth"
       >
         {{ store.totalNetWorth() | money: store.baseCurrency() }}
@@ -21,7 +21,7 @@
               <span class="text-cmn-xs tabular-nums text-text-secondary"
                 >{{ row.percent | number: '1.0-0' }}%</span
               >
-              <span class="ml-auto font-mono text-cmn-sm tabular-nums text-text-primary">
+              <span class="ml-auto text-cmn-sm tabular-nums text-text-primary">
                 {{ row.value | money: store.baseCurrency() }}
               </span>
             </div>
@@ -105,7 +105,7 @@
 
               <div
                 [class.text-status-error]="inst.totalInBaseCurrency < 0"
-                class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
+                class="tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
                 status
               >
                 {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
@@ -143,7 +143,7 @@
                           <span class="font-medium text-cmn-sm text-text-primary">{{
                             card.displayName
                           }}</span>
-                          <span class="font-mono tabular-nums text-cmn-xs text-text-secondary">{{
+                          <span class="tabular-nums text-cmn-xs text-text-secondary">{{
                             card.totalInBaseCurrency | netBalance: store.baseCurrency()
                           }}</span>
                         </div>
@@ -221,7 +221,7 @@
 
 <ng-template #amountCell let-account>
   @let bal = account | accountBalance: store.baseCurrency();
-  <div class="shrink-0 text-right font-mono tabular-nums">
+  <div class="shrink-0 text-right tabular-nums">
     <div [class]="bal.owed ? 'text-status-error' : 'text-text-primary'" class="text-cmn-sm">
       {{ bal.native }}
     </div>

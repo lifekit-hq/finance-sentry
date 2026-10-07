@@ -83,6 +83,20 @@
               id="s-currency"
             />
           </cmn-form-field>
+        </div>
+      </div>
+
+      <!-- ── Appearance ── -->
+      <div
+        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      >
+        <div>
+          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Appearance</h2>
+          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
+            Light or dark, and the colour Finance Sentry takes. The colour is kept on this device.
+          </p>
+        </div>
+        <div class="space-y-cmn-4">
           <cmn-form-field label="Theme" fieldId="s-theme">
             <cmn-select
               [ngModel]="profile.theme"
@@ -91,6 +105,12 @@
               id="s-theme"
             />
           </cmn-form-field>
+          <lk-theme-picker
+            [appSeed]="appSeed"
+            [seed]="appearance.seed() ?? ''"
+            [intensity]="appearance.intensity()"
+            (lk-theme-picker-change)="onThemeChoice($event)"
+          />
         </div>
       </div>
 

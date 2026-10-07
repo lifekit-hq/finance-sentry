@@ -126,7 +126,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 <cmn-skeleton height="2.25rem" width="50%" />
               } @else {
                 <p
-                  class="font-mono text-cmn-2xl font-semibold tabular-nums text-text-primary"
+                  class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
                   data-testid="net-worth-value"
                 >
                   {{ store.totalBalanceFormatted() }}
@@ -231,7 +231,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       <cmn-skeleton height="1.5rem" width="70%" />
                     } @else {
                       <span
-                        class="block truncate font-mono text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
+                        class="block truncate text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
                         >{{ tile.value() }}</span
                       >
                     }

@@ -149,12 +149,12 @@
                         class="block h-full rounded-full bg-accent-default"
                       ></span>
                     </span>
-                    <span class="font-mono text-cmn-xs tabular-nums text-text-secondary"
+                    <span class="text-cmn-xs tabular-nums text-text-secondary"
                       >{{ group.sharePct | number: '1.0-0' }}%</span
                     >
                   </span>
                 }
-                <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
+                <span class="text-cmn-sm font-semibold tabular-nums text-text-primary">
                   {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
                 </span>
               </div>
@@ -185,11 +185,11 @@
                         [class]="
                           i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
                         "
-                        class="font-mono text-cmn-sm font-semibold tabular-nums"
+                        class="text-cmn-sm font-semibold tabular-nums"
                       >
                         {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
                       </div>
-                      <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
+                      <div class="text-cmn-xs tabular-nums text-text-secondary">
                         {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
                       </div>
                     </div>
@@ -260,12 +260,12 @@
                         [class]="
                           i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
                         "
-                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums"
+                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right tabular-nums"
                       >
                         {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
                       </td>
                       <td
-                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums text-text-secondary"
+                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right tabular-nums text-text-secondary"
                       >
                         {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
                       </td>

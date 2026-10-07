@@ -1,17 +1,14 @@
-import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {Router, RouterOutlet} from '@angular/router';
 import {
   AppLayoutAccount,
   AppLayoutComponent,
-  CMN_MEDIA_MD,
+  CmnShellService,
   CommandPaletteItem,
   type MenuItem,
   type NavItem,
   PALETTE_THEME_ACTION,
 } from '@lifekit-hq/ui';
-import {map} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
@@ -79,14 +76,10 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
 })
 export class AppShellComponent {
   private readonly router = inject(Router);
-  private readonly breakpoints = inject(BreakpointObserver);
+  private readonly shell = inject(CmnShellService);
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
-  private readonly sidebarShown = toSignal(
-    this.breakpoints.observe(CMN_MEDIA_MD).pipe(map(state => state.matches)),
-    {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
-  );
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
     (item.route as AppRoute) === AppRoute.Alerts
       ? {...item, badge: (): number => this.alertsStore.unreadCount()}
@@ -108,9 +101,9 @@ export class AppShellComponent {
     menuItems: AVATAR_MENU_ITEMS,
   }));
 
-  /** The sidebar leaves navigating to the app; the phone tab bar navigates itself (lifekit 2.0). */
+  /** The rail and the sidebar leave navigating to the app; the phone tab bar navigates itself. */
   public navigate(item: NavItem): void {
-    if (this.sidebarShown()) {
+    if (!this.shell.isPhone()) {
       void this.router.navigateByUrl(item.route);
     }
   }
