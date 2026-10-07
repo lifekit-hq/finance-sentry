@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  CUSTOM_ELEMENTS_SCHEMA,
   inject,
   signal,
   ViewContainerRef,
@@ -27,13 +28,16 @@ import {InputHintsDirective} from '../../../../shared/directives/input-hints.dir
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {APP_SEED} from '../../constants/appearance/appearance.constants';
 import {
   REAL_ANNUAL_RETURN_MAX_PERCENT,
   REAL_ANNUAL_RETURN_MIN_PERCENT,
   SAFE_WITHDRAWAL_RATE_MAX_PERCENT,
   SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
 } from '../../constants/fire/fire-assumptions.constants';
+import {type ThemeChoice} from '../../models/appearance/appearance.model';
 import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
+import {AppearanceStore} from '../../store/appearance/appearance.store';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 
@@ -68,7 +72,8 @@ const MIN_PASSWORD_LENGTH = 8;
     ToggleComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [SettingsStore, PushStore],
+  providers: [SettingsStore, PushStore, AppearanceStore],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './settings.component.html',
 })
 export class SettingsComponent {
@@ -82,6 +87,8 @@ export class SettingsComponent {
 
   public readonly store = inject(SettingsStore);
   public readonly push = inject(PushStore);
+  public readonly appearance = inject(AppearanceStore);
+  public readonly appSeed = APP_SEED;
   public readonly currencyOptions = CURRENCY_OPTIONS;
   public readonly themeOptions = THEME_OPTIONS;
   public readonly canManageUsers = this.authStore.canManageUsers;
@@ -192,6 +199,10 @@ export class SettingsComponent {
     this.pwNext.set('');
     this.pwConfirm.set('');
     this.toast.show('Password updated', 'success');
+  }
+
+  public onThemeChoice(event: Event): void {
+    this.appearance.choose((event as CustomEvent<ThemeChoice>).detail);
   }
 
   public openPeople(): void {

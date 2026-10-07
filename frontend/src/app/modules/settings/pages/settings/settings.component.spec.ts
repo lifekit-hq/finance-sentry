@@ -6,6 +6,7 @@ import {describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UserProfile} from '../../models/settings/settings.model';
+import {AppearanceStore} from '../../store/appearance/appearance.store';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {SettingsComponent} from './settings.component';
@@ -30,6 +31,7 @@ function create() {
     saveProfile: vi.fn(),
     updateProfile: vi.fn(),
   };
+  const appearance = {seed: signal<string | null>(null), intensity: signal(0.12), choose: vi.fn()};
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -42,11 +44,16 @@ function create() {
       providers: [
         {provide: SettingsStore, useValue: store},
         {provide: PushStore, useValue: {}},
+        {provide: AppearanceStore, useValue: appearance},
       ],
       template: '',
     },
   });
-  return {store, component: TestBed.createComponent(SettingsComponent).componentInstance};
+  return {
+    store,
+    appearance,
+    component: TestBed.createComponent(SettingsComponent).componentInstance,
+  };
 }
 
 describe('SettingsComponent financial independence assumptions', () => {
@@ -104,5 +111,25 @@ describe('SettingsComponent financial independence assumptions', () => {
     component.setRealReturn('abc');
     expect(component.realReturnError()).not.toBe('');
     expect(component.assumptionsInvalid()).toBe(true);
+  });
+});
+
+describe('SettingsComponent appearance', () => {
+  it('hands a picked colour to the appearance store', () => {
+    const {appearance, component} = create();
+    const detail = {seed: '#4f46e5', intensity: 0.3};
+    component.onThemeChoice(new CustomEvent('lk-theme-picker-change', {detail}));
+    expect(appearance.choose).toHaveBeenCalledWith(detail);
+  });
+
+  it('hands a reset to the appearance store as a null seed', () => {
+    const {appearance, component} = create();
+    const detail = {seed: null, intensity: 0.12};
+    component.onThemeChoice(new CustomEvent('lk-theme-picker-change', {detail}));
+    expect(appearance.choose).toHaveBeenCalledWith(detail);
+  });
+
+  it('offers Petrol as the app default', () => {
+    expect(create().component.appSeed).toBe('#175a6d');
   });
 });

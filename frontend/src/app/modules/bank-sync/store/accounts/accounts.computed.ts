@@ -1,5 +1,5 @@
 import {computed, type Signal} from '@angular/core';
-import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {
@@ -26,10 +26,10 @@ const CATEGORY_LABEL: Record<AccountCategory, string> = {
 
 // Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
 const CATEGORY_SERIES: Record<AccountCategory, number> = {
-  banking: SERIES.green,
-  brokerage: SERIES.accent,
-  crypto: SERIES.amber,
-  other: SERIES.slate,
+  banking: CATEGORICAL_STEPS[2],
+  brokerage: CATEGORICAL_STEPS[0],
+  crypto: CATEGORICAL_STEPS[1],
+  other: NEUTRAL_STEP,
 };
 
 const SECTION_ORDER: Omit<CategorySection, 'summary'>[] = [

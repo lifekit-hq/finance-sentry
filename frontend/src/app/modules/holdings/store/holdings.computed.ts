@@ -1,5 +1,5 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS, seriesColor} from '@lifekit-hq/charts-core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
@@ -61,9 +61,9 @@ const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
 
 // Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
 const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
-  equity: SERIES.accent,
-  crypto: SERIES.amber,
-  venueCash: SERIES.green,
+  equity: CATEGORICAL_STEPS[0],
+  crypto: CATEGORICAL_STEPS[1],
+  venueCash: CATEGORICAL_STEPS[2],
 };
 
 function resolveAssetClass(position: Position): AssetClass {

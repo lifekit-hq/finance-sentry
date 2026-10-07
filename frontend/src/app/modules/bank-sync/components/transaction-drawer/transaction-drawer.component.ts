@@ -24,10 +24,7 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
     <div class="flex flex-col gap-cmn-6 p-cmn-6">
       <!-- Amount hero -->
       <div class="text-center">
-        <p
-          [class]="tx | transactionAmountClass"
-          class="font-mono text-cmn-3xl font-bold tabular-nums"
-        >
+        <p [class]="tx | transactionAmountClass" class="text-cmn-3xl font-bold tabular-nums">
           {{ tx | transactionAmount }}
         </p>
         <p class="mt-cmn-1 text-cmn-sm text-text-secondary">

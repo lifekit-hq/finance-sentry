@@ -33,6 +33,7 @@
               "src/styles.scss",
               "node_modules/@lifekit-hq/tokens/fonts.css",
               "node_modules/@lifekit-hq/tokens/theme.css",
+              "node_modules/@lifekit-hq/tokens/seeds/fs.css",
               "node_modules/@lifekit-hq/tokens/base.css"
             ],
             "browser": "src/main.ts"
@@ -56,7 +57,7 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1.46mb",
+                  "maximumWarning": "1.48mb",
                   "maximumError": "1.5mb"
                 },
                 {

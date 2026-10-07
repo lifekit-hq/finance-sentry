@@ -521,7 +521,7 @@ describe('dashboardComputed', () => {
       expect(segments[7]).toEqual({
         label: 'Other categories',
         value: 93 + 92 + 91,
-        color: '#64748b',
+        color: '#636a6d',
       });
     });
   });

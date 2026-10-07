@@ -57,6 +57,15 @@ test.describe('Asset dossier visual baseline', () => {
     await expect(page).toHaveScreenshot('dossier-desktop.png', SCREENSHOT_OPTIONS);
   });
 
+  test('full dossier on desktop, dark', async ({page}) => {
+    await page.emulateMedia({colorScheme: 'dark'});
+    await page.setViewportSize(DESKTOP);
+    await openDossier(page, 'AAPL');
+    await expect(page.getByTestId('ledger-read-empty')).toBeVisible();
+    await expectTrendDrawn(page);
+    await expect(page).toHaveScreenshot('dossier-desktop-dark.png', SCREENSHOT_OPTIONS);
+  });
+
   test('full dossier on a phone', async ({page}) => {
     await page.setViewportSize(PHONE_FULL);
     await openDossier(page, 'AAPL');

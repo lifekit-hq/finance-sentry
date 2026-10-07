@@ -4,7 +4,7 @@ import {API, AUTH_RESPONSE} from './support/dossier-mocks';
 
 // Pixel baseline for the dashboard, same pattern as the asset dossier spec: route-mocked fixtures,
 // a clock that starts at a pinned time so month keys and relative timestamps are stable, CSS
-// animations disabled by the screenshot options. Light theme (the default), desktop and 390 px phone.
+// animations disabled by the screenshot options. Light theme (the default) and dark, desktop and 390 px phone.
 // The clock is installed (ticking) rather than frozen: Chart.js animates off Date.now, so a frozen
 // clock leaves the bar chart at zero height. Capture waits for the chart canvas, then advances the
 // fake clock past the animation (CHART_SETTLE_MS) so the bars are drawn at their full data height.
@@ -107,6 +107,20 @@ test.describe('Dashboard visual baseline', () => {
     await page.setViewportSize(DESKTOP);
     await openDashboard(page);
     await expectBaseline(page, 'dashboard-desktop.png');
+  });
+
+  test('dashboard on desktop, dark', async ({page}) => {
+    await page.emulateMedia({colorScheme: 'dark'});
+    await page.setViewportSize(DESKTOP);
+    await openDashboard(page);
+    await expectBaseline(page, 'dashboard-desktop-dark.png');
+  });
+
+  test('dashboard on a phone, dark', async ({page}) => {
+    await page.emulateMedia({colorScheme: 'dark'});
+    await page.setViewportSize(PHONE);
+    await openDashboard(page);
+    await expectBaseline(page, 'dashboard-phone-dark.png');
   });
 
   test('dashboard on a phone', async ({page}) => {

@@ -64,9 +64,11 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/alerts?**`, route => route.fulfill(json(ALERTS)));
   await page.route(`${API}/accounts**`, route => route.fulfill(json([])));
   // The filing opens on sec.gov; the sandbox must not reach the real site.
-  await page.context().route('https://www.sec.gov/**', route =>
-    route.fulfill({contentType: 'text/html', body: '<h1>stub EDGAR filing</h1>'})
-  );
+  await page
+    .context()
+    .route('https://www.sec.gov/**', route =>
+      route.fulfill({contentType: 'text/html', body: '<h1>stub EDGAR filing</h1>'})
+    );
 }
 
 test.describe('Filing alerts', () => {

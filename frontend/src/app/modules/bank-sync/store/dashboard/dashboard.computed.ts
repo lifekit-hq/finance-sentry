@@ -1,11 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
 import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
 
-import {
-  CATEGORICAL_SERIES_STEPS,
-  OTHER_SERIES_STEP,
-} from '../../../../shared/constants/chart/chart.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
@@ -51,14 +47,16 @@ function formatMonthYear(date: Date): string {
 const SHORT_SPAN_DAYS = 92;
 const MS_PER_DAY = 86_400_000;
 
-// Chart-series steps; resolved when a chart is built, since a canvas cannot read a CSS var.
+// Chart-series steps (positions in the seed's categorical ramp); resolved when a chart is built,
+// since a canvas cannot read a CSS var. Colour carries no gain/loss meaning here: that is the
+// delta text's job alone.
 const SLEEVE_SERIES = {
-  banking: SERIES.green,
-  brokerage: SERIES.accent,
-  crypto: SERIES.amber,
+  banking: CATEGORICAL_STEPS[2],
+  brokerage: CATEGORICAL_STEPS[0],
+  crypto: CATEGORICAL_STEPS[1],
 } as const;
-const INCOME_SERIES = SERIES.green;
-const SPENDING_SERIES = SERIES.red;
+const INCOME_SERIES = CATEGORICAL_STEPS[0];
+const SPENDING_SERIES = CATEGORICAL_STEPS[5];
 const PERCENT = 100;
 const OTHER_CATEGORIES_LABEL = 'Other categories';
 
@@ -391,17 +389,17 @@ export function dashboardComputed(store: StateSignals) {
         label: categoryStore.labelMap()[c.category] ?? MerchantCategoryUtils.format(c.category),
         value: c.totalSpend,
       }));
-      if (segments.length <= CATEGORICAL_SERIES_STEPS.length) {
+      if (segments.length <= CATEGORICAL_STEPS.length) {
         return segments;
       }
-      const named = segments.slice(0, CATEGORICAL_SERIES_STEPS.length - 1);
+      const named = segments.slice(0, CATEGORICAL_STEPS.length - 1);
       const tail = segments.slice(named.length);
       return [
         ...named,
         {
           label: OTHER_CATEGORIES_LABEL,
           value: tail.reduce((sum, s) => sum + s.value, 0),
-          color: seriesColor(OTHER_SERIES_STEP),
+          color: seriesColor(NEUTRAL_STEP),
         },
       ];
     }),
