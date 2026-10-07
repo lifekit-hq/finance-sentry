@@ -1,10 +1,12 @@
 import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
   CardComponent,
   CmnDialogService,
+  CmnPageActionsService,
   EmptyStateComponent,
   IconComponent,
   InputComponent,
@@ -12,11 +14,11 @@ import {
   type MenuItem,
   MonthStepperComponent,
   PageContainerComponent,
-  PageHeaderComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {BUDGETS_ADD_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
@@ -49,7 +51,6 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
     MenuComponent,
     MoneyPipe,
     MonthStepperComponent,
-    PageHeaderComponent,
     TagComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,6 +68,13 @@ export class BudgetsComponent {
   public readonly budgetMenuItems = BUDGET_MENU_ITEMS;
   public readonly nearLimitPct = BUDGET_NEAR_LIMIT_PCT;
   public readonly currentMonth = new Date();
+
+  constructor() {
+    inject(CmnPageActionsService)
+      .on(BUDGETS_ADD_ACTION)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.openAddBudget());
+  }
 
   // By position in the grid, not by category: the colours repeat only every eight cards, so
   // cards that sit side by side never share one.

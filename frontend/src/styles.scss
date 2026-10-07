@@ -21,3 +21,12 @@ body {
 body {
   font-size: 0.875rem;
 }
+
+/* The phone top bar carries no avatar: its account items (Log out) live on the More page. The
+   library top bar always renders the avatar menu and offers no input to drop it, and the avatar is
+   its only menu. Matches CMN_MEDIA_MD (min-width: 768px) from the other side. */
+@media (max-width: 767.98px) {
+  cmn-top-bar cmn-menu {
+    display: none;
+  }
+}

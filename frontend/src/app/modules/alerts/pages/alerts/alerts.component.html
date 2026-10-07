@@ -1,11 +1,5 @@
 <cmn-page-container spacing="none" fill>
-  <cmn-page-header
-    [subtitle]="alertsSubtitle()"
-    [secondaryActionLabel]="store.unreadCount() > 0 ? 'Mark all read' : null"
-    (secondaryClick)="markAllRead()"
-    title="Alerts"
-    secondaryActionIcon="CheckCheck"
-  />
+  <p class="text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
 
   <div class="mt-cmn-4 flex gap-cmn-2 overflow-x-auto">
     @for (opt of filterOptions; track opt.id) {

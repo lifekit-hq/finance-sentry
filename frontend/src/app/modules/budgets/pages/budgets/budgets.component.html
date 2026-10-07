@@ -1,11 +1,6 @@
 <cmn-page-container spacing="none">
   <div class="space-y-cmn-5">
-    <cmn-page-header
-      (actionClick)="openAddBudget()"
-      title="Budgets"
-      subtitle="Monthly spending limits"
-      actionLabel="Add budget"
-    />
+    <p class="text-cmn-sm text-text-secondary">Monthly spending limits</p>
 
     <cmn-month-stepper
       [value]="store.selectedMonthDate()"

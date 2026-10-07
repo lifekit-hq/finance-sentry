@@ -1,5 +1,6 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
@@ -7,6 +8,7 @@ import {
   CardComponent,
   ChipComponent,
   CmnDialogService,
+  CmnPageActionsService,
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -14,11 +16,11 @@ import {
   MenuComponent,
   type MenuItem,
   PageContainerComponent,
-  PageHeaderComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {SUBSCRIPTIONS_ADD_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
@@ -78,7 +80,6 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     MenuComponent,
     MerchantColorPipe,
     MoneyPipe,
-    PageHeaderComponent,
     SlicePipe,
     StatCardComponent,
     UpperCasePipe,
@@ -95,6 +96,13 @@ export class SubscriptionsComponent {
   public readonly store = inject(SubscriptionsStore);
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
+
+  constructor() {
+    inject(CmnPageActionsService)
+      .on(SUBSCRIPTIONS_ADD_ACTION)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.openAdd());
+  }
 
   public subscriptionMenuItems(sub: MenuSubscription): MenuItem[] {
     const items = sub.isTracked ? SUBSCRIPTION_MENU_ITEMS : UNLINKED_SUBSCRIPTION_MENU_ITEMS;

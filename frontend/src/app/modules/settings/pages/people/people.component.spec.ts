@@ -1,11 +1,10 @@
 import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
-import {provideRouter, Router} from '@angular/router';
+import {provideRouter} from '@angular/router';
 import {API_BASE_URL} from '@lifekit-hq/core';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {PeopleService} from '../../services/people.service';
 import {PeopleComponent} from './people.component';
 
@@ -26,15 +25,10 @@ describe('PeopleComponent', () => {
     fixture = TestBed.createComponent(PeopleComponent);
   });
 
-  it('renders a back link that navigates to Settings', () => {
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  it('leaves the title and the way back to the top bar', () => {
     fixture.detectChanges();
-    const back = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="people-back"]'
-    );
-    expect(back).not.toBeNull();
-    expect(back?.textContent).toContain('Settings');
-    fixture.componentInstance.goBack();
-    expect(navigate).toHaveBeenCalledWith([AppRoute.Settings]);
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[data-testid="people-back"]')).toBeNull();
+    expect(host.querySelector('h1')).toBeNull();
   });
 });

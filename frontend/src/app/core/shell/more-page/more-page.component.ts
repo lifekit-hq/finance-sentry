@@ -29,9 +29,15 @@ import {NavUtils} from '../utils/nav.utils';
 export class MorePageComponent {
   private readonly authStore = inject(AuthStore);
 
+  public readonly email = this.authStore.email;
+
   public readonly items = computed(() =>
     NavUtils.moreItems(NAV_ITEMS).filter(item =>
       NavUtils.isPermitted(item.route, this.authStore.permissions())
     )
   );
+
+  public logout(): void {
+    this.authStore.logout();
+  }
 }

@@ -1,17 +1,19 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
   ButtonComponent,
   ChipComponent,
+  CmnPageActionsService,
   EmptyStateComponent,
   type LucideIconName,
   PageContainerComponent,
-  PageHeaderComponent,
   ToastService,
 } from '@lifekit-hq/ui';
 
+import {ALERTS_MARK_ALL_READ_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {
   type Alert,
   type AlertFilter,
@@ -46,7 +48,6 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     ButtonComponent,
     ChipComponent,
     EmptyStateComponent,
-    PageHeaderComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block h-full'},
@@ -93,6 +94,13 @@ export class AlertsComponent {
     () => this.store.totalCount() > Math.min(...ALERT_PAGE_SIZE_OPTIONS)
   );
 
+  constructor() {
+    inject(CmnPageActionsService)
+      .on(ALERTS_MARK_ALL_READ_ACTION)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.markAllRead());
+  }
+
   public iconFor(type: AlertType): LucideIconName {
     return AlertTypeUtils.meta(type).icon;
   }
@@ -106,6 +114,9 @@ export class AlertsComponent {
   }
 
   public markAllRead(): void {
+    if (this.store.unreadCount() === 0) {
+      return;
+    }
     this.store.markAllRead();
     this.toast.show('All alerts marked as read', 'success');
   }

@@ -13,7 +13,6 @@ import {
   DonutChartComponent,
   IconComponent,
   PageContainerComponent,
-  PageHeaderComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
@@ -59,7 +58,6 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     IconComponent,
     MerchantCategoryPipe,
     MoneyPipe,
-    PageHeaderComponent,
     RouterLink,
     SkeletonComponent,
   ],
@@ -68,11 +66,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   template: `
     <cmn-page-container spacing="none">
       <div class="space-y-cmn-6">
-        <cmn-page-header
-          class="block"
-          title="Dashboard"
-          subtitle="How your money is trending over time"
-        />
+        <p class="text-cmn-sm text-text-secondary">How your money is trending over time</p>
 
         @if (store.errorMessage()) {
           <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>

@@ -2,7 +2,6 @@ import {Clipboard} from '@angular/cdk/clipboard';
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
 import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
-import {Router} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
@@ -14,14 +13,12 @@ import {
   InputComponent,
   ListItemRowComponent,
   PageContainerComponent,
-  PageHeaderComponent,
   SkeletonComponent,
   TagComponent,
   ToastService,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
-import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {PERSON_STATUS_TAG_VARIANT} from '../../constants/person/person.constants';
 import {type PersonRow} from '../../models/person/person.model';
 import {PeopleStore} from '../../store/people/people.store';
@@ -42,7 +39,6 @@ const SKELETON_ROWS = 3;
     FormFieldComponent,
     InputComponent,
     ListItemRowComponent,
-    PageHeaderComponent,
     SkeletonComponent,
     TagComponent,
   ],
@@ -53,7 +49,6 @@ const SKELETON_ROWS = 3;
 export class PeopleComponent {
   private readonly clipboard = inject(Clipboard);
   private readonly dialog = inject(CmnDialogService);
-  private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly viewContainerRef = inject(ViewContainerRef);
 
@@ -63,10 +58,6 @@ export class PeopleComponent {
   public readonly inviteForm = inject(FormBuilder).group({
     email: ['', [Validators.required, Validators.email]],
   });
-
-  public goBack(): void {
-    void this.router.navigate([AppRoute.Settings]);
-  }
 
   public createInvite(): void {
     if (this.inviteForm.invalid) {

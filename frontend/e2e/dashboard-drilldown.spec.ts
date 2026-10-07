@@ -590,6 +590,8 @@ test.describe('Dashboard → Ledger spending consistency', () => {
     // Read the Spending tile value from the dashboard.
     const spendingCard = page.getByRole('button', {name: /view spending details/i});
     await expect(spendingCard).toBeVisible();
+    // The title now comes from the route, so it shows before the tile has loaded its value.
+    await expect(spendingCard).toContainText(/\$[\d,.]+/);
     const spendingText = (await spendingCard.innerText()).trim();
     const dashboardAmount = extractAmount(spendingText);
 

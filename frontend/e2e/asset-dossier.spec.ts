@@ -57,11 +57,11 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByText('Apple reports record services revenue in Q3')).toBeVisible();
   });
 
-  test('back button returns to investments', async ({page}) => {
+  test('the top bar back chevron returns to investments', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
 
-    await page.getByTestId('dossier-back').click();
+    await page.getByRole('button', {name: 'Back'}).click();
 
     await expect(page).toHaveURL(/\/accounts\/investments/);
   });
