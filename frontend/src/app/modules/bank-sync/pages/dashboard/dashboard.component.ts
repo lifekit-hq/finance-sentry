@@ -105,11 +105,14 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
           <cmn-card>
             <div class="space-y-cmn-2">
               <div class="flex flex-wrap items-center justify-between gap-cmn-2">
-                <span
-                  class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+                <a
+                  [routerLink]="accountsRoute"
+                  class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+                  data-testid="net-worth-link"
+                  aria-label="View accounts behind net worth"
                 >
-                  Net worth
-                </span>
+                  Net worth →
+                </a>
                 <div
                   class="grid w-full grid-cols-4 justify-items-start gap-cmn-1 sm:flex sm:w-auto"
                   role="group"
@@ -287,6 +290,7 @@ export class DashboardComponent {
   public readonly store = inject(DashboardStore);
   public readonly ranges = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
+  public readonly accountsRoute = AppRoute.AccountsList;
   public readonly showEmptyState = computed(
     () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
   );

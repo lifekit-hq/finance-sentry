@@ -82,9 +82,14 @@
                   [style.background]="categoryColor(b.category)"
                   class="h-2.5 w-2.5 shrink-0 rounded-sm"
                 ></div>
-                <span class="truncate font-label text-cmn-sm font-semibold text-text-primary">{{
-                  b.categoryLabel
-                }}</span>
+                <button
+                  (click)="viewTransactions(b.category)"
+                  class="truncate font-label text-cmn-sm font-semibold text-text-primary hover:underline"
+                  data-testid="budget-category-link"
+                  type="button"
+                >
+                  {{ b.categoryLabel }}
+                </button>
               </div>
               <div class="flex shrink-0 items-center gap-cmn-1">
                 @if (b.isOverBudget) {
