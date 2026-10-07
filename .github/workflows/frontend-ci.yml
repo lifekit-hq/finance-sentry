@@ -81,6 +81,11 @@ jobs:
       run: npm run build
       working-directory: frontend
 
+    # Built index.html theme-color pair and manifest fields against the lifekit browser-chrome standard.
+    - name: Browser chrome check
+      run: npm run chrome-check
+      working-directory: frontend
+
     # Vitest runs specs in a real Chromium via @vitest/browser-playwright.
     - name: Install Playwright Chromium
       run: npx playwright install --with-deps chromium

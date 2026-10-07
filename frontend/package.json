@@ -14,6 +14,7 @@
     "format": "prettier --write \"src/**/*.{ts,html,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss}\"",
     "drift": "lifekit-chrome-check drift src",
+    "chrome-check": "lifekit-chrome-check --app fs --name \"Finance Sentry\" dist/finance-sentry/browser",
     "e2e": "playwright test",
     "e2e:live": "playwright test --config playwright.live.config.ts",
     "prepare": "git -C .. config core.hooksPath .husky || true"
