@@ -77,6 +77,10 @@ export class FlowBreakdownComponent {
     return {...extra, ...this.windowDates()};
   }
 
+  public counterpartyQuery(item: FlowBreakdownItem): Nullable<string> {
+    return FlowBreakdownUtils.counterpartyQuery(item);
+  }
+
   public cardParams(type: 'credit' | 'debit'): Record<string, string> {
     const account = this.store.accountFilter();
     return this.ledgerParams(account ? {type, account} : {type});

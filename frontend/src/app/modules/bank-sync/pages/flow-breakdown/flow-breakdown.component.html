@@ -229,15 +229,20 @@
                     </td>
                     <td class="px-cmn-4 py-cmn-3">
                       @if (i.counterpartyName) {
-                        <a
-                          [routerLink]="transactionsRoute"
-                          [queryParams]="ledgerParams({q: i.counterpartyName})"
-                          (click)="$event.stopPropagation()"
-                          (keydown.enter)="$event.stopPropagation()"
-                          data-testid="breakdown-counterparty-link"
-                        >
+                        @let counterpartyQ = counterpartyQuery(i);
+                        @if (counterpartyQ) {
+                          <a
+                            [routerLink]="transactionsRoute"
+                            [queryParams]="ledgerParams({q: counterpartyQ})"
+                            (click)="$event.stopPropagation()"
+                            (keydown.enter)="$event.stopPropagation()"
+                            data-testid="breakdown-counterparty-link"
+                          >
+                            <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
+                          </a>
+                        } @else {
                           <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
-                        </a>
+                        }
                       } @else if (i.category) {
                         <a
                           [routerLink]="transactionsRoute"

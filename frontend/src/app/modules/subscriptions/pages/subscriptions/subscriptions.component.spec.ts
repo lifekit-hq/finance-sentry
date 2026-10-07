@@ -43,22 +43,28 @@ describe('SubscriptionsComponent', () => {
 
     const ids = (items: {id: string}[]) => items.map(i => i.id);
 
-    expect(ids(component.subscriptionMenuItems({isTracked: true}))).not.toContain('link');
-    expect(ids(component.subscriptionMenuItems({isTracked: false}))).toContain('link');
-    expect(ids(component.installmentMenuItems({isTracked: true}))).not.toContain('link');
-    expect(ids(component.installmentMenuItems({isTracked: false}))).toContain('link');
+    const row = {isManual: false, merchantName: 'Netflix'};
+
+    expect(ids(component.subscriptionMenuItems({...row, isTracked: true}))).not.toContain('link');
+    expect(ids(component.subscriptionMenuItems({...row, isTracked: false}))).toContain('link');
+    expect(ids(component.installmentMenuItems({...row, isTracked: true}))).not.toContain('link');
+    expect(ids(component.installmentMenuItems({...row, isTracked: false}))).toContain('link');
   });
 
-  it('offers View charges on every subscription and installment row', () => {
+  it('offers View charges only on rows whose name the ledger search can find', () => {
     TestBed.configureTestingModule({});
     const component = TestBed.runInInjectionContext(() =>
       Object.create(SubscriptionsComponent.prototype)
     ) as SubscriptionsComponent;
     const ids = (items: {id: string}[]) => items.map(i => i.id);
+    const detected = {isManual: false, merchantName: 'Netflix'};
+    const manual = {isManual: true, merchantName: 'Car loan'};
 
     for (const isTracked of [true, false]) {
-      expect(ids(component.subscriptionMenuItems({isTracked}))).toContain('charges');
-      expect(ids(component.installmentMenuItems({isTracked}))).toContain('charges');
+      expect(ids(component.subscriptionMenuItems({...detected, isTracked}))).toContain('charges');
+      expect(ids(component.installmentMenuItems({...detected, isTracked}))).toContain('charges');
+      expect(ids(component.subscriptionMenuItems({...manual, isTracked}))).not.toContain('charges');
+      expect(ids(component.installmentMenuItems({...manual, isTracked}))).not.toContain('charges');
     }
   });
 
@@ -70,12 +76,26 @@ describe('SubscriptionsComponent', () => {
       c.router = TestBed.inject(Router);
       return c as unknown as SubscriptionsComponent;
     });
-    const sub = {id: 's1', merchantName: 'Netflix'} as unknown as Subscription;
+    const sub = {id: 's1', merchantName: 'Netflix', isManual: false} as unknown as Subscription;
 
     component.onSubscriptionAction('charges', sub);
     component.onInstallmentAction('charges', sub);
 
     expect(navigate).toHaveBeenCalledTimes(2);
     expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {q: 'Netflix'}});
+  });
+
+  it('does not navigate for a row with no searchable name', () => {
+    TestBed.configureTestingModule({providers: [provideRouter([])]});
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const component = TestBed.runInInjectionContext(() => {
+      const c = Object.create(SubscriptionsComponent.prototype) as {router: Router};
+      c.router = TestBed.inject(Router);
+      return c as unknown as SubscriptionsComponent;
+    });
+
+    component.viewCharges({isTracked: true, isManual: true, merchantName: 'Car loan'});
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

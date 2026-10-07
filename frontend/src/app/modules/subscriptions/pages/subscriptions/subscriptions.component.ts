@@ -33,6 +33,7 @@ import {
 import {InstallmentProgressPipe} from '../../pipes/installment-progress.pipe';
 import {MerchantColorPipe} from '../../pipes/merchant-color.pipe';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
+import {SubscriptionUtils} from '../../utils/subscription.utils';
 
 const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
   {value: 'date', label: 'Next charge'},
@@ -42,31 +43,23 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
 
 const LINK_MENU_ITEM: MenuItem = {id: 'link', label: 'Link transaction', icon: 'Link'};
 
+type MenuSubscription = Pick<Subscription, 'isTracked' | 'isManual' | 'merchantName'>;
+
 const CHARGES_MENU_ITEM: MenuItem = {id: 'charges', label: 'View charges', icon: 'Receipt'};
 
 const INSTALLMENT_MENU_ITEMS: MenuItem[] = [
-  CHARGES_MENU_ITEM,
   {id: 'term', label: 'Set term', icon: 'Pencil'},
   {id: 'done', label: 'Mark as done', icon: 'Check'},
   {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
 ];
 
-const UNLINKED_INSTALLMENT_MENU_ITEMS: MenuItem[] = [
-  CHARGES_MENU_ITEM,
-  LINK_MENU_ITEM,
-  ...INSTALLMENT_MENU_ITEMS.slice(1),
-];
+const UNLINKED_INSTALLMENT_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...INSTALLMENT_MENU_ITEMS];
 
 const SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
-  CHARGES_MENU_ITEM,
   {id: 'dismiss', label: 'Dismiss', icon: 'X', destructive: true},
 ];
 
-const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
-  CHARGES_MENU_ITEM,
-  LINK_MENU_ITEM,
-  ...SUBSCRIPTION_MENU_ITEMS.slice(1),
-];
+const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRIPTION_MENU_ITEMS];
 
 @Component({
   selector: 'fns-subscriptions',
@@ -101,17 +94,22 @@ export class SubscriptionsComponent {
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
 
-  public subscriptionMenuItems(sub: Pick<Subscription, 'isTracked'>): MenuItem[] {
-    return sub.isTracked ? SUBSCRIPTION_MENU_ITEMS : UNLINKED_SUBSCRIPTION_MENU_ITEMS;
+  public subscriptionMenuItems(sub: MenuSubscription): MenuItem[] {
+    const items = sub.isTracked ? SUBSCRIPTION_MENU_ITEMS : UNLINKED_SUBSCRIPTION_MENU_ITEMS;
+    return SubscriptionUtils.chargesQuery(sub) ? [CHARGES_MENU_ITEM, ...items] : items;
   }
 
-  public installmentMenuItems(item: Pick<Subscription, 'isTracked'>): MenuItem[] {
-    return item.isTracked ? INSTALLMENT_MENU_ITEMS : UNLINKED_INSTALLMENT_MENU_ITEMS;
+  public installmentMenuItems(item: MenuSubscription): MenuItem[] {
+    const items = item.isTracked ? INSTALLMENT_MENU_ITEMS : UNLINKED_INSTALLMENT_MENU_ITEMS;
+    return SubscriptionUtils.chargesQuery(item) ? [CHARGES_MENU_ITEM, ...items] : items;
   }
 
-  /** Opens the ledger narrowed to the merchant's charges (its search box reads `q`). */
-  public viewCharges(item: Pick<Subscription, 'merchantName'>): void {
-    void this.router.navigate([AppRoute.Transactions], {queryParams: {q: item.merchantName}});
+  /** Opens the ledger narrowed to the row's charges (its search box reads `q`). */
+  public viewCharges(item: MenuSubscription): void {
+    const q = SubscriptionUtils.chargesQuery(item);
+    if (q) {
+      void this.router.navigate([AppRoute.Transactions], {queryParams: {q}});
+    }
   }
 
   public setSort(sort: SubscriptionSort): void {
