@@ -100,6 +100,33 @@ const NET_WORTH_HISTORY = {
   hasHistory: false,
 };
 
+const SCRUB_HISTORY = {
+  hasHistory: true,
+  snapshots: [
+    ['2026-09-01', 40_000],
+    ['2026-09-15', 45_000],
+    ['2026-10-01', 50_000],
+  ].map(([snapshotDate, totalNetWorth]) => ({
+    snapshotDate,
+    bankingTotal: totalNetWorth,
+    brokerageTotal: 0,
+    cryptoTotal: 0,
+    totalNetWorth,
+    currency: 'USD',
+  })),
+};
+
+// Registered after mockApis, so it wins over the empty history there.
+async function mockHistory(page: Page): Promise<void> {
+  await page.route(`${API}/net-worth/history**`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SCRUB_HISTORY),
+    })
+  );
+}
+
 const INCOME_TRANSACTIONS = {
   items: [
     {
@@ -394,9 +421,65 @@ test.describe('Dashboard range presets (IBKR set)', () => {
 
   test('offers 1W MTD 1M 3M YTD 1Y ALL, in that order, and no 6M', async ({page}) => {
     await page.goto('/dashboard');
-    const bar = page.getByRole('group', {name: 'History range'});
-    await expect(bar.getByRole('button')).toHaveText(['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL']);
-    await expect(bar.getByRole('button', {name: '6M', exact: true})).toHaveCount(0);
+    const bar = page.getByRole('radiogroup', {name: 'History range'});
+    await expect(bar.getByRole('radio')).toHaveText(['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL']);
+    await expect(bar.getByRole('radio', {name: '6M', exact: true})).toHaveCount(0);
+  });
+
+  test('the range control sits under the chart in the hero card and stays on one row on a phone', async ({
+    page,
+  }) => {
+    await page.setViewportSize({width: 390, height: 844});
+    await mockHistory(page);
+    await page.goto('/dashboard');
+    const bar = page.getByRole('radiogroup', {name: 'History range'});
+    const chart = page.locator('cmn-area-chart');
+    await expect(bar).toBeVisible();
+    await expect(chart).toBeVisible();
+
+    const boxes = await bar.getByRole('radio').evaluateAll(cells =>
+      cells.map(c => {
+        const {top, height} = c.getBoundingClientRect();
+        return {top, height};
+      })
+    );
+    expect(boxes).toHaveLength(7);
+    expect(new Set(boxes.map(b => Math.round(b.top))).size).toBe(1);
+    expect(Math.min(...boxes.map(b => b.height))).toBeGreaterThanOrEqual(44);
+
+    const chartBottom = await chart.evaluate(el => el.getBoundingClientRect().bottom);
+    const barTop = await bar.evaluate(el => el.getBoundingClientRect().top);
+    expect(barTop).toBeGreaterThanOrEqual(chartBottom);
+  });
+
+  test('scrubbing the chart shows that point in the hero and releasing restores it', async ({
+    page,
+  }) => {
+    await mockHistory(page);
+    await page.goto('/dashboard');
+    const value = page.getByTestId('net-worth-value');
+    await expect(value).toContainText('$50,000.00');
+    const canvas = page.locator('cmn-area-chart canvas');
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    if (!box) {
+      throw new Error('chart canvas has no box');
+    }
+
+    await page.mouse.move(box.x + 2, box.y + box.height / 2);
+    await expect(value).toContainText('$40,000.00');
+    await expect(page.getByTestId('net-worth-change')).toContainText('Sep 1, 2026');
+
+    await page.mouse.move(box.x - 50, box.y - 50);
+    await expect(value).toContainText('$50,000.00');
+  });
+
+  test('choosing a range updates the selected cell', async ({page}) => {
+    await page.goto('/dashboard');
+    const bar = page.getByRole('radiogroup', {name: 'History range'});
+    await bar.getByRole('radio', {name: '1Y'}).click();
+    await expect(bar.getByRole('radio', {name: '1Y'})).toBeChecked();
+    await expect(bar.getByRole('radio', {name: '3M'})).not.toBeChecked();
   });
 
   test('1W asks the API for a day window and the tiles drill into the same seven days', async ({
@@ -409,8 +492,8 @@ test.describe('Dashboard range presets (IBKR set)', () => {
       r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
     );
     await page
-      .getByRole('group', {name: 'History range'})
-      .getByRole('button', {name: '1W'})
+      .getByRole('radiogroup', {name: 'History range'})
+      .getByRole('radio', {name: '1W'})
       .click();
     await aggregated;
     await expect(page.getByText('Last 7 days')).toBeVisible();
@@ -429,8 +512,8 @@ test.describe('Dashboard range presets (IBKR set)', () => {
       r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
     );
     await page
-      .getByRole('group', {name: 'History range'})
-      .getByRole('button', {name: 'MTD'})
+      .getByRole('radiogroup', {name: 'History range'})
+      .getByRole('radio', {name: 'MTD'})
       .click();
     await aggregated;
     await expect(page.getByText('Month to date')).toBeVisible();

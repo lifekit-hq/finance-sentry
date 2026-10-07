@@ -64,13 +64,28 @@ const json = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 
+// Enough snapshots for the hero chart, so the baseline shows the figure, chart and range control as one card.
+const HISTORY = [
+  ['2026-07-15', 41_000, 5_000, 1_000],
+  ['2026-08-15', 42_500, 5_500, 1_200],
+  ['2026-09-01', 43_000, 5_800, 1_100],
+  ['2026-09-15', 43_000, 5_800, 1_200],
+].map(([snapshotDate, bankingTotal, brokerageTotal, cryptoTotal]) => ({
+  snapshotDate,
+  bankingTotal,
+  brokerageTotal,
+  cryptoTotal,
+  totalNetWorth: Number(bankingTotal) + Number(brokerageTotal) + Number(cryptoTotal),
+  currency: 'USD',
+}));
+
 async function openDashboard(page: Page): Promise<void> {
   await page.clock.install({time: FROZEN_NOW});
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/dashboard/aggregated**`, route => route.fulfill(json(DASHBOARD)));
   await page.route(`${API}/net-worth/history**`, route =>
-    route.fulfill(json({snapshots: [], hasHistory: false}))
+    route.fulfill(json({snapshots: HISTORY, hasHistory: true}))
   );
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route => route.fulfill(json({accounts: []})));

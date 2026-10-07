@@ -11,6 +11,8 @@ export interface DashboardState {
   historyHasHistory: boolean;
   historyLoading: boolean;
   historyError: string | null;
+  /** Index into the drawn history while a pointer scrubs the hero chart; null at rest. */
+  scrubIndex: number | null;
 }
 
 export const initialDashboardState: DashboardState = {
@@ -20,4 +22,5 @@ export const initialDashboardState: DashboardState = {
   historyHasHistory: false,
   historyLoading: false,
   historyError: null,
+  scrubIndex: null,
 };

@@ -28,10 +28,17 @@ interface StateSignals {
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
   historyLoading: Signal<boolean>;
   historyError: Signal<string | null>;
+  scrubIndex: Signal<number | null>;
 }
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short'});
 const DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short', day: 'numeric'});
+const FULL_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 const YEAR_SUFFIX_DIGITS = 2;
 
 // "Jun '26", not "Jun 26" — a bare 2-digit year reads as a day of the month.
@@ -203,14 +210,22 @@ export function dashboardComputed(store: StateSignals) {
   // Named once so the headline reads straight off the same figure the basis label describes.
   const projectedContributions = computed(() => medianMonthlySavings() * PROJECTION_HORIZON_MONTHS);
 
-  // Net-worth change across the loaded window, null until there are two usable snapshots.
+  // The snapshot under a scrubbing pointer; null at rest or when the index is stale.
+  const scrubbed = computed(() => {
+    const index = store.scrubIndex();
+    return index === null ? null : (validHistory()[index] ?? null);
+  });
+
+  // Net-worth change from the window's first snapshot to the one shown (the scrubbed point while
+  // held, else the latest), null until there are two usable snapshots.
   const netWorthChange = computed((): {delta: number; percent: number | null} | null => {
     const history = validHistory();
     if (history.length < MIN_POINTS_FOR_DELTA) {
       return null;
     }
     const start = history[0].totalNetWorth;
-    const delta = history[history.length - 1].totalNetWorth - start;
+    const end = (scrubbed() ?? history[history.length - 1]).totalNetWorth;
+    const delta = end - start;
     return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
   });
 
@@ -228,9 +243,18 @@ export function dashboardComputed(store: StateSignals) {
 
   return {
     baseCurrency,
+    // The scrubbed point's total while a pointer holds the chart, else the live net worth.
     totalBalanceFormatted: computed(() =>
-      MoneyUtils.format(store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
+      MoneyUtils.format(
+        scrubbed()?.totalNetWorth ?? store.data()?.totalNetWorthUsd ?? 0,
+        baseCurrency()
+      )
     ),
+    // The scrubbed snapshot's date, replacing the range label beside the delta; null at rest.
+    scrubDateFormatted: computed((): string | null => {
+      const snapshot = scrubbed();
+      return snapshot ? FULL_DATE_FORMATTER.format(new Date(snapshot.snapshotDate)) : null;
+    }),
 
     // Signed net-worth change across the loaded window, shown inline under the hero figure.
     netWorthChangeFormatted: computed(() => {
