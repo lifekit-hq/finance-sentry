@@ -145,11 +145,6 @@ public sealed class FundamentalsChainService(
                 FundamentalsCoverageStatus.Covered, issuerType, notes.Count == 0 ? null : string.Join("; ", notes), bases);
         }
 
-        if (failure is not null)
-        {
-            return new FundamentalsCoverage(FundamentalsCoverageStatus.SourceUnavailable, issuerType, failure, bases);
-        }
-
         if (issuerType == FundamentalsIssuerType.InvestmentFund)
         {
             return new FundamentalsCoverage(
@@ -157,6 +152,11 @@ public sealed class FundamentalsChainService(
                 issuerType,
                 $"{ticker} is an investment fund: it files fund reports, not company financial statements",
                 bases);
+        }
+
+        if (failure is not null)
+        {
+            return new FundamentalsCoverage(FundamentalsCoverageStatus.SourceUnavailable, issuerType, failure, bases);
         }
 
         var tried = noData.Count == 0 ? "no source is configured" : string.Join("; ", noData);

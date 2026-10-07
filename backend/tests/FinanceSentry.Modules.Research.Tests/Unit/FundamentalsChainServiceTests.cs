@@ -139,6 +139,19 @@ public sealed class FundamentalsChainServiceTests
     }
 
     [Fact]
+    public async Task InvestmentFund_StaysUnsupported_WhenALaterSourceFails()
+    {
+        var edgar = new ScriptedSource("edgar", FundamentalsSourceResult.NoData(
+            "no us-gaap facts filed", FundamentalsIssuerType.InvestmentFund));
+        var yahoo = new ScriptedSource("yahoo", FundamentalsSourceResult.Failed("429"));
+
+        var result = await Chain([edgar, yahoo]).GetFundamentalsAsync("TLT", 20);
+
+        result.Coverage.Status.Should().Be(FundamentalsCoverageStatus.UnsupportedIssuerType);
+        result.Coverage.IssuerType.Should().Be(FundamentalsIssuerType.InvestmentFund);
+    }
+
+    [Fact]
     public async Task ConfiguredOrder_DecidesWhoIsAskedFirst_AndLeavesOutUnlistedSources()
     {
         var a = new ScriptedSource("a", Facts("a", Quarter(RecentQuarter), Year(RecentYear)));
