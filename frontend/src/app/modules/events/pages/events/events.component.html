@@ -42,86 +42,86 @@
       </cmn-alert>
     }
 
-    @if (store.upcomingErrorMessage(); as error) {
-      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
-    } @else if (store.isUpcomingLoading()) {
-      <div class="mt-cmn-5 space-y-cmn-3" data-testid="upcoming-loading">
-        @for (row of skeletonRows; track row) {
-          <cmn-skeleton height="2.5rem" width="100%" />
-        }
-      </div>
-    } @else if (store.isUpcomingEmpty()) {
-      <div class="flex min-h-0 flex-1 items-center justify-center">
-        <cmn-empty-state
-          message="Nothing scheduled"
-          subMessage="No dated events for your holdings, watchlist, theses or the macro calendar in this window."
-          icon="CalendarDays"
-          iconClass="text-text-secondary"
-        />
-      </div>
-    } @else {
-      <div class="mt-cmn-5 space-y-cmn-5 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
-        @for (section of store.upcomingSections(); track section.id) {
-          @if (store.upcomingSections().length > 1) {
-            <h2
-              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-              data-testid="week-section"
-            >
-              {{ section.label }}
-            </h2>
-          }
-          @for (group of section.groups; track group.date) {
-            <section [attr.data-testid]="'day-' + group.date">
+    <cmn-async-state
+      [status]="upcomingStatus()"
+      [errorMessage]="store.upcomingErrorMessage()"
+      [skeletonRows]="skeletonRows.length"
+      class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      skeletonHeight="2.5rem"
+    >
+      @if (store.isUpcomingEmpty()) {
+        <div class="flex min-h-0 flex-1 items-center justify-center">
+          <cmn-empty-state
+            message="Nothing scheduled"
+            subMessage="No dated events for your holdings, watchlist, theses or the macro calendar in this window."
+            icon="CalendarDays"
+            iconClass="text-text-secondary"
+          />
+        </div>
+      } @else {
+        <div class="space-y-cmn-5 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
+          @for (section of store.upcomingSections(); track section.id) {
+            @if (store.upcomingSections().length > 1) {
               <h2
-                class="mb-cmn-2 flex items-baseline gap-cmn-2 text-cmn-sm font-semibold text-text-primary"
+                class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+                data-testid="week-section"
               >
-                {{ group.date | eventDayLabel }}
+                {{ section.label }}
               </h2>
-              <ul
-                class="divide-y divide-border-default rounded-cmn-md border border-border-default"
-              >
-                @for (
-                  item of group.items;
-                  track item.kind +
-                    item.subject +
-                    item.date +
-                    item.referenceId +
-                    item.title +
-                    item.detail
-                ) {
-                  <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
-                    <cmn-tag [variant]="kindMeta(item.kind).variant">
-                      {{ kindMeta(item.kind).label }}
-                    </cmn-tag>
-                    <span class="font-mono text-cmn-sm font-semibold text-text-primary">
-                      {{ item.subject }}
-                    </span>
-                    @let rowTitle =
-                      item.title | eventTitle: kindMeta(item.kind).label : item.subject;
-                    <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
-                      {{ rowTitle }}
-                      @if (item.detail) {
-                        <span class="text-text-secondary">
-                          {{ rowTitle ? '· ' : '' }}{{ item.detail }}
-                        </span>
+            }
+            @for (group of section.groups; track group.date) {
+              <section [attr.data-testid]="'day-' + group.date">
+                <h2
+                  class="mb-cmn-2 flex items-baseline gap-cmn-2 text-cmn-sm font-semibold text-text-primary"
+                >
+                  {{ group.date | eventDayLabel }}
+                </h2>
+                <ul
+                  class="divide-y divide-border-default rounded-cmn-md border border-border-default"
+                >
+                  @for (
+                    item of group.items;
+                    track item.kind +
+                      item.subject +
+                      item.date +
+                      item.referenceId +
+                      item.title +
+                      item.detail
+                  ) {
+                    <li class="flex flex-wrap items-center gap-cmn-3 px-cmn-4 py-cmn-3">
+                      <cmn-tag [variant]="kindMeta(item.kind).variant">
+                        {{ kindMeta(item.kind).label }}
+                      </cmn-tag>
+                      <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                        {{ item.subject }}
+                      </span>
+                      @let rowTitle =
+                        item.title | eventTitle: kindMeta(item.kind).label : item.subject;
+                      <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
+                        {{ rowTitle }}
+                        @if (item.detail) {
+                          <span class="text-text-secondary">
+                            {{ rowTitle ? '· ' : '' }}{{ item.detail }}
+                          </span>
+                        }
+                      </span>
+                      @if (item.time) {
+                        <span class="text-cmn-xs text-text-secondary">{{
+                          item.time.slice(0, 5)
+                        }}</span>
                       }
-                    </span>
-                    @if (item.time) {
-                      <span class="text-cmn-xs text-text-secondary">{{
-                        item.time.slice(0, 5)
-                      }}</span>
-                    }
-                    @if (item.isEstimate) {
-                      <cmn-tag variant="warning">Estimate</cmn-tag>
-                    }
-                  </li>
-                }
-              </ul>
-            </section>
+                      @if (item.isEstimate) {
+                        <cmn-tag variant="warning">Estimate</cmn-tag>
+                      }
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
           }
-        }
-      </div>
-    }
+        </div>
+      }
+    </cmn-async-state>
   } @else {
     @if (store.hasFiredRows()) {
       <div class="mt-cmn-5 space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">

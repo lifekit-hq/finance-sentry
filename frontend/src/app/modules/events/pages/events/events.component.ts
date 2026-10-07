@@ -1,7 +1,9 @@
 import {DatePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {
   AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   ButtonComponent,
   ChipComponent,
   CmnTab,
@@ -37,6 +39,7 @@ const SKELETON_ROWS = 4;
   selector: 'fns-events',
   imports: [
     AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     ChipComponent,
     DatePipe,
@@ -59,6 +62,12 @@ export class EventsComponent {
   public readonly horizons = EVENT_HORIZON_DAYS;
   public readonly kinds = EVENT_KIND_ORDER;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  public readonly upcomingStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.upcomingErrorMessage()) {
+      return 'error';
+    }
+    return this.store.isUpcomingLoading() ? 'loading' : 'success';
+  });
 
   public selectView(id: string): void {
     const option = EVENTS_VIEW_OPTIONS.find(opt => opt.id === id);

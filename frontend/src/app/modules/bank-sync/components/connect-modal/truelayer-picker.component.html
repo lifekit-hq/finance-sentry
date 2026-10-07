@@ -30,18 +30,17 @@
     />
   </cmn-form-field>
 
-  @if (loadError()) {
-    <cmn-alert variant="error">{{ loadError() }}</cmn-alert>
-  } @else if (store.errorMessage()) {
+  @if (store.errorMessage()) {
     <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
   }
 
   <div class="flex flex-col gap-cmn-2 max-h-[420px] overflow-y-auto">
-    @if (isLoading()) {
-      @for (placeholder of [1, 2, 3, 4]; track placeholder) {
-        <cmn-skeleton height="56px" />
-      }
-    } @else {
+    <cmn-async-state
+      [status]="listStatus()"
+      [errorMessage]="loadError() ?? ''"
+      [skeletonRows]="4"
+      skeletonHeight="56px"
+    >
       @for (provider of filteredProviders(); track provider.providerId) {
         <cmn-selectable-card (clicked)="select(provider)" orientation="horizontal">
           @if (provider.logoUrl) {
@@ -62,7 +61,7 @@
           No banks match your search.
         </p>
       }
-    }
+    </cmn-async-state>
   </div>
 
   <cmn-dialog-actions align="start">

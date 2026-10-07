@@ -3,12 +3,13 @@ import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@ang
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {
   AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   ButtonComponent,
   DialogActionsComponent,
   FormFieldComponent,
   InputComponent,
   SelectableCardComponent,
-  SkeletonComponent,
 } from '@lifekit-hq/ui';
 import {finalize, type Subscription} from 'rxjs';
 
@@ -25,6 +26,7 @@ import {TRUELAYER_COUNTRIES} from './connect-modal.constants';
   imports: [
     InputHintsDirective,
     AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     DialogActionsComponent,
     FormFieldComponent,
@@ -32,7 +34,6 @@ import {TRUELAYER_COUNTRIES} from './connect-modal.constants';
     NgOptimizedImage,
     ReactiveFormsModule,
     SelectableCardComponent,
-    SkeletonComponent,
   ],
   templateUrl: './truelayer-picker.component.html',
 })
@@ -50,6 +51,13 @@ export class TrueLayerPickerComponent {
   public readonly providers = signal<readonly TrueLayerProvider[]>([]);
   public readonly isLoading = signal<boolean>(false);
   public readonly loadError = signal<Nullable<string>>(null);
+
+  public readonly listStatus = computed<AsyncStateStatus>(() => {
+    if (this.isLoading()) {
+      return 'loading';
+    }
+    return this.loadError() ? 'error' : 'success';
+  });
 
   public readonly searchControl = new FormControl<string>('', {nonNullable: true});
 
