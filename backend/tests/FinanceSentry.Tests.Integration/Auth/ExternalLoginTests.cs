@@ -6,10 +6,13 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Domain.Exceptions;
+using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 /// <summary>
@@ -120,6 +123,27 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
 
         await act.Should().ThrowAsync<AccountNotInvitedException>();
         (await FindByLoginAsync("sub-google-unverified")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SeededPasswordlessSmokeAccount_IsLinkedByTheProviderUsersVerifiedEmail()
+    {
+        // What the post-deploy smoke relies on: the startup seed makes an account with no password, and the first
+        // provider sign-in as the dedicated provider user (same verified email) links it.
+        Guid? seeded;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var config = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { [SmokeAccountSeeder.EmailConfigKey] = "ext-smoke@test.com" })
+                .Build();
+            seeded = await SmokeAccountSeeder.SeedAsync(
+                scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(), config, NullLogger.Instance);
+        }
+
+        var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-smoke", "ext-smoke@test.com", true));
+
+        result.Response.User.Id.Should().Be(seeded!.Value.ToString());
+        (await FindByLoginAsync("sub-smoke"))!.Id.Should().Be(seeded.Value.ToString());
     }
 
     [Fact]

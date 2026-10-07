@@ -59,16 +59,20 @@ registered account, and only while nobody holds it — so once a second account 
 `auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
 (`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
-**Smoke account:** the post-deploy live smoke (`frontend/e2e/live/smoke.spec.ts`) signs in as a dedicated account
-the API seeds at startup from `Auth__SmokeAccount__Email` / `Auth__SmokeAccount__Password` (prod: compose reads
-`SMOKE_ACCOUNT_EMAIL` / `SMOKE_ACCOUNT_PASSWORD` from the deploy step's environment, which `deploy.yml` fills from the
-`E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD` GitHub Actions secrets; the smoke step reads the same two secrets). Both set =
-the seed creates the account as a Member, marked with the `seeded-account: smoke` user claim, plus one fake `seeded`
-bank account with a few transactions; later starts only converge its password, so rotating the secrets needs just a
-redeploy. Either unset = no seed. It never touches an account it did not create, is never granted Owner, is not shared
-with anyone, and its `seeded` account is excluded from every cross-user read (`GetAllActiveUnscopedAsync`), so it gets
-no provider sync, snapshot, alert or external lookup from any background job. A People-page revoke stays in effect; to
-retire it, revoke it there and delete the two secrets.
+**Smoke account:** production has password sign-in off (`Auth__PasswordLogin__Enabled` ← `AUTH_PASSWORD_LOGIN_ENABLED`,
+default `false` in `docker-compose.prod.yml`), so the post-deploy live smoke (`frontend/e2e/live/smoke.spec.ts`) signs in
+through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
+`E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). The API
+seeds the matching finance-sentry account at startup from `Auth__SmokeAccount__Email` (prod: compose reads
+`SMOKE_ACCOUNT_EMAIL`, which `deploy.yml` fills from `E2E_LIVE_LOGTO_EMAIL`): a passwordless Member marked with the
+`seeded-account: smoke` user claim, plus one fake `seeded` bank account with a few transactions. The first Logto sign-in
+with the same verified email links the account to the Logto identity (invite-only rule, same as any invited person); a
+marked account that still carries a password has it removed at startup. Email unset = no seed. It never touches an
+account it did not create, is never granted Owner, is not shared with anyone, and its `seeded` account is excluded from
+every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from
+any background job. A People-page revoke stays in effect; to retire it, revoke it there, disable the Logto user and delete
+the two secrets. Break-glass if Logto is down: set `AUTH_PASSWORD_LOGIN_ENABLED=true` in the deploy environment and
+redeploy (existing accounts keep their passwords).
 
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).

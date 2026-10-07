@@ -129,11 +129,13 @@ services:
       # Account granted the Owner role at startup (Hangfire dashboard, owner-only features). Empty =
       # promote the sole registered user while nobody holds the role. Not a secret. See the runbook §4.
       Auth__OwnerEmail: ${AUTH_OWNER_EMAIL:-}
-      # Account the post-deploy live smoke signs in with: seeded at startup as a Member with fake data,
-      # never the owner. Empty = no seed. The deploy workflow passes both from GitHub Actions secrets
-      # (E2E_LIVE_EMAIL / E2E_LIVE_PASSWORD), not from docker/.env.sops. See the runbook §4.
+      # Password sign-in is off in production: Logto is the only way in. Set AUTH_PASSWORD_LOGIN_ENABLED=true and
+      # redeploy only as break-glass while Logto is down (runbook §4).
+      Auth__PasswordLogin__Enabled: ${AUTH_PASSWORD_LOGIN_ENABLED:-false}
+      # Account the post-deploy live smoke signs in as, through Logto: seeded at startup as a passwordless Member
+      # with fake data, never the owner. It must carry the email of the dedicated Logto smoke user. Empty = no seed.
+      # The deploy workflow passes it from the E2E_LIVE_LOGTO_EMAIL GitHub Actions secret, not docker/.env.sops.
       Auth__SmokeAccount__Email: ${SMOKE_ACCOUNT_EMAIL:-}
-      Auth__SmokeAccount__Password: ${SMOKE_ACCOUNT_PASSWORD:-}
       # Org identity provider (Logto) sign-in. Off unless all of authority, client id, secret and the
       # app's public URL are set. The client secret belongs in docker/.env.sops, never in clear.
       Auth__Oidc__Authority: ${AUTH_OIDC_AUTHORITY:-}

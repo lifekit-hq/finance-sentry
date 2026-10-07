@@ -99,13 +99,12 @@ jobs:
 
       # A commit from before deploy-by-SHA has a compose file that builds its images instead, so
       # it cannot be deployed this way.
-      # The smoke account the next step signs in with is seeded by the API from these at startup;
-      # compose takes them from this step's environment (runbook §4).
+      # The smoke account the next step signs in as (through Logto) is seeded passwordless by the API from its
+      # email at startup; compose takes it from this step's environment (runbook §4).
       - name: Deploy
         if: steps.target.outputs.stale != 'true'
         env:
-          SMOKE_ACCOUNT_EMAIL: ${{ secrets.E2E_LIVE_EMAIL }}
-          SMOKE_ACCOUNT_PASSWORD: ${{ secrets.E2E_LIVE_PASSWORD }}
+          SMOKE_ACCOUNT_EMAIL: ${{ secrets.E2E_LIVE_LOGTO_EMAIL }}
         run: |
           if ! grep -q 'IMAGE_TAG' docker/docker-compose.prod.yml; then
             echo "::error::$IMAGE_TAG predates deploying by commit SHA; pick a later commit"
@@ -113,21 +112,28 @@ jobs:
           fi
           ./docker/deploy.sh
 
-      # Read-only Playwright smoke against the stack just deployed (real login, no
-      # mocks). Runs in the Playwright image on the host network so it can reach the
-      # loopback-bound gateway; the e2e sources are copied out of the read-only mount
-      # so npm never writes into the runner workspace.
+      # Read-only Playwright smoke against the stack just deployed (real Logto sign-in as a dedicated
+      # Logto user, no mocks; production has password sign-in off). Runs in the Playwright image on the
+      # host network so it resolves the tailnet name; the e2e sources are copied out of the read-only
+      # mount so npm never writes into the runner workspace.
       - name: Live e2e smoke (deployed stack)
         if: steps.target.outputs.stale != 'true'
         env:
-          E2E_LIVE_EMAIL: ${{ secrets.E2E_LIVE_EMAIL }}
-          E2E_LIVE_PASSWORD: ${{ secrets.E2E_LIVE_PASSWORD }}
+          E2E_LIVE_LOGTO_EMAIL: ${{ secrets.E2E_LIVE_LOGTO_EMAIL }}
+          E2E_LIVE_LOGTO_PASSWORD: ${{ secrets.E2E_LIVE_LOGTO_PASSWORD }}
         run: |
+          # Secrets are masked automatically; mask the values explicitly too so a derived or reformatted
+          # echo (a trace line, a URL) cannot leak them.
+          echo "::add-mask::$E2E_LIVE_LOGTO_EMAIL"
+          echo "::add-mask::$E2E_LIVE_LOGTO_PASSWORD"
+          # The OIDC redirect returns to the app's public origin, so the smoke starts there (not on the
+          # loopback gateway).
           # CI=true enables the config's single retry with a trace on that retry; the
           # trace lands in a host directory so it outlives the --rm container.
           results="$RUNNER_TEMP/live-smoke-results"
           rm -rf "$results" && mkdir -p "$results"
-          docker run --rm --network host -e CI=true -e E2E_LIVE_EMAIL -e E2E_LIVE_PASSWORD \
+          docker run --rm --network host -e CI=true -e E2E_LIVE_LOGTO_EMAIL -e E2E_LIVE_LOGTO_PASSWORD \
+            -e E2E_LIVE_BASE_URL="$FRONTEND_BASE_URL" \
             -v "$PWD/frontend:/repo:ro" -v "$results:/work/test-results" -w /work \
             mcr.microsoft.com/playwright:v1.62.1-noble \
             bash -c "cp -r /repo/e2e /repo/playwright.live.config.ts . \

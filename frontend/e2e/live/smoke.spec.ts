@@ -2,30 +2,43 @@ import {expect, type Page, test} from '@playwright/test';
 
 // READ-ONLY smoke against the deployed stack. This suite hits the production
 // database as the seeded smoke account (a Member with fake data, seeded by the
-// API from the same credentials) — it must never create, mutate, or delete
-// anything, and must assert shape (headings, tables, health), never exact
-// values. The credentials come only from the environment; there is no default.
-const EMAIL = process.env['E2E_LIVE_EMAIL'];
-const PASSWORD = process.env['E2E_LIVE_PASSWORD'];
+// API from its email) — it must never create, mutate, or delete anything, and
+// must assert shape (headings, tables, health), never exact values.
+//
+// Production has password sign-in off: Logto is the only way in. The smoke signs in as a
+// dedicated Logto user by driving the real Logto sign-in page; that user's verified email is
+// the smoke account's email, so the first sign-in links the two. The credentials come only
+// from the environment; there is no default. E2E_LIVE_BASE_URL must be the app's public
+// origin (the OIDC redirect returns there; cookies set on another host would not follow).
+const EMAIL = process.env['E2E_LIVE_LOGTO_EMAIL'];
+const PASSWORD = process.env['E2E_LIVE_LOGTO_PASSWORD'];
+const LOGTO_STEP_TIMEOUT_MS = 30_000;
+const SIGNED_IN_TIMEOUT_MS = 30_000;
 
 async function login(page: Page): Promise<void> {
   if (!EMAIL || !PASSWORD) {
     throw new Error(
-      'E2E_LIVE_EMAIL and E2E_LIVE_PASSWORD must both be set to sign in to the deployed stack.'
+      'E2E_LIVE_LOGTO_EMAIL and E2E_LIVE_LOGTO_PASSWORD must both be set to sign in to the deployed stack.'
     );
   }
+  // The unauthenticated '/' bounces to /login, which forwards straight to Logto when it is the
+  // only sign-in method. Every full page load spends two requests (/auth/methods, /auth/me) of
+  // the API's 10-per-minute anonymous budget per address, so do not reload around it.
   await page.goto('/');
-  // The cmn-input wrapper mirrors the placeholder attribute of its inner native
-  // input, so placeholder/role locators match twice — target the native inputs.
-  await page.locator('input[type="email"]').fill(EMAIL);
-  await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.locator('form').getByRole('button', {name: /sign in/i}).click();
-  // The unauthenticated '/' bounces to /login?returnUrl=/dashboard, so sign-in lands on the
-  // dashboard. Do not reload it: every full page load spends two requests (/auth/methods,
-  // /auth/me) of the API's 10-per-minute anonymous budget per address, and the suite's
-  // logins and page loads share that budget.
-  await page.waitForURL(url => !url.pathname.startsWith('/login'), {timeout: 15_000});
-  await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible({timeout: 15_000});
+  const identifier = page.locator('input[name="identifier"]');
+  await identifier.waitFor({timeout: LOGTO_STEP_TIMEOUT_MS});
+  await identifier.fill(EMAIL);
+  await page.locator('input[name="password"]').fill(PASSWORD);
+  // Logto shows its terms checkbox on the same form when the tenant requires agreement.
+  const terms = page.locator('input[name="termsAgreement"]');
+  if ((await terms.count()) > 0 && !(await terms.isChecked())) {
+    await terms.check({force: true});
+  }
+  await page.getByRole('button', {name: /^sign in$/i}).click();
+  // Logto returns to the app, which lands on the dashboard; the heading only exists in the app.
+  await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible({
+    timeout: SIGNED_IN_TIMEOUT_MS,
+  });
 }
 
 test.describe('Live smoke — deployed stack', () => {

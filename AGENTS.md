@@ -111,7 +111,7 @@ Not auto-loaded — follow these links when the task touches them:
 
 ## QA — Test Account
 
-`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production live checks use the seeded smoke account, whose credentials live only in the CI secrets `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD`. Full scenarios: [QA guide](docs/claude/qa.md).
+`test@gmail.com` is no longer a real account; it remains only as a stubbed identity in the route-mocked Playwright specs. Production has password sign-in off; the live checks sign in through Logto as a dedicated Logto smoke user whose credentials live only in the CI secrets `E2E_LIVE_LOGTO_EMAIL` / `E2E_LIVE_LOGTO_PASSWORD` (its email is also the seeded, passwordless smoke account's email). Full scenarios: [QA guide](docs/claude/qa.md).
 
 ---
 
