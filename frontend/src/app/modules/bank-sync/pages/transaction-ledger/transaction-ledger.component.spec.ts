@@ -1,11 +1,29 @@
+import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, provideRouter, Router} from '@angular/router';
+import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {BehaviorSubject} from 'rxjs';
 
 import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
+
+const ROW = {
+  transactionId: 't1',
+  accountId: 'a1',
+  bankName: 'Monzo',
+  currency: 'USD',
+  amount: -5,
+  amountUsd: -5,
+  date: '2026-10-06T09:00:00Z',
+  postedDate: null,
+  description: 'Coffee',
+  transactionType: 'debit',
+  merchantCategory: null,
+  isPending: false,
+};
 
 function setup(type: string | null, extra: Record<string, string> = {}) {
   const params$ = new BehaviorSubject(convertToParamMap({...(type ? {type} : {}), ...extra}));
@@ -14,8 +32,10 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     monthlyOutflow: signal(null),
     monthlyOutflowCurrency: signal('USD'),
     topCategory: signal(null),
-    errorMessage: signal<string | null>(null),
+    errorMessage: signal(''),
     load: vi.fn(),
+    retry: vi.fn(),
+    lastSyncedAt: signal<number | null>(null),
     isLoading: signal(false),
     isEmpty: signal(true),
     hasActiveFilter: signal(false),
@@ -31,7 +51,13 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     set: {providers: [{provide: TransactionLedgerStore, useValue: store}]},
   });
   TestBed.configureTestingModule({
-    providers: [provideRouter([]), {provide: ActivatedRoute, useValue: {queryParamMap: params$}}],
+    providers: [
+      provideRouter([]),
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideApiBaseUrl('http://localhost/api/v1'),
+      {provide: ActivatedRoute, useValue: {queryParamMap: params$}},
+    ],
   });
   const router = TestBed.inject(Router);
   const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -211,6 +237,43 @@ describe('TransactionLedgerComponent async states', () => {
 
     expect(root.querySelector('cmn-alert')?.textContent).toContain('Failed to load transactions.');
     root.querySelector<HTMLElement>('cmn-alert cmn-button button')?.click();
-    expect(store.load).toHaveBeenCalledOnce();
+    expect(store.retry).toHaveBeenCalledOnce();
+  });
+
+  it('never renders an error as the empty state', () => {
+    const {store, fixture, root} = setup(null);
+    store.errorMessage.set('Failed to load transactions.');
+    store.isEmpty.set(false);
+    fixture.detectChanges();
+
+    expect(root.textContent).not.toContain('No transactions found');
+  });
+
+  it('keeps the loaded rows under the error and through a retry', () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    store.isLoading.set(true);
+    fixture.detectChanges();
+
+    expect(root.querySelector('cmn-skeleton')).toBeNull();
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+  });
+
+  it('shows the last data with a last-synced notice instead of an error while offline', () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    store.lastSyncedAt.set(Date.now());
+    store.errorMessage.set('Failed to load transactions.');
+    fixture.detectChanges();
+
+    expect(root.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+      "You're offline"
+    );
+    expect(root.textContent).not.toContain('Failed to load transactions.');
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+    vi.restoreAllMocks();
   });
 });

@@ -28,6 +28,7 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 }
 
 interface EffectsStore {
+  transactions: Signal<GlobalTransactionDto[]>;
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
@@ -41,7 +42,7 @@ interface EffectsStore {
   setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
-  setLoading: () => void;
+  setLoading: (keepRows?: boolean) => void;
   setTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
@@ -75,24 +76,21 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
   const fetchPage = rxMethod<'first' | 'next'>(
     pipe(
-      tap(page => {
-        if (page === 'next') {
-          store.nextPage();
-        }
-        store.setLoading();
-      }),
-      switchMap(page =>
-        bankSyncService
-          .getAllTransactions(pageParams(store, page === 'next' ? store.offset() : 0))
-          .pipe(
-            tap(res =>
-              page === 'next'
-                ? store.appendTransactions(res.items, res.totalCount, res.hasMore)
-                : store.setTransactions(res.items, res.totalCount, res.hasMore)
-            ),
-            StoreErrorUtils.catchAndSetError(store)
-          )
-      )
+      tap(page => store.setLoading(page === 'next')),
+      switchMap(page => {
+        const offset = page === 'first' ? 0 : store.offset() + PAGE_SIZE;
+        return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
+          tap(res => {
+            if (page === 'next') {
+              store.nextPage();
+              store.appendTransactions(res.items, res.totalCount, res.hasMore);
+            } else {
+              store.setTransactions(res.items, res.totalCount, res.hasMore);
+            }
+          }),
+          StoreErrorUtils.catchAndSetError(store)
+        );
+      })
     )
   );
 
@@ -102,6 +100,10 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
   return {
     load,
+    /** Re-issues the failed request with the rows already on screen kept in place. */
+    retry: (): void => {
+      fetchPage(store.transactions().length > 0 ? 'next' : 'first');
+    },
     loadSummary: rxMethod<void>(
       pipe(
         switchMap(() =>

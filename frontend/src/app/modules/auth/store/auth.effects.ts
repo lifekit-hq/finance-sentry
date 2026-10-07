@@ -10,7 +10,7 @@ import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {ErrorUtils} from '../../../shared/utils/error.utils';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
-import {FALLBACK_SIGN_IN_METHODS, SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
+import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
 import {
   type AcceptInviteRequest,
   type AuthRequest,
@@ -19,7 +19,7 @@ import {
 } from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {AuthUtils} from '../utils/auth.utils';
-import {type AuthFlow, type FlashMessage} from './auth.state';
+import {type AuthFlow, type FlashMessage, type SignInMethodsStatus} from './auth.state';
 
 interface EffectsStore {
   applyAuthResponse: (res: AuthResponse) => void;
@@ -30,6 +30,7 @@ interface EffectsStore {
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   setSignInMethods: (signInMethods: SignInMethods) => void;
+  setSignInMethodsStatus: (status: SignInMethodsStatus) => void;
   isAuthenticated: Signal<boolean>;
   returnUrl: Signal<Nullable<string>>;
 }
@@ -104,11 +105,13 @@ export function authEffects(store: EffectsStore) {
     },
     loadSignInMethods: rxMethod<void>(
       pipe(
+        tap(() => store.setSignInMethodsStatus('loading')),
         switchMap(() =>
           authService.getSignInMethods().pipe(
             tap(methods => store.setSignInMethods(methods)),
+            // No guessed fallback set: the login page shows the failure with a Retry.
             catchError(() => {
-              store.setSignInMethods(FALLBACK_SIGN_IN_METHODS);
+              store.setSignInMethodsStatus('error');
               return EMPTY;
             })
           )

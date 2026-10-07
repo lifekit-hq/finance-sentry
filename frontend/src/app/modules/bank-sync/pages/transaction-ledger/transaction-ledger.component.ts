@@ -3,8 +3,8 @@ import {takeUntilDestroyed, toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
+  AlertComponent,
   AsyncStateComponent,
-  type AsyncStateStatus,
   ButtonComponent,
   CardComponent,
   ChipComponent,
@@ -22,6 +22,8 @@ import {debounceTime, distinctUntilChanged, map} from 'rxjs';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
@@ -49,6 +51,7 @@ const DRAWER_WIDTH = '480px';
   selector: 'fns-transaction-ledger',
   imports: [
     PageContainerComponent,
+    AlertComponent,
     AsyncStateComponent,
     ButtonComponent,
     CardComponent,
@@ -75,6 +78,7 @@ export class TransactionLedgerComponent {
   private readonly drawer = inject(CmnDrawerService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(TransactionLedgerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
@@ -117,12 +121,15 @@ export class TransactionLedgerComponent {
   public readonly periods = LEDGER_PERIODS;
 
   /** The quick period whose bounds equal the date filter; any other range selects none. */
-  public readonly ledgerStatus = computed<AsyncStateStatus>(() => {
-    if (this.store.isLoading()) {
-      return 'loading';
-    }
-    return this.store.errorMessage() ? 'error' : 'success';
-  });
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData: this.store.transactions().length > 0,
+      errorMessage: this.store.errorMessage(),
+      offline: this.connectivity.offline(),
+      lastSyncedAt: this.store.lastSyncedAt(),
+    })
+  );
   public readonly activePeriod = computed(() => {
     const {from, to} = this.activeDateRange();
     return LedgerPeriodUtils.match(from, to);

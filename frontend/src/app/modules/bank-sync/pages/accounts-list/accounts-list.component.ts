@@ -12,8 +12,8 @@ import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
+  AlertComponent,
   AsyncStateComponent,
-  type AsyncStateStatus,
   ButtonComponent,
   CardComponent,
   CmnDialogService,
@@ -37,6 +37,8 @@ import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
@@ -59,6 +61,7 @@ const SKELETON_ROWS = 5;
   selector: 'fns-accounts-list',
   imports: [
     AccountBalancePipe,
+    AlertComponent,
     AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
@@ -87,6 +90,7 @@ export class AccountsListComponent implements OnInit {
   private readonly connectStore = inject(ConnectStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
   private readonly toast = inject(ToastService);
   private readonly isPhone = toSignal(
     inject(BreakpointObserver)
@@ -97,12 +101,15 @@ export class AccountsListComponent implements OnInit {
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
-  public readonly accountsStatus = computed<AsyncStateStatus>(() => {
-    if (this.store.isLoading()) {
-      return 'loading';
-    }
-    return this.store.errorMessage() ? 'error' : 'success';
-  });
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData: this.store.summary() !== null,
+      errorMessage: this.store.errorMessage(),
+      offline: this.connectivity.offline(),
+      lastSyncedAt: this.store.lastSyncedAt(),
+    })
+  );
   public readonly dotClass = SYNC_DOT_CLASS;
 
   public ngOnInit(): void {

@@ -1,5 +1,5 @@
 <div>
-  @if (!store.isLoading() && store.totalNetWorth() !== 0) {
+  @if (store.summary() !== null && store.totalNetWorth() !== 0) {
     <cmn-card class="block mb-cmn-8">
       <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
       <p
@@ -31,9 +31,15 @@
     </cmn-card>
   }
 
+  @if (view().offlineNotice; as notice) {
+    <cmn-alert variant="info" class="mb-cmn-4 block" data-testid="offline-notice">{{
+      notice
+    }}</cmn-alert>
+  }
+
   <cmn-async-state
-    [status]="accountsStatus()"
-    [errorMessage]="store.errorMessage()"
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
     [isEmpty]="store.isEmpty()"
     errorPlacement="above"
   >

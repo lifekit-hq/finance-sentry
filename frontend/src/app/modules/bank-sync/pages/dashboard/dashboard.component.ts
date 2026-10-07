@@ -10,7 +10,6 @@ import {
   AlertComponent,
   AreaChartComponent,
   AsyncStateComponent,
-  type AsyncStateStatus,
   BarChartComponent,
   ButtonComponent,
   CardComponent,
@@ -27,6 +26,8 @@ import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {
   HISTORY_RANGE_LABELS,
@@ -77,13 +78,22 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
       <div>
         <p class="text-cmn-sm text-text-secondary">How your money is trending over time</p>
 
+        @if (view().offlineNotice; as notice) {
+          <cmn-alert variant="info" class="mt-cmn-3 block" data-testid="offline-notice">{{
+            notice
+          }}</cmn-alert>
+        }
+
         <cmn-async-state
-          [status]="dashboardStatus()"
-          [errorMessage]="store.errorMessage()"
+          [status]="view().status"
+          [errorMessage]="view().errorMessage"
           [isEmpty]="showEmptyState()"
+          [errorPlacement]="errorPlacement()"
           class="block space-y-cmn-6"
-          errorPlacement="above"
         >
+          <cmn-button (clicked)="retry()" error-action variant="secondary" size="sm"
+            >Retry</cmn-button
+          >
           <cmn-card empty>
             <div class="flex flex-col items-center gap-cmn-4 py-cmn-10 text-center">
               <div
@@ -289,16 +299,32 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
 })
 export class DashboardComponent {
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(DashboardStore);
   public readonly rangeOptions = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly accountsRoute = AppRoute.AccountsList;
-  public readonly showEmptyState = computed(
-    () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
+  // An error leaves `data` null, which must never read as "no accounts connected".
+  public readonly showEmptyState = computed(() => {
+    const data = this.store.data();
+    return (
+      !this.store.isLoading() && !this.store.hasError() && data !== null && data.accountCount === 0
+    );
+  });
+  // With no data to keep, the error replaces the zeroed widgets instead of sitting above them.
+  public readonly errorPlacement = computed(() =>
+    this.store.data() === null ? 'replace' : 'above'
   );
-  public readonly dashboardStatus = computed<AsyncStateStatus>(() =>
-    this.store.errorMessage() ? 'error' : 'success'
+  // Loading stays out of the status: the dashboard renders per-widget skeletons in place.
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: false,
+      hasData: this.store.data() !== null,
+      errorMessage: this.store.errorMessage(),
+      offline: this.connectivity.offline(),
+      lastSyncedAt: this.store.lastSyncedAt(),
+    })
   );
   public readonly breakdownParams = computed(() =>
     DashboardRangeUtils.breakdownParams(this.store.historyRange())
@@ -347,6 +373,11 @@ export class DashboardComponent {
   public onRangeChange(event: Event): void {
     const {value} = (event as CustomEvent<{value: HistoryRange}>).detail;
     this.store.setHistoryRange(value);
+  }
+
+  public retry(): void {
+    this.store.load(this.store.historyRange());
+    this.store.loadNetWorthHistory(this.store.historyRange());
   }
 
   public goToAccounts(): void {

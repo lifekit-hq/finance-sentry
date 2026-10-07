@@ -11,7 +11,6 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
-import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
 import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
@@ -33,6 +32,7 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     setFlashMessage: vi.fn((message: Nullable<FlashMessage>) => flashMessage.set(message)),
     setProfileName: vi.fn(),
     setSignInMethods: vi.fn(),
+    setSignInMethodsStatus: vi.fn(),
     loadProfileName: vi.fn(),
     loadSignInMethods: vi.fn(),
     firstName: signal<Nullable<string>>(null),
@@ -48,7 +48,7 @@ function buildService() {
   return {
     login: vi.fn(),
     acceptInvite: vi.fn(),
-    getSignInMethods: vi.fn().mockReturnValue(of(FALLBACK_SIGN_IN_METHODS)),
+    getSignInMethods: vi.fn().mockReturnValue(of({oidc: false, passwordLogin: true})),
     logout: vi.fn().mockReturnValue(of(null)),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
   };
@@ -265,7 +265,7 @@ describe('authEffects', () => {
       expect(store.setSignInMethods).toHaveBeenCalledWith(methods);
     });
 
-    it('falls back to the pre-OIDC methods when the request fails', () => {
+    it('reports the failure instead of guessing a method set', () => {
       const store = buildStore();
       const service = buildService();
       service.getSignInMethods.mockReturnValue(throwError(() => new Error('down')));
@@ -273,7 +273,9 @@ describe('authEffects', () => {
 
       TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
 
-      expect(store.setSignInMethods).toHaveBeenCalledWith(FALLBACK_SIGN_IN_METHODS);
+      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('loading');
+      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('error');
+      expect(store.setSignInMethods).not.toHaveBeenCalled();
     });
   });
 

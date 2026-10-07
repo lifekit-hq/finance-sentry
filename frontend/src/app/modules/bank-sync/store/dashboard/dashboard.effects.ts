@@ -131,18 +131,27 @@ export function dashboardHooks(store: HookStore): void {
     pipe(
       switchMap(() =>
         timer(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS).pipe(
+          // The catch sits inside the inner stream: one failed refresh must not end the timer.
           switchMap(() =>
-            bankSyncService.getDashboardData(
-              DashboardRangeUtils.months(untracked(store.historyRange)),
-              DashboardRangeUtils.windowMonths(untracked(store.historyRange)),
-              DashboardRangeUtils.windowFrom(untracked(store.historyRange))
-            )
-          ),
-          tap(data => untracked(() => store.setData(data))),
-          catchError((err: unknown) => {
-            untracked(() => store.setError(extractErrorCode(err)));
-            return EMPTY;
-          })
+            bankSyncService
+              .getDashboardData(
+                DashboardRangeUtils.months(untracked(store.historyRange)),
+                DashboardRangeUtils.windowMonths(untracked(store.historyRange)),
+                DashboardRangeUtils.windowFrom(untracked(store.historyRange))
+              )
+              .pipe(
+                tap(data =>
+                  untracked(() => {
+                    store.setData(data);
+                    store.setSuccess();
+                  })
+                ),
+                catchError((err: unknown) => {
+                  untracked(() => store.setError(extractErrorCode(err)));
+                  return EMPTY;
+                })
+              )
+          )
         )
       )
     )

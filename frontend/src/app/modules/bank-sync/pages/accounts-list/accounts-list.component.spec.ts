@@ -29,13 +29,21 @@ function setupFixture(
   isPhone: boolean,
   overrides: Partial<Institution> = {},
   extraProviders: unknown[] = [],
-  state: {isLoading?: boolean; isEmpty?: boolean; errorMessage?: string; load?: () => void} = {}
+  state: {
+    isLoading?: boolean;
+    isEmpty?: boolean;
+    errorMessage?: string;
+    hasData?: boolean;
+    load?: () => void;
+  } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
     isLoading: signal(state.isLoading ?? false),
     isEmpty: signal(state.isEmpty ?? false),
-    errorMessage: signal(state.errorMessage ?? null),
+    errorMessage: signal(state.errorMessage ?? ''),
+    summary: signal(state.hasData ? {} : null),
+    lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
     totalNetWorth: signal(0),
     netWorthBreakdown: signal([]),
@@ -221,6 +229,30 @@ describe('AccountsListComponent async states', () => {
     );
     retry?.querySelector('button')?.click();
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('never renders an error as the empty state', () => {
+    const el = render({errorMessage: 'Failed to load accounts.', isEmpty: false});
+
+    expect(el.textContent).not.toContain('No accounts connected yet.');
+  });
+
+  it('keeps the loaded accounts on screen while a retry loads', () => {
+    const el = render({isLoading: true, hasData: true});
+
+    expect(el.querySelector('cmn-disclosure-row')).not.toBeNull();
+  });
+
+  it('shows the last data with a last-synced notice instead of an error while offline', () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const el = render({errorMessage: 'Failed to load accounts.', hasData: true});
+
+    expect(el.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+      "You're offline"
+    );
+    expect(el.textContent).not.toContain('Failed to load accounts.');
+    expect(el.querySelector('cmn-disclosure-row')).not.toBeNull();
+    vi.restoreAllMocks();
   });
 
   it('shows the institutions with no banner when loaded', () => {
