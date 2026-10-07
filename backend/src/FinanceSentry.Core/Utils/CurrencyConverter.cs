@@ -60,6 +60,27 @@ public static class CurrencyConverter
     }
 
     /// <summary>
+    /// The inverse of <see cref="ToUsd"/>: expresses a USD amount in <paramref name="currency"/>.
+    /// A currency without a rate (or a missing one) leaves the amount in USD, matching
+    /// <see cref="ToUsd"/>'s 1:1 fallback; pair it with <see cref="ResolveBase"/> so the label
+    /// follows the figure.
+    /// </summary>
+    public static decimal FromUsd(decimal usd, string? currency)
+    {
+        if (!string.IsNullOrWhiteSpace(currency) && _table.Rates.TryGetValue(currency, out var rate) && rate > 0m)
+            return usd / rate;
+
+        return usd;
+    }
+
+    /// <summary>
+    /// The currency a base-currency total is actually expressed in: the profile's choice when a
+    /// rate exists for it, otherwise "USD" (an unset profile, or one with no rate such as BTC).
+    /// </summary>
+    public static string ResolveBase(string? baseCurrency) =>
+        IsKnown(baseCurrency) ? baseCurrency!.ToUpperInvariant() : "USD";
+
+    /// <summary>
     /// True when a rate is available for <paramref name="currency"/>. Callers building a total
     /// should check this to flag the result as approximate rather than trusting a silent 1:1
     /// fallback for an unlisted currency.

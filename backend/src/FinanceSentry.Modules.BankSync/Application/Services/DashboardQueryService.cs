@@ -5,7 +5,9 @@ using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 /// <summary>
-/// Aggregated dashboard payload for a user.
+/// Aggregated dashboard payload for a user. The service computes every <c>…Usd</c> figure in USD;
+/// the controller re-expresses them in the profile base currency and stamps <see cref="BaseCurrency"/>
+/// (the field names keep their historical suffix so the API shape does not change).
 /// </summary>
 public record DashboardData(
     Dictionary<string, decimal> AggregatedBalance,
@@ -15,7 +17,8 @@ public record DashboardData(
     IReadOnlyList<MonthlyFlow> MonthlyFlow,
     IReadOnlyList<CategoryStat> TopCategories,
     DateTime? LastSyncTimestamp,
-    IReadOnlyList<MonthlyFlow>? WindowFlow = null);
+    IReadOnlyList<MonthlyFlow>? WindowFlow = null,
+    string BaseCurrency = "USD");
 
 /// <summary>
 /// Composes all dashboard data in a single call.

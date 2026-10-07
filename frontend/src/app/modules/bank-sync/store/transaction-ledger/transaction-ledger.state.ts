@@ -1,3 +1,4 @@
+import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {EMPTY_TRANSACTION_FILTERS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
 import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {
@@ -14,6 +15,7 @@ export interface TransactionLedgerState {
   status: AsyncStatus;
   errorCode: Nullable<string>;
   monthlyOutflowUsd: number | null;
+  monthlyOutflowCurrency: string;
   /** Server-side filters, synced to the query string; amount bounds are USD. */
   filters: TransactionFilters;
   accounts: TransactionAccountOption[];
@@ -29,6 +31,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   status: 'idle',
   errorCode: null,
   monthlyOutflowUsd: null,
+  monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
   filters: EMPTY_TRANSACTION_FILTERS,
   accounts: [],
 };

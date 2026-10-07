@@ -2,6 +2,8 @@ namespace FinanceSentry.Modules.Wealth.API.Controllers;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,8 +14,10 @@ using Microsoft.AspNetCore.Mvc;
 public class WealthController(
     IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> wealthSummaryHandler,
     IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
-    IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler) : ControllerBase
+    IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
+    IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
     private readonly IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> _txSummaryHandler = txSummaryHandler ?? throw new ArgumentNullException(nameof(txSummaryHandler));
     private readonly IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> _fireProjectionHandler = fireProjectionHandler ?? throw new ArgumentNullException(nameof(fireProjectionHandler));
@@ -30,8 +34,43 @@ public class WealthController(
         if (category is not null && !AllowedCategories.Contains(category))
             return BadRequest(new { error = "Invalid category value. Allowed: banking, crypto, brokerage, other.", errorCode = "INVALID_FILTER" });
 
-        var result = await _wealthSummaryHandler.Handle(new GetWealthSummaryQuery(User.RequireUserId(), category, provider), ct);
-        return Ok(result);
+        var userId = User.RequireUserId();
+        var result = await _wealthSummaryHandler.Handle(new GetWealthSummaryQuery(userId, category, provider), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // The aggregation speaks USD; the profile's base currency is applied once, here. USD (or an
+    // unset profile) is an identity, so nobody without a setting sees a change.
+    private static WealthSummaryResponse InBaseCurrency(WealthSummaryResponse summary, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return summary with { BaseCurrency = baseCurrency };
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        AccountBalanceDto Account(AccountBalanceDto a) =>
+            a with { BalanceInBaseCurrency = a.BalanceInBaseCurrency is { } v ? Fx(v) : null };
+        InstitutionDto Institution(InstitutionDto i) => i with
+        {
+            TotalInBaseCurrency = Fx(i.TotalInBaseCurrency),
+            Accounts = [.. i.Accounts.Select(Account)],
+            Cards = i.Cards?.Select(c => c with
+            {
+                TotalInBaseCurrency = Fx(c.TotalInBaseCurrency),
+                Accounts = [.. c.Accounts.Select(Account)],
+            }).ToList(),
+        };
+
+        return summary with
+        {
+            TotalNetWorth = Fx(summary.TotalNetWorth),
+            BaseCurrency = baseCurrency,
+            Categories = [.. summary.Categories.Select(c => c with
+            {
+                TotalInBaseCurrency = Fx(c.TotalInBaseCurrency),
+                Institutions = [.. c.Institutions.Select(Institution)],
+            })],
+        };
     }
 
     [HttpGet("transactions/summary")]

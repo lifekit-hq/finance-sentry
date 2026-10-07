@@ -1,6 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
 
+import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
@@ -75,10 +76,6 @@ function median(values: number[]): number {
 const WHOLE_DOLLARS = {maxFractionDigits: 0} as const;
 const CHANGE_PERCENT_DIGITS = 1;
 
-function wholeUsd(value: number): string {
-  return MoneyUtils.format(value, 'USD', WHOLE_DOLLARS);
-}
-
 function currentMonthKey(): string {
   const now = new Date();
   const MONTH_KEY_PAD = 2;
@@ -138,6 +135,9 @@ function savingsRateOf(totals: MonthTotals): number {
 
 export function dashboardComputed(store: StateSignals) {
   const categoryStore = inject(CategoryStore);
+
+  // Every dashboard total arrives already converted to the profile's base currency.
+  const baseCurrency = computed(() => store.data()?.baseCurrency ?? DEFAULT_BASE_CURRENCY);
 
   // Snapshots with a real total; days with a missing feed land as 0 and would otherwise
   // render as a cliff down to the axis, reading as if net worth briefly vanished.
@@ -216,12 +216,17 @@ export function dashboardComputed(store: StateSignals) {
   });
 
   return {
-    totalBalanceFormatted: computed(() => MoneyUtils.format(store.data()?.totalNetWorthUsd ?? 0)),
+    baseCurrency,
+    totalBalanceFormatted: computed(() =>
+      MoneyUtils.format(store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
+    ),
 
     // Signed net-worth change across the loaded window, shown inline under the hero figure.
     netWorthChangeFormatted: computed(() => {
       const change = netWorthChange();
-      return change ? MoneyUtils.format(change.delta, 'USD', {...WHOLE_DOLLARS, signed: true}) : '';
+      return change
+        ? MoneyUtils.format(change.delta, baseCurrency(), {...WHOLE_DOLLARS, signed: true})
+        : '';
     }),
     netWorthChangePercentFormatted: computed(() => {
       const percent = netWorthChange()?.percent;
@@ -234,12 +239,12 @@ export function dashboardComputed(store: StateSignals) {
 
     windowSpendingFormatted: computed(() => {
       const totals = windowTotals();
-      return totals ? MoneyUtils.format(totals.outflow, 'USD') : '—';
+      return totals ? MoneyUtils.format(totals.outflow, baseCurrency()) : '—';
     }),
 
     windowInflowFormatted: computed(() => {
       const totals = windowTotals();
-      return totals ? MoneyUtils.format(totals.inflow, 'USD') : '—';
+      return totals ? MoneyUtils.format(totals.inflow, baseCurrency()) : '—';
     }),
 
     windowSavingsRateFormatted: computed(() => {
@@ -313,7 +318,11 @@ export function dashboardComputed(store: StateSignals) {
     hasProjection,
 
     projectedNetWorthFormatted: computed(() =>
-      wholeUsd((store.data()?.totalNetWorthUsd ?? 0) + projectedContributions())
+      MoneyUtils.format(
+        (store.data()?.totalNetWorthUsd ?? 0) + projectedContributions(),
+        baseCurrency(),
+        WHOLE_DOLLARS
+      )
     ),
 
     // Always plural: the line is gated at three months, so the singular can never surface.

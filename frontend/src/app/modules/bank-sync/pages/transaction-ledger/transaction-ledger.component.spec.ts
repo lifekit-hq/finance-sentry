@@ -14,6 +14,7 @@ function setup(filters: Partial<TransactionFilters> = {}, overrides: {hasMore?: 
     dateRange: signal({from: null, to: null}),
     dayGroups: signal([]),
     monthlyOutflow: signal(null),
+    monthlyOutflowCurrency: signal('USD'),
     topCategory: signal(null),
     errorMessage: signal(''),
     isLoading: signal(false),

@@ -2,6 +2,8 @@ namespace FinanceSentry.Modules.Wealth.API.Controllers;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,8 +11,11 @@ using Microsoft.AspNetCore.Mvc;
 [ApiController]
 [Authorize]
 [Route("net-worth")]
-public class NetWorthHistoryController(IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> handler) : ControllerBase
+public class NetWorthHistoryController(
+    IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> handler,
+    IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> _handler
         = handler ?? throw new ArgumentNullException(nameof(handler));
 
@@ -20,7 +25,24 @@ public class NetWorthHistoryController(IQueryHandler<GetNetWorthHistoryQuery, Ne
         [FromQuery] DateOnly? to = null,
         CancellationToken ct = default)
     {
-        var result = await _handler.Handle(new GetNetWorthHistoryQuery(User.RequireUserId(), from, to), ct);
-        return Ok(result);
+        var userId = User.RequireUserId();
+        var result = await _handler.Handle(new GetNetWorthHistoryQuery(userId, from, to), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        if (baseCurrency == "USD")
+            return Ok(result);
+
+        // Snapshots are stored in USD; the profile's base currency is applied at the boundary.
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        return Ok(result with
+        {
+            Snapshots = [.. result.Snapshots.Select(s => s with
+            {
+                BankingTotal = Fx(s.BankingTotal),
+                BrokerageTotal = Fx(s.BrokerageTotal),
+                CryptoTotal = Fx(s.CryptoTotal),
+                TotalNetWorth = Fx(s.TotalNetWorth),
+                Currency = baseCurrency,
+            })],
+        });
     }
 }

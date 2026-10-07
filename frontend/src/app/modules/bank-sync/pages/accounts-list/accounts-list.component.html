@@ -216,13 +216,13 @@
 </ng-template>
 
 <ng-template #amountCell let-account>
-  @let bal = account | accountBalance;
+  @let bal = account | accountBalance: store.baseCurrency();
   <div class="shrink-0 text-right font-mono tabular-nums">
     <div [class]="bal.owed ? 'text-status-error' : 'text-text-primary'" class="text-cmn-sm">
       {{ bal.native }}
     </div>
-    @if (bal.usd) {
-      <div class="text-cmn-xs text-text-secondary">{{ bal.usd }}</div>
+    @if (bal.equivalent) {
+      <div class="text-cmn-xs text-text-secondary">{{ bal.equivalent }}</div>
     }
   </div>
 </ng-template>

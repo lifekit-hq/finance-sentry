@@ -57,4 +57,7 @@ export interface DashboardData {
   windowFlow?: MonthlyFlow[];
   topCategories: CategoryStat[];
   lastSyncTimestamp: Nullable<string>;
+  /** Currency every `…Usd` figure and category total is expressed in — the profile's base
+   * currency (the field names keep their historical suffix). */
+  baseCurrency?: string;
 }

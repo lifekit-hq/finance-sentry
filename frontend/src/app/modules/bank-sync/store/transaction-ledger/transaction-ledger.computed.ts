@@ -17,6 +17,7 @@ interface StateSignals {
   status: Signal<AsyncStatus>;
   errorCode: Signal<Nullable<string>>;
   monthlyOutflowUsd: Signal<number | null>;
+  monthlyOutflowCurrency: Signal<string>;
   filters: Signal<TransactionFilters>;
   accounts: Signal<TransactionAccountOption[]>;
 }
@@ -42,6 +43,7 @@ export function transactionLedgerComputed(store: StateSignals) {
     }),
     dayGroups: computed(() => TransactionGroupUtils.groupByDay(store.transactions())),
     monthlyOutflow: computed(() => store.monthlyOutflowUsd()),
+    monthlyOutflowCurrency: computed(() => store.monthlyOutflowCurrency()),
     topCategory: computed(() => {
       const counts: Record<string, number> = {};
       for (const t of store.transactions()) {

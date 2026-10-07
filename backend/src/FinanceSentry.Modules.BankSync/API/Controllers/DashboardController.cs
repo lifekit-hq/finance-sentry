@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.BankSync.API.Controllers;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.API.Responses;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -15,8 +17,10 @@ public class DashboardController(
     ITransactionRepository transactions,
     IBankAccountRepository accounts,
     ITransferDetectionService transferDetection,
-    IFlowBreakdownService flowBreakdown) : ControllerBase
+    IFlowBreakdownService flowBreakdown,
+    IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IDashboardQueryService _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
     private readonly IFlowBreakdownService _flowBreakdown = flowBreakdown ?? throw new ArgumentNullException(nameof(flowBreakdown));
     private readonly ITransactionRepository _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
@@ -32,8 +36,39 @@ public class DashboardController(
         [FromQuery] DateOnly? windowFrom = null,
         CancellationToken ct = default)
     {
-        var data = await _dashboard.GetDashboardDataAsync(User.RequireUserId(), months, windowMonths, windowFrom, ct);
-        return Ok(data);
+        var userId = User.RequireUserId();
+        var data = await _dashboard.GetDashboardDataAsync(userId, months, windowMonths, windowFrom, ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(data, baseCurrency));
+    }
+
+    // The service speaks USD; the profile's base currency is applied once, here, with the same
+    // rate table every other conversion uses. USD (or an unset profile) is an identity.
+    private static DashboardData InBaseCurrency(DashboardData data, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return data with { BaseCurrency = baseCurrency };
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        MonthlyFlow Flow(MonthlyFlow f) => f with
+        {
+            InflowUsd = Fx(f.InflowUsd),
+            OutflowUsd = Fx(f.OutflowUsd),
+            NetUsd = Fx(f.NetUsd),
+            CommittedOutflowUsd = Fx(f.CommittedOutflowUsd),
+            DiscretionaryOutflowUsd = Fx(f.DiscretionaryOutflowUsd),
+            FamilySupportOutflowUsd = Fx(f.FamilySupportOutflowUsd),
+            InvestedOutflowUsd = Fx(f.InvestedOutflowUsd),
+        };
+
+        return data with
+        {
+            TotalNetWorthUsd = Fx(data.TotalNetWorthUsd),
+            MonthlyFlow = [.. data.MonthlyFlow.Select(Flow)],
+            WindowFlow = data.WindowFlow?.Select(Flow).ToList(),
+            TopCategories = [.. data.TopCategories.Select(c => c with { TotalSpend = Fx(c.TotalSpend) })],
+            BaseCurrency = baseCurrency,
+        };
     }
 
     // ── GET /api/dashboard/flow-breakdown ─────────────────────────────────────
