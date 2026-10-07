@@ -211,7 +211,7 @@
                       </div>
                       <div class="text-cmn-xs text-text-secondary">
                         @if (device.lastSuccessAt) {
-                          Last notified {{ device.lastSuccessAt | relativeTime }}
+                          Last notified {{ device.lastSuccessAt | cmnRelativeTime: 'Never' }}
                         } @else {
                           Not notified yet
                         }

@@ -91,7 +91,8 @@
                 <span
                   [title]="
                     inst.lastSuccessfulSyncTimestamp
-                      ? 'Last successful sync ' + (inst.lastSuccessfulSyncTimestamp | relativeTime)
+                      ? 'Last successful sync ' +
+                        (inst.lastSuccessfulSyncTimestamp | cmnRelativeTime: 'Never')
                       : 'No successful sync yet'
                   "
                   class="hidden whitespace-nowrap sm:inline"
@@ -100,7 +101,7 @@
                     <span class="text-status-error">{{ inst.syncStatus | syncStatusLabel }}</span>
                     ·
                   }
-                  {{ inst.lastSyncTimestamp | relativeTime }}
+                  {{ inst.lastSyncTimestamp | cmnRelativeTime: 'Never' }}
                 </span>
               </div>
 

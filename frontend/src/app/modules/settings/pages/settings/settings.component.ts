@@ -15,6 +15,7 @@ import {
   FormFieldComponent,
   InputComponent,
   PageHeaderComponent,
+  RelativeTimePipe,
   SelectComponent,
   TagComponent,
   ToastService,
@@ -24,7 +25,6 @@ import {take} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
-import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {

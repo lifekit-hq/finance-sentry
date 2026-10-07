@@ -9,6 +9,7 @@ import {
   CmnColumnComponent,
   DataTableComponent,
   EmptyStateComponent,
+  RelativeTimePipe,
   SkeletonComponent,
   StatCardComponent,
   TagComponent,
@@ -17,7 +18,6 @@ import {
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
-import {RelativeTimePipe} from '../../../../shared/pipes/relative-time.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type DossierSignalItem} from '../../models/dossier/dossier.model';
 import {CoverageLabelPipe, SignalTypeLabelPipe} from '../../pipes/dossier-label.pipe';
