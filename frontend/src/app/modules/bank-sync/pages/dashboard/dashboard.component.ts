@@ -343,9 +343,10 @@ export class DashboardComponent {
     });
   }
 
+  // Top spendings counts outflows only, so the drill-down lists the category's debits.
   public onCategoryClick(row: CategoryStat): void {
     void this.router.navigate([AppRoute.Transactions], {
-      queryParams: {category: row.category, ...this.rangeDates()},
+      queryParams: {type: 'debit', category: row.category, ...this.rangeDates()},
     });
   }
 

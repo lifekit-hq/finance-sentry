@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -293,7 +294,14 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
             query = query.Where(t => accountIds.Contains(t.AccountId));
 
         if (filter.Categories is { Count: > 0 } categories)
-            query = query.Where(t => t.MerchantCategory != null && categories.Contains(t.MerchantCategory));
+        {
+            var includesUncategorized = categories.Contains(CategoryKeys.Uncategorized);
+            var classifiedIds = filter.CategoryTransactionIds ?? [];
+            query = query.Where(t =>
+                (t.MerchantCategory != null && categories.Contains(t.MerchantCategory))
+                || (includesUncategorized && t.MerchantCategory == null)
+                || classifiedIds.Contains(t.Id));
+        }
 
         if (filter.From.HasValue)
             query = query.Where(t => (t.PostedDate ?? t.TransactionDate) >= filter.From.Value);

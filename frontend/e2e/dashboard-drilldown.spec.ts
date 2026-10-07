@@ -492,3 +492,62 @@ test.describe('Dashboard → Ledger spending consistency', () => {
     expect(dashboardAmount).toBeCloseTo(ledgerAmount, 1);
   });
 });
+
+// Top spendings counts the range's debits per category, including the computed FAMILY_SUPPORT
+// bucket and UNCATEGORIZED (null category). A row must open the ledger on exactly that slice:
+// the category selected in the filter and the query scoped to debits over the same range.
+test.describe('Top spendings → Ledger category drill-down', () => {
+  const CATEGORIES = [
+    {key: 'FOOD_AND_DRINK', label: 'Food & Drink', sortOrder: 10},
+    {key: 'FAMILY_SUPPORT', label: 'Family Support', sortOrder: 135},
+    {key: 'UNCATEGORIZED', label: 'Uncategorized', sortOrder: 999},
+  ];
+
+  for (const {key, label} of CATEGORIES) {
+    test(`the ${label} row opens the debit ledger filtered to ${key}`, async ({page}) => {
+      await mockApisWithLedger(page);
+      const ledgerQueries: URLSearchParams[] = [];
+      await page.route(`${API}/categories`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(CATEGORIES),
+        })
+      );
+      await page.route(`${API}/dashboard/aggregated**`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...DASHBOARD_DATA,
+            topCategories: [
+              {category: 'FAMILY_SUPPORT', totalSpend: 800, percentOfTotal: 40},
+              {category: 'FOOD_AND_DRINK', totalSpend: 700, percentOfTotal: 35},
+              {category: 'UNCATEGORIZED', totalSpend: 500, percentOfTotal: 25},
+            ],
+          }),
+        })
+      );
+      await page.route(`${API}/accounts/transactions**`, route => {
+        ledgerQueries.push(new URL(route.request().url()).searchParams);
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(LEDGER_TRANSACTIONS),
+        });
+      });
+
+      await page.goto('/dashboard?range=1m');
+      await page.locator('cmn-data-table').getByText(label, {exact: true}).click();
+
+      await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
+      expect(new URL(page.url()).searchParams.get('type')).toBe('debit');
+      await expect(page.getByTestId('category-filter')).toContainText(label);
+      await expect.poll(() => ledgerQueries.at(-1)?.getAll('category')).toEqual([key]);
+      const query = ledgerQueries.at(-1);
+      expect(query?.get('transactionType')).toBe('debit');
+      expect(query?.get('from')).toMatch(/^\d{4}-\d{2}-01$/);
+      expect(query?.get('to')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  }
+});

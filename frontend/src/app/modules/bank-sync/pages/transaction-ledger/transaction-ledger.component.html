@@ -38,7 +38,7 @@
   </div>
 
   <div
-    class="mb-cmn-4 flex flex-wrap items-end gap-cmn-2"
+    class="mb-cmn-4 grid grid-cols-2 items-end gap-cmn-2 md:flex md:flex-wrap [&>cmn-multi-select]:col-span-2"
     role="group"
     aria-label="Transaction filters"
     data-testid="ledger-filters"
@@ -46,7 +46,7 @@
     <cmn-search-input
       [ngModel]="store.inputText().search"
       (ngModelChange)="store.applySearch($event)"
-      class="w-full md:w-64"
+      class="col-span-2 md:w-64"
       placeholder="Search transactions"
       ariaLabel="Search transactions"
     />
@@ -71,13 +71,14 @@
     <cmn-date-range
       [ngModel]="store.dateRange()"
       (ngModelChange)="selectDateRange($event)"
+      class="col-span-2"
       groupLabel="Dates"
       data-testid="date-filter"
     />
     <cmn-input
       [ngModel]="store.inputText().minAmount"
       (ngModelChange)="store.applyAmount({bound: 'minAmount', raw: $event})"
-      class="w-28"
+      class="md:w-28"
       type="number"
       placeholder="Min $"
       data-testid="min-amount-filter"
@@ -85,7 +86,7 @@
     <cmn-input
       [ngModel]="store.inputText().maxAmount"
       (ngModelChange)="store.applyAmount({bound: 'maxAmount', raw: $event})"
-      class="w-28"
+      class="md:w-28"
       type="number"
       placeholder="Max $"
       data-testid="max-amount-filter"
@@ -93,8 +94,8 @@
     @if (store.hasActiveFilter()) {
       <cmn-button
         (clicked)="store.clearFilters()"
+        class="col-span-2 justify-self-end"
         variant="secondary"
-        size="sm"
         data-testid="clear-filters"
         >Clear filters</cmn-button
       >

@@ -2,7 +2,9 @@ namespace FinanceSentry.Modules.BankSync.Application.Queries;
 
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
@@ -55,11 +57,13 @@ public record GetAllTransactionsQuery(
 
 public class GetAllTransactionsQueryHandler(
     ITransactionRepository transactions,
-    IBankAccountRepository accounts)
+    IBankAccountRepository accounts,
+    ICounterpartyClassificationService counterpartyClassification)
     : IQueryHandler<GetAllTransactionsQuery, AllTransactionsResult>
 {
     private readonly ITransactionRepository _transactions = transactions;
     private readonly IBankAccountRepository _accounts = accounts;
+    private readonly ICounterpartyClassificationService _counterpartyClassification = counterpartyClassification;
 
     public async Task<AllTransactionsResult> Handle(GetAllTransactionsQuery request, CancellationToken ct)
     {
@@ -73,7 +77,8 @@ public class GetAllTransactionsQueryHandler(
             To: request.To,
             TransactionType: request.TransactionType,
             Search: request.Search,
-            AmountRanges: BuildAmountRanges(request.MinAmountUsd, request.MaxAmountUsd, accountList));
+            AmountRanges: BuildAmountRanges(request.MinAmountUsd, request.MaxAmountUsd, accountList),
+            CategoryTransactionIds: await ResolveFamilySupportAsync(request, accountList, ct));
 
         var (items, totalCount) = await _transactions.GetFilteredByUserIdAsync(
             request.UserId, filter, request.Paging.Offset, request.Paging.Limit, ct);
@@ -100,6 +105,35 @@ public class GetAllTransactionsQueryHandler(
 
         return new AllTransactionsResult(
             dtos, totalCount, request.Paging.Offset + dtos.Count < totalCount, request.Paging.Offset, request.Paging.Limit);
+    }
+
+    /// <summary>
+    /// <c>FAMILY_SUPPORT</c> is never stored on a row: the top-categories statistics compute it
+    /// from counterparty classification — the outbound side of family-support counterparties.
+    /// Resolving it through the same <see cref="ICounterpartyClassificationService"/> lets the
+    /// category drill-down list the transactions that bucket counted.
+    /// </summary>
+    private async Task<IReadOnlyList<Guid>?> ResolveFamilySupportAsync(
+        GetAllTransactionsQuery request, IReadOnlyList<Domain.BankAccount> accounts, CancellationToken ct)
+    {
+        if (request.Categories is null || !request.Categories.Contains(CategoryKeys.FamilySupport))
+            return null;
+
+        var txList = (request.From is { } from
+            ? await _transactions.GetByUserIdSinceAsync(request.UserId, from, ct)
+            : await _transactions.GetByUserIdAsync(request.UserId, ct)).ToList();
+        var accountCurrencies = accounts.Where(a => a.IsActive).ToDictionary(a => a.Id, a => a.Currency);
+
+        var classification = await _counterpartyClassification.ClassifyAsync(
+            request.UserId, txList, accountCurrencies, ct);
+        var matches = classification.Matches ?? new Dictionary<Guid, CounterpartyMatch>();
+
+        return txList
+            .Where(t => t.TransactionType == "debit"
+                        && matches.TryGetValue(t.Id, out var match)
+                        && match.FlowRole == FlowRoles.FamilySupport)
+            .Select(t => t.Id)
+            .ToList();
     }
 
     /// <summary>

@@ -2,6 +2,15 @@ import {expect, type Page, test} from '@playwright/test';
 
 const API = '**/api/v1';
 const DEBOUNCE_SETTLE_MS = 600;
+const PHONE_VIEWPORT = {width: 390, height: 844};
+const FILTER_TEST_IDS = [
+  'account-filter',
+  'category-filter',
+  'date-filter',
+  'min-amount-filter',
+  'max-amount-filter',
+  'clear-filters',
+];
 
 const AUTH_RESPONSE = {
   user: {id: 'test-user-id', email: 'test@gmail.com', roles: ['Owner'], permissions: []},
@@ -226,5 +235,38 @@ test.describe('Transaction ledger — server-side filters with URL sync', () => 
     await expect.poll(() => last(requests).get('to')).toBe('2026-09-30');
     expect(page.url()).toContain('from=2026-09-01');
     expect(page.url()).toContain('to=2026-09-30');
+  });
+
+  test('the filter bar fits a 390px phone with every filter active', async ({page}) => {
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await mockApi(page);
+    await page.goto(
+      '/transactions?account=acc-aib&category=FOOD_AND_DRINK&type=credit&from=2026-09-01&to=2026-09-30&minAmountUsd=10&maxAmountUsd=500&search=coffee'
+    );
+    await expect(page.getByTestId('ledger-row')).toHaveCount(1);
+    await expect(page.getByTestId('clear-filters')).toBeVisible();
+
+    const overflow = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
+
+    const withinViewport = (box: {x: number; width: number} | null) => {
+      expect(box).not.toBeNull();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(PHONE_VIEWPORT.width);
+    };
+    withinViewport(await page.getByRole('searchbox', {name: 'Search transactions'}).boundingBox());
+    for (const testId of FILTER_TEST_IDS) {
+      const control = page.getByTestId(testId);
+      await expect(control, testId).toBeVisible();
+      withinViewport(await control.boundingBox());
+    }
+
+    await page.getByTestId('category-filter').getByRole('button').first().click();
+    const panel = page.locator('.cdk-overlay-pane').first();
+    await expect(panel).toBeVisible();
+    withinViewport(await panel.boundingBox());
   });
 });

@@ -540,6 +540,21 @@ period-over-period comparison, so a partial month does not distort it the way it
 a bar sitting next to complete ones — and dropping the freshest spending from "where does
 my money go" would be a real loss.
 
+**Every row drills into its own transactions.** The ledger's category filter
+(`GetAllTransactionsQuery`, `category=` on `GET /accounts/transactions`) uses the same keys
+the statistics group by, including the two that no stored column holds as such:
+
+- `UNCATEGORIZED` matches a null `MerchantCategory` as well as the stored key, because the
+  statistics group a null category under it.
+- `FAMILY_SUPPORT` is never stored on a row. The query runs the same counterparty
+  classification (§5) over the window and matches the debits a `family_support`
+  counterparty claimed, whatever their stored category (usually `TRANSFER_OUT`).
+
+With the row's `type=debit` and window (§7), the ledger lists the debits the row totals. It
+can list a few more: the statistics also set aside own-account transfer pairs and debits
+claimed by a `self_routing`, `investment` or `household` counterparty, and the ledger's
+category filter still matches those on their stored category.
+
 ## 7. Month-bucketed charts vs. range-total tiles
 
 Frontend-only (`dashboard.computed.ts`). The in-progress month is kept out of the bar
@@ -568,7 +583,8 @@ months ending with the current one (YTD = months since January), and the tiles s
   windows hold whole months of income and need no gate.
 
 **Drill-downs carry the window.** Clicking the Income / Spending tile or a top-category row
-opens Transactions with `type` / `category` plus `from` / `to` (`DashboardRangeUtils.windowDates`):
+opens Transactions with `type` / `category` (a top-category row sends `type=debit` too, since
+it totals debits only) plus `from` / `to` (`DashboardRangeUtils.windowDates`):
 inclusive `YYYY-MM-DD` bounds from the first day of the window's first month (`windowStartKey`)
 through the last day of the current month, so the list covers the months the tile totals.
 `All` is unbounded and sends no bounds. The ledger shows the active bounds as a removable
