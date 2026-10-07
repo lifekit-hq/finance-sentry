@@ -17,7 +17,7 @@ public class GetFundamentalsQueryHandler(ISecEdgarService svc)
         return facts
             .Select(f => new FundamentalFactDto(
                 f.Ticker, f.Concept, f.Label, f.Unit, f.Value,
-                f.PeriodEnd, f.FiscalPeriod, f.FiscalYear, f.Form))
+                f.PeriodEnd, f.FiscalPeriod, f.FiscalYear, f.Form, f.Taxonomy))
             .ToList();
     }
 }

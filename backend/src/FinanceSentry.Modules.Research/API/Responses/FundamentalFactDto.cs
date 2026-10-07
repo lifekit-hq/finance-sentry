@@ -9,4 +9,5 @@ public record FundamentalFactDto(
     DateOnly PeriodEnd,
     string? FiscalPeriod,
     int? FiscalYear,
-    string Form);
+    string Form,
+    string Taxonomy);

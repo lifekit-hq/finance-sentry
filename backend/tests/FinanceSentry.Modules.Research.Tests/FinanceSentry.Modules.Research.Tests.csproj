@@ -21,6 +21,8 @@
   <ItemGroup>
     <!-- Verbatim live captures backing the TrendForce external-contract tests (issue #318). -->
     <Content Include="Companion\Fixtures\*.html" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Recorded EDGAR companyconcept responses for the fundamentals tests (issue #837). -->
+    <Content Include="Unit\Fixtures\Edgar\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

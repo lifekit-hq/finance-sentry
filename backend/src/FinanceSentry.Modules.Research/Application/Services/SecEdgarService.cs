@@ -41,6 +41,22 @@ public sealed class SecEdgarService(
         ("StockholdersEquity", ["StockholdersEquity"]),
     ];
 
+    // The same friendly concepts in the ifrs-full taxonomy, read only when a filer reports none of
+    // the us-gaap ones — a foreign private issuer filing 20-F/40-F under IFRS (e.g. GRAB). Each tag
+    // matches its us-gaap counterpart's meaning: NetIncome and StockholdersEquity are the parent's
+    // share (excluding non-controlling interests), as NetIncomeLoss and StockholdersEquity are.
+    // RevenueFromContractsWithCustomers is listed first so a filer reporting both keeps Revenue
+    // (the total line) for any period they overlap — the merge below keeps the later tag's row.
+    private static readonly (string Concept, string[] Tags)[] IfrsConcepts =
+    [
+        ("Revenue", ["RevenueFromContractsWithCustomers", "Revenue"]),
+        ("GrossProfit", ["GrossProfit"]),
+        ("OperatingIncome", ["ProfitLossFromOperatingActivities"]),
+        ("NetIncome", ["ProfitLossAttributableToOwnersOfParent"]),
+        ("DilutedEPS", ["DilutedEarningsLossPerShare"]),
+        ("StockholdersEquity", ["EquityAttributableToOwnersOfParent"]),
+    ];
+
     private readonly SemaphoreSlim tickerMapLock = new(1, 1);
     private readonly ConcurrentDictionary<string, CachedFilings> filingsCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CachedFundamentals> fundamentalsCache = new(StringComparer.OrdinalIgnoreCase);
@@ -81,13 +97,26 @@ public sealed class SecEdgarService(
             return [];
         }
 
+        var facts = await FetchTaxonomyAsync(upper, cik, FundamentalFact.UsGaapTaxonomy, CoreConcepts, ct);
+        if (facts.Count == 0)
+        {
+            facts = await FetchTaxonomyAsync(upper, cik, FundamentalFact.IfrsTaxonomy, IfrsConcepts, ct);
+        }
+
+        fundamentalsCache[upper] = new CachedFundamentals(DateTimeOffset.UtcNow, facts);
+        return Trim(facts, perConcept);
+    }
+
+    private async Task<IReadOnlyList<FundamentalFact>> FetchTaxonomyAsync(
+        string ticker, string cik, string taxonomy, (string Concept, string[] Tags)[] concepts, CancellationToken ct)
+    {
         using var throttle = new SemaphoreSlim(MaxConcurrentConceptFetches);
-        var tasks = CoreConcepts.Select(async spec =>
+        var tasks = concepts.Select(async spec =>
         {
             await throttle.WaitAsync(ct);
             try
             {
-                return await FetchConceptAsync(upper, cik, spec.Concept, spec.Tags, ct);
+                return await FetchConceptAsync(ticker, cik, taxonomy, spec.Concept, spec.Tags, ct);
             }
             finally
             {
@@ -95,9 +124,7 @@ public sealed class SecEdgarService(
             }
         });
 
-        var facts = (await Task.WhenAll(tasks)).SelectMany(f => f).ToList();
-        fundamentalsCache[upper] = new CachedFundamentals(DateTimeOffset.UtcNow, facts);
-        return Trim(facts, perConcept);
+        return (await Task.WhenAll(tasks)).SelectMany(f => f).ToList();
     }
 
     private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(
@@ -203,7 +230,7 @@ public sealed class SecEdgarService(
     }
 
     private async Task<IReadOnlyList<FundamentalFact>> FetchConceptAsync(
-        string ticker, string cik, string concept, string[] tags, CancellationToken ct)
+        string ticker, string cik, string taxonomy, string concept, string[] tags, CancellationToken ct)
     {
         var client = httpFactory.CreateClient(HttpClientName);
 
@@ -213,7 +240,7 @@ public sealed class SecEdgarService(
         var merged = new List<FundamentalFact>();
         foreach (var tag in tags)
         {
-            var url = $"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{tag}.json";
+            var url = $"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/{taxonomy}/{tag}.json";
             try
             {
                 using var response = await client.GetAsync(url, ct);
@@ -226,7 +253,7 @@ public sealed class SecEdgarService(
                 await using var stream = await response.Content.ReadAsStreamAsync(ct);
                 using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-                merged.AddRange(ParseConcept(ticker, concept, doc.RootElement));
+                merged.AddRange(ParseConcept(ticker, taxonomy, concept, doc.RootElement));
             }
             catch (Exception ex)
             {
@@ -242,7 +269,8 @@ public sealed class SecEdgarService(
             .ToList();
     }
 
-    private static IReadOnlyList<FundamentalFact> ParseConcept(string ticker, string concept, JsonElement root)
+    private static IReadOnlyList<FundamentalFact> ParseConcept(
+        string ticker, string taxonomy, string concept, JsonElement root)
     {
         var label = root.TryGetProperty("label", out var labelProp) ? labelProp.GetString() ?? concept : concept;
 
@@ -283,16 +311,22 @@ public sealed class SecEdgarService(
                 end.Value,
                 point.TryGetProperty("fp", out var fp) ? fp.GetString() : null,
                 point.TryGetProperty("fy", out var fy) && fy.ValueKind == JsonValueKind.Number ? fy.GetInt32() : null,
-                form));
+                form,
+                taxonomy));
         }
 
         return facts;
     }
 
-    // 10-K / 10-Q and their amendments (10-K/A, 10-Q/A) — the audited/reviewed periodic financials.
+    // The audited/reviewed periodic financials and their amendments (…/A): 10-K / 10-Q for domestic
+    // filers, 20-F / 40-F annual reports for foreign private issuers. A 6-K (an FPI's interim
+    // furnishing) is left out — EDGAR tags its facts with no fiscal period, and it is not a
+    // periodic statement in the 10-Q sense.
     private static bool IsPeriodicStatement(string form)
         => form.StartsWith("10-K", StringComparison.OrdinalIgnoreCase)
-            || form.StartsWith("10-Q", StringComparison.OrdinalIgnoreCase);
+            || form.StartsWith("10-Q", StringComparison.OrdinalIgnoreCase)
+            || form.StartsWith("20-F", StringComparison.OrdinalIgnoreCase)
+            || form.StartsWith("40-F", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<FundamentalFact> Trim(IReadOnlyList<FundamentalFact> facts, int perConcept)
         => facts
