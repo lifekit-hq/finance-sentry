@@ -9,7 +9,7 @@ import {AlertTypeUtils} from './alert-type.utils';
 const TICKER = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
 
 export class AlertDestinationUtils {
-  /** Where tapping the alert goes: the server-resolved appPath, else the type's coarse destination;, or null when the alert only gets marked read. */
+  /** Where tapping the alert goes: the server-resolved appPath, else the type's coarse destination, or null when the alert only gets marked read. */
   public static resolve(alert: Alert): Nullable<AlertNavigation> {
     if (alert.type === 'FilingLanded') {
       const url = AlertMessageUtils.filingUrl(alert.message);
