@@ -62,6 +62,7 @@ export class PositionsService extends ApiService {
           return {
             symbol: p.symbol,
             provider: p.provider ?? brokerage?.provider ?? 'ibkr',
+            instrumentType: p.instrumentType,
             quantity: p.quantity,
             currentValue: p.usdValue,
             currentPrice: p.quantity > 0 ? p.usdValue / p.quantity : 0,
@@ -76,6 +77,7 @@ export class PositionsService extends ApiService {
         const cryptoPositions: Position[] = (crypto?.holdings ?? []).map(h => ({
           symbol: h.asset,
           provider: h.provider,
+          instrumentType: null,
           quantity: h.freeQuantity + h.lockedQuantity,
           currentValue: h.usdValue,
           currentPrice: cryptoUnitPrice(h),

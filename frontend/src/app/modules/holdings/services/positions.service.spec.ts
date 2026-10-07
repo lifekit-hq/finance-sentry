@@ -104,9 +104,9 @@ describe('PositionsService', () => {
     http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
     http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(null);
 
-    expect(positions.map(p => [p.symbol, p.provider])).toEqual([
-      ['AAPL', 'ibkr'],
-      ['Fund A', 'inzhur'],
+    expect(positions.map(p => [p.symbol, p.provider, p.instrumentType])).toEqual([
+      ['AAPL', 'ibkr', 'STK'],
+      ['Fund A', 'inzhur', 'REIT'],
     ]);
   });
 

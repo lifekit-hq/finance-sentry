@@ -1,4 +1,4 @@
-import {DecimalPipe} from '@angular/common';
+import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {
@@ -31,6 +31,7 @@ const SKELETON_ROWS = 4;
     DataTableComponent,
     DecimalPipe,
     MoneyPipe,
+    NgTemplateOutlet,
     RouterLink,
     SkeletonComponent,
     DonutChartComponent,

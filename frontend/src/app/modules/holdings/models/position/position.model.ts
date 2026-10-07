@@ -40,6 +40,8 @@ export interface CryptoHoldingsDto {
 export interface Position {
   symbol: string;
   provider: string;
+  /** Brokerage instrument type (`STK`, `CASH`, `BOND`, ...); null for crypto venue rows. */
+  instrumentType: Nullable<string>;
   quantity: number;
   currentValue: number;
   /** Null for venue cash — a currency balance has no unit price. */

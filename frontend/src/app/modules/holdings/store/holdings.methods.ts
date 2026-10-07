@@ -11,6 +11,9 @@ export function holdingsMethods(store: WritableStateSource<HoldingsState>) {
     setPositions(positions: Position[]): void {
       patchState(store, {positions, positionsStatus: 'idle', positionsErrorCode: null});
     },
+    setDayChangePct(dayChangePctByTicker: Record<string, number>): void {
+      patchState(store, {dayChangePctByTicker});
+    },
     setPositionsError(errorCode: Nullable<string>): void {
       patchState(store, {positionsStatus: 'error', positionsErrorCode: errorCode});
     },
