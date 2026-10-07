@@ -16,6 +16,16 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Xunit;
 
+internal sealed class UnreachableConfigurationManager : IConfigurationManager<OpenIdConnectConfiguration>
+{
+    public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel) =>
+        throw new HttpRequestException("The identity provider is unreachable.");
+
+    public void RequestRefresh()
+    {
+    }
+}
+
 /// <summary>An API host with the org OIDC login configured; the provider's discovery document is stubbed in.</summary>
 public class OidcApiFactory : AuthApiFactory
 {
@@ -25,6 +35,9 @@ public class OidcApiFactory : AuthApiFactory
 
     /// <summary>What the stubbed discovery document advertises as the authorize endpoint.</summary>
     protected virtual string DiscoveredAuthorizationEndpoint => AuthorizationEndpoint;
+
+    /// <summary>When set, discovery fails the way an unreachable provider does and no document is cached.</summary>
+    protected virtual bool DiscoveryUnreachable => false;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -42,6 +55,13 @@ public class OidcApiFactory : AuthApiFactory
                 TokenEndpoint = "https://idp.test/oidc/token",
                 EndSessionEndpoint = EndSessionEndpoint,
             };
+            if (DiscoveryUnreachable)
+            {
+                o.Configuration = null;
+                o.ConfigurationManager = new UnreachableConfigurationManager();
+                return;
+            }
+
             o.Configuration = discovery;
             o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(discovery);
         }));
@@ -229,6 +249,30 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
                                       || c.Contains("refresh", StringComparison.OrdinalIgnoreCase));
 
     private sealed record MethodsShape(bool Oidc, bool PasswordLogin);
+}
+
+/// <summary>An API host whose identity provider cannot be reached for discovery.</summary>
+public class OidcUnreachableApiFactory : OidcApiFactory
+{
+    protected override bool DiscoveryUnreachable => true;
+}
+
+/// <summary>Sign-out stays local when the provider's end-session endpoint cannot be resolved.</summary>
+public class OidcLogoutUnreachableTests(OidcUnreachableApiFactory factory) : IClassFixture<OidcUnreachableApiFactory>
+{
+    [Fact]
+    public async Task Logout_WhenDiscoveryIsUnreachable_StillReturns204AndClearsEveryCookie()
+    {
+        var client = factory.CookieClient(("fs_oidc_id_token", "the.id.token"));
+
+        var response = await client.PostAsync("/api/v1/auth/logout", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.Headers.GetValues("Set-Cookie").Should()
+            .Contain(c => c.StartsWith("fs_oidc_id_token=;", StringComparison.Ordinal))
+            .And.Contain(c => c.StartsWith("fs_refresh_token=;", StringComparison.Ordinal))
+            .And.Contain(c => c.StartsWith("fs_access_token=;", StringComparison.Ordinal));
+    }
 }
 
 /// <summary>POST /api/v1/auth/logout also ends the provider's session (RP-initiated logout) for a session that came from it.</summary>

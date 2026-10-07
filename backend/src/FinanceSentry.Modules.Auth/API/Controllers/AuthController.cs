@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
@@ -39,7 +40,8 @@ public class AuthController(
     IQueryHandler<GetMeQuery, GetMeResult> getMeHandler,
     IWebHostEnvironment env,
     IOptions<AuthSignInOptions> signInOptions,
-    IOptions<OidcLoginOptions> oidcOptions) : ControllerBase
+    IOptions<OidcLoginOptions> oidcOptions,
+    ILogger<AuthController> logger) : ControllerBase
 {
     private const int RefreshTokenCookieDays = 30;
     private const string ReturnUrlItem = "returnUrl";
@@ -267,7 +269,16 @@ public class AuthController(
 
         var properties = new AuthenticationProperties();
         properties.StoreTokens([new AuthenticationToken { Name = OpenIdConnectParameterNames.IdToken, Value = idToken }]);
-        await HttpContext.SignOutAsync(OidcLoginOptions.Scheme, properties);
+        try
+        {
+            await HttpContext.SignOutAsync(OidcLoginOptions.Scheme, properties);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not build the identity provider's end-session URL; the local sign-out still completed.");
+            return NoContent();
+        }
+
         return HttpContext.Items[OidcLoginExtensions.EndSessionUrlItem] is string endSessionUrl
             ? Ok(new LogoutResponse(endSessionUrl))
             : NoContent();

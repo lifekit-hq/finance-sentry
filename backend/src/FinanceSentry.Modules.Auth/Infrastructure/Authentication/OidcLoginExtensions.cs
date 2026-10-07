@@ -81,7 +81,8 @@ public static class OidcLoginExtensions
                 message.PostLogoutRedirectUri = options.PostLogoutRedirectUri;
                 if (!string.IsNullOrWhiteSpace(options.BackchannelAuthority) && message.IssuerAddress is { Length: > 0 } issuerAddress)
                     message.IssuerAddress = OidcAuthorityRewriteHandler.ToPublic(issuerAddress, options.Authority, options.BackchannelAuthority);
-                context.HttpContext.Items[EndSessionUrlItem] = message.CreateLogoutRequestUrl();
+                if (!string.IsNullOrWhiteSpace(message.IssuerAddress))
+                    context.HttpContext.Items[EndSessionUrlItem] = message.CreateLogoutRequestUrl();
                 context.HandleResponse();
                 return Task.CompletedTask;
             };
