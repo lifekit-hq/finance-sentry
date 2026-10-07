@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -43,6 +44,22 @@ public sealed class SecEdgarFundamentalsTests
         Fact(facts, "OperatingIncome", new DateOnly(2025, 12, 31)).Value.Should().Be(65_000_000m);
         Fact(facts, "DilutedEPS", new DateOnly(2025, 12, 31)).Unit.Should().Be("USD/shares");
         Fact(facts, "StockholdersEquity", new DateOnly(2025, 12, 31)).Value.Should().Be(6_728_000_000m);
+    }
+
+    [Fact]
+    public async Task Evaluate_IfrsForeignPrivateIssuer_ScoresOnAnnualBasis()
+    {
+        var sut = CreateFixtureSut();
+        var facts = await sut.GetFundamentalsAsync("GRAB", FundamentalsScorer.FactsPerConcept);
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        // Before this step the quarterly-only scorer returned a null score for GRAB.
+        result.Basis.Should().Be(FundamentalsScorer.AnnualBasis);
+        result.Score.Should().Be(35);
+        result.RevenueYoy.Should().BeApproximately(0.2048623m, 0.0000001m);
+        result.EpsYoy.Should().Be(-3m);
+        result.NotEvaluableReasons.Should().Contain("gross_margin_not_evaluable");
     }
 
     [Fact]

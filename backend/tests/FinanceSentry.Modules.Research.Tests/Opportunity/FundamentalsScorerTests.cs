@@ -89,4 +89,81 @@ public sealed class FundamentalsScorerTests
         run1.Score.Should().NotBeNull();
         run1.GrossMarginTrend.Should().NotBeNull();
     }
+
+    private static FundamentalFact Annual(string concept, decimal value, int fiscalYear)
+        => new("ZIM", concept, concept, "USD", value, new DateOnly(fiscalYear, 12, 31), "FY", fiscalYear, "20-F");
+
+    [Fact]
+    public void Evaluate_FallsBackToAnnualPeriods_WhenFilerHasNoQuarterlyFacts()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Annual("Revenue", 120m, 2025),
+            Annual("Revenue", 100m, 2024),
+            Annual("GrossProfit", 60m, 2025),
+            Annual("GrossProfit", 40m, 2024),
+            Annual("DilutedEPS", 3m, 2025),
+            Annual("DilutedEPS", 2m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.Basis.Should().Be(FundamentalsScorer.AnnualBasis);
+        result.RevenueYoy.Should().Be(0.2m);
+        result.GrossMarginLatest.Should().Be(0.5m);
+        result.GrossMarginTrend.Should().BeApproximately(0.5m - 0.4m, 0.0000001m);
+        result.EpsYoy.Should().Be(0.5m);
+        result.Score.Should().NotBeNull();
+        result.NotEvaluableReasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Evaluate_AnnualBasis_SurfacesMissingComponentsAsNull_NeverFaked()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Annual("Revenue", 120m, 2025),
+            Annual("Revenue", 100m, 2024),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.Basis.Should().Be(FundamentalsScorer.AnnualBasis);
+        result.Score.Should().Be(70);
+        result.GrossMarginLatest.Should().BeNull();
+        result.GrossMarginTrend.Should().BeNull();
+        result.EpsYoy.Should().BeNull();
+        result.NotEvaluableReasons.Should().Contain(["gross_margin_not_evaluable", "gross_margin_trend_not_evaluable", "eps_yoy_not_evaluable"]);
+    }
+
+    [Fact]
+    public void Evaluate_SingleFiscalYear_IsNotEvaluableForYoyAndTrend()
+    {
+        var facts = new List<FundamentalFact> { Annual("Revenue", 120m, 2025), Annual("GrossProfit", 60m, 2025) };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.RevenueYoy.Should().BeNull();
+        result.GrossMarginTrend.Should().BeNull();
+        result.GrossMarginLatest.Should().Be(0.5m);
+    }
+
+    [Fact]
+    public void Evaluate_DomesticFilerWithQuarterlyFacts_StaysOnQuarterlyBasis_EvenAlongsideAnnualFacts()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("Revenue", 120m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2025, "Q2", new DateOnly(2025, 5, 31)),
+            // Annual facts present too: they must not influence a quarterly-basis score.
+            Fact("Revenue", 900m, 2025, "FY", new DateOnly(2025, 12, 31)),
+            Fact("Revenue", 100m, 2024, "FY", new DateOnly(2024, 12, 31)),
+        };
+
+        var result = FundamentalsScorer.Evaluate(facts);
+
+        result.Basis.Should().Be(FundamentalsScorer.QuarterlyBasis);
+        result.RevenueYoy.Should().Be(0.2m);
+        FundamentalsScorer.Score(facts).Score.Should().Be(result.Score);
+    }
 }

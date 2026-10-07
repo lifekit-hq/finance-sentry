@@ -14,6 +14,9 @@ public static class FundamentalsScorer
     /// <summary>EDGAR datapoints per concept a caller must fetch for the YoY and margin-trend windows to resolve.</summary>
     public const int FactsPerConcept = 8;
 
+    public const string QuarterlyBasis = "quarterly";
+    public const string AnnualBasis = "annual";
+
     private const decimal MinScore = 0m;
     private const decimal MaxScore = 100m;
     private const decimal Midpoint = 50m;
@@ -31,6 +34,11 @@ public static class FundamentalsScorer
     // quarter-over-quarter noise is not a trend.
     private const int MarginTrendLookbackQuarters = 4;
 
+    // Annual-only filers (20-F/40-F foreign private issuers) have no quarterly facts. Window on
+    // annual data: YoY = latest fiscal year vs the prior fiscal year, margin level = latest fiscal
+    // year, margin trend = latest fiscal year vs the one before (lookback 1).
+    private const int MarginTrendLookbackYears = 1;
+
     public static (
         int? Score,
         decimal? RevenueYoy,
@@ -39,15 +47,31 @@ public static class FundamentalsScorer
         decimal? EpsYoy,
         IReadOnlyList<string> NotEvaluableReasons) Score(IReadOnlyList<FundamentalFact> facts)
     {
+        var r = Evaluate(facts);
+        return (r.Score, r.RevenueYoy, r.GrossMarginLatest, r.GrossMarginTrend, r.EpsYoy, r.NotEvaluableReasons);
+    }
+
+    /// <summary>
+    /// Same score as <see cref="Score"/> plus the period basis it was computed on. The annual
+    /// fiscal-year basis is used only when the filer has no quarterly facts at all; filers with
+    /// quarterly data score exactly as before.
+    /// </summary>
+    public static FundamentalsScoreResult Evaluate(IReadOnlyList<FundamentalFact> facts)
+    {
         if (facts.Count == 0)
         {
-            return (null, null, null, null, null, ["no_fundamentals_data"]);
+            return new FundamentalsScoreResult(null, null, null, null, null, ["no_fundamentals_data"], QuarterlyBasis);
         }
+
+        var annual = !facts.Any(f => FundamentalMath.MatchesPeriodType(f, ThesisPeriodType.Quarter));
+        var periodType = annual ? ThesisPeriodType.Annual : ThesisPeriodType.Quarter;
+        var basis = annual ? AnnualBasis : QuarterlyBasis;
+        var trendLookback = annual ? MarginTrendLookbackYears : MarginTrendLookbackQuarters;
 
         var reasons = new List<string>();
         var components = new List<decimal>();
 
-        var revenueYoy = FundamentalMath.LatestYoy(facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.RevenueYoy]);
+        var revenueYoy = FundamentalMath.LatestYoy(facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.RevenueYoy], periodType);
         if (revenueYoy is { } rev)
         {
             components.Add(Clamp(Midpoint + (rev * YoyScaleFactor)));
@@ -58,7 +82,7 @@ public static class FundamentalsScorer
         }
 
         var (grossNumerator, grossDenominator) = FundamentalMath.MarginConceptsByMetric[ThesisMetric.GrossMargin];
-        var marginLatest = FundamentalMath.LatestMargin(facts, grossNumerator, grossDenominator);
+        var marginLatest = FundamentalMath.LatestMargin(facts, grossNumerator, grossDenominator, periodType);
         if (marginLatest is { } latestMargin)
         {
             components.Add(Clamp(latestMargin * MarginLevelScaleFactor));
@@ -68,7 +92,7 @@ public static class FundamentalsScorer
             reasons.Add("gross_margin_not_evaluable");
         }
 
-        var marginTrend = FundamentalMath.MarginTrend(facts, grossNumerator, grossDenominator, MarginTrendLookbackQuarters);
+        var marginTrend = FundamentalMath.MarginTrend(facts, grossNumerator, grossDenominator, trendLookback, periodType);
         if (marginTrend is { } trend)
         {
             components.Add(Clamp(Midpoint + (trend * MarginTrendScaleFactor)));
@@ -78,7 +102,7 @@ public static class FundamentalsScorer
             reasons.Add("gross_margin_trend_not_evaluable");
         }
 
-        var epsYoy = FundamentalMath.LatestYoy(facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.EpsYoy]);
+        var epsYoy = FundamentalMath.LatestYoy(facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.EpsYoy], periodType);
         if (epsYoy is { } eps)
         {
             components.Add(Clamp(Midpoint + (eps * YoyScaleFactor)));
@@ -90,12 +114,22 @@ public static class FundamentalsScorer
 
         if (components.Count == 0)
         {
-            return (null, revenueYoy, marginLatest, marginTrend, epsYoy, reasons);
+            return new FundamentalsScoreResult(null, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis);
         }
 
         var score = (int)Math.Round(components.Average(), MidpointRounding.AwayFromZero);
-        return (score, revenueYoy, marginLatest, marginTrend, epsYoy, reasons);
+        return new FundamentalsScoreResult(score, revenueYoy, marginLatest, marginTrend, epsYoy, reasons, basis);
     }
 
     private static decimal Clamp(decimal value) => Math.Clamp(value, MinScore, MaxScore);
 }
+
+/// <summary>A fundamentals sub-score with its components and the period basis (<c>quarterly</c> or <c>annual</c>) it was computed on.</summary>
+public sealed record FundamentalsScoreResult(
+    int? Score,
+    decimal? RevenueYoy,
+    decimal? GrossMarginLatest,
+    decimal? GrossMarginTrend,
+    decimal? EpsYoy,
+    IReadOnlyList<string> NotEvaluableReasons,
+    string Basis);

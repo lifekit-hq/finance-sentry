@@ -72,8 +72,8 @@ public sealed class ScoreCandidateCommandHandler(
         var holdings = await holdingsReader.GetHoldingsAsync(command.UserId, ct);
 
         var (structureScore, structureReasons) = StructureScorer.Score(structureSnapshot);
-        var (fundamentalsScore, revenueYoy, grossMarginLatest, grossMarginTrend, epsYoy, fundamentalsReasons) =
-            FundamentalsScorer.Score(fundamentalFacts);
+        var (fundamentalsScore, revenueYoy, grossMarginLatest, grossMarginTrend, epsYoy, fundamentalsReasons, fundamentalsBasis) =
+            FundamentalsScorer.Evaluate(fundamentalFacts);
         var crowding = CrowdingClassifier.Classify(
             structureSnapshot?.ExtensionFromMa50, structureSnapshot?.VolumeRatio, _options);
 
@@ -99,7 +99,8 @@ public sealed class ScoreCandidateCommandHandler(
             fundamentalsReasons,
             SectorRank: structureSnapshot?.SectorRank,
             SectorRankDelta: structureSnapshot?.SectorRankDelta,
-            DistanceFrom63dHigh: structureSnapshot?.DistanceFrom63dHigh);
+            DistanceFrom63dHigh: structureSnapshot?.DistanceFrom63dHigh,
+            FundamentalsBasis: fundamentalsBasis);
 
         var scorecard = new CandidateScorecard(
             structureScore, fundamentalsScore, crowding, ipsFit, evidence, _options.FormulaVersion, regime);
