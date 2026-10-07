@@ -57,3 +57,30 @@ describe('FlowBreakdownUtils.monthDates', () => {
     expect(FlowBreakdownUtils.monthDates('')).toEqual({});
   });
 });
+
+describe('FlowBreakdownUtils.counterpartyQuery', () => {
+  it('searches the counterparty name when the row spells it, case-insensitively', () => {
+    expect(
+      FlowBreakdownUtils.counterpartyQuery({
+        ...ITEM,
+        counterpartyName: ' Anna K ',
+        description: 'Від: ANNA K rent',
+      })
+    ).toBe('Anna K');
+    expect(
+      FlowBreakdownUtils.counterpartyQuery({
+        ...ITEM,
+        counterpartyName: 'Anna K',
+        merchantName: 'anna k',
+      })
+    ).toBe('Anna K');
+  });
+
+  it('returns null when neither merchant nor description spells the name, or there is none', () => {
+    expect(
+      FlowBreakdownUtils.counterpartyQuery({...ITEM, counterpartyName: 'Landlord'})
+    ).toBeNull();
+    expect(FlowBreakdownUtils.counterpartyQuery({...ITEM, counterpartyName: null})).toBeNull();
+    expect(FlowBreakdownUtils.counterpartyQuery({...ITEM, counterpartyName: '  '})).toBeNull();
+  });
+});

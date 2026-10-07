@@ -187,6 +187,24 @@ describe('FlowBreakdownComponent drill-downs', () => {
     );
   });
 
+  it('links the counterparty tag to the ledger searched by that name when the row spells it', () => {
+    const el = render({
+      ...GROUP,
+      items: [{...GROUP.items[0], counterpartyName: 'Anna K', description: 'Від: Anna K'}],
+    });
+
+    expect(href(el, 'breakdown-counterparty-link')).toBe(
+      '/transactions?q=Anna%20K&from=2026-09-01&to=2026-09-30'
+    );
+  });
+
+  it('leaves the counterparty tag unlinked when the ledger search could not find the name', () => {
+    const el = render({...GROUP, items: [{...GROUP.items[0], counterpartyName: 'Landlord'}]});
+
+    expect(el.querySelector('[data-testid="breakdown-counterparty-link"]')).toBeNull();
+    expect(el.textContent).toContain('Landlord');
+  });
+
   it('opens the transaction drawer from a row without following the account link', () => {
     drawer.open.mockClear();
     const el = render();

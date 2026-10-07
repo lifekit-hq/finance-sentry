@@ -38,4 +38,23 @@ export class FlowBreakdownUtils {
     const lastDay = new Date(Date.UTC(year ?? 0, monthNumber ?? 1, 0)).getUTCDate();
     return {from: `${month}-01`, to: `${month}-${String(lastDay).padStart(DAY_PAD, '0')}`};
   }
+
+  /**
+   * The ledger search that lands on a row's counterparty, or null when its name appears in none of
+   * the text the ledger searches: counterparties match by their own rules, so the name is a search
+   * term only when this row's merchant or description spells it.
+   */
+  public static counterpartyQuery(
+    item: Pick<FlowBreakdownItem, 'counterpartyName' | 'merchantName' | 'description'>
+  ): Nullable<string> {
+    const name = item.counterpartyName?.trim();
+    if (!name) {
+      return null;
+    }
+    const needle = name.toLowerCase();
+    const spelled = [item.merchantName, item.description].some(text =>
+      text?.toLowerCase().includes(needle)
+    );
+    return spelled ? name : null;
+  }
 }

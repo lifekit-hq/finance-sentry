@@ -3,6 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, provideRouter, Router} from '@angular/router';
 import {BehaviorSubject} from 'rxjs';
 
+import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
 
@@ -38,7 +39,7 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
   const root = fixture.nativeElement as HTMLElement;
   const chip = (id: string) => root.querySelector(`[data-testid="${id}"]`) as HTMLElement;
   const selected = (id: string) => chip(id).querySelector('button')?.getAttribute('aria-pressed');
-  return {chip, selected, navigate, root, store};
+  return {chip, selected, navigate, root, store, params$, fixture};
 }
 
 describe('TransactionLedgerComponent type control', () => {
@@ -126,5 +127,57 @@ describe('TransactionLedgerComponent category', () => {
       queryParams: {category: null},
       queryParamsHandling: 'merge',
     });
+  });
+});
+
+describe('TransactionLedgerComponent search param', () => {
+  const searchBox = (root: HTMLElement) =>
+    root.querySelector('input[type="search"]') as HTMLInputElement;
+
+  afterEach(() => vi.useRealTimers());
+
+  it('reads the initial search from q and feeds the store', () => {
+    const {root, store} = setup(null, {q: 'netflix'});
+    expect(searchBox(root).value).toBe('netflix');
+    expect(store.applyDateRange).toHaveBeenCalled();
+  });
+
+  it('writes typed search to q, debounced, replacing history and keeping the other params', () => {
+    vi.useFakeTimers();
+    const {root, navigate} = setup(null, {account: 'a1', category: 'FOOD'});
+    const input = searchBox(root);
+    input.value = 'spotify';
+    input.dispatchEvent(new Event('input'));
+    expect(navigate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {q: 'spotify'},
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  });
+
+  it('drops q from the URL when the box is cleared', () => {
+    vi.useFakeTimers();
+    const {root, navigate} = setup(null, {q: 'spotify'});
+    const input = searchBox(root);
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {q: null},
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  });
+
+  it('restores the box from q on back/forward without writing the URL again', () => {
+    vi.useFakeTimers();
+    const {root, navigate, params$, fixture} = setup(null, {q: 'netflix'});
+    params$.next(convertToParamMap({q: 'spotify', account: 'a1'}));
+    fixture.detectChanges();
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+    expect(searchBox(root).value).toBe('spotify');
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

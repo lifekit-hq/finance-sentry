@@ -79,3 +79,19 @@ describe('SubscriptionUtils.installmentProgress', () => {
     ).toBe('4 payments');
   });
 });
+
+describe('SubscriptionUtils.chargesQuery', () => {
+  it('searches a detected row by its statement name', () => {
+    expect(SubscriptionUtils.chargesQuery({isManual: false, merchantName: ' Netflix '})).toBe(
+      'Netflix'
+    );
+  });
+
+  it('returns null for a hand-typed label, a composed top-up name, or a blank name', () => {
+    expect(SubscriptionUtils.chargesQuery({isManual: true, merchantName: 'Car loan'})).toBeNull();
+    expect(
+      SubscriptionUtils.chargesQuery({isManual: false, merchantName: 'Mobile top-up 0057'})
+    ).toBeNull();
+    expect(SubscriptionUtils.chargesQuery({isManual: false, merchantName: '  '})).toBeNull();
+  });
+});

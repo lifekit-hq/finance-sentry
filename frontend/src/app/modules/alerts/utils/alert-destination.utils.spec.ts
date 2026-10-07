@@ -28,6 +28,27 @@ const FILING_URL =
   'https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240630.htm';
 
 describe('AlertDestinationUtils.resolve', () => {
+  it('opens the ledger searched by the statement merchant for a duplicate charge, over the bare server path', () => {
+    expect(
+      AlertDestinationUtils.resolve(
+        makeAlert({
+          type: 'DuplicateCharge',
+          message: 'Charged 2× for 9.99 EUR at Anthropic Ireland within the detection window.',
+          referenceLabel: 'claude',
+          appPath: '/transactions',
+        })
+      )
+    ).toEqual({kind: 'url', url: '/transactions?q=Anthropic%20Ireland'});
+  });
+
+  it('falls back to the plain ledger for a duplicate charge whose message names no merchant', () => {
+    expect(
+      AlertDestinationUtils.resolve(
+        makeAlert({type: 'DuplicateCharge', message: 'Balance dropped', referenceLabel: 'claude'})
+      )
+    ).toEqual({kind: 'route', commands: [AppRoute.Transactions]});
+  });
+
   it('prefers the server appPath, query string included, over the type destination', () => {
     const appPath = '/transactions?account=acc-1';
     expect(AlertDestinationUtils.resolve(makeAlert({type: 'LowBalance', appPath}))).toEqual({

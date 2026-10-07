@@ -48,3 +48,18 @@ describe('AlertMessageUtils filing URL', () => {
     expect(AlertMessageUtils.filingUrl(null)).toBeNull();
   });
 });
+
+describe('AlertMessageUtils.duplicateChargeMerchant', () => {
+  it('reads the statement merchant out of a duplicate-charge message', () => {
+    expect(
+      AlertMessageUtils.duplicateChargeMerchant(
+        'Charged 3× for 12.50 USD at PAYPAL *SPOTIFY within the detection window.'
+      )
+    ).toBe('PAYPAL *SPOTIFY');
+  });
+
+  it('returns null for any other message, or none', () => {
+    expect(AlertMessageUtils.duplicateChargeMerchant('Balance dropped')).toBeNull();
+    expect(AlertMessageUtils.duplicateChargeMerchant(null)).toBeNull();
+  });
+});
