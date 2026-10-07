@@ -34,5 +34,4 @@ public enum CompanionEventKind
     PolicyReview,
     PolicyReviewMissed,
     RelativeUnderperformance,
-    AnalystRatingChange,
 }
