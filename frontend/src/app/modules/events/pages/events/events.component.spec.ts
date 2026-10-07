@@ -1,5 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {provideRouter} from '@angular/router';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {OUTCOME_META_REGISTRY} from '../../constants/event/event.constants';
@@ -138,7 +139,10 @@ describe('EventsComponent', () => {
       loadMoreFired: vi.fn(),
     };
 
-    await TestBed.configureTestingModule({imports: [EventsComponent]})
+    await TestBed.configureTestingModule({
+      imports: [EventsComponent],
+      providers: [provideRouter([])],
+    })
       .overrideComponent(EventsComponent, {
         set: {providers: [{provide: EventsStore, useValue: mockStore}]},
       })
@@ -265,6 +269,36 @@ describe('EventsComponent', () => {
         row.querySelector('[data-testid="fired-line-2"] [data-testid="outcome"]')
       ).not.toBeNull();
     }
+  });
+
+  it('links each ticker calendar row to its dossier and leaves the macro row plain', () => {
+    const {host} = render();
+
+    const links = Array.from(host.querySelectorAll('[data-testid="event-link"]'));
+    expect(links.map(a => a.getAttribute('href'))).toEqual(['/assets/MU', '/assets/PLTR']);
+  });
+
+  it('links a fired row to its dossier, and a filing to its SEC document', () => {
+    mockStore.view.set('fired');
+    mockStore.fired.set([
+      fired('a', 'silent'),
+      {
+        ...fired('b', 'silent'),
+        kind: 'FilingLanded',
+        message: 'MU filed. https://www.sec.gov/Archives/edgar/data/1/2/a.htm',
+      },
+      {...fired('c', 'silent'), kind: 'BudgetBreach', subject: 'Groceries'},
+    ]);
+
+    const {host} = render();
+
+    const links = Array.from(host.querySelectorAll('[data-testid="fired-link"]'));
+    expect(links.map(a => a.getAttribute('href'))).toEqual([
+      '/assets/MU',
+      'https://www.sec.gov/Archives/edgar/data/1/2/a.htm',
+      '/budgets',
+    ]);
+    expect(links[1].getAttribute('target')).toBe('_blank');
   });
 
   it('maps not_delivered to the neutral variant', () => {

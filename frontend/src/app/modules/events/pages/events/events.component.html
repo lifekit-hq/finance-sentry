@@ -92,9 +92,19 @@
                       <cmn-tag [variant]="kindMeta(item.kind).variant">
                         {{ kindMeta(item.kind).label }}
                       </cmn-tag>
-                      <span class="font-mono text-cmn-sm font-semibold text-text-primary">
-                        {{ item.subject }}
-                      </span>
+                      @if (upcomingTarget(item); as target) {
+                        <a
+                          [routerLink]="target.commands"
+                          class="font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                          data-testid="event-link"
+                        >
+                          {{ item.subject }}
+                        </a>
+                      } @else {
+                        <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                          {{ item.subject }}
+                        </span>
+                      }
                       @let rowTitle =
                         item.title | eventTitle: kindMeta(item.kind).label : item.subject;
                       <span class="min-w-0 flex-1 text-cmn-sm text-text-primary">
@@ -134,9 +144,32 @@
               <cmn-tag [variant]="firedKindMeta(event.kind).variant">
                 {{ firedKindMeta(event.kind).label }}
               </cmn-tag>
-              <span class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary">
-                {{ event.subject }}
-              </span>
+              @let target = firedTarget(event);
+              @if (target?.kind === 'route') {
+                <a
+                  [routerLink]="routeCommands(target)"
+                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  data-testid="fired-link"
+                >
+                  {{ event.subject }}
+                </a>
+              } @else if (target?.kind === 'external') {
+                <a
+                  [href]="externalUrl(target)"
+                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  data-testid="fired-link"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {{ event.subject }}
+                </a>
+              } @else {
+                <span
+                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary"
+                >
+                  {{ event.subject }}
+                </span>
+              }
               <span class="ml-auto shrink-0 text-cmn-xs text-text-secondary">
                 {{ event.occurredAt | date: 'd MMM, HH:mm' }}
               </span>

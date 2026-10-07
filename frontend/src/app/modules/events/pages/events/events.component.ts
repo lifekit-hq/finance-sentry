@@ -1,5 +1,6 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {RouterLink} from '@angular/router';
 import {
   AlertComponent,
   AsyncStateComponent,
@@ -14,6 +15,7 @@ import {
   TagComponent,
 } from '@lifekit-hq/ui';
 
+import {AlertNavigation} from '../../../alerts/models/alert/alert-destination.model';
 import {
   EVENT_HORIZON_DAYS,
   EVENT_KIND_META_REGISTRY,
@@ -27,11 +29,14 @@ import {
 import {
   type EventKind,
   type EventOutcome,
+  type FiredEvent,
   type FiredEventKind,
+  type UpcomingEvent,
 } from '../../models/event/event.model';
 import {EventDayLabelPipe} from '../../pipes/event-day-label.pipe';
 import {EventTitlePipe} from '../../pipes/event-title.pipe';
 import {EventsStore} from '../../store/events.store';
+import {EventDestinationUtils} from '../../utils/event-destination.utils';
 
 const SKELETON_ROWS = 4;
 
@@ -47,6 +52,7 @@ const SKELETON_ROWS = 4;
     EventDayLabelPipe,
     EventTitlePipe,
     PageHeaderComponent,
+    RouterLink,
     SkeletonComponent,
     TabGroupComponent,
     TagComponent,
@@ -86,5 +92,22 @@ export class EventsComponent {
 
   public outcomeMeta(outcome: EventOutcome): OutcomeMeta {
     return OUTCOME_META_REGISTRY[outcome];
+  }
+
+  public upcomingTarget(event: UpcomingEvent): Nullable<{commands: string[]}> {
+    const target = EventDestinationUtils.upcoming(event);
+    return target?.kind === 'route' ? target : null;
+  }
+
+  public firedTarget(event: FiredEvent): Nullable<AlertNavigation> {
+    return EventDestinationUtils.fired(event);
+  }
+
+  public routeCommands(target: Nullable<AlertNavigation>): string[] {
+    return target?.kind === 'route' ? target.commands : [];
+  }
+
+  public externalUrl(target: Nullable<AlertNavigation>): string {
+    return target?.kind === 'external' ? target.url : '';
   }
 }
