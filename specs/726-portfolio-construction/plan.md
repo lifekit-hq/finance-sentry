@@ -21,7 +21,7 @@ questions in the spec are settled.
 Options binding, NgRx SignalStore, `@lifekit-hq/ui`
 
 **Storage**: PostgreSQL. New tables for universe members and scorecards (Research schema, shared corpus) and
-the per-user archetype selection (new `portfolio_construction` schema, owner-filtered)
+the archetype as a new IPS field (spec OQ-7); the new module needs no per-user table of its own
 
 **Testing**: xUnit unit tests for the verdict rules and the constructor (pure functions), contract tests via
 `WebApplicationFactory`, MCP contract and tool-count tests, Vitest for the store and utils, Playwright
@@ -66,9 +66,10 @@ composite score anywhere (spec FR-007), config-gated and off by default (spec FR
 | ---------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `UniverseMember`, `UniverseScorecard` entities + migration | Research (`Domain/Scoring/`, shared corpus `UserId == null`) | the scorers and their inputs live in Research; the issue puts verdict thresholds "with the scoring module"                                                       |
 | `UniverseScoringJob` (Hangfire)                            | Research `Infrastructure/Jobs/`                              | calls the unchanged scorers per member and appends scorecards; without `ScoreCandidateCommandHandler`'s per-user side effects (no candidates, signals or alerts) |
-| `VerdictRules` (pure) + `VerdictOptions`                   | Research `Domain/Scoring/`                                   | the versioned decision list (spec OQ-4); thresholds via Options binding                                                                                          |
+| `VerdictRules` (pure, reads the regime-adjusted structure score per spec OQ-8) + `VerdictOptions`                   | Research `Domain/Scoring/`                                   | the versioned decision list (spec OQ-4); thresholds via Options binding                                                                                          |
 | `IUniverseScorecardReader` published port                  | Research `Domain/Ports/`                                     | same pattern as `IAllocationDriftReader`                                                                                                                         |
 | `IProposedBookEvaluator` published port                    | Risk `Domain/Ports/`                                         | wraps the unchanged `IRiskEvaluationService.Evaluate` for a hypothetical `BookSnapshot`; Risk logic untouched                                                    |
+| IPS `Archetype` field + migration                          | Research IPS (`save_ips` / `get_ips`)                        | spec OQ-7: the one deliberate IPS schema change; Research logic otherwise untouched                                                                              |
 | Scorecard HTTP read                                        | Research API                                                 | today the scorecard is MCP-only (fs-825 §3.2); needed by the strip and #824                                                                                      |
 
 ### New module: `FinanceSentry.Modules.PortfolioConstruction`
@@ -78,7 +79,6 @@ backend/src/FinanceSentry.Modules.PortfolioConstruction/
 ├── PortfolioConstructionModule.cs          IModuleRegistrar; Options binding; feature flag
 ├── Domain/
 │   ├── Archetype.cs                        config record: gates, ordering, default constraints
-│   ├── ArchetypeSelection.cs               per-user selection (spec OQ-7), owner-filtered
 │   ├── PortfolioConstructor.cs             pure: universe + archetype + constraints → proposal
 │   ├── GapCalculator.cs                    pure: proposal + current book → gap lines
 │   └── Ports/                              consumer-side ports, Integration adapters
@@ -86,8 +86,7 @@ backend/src/FinanceSentry.Modules.PortfolioConstruction/
 │   ├── Queries/GetUniverseScreenQuery.cs
 │   ├── Queries/ConstructPortfolioQuery.cs
 │   ├── Queries/GetConstructionGapQuery.cs
-│   └── Commands/SelectArchetypeCommand.cs
-├── Infrastructure/Persistence/             PortfolioConstructionDbContext (ICurrentUser, owner filter)
+├── Infrastructure/Persistence/             none in v1 (archetype lives on the IPS, spec OQ-7)
 └── API/Controllers/PortfolioConstructionController.cs
 ```
 
@@ -102,7 +101,6 @@ change (spec FR-012). v1 ships `growth` and `balanced` (spec OQ-2).
 | `GET /research/scorecards/{symbol}`               | `get_scorecard`        | US2  |
 | `GET /portfolio-construction/proposal?archetype=` | `construct_portfolio`  | US3  |
 | `GET /portfolio-construction/gap?archetype=`      | `get_construction_gap` | US4  |
-| `PUT /portfolio-construction/archetype`           | `select_archetype`     | OQ-7 |
 
 All endpoints are `[Authorize]`. The anonymous list in `ApiAuthenticationPipelineTests` is unchanged. The MCP
 canonical list (`backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`) and
@@ -135,8 +133,8 @@ The dossier header adoption of the strip is #824's own slice.
 
 ## Risks
 
-- **Verdict reads as advice.** Mitigated by the descriptive vocabulary (spec OQ-3), descriptive gap lines (spec
-  FR-020) and the always-visible facts.
+- **Verdict is a trade call.** The owner chose `STRONG BUY / BUY / WAIT / AVOID` (spec OQ-3). Mitigated by the
+  always-visible facts and fired rule, the versioned rule table, and the product never placing a trade (019 FR-014).
 - **Upstream cost.** Valuation snapshots fetch live per symbol. The universe is bounded by the shortlist cap
   plus the curated list, and the job is rate-bounded like stage 1.
 - **Thin universe** for the cold-start user if the shortlist fails. A configured curated list keeps the
