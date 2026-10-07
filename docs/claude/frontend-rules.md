@@ -123,6 +123,23 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 
 ---
 
+## Async State — `cmn-async-state`
+
+A region that swaps between loading, error and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Adopters: `events` (upcoming list) and `truelayer-picker`.
+
+The primitive renders uniform full-width skeleton bars, a bare error alert that replaces the content, and a plain-text empty line. Surfaces that need more keep local markup; each gap:
+
+| Surface | Missing in the primitive |
+|---|---|
+| `holdings` | row-shaped skeleton (avatar + two text lines + trailing value) in a card; empty state is a card with a second "import pending" variant |
+| `asset-dossier` | composite skeleton with per-block heights/widths (heading + three card-sized blocks) |
+| `dashboard` | per-widget inline skeletons inside live cards (no region swap); icon + CTA empty state; error banner sits above content that stays rendered |
+| `flow-breakdown` | multi-column row skeleton in a card; persistent error banner above content; empty state with message + sub-message that varies by range |
+| `accounts-list` | multi-column row skeleton in a card; error alert with a Retry action; empty state with a CTA slot |
+| `transaction-ledger` | row-shaped skeleton (avatar + two text lines + trailing value) in a card; persistent error banner; empty state that varies by active filter |
+
+Adopt the primitive on these when it gains a skeleton template slot, an error action slot and a rich empty slot; drop the row from this table in the same PR.
+
 ---
 
 ## Mobile Keyboards — `inputmode` on numeric fields
