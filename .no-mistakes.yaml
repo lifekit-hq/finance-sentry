@@ -33,7 +33,11 @@
 # networking. The container is capped with --memory 2g; --memory-swap is left
 # unset so Docker's default applies (swap equal to the memory limit), meaning a
 # runaway run slows down on swap instead of getting the host's other processes
-# OOM-killed. Memory is kept in check by: build without the resident Roslyn server
+# OOM-killed. NuGet packages persist in the named volume nm-nuget-cache
+# (NUGET_PACKAGES=/nuget), so a warm run restores from disk, not the network.
+# The docker run goes through scripts/nm-heavy-slot.sh, a 2-slot flock
+# (/tmp/nm-heavy.{1,2}.lock, shared by every home on the box) held only for the
+# run: at most 2 heavy validation jobs at once (compute audit limit L1). Memory is kept in check by: build without the resident Roslyn server
 # (-p:UseSharedCompilation=false + `dotnet build-server shutdown`), test
 # hosts limited to two (-m:2; unset it starts one per logical CPU), and
 # workstation GC (DOTNET_gcServer=0).
@@ -79,9 +83,13 @@ commands:
       if command -v dotnet >/dev/null 2>&1; then
         sh -c "$dn"
       else
-        docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)" \
+        img=mcr.microsoft.com/dotnet/sdk:10.0
+        # A fresh named volume is root-owned; hand it to the caller once (cheap, idempotent).
+        docker run --rm -u 0 -v nm-nuget-cache:/nuget "$img" chown "$(id -u):$(id -g)" /nuget
+        sh scripts/nm-heavy-slot.sh docker run --rm --memory 2g --network host -u "$(id -u):$(id -g)" \
           -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1 -e DOTNET_gcServer=0 \
-          -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 sh -c "$dn"
+          -e NUGET_PACKAGES=/nuget -v nm-nuget-cache:/nuget \
+          -v "$PWD":/src -w /src "$img" sh -c "$dn"
       fi
     fi
     if [ "$fe" = 1 ]; then
