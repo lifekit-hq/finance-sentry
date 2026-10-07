@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Application.Services;
 
 using System.Globalization;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 
 /// <summary>The Telegram-bound monthly brief: <c>Headline</c> is the alert title, <c>Body</c> the message.</summary>
@@ -9,7 +10,8 @@ public sealed record FireBrief(string Headline, string Body);
 /// <summary>
 /// Composes the monthly FIRE brief (#433 S7) from a <see cref="FireProjectionResponse"/>: the same
 /// gauge and the same spelled-out assumptions the dashboard tile shows. Pure — no I/O, no clock.
-/// Stays within the Ledger message-format rule (headline included, at most twelve lines).
+/// Stays within the Ledger message-format rule (headline included, at most twelve lines). Each body line is a bullet;
+/// the ones with an app page (the dashboard tile, the accounts list) end with its absolute link.
 /// </summary>
 public static class FireBriefComposer
 {
@@ -25,7 +27,7 @@ public static class FireBriefComposer
     /// Returns <c>null</c> for <see cref="FireProjectionStatus.InsufficientHistory"/>: with under three
     /// complete months of flow there is no honest figure to brief, and the tile is hidden for the same reason.
     /// </summary>
-    public static FireBrief? Compose(FireProjectionResponse projection)
+    public static FireBrief? Compose(FireProjectionResponse projection, string? appBaseUrl = null)
     {
         if (projection.Status == FireProjectionStatus.InsufficientHistory)
         {
@@ -34,15 +36,20 @@ public static class FireBriefComposer
 
         var lines = new List<string>
         {
-            BuildGauge(projection),
-            $"Net worth {FormatUsd(projection.CurrentNetWorth)} of a {FormatUsd(projection.Target)} target.",
-            BuildOutcomeLine(projection),
-            BuildAssumptionsLine(projection),
+            AppUrl.Bullet(BuildGauge(projection), appBaseUrl, AlertAppPath.Dashboard),
+            AppUrl.Bullet(
+                $"Net worth {FormatUsd(projection.CurrentNetWorth)} of a {FormatUsd(projection.Target)} target.",
+                appBaseUrl,
+                AlertAppPath.AccountsList),
+            AppUrl.Bullet(BuildOutcomeLine(projection), appBaseUrl, AlertAppPath.Dashboard),
+            // The assumptions are the brief's own, not a page's, so the bullet stays unlinked.
+            AppUrl.Bullet(BuildAssumptionsLine(projection), appBaseUrl, null),
         };
 
         if (projection.HasStaleSleeves)
         {
-            lines.Add("Some holdings have not synced recently, so net worth may lag.");
+            lines.Add(AppUrl.Bullet(
+                "Some holdings have not synced recently, so net worth may lag.", appBaseUrl, AlertAppPath.AccountsList));
         }
 
         return new FireBrief(BuildHeadline(projection), string.Join("\n", lines));

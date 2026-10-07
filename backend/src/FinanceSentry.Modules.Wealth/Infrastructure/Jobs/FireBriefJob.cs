@@ -5,6 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using Hangfire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -19,8 +20,12 @@ public sealed class FireBriefJob(
     IBankingTotalsReader bankingTotals,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> projectionQuery,
     IAlertGeneratorService alerts,
+    IConfiguration configuration,
     ILogger<FireBriefJob> logger)
 {
+    /// <summary>Public origin the brief's bullets link onto (<c>Companion:PublicBaseUrl</c>); empty = no links.</summary>
+    private string? AppBaseUrl => configuration["Companion:PublicBaseUrl"];
+
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
@@ -50,7 +55,7 @@ public sealed class FireBriefJob(
         try
         {
             var projection = await projectionQuery.Handle(new GetFireProjectionQuery(userId), ct);
-            var brief = FireBriefComposer.Compose(projection);
+            var brief = FireBriefComposer.Compose(projection, AppBaseUrl);
             if (brief is null)
             {
                 return null;

@@ -67,4 +67,23 @@ public sealed class FireBriefComposerTests
     [Fact]
     public void Brief_StaysWithinTheTwelveLineMessageRule()
         => FireBriefComposer.Compose(Projection(stale: true))!.Body.Split('\n').Length.Should().BeLessThan(12);
+
+    private const string AppBase = "https://app.example.com";
+
+    [Fact]
+    public void Bullets_LinkToTheirPage_AndTheAssumptionsStayPlain()
+    {
+        var lines = FireBriefComposer.Compose(Projection(stale: true), AppBase)!.Body.Split('\n');
+
+        lines.Should().OnlyContain(l => l.StartsWith("• "));
+        lines[0].Should().EndWith(" → " + AppBase + "/dashboard");
+        lines[1].Should().EndWith(" → " + AppBase + "/accounts/list");
+        lines[2].Should().EndWith(" → " + AppBase + "/dashboard");
+        lines[3].Should().StartWith("• Assumes").And.NotContain("http");
+        lines[4].Should().EndWith(" → " + AppBase + "/accounts/list");
+    }
+
+    [Fact]
+    public void NoAppBaseUrl_LeavesPlainBullets()
+        => FireBriefComposer.Compose(Projection())!.Body.Should().NotContain("http");
 }

@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Radar.Application.Services;
 
 using System.Text.Json;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 
@@ -13,6 +14,8 @@ public sealed record PerformanceBrief(string Headline, string Body);
 ///
 /// Layout, in reservation order so the highest-value lines survive the budget:
 /// headline · scoreboard · blank · track record · drift trends · blank · one suggested action.
+/// Every body line is a bullet carrying its own figure; a bullet whose subject has an app page ends with the
+/// absolute link to it (<see cref="AppUrl.Bullet"/>), the rest stay plain.
 /// </summary>
 public static class PerformanceBriefComposer
 {
@@ -35,12 +38,13 @@ public static class PerformanceBriefComposer
     public static PerformanceBrief Compose(
         BookPerformanceResult result,
         IReadOnlyList<RadarSignal> portfolioSignals,
-        TrackRecordDelta? trackRecord)
+        TrackRecordDelta? trackRecord,
+        string? appBaseUrl = null)
     {
         var headline = BuildHeadline(result);
-        var lines = BuildScoreboard(result);
+        var lines = BuildScoreboard(result, appBaseUrl);
 
-        var action = BuildActionLine(portfolioSignals);
+        var action = BuildActionLine(portfolioSignals, appBaseUrl);
 
         // Budget: everything below the scoreboard shares what the headline and the reserved
         // action section leave behind.
@@ -49,7 +53,7 @@ public static class PerformanceBriefComposer
         var context = new List<string>();
         if (available > 1)
         {
-            var trackLine = BuildTrackRecordLine(trackRecord);
+            var trackLine = BuildTrackRecordLine(trackRecord, appBaseUrl);
             if (trackLine is not null)
             {
                 context.Add(trackLine);
@@ -58,7 +62,7 @@ public static class PerformanceBriefComposer
             var trendBudget = Math.Min(MaxTrendLines, available - 1 - context.Count);
             if (trendBudget > 0)
             {
-                context.AddRange(BuildDriftTrendLines(NotableDrift(portfolioSignals), trendBudget));
+                context.AddRange(BuildDriftTrendLines(NotableDrift(portfolioSignals), trendBudget, appBaseUrl));
             }
         }
 
@@ -88,7 +92,7 @@ public static class PerformanceBriefComposer
             : $"Weekly brief: {CapitalizeFirst(verdict)}";
     }
 
-    private static List<string> BuildScoreboard(BookPerformanceResult result)
+    private static List<string> BuildScoreboard(BookPerformanceResult result, string? appBaseUrl)
     {
         var lines = new List<string>(result.Periods.Count);
 
@@ -107,7 +111,8 @@ public static class PerformanceBriefComposer
             var spy = p.SpyTwr.HasValue ? $"{p.SpyTwr.Value:+0.##%;-0.##%;0%}" : "N/A";
             var diff = p.Delta.HasValue ? $" (Δ {p.Delta.Value:+0.##%;-0.##%;0%})" : string.Empty;
 
-            lines.Add($"{label}: Book {book} | {Benchmark} {spy}{diff}");
+            lines.Add(AppUrl.Bullet(
+                $"{label}: Book {book} | {Benchmark} {spy}{diff}", appBaseUrl, AlertAppPath.AccountsInvestments));
         }
 
         return lines;
@@ -117,7 +122,7 @@ public static class PerformanceBriefComposer
     /// The track-record delta: how Denys' own calls fared against the benchmark. Terminal and open
     /// records are reported separately, never blended (feature 020 R4).
     /// </summary>
-    private static string? BuildTrackRecordLine(TrackRecordDelta? record)
+    private static string? BuildTrackRecordLine(TrackRecordDelta? record, string? appBaseUrl)
     {
         if (record is null || record.Count == 0 ||
             (record.HitRatePct is null && record.AverageExcessReturnPct is null))
@@ -144,7 +149,8 @@ public static class PerformanceBriefComposer
         }
 
         var caveat = record.LowSample ? " (low sample)" : string.Empty;
-        return $"Calls: {string.Join(", ", parts)}{caveat}";
+        // Calls are judged per thesis, and no page lists them together, so the bullet stays unlinked.
+        return AppUrl.Bullet($"Calls: {string.Join(", ", parts)}{caveat}", appBaseUrl, null);
     }
 
     /// <summary>
@@ -152,10 +158,12 @@ public static class PerformanceBriefComposer
     /// IPS allocation bands first, then the cash floor, then the single-position cap. No breach on
     /// file means no line — the brief stays silent rather than inventing something to say.
     /// </summary>
-    private static string? BuildActionLine(IReadOnlyList<RadarSignal> signals)
-        => DriftAction(NotableDrift(signals)) ?? CashBufferAction(signals) ?? ConcentrationAction(signals);
+    private static string? BuildActionLine(IReadOnlyList<RadarSignal> signals, string? appBaseUrl)
+        => DriftAction(NotableDrift(signals), appBaseUrl)
+           ?? CashBufferAction(signals, appBaseUrl)
+           ?? ConcentrationAction(signals, appBaseUrl);
 
-    private static string? DriftAction(IReadOnlyList<RadarSignal> driftSignals)
+    private static string? DriftAction(IReadOnlyList<RadarSignal> driftSignals, string? appBaseUrl)
     {
         var worst = MostRecentPerSubject(driftSignals)
             .OrderByDescending(s => Math.Abs(ReadDecimal(s, "driftPct")))
@@ -170,12 +178,15 @@ public static class PerformanceBriefComposer
         var target = ReadDecimal(worst, "targetPct");
         var swing = FormatUsd(Math.Abs(drift) / PercentDivisor * ReadDecimal(worst, "totalUsd"));
 
-        return ReadString(worst, "status") == StatusUnderBand
+        var text = ReadString(worst, "status") == StatusUnderBand
             ? $"Action: Add ~{Math.Abs(drift):0.#}pp (~{swing}) to {worst.Subject} to reach its {target:0.#}% IPS target."
             : $"Action: Trim {worst.Subject} by ~{Math.Abs(drift):0.#}pp (~{swing}) to its {target:0.#}% IPS target.";
+
+        // The subject is an asset-class sleeve, which has no page of its own: the investments overview shows it.
+        return AppUrl.Bullet(text, appBaseUrl, AlertAppPath.AccountsInvestments);
     }
 
-    private static string? CashBufferAction(IReadOnlyList<RadarSignal> signals)
+    private static string? CashBufferAction(IReadOnlyList<RadarSignal> signals, string? appBaseUrl)
     {
         var breach = MostRecent(signals, RadarSignalTypes.CashBuffer, s => !ReadBool(s, "compliant"));
         if (breach is null)
@@ -187,10 +198,13 @@ public static class PerformanceBriefComposer
         var floorPct = ReadDecimal(breach, "minCashBufferPct");
         var shortfall = FormatUsd((floorPct - cashPct) / PercentDivisor * ReadDecimal(breach, "totalUsd"));
 
-        return $"Action: Rebuild cash to the {floorPct:0.#}% floor — now {cashPct:0.#}% (~{shortfall} short).";
+        return AppUrl.Bullet(
+            $"Action: Rebuild cash to the {floorPct:0.#}% floor — now {cashPct:0.#}% (~{shortfall} short).",
+            appBaseUrl,
+            AlertAppPath.AccountsInvestments);
     }
 
-    private static string? ConcentrationAction(IReadOnlyList<RadarSignal> signals)
+    private static string? ConcentrationAction(IReadOnlyList<RadarSignal> signals, string? appBaseUrl)
     {
         var breach = MostRecent(signals, RadarSignalTypes.ConcentrationWeight, s => ReadBool(s, "overLimit"));
         if (breach is null)
@@ -198,19 +212,26 @@ public static class PerformanceBriefComposer
             return null;
         }
 
-        return $"Action: Trim {breach.Subject} to the {ReadDecimal(breach, "limitPct"):0.#}% cap — " +
-               $"now {ReadDecimal(breach, "weightPct"):0.#}% of the book.";
+        return AppUrl.Bullet(
+            $"Action: Trim {breach.Subject} to the {ReadDecimal(breach, "limitPct"):0.#}% cap — " +
+            $"now {ReadDecimal(breach, "weightPct"):0.#}% of the book.",
+            appBaseUrl,
+            AlertAppPath.ForSymbol(breach.Subject) ?? AlertAppPath.AccountsInvestments);
     }
 
-    private static IReadOnlyList<string> BuildDriftTrendLines(IReadOnlyList<RadarSignal> signals, int maxLines)
+    private static IReadOnlyList<string> BuildDriftTrendLines(
+        IReadOnlyList<RadarSignal> signals, int maxLines, string? appBaseUrl)
     {
         var bySubject = MostRecentPerSubject(signals)
             .OrderByDescending(s => Math.Abs(ReadDecimal(s, "driftPct")))
             .Take(maxLines);
 
         return bySubject
-            .Select(s => $"Drift: {s.Subject} {ReadString(s, "status")} " +
-                         $"({ReadDecimal(s, "driftPct"):+0.#;-0.#;0}pp vs target)")
+            .Select(s => AppUrl.Bullet(
+                $"Drift: {s.Subject} {ReadString(s, "status")} " +
+                $"({ReadDecimal(s, "driftPct"):+0.#;-0.#;0}pp vs target)",
+                appBaseUrl,
+                AlertAppPath.AccountsInvestments))
             .ToList();
     }
 

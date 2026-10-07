@@ -12,6 +12,7 @@ using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 
@@ -70,6 +71,7 @@ public sealed class FamilyClearingStatementDeliveryTests : IAsyncLifetime
         await using var ctx = CreateContext();
         var job = new FamilyClearingStatementJob(
             users.Object, query.Object, new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object),
+            new ConfigurationBuilder().Build(),
             NullLogger<FamilyClearingStatementJob>.Instance);
         await job.ExecuteAsync();
     }

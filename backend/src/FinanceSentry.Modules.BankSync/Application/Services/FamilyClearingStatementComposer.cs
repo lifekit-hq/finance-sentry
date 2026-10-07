@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 
 /// <summary>The Telegram-bound monthly statement: <c>Headline</c> is the alert title, <c>Body</c> the message.</summary>
@@ -21,7 +22,7 @@ public static class FamilyClearingStatementComposer
     private const decimal ThousandThreshold = 1_000m;
     private const decimal MillionThreshold = 1_000_000m;
 
-    public static FamilyStatementBrief Compose(FamilyClearingStatement statement)
+    public static FamilyStatementBrief Compose(FamilyClearingStatement statement, string? appBaseUrl = null)
     {
         var headline = BuildHeadline(statement);
         var lines = new List<string>();
@@ -32,7 +33,7 @@ public static class FamilyClearingStatementComposer
 
         if (statement.Counterparties.Count == 0)
         {
-            lines.Add("No family-support activity this month.");
+            lines.Add(AppUrl.Bullet("No family-support activity this month.", appBaseUrl, null));
         }
         else
         {
@@ -41,20 +42,25 @@ public static class FamilyClearingStatementComposer
             var take = willTruncate ? Math.Max(0, budget - 1) : budget;
 
             var shown = statement.Counterparties.Take(take).ToList();
-            lines.AddRange(shown.Select(BuildCounterpartyLine));
+            // A counterparty has no page of its own, so its bullet stays unlinked.
+            lines.AddRange(shown.Select(c => AppUrl.Bullet(BuildCounterpartyLine(c), appBaseUrl, null)));
 
             var remaining = statement.Counterparties.Count - shown.Count;
             if (remaining > 0)
             {
-                lines.Add($"+{remaining} more — ask for detail.");
+                lines.Add(AppUrl.Bullet($"+{remaining} more — ask for detail.", appBaseUrl, null));
             }
         }
 
-        lines.Add($"Total: {FormatUsd(statement.ReceivedTotalUsd)} in, {FormatUsd(statement.SupportTotalUsd)} out");
+        lines.Add(AppUrl.Bullet(
+            $"Total: {FormatUsd(statement.ReceivedTotalUsd)} in, {FormatUsd(statement.SupportTotalUsd)} out",
+            appBaseUrl,
+            AlertAppPath.AccountsList));
 
         if (hasExcluded)
         {
-            lines.Add($"{statement.ExcludedRoutingLegs} routing leg(s) excluded — not missing money.");
+            lines.Add(AppUrl.Bullet(
+                $"{statement.ExcludedRoutingLegs} routing leg(s) excluded — not missing money.", appBaseUrl, null));
         }
 
         return new FamilyStatementBrief(headline, string.Join("\n", lines));

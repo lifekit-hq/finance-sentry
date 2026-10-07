@@ -5,6 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using Hangfire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -18,8 +19,12 @@ public sealed class FamilyClearingStatementJob(
     IBankingTotalsReader bankingTotals,
     IQueryHandler<GetFamilyClearingStatementQuery, FamilyClearingStatement> statementQuery,
     IAlertGeneratorService alerts,
+    IConfiguration configuration,
     ILogger<FamilyClearingStatementJob> logger)
 {
+    /// <summary>Public origin the brief's bullets link onto (<c>Companion:PublicBaseUrl</c>); empty = no links.</summary>
+    private string? AppBaseUrl => configuration["Companion:PublicBaseUrl"];
+
     [AutomaticRetry(Attempts = 1)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
@@ -47,7 +52,7 @@ public sealed class FamilyClearingStatementJob(
         try
         {
             var statement = await statementQuery.Handle(new GetFamilyClearingStatementQuery(userId), ct);
-            var brief = FamilyClearingStatementComposer.Compose(statement);
+            var brief = FamilyClearingStatementComposer.Compose(statement, AppBaseUrl);
             await alerts.GenerateFamilyStatementAlertAsync(userId, brief.Headline, brief.Body, ct);
             return null;
         }
