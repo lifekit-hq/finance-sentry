@@ -77,6 +77,7 @@ test.describe('Asset Dossier', () => {
     await page.goto('/assets/BTC');
     await expect(page.getByRole('heading', {name: 'BTC', level: 1})).toBeVisible();
     await expect(page.getByTestId('dossier-quote')).toBeVisible();
+    await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('dossier-price')).toHaveCount(0);
     expect(quoteRequests).toEqual([]);
   });

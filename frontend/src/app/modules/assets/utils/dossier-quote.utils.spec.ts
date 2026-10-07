@@ -94,7 +94,7 @@ function position(assetClass: string): DossierPositionSection {
   };
 }
 
-function valuation(notApplicable: boolean): ValuationSnapshotDto {
+function valuation(notApplicable: boolean, price: Nullable<number> = 189.3): ValuationSnapshotDto {
   const metric = {
     value: null,
     fiveYearAvg: null,
@@ -104,7 +104,7 @@ function valuation(notApplicable: boolean): ValuationSnapshotDto {
   return {
     ticker: 'AAPL',
     notApplicable,
-    price: null,
+    price,
     isStale: false,
     metrics: {trailingPe: metric, forwardPe: metric, evToEbitda: metric, dividendYield: metric},
     consensusTarget: null,
@@ -136,6 +136,12 @@ describe('DossierQuoteUtils.isQuotable', () => {
     expect(DossierQuoteUtils.isQuotable(dossier({symbol: 'USD', valuation: valuation(true)}))).toBe(
       false
     );
+  });
+
+  it('skips an unheld symbol whose valuation lookup came back empty', () => {
+    expect(
+      DossierQuoteUtils.isQuotable(dossier({symbol: 'ETH', valuation: valuation(false, null)}))
+    ).toBe(false);
   });
 
   it('skips an unheld symbol with no valuation to classify it', () => {

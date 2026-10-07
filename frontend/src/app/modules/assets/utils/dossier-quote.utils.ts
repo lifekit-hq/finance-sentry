@@ -13,13 +13,17 @@ export class DossierQuoteUtils {
   /**
    * Research quotes price listed equities by the ticker as given, so crypto and cash symbols
    * (`BTC`, `USD`) would come back as unrelated ETFs. A holding decides by its asset class;
-   * anything else needs the valuation source to have classed the ticker as an equity.
+   * anything else needs the valuation source to have priced the ticker as an equity.
    */
   public static isQuotable(dossier: AssetDossierDto): boolean {
     if (dossier.position) {
       return dossier.position.assetClass === EQUITY_ASSET_CLASS;
     }
-    return dossier.valuation !== null && !dossier.valuation.notApplicable;
+    return (
+      dossier.valuation !== null &&
+      !dossier.valuation.notApplicable &&
+      dossier.valuation.price !== null
+    );
   }
 
   /** "$189.30" with "+1.25%"; a quote without a usable price yields null so the slot stays empty. */
