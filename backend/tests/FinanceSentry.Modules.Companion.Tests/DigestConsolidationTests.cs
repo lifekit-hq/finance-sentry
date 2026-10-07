@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion.Tests;
 
 using FinanceSentry.Modules.Companion.Application.Commands;
 using FinanceSentry.Modules.Companion.Application.Queries;
+using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
@@ -11,6 +12,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 /// <summary>
@@ -48,8 +50,9 @@ public sealed class DigestConsolidationTests
     }
 
     private static GetPendingCompanionEventsQueryHandler NewHandler(
-        ICompanionEventRepository events, ILogger<GetPendingCompanionEventsQueryHandler>? logger = null)
-        => new(events, PassThroughReconciler.Instance, new DigestModeSettings(), logger ?? NullLogger<GetPendingCompanionEventsQueryHandler>.Instance);
+        ICompanionEventRepository events, ILogger<GetPendingCompanionEventsQueryHandler>? logger = null, CompanionOptions? options = null)
+        => new(events, PassThroughReconciler.Instance, new DigestModeSettings(), Options.Create(options ?? new CompanionOptions()),
+            logger ?? NullLogger<GetPendingCompanionEventsQueryHandler>.Instance);
 
     private static CompanionDbContext NewDb() => new(
         new DbContextOptionsBuilder<CompanionDbContext>()
@@ -85,6 +88,27 @@ public sealed class DigestConsolidationTests
         var withReason = await handler.Handle(
             new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default);
         withReason.Events.Should().HaveCount(2, "only this user's held events");
+    }
+
+    [Fact]
+    public async Task Pulled_event_carries_an_absolute_app_url_only_when_it_has_a_path_and_a_base_url_is_set()
+    {
+        await using var db = NewDb();
+        var withPath = Held(User, "a");
+        withPath.AppPath = "/assets/NVDA";
+        var withoutPath = Held(User, "b");
+        db.Events.AddRange(withPath, withoutPath);
+        await db.SaveChangesAsync();
+        var query = new GetPendingCompanionEventsQuery(User, 25, true, "daily digest");
+
+        var configured = NewHandler(new CompanionEventRepository(db), options: new CompanionOptions { PublicBaseUrl = "https://app.example.com/" });
+        var result = (await configured.Handle(query, default)).Events;
+        result.Single(e => e.Id == withPath.Id).AppUrl.Should().Be("https://app.example.com/assets/NVDA");
+        result.Single(e => e.Id == withoutPath.Id).AppUrl.Should().BeNull("an event with no target has no link");
+
+        var unconfigured = NewHandler(new CompanionEventRepository(db));
+        (await unconfigured.Handle(query, default)).Events.Should().OnlyContain(
+            e => e.AppUrl == null, "no base URL means no link, never a relative one");
     }
 
     [Fact]

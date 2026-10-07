@@ -88,6 +88,43 @@ public sealed class WebhookPayloadTests
         handler.Body.Should().NotContain("SUPER-SECRET", "the wake carries no full detail or secrets");
     }
 
+    private static WebhookAgentWakeDispatcher DispatcherFor(CapturingHandler handler, string? publicBaseUrl) => new(
+        new FakeHttpFactory(handler),
+        Options.Create(new CompanionOptions { AgentTriggerUrl = "http://agent.local/trigger", PublicBaseUrl = publicBaseUrl }),
+        AlwaysAuthorized,
+        NullLogger<WebhookAgentWakeDispatcher>.Instance);
+
+    [Fact]
+    public async Task Wake_carries_an_absolute_app_url_for_the_page_the_event_is_about()
+    {
+        var handler = new CapturingHandler();
+        var evt = SampleEvent();
+        evt.AppPath = "/transactions?account=abc&type=debit";
+
+        await DispatcherFor(handler, "https://app.example.com").WakeAsync(evt);
+
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("appUrl").GetString()
+            .Should().Be("https://app.example.com/transactions?account=abc&type=debit");
+    }
+
+    [Theory]
+    [InlineData(null, "/assets/MU")]
+    [InlineData("", "/assets/MU")]
+    [InlineData("not a url", "/assets/MU")]
+    [InlineData("https://app.example.com", null)]
+    public async Task Wake_omits_the_app_url_without_a_usable_base_url_or_path(string? publicBaseUrl, string? appPath)
+    {
+        var handler = new CapturingHandler();
+        var evt = SampleEvent();
+        evt.AppPath = appPath;
+
+        await DispatcherFor(handler, publicBaseUrl).WakeAsync(evt);
+
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body!);
+        body.RootElement.TryGetProperty("appUrl", out _).Should().BeFalse("no link beats a relative or wrong one");
+    }
+
     [Fact]
     public async Task Policy_review_wake_asks_for_acknowledgement_against_the_review_reference()
     {

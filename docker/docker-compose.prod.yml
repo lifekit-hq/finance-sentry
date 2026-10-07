@@ -98,6 +98,8 @@ services:
       # Empty URL = no push; the pulse stays as the backstop either way.
       Companion__AgentTriggerUrl: ${COMPANION_AGENT_TRIGGER_URL:-}
       Companion__AgentTriggerToken: ${COMPANION_AGENT_TRIGGER_TOKEN:-}
+      # Absolute app links (appUrl) on the wake payload; empty = none emitted. The MCP host binds the same value below.
+      Companion__PublicBaseUrl: ${FRONTEND_BASE_URL:-}
       # Off-host encrypted backups (feature 024). Empty = backup jobs no-op (dev/local safe).
       Backup__R2Endpoint: ${BACKUP_R2_ENDPOINT:-}
       Backup__R2Bucket: ${BACKUP_R2_BUCKET:-}
@@ -200,6 +202,7 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Mcp__ApiBaseUrl: http://api:5000/api/v1
       Mcp__FrontendBaseUrl: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL to the frontend origin}
+      Companion__PublicBaseUrl: ${FRONTEND_BASE_URL}
       # Streamable HTTP transport. OpenClaw can't spawn docker-exec from inside its
       # gateway container, so we expose MCP over HTTP on the shared lifekit-shared
       # network. Reachable from the openclaw container as http://finance-sentry-mcp:5100/.
