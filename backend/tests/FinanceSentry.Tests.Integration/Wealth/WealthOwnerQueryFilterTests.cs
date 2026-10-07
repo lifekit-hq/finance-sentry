@@ -74,7 +74,7 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         return await read.NetWorthSnapshots.OrderBy(s => s.SnapshotDate).ToListAsync();
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public void Every_per_user_entity_declares_the_Owner_filter()
     {
         using var ctx = CreateContext();

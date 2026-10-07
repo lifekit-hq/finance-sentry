@@ -12,10 +12,8 @@ cd "$(dirname "$0")/.."
 
 SOLUTION=backend/FinanceSentry.sln
 
-# DEVCLAW_SANDBOX_CPUS/_MEMORY are the container's real limits; /proc and nproc report
-# the host. The default parallel test run gets OOM-killed inside a 2-CPU / 4-6 GB box,
-# so the whole run is serialised with -m:1 (see AGENTS.md "MCP Verification").
-MSBUILD_JOBS="-m:1"
+# Build parallelism (one node, no shared compiler server) comes from backend/Directory.Build.rsp:
+# the default parallel run gets OOM-killed inside a 2-CPU / 4-6 GB box.
 
 if [[ "${1:-}" != "--skip-restore" ]]; then
   echo "==> restore"
@@ -23,12 +21,12 @@ if [[ "${1:-}" != "--skip-restore" ]]; then
 fi
 
 echo "==> build (Release, warnings are errors via Directory.Build.props)"
-dotnet build "$SOLUTION" --configuration Release --no-restore $MSBUILD_JOBS
+dotnet build "$SOLUTION" --configuration Release --no-restore
 
 # CI runs the solution unfiltered against a postgres:14-alpine service container.
 # Locally the DB-backed tests report themselves Skipped ([DockerRequiredFact], or a
 # connection failure) — do NOT add a --filter to paper over a failure.
 echo "==> test (full solution, no filter)"
-dotnet test "$SOLUTION" --configuration Release --no-build --verbosity normal $MSBUILD_JOBS
+dotnet test "$SOLUTION" --configuration Release --no-build --verbosity normal
 
 echo "==> verify OK"

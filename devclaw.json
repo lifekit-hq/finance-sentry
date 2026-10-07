@@ -6,5 +6,5 @@
   "surface": "app",
   "stack": ["dotnet", "angular"],
   "capabilities": ["registry:npm-github"],
-  "verifyCmd": "cd backend && dotnet restore FinanceSentry.sln && dotnet build FinanceSentry.sln --no-restore -c Release -m:1 && dotnet test FinanceSentry.sln --no-build -c Release -m:1 --filter 'Category!=Integration' && cd ../frontend && npm ci && npm run lint && npm run format:check && npm run drift && NODE_OPTIONS=--max-old-space-size=2048 npm run build && npx playwright install chromium && npm run test:ci && npx playwright test --reporter=json"
+  "verifyCmd": "cd backend && dotnet restore FinanceSentry.sln && dotnet build FinanceSentry.sln --no-restore -c Release && dotnet test FinanceSentry.sln --no-build -c Release --filter 'Category!=Integration' && cd ../frontend && npm ci && npm run lint && npm run format:check && npm run drift && NODE_OPTIONS=--max-old-space-size=2048 npm run build && npx playwright install chromium && npm run test:ci && npx playwright test --reporter=json"
 }

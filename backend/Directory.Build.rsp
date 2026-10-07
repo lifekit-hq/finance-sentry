@@ -1,0 +1,8 @@
+# Read automatically by `dotnet build|test|restore` for anything under backend/.
+# One build node. The solution has ~35 projects; the default (one node per core) puts a
+# Roslyn compile per core in memory at once and the full test run needs well over 4 GB.
+# -m:1 holds a build to 2 GB, the production host's per-container limit with 3 builds in
+# parallel. The compiler server is off for the same reason: a resident VBCSCompiler keeps
+# a second compiler process alive after the build for no gain in a one-shot run.
+-maxcpucount:1
+-p:UseSharedCompilation=false
