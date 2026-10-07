@@ -1,22 +1,17 @@
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
-import {RouterLink, RouterLinkActive, RouterOutlet} from '@angular/router';
-import {CmnDialogService, PageHeaderComponent} from '@lifekit-hq/ui';
+import {RouterOutlet} from '@angular/router';
+import {CmnDialogService, CmnTab, PageHeaderComponent, TabGroupComponent} from '@lifekit-hq/ui';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {ConnectModalComponent} from '../../components/connect-modal/connect-modal.component';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 
-interface AccountsTab {
-  label: string;
-  route: string;
-}
-
 // Both stores live on the shell so the Connect action in the header and the routed tab pages
 // share one instance: the connect forms reload the accounts store they find above them.
 @Component({
   selector: 'fns-accounts-shell',
-  imports: [PageHeaderComponent, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [PageHeaderComponent, RouterOutlet, TabGroupComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [AccountsStore, ConnectStore],
   template: `
@@ -29,20 +24,7 @@ interface AccountsTab {
         actionIcon="Plus"
       />
 
-      <nav class="mt-cmn-6 mb-cmn-6 flex gap-cmn-2 border-b border-border-default" role="tablist">
-        @for (tab of tabs; track tab.route) {
-          <a
-            [routerLink]="tab.route"
-            [routerLinkActiveOptions]="{exact: false}"
-            routerLinkActive
-            ariaCurrentWhenActive="page"
-            class="border-b-2 border-transparent px-cmn-4 py-cmn-2 text-cmn-sm font-medium text-text-secondary transition-colors hover:text-text-primary aria-[current=page]:border-accent-default aria-[current=page]:text-text-primary"
-            role="tab"
-          >
-            {{ tab.label }}
-          </a>
-        }
-      </nav>
+      <cmn-tab-group [tabs]="tabs" ariaLabel="Accounts view" class="mt-cmn-6 mb-cmn-6" />
 
       <router-outlet />
     </div>
@@ -53,9 +35,9 @@ export class AccountsShellComponent {
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly connectStore = inject(ConnectStore);
 
-  public readonly tabs: AccountsTab[] = [
-    {label: 'Inventory', route: AppRoute.AccountsList},
-    {label: 'Investments', route: AppRoute.AccountsInvestments},
+  public readonly tabs: CmnTab[] = [
+    {id: 'inventory', label: 'Inventory', link: AppRoute.AccountsList},
+    {id: 'investments', label: 'Investments', link: AppRoute.AccountsInvestments},
   ];
 
   public connectAccount(): void {

@@ -4,18 +4,13 @@
     subtitle="What is coming for your book, what fired, and what the reader made of it"
   />
 
-  <div class="mt-cmn-5 flex flex-wrap gap-cmn-2" role="tablist" aria-label="Events view">
-    @for (opt of viewOptions; track opt.id) {
-      <cmn-chip
-        [selected]="store.view() === opt.id"
-        [attr.aria-selected]="store.view() === opt.id"
-        (clicked)="store.setView(opt.id)"
-        role="tab"
-      >
-        {{ opt.label }}
-      </cmn-chip>
-    }
-  </div>
+  <cmn-tab-group
+    [tabs]="viewTabs"
+    [activeTab]="store.view()"
+    (activeTabChange)="selectView($event)"
+    ariaLabel="Events view"
+    class="mt-cmn-5"
+  />
 
   @if (store.view() === 'calendar') {
     <div class="mt-cmn-4 flex flex-wrap items-center gap-cmn-2" data-testid="horizon-chips">

@@ -4,9 +4,11 @@ import {
   AlertComponent,
   ButtonComponent,
   ChipComponent,
+  CmnTab,
   EmptyStateComponent,
   PageHeaderComponent,
   SkeletonComponent,
+  TabGroupComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
 
@@ -43,6 +45,7 @@ const SKELETON_ROWS = 4;
     EventTitlePipe,
     PageHeaderComponent,
     SkeletonComponent,
+    TabGroupComponent,
     TagComponent,
   ],
   providers: [EventsStore],
@@ -52,10 +55,17 @@ const SKELETON_ROWS = 4;
 })
 export class EventsComponent {
   public readonly store = inject(EventsStore);
-  public readonly viewOptions = EVENTS_VIEW_OPTIONS;
+  public readonly viewTabs: CmnTab[] = [...EVENTS_VIEW_OPTIONS];
   public readonly horizons = EVENT_HORIZON_DAYS;
   public readonly kinds = EVENT_KIND_ORDER;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+
+  public selectView(id: string): void {
+    const option = EVENTS_VIEW_OPTIONS.find(opt => opt.id === id);
+    if (option) {
+      this.store.setView(option.id);
+    }
+  }
 
   public kindMeta(kind: EventKind): EventKindMeta {
     return EVENT_KIND_META_REGISTRY[kind];

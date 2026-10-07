@@ -41,9 +41,9 @@ describe('AccountsShellComponent tabs', () => {
     await harness.navigateByUrl('/accounts/investments');
     harness.detectChanges();
 
-    const tabs = Array.from<HTMLElement>(
-      harness.routeNativeElement?.querySelectorAll('a[role="tab"]') ?? []
-    );
+    const nav = harness.routeNativeElement?.querySelector('nav');
+    expect(nav?.getAttribute('aria-label')).toBe('Accounts view');
+    const tabs = Array.from<HTMLElement>(nav?.querySelectorAll('a') ?? []);
     expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['Inventory', 'Investments']);
     expect(tabs.map(tab => tab.getAttribute('aria-current'))).toEqual([null, 'page']);
   });
