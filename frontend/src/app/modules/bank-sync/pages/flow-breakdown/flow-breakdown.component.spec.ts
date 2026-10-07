@@ -186,4 +186,21 @@ describe('FlowBreakdownComponent drill-downs', () => {
       })
     );
   });
+
+  it('keeps Enter on the account and category links from also opening the drawer', () => {
+    drawer.open.mockClear();
+    const el = render({...GROUP, items: [{...GROUP.items[0], category: 'groceries'}]});
+
+    for (const testId of ['breakdown-account-link', 'breakdown-category-link']) {
+      el.querySelector(`[data-testid="${testId}"]`)?.dispatchEvent(
+        new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
+      );
+    }
+    expect(drawer.open).not.toHaveBeenCalled();
+
+    el.querySelector('tr[data-testid="breakdown-row"]')?.dispatchEvent(
+      new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
+    );
+    expect(drawer.open).toHaveBeenCalledTimes(1);
+  });
 });

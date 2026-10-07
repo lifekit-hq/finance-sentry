@@ -221,6 +221,7 @@
                         [routerLink]="transactionsRoute"
                         [queryParams]="ledgerParams({account: i.accountId})"
                         (click)="$event.stopPropagation()"
+                        (keydown.enter)="$event.stopPropagation()"
                         class="hover:text-accent-default hover:underline"
                         data-testid="breakdown-account-link"
                         >{{ i.bankName }} ••{{ i.accountLast4 }}</a
@@ -234,6 +235,7 @@
                           [routerLink]="transactionsRoute"
                           [queryParams]="ledgerParams({category: i.category})"
                           (click)="$event.stopPropagation()"
+                          (keydown.enter)="$event.stopPropagation()"
                           data-testid="breakdown-category-link"
                         >
                           <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>
