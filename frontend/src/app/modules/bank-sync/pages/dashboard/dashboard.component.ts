@@ -286,7 +286,7 @@ export class DashboardComponent {
   private readonly router = inject(Router);
 
   public readonly store = inject(DashboardStore);
-  public readonly rangeOptions = HISTORY_RANGES.map(({label, value}) => ({label, value}));
+  public readonly rangeOptions = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly accountsRoute = AppRoute.AccountsList;
   public readonly showEmptyState = computed(

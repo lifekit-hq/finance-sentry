@@ -210,25 +210,6 @@ export function dashboardComputed(store: StateSignals) {
   // Named once so the headline reads straight off the same figure the basis label describes.
   const projectedContributions = computed(() => medianMonthlySavings() * PROJECTION_HORIZON_MONTHS);
 
-  // The snapshot under a scrubbing pointer; null at rest or when the index is stale.
-  const scrubbed = computed(() => {
-    const index = store.scrubIndex();
-    return index === null ? null : (validHistory()[index] ?? null);
-  });
-
-  // Net-worth change from the window's first snapshot to the one shown (the scrubbed point while
-  // held, else the latest), null until there are two usable snapshots.
-  const netWorthChange = computed((): {delta: number; percent: number | null} | null => {
-    const history = validHistory();
-    if (history.length < MIN_POINTS_FOR_DELTA) {
-      return null;
-    }
-    const start = history[0].totalNetWorth;
-    const end = (scrubbed() ?? history[history.length - 1]).totalNetWorth;
-    const delta = end - start;
-    return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
-  });
-
   const snapshotLabeller = computed((): ((s: NetWorthSnapshotDto) => string) => {
     const history = validHistory();
     if (history.length === 0) {
@@ -241,14 +222,87 @@ export function dashboardComputed(store: StateSignals) {
     return s => label(new Date(s.snapshotDate));
   });
 
+  // Stacked net-worth composition (banking / brokerage / crypto) over time — the snapshots
+  // already carry each sleeve, so we plot the mix rather than throwing it away for one line.
+  const netWorthAreaSeries = computed((): AreaSeries[] => {
+    const history = validHistory();
+    if (history.length === 0) {
+      return [];
+    }
+    const labelOf = snapshotLabeller();
+    const labels = history.map(labelOf);
+    // A sleeve reading 0 on a given day means its feed was missing, not that the
+    // balance vanished — carry the last-known value forward so the stack doesn't
+    // collapse to the axis and read as a crash.
+    const carryForward = (pick: (s: NetWorthSnapshotDto) => number): number[] => {
+      let last = 0;
+      return history.map(s => {
+        const value = pick(s);
+        if (value > 0) {
+          last = value;
+        }
+        return last;
+      });
+    };
+    const toPoints = (values: number[]) => values.map((value, i) => ({label: labels[i], value}));
+    return [
+      {
+        label: 'Banking',
+        color: seriesColor(SLEEVE_SERIES.banking),
+        points: toPoints(carryForward(s => s.bankingTotal)),
+      },
+      {
+        label: 'Brokerage',
+        color: seriesColor(SLEEVE_SERIES.brokerage),
+        points: toPoints(carryForward(s => s.brokerageTotal)),
+      },
+      {
+        label: 'Crypto',
+        color: seriesColor(SLEEVE_SERIES.crypto),
+        points: toPoints(carryForward(s => s.cryptoTotal)),
+      },
+    ];
+  });
+
+  // The stack top the chart draws at each point, carried-forward sleeves included.
+  const chartedTotals = computed(() => {
+    const series = netWorthAreaSeries();
+    return series.length === 0
+      ? []
+      : series[0].points.map((_, i) => series.reduce((sum, s) => sum + s.points[i].value, 0));
+  });
+
+  // The snapshot under a scrubbing pointer; null at rest or when the index is stale.
+  const scrubbed = computed(() => {
+    const index = store.scrubIndex();
+    return index === null ? null : (validHistory()[index] ?? null);
+  });
+
+  // The charted total under a scrubbing pointer, so the hero reads what the chart draws.
+  const scrubbedTotal = computed((): number | null => {
+    const index = store.scrubIndex();
+    return index === null || scrubbed() === null ? null : chartedTotals()[index];
+  });
+
+  // Net-worth change from the window start to the figure shown: while scrubbing, both ends come
+  // off the charted series; at rest, off the snapshots. Null until there are two usable snapshots.
+  const netWorthChange = computed((): {delta: number; percent: number | null} | null => {
+    const history = validHistory();
+    if (history.length < MIN_POINTS_FOR_DELTA) {
+      return null;
+    }
+    const held = scrubbedTotal();
+    const start = held === null ? history[0].totalNetWorth : chartedTotals()[0];
+    const end = held ?? history[history.length - 1].totalNetWorth;
+    const delta = end - start;
+    return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
+  });
+
   return {
     baseCurrency,
     // The scrubbed point's total while a pointer holds the chart, else the live net worth.
     totalBalanceFormatted: computed(() =>
-      MoneyUtils.format(
-        scrubbed()?.totalNetWorth ?? store.data()?.totalNetWorthUsd ?? 0,
-        baseCurrency()
-      )
+      MoneyUtils.format(scrubbedTotal() ?? store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
     ),
     // The scrubbed snapshot's date, replacing the range label beside the delta; null at rest.
     scrubDateFormatted: computed((): string | null => {
@@ -287,47 +341,7 @@ export function dashboardComputed(store: StateSignals) {
       return rate === null ? '—' : `${Math.round(rate)}%`;
     }),
 
-    // Stacked net-worth composition (banking / brokerage / crypto) over time — the snapshots
-    // already carry each sleeve, so we plot the mix rather than throwing it away for one line.
-    netWorthAreaSeries: computed((): AreaSeries[] => {
-      const history = validHistory();
-      if (history.length === 0) {
-        return [];
-      }
-      const labelOf = snapshotLabeller();
-      const labels = history.map(labelOf);
-      // A sleeve reading 0 on a given day means its feed was missing, not that the
-      // balance vanished — carry the last-known value forward so the stack doesn't
-      // collapse to the axis and read as a crash.
-      const carryForward = (pick: (s: NetWorthSnapshotDto) => number): number[] => {
-        let last = 0;
-        return history.map(s => {
-          const value = pick(s);
-          if (value > 0) {
-            last = value;
-          }
-          return last;
-        });
-      };
-      const toPoints = (values: number[]) => values.map((value, i) => ({label: labels[i], value}));
-      return [
-        {
-          label: 'Banking',
-          color: seriesColor(SLEEVE_SERIES.banking),
-          points: toPoints(carryForward(s => s.bankingTotal)),
-        },
-        {
-          label: 'Brokerage',
-          color: seriesColor(SLEEVE_SERIES.brokerage),
-          points: toPoints(carryForward(s => s.brokerageTotal)),
-        },
-        {
-          label: 'Crypto',
-          color: seriesColor(SLEEVE_SERIES.crypto),
-          points: toPoints(carryForward(s => s.cryptoTotal)),
-        },
-      ];
-    }),
+    netWorthAreaSeries,
 
     incomeVsSpendingBars: computed((): BarSeries[] => {
       const grouped = completeMonths();

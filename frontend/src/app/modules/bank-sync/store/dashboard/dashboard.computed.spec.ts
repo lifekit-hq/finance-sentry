@@ -448,6 +448,19 @@ describe('dashboardComputed', () => {
         expect(c.scrubDateFormatted()).toBeNull();
       });
 
+      it('reads the charted total on a day a sleeve feed went missing', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 40_000,
+          netWorthHistory: [snapshot(40_000, 5_000, 0), snapshot(40_000, 0, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$45,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('$0');
+        expect(c.netWorthChangeDirection()).toBe(0);
+      });
+
       it('ignores an index past the drawn history', () => {
         const c = projectionFor({
           monthlyFlow: [],
