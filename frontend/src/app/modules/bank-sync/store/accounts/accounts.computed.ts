@@ -1,4 +1,5 @@
 import {computed, type Signal} from '@angular/core';
+import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {
@@ -7,6 +8,7 @@ import {
   type NetWorthBreakdownRow,
   type WealthSummaryResponse,
 } from '../../../../shared/models/wealth/wealth.model';
+import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 
 const PERCENT = 100;
 
@@ -22,11 +24,12 @@ const CATEGORY_LABEL: Record<AccountCategory, string> = {
   other: 'Other',
 };
 
-const CATEGORY_COLOR: Record<AccountCategory, string> = {
-  banking: '#10b981',
-  brokerage: '#6366f1',
-  crypto: '#f59e0b',
-  other: '#64748b',
+// Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
+const CATEGORY_SERIES: Record<AccountCategory, number> = {
+  banking: SERIES.green,
+  brokerage: SERIES.accent,
+  crypto: SERIES.amber,
+  other: SERIES.slate,
 };
 
 const SECTION_ORDER: Omit<CategorySection, 'summary'>[] = [
@@ -57,7 +60,7 @@ export function accountsComputed(store: StateSignals) {
         .map(cat => ({
           label: CATEGORY_LABEL[cat.category],
           value: cat.totalInBaseCurrency,
-          color: CATEGORY_COLOR[cat.category],
+          color: seriesColor(CATEGORY_SERIES[cat.category]),
         }))
     ),
     netWorthBreakdown: computed((): NetWorthBreakdownRow[] => {
@@ -68,7 +71,7 @@ export function accountsComputed(store: StateSignals) {
       return positive
         .map(cat => ({
           label: CATEGORY_LABEL[cat.category],
-          color: CATEGORY_COLOR[cat.category],
+          color: ChartColorUtils.series(CATEGORY_SERIES[cat.category]),
           value: cat.totalInBaseCurrency,
           institutionCount: cat.institutionCount,
           percent: total > 0 ? (cat.totalInBaseCurrency / total) * PERCENT : 0,

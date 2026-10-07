@@ -1,8 +1,8 @@
+import {OTHER_SERIES_STEP} from '../../../shared/constants/chart/chart.constants';
+import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
+import {MERCHANT_SERIES_STEPS} from '../constants/subscription/subscription.constants';
 import {type Subscription} from '../models/subscription/subscription.model';
 
-const DEGREES = 360;
-const SATURATION = 55;
-const LIGHTNESS = 42;
 const HASH_SHIFT = 5;
 const MS_PER_DAY = 86_400_000;
 // Detection builds this label itself (`Mobile top-up 0057`); the statement line reads `*MOBI TOP-UP 0857860057`.
@@ -15,14 +15,14 @@ export class SubscriptionUtils {
 
   public static getMerchantColor(name: string): string {
     if (!name) {
-      return 'hsl(220, 14%, 50%)';
+      return ChartColorUtils.series(OTHER_SERIES_STEP);
     }
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << HASH_SHIFT) - hash);
     }
-    const hue = ((hash % DEGREES) + DEGREES) % DEGREES;
-    return `hsl(${hue}, ${SATURATION}%, ${LIGHTNESS}%)`;
+    const steps = MERCHANT_SERIES_STEPS.length;
+    return ChartColorUtils.series(MERCHANT_SERIES_STEPS[((hash % steps) + steps) % steps]);
   }
 
   public static installmentProgress(

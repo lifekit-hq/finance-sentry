@@ -1,7 +1,9 @@
 import {computed, inject, type Signal} from '@angular/core';
+import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
+import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position} from '../models/position/position.model';
 import {type HoldingsState} from './holdings.state';
@@ -51,10 +53,11 @@ const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   venueCash: 'Venue cash',
 };
 
-const ASSET_CLASS_COLOR: Record<AssetClass, string> = {
-  equity: '#6366f1',
-  crypto: '#f59e0b',
-  venueCash: '#10b981',
+// Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
+const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
+  equity: SERIES.accent,
+  crypto: SERIES.amber,
+  venueCash: SERIES.green,
 };
 
 const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
@@ -125,7 +128,7 @@ export function holdingsComputed(store: StateSignals) {
       positionsByAssetClass().map(group => ({
         label: group.label,
         value: group.totalValue,
-        color: ASSET_CLASS_COLOR[group.assetClass],
+        color: seriesColor(ASSET_CLASS_SERIES[group.assetClass]),
       }))
     ),
     allocationBreakdown: computed((): AllocationBreakdownRow[] => {
@@ -133,7 +136,7 @@ export function holdingsComputed(store: StateSignals) {
       const total = groups.reduce((sum, g) => sum + g.totalValue, 0);
       return groups.map(group => ({
         label: group.label,
-        color: ASSET_CLASS_COLOR[group.assetClass],
+        color: ChartColorUtils.series(ASSET_CLASS_SERIES[group.assetClass]),
         value: group.totalValue,
         percent: total > 0 ? (group.totalValue / total) * WEIGHT_TO_PERCENT : 0,
       }));

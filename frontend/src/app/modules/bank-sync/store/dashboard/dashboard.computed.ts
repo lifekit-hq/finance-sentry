@@ -1,6 +1,11 @@
 import {computed, inject, type Signal} from '@angular/core';
+import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
 import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
 
+import {
+  CATEGORICAL_SERIES_STEPS,
+  OTHER_SERIES_STEP,
+} from '../../../../shared/constants/chart/chart.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
@@ -39,10 +44,16 @@ function formatMonthYear(date: Date): string {
 const SHORT_SPAN_DAYS = 92;
 const MS_PER_DAY = 86_400_000;
 
-const SLEEVE_COLOR = {banking: '#10b981', brokerage: '#6366f1', crypto: '#f59e0b'} as const;
-const INCOME_COLOR = '#10b981';
-const SPENDING_COLOR = '#ef4444';
+// Chart-series steps; resolved when a chart is built, since a canvas cannot read a CSS var.
+const SLEEVE_SERIES = {
+  banking: SERIES.green,
+  brokerage: SERIES.accent,
+  crypto: SERIES.amber,
+} as const;
+const INCOME_SERIES = SERIES.green;
+const SPENDING_SERIES = SERIES.red;
 const PERCENT = 100;
+const OTHER_CATEGORIES_LABEL = 'Other categories';
 
 // A savings rate over a single month is only meaningful once the month's income has actually
 // landed. Salary posts once, often on the last day, so before then the month holds a full run
@@ -278,17 +289,17 @@ export function dashboardComputed(store: StateSignals) {
       return [
         {
           label: 'Banking',
-          color: SLEEVE_COLOR.banking,
+          color: seriesColor(SLEEVE_SERIES.banking),
           points: toPoints(carryForward(s => s.bankingTotal)),
         },
         {
           label: 'Brokerage',
-          color: SLEEVE_COLOR.brokerage,
+          color: seriesColor(SLEEVE_SERIES.brokerage),
           points: toPoints(carryForward(s => s.brokerageTotal)),
         },
         {
           label: 'Crypto',
-          color: SLEEVE_COLOR.crypto,
+          color: seriesColor(SLEEVE_SERIES.crypto),
           points: toPoints(carryForward(s => s.cryptoTotal)),
         },
       ];
@@ -302,12 +313,12 @@ export function dashboardComputed(store: StateSignals) {
       return [
         {
           label: 'Income',
-          color: INCOME_COLOR,
+          color: seriesColor(INCOME_SERIES),
           points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.inflow})),
         },
         {
           label: 'Spending',
-          color: SPENDING_COLOR,
+          color: seriesColor(SPENDING_SERIES),
           points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.outflow})),
         },
       ];
@@ -335,12 +346,27 @@ export function dashboardComputed(store: StateSignals) {
     // as a broken widget rather than as "not enough history".
     hasCashFlow: computed(() => completeMonths().length > 0),
 
-    categoryChartData: computed((): DonutSegment[] =>
-      (store.data()?.topCategories ?? []).map(c => ({
+    // The donut cycles the categorical series colours, so past that many slices two categories
+    // would share one; the tail folds into a single slate slice instead. The table lists them all.
+    categoryChartData: computed((): DonutSegment[] => {
+      const segments = (store.data()?.topCategories ?? []).map(c => ({
         label: categoryStore.labelMap()[c.category] ?? MerchantCategoryUtils.format(c.category),
         value: c.totalSpend,
-      }))
-    ),
+      }));
+      if (segments.length <= CATEGORICAL_SERIES_STEPS.length) {
+        return segments;
+      }
+      const named = segments.slice(0, CATEGORICAL_SERIES_STEPS.length - 1);
+      const tail = segments.slice(named.length);
+      return [
+        ...named,
+        {
+          label: OTHER_CATEGORIES_LABEL,
+          value: tail.reduce((sum, s) => sum + s.value, 0),
+          color: seriesColor(OTHER_SERIES_STEP),
+        },
+      ];
+    }),
 
     netWorthStaleNotice: computed((): string | null => {
       const history = store.netWorthHistory();

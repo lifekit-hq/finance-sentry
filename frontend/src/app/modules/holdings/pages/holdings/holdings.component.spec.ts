@@ -89,8 +89,8 @@ describe('InvestmentsComponent — positions view', () => {
       totalPositionsValue: signal(150),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
-        {label: 'Equities', color: '#6366f1', value: 100, percent: 67},
-        {label: 'Crypto', color: '#f59e0b', value: 50, percent: 33},
+        {label: 'Equities', color: 'var(--color-chart-series-1)', value: 100, percent: 67},
+        {label: 'Crypto', color: 'var(--color-chart-series-2)', value: 50, percent: 33},
       ]),
     };
 

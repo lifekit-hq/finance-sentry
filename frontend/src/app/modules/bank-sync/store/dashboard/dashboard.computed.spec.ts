@@ -6,6 +6,7 @@ import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
+  type CategoryStat,
   type DashboardData,
   type HistoryRange,
   type MonthlyFlow,
@@ -35,10 +36,18 @@ interface Fixture {
   totalNetWorthUsd?: number;
   netWorthHistory?: NetWorthSnapshotDto[];
   baseCurrency?: string;
+  topCategories?: CategoryStat[];
 }
 
 function build(
-  {monthlyFlow, windowFlow, totalNetWorthUsd = 0, netWorthHistory = [], baseCurrency}: Fixture,
+  {
+    monthlyFlow,
+    windowFlow,
+    totalNetWorthUsd = 0,
+    netWorthHistory = [],
+    baseCurrency,
+    topCategories = [],
+  }: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
   const data: DashboardData = {
@@ -48,7 +57,7 @@ function build(
     accountsByType: {},
     monthlyFlow,
     windowFlow,
-    topCategories: [],
+    topCategories,
     lastSyncTimestamp: null,
     baseCurrency,
   } as unknown as DashboardData;
@@ -403,6 +412,36 @@ describe('dashboardComputed', () => {
       expect(c.netWorthChangeFormatted()).toBe('');
       expect(c.netWorthChangePercentFormatted()).toBe('');
       expect(c.netWorthChangeDirection()).toBe(0);
+    });
+  });
+
+  describe('top spending categories donut', () => {
+    function categories(count: number): CategoryStat[] {
+      return Array.from({length: count}, (_, i) => ({
+        category: `cat-${i}`,
+        totalSpend: 100 - i,
+        percentOfTotal: 0,
+      }));
+    }
+
+    it('draws every category while each can keep its own colour', () => {
+      const c = projectionFor({monthlyFlow: [], topCategories: categories(8)});
+
+      expect(c.categoryChartData().map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94, 93]);
+      expect(c.categoryChartData().every(s => !('color' in s))).toBe(true);
+    });
+
+    it('folds the tail past seven into one slate slice', () => {
+      const c = projectionFor({monthlyFlow: [], topCategories: categories(10)});
+      const segments = c.categoryChartData();
+
+      expect(segments).toHaveLength(8);
+      expect(segments.slice(0, 7).map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94]);
+      expect(segments[7]).toEqual({
+        label: 'Other categories',
+        value: 93 + 92 + 91,
+        color: '#64748b',
+      });
     });
   });
 });

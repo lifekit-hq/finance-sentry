@@ -79,7 +79,7 @@
             <div class="mb-cmn-3 flex items-center justify-between gap-cmn-2">
               <div class="flex min-w-0 items-center gap-cmn-2">
                 <div
-                  [style.background]="categoryColor(b.category)"
+                  [style.background]="categoryColor($index)"
                   class="h-2.5 w-2.5 shrink-0 rounded-sm"
                 ></div>
                 <button
@@ -145,7 +145,7 @@
             <div class="mt-cmn-3 h-1.5 overflow-hidden rounded-full bg-surface-raised">
               <div
                 [style.width.%]="pct"
-                [style.background]="barColor(b.spent, b.monthlyLimit, b.category)"
+                [style.background]="barColor(b.spent, b.monthlyLimit, $index)"
                 class="h-full rounded-full"
               ></div>
             </div>
