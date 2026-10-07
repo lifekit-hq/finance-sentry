@@ -94,14 +94,14 @@
             </span>
           </div>
 
-          <cmn-data-table [rows]="group.rows">
+          <cmn-data-table
+            [rows]="group.rows"
+            [rowsActionable]="true"
+            (rowClick)="navigateToDossier($event.symbol)"
+          >
             <cmn-column key="symbol" listSlot="primary" header="Symbol">
               <ng-template let-row cmnCell>
-                <button
-                  (click)="navigateToDossier(row.symbol)"
-                  type="button"
-                  class="inline-flex cursor-pointer items-center gap-cmn-3 text-left transition-colors hover:text-brand-primary"
-                >
+                <span class="inline-flex items-center gap-cmn-3 text-left">
                   <cmn-institution-avatar
                     [name]="row.symbol"
                     [logoUrl]="row.symbol | assetLogo: row.provider"
@@ -109,9 +109,15 @@
                   />
                   <span class="flex flex-col leading-tight">
                     <span class="font-semibold text-text-primary">{{ row.symbol }}</span>
-                    <span class="text-cmn-xs text-text-secondary">{{ row.providerLabel }}</span>
+                    <a
+                      [routerLink]="accountsRoute"
+                      (click)="$event.stopPropagation()"
+                      class="text-cmn-xs text-text-secondary hover:underline"
+                      data-testid="holding-provider-link"
+                      >{{ row.providerLabel }}</a
+                    >
                   </span>
-                </button>
+                </span>
               </ng-template>
             </cmn-column>
             <cmn-column key="quantity" listSlot="secondary" header="Quantity" align="right">

@@ -121,7 +121,14 @@
       @if (dossier.position; as position) {
         <cmn-card class="block">
           <h2 class="font-headline text-cmn-lg font-semibold text-text-primary">Position</h2>
-          <p class="text-cmn-xs text-text-secondary">{{ position.provider | providerLabel }}</p>
+          <p class="text-cmn-xs text-text-secondary">
+            <a
+              [routerLink]="accountsRoute"
+              class="hover:underline"
+              data-testid="position-provider-link"
+              >{{ position.provider | providerLabel }}</a
+            >
+          </p>
 
           <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
             <cmn-stat-card
@@ -338,7 +345,18 @@
                 <div
                   class="flex flex-wrap items-start gap-cmn-3 border-b border-border-default pb-cmn-2 text-cmn-sm last:border-0 last:pb-0"
                 >
-                  <span class="shrink-0 font-medium text-text-primary">{{ action.firm }}</span>
+                  @if (action.sourceUrl) {
+                    <a
+                      [href]="action.sourceUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="shrink-0 font-medium text-text-primary underline-offset-2 hover:underline"
+                      data-testid="analyst-action-link"
+                      >{{ action.firm }}</a
+                    >
+                  } @else {
+                    <span class="shrink-0 font-medium text-text-primary">{{ action.firm }}</span>
+                  }
                   <span
                     class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
                   >

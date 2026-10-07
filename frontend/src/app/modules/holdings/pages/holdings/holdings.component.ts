@@ -1,6 +1,6 @@
 import {DecimalPipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {Router} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   CardComponent,
@@ -31,6 +31,7 @@ const SKELETON_ROWS = 4;
     DataTableComponent,
     DecimalPipe,
     MoneyPipe,
+    RouterLink,
     SkeletonComponent,
     DonutChartComponent,
     InstitutionAvatarComponent,
@@ -43,6 +44,7 @@ export class InvestmentsComponent {
   private readonly router = inject(Router);
   public readonly store = inject(HoldingsStore);
   public readonly connectStore = inject(ConnectStore);
+  public readonly accountsRoute = AppRoute.AccountsInvestments;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';

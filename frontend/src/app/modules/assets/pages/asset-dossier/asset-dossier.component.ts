@@ -1,6 +1,6 @@
 import {DatePipe, DecimalPipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {Router} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
@@ -49,6 +49,7 @@ const SPARKLINE_MIN_POINTS = 2;
     MoneyPipe,
     ProviderLabelPipe,
     RelativeTimePipe,
+    RouterLink,
     SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,
@@ -64,6 +65,7 @@ export class AssetDossierComponent {
   private readonly router = inject(Router);
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
+  public readonly accountsRoute = AppRoute.AccountsInvestments;
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
 

@@ -1,7 +1,8 @@
 import {DecimalPipe} from '@angular/common';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {provideRouter, Router} from '@angular/router';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {type Position} from '../../models/position/position.model';
@@ -95,7 +96,7 @@ describe('InvestmentsComponent — positions view', () => {
 
     await TestBed.configureTestingModule({
       imports: [InvestmentsComponent],
-      providers: [DecimalPipe],
+      providers: [DecimalPipe, provideRouter([])],
     })
       .overrideComponent(InvestmentsComponent, {
         set: {
@@ -169,5 +170,32 @@ describe('InvestmentsComponent — positions view', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('No positions yet');
+  });
+
+  it('opens the asset page when a holding row is clicked', () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const row = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="list-row"], tbody tr'
+    );
+    row?.click();
+
+    expect(navigate).toHaveBeenCalledWith(['/assets', 'DRAM']);
+  });
+
+  it('links the provider label to the investment accounts list without opening the asset', () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '[data-testid="holding-provider-link"]'
+    );
+    expect(link?.getAttribute('href')).toBe('/accounts/investments');
+    link?.addEventListener('click', e => e.preventDefault());
+    link?.click();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
