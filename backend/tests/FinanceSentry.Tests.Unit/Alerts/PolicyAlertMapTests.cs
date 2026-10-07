@@ -38,6 +38,7 @@ public class PolicyAlertMapTests
         AlertType.CashSweepProposal,
         AlertType.EarningsAhead,
         AlertType.FilingLanded,
+        AlertType.AnalystRatingChange,
         AlertType.NewsCluster,
         AlertType.BudgetBreach,
         AlertType.FamilyStatement,

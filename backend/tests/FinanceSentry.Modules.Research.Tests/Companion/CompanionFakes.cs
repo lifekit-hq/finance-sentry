@@ -95,6 +95,19 @@ internal sealed class FakeAnalystActionRepository : IAnalystActionRepository
             q.OrderByDescending(a => a.ActionDate).Take(limit).ToList());
     }
 
+    public Task<IReadOnlyList<AnalystAction>> ListRatingChangesAsync(
+        IReadOnlyCollection<string> tickers, DateOnly since, CancellationToken ct = default)
+    {
+        var upper = tickers.Select(t => t.Trim().ToUpperInvariant()).ToHashSet();
+        return Task.FromResult<IReadOnlyList<AnalystAction>>(Actions
+            .Where(a => a.ActionDate >= since
+                && a.ActionType is AnalystActionType.Upgrade or AnalystActionType.Downgrade
+                && upper.Contains(a.Ticker))
+            .OrderBy(a => a.ActionDate)
+            .ThenBy(a => a.Firm)
+            .ToList());
+    }
+
     public Task<AnalystAction?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => Task.FromResult(Actions.FirstOrDefault(a => a.Id == id));
 }

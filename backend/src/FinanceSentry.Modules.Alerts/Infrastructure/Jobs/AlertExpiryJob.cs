@@ -44,6 +44,7 @@ public sealed class AlertExpiryJob(
     {
         [AlertType.NewsCluster] = TimeSpan.FromDays(3),
         [AlertType.FilingLanded] = TimeSpan.FromDays(14),
+        [AlertType.AnalystRatingChange] = TimeSpan.FromDays(14),
         [AlertType.MarketStructure] = TimeSpan.FromDays(7), // ticker-move flavour only; see GetExpiresAt
         [AlertType.FxSpread] = TimeSpan.FromDays(30),
         [AlertType.DuplicateCharge] = TimeSpan.FromDays(30),

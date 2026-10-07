@@ -51,6 +51,7 @@ public class AlertAppPathTests
         { AlertType.Opportunity, Guid.NewGuid(), "BTC", "/assets/BTC" },
         { AlertType.EarningsAhead, Guid.NewGuid(), "AAPL", "/assets/AAPL" },
         { AlertType.FilingLanded, Guid.NewGuid(), "MSFT", "/assets/MSFT" },
+        { AlertType.AnalystRatingChange, Guid.NewGuid(), "NVDA", "/assets/NVDA#analyst-coverage" },
         { AlertType.NewsCluster, Guid.NewGuid(), "TSLA", "/assets/TSLA" },
         { AlertType.MarketStructure, Guid.NewGuid(), "freshness", null },
         { AlertType.ThesisBroken, null, null, null },

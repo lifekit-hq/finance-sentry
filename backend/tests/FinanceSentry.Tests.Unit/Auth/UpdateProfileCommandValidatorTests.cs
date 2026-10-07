@@ -42,5 +42,5 @@ public class UpdateProfileCommandValidatorTests
     }
 
     private static UpdateProfileCommand Command(decimal withdrawalRate, decimal realReturn) =>
-        new(Guid.NewGuid(), "Fire", "Bounds", "USD", "dark", true, false, 100m, true, withdrawalRate, realReturn);
+        new(Guid.NewGuid(), "Fire", "Bounds", "USD", "dark", true, false, 100m, true, false, withdrawalRate, realReturn);
 }

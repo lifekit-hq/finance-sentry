@@ -44,6 +44,14 @@ public sealed class LookaheadUniverse(
         return tickers;
     }
 
+    /// <summary>Equity holdings alone: the names the analyst rating-change alert covers by default.</summary>
+    public async Task<IReadOnlySet<string>> HeldEquityTickersAsync(Guid userId, CancellationToken ct = default)
+        => await EquityHoldingsAsync(userId, ct);
+
+    /// <summary>The watchlist alone: covered by the analyst rating-change alert only when the user opts in.</summary>
+    public async Task<IReadOnlySet<string>> WatchlistTickersAsync(Guid userId, CancellationToken ct = default)
+        => (await watchlist.ListTickersAsync(userId, ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Equity holdings, thesis tickers and their invalidation-trigger proxy tickers.</summary>
     public async Task<IReadOnlySet<string>> FilingTickersAsync(Guid userId, CancellationToken ct = default)
     {

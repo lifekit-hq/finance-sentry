@@ -19,6 +19,7 @@ const profile = {
   lowBalanceAlerts: true,
   lowBalanceThreshold: 100,
   syncFailureAlerts: true,
+  watchlistAnalystAlerts: false,
   safeWithdrawalRate: 0.04,
   realAnnualReturn: 0.05,
 } as unknown as UserProfile;

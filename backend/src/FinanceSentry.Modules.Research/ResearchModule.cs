@@ -88,6 +88,12 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(1));
 
+            // Analyst rating-change alerts (#825 pick 6), 01:30 UTC - after the 01:00 ingestion they read.
+            mgr.AddOrUpdate<AnalystRatingChangeAlertJob>(
+                AnalystRatingChangeAlertJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(1, 30));
+
             // Research retrieval indexing (feature 036), offset 15 min from the */30 news ingestion
             // so freshly ingested articles are chunked/embedded shortly after they land.
             mgr.AddOrUpdate<ResearchIndexingJob>(
@@ -420,6 +426,7 @@ public static class ResearchModule
         services.AddSingleton<IRecurringJobAgeReader, HangfireRecurringJobAgeReader>();
         services.AddScoped<EarningsAheadJob>();
         services.AddScoped<FilingWatchJob>();
+        services.AddScoped<AnalystRatingChangeAlertJob>();
         services.AddScoped<LookaheadSilenceMonitorJob>();
         services.AddScoped<NewsMaterialityJob>();
         services.AddScoped<GeopoliticsSourceSeedJob>();

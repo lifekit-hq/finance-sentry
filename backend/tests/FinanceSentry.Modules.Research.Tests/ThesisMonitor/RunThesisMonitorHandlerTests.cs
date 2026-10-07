@@ -536,6 +536,11 @@ public class RunThesisMonitorHandlerTests
             CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task GenerateAnalystRatingChangeAlertAsync(
+            Guid userId, string ticker, DateOnly day, IReadOnlyList<AnalystRatingChange> changes,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task GenerateNewsClusterAlertAsync(
             Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default)
             => Task.CompletedTask;

@@ -124,6 +124,7 @@ describe('AlertDestinationUtils.resolve', () => {
     'Opportunity',
     'EarningsAhead',
     'NewsCluster',
+    'AnalystRatingChange',
   ])('routes %s to the dossier of its ticker', type => {
     expect(AlertDestinationUtils.resolve(makeAlert({type, referenceLabel: 'BRK.B'}))).toEqual({
       kind: 'route',

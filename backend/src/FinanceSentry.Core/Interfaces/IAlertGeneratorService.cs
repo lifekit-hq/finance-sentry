@@ -392,6 +392,20 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Raises an Info alert that the street changed its rating on a ticker (pick 6 of #825): one
+    /// alert per (ticker, <paramref name="day"/>) that summarises every firm's upgrade or downgrade
+    /// that day, never one per firm. Deduped once per reference, so the daily detector re-reading the
+    /// same day is a no-op even after the user dismisses the alert. The alert opens the dossier's
+    /// Analyst Coverage card (<c>AlertAppPath.ForAnalystCoverage</c>).
+    /// </summary>
+    Task GenerateAnalystRatingChangeAlertAsync(
+        Guid userId,
+        string ticker,
+        DateOnly day,
+        IReadOnlyList<AnalystRatingChange> changes,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Raises a Warning alert that a held name or thesis keyword clustered in the news (N1,
     /// ledger-heartbeat design): two or more distinct sources reporting two or more distinct stories
     /// within a 2h window, a thesis-attached source hit, or a hit on a configurable material-class
@@ -537,3 +551,6 @@ public enum SyncFailureClass
     /// <summary>The cause is not known to be either.</summary>
     Unknown,
 }
+
+/// <summary>One firm's rating change on a ticker, as <see cref="IAlertGeneratorService.GenerateAnalystRatingChangeAlertAsync"/> summarises it.</summary>
+public sealed record AnalystRatingChange(string Firm, bool IsUpgrade, string? PriorRating, string? NewRating);

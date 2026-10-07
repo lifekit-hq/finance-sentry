@@ -77,6 +77,9 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// </summary>
     private static readonly TimeSpan MarketStructureFreshnessSilenceWindow = TimeSpan.FromHours(12);
 
+    /// <summary>How many firms an analyst rating-change alert names before it folds the rest into "and N more".</summary>
+    private const int AnalystSummaryFirms = 3;
+
     private readonly IAlertRepository _alerts = alerts;
 
     public Task GenerateLowBalanceAlertAsync(
@@ -472,6 +475,40 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             $"{ticker} filed a {form} on {filingDate:yyyy-MM-dd}. {documentUrl}"),
             ct);
 
+    public Task GenerateAnalystRatingChangeAlertAsync(
+        Guid userId, string ticker, DateOnly day, IReadOnlyList<AnalystRatingChange> changes,
+        CancellationToken ct = default)
+    {
+        if (changes.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        ticker = ticker.Trim().ToUpperInvariant();
+        var upgrades = changes.Count(c => c.IsUpgrade);
+        var downgrades = changes.Count - upgrades;
+        var headline = (upgrades, downgrades) switch
+        {
+            (> 0, 0) => "Analyst upgrade",
+            (0, > 0) => "Analyst downgrade",
+            _ => "Analyst rating changes",
+        };
+
+        var listed = changes.Take(AnalystSummaryFirms).Select(DescribeRatingChange);
+        var more = changes.Count > AnalystSummaryFirms ? $" and {changes.Count - AnalystSummaryFirms} more" : string.Empty;
+
+        return EmitAsync(userId, new AlertDraft(
+            AlertType.AnalystRatingChange, AlertSeverity.Info,
+            AnalystRatingChangeReferenceId(ticker, day), ticker,
+            $"{headline}: {ticker}",
+            $"{ticker} on {day:yyyy-MM-dd}: {string.Join("; ", listed)}{more}.")
+        {
+            Dedup = AlertDedup.OncePerReference,
+            AppPath = AlertAppPath.ForAnalystCoverage(ticker),
+        },
+            ct);
+    }
+
     public Task GenerateNewsClusterAlertAsync(
         Guid userId, string ticker, string reason, DateOnly day, CancellationToken ct = default)
         => EmitAsync(userId, new AlertDraft(
@@ -637,6 +674,20 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-(ticker, accession number) synthetic GUID — never emit twice for the same filing.</summary>
     private static Guid FilingLandedReferenceId(string ticker, string accessionNumber)
         => DerivedReferenceId($"filing-landed:{ticker.ToUpperInvariant()}:{accessionNumber}");
+
+    /// <summary>Stable per-(ticker, day) synthetic GUID — one analyst rating-change alert per ticker per day, however many firms moved.</summary>
+    private static Guid AnalystRatingChangeReferenceId(string ticker, DateOnly day)
+        => DerivedReferenceId($"analyst-rating-change:{ticker.ToUpperInvariant()}:{day:yyyy-MM-dd}");
+
+    private static string DescribeRatingChange(AnalystRatingChange change)
+    {
+        var verb = change.IsUpgrade ? "upgraded" : "downgraded";
+        return change.PriorRating is { Length: > 0 } prior && change.NewRating is { Length: > 0 } now
+            ? $"{change.Firm} {verb} {prior} to {now}"
+            : change.NewRating is { Length: > 0 } rating
+                ? $"{change.Firm} {verb} to {rating}"
+                : $"{change.Firm} {verb}";
+    }
 
     /// <summary>Stable per-(ticker, day) synthetic GUID — one news-cluster alert per ticker per day.</summary>
     private static Guid NewsClusterReferenceId(string ticker, DateOnly day)
