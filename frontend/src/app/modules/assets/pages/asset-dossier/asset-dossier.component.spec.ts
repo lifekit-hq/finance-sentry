@@ -39,6 +39,7 @@ const DOSSIER: AssetDossierDto = {
   symbol: 'DRAM',
   position: {
     provider: 'ibkr',
+    assetClass: 'Equities',
     quantity: 10,
     currentValueUsd: 431.94,
     costBasisUsd: 400,

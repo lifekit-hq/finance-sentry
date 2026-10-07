@@ -11,6 +11,8 @@ export interface DossierTaxLotEntry {
 
 export interface DossierPositionSection {
   provider: string;
+  /** Canonical asset class (`Equities`, `Crypto`, `Bonds`, ...). */
+  assetClass: string;
   quantity: number;
   currentValueUsd: number;
   costBasisUsd: Nullable<number>;

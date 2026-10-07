@@ -1,6 +1,11 @@
 import {describe, expect, it} from 'vitest';
 
-import {type DossierQuoteDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type DossierPositionSection,
+  type DossierQuoteDto,
+  type ValuationSnapshotDto,
+} from '../models/dossier/dossier.model';
 import {DossierQuoteUtils} from './dossier-quote.utils';
 
 function quote(overrides: Partial<DossierQuoteDto> = {}): DossierQuoteDto {
@@ -58,5 +63,82 @@ describe('DossierQuoteUtils.toHeader', () => {
   it('returns null for an unusable price', () => {
     expect(DossierQuoteUtils.toHeader(quote({price: 0}))).toBeNull();
     expect(DossierQuoteUtils.toHeader(quote({price: Number.NaN}))).toBeNull();
+  });
+});
+
+function dossier(overrides: Partial<AssetDossierDto> = {}): AssetDossierDto {
+  return {
+    symbol: 'AAPL',
+    position: null,
+    thesis: null,
+    valuation: null,
+    analysts: null,
+    recentNews: [],
+    nextEarnings: null,
+    radarSignals: [],
+    generatedAt: '2026-09-03T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function position(assetClass: string): DossierPositionSection {
+  return {
+    provider: 'ibkr',
+    assetClass,
+    quantity: 1,
+    currentValueUsd: 100,
+    costBasisUsd: null,
+    unrealizedPnlUsd: null,
+    unrealizedPnlPercent: null,
+    taxLots: [],
+  };
+}
+
+function valuation(notApplicable: boolean): ValuationSnapshotDto {
+  const metric = {
+    value: null,
+    fiveYearAvg: null,
+    historyWindowYears: null,
+    historyUnavailable: true,
+  };
+  return {
+    ticker: 'AAPL',
+    notApplicable,
+    price: null,
+    isStale: false,
+    metrics: {trailingPe: metric, forwardPe: metric, evToEbitda: metric, dividendYield: metric},
+    consensusTarget: null,
+    impliedUpsidePct: null,
+    peerSet: null,
+    sources: [],
+    retrievedAt: '2026-09-03T00:00:00Z',
+  };
+}
+
+describe('DossierQuoteUtils.isQuotable', () => {
+  it('quotes an equity holding', () => {
+    expect(DossierQuoteUtils.isQuotable(dossier({position: position('Equities')}))).toBe(true);
+  });
+
+  it('never quotes a crypto holding, whatever the valuation says', () => {
+    expect(
+      DossierQuoteUtils.isQuotable(
+        dossier({symbol: 'BTC', position: position('Crypto'), valuation: valuation(false)})
+      )
+    ).toBe(false);
+  });
+
+  it('quotes an unheld symbol the valuation source classed as an equity', () => {
+    expect(DossierQuoteUtils.isQuotable(dossier({valuation: valuation(false)}))).toBe(true);
+  });
+
+  it('skips an unheld symbol the valuation source classed as non-equity', () => {
+    expect(DossierQuoteUtils.isQuotable(dossier({symbol: 'USD', valuation: valuation(true)}))).toBe(
+      false
+    );
+  });
+
+  it('skips an unheld symbol with no valuation to classify it', () => {
+    expect(DossierQuoteUtils.isQuotable(dossier())).toBe(false);
   });
 });

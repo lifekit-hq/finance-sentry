@@ -96,6 +96,7 @@ export const DOSSIER_AAPL = {
   symbol: 'AAPL',
   position: {
     provider: 'ibkr',
+    assetClass: 'Equities',
     quantity: 10,
     currentValueUsd: 17500,
     costBasisUsd: 15000,

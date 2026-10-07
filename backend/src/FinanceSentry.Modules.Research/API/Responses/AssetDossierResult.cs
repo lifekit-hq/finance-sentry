@@ -19,9 +19,13 @@ public sealed record AssetDossierResult(
     IReadOnlyList<DossierSignalItem> RadarSignals,
     DateTimeOffset GeneratedAt);
 
-/// <summary>Position and tax-lot detail for a holding in the user's book. TaxLots: IBKR only; empty for crypto.</summary>
+/// <summary>
+/// Position and tax-lot detail for a holding in the user's book. TaxLots: IBKR only; empty for crypto.
+/// AssetClass: the canonical bucket from <see cref="FinanceSentry.Core.Domain.AssetClassNormalizer"/>.
+/// </summary>
 public sealed record DossierPositionSection(
     string Provider,
+    string AssetClass,
     decimal Quantity,
     decimal CurrentValueUsd,
     decimal? CostBasisUsd,

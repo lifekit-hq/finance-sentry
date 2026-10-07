@@ -63,6 +63,7 @@ function emptyDossier(overrides: Partial<AssetDossierDto> = {}): AssetDossierDto
 
 const POSITION: DossierPositionSection = {
   provider: 'ibkr',
+  assetClass: 'Equities',
   quantity: 1,
   currentValueUsd: 100,
   costBasisUsd: null,

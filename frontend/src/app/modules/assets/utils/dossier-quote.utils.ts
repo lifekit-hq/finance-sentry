@@ -1,5 +1,7 @@
 import {MoneyUtils} from '../../../shared/utils/money.utils';
+import {EQUITY_ASSET_CLASS} from '../constants/dossier/dossier-quote.constants';
 import {
+  type AssetDossierDto,
   type DossierDeltaDirection,
   type DossierQuoteDto,
   type DossierQuoteHeader,
@@ -8,6 +10,18 @@ import {
 const CHANGE_FRACTION_DIGITS = 2;
 
 export class DossierQuoteUtils {
+  /**
+   * Research quotes price listed equities by the ticker as given, so crypto and cash symbols
+   * (`BTC`, `USD`) would come back as unrelated ETFs. A holding decides by its asset class;
+   * anything else needs the valuation source to have classed the ticker as an equity.
+   */
+  public static isQuotable(dossier: AssetDossierDto): boolean {
+    if (dossier.position) {
+      return dossier.position.assetClass === EQUITY_ASSET_CLASS;
+    }
+    return dossier.valuation !== null && !dossier.valuation.notApplicable;
+  }
+
   /** "$189.30" with "+1.25%"; a quote without a usable price yields null so the slot stays empty. */
   public static toHeader(quote: Nullable<DossierQuoteDto>): Nullable<DossierQuoteHeader> {
     if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
