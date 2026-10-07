@@ -657,7 +657,7 @@ test.describe('Top spendings → Ledger category drill-down', () => {
         });
       });
 
-      await page.goto('/dashboard?range=1m');
+      await page.goto('/dashboard?range=mtd');
       await page.locator('cmn-data-table').getByText(label, {exact: true}).click();
 
       await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
