@@ -18,8 +18,8 @@ test.describe('Asset Dossier', () => {
     // Wait for positions to load and AAPL to appear
     await expect(page.getByText('AAPL').first()).toBeVisible();
 
-    // Click the AAPL symbol button
-    await page.getByRole('button', {name: /AAPL/i}).first().click();
+    // The whole row is the click target (cmn-data-table rowsActionable)
+    await page.getByText('AAPL').first().click();
 
     // Should land on the dossier URL
     await expect(page).toHaveURL(/\/assets\/AAPL/);

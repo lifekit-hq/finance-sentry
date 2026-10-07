@@ -56,7 +56,34 @@ const DOSSIER: AssetDossierDto = {
   thesis: THESIS,
   valuation: null,
   analysts: {
-    recentActions: [],
+    recentActions: [
+      {
+        ticker: 'DRAM',
+        firm: 'Needham',
+        actionType: 'upgrade',
+        priorRating: null,
+        newRating: 'Buy',
+        priorTarget: null,
+        newTarget: 500,
+        actionDate: '2026-09-01',
+        source: 'finnhub',
+        sourceUrl: 'https://example.com/needham',
+        ingestedAt: '2026-09-01T00:00:00Z',
+      },
+      {
+        ticker: 'DRAM',
+        firm: 'Barclays',
+        actionType: 'reiterate',
+        priorRating: null,
+        newRating: null,
+        priorTarget: null,
+        newTarget: null,
+        actionDate: '2026-09-02',
+        source: 'finnhub',
+        sourceUrl: null,
+        ingestedAt: '2026-09-02T00:00:00Z',
+      },
+    ],
     coverage: 'inUniverse',
     trends: [
       {
@@ -164,6 +191,21 @@ describe('AssetDossierComponent', () => {
     expect(text).toContain('$431.94');
     expect(text).not.toContain('431.94 USD');
     expect(text).toContain('Interactive Brokers');
+  });
+
+  it('links the position provider to the investment accounts list', () => {
+    fixture.detectChanges();
+
+    expect(byTestId('position-provider-link')?.getAttribute('href')).toBe('/accounts/investments');
+  });
+
+  it('links an analyst action to its source only when one exists', () => {
+    fixture.detectChanges();
+
+    const links = root().querySelectorAll<HTMLAnchorElement>('[data-testid="analyst-action-link"]');
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute('href')).toBe('https://example.com/needham');
+    expect(root().textContent).toContain('Barclays');
   });
 
   it('keeps tax lots collapsed behind a counted summary', () => {
