@@ -17,6 +17,13 @@ public sealed class CompanionOptions
     /// </summary>
     public string? AgentTriggerToken { get; set; }
 
+    /// <summary>
+    /// Public origin of the app (e.g. <c>https://app.example.com</c>). An event's relative <c>AppPath</c> joins onto it
+    /// to give the absolute <c>appUrl</c> the agent wake and the MCP event carry. Empty or not an absolute http(s) URL
+    /// = no <c>appUrl</c> is emitted, never a relative or guessed one. Deploys bind it from <c>FRONTEND_BASE_URL</c>.
+    /// </summary>
+    public string? PublicBaseUrl { get; set; }
+
     public string DefaultTimeZoneId { get; set; } = "Europe/Dublin";
 
     public int? QuietHoursStartLocal { get; set; } = 22;

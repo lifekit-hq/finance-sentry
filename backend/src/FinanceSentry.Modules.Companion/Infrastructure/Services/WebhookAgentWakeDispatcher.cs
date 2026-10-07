@@ -12,7 +12,8 @@ using Microsoft.Extensions.Options;
 /// <summary>
 /// Posts a minimal wake payload to the configured agent-trigger URL (feature 031). When no URL is
 /// configured the event stays pending for the agent to pull (no realtime push). Payload carries only
-/// ids/refs — never secrets or full detail (FR-016). Waking the agent is an AI feature, so wakes for a
+/// ids/refs — never secrets or full detail (FR-016) — plus an absolute <c>appUrl</c> to the page the event is about
+/// when a public base URL is configured and the event has a target. Waking the agent is an AI feature, so wakes for a
 /// user whose account fails <see cref="AuthPolicies.RequireAiUse"/> are skipped (<see cref="WakeResult.Skipped"/>).
 /// Authenticates with the configured bearer token and stamps each event wake with <c>Idempotency-Key: &lt;eventId&gt;</c>, so the receiver can dedup
 /// the relay's retries (the dispatch job re-posts a failed wake up to <see cref="CompanionOptions.MaxDispatchAttempts"/>).
@@ -55,17 +56,23 @@ public sealed class WebhookAgentWakeDispatcher(
         // Proposal events carry acknowledgement metadata so the bot can render inline-keyboard buttons.
         // referenceId is the stable per-user anchor GUID; the bot calls PATCH /alerts/{referenceId}/acknowledge.
         var isProposal = ProposalKinds.Contains(evt.Kind);
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            eventId = evt.Id,
-            userId = evt.UserId,
-            kind = evt.Kind.ToString(),
-            subject = evt.Subject,
-            severity = evt.Severity,
-            occurredAt = evt.OccurredAt,
-            requiresAcknowledgement = isProposal ? (bool?)true : null,
-            referenceId = isProposal ? evt.ReferenceId : null,
+            ["eventId"] = evt.Id,
+            ["userId"] = evt.UserId,
+            ["kind"] = evt.Kind.ToString(),
+            ["subject"] = evt.Subject,
+            ["severity"] = evt.Severity,
+            ["occurredAt"] = evt.OccurredAt,
+            ["requiresAcknowledgement"] = isProposal ? true : null,
+            ["referenceId"] = isProposal ? evt.ReferenceId : null,
         };
+
+        // The page the event is about, absolute so the agent can put it in a message; left out (not null) when unknown.
+        if (CompanionAppUrl.For(_options.PublicBaseUrl, evt.AppPath) is { } appUrl)
+        {
+            payload["appUrl"] = appUrl;
+        }
 
         return await PostAsync(payload, $"event {evt.Id}", evt.Id.ToString(), ct);
     }

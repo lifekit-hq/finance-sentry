@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// The user's undelivered companion events for the agent to deliver (feature 031, US2). Read-only —
@@ -21,6 +22,7 @@ public class GetPendingCompanionEventsQueryHandler(
     ICompanionEventRepository events,
     ISyncFailureReconciler reconciler,
     INotificationSettingRepository settings,
+    IOptions<CompanionOptions> options,
     ILogger<GetPendingCompanionEventsQueryHandler> logger)
     : IQueryHandler<GetPendingCompanionEventsQuery, CompanionEventsResult>
 {
@@ -57,7 +59,8 @@ public class GetPendingCompanionEventsQueryHandler(
         var dtos = rows
             .Select(e => new CompanionEventDto(
                 e.Id, e.Kind.ToString(), e.Subject, e.Severity, e.Summary,
-                e.ReferenceId, e.Disposition.ToString(), e.OccurredAt))
+                e.ReferenceId, e.Disposition.ToString(), e.OccurredAt,
+                CompanionAppUrl.For(options.Value.PublicBaseUrl, e.AppPath)))
             .ToList();
 
         return new CompanionEventsResult(dtos, mode.ToString(), DateTimeOffset.UtcNow, refused ? HeldWithheldNote : null);
