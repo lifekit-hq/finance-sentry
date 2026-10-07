@@ -10,6 +10,11 @@ public class Alert
     public string Message { get; set; } = string.Empty;
     public Guid? ReferenceId { get; set; }
     public string? ReferenceLabel { get; set; }
+    /// <summary>
+    /// Where in the app this alert opens (<c>AlertAppPath</c>), written by the emitter that knows what it is about. Null on
+    /// alerts stored before it existed; <see cref="AlertAppPaths.For"/> resolves those from type, reference and label.
+    /// </summary>
+    public string? AppPath { get; set; }
     public bool IsRead { get; set; }
     public bool IsResolved { get; set; }
     public bool IsDismissed { get; set; }

@@ -7,10 +7,12 @@ using FinanceSentry.Modules.Companion.Domain;
 /// <summary>
 /// The lock-screen notification (spec 859 FR-003): the kind, the subject and a deep link, nothing else. Never the
 /// event summary, severity, amounts or merchants; detail appears after the tap, inside the authenticated app. Shaped for
-/// the Angular service worker (<c>{"notification":{…}}</c>), which shows it and opens the link on click.
+/// the Angular service worker (<c>{"notification":{…}}</c>), which shows it and opens the link on click. The link is the
+/// event's own <see cref="CompanionEvent.AppPath"/> (the thing it is about), or the alerts page when it has none.
 /// </summary>
 public static partial class PushPayload
 {
+    /// <summary>Where a notification opens when its event has no target of its own.</summary>
     public const string DeepLink = "/alerts";
 
     public static string Build(CompanionEvent evt)
@@ -24,7 +26,7 @@ public static partial class PushPayload
             {
                 onActionClick = new
                 {
-                    @default = new { operation = "navigateLastFocusedOrOpen", url = DeepLink },
+                    @default = new { operation = "navigateLastFocusedOrOpen", url = LinkFor(evt) },
                 },
             },
         };
@@ -33,6 +35,12 @@ public static partial class PushPayload
 
         return JsonSerializer.Serialize(new { notification }, JsonOptions);
     }
+
+    /// <summary>The event's own path when it is a path inside this app, otherwise <see cref="DeepLink"/>.</summary>
+    public static string LinkFor(CompanionEvent evt)
+        => evt.AppPath is { } path && path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal)
+            ? path
+            : DeepLink;
 
     /// <summary>"LowBalance" becomes "Low balance".</summary>
     public static string KindLabel(CompanionEventKind kind)

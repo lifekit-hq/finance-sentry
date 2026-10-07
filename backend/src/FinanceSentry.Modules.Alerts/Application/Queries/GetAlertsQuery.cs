@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Alerts.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Alerts.API.Responses;
+using FinanceSentry.Modules.Alerts.Domain;
 using FinanceSentry.Modules.Alerts.Domain.Repositories;
 
 public record GetAlertsQuery(
@@ -26,7 +27,7 @@ public class GetAlertsQueryHandler(IAlertRepository alerts) : IQueryHandler<GetA
         var dtos = items.Select(a => new AlertDto(
             a.Id, a.Type, a.Severity, a.Title, a.Message,
             a.ReferenceId, a.ReferenceLabel, a.IsRead, a.IsResolved,
-            a.CreatedAt, a.ResolvedAt, a.OccurrenceCount, a.LastOccurredAt)).ToList();
+            a.CreatedAt, a.ResolvedAt, a.OccurrenceCount, a.LastOccurredAt, AlertAppPaths.For(a))).ToList();
 
         var totalPages = pageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
 

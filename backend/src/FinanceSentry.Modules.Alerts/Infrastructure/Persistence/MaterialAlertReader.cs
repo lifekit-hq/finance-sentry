@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Alerts.Infrastructure.Persistence;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Alerts.Domain;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
@@ -17,13 +18,16 @@ public class MaterialAlertReader(AlertsDbContext db) : IMaterialAlertReader
         DateTimeOffset watermark, int limit, CancellationToken ct = default)
     {
         var effective = Math.Clamp(limit, 1, MaxLimit);
-        return await db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+        var rows = await db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(a => a.CreatedAt > watermark && !a.IsDismissed)
             .OrderBy(a => a.CreatedAt)
             .Take(effective)
-            .Select(a => new MaterialAlertRecord(
-                a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt))
             .ToListAsync(ct);
+        return rows
+            .Select(a => new MaterialAlertRecord(
+                a.Id, a.UserId, a.Type, a.Severity, a.Title, a.ReferenceId, a.ReferenceLabel, a.CreatedAt,
+                AlertAppPaths.For(a)))
+            .ToList();
     }
 
     public async Task<IReadOnlySet<Guid>> GetOpenIdsAsync(

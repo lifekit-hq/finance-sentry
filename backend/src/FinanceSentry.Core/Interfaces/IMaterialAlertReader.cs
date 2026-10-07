@@ -16,7 +16,7 @@ public interface IMaterialAlertReader
     Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
 }
 
-/// <summary>A lightweight projection of an alert for companion capture.</summary>
+/// <summary>A lightweight projection of an alert for companion capture. <paramref name="AppPath"/> is where the alert opens in the app.</summary>
 public sealed record MaterialAlertRecord(
     Guid AlertId,
     Guid UserId,
@@ -25,4 +25,5 @@ public sealed record MaterialAlertRecord(
     string Title,
     Guid? ReferenceId,
     string? ReferenceLabel,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? AppPath = null);

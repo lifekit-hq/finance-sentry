@@ -50,6 +50,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.Property(x => x.Summary).HasMaxLength(500);
             e.Property(x => x.DedupKey).HasMaxLength(200);
             e.Property(x => x.SourceModule).HasMaxLength(32);
+            e.Property(x => x.AppPath).HasMaxLength(500);
             e.Property(x => x.LastError).HasMaxLength(1000);
         });
 

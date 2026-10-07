@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -72,6 +73,7 @@ public sealed class CompanionEventCapture(
                 Summary = Trim(a.Title, 500),
                 DedupKey = policy.AlertDedupKey(a.AlertId),
                 ReferenceId = a.ReferenceId ?? a.AlertId,
+                AppPath = a.AppPath,
                 SourceModule = "alerts",
                 Disposition = policy.DispositionFor(mode, kind.Value, staleness),
                 OccurredAt = a.CreatedAt,
@@ -133,6 +135,7 @@ public sealed class CompanionEventCapture(
                     Summary = Trim($"{a.Firm} {a.ActionType} {ticker}{target}", 500),
                     DedupKey = policy.AnalystDedupKey(userId, a.ActionId),
                     ReferenceId = a.ActionId,
+                    AppPath = AlertAppPath.ForSymbol(ticker),
                     SourceModule = "research",
                     Disposition = policy.DispositionFor(mode, CompanionEventKind.AnalystAction),
                     OccurredAt = a.IngestedAt,
