@@ -9,6 +9,7 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {AppShellComponent} from './app-shell.component';
+import {PaletteEntitiesService} from './services/palette-entities.service';
 
 @Component({
   selector: 'fns-chat-widget',
@@ -38,6 +39,17 @@ describe('AppShellComponent FAB clearance', () => {
           },
         },
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
+        {
+          provide: PaletteEntitiesService,
+          useValue: {
+            load: () =>
+              of({
+                holdings: [{symbol: 'AAPL', isVenueCash: false}],
+                watchlist: [{ticker: 'NVDA'}],
+                accounts: [{accountId: 'a1', bankName: 'Monobank', accountNumberLast4: '1234'}],
+              }),
+          },
+        },
       ],
     });
     TestBed.overrideComponent(AppShellComponent, {
@@ -49,6 +61,14 @@ describe('AppShellComponent FAB clearance', () => {
     fixture.detectChanges();
     return fixture;
   };
+
+  it('adds held, watchlist and account entities to the palette', async () => {
+    const fixture = await setup(AppRoute.Settings);
+    const ids = fixture.componentInstance.paletteItems().map(item => item.id);
+    expect(ids).toEqual(
+      expect.arrayContaining(['/assets/AAPL', '/assets/NVDA', '/transactions?account=a1'])
+    );
+  });
 
   it('shows the store avatar initials in the top bar', async () => {
     const fixture = await setup(AppRoute.Settings);

@@ -19,6 +19,7 @@ import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
 import {CONNECT_ACTION_ID, NAV_ITEMS, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {PaletteEntitiesStore} from './store/palette-entities.store';
 import {NavUtils} from './utils/nav.utils';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
@@ -52,6 +53,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
   selector: 'fns-app-shell',
   imports: [AppLayoutComponent, RouterOutlet, ChatWidgetComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [PaletteEntitiesStore],
   template: `
     <cmn-app-layout
       [navItems]="navItems()"
@@ -80,6 +82,7 @@ export class AppShellComponent {
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
+  private readonly paletteEntities = inject(PaletteEntitiesStore);
   private readonly sidebarShown = toSignal(
     this.breakpoints.observe(CMN_MEDIA_MD).pipe(map(state => state.matches)),
     {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
@@ -98,7 +101,7 @@ export class AppShellComponent {
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );
   public readonly paletteItems = computed(() =>
-    PALETTE_ITEMS.filter(item => this.isPermitted(item.id))
+    [...PALETTE_ITEMS, ...this.paletteEntities.items()].filter(item => this.isPermitted(item.id))
   );
   public readonly account = computed<AppLayoutAccount>(() => ({
     label: this.authStore.avatarInitials(),
