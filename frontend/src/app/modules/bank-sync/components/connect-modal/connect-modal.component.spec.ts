@@ -12,6 +12,7 @@ class MonobankFormStub {}
 class BinanceFormStub {}
 class RevolutXFormStub {}
 class IbkrFormStub {}
+class InzhurFormStub {}
 
 const STRATEGIES: readonly ConnectStrategy[] = [
   {
@@ -26,6 +27,7 @@ const STRATEGIES: readonly ConnectStrategy[] = [
     submit: () => null as never,
   },
   {slug: 'ibkr', formComponent: IbkrFormStub as Type<unknown>, submit: () => null as never},
+  {slug: 'inzhur', formComponent: InzhurFormStub as Type<unknown>, submit: () => null as never},
 ];
 
 function buildStore(modalStep: ModalStep) {
@@ -52,6 +54,7 @@ describe('ConnectModalComponent', () => {
     ['binance-form', BinanceFormStub],
     ['revolut-x-form', RevolutXFormStub],
     ['ibkr-form', IbkrFormStub],
+    ['inzhur-form', InzhurFormStub],
   ] as const)('resolves the strategy form component for %s', (step, expected) => {
     configure(buildStore(step));
     const fixture = TestBed.createComponent(ConnectModalComponent);

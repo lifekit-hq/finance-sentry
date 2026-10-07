@@ -46,6 +46,9 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
         new(new DbContextOptionsBuilder<BrokerageSyncDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
+    private static InzhurCredential NewInzhurCredential(Guid userId) =>
+        new(userId, new EncryptedSecret([1], [1], [1], 1), new EncryptedSecret([2], [2], [2], 1));
+
     private static BrokerageHolding NewHolding(Guid userId, string symbol = "AAPL", decimal quantity = 1m) =>
         new(userId, symbol, "STK", quantity, quantity * 100m, Provider);
 
@@ -72,7 +75,7 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(6);
+        perUser.Should().HaveCount(7);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -118,14 +121,22 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
-    public async Task Holdings_delete_with_no_person_removes_only_the_named_users_rows()
+    public async Task Holdings_delete_removes_only_the_acting_users_rows_of_that_provider_and_nothing_without_a_person()
     {
-        await SeedAsync(NewHolding(_userA), NewHolding(_userB));
+        var inzhur = new BrokerageHolding(_userA, "Fund A", "REIT", 1m, 10m, "inzhur");
+        await SeedAsync(NewHolding(_userA), NewHolding(_userB), inzhur);
 
-        await using (var ctx = CreateContext())
-            await new BrokerageHoldingRepository(ctx).DeleteByUserIdAsync(_userA);
+        // A disconnect runs on the request path; ExecuteDelete is owner-filtered, so with no person it deletes nothing.
+        await using (var asNoOne = CreateContext())
+            await new BrokerageHoldingRepository(asNoOne).DeleteByUserIdAndProviderAsync(_userA, Provider);
+        (await AllHoldingsAsync()).Should().HaveCount(3);
 
-        (await AllHoldingsAsync()).Should().ContainSingle(h => h.UserId == _userB);
+        await using (var asA = CreateContext(_userA))
+            await new BrokerageHoldingRepository(asA).DeleteByUserIdAndProviderAsync(_userA, Provider);
+
+        var rows = await AllHoldingsAsync();
+        rows.Should().HaveCount(2, "a disconnect of one broker never touches another broker's rows or another person's");
+        rows.Should().Contain(h => h.Id == inzhur.Id).And.Contain(h => h.UserId == _userB);
     }
 
     [DockerRequiredFact]
@@ -194,5 +205,48 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
         var rotated = await new IBKRFlexCredentialRotationTarget(ctx, encryption.Object).RotateAsync(2, default);
 
         rotated.Should().Be(2);
+    }
+
+    [DockerRequiredFact]
+    public async Task Inzhur_credential_reads_follow_the_acting_person_and_the_unscoped_reads_serve_the_daily_job()
+    {
+        var a = NewInzhurCredential(_userA);
+        a.StartSession(new EncryptedSecret([3], [3], [3], 1), DateTime.UtcNow);
+        await SeedAsync(a, NewInzhurCredential(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repository = new InzhurCredentialRepository(asA);
+            (await repository.GetByUserIdAsync(_userA)).Should().NotBeNull();
+            (await repository.GetByUserIdAsync(_userB)).Should().BeNull("naming another person does not lift the owner scope");
+        }
+
+        await using var asNoOne = CreateContext();
+        var noPerson = new InzhurCredentialRepository(asNoOne);
+        (await noPerson.GetByUserIdAsync(_userA)).Should().BeNull();
+        (await noPerson.GetByUserIdUnscopedAsync(_userB))!.UserId.Should().Be(_userB);
+        (await noPerson.GetAllActiveUnscopedAsync()).Select(c => c.UserId).Should().Contain(_userA)
+            .And.NotContain(_userB, "a connection without a session is not read by the daily job");
+    }
+
+    [DockerRequiredFact]
+    public async Task Inzhur_rotation_with_no_person_rotates_every_users_secrets()
+    {
+        var encryption = new Mock<ICredentialEncryptionService>();
+        encryption.Setup(e => e.Decrypt(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>())).Returns("t");
+        encryption.Setup(e => e.Encrypt(It.IsAny<string>())).Returns(new EncryptionResult([9], [9], [9], 2));
+        var withSession = NewInzhurCredential(_userA);
+        withSession.StartSession(new EncryptedSecret([3], [3], [3], 1), DateTime.UtcNow);
+        await SeedAsync(withSession, NewInzhurCredential(_userB));
+
+        await using (var ctx = CreateContext())
+            (await new InzhurCredentialRotationTarget(ctx, encryption.Object).RotateAsync(2, default)).Should().Be(2);
+
+        await using var read = CreateContext();
+        var rows = await read.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .Where(c => c.UserId == _userA || c.UserId == _userB).ToListAsync();
+        rows.Should().OnlyContain(c => c.KeyVersion == 2 && c.SessionKeyVersion == 2);
+        rows.Single(c => c.UserId == _userA).EncryptedSession.Should().Equal(9);
+        rows.Single(c => c.UserId == _userB).EncryptedSession.Should().BeEmpty("a missing session is not invented by a rotation");
     }
 }

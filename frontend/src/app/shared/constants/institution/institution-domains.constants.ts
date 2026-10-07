@@ -13,6 +13,7 @@
 export const PROVIDER_DOMAINS: Readonly<Record<string, string>> = {
   monobank: 'monobank.ua',
   ibkr: 'interactivebrokers.com',
+  inzhur: 'inzhur.reit',
   binance: 'binance.com',
   // Provider slugs are the backend's snake_case wire values.
   // eslint-disable-next-line @typescript-eslint/naming-convention

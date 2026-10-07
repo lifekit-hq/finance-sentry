@@ -11,10 +11,14 @@ public sealed class DisconnectIBKRCommandHandler(
     IBrokerageHoldingRepository holdingRepository)
     : ICommandHandler<DisconnectIBKRCommand, Unit>
 {
+    private const string IbkrProvider = "ibkr";
+
     public async Task<Unit> Handle(DisconnectIBKRCommand command, CancellationToken cancellationToken)
     {
         var credential = await credentialRepository.GetByUserIdAsync(command.UserId, cancellationToken);
-        var holdings = await holdingRepository.GetByUserIdAsync(command.UserId, cancellationToken);
+        var holdings = (await holdingRepository.GetByUserIdAsync(command.UserId, cancellationToken))
+            .Where(h => h.Provider == IbkrProvider)
+            .ToList();
 
         var hasActiveCredential = credential is not null && credential.IsActive;
         if (!hasActiveCredential && holdings.Count == 0)
@@ -27,7 +31,7 @@ public sealed class DisconnectIBKRCommandHandler(
             credentialRepository.Update(credential);
         }
 
-        await holdingRepository.DeleteByUserIdAsync(command.UserId, cancellationToken);
+        await holdingRepository.DeleteByUserIdAndProviderAsync(command.UserId, IbkrProvider, cancellationToken);
         await holdingRepository.SaveChangesAsync(cancellationToken);
 
         if (credential is not null)

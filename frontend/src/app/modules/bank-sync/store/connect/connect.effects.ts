@@ -56,6 +56,7 @@ function institutionTypeForSlug(strategy: ConnectStrategy): InstitutionType {
     case 'revolut_x':
       return 'crypto';
     case 'ibkr':
+    case 'inzhur':
       return 'broker';
   }
 }

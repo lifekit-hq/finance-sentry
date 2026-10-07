@@ -6,4 +6,5 @@ export type ModalStep =
   | 'binance-form'
   | 'revolut-x-form'
   | 'ibkr-form'
+  | 'inzhur-form'
   | 'closed';

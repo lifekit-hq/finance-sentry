@@ -11,7 +11,7 @@ import {type ConnectState} from './connect.state';
 const STEP_FOR_TYPE: Record<InstitutionType, ModalStep> = {
   bank: 'provider-picker',
   crypto: 'provider-picker',
-  broker: 'ibkr-form',
+  broker: 'provider-picker',
 };
 
 const STEP_FOR_PICKED_PROVIDER: Record<PickableProvider, ModalStep> = {
@@ -21,6 +21,8 @@ const STEP_FOR_PICKED_PROVIDER: Record<PickableProvider, ModalStep> = {
   // Provider slugs are the backend's snake_case wire values.
   // eslint-disable-next-line @typescript-eslint/naming-convention
   revolut_x: 'revolut-x-form',
+  ibkr: 'ibkr-form',
+  inzhur: 'inzhur-form',
 };
 
 const TYPE_FOR_PICKED_PROVIDER: Record<PickableProvider, InstitutionType> = {
@@ -29,11 +31,8 @@ const TYPE_FOR_PICKED_PROVIDER: Record<PickableProvider, InstitutionType> = {
   binance: 'crypto',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   revolut_x: 'crypto',
-};
-
-// Types with a single provider skip the picker.
-const PROVIDER_FOR_TYPE: Partial<Record<InstitutionType, Provider>> = {
-  broker: 'ibkr',
+  ibkr: 'broker',
+  inzhur: 'broker',
 };
 
 export function connectMethods(store: WritableStateSource<ConnectState>) {
@@ -59,14 +58,12 @@ export function connectMethods(store: WritableStateSource<ConnectState>) {
       });
     },
     selectInstitutionType(type: InstitutionType): void {
-      const provider = PROVIDER_FOR_TYPE[type];
       patchState(store, {
         institutionType: type,
         modalStep: STEP_FOR_TYPE[type],
         status: 'idle',
         errorCode: null,
         statusMessage: null,
-        ...(provider ? {selectedProvider: provider} : {}),
       });
     },
     setInstitutionType(type: InstitutionType): void {

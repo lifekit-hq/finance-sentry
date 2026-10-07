@@ -24,6 +24,10 @@ public sealed class NewsIngestionJob(
 {
     private const int MaxTickersPerRun = 60;
 
+    // Holding rows whose symbol is not an exchange ticker: broker cash ledgers ("USD Cash") and Inzhur's
+    // fund/bond names. Querying news for them only spends the per-run ticker budget.
+    private static readonly HashSet<string> NonTickerInstrumentTypes = new(StringComparer.OrdinalIgnoreCase) { "CASH", "REIT", "BOND" };
+
     public async Task IngestTickersAsync(CancellationToken ct = default)
     {
         var tickers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +61,7 @@ public sealed class NewsIngestionJob(
         {
             foreach (var h in await brokerage.GetHoldingsAsync(userId, ct))
             {
+                if (NonTickerInstrumentTypes.Contains(h.InstrumentType)) continue;
                 tickers.Add(h.Symbol);
             }
 

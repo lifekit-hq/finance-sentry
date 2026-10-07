@@ -52,4 +52,14 @@ export const PROVIDER_CATALOG: readonly ProviderDescriptor[] = Object.freeze([
     formShape: 'user-pass',
     helpUrl: 'https://www.interactivebrokers.com/en/trading/free-demo.php',
   }),
+  Object.freeze({
+    slug: 'inzhur',
+    displayName: 'Inzhur',
+    institutionType: 'broker',
+    description:
+      'Connect your Inzhur cabinet with your phone, password and an SMS code. Read-only.',
+    iconAsset: '/assets/providers/inzhur.svg',
+    formShape: 'phone-password-sms',
+    helpUrl: 'https://inzhur.reit',
+  }),
 ] as const);

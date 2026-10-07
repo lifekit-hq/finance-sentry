@@ -41,10 +41,8 @@ export class ProviderPickerComponent {
     );
   });
 
-  public readonly prompt = computed(() =>
-    this.store.institutionType() === 'crypto'
-      ? PROVIDER_PICKER_PROMPT.crypto
-      : PROVIDER_PICKER_PROMPT.bank
+  public readonly prompt = computed(
+    () => PROVIDER_PICKER_PROMPT[this.store.institutionType() ?? 'bank']
   );
 
   public readonly connected = computed(() => this.store.connectedProviders());

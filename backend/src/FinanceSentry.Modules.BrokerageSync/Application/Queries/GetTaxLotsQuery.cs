@@ -38,6 +38,8 @@ public sealed class GetTaxLotsQueryHandler(
     BrokerageCostBasisReconciler reconciler)
     : IQueryHandler<GetTaxLotsQuery, TaxLotsResponse>
 {
+    private const string IbkrProvider = "ibkr";
+
     private static readonly TimeSpan LongTermThreshold = TimeSpan.FromDays(365);
 
     private readonly IBrokerageHoldingRepository _holdingRepository = holdingRepository;
@@ -46,10 +48,12 @@ public sealed class GetTaxLotsQueryHandler(
 
     public async Task<TaxLotsResponse> Handle(GetTaxLotsQuery request, CancellationToken ct)
     {
-        var holdings = await _holdingRepository.GetByUserIdAsync(request.UserId, ct);
+        var holdings = (await _holdingRepository.GetByUserIdAsync(request.UserId, ct))
+            .Where(h => h.Provider == IbkrProvider)
+            .ToList();
 
         if (holdings.Count == 0)
-            return new TaxLotsResponse("ibkr", null, [], 0m, 0m);
+            return new TaxLotsResponse(IbkrProvider, null, [], 0m, 0m);
 
         var trades = await _tradeRepository.GetByUserIdAsync(request.UserId, ct);
         var now = DateTime.UtcNow;
@@ -86,7 +90,7 @@ public sealed class GetTaxLotsQueryHandler(
             .ToList();
 
         return new TaxLotsResponse(
-            Provider: "ibkr",
+            Provider: IbkrProvider,
             SyncedAt: holdings.Max(h => h.SyncedAt),
             Items: items,
             TotalCostBasisUsd: items.Sum(i => i.CostBasisUsd ?? 0m),

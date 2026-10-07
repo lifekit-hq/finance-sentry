@@ -41,7 +41,7 @@ import {
   MENU_ACTION_RECONNECT,
   PHONE_MEDIA_QUERY,
   RECONNECT_MENU,
-  RECONNECTABLE_PROVIDER,
+  RECONNECT_TARGET,
   SYNC_DOT_CLASS,
 } from './accounts-list.constants';
 
@@ -115,12 +115,15 @@ export class AccountsListComponent implements OnInit {
     });
   }
 
-  public reconnect(): void {
+  public reconnect(institution: Pick<Institution, 'provider'>): void {
+    const target = RECONNECT_TARGET[institution.provider];
+    if (!target) {
+      return;
+    }
     this.connectStore.openModal();
-    this.connectStore.selectInstitutionType('bank');
-    this.connectStore.selectPickedProvider('truelayer');
+    this.connectStore.selectPickedProvider(target.slug);
     this.dialog.open(ConnectModalComponent, {
-      title: 'Reconnect bank',
+      title: target.title,
       size: 'md',
       viewContainerRef: this.viewContainerRef,
     });
@@ -190,7 +193,7 @@ export class AccountsListComponent implements OnInit {
   }
 
   public canReconnect(institution: Institution): boolean {
-    return institution.provider === RECONNECTABLE_PROVIDER;
+    return institution.provider in RECONNECT_TARGET;
   }
 
   public institutionMenu(institution: Institution): MenuItem[] {
@@ -199,7 +202,7 @@ export class AccountsListComponent implements OnInit {
 
   public onInstitutionAction(institution: Institution, action: string): void {
     if (action === MENU_ACTION_RECONNECT) {
-      this.reconnect();
+      this.reconnect(institution);
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
     }
@@ -229,6 +232,10 @@ export class AccountsListComponent implements OnInit {
         }
         if (institution.provider === 'ibkr') {
           this.store.disconnectIBKR();
+          return;
+        }
+        if (institution.provider === 'inzhur') {
+          this.store.disconnectInzhur();
           return;
         }
         if (institution.provider === 'binance') {

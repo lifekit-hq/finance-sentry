@@ -20,6 +20,7 @@ public sealed class BrokerageSyncDbContext : DbContext
 
     public DbSet<IBKRCredential> IBKRCredentials => Set<IBKRCredential>();
     public DbSet<IBKRFlexCredential> IBKRFlexCredentials => Set<IBKRFlexCredential>();
+    public DbSet<InzhurCredential> InzhurCredentials => Set<InzhurCredential>();
     public DbSet<BrokerageHolding> BrokerageHoldings => Set<BrokerageHolding>();
     public DbSet<BrokerageInstrument> BrokerageInstruments => Set<BrokerageInstrument>();
     public DbSet<BrokerageTrade> BrokerageTrades => Set<BrokerageTrade>();
@@ -70,6 +71,31 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.TokenIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.TokenAuthTag).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
+            entity.HasConnectionHealth(e => e.Health);
+        });
+
+        modelBuilder.Entity<InzhurCredential>(entity =>
+        {
+            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
+            entity.ToTable("InzhurCredentials");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.LastSyncError).HasMaxLength(InzhurCredential.LastErrorMaxLength);
+            entity.Property(e => e.EncryptedPhone).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.PhoneIv).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.PhoneAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.EncryptedPassword).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.PasswordIv).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.PasswordAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.EncryptedSession).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.SessionIv).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.SessionAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
+            entity.Property(e => e.SessionKeyVersion).IsRequired().HasDefaultValue(1);
+            entity.Ignore(e => e.HasSession);
+            entity.Ignore(e => e.HasLoginSecrets);
             entity.HasConnectionHealth(e => e.Health);
         });
 

@@ -18,6 +18,7 @@ const DEFAULT_BINANCE_ERROR = 'Failed to connect Binance account. Please check y
 const DEFAULT_REVOLUT_X_ERROR =
   'Failed to connect Revolut X. Please check your API key and Ed25519 private key.';
 const DEFAULT_IBKR_ERROR = 'Failed to connect IBKR account. Please check your credentials.';
+const DEFAULT_INZHUR_ERROR = 'Failed to connect Inzhur. Please try again.';
 const DEFAULT_MONOBANK_ERROR = 'Failed to connect Monobank account. Please try again.';
 
 function mapErrorByProvider(
@@ -35,6 +36,8 @@ function mapErrorByProvider(
       return DEFAULT_REVOLUT_X_ERROR;
     case 'ibkr':
       return DEFAULT_IBKR_ERROR;
+    case 'inzhur':
+      return DEFAULT_INZHUR_ERROR;
     default:
       return DEFAULT_MONOBANK_ERROR;
   }
@@ -46,6 +49,7 @@ const PROVIDER_SLUGS: readonly Provider[] = [
   'binance',
   'revolut_x',
   'ibkr',
+  'inzhur',
 ];
 
 function resolveForProvider(

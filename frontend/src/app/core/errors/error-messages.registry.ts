@@ -45,6 +45,20 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
     'IBKR could not run this Flex query. Check the token and query ID, and that it is an Activity Flex Query.',
   IBKR_GATEWAY_UNAVAILABLE:
     'Could not reach the IBKR gateway. This is usually temporary — try again in a minute.',
+  INZHUR_CREDENTIALS_REQUIRED: 'Enter the phone number and password you use for Inzhur.',
+  INZHUR_LOGIN_LIMIT:
+    'Inzhur sign-in is limited to two attempts a day, as each one can send you an SMS. Try again tomorrow.',
+  INZHUR_RECAPTCHA_REJECTED:
+    "Inzhur's bot check turned this sign-in away. Wait a while and try again; your saved holdings stay as they are.",
+  INZHUR_INVALID_CREDENTIALS:
+    "Inzhur didn't accept this phone number and password. Check them in the Inzhur app and enter them again.",
+  INZHUR_CHALLENGE_EXPIRED: 'The SMS code has expired. Start over to get a new one.',
+  INZHUR_TOO_MANY_ATTEMPTS: 'Too many wrong codes. Start over to get a new one.',
+  INZHUR_INVALID_CODE: "That code didn't match. Check the SMS from Inzhur and try again.",
+  INZHUR_LOGIN_UNAVAILABLE:
+    "Finance Sentry can't sign in to Inzhur right now. Try again later; your saved holdings stay as they are.",
+  INZHUR_LOGIN_FAILED: "Couldn't sign in to Inzhur. Please try again.",
+  INZHUR_NOT_CONNECTED: 'Inzhur is not connected.',
   VALIDATION_ERROR: 'Some fields look wrong — please review the highlighted errors.',
   ALERT_NOT_FOUND: 'Alert not found.',
   PUSH_UNAVAILABLE: 'Push notifications are not available right now.',

@@ -61,7 +61,7 @@ export class PositionsService extends ApiService {
             p.costBasisUsd ?? (p.averageCostUsd != null ? p.averageCostUsd * p.quantity : null);
           return {
             symbol: p.symbol,
-            provider: brokerage?.provider ?? 'ibkr',
+            provider: p.provider ?? brokerage?.provider ?? 'ibkr',
             quantity: p.quantity,
             currentValue: p.usdValue,
             currentPrice: p.quantity > 0 ? p.usdValue / p.quantity : 0,

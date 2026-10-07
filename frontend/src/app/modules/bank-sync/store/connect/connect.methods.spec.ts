@@ -34,17 +34,31 @@ describe('connectMethods', () => {
     expect(state.statusMessage()).toBeNull();
   });
 
-  it('selectInstitutionType(broker) resets error status and selects ibkr', () => {
+  it('selectInstitutionType(broker) resets error status and offers the broker picker', () => {
     const state = signalState(initialConnectState);
     const methods = connectMethods(state);
     methods.setError('X');
 
     methods.selectInstitutionType('broker');
 
-    expect(state.modalStep()).toBe('ibkr-form');
-    expect(state.selectedProvider()).toBe('ibkr');
+    expect(state.modalStep()).toBe('provider-picker');
+    expect(state.institutionType()).toBe('broker');
     expect(state.status()).toBe('idle');
     expect(state.errorCode()).toBeNull();
+  });
+
+  it.each([
+    ['ibkr', 'ibkr-form'],
+    ['inzhur', 'inzhur-form'],
+  ] as const)('selectPickedProvider(%s) opens %s as a broker', (slug, step) => {
+    const state = signalState(initialConnectState);
+    const methods = connectMethods(state);
+
+    methods.selectPickedProvider(slug);
+
+    expect(state.modalStep()).toBe(step);
+    expect(state.selectedProvider()).toBe(slug);
+    expect(state.institutionType()).toBe('broker');
   });
 
   it('selectInstitutionType(bank) keeps the current provider until a bank is picked', () => {

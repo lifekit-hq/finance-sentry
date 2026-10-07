@@ -9,6 +9,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain.Interfaces;
 using FinanceSentry.Modules.BrokerageSync.Domain.Ports;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
@@ -18,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
 
@@ -45,6 +47,9 @@ public static class BrokerageSyncModule
             // only triggered manually from the Hangfire dashboard.
             mgr.AddOrUpdate<IbkrFlexBackfillJob>(
                 "ibkr-flex-backfill", job => job.ExecuteAsync(), Cron.Never());
+
+            var inzhur = sp.GetRequiredService<IOptions<InzhurOptions>>().Value;
+            mgr.AddOrUpdate<InzhurSyncJob>("inzhur-sync", job => job.ExecuteAsync(), inzhur.SyncCron);
         }
     }
 
@@ -97,6 +102,27 @@ public static class BrokerageSyncModule
         // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
+        // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in from the connect modal
+        // through a headless Chromium sidecar (reCAPTCHA v3 scores the real sign-in page); the daily job only
+        // refreshes that session and reads the portfolio. Read-only: no trade or other write call to Inzhur exists.
+        services.Configure<InzhurOptions>(config.GetSection(InzhurOptions.SectionName));
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IInzhurCredentialRepository, InzhurCredentialRepository>();
+        services.AddScoped<ICredentialRotationTarget, InzhurCredentialRotationTarget>();
+        services.AddHttpClient<IInzhurApiClient, InzhurApiClient>((sp, client) =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(sp.GetRequiredService<IOptions<InzhurOptions>>().Value.UserAgent);
+                client.Timeout = InzhurApiClient.RequestTimeout;
+            })
+            // The session's cookies are kept in the encrypted jar, not a handler-wide container shared across users.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
+            .RedactLoggedHeaders(_ => true);
+        services.AddSingleton<IInzhurBrowserLogin, PuppeteerInzhurBrowserLogin>();
+        services.AddScoped<IInzhurSyncService, InzhurSyncService>();
+        services.AddScoped<IInzhurConnector, InzhurConnector>();
+        services.AddScoped<InzhurSyncJob>();
+        services.AddScoped<IBrokerageConnectionStatusReader, BrokerageConnectionStatusReader>();
+
         services.AddScoped<IBKRSyncJob>();
         services.AddScoped<IbkrFlexIncrementalSyncJob>();
         services.AddScoped<IbkrFlexBackfillJob>();
