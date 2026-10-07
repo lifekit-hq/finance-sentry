@@ -760,8 +760,8 @@ reaches the financial-independence target. Computed on read; nothing is persiste
 - **Target** = annual spend ÷ safe withdrawal rate. A non-positive rate is guarded to a zero target
   (reads as already reached).
 - **Assumptions** are per-user (`IUserFireAssumptionsReader`), defaulting to a 4% safe withdrawal rate
-  and a 5% real annual return. The Settings form bounds them to 0.5-10% and 0-15%; the API itself
-  does not.
+  and a 5% real annual return. Both the Settings form and `PUT /profile`
+  (`UpdateProfileCommandValidator`, 400 when out of range) bound them to 0.5-10% and 0-15%.
 - **Outcome.** Net worth ≥ target → `AlreadyReached`; else savings ≤ 0 → `NotSaving` (no date); else
   `Projected`. Months to target solve the future value of the current balance plus level monthly
   contributions, both compounding at the real return converted to a monthly rate
