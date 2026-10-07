@@ -656,6 +656,12 @@ are closed periods.
   previous day's value is carried forward and the sleeve is listed in `StaleSleeves`
   (`NetWorthSnapshotService`). The baseline is the latest snapshot *strictly before* the
   snapshot date, so a same-day refresh never carries forward from itself.
+- **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
+  chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
+  exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,
+  the hero figure is that charted stack total at the point and the delta runs from the charted
+  total at the window start, so figure, delta and chart agree; at rest the hero is the live
+  headline and the delta runs between the first and last snapshots' `totalNetWorth`.
 - **Backfill** (`NetWorthSnapshotBackfillService`, on boot): fills missed days with
   *current* balances — a downtime gap renders as a flat line, not real history.
 - **Historical reconstruction** (`BackfillNetWorthHistoryCommand`, admin-triggered, one-off):

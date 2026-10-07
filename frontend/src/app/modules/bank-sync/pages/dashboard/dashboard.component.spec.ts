@@ -2,8 +2,11 @@ import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
+import {type ChartScrubPoint} from '@lifekit-hq/charts-core';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
+import {AreaChartComponent} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -20,10 +23,12 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
  */
 function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCategories: []}) {
   const historyRange = signal<HistoryRange>(range);
+  const setScrubIndex = vi.fn();
   const setHistoryRange = vi.fn((next: HistoryRange) => historyRange.set(next));
   const real: Record<string, unknown> = {
     historyRange,
     setHistoryRange,
+    setScrubIndex,
     data: signal(data),
     baseCurrency: signal('EUR'),
     isLoading: signal(false),
@@ -72,9 +77,11 @@ describe('DashboardComponent range presets', () => {
   });
 
   it('offers the IBKR presets in order, with no 6M', () => {
-    const chips = render().el.querySelectorAll('[aria-label="History range"] cmn-chip');
+    const control = render().el.querySelector<HTMLElement & {options: {label: string}[]}>(
+      'lk-segmented[label="History range"]'
+    );
 
-    expect(Array.from(chips, c => c.textContent?.trim())).toEqual([
+    expect(control?.options.map(o => o.label)).toEqual([
       '1W',
       'MTD',
       '1M',
@@ -85,15 +92,40 @@ describe('DashboardComponent range presets', () => {
     ]);
   });
 
-  it('selects a preset through the store when its chip is clicked', () => {
+  it('selects a preset through the store when the control changes', () => {
     const {el, store} = render();
-    const mtd = Array.from(el.querySelectorAll('[aria-label="History range"] cmn-chip')).find(
-      c => c.textContent?.trim() === 'MTD'
-    );
+    const control = el.querySelector('lk-segmented');
 
-    mtd?.querySelector('button')?.click();
+    control?.dispatchEvent(new CustomEvent('lk-segmented-change', {detail: {value: 'mtd'}}));
 
     expect(store['setHistoryRange']).toHaveBeenCalledWith('mtd');
+  });
+
+  it('puts the chart between the figure and the range control in the hero card', () => {
+    const card = render().el.querySelector('cmn-card');
+    const order = ['[data-testid="net-worth-value"]', 'cmn-area-chart', 'lk-segmented'].map(sel =>
+      card?.querySelector(sel)
+    );
+
+    expect(order.every(Boolean)).toBe(true);
+    expect(order[0]?.compareDocumentPosition(order[1] as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(order[1]?.compareDocumentPosition(order[2] as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('scrubs the hero figure to the point under the pointer and snaps back on release', () => {
+    const {fixture, store} = render();
+    const chart = fixture.debugElement.query(By.directive(AreaChartComponent))
+      .componentInstance as AreaChartComponent;
+
+    chart.scrub.emit({index: 4} as ChartScrubPoint);
+    chart.scrubEnd.emit();
+
+    expect(store['setScrubIndex']).toHaveBeenNthCalledWith(1, 4);
+    expect(store['setScrubIndex']).toHaveBeenNthCalledWith(2, null);
   });
 
   it('links the net-worth hero to the accounts list', () => {

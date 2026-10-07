@@ -13,10 +13,13 @@ export function dashboardMethods(store: WritableStateSource<DashboardState>) {
       patchState(store, {data});
     },
     setNetWorthHistory(snapshots: NetWorthSnapshotDto[]): void {
-      patchState(store, {netWorthHistory: snapshots});
+      patchState(store, {netWorthHistory: snapshots, scrubIndex: null});
     },
     setHistoryRange(range: HistoryRange): void {
-      patchState(store, {historyRange: range});
+      patchState(store, {historyRange: range, scrubIndex: null});
+    },
+    setScrubIndex(index: number | null): void {
+      patchState(store, {scrubIndex: index});
     },
     setHistoryLoading(loading: boolean): void {
       patchState(store, {historyLoading: loading});

@@ -37,6 +37,7 @@ interface Fixture {
   netWorthHistory?: NetWorthSnapshotDto[];
   baseCurrency?: string;
   topCategories?: CategoryStat[];
+  scrubIndex?: number | null;
 }
 
 function build(
@@ -47,6 +48,7 @@ function build(
     netWorthHistory = [],
     baseCurrency,
     topCategories = [],
+    scrubIndex = null,
   }: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
@@ -68,6 +70,7 @@ function build(
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
+    scrubIndex: signal<number | null>(scrubIndex),
   };
 }
 
@@ -404,6 +407,84 @@ describe('dashboardComputed', () => {
       expect(c.netWorthChangeFormatted()).toBe('-$500');
       expect(c.netWorthChangePercentFormatted()).toBe('-5.0%');
       expect(c.netWorthChangeDirection()).toBe(-1);
+    });
+
+    describe('while scrubbing', () => {
+      const points = [snapshot(10_000, 0, 0), snapshot(12_000, 0, 0), snapshot(11_000, 0, 0)];
+
+      it('shows the scrubbed point and its change since the window start', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 11_000,
+          netWorthHistory: points,
+          scrubIndex: 1,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$12,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('+$2,000');
+        expect(c.netWorthChangePercentFormatted()).toBe('+20.0%');
+        expect(c.scrubDateFormatted()).toBe('Jul 31, 2026');
+      });
+
+      it('colours the delta by the scrubbed point, not the window end', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: [snapshot(10_000, 0, 0), snapshot(8_000, 0, 0), snapshot(11_000, 0, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.netWorthChangeDirection()).toBe(-1);
+      });
+
+      it('rests on the live figure when nothing is scrubbed', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 11_000,
+          netWorthHistory: points,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$11,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('+$1,000');
+        expect(c.scrubDateFormatted()).toBeNull();
+      });
+
+      it('reads the charted total on a day a sleeve feed went missing', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 40_000,
+          netWorthHistory: [snapshot(40_000, 5_000, 0), snapshot(40_000, 0, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$45,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('$0');
+        expect(c.netWorthChangeDirection()).toBe(0);
+      });
+
+      it('keeps a negative sleeve in the scrubbed total and its delta', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 8_000,
+          netWorthHistory: [snapshot(1_000, 10_000, 0), snapshot(-2_000, 10_000, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$8,000.00');
+        expect(c.netWorthChangeFormatted()).toBe('-$3,000');
+        expect(c.netWorthChangeDirection()).toBe(-1);
+      });
+
+      it('ignores an index past the drawn history', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 11_000,
+          netWorthHistory: points,
+          scrubIndex: 9,
+        });
+
+        expect(c.totalBalanceFormatted()).toBe('$11,000.00');
+        expect(c.scrubDateFormatted()).toBeNull();
+      });
     });
 
     it('shows nothing until two snapshots exist', () => {

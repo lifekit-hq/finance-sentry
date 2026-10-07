@@ -1,4 +1,10 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
@@ -6,7 +12,6 @@ import {
   BarChartComponent,
   ButtonComponent,
   CardComponent,
-  ChipComponent,
   CmnCellDirective,
   CmnColumnComponent,
   DataTableComponent,
@@ -29,6 +34,7 @@ import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashb
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
+// lk-segmented reads `value` as a string; the options are the preset keys.
 const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   {label: '1W', value: '1w'},
   {label: 'MTD', value: 'mtd'},
@@ -49,7 +55,6 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     BarChartComponent,
     ButtonComponent,
     CardComponent,
-    ChipComponent,
     CmnCellDirective,
     CmnColumnComponent,
     DataTableComponent,
@@ -62,6 +67,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DashboardStore],
   template: `
     <cmn-page-container spacing="none">
@@ -94,13 +100,14 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
           </cmn-card>
         } @else {
           <!--
-            One hero for the headline figure and how it moved over the selected range. The range
-            chips drive the chart below, the delta here and the category widgets, so they sit with
-            the figure they change.
+            One hero: the headline figure and how it moved, the chart it comes from, then the range
+            control under the chart (Robinhood/IBKR hero, #825 pick 2). The control stays page-level:
+            it also drives the tiles and category widgets below. Holding the chart scrubs the figure
+            and the delta to that point; release snaps both back.
           -->
           <cmn-card>
             <div class="space-y-cmn-2">
-              <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+              <div class="flex items-center justify-between gap-cmn-2">
                 <a
                   [routerLink]="accountsRoute"
                   class="font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
@@ -109,19 +116,6 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 >
                   Net worth →
                 </a>
-                <div
-                  class="grid w-full grid-cols-4 justify-items-start gap-cmn-1 sm:flex sm:w-auto"
-                  role="group"
-                  aria-label="History range"
-                >
-                  @for (r of ranges; track r.value) {
-                    <cmn-chip
-                      [selected]="store.historyRange() === r.value"
-                      (clicked)="store.setHistoryRange(r.value)"
-                      >{{ r.label }}</cmn-chip
-                    >
-                  }
-                </div>
               </div>
               @if (store.isLoading()) {
                 <cmn-skeleton height="2.25rem" width="50%" />
@@ -142,7 +136,9 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                     @if (store.netWorthChangePercentFormatted()) {
                       ({{ store.netWorthChangePercentFormatted() }})
                     }
-                    <span class="font-normal text-text-secondary">· {{ rangeLabel() }}</span>
+                    <span class="font-normal text-text-secondary"
+                      >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
+                    >
                   </p>
                 }
               }
@@ -160,30 +156,36 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   in 12 months
                 </p>
               }
+              @if (store.historyErrorMessage()) {
+                <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
+              } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
+                <cmn-alert variant="info"
+                  >Net worth history starts after tonight's snapshot.</cmn-alert
+                >
+              } @else {
+                <cmn-area-chart
+                  [series]="store.netWorthAreaSeries()"
+                  [stacked]="true"
+                  [currency]="store.baseCurrency()"
+                  [scrubbable]="true"
+                  (scrub)="store.setScrubIndex($event.index)"
+                  (scrubEnd)="store.setScrubIndex(null)"
+                  label="Net worth by sleeve"
+                />
+                @if (store.netWorthStaleNotice()) {
+                  <div class="mt-cmn-2">
+                    <cmn-alert variant="warning">{{ store.netWorthStaleNotice() }}</cmn-alert>
+                  </div>
+                }
+              }
+              <lk-segmented
+                [options]="rangeOptions"
+                [value]="store.historyRange()"
+                (lk-segmented-change)="onRangeChange($event)"
+                label="History range"
+              />
             </div>
           </cmn-card>
-
-          <div>
-            @if (store.historyErrorMessage()) {
-              <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
-            } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
-              <cmn-alert variant="info"
-                >Net worth history starts after tonight's snapshot.</cmn-alert
-              >
-            } @else {
-              <cmn-area-chart
-                [series]="store.netWorthAreaSeries()"
-                [stacked]="true"
-                [currency]="store.baseCurrency()"
-                label="Net worth by sleeve"
-              />
-              @if (store.netWorthStaleNotice()) {
-                <div class="mt-cmn-2">
-                  <cmn-alert variant="warning">{{ store.netWorthStaleNotice() }}</cmn-alert>
-                </div>
-              }
-            }
-          </div>
 
           <!--
             Computed on read from the same honest monthly flow as the savings rate, with both
@@ -284,7 +286,7 @@ export class DashboardComponent {
   private readonly router = inject(Router);
 
   public readonly store = inject(DashboardStore);
-  public readonly ranges = HISTORY_RANGES;
+  public readonly rangeOptions = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly accountsRoute = AppRoute.AccountsList;
   public readonly showEmptyState = computed(
@@ -332,6 +334,11 @@ export class DashboardComponent {
       return 'text-text-secondary';
     }
     return delta > 0 ? 'text-status-success' : 'text-status-error';
+  }
+
+  public onRangeChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: HistoryRange}>).detail;
+    this.store.setHistoryRange(value);
   }
 
   public goToAccounts(): void {
