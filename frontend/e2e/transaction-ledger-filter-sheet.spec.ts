@@ -200,5 +200,16 @@ test.describe('Transaction ledger — filter sheet', () => {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
+
+    // Sheet content lines up with the padded "Filters" header instead of the panel edge.
+    // Reduced motion keeps the slide-in from skewing the measurements.
+    await page.emulateMedia({reducedMotion: 'reduce'});
+    await page.getByTestId('filter-button').getByRole('button').click();
+    await expect(page.getByRole('heading', {name: 'Filters'})).toBeInViewport();
+    const x = async (locator: ReturnType<typeof page.locator>) =>
+      (await locator.boundingBox())?.x ?? Number.NaN;
+    const header = await x(page.getByRole('heading', {name: 'Filters'}));
+    expect(await x(page.getByTestId('sheet-period-this-month'))).toBeGreaterThanOrEqual(header);
+    expect(await x(page.getByRole('button', {name: 'Show results'}))).toBeGreaterThanOrEqual(header);
   });
 });
