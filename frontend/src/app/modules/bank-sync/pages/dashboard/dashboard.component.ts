@@ -133,7 +133,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 </a>
               </div>
               @if (store.isLoading()) {
-                <cmn-skeleton height="2.25rem" width="50%" />
+                <cmn-skeleton height="1.875rem" width="50%" />
               } @else {
                 <p
                   class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
@@ -141,10 +141,19 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 >
                   {{ store.totalBalanceFormatted() }}
                 </p>
-                @if (store.netWorthChangeFormatted()) {
+              }
+              <!--
+                Both lines under the figure own a fixed-height slot, so the hero keeps one height
+                across every range, while the history loads and while scrubbing: a line that does
+                not apply (or has no number yet) leaves its slot empty instead of collapsing it.
+              -->
+              <div class="h-5 leading-5" data-testid="net-worth-change-slot">
+                @if (store.isLoading() || store.isHistoryLoading()) {
+                  <cmn-skeleton height="1rem" width="40%" />
+                } @else if (store.netWorthChangeFormatted()) {
                   <p
                     [class]="changeClass()"
-                    class="font-label text-cmn-sm font-medium"
+                    class="font-label text-cmn-sm font-medium leading-5"
                     data-testid="net-worth-change"
                   >
                     {{ store.netWorthChangeFormatted() }}
@@ -156,21 +165,28 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                     >
                   </p>
                 }
-              }
+              </div>
               <!--
                 Projected from contributions, never from the net-worth line: most of the book is
                 market-marked, so a trend fitted to that line would forecast the market and call
-                it a savings forecast. Hidden below three complete months by hasProjection().
+                it a savings forecast. Empty below three complete months (hasProjection()).
               -->
-              @if (store.hasProjection()) {
-                <p [title]="store.projectionBasisLabel()" class="text-cmn-xs text-text-secondary">
-                  At this pace:
-                  <span class="font-medium text-text-primary">{{
-                    store.projectedNetWorthFormatted()
-                  }}</span>
-                  in 12 months
-                </p>
-              }
+              <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
+                @if (store.isLoading() || store.isHistoryLoading()) {
+                  <cmn-skeleton height="0.875rem" width="55%" />
+                } @else if (store.hasProjection()) {
+                  <p
+                    [title]="store.projectionBasisLabel()"
+                    class="text-cmn-xs leading-4 text-text-secondary"
+                  >
+                    At this pace:
+                    <span class="font-medium text-text-primary">{{
+                      store.projectedNetWorthFormatted()
+                    }}</span>
+                    in 12 months
+                  </p>
+                }
+              </div>
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
               } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
@@ -238,7 +254,9 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       >{{ tile.label }}</span
                     >
                     @if (store.isLoading()) {
-                      <cmn-skeleton height="1.5rem" width="70%" />
+                      <span class="block h-6 sm:h-[1.5625rem]">
+                        <cmn-skeleton height="100%" width="70%" />
+                      </span>
                     } @else {
                       <span
                         class="block truncate text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
