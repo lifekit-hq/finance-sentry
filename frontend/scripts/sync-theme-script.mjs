@@ -18,7 +18,7 @@ const CSP_FILES = [
 ];
 const BLOCK =
   /(<!-- theme-init:start[^>]*-->\n(?:\s*<!-- prettier-ignore -->\n)?)[\s\S]*?(\n\s*<!-- theme-init:end -->)/;
-const HASH = /'sha256-[A-Za-z0-9+/=]+'(?= https:\/\/accounts\.google\.com\/gsi\/client;)/;
+const HASH = /'sha256-[A-Za-z0-9+/=]+'(?=; style-src)/;
 
 export function expected() {
   const script = readFileSync(join(dist, 'theme-init.js'), 'utf8');

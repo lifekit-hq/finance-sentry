@@ -9,21 +9,21 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Idempotent startup seed for the account the post-deploy live smoke signs in with. With both
-/// <c>Auth:SmokeAccount:Email</c> and <c>Auth:SmokeAccount:Password</c> set:
+/// Idempotent startup seed for the account the post-deploy live smoke signs in as. The smoke reaches it through
+/// the identity provider (a dedicated provider user with the same verified email), never with a password here.
+/// With <c>Auth:SmokeAccount:Email</c> set:
 /// <list type="number">
-/// <item>Creates the account, marked with <see cref="MarkerClaim"/>, as a <see cref="AuthRoles.Member"/>.</item>
-/// <item>On later runs converges a marked account's password to the configured one, so rotating the secret
-/// needs only a redeploy.</item>
+/// <item>Creates the account with no password, marked with <see cref="MarkerClaim"/>, as a <see cref="AuthRoles.Member"/>;
+/// the first provider sign-in links it by verified email (<c>ExternalLoginCommand</c>).</item>
+/// <item>On later runs removes any password a marked account still carries, so it is not a password sign-in target.</item>
 /// </list>
 /// An existing account without the marker is never touched, so the setting cannot take over a real person's
 /// account, and a revoked smoke account stays revoked. <see cref="RoleSeeder"/> never makes a marked account
-/// the owner. With either setting empty the seed does nothing.
+/// the owner. With the email empty the seed does nothing.
 /// </summary>
 public static class SmokeAccountSeeder
 {
     public const string EmailConfigKey = "Auth:SmokeAccount:Email";
-    public const string PasswordConfigKey = "Auth:SmokeAccount:Password";
 
     /// <summary>User claim marking the one account this seed created and may manage.</summary>
     public static readonly Claim MarkerClaim = new("seeded-account", "smoke");
@@ -35,17 +35,12 @@ public static class SmokeAccountSeeder
     public static async Task<Guid?> SeedAsync(UserManager<ApplicationUser> users, IConfiguration config, ILogger logger)
     {
         var email = config[EmailConfigKey]?.Trim();
-        var password = config[PasswordConfigKey];
-        if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
-        {
-            if (!string.IsNullOrEmpty(email) || !string.IsNullOrEmpty(password))
-                logger.LogWarning("Only one of the smoke account email and password settings is set; the smoke account was not seeded.");
+        if (string.IsNullOrEmpty(email))
             return null;
-        }
 
         var user = await users.FindByEmailAsync(email);
         if (user is null)
-            return await CreateAsync(users, email, password, logger);
+            return await CreateAsync(users, email, logger);
 
         if (!await IsMarkedAsync(users, user))
         {
@@ -59,12 +54,10 @@ public static class SmokeAccountSeeder
             return null;
         }
 
-        if (!await users.CheckPasswordAsync(user, password))
+        if (await users.HasPasswordAsync(user))
         {
-            if (await users.HasPasswordAsync(user))
-                EnsureSucceeded(await users.RemovePasswordAsync(user), "clear the smoke account password");
-            EnsureSucceeded(await users.AddPasswordAsync(user, password), "set the smoke account password");
-            logger.LogInformation("Updated the smoke account {UserId} password from configuration.", user.Id);
+            EnsureSucceeded(await users.RemovePasswordAsync(user), "remove the smoke account password");
+            logger.LogInformation("Removed the password from the smoke account {UserId}; it signs in through the identity provider.", user.Id);
         }
 
         return Guid.Parse(user.Id);
@@ -74,7 +67,7 @@ public static class SmokeAccountSeeder
         (await users.GetClaimsAsync(user)).Any(c => c.Type == MarkerClaim.Type && c.Value == MarkerClaim.Value);
 
     private static async Task<Guid> CreateAsync(
-        UserManager<ApplicationUser> users, string email, string password, ILogger logger)
+        UserManager<ApplicationUser> users, string email, ILogger logger)
     {
         var user = new ApplicationUser
         {
@@ -84,7 +77,7 @@ public static class SmokeAccountSeeder
             FirstName = "Smoke",
             LastName = "Test",
         };
-        EnsureSucceeded(await users.CreateAsync(user, password), "create the smoke account");
+        EnsureSucceeded(await users.CreateAsync(user), "create the smoke account");
         EnsureSucceeded(await users.AddClaimAsync(user, MarkerClaim), "mark the smoke account");
         EnsureSucceeded(await users.AddToRoleAsync(user, AuthRoles.Member), "make the smoke account a Member");
         logger.LogInformation("Created the smoke account {UserId}.", user.Id);

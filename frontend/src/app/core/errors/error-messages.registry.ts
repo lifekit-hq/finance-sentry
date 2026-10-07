@@ -1,7 +1,7 @@
 import {type ErrorMessagesMap} from '@lifekit-hq/core';
 
 export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
-  GOOGLE_ACCOUNT_ONLY: "This account uses Google sign-in. Click 'Continue with Google' instead.",
+  EXTERNAL_ACCOUNT_ONLY: 'This account signs in through single sign-on and has no password.',
   DUPLICATE_EMAIL: 'This email already belongs to an account.',
   INVALID_INVITE: 'This invite link is invalid or has expired. Ask the owner for a new one.',
   SIGN_IN_METHOD_DISABLED: 'This sign-in method is not available.',

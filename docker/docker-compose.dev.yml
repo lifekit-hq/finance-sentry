@@ -67,7 +67,6 @@ services:
       Jwt__Secret: ${JWT_SECRET:-your-secret-key-change-in-production}
       Jwt__Issuer: "https://finance-sentry.local"
       Deduplication__MasterKeyBase64: dGVzdC1kZWR1cGxpY2F0aW9uLWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbg==
-      GOOGLEOAUTH__CLIENTID: "${GOOGLE_CLIENT_ID:-}"
       # Org identity provider (Logto) sign-in. Off unless all of authority, client id, secret and the
       # app's public URL are set. The client secret belongs in docker/.env.sops, never in clear.
       Auth__Oidc__Authority: ${AUTH_OIDC_AUTHORITY:-}

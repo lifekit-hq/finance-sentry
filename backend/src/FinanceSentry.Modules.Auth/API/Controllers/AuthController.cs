@@ -28,7 +28,6 @@ public class AuthController(
     ICommandHandler<LoginCommand, AuthResult> loginHandler,
     ICommandHandler<AcceptInviteCommand, AuthResult> acceptInviteHandler,
     ICommandHandler<RefreshCommand, AuthResult> refreshHandler,
-    ICommandHandler<VerifyGoogleCredentialCommand, AuthResult> googleVerifyHandler,
     ICommandHandler<ExternalLoginCommand, AuthResult> externalLoginHandler,
     ICommandHandler<LogoutCommand, Unit> logoutHandler,
     ICommandHandler<AuthorizeMcpCommand, AuthorizeMcpResult> authorizeMcpHandler,
@@ -72,8 +71,7 @@ public class AuthController(
     [HttpGet("methods")]
     public IActionResult Methods() => Ok(new SignInMethodsResponse(
         Oidc: oidcOptions.Value.IsConfigured,
-        PasswordLogin: signInOptions.Value.PasswordLogin.Enabled,
-        GoogleDirect: signInOptions.Value.GoogleDirect.Enabled));
+        PasswordLogin: signInOptions.Value.PasswordLogin.Enabled));
 
     // Sends the browser to the org identity provider. The provider returns to the OIDC handler's callback
     // (OidcLoginOptions.CallbackPath), which signs into Identity's external cookie and lands on OidcCallback.
@@ -179,16 +177,6 @@ public class AuthController(
             DeleteRefreshTokenCookie();
             throw;
         }
-    }
-
-    [AllowAnonymous]
-    [HttpPost("google/verify")]
-    public async Task<IActionResult> GoogleVerify([FromBody] VerifyGoogleCredentialRequest request)
-    {
-        var result = await googleVerifyHandler.Handle(new VerifyGoogleCredentialCommand(request.Credential), HttpContext.RequestAborted);
-        SetRefreshTokenCookie(result.RawRefreshToken);
-        SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
-        return Ok(result.Response);
     }
 
     [AllowAnonymous]

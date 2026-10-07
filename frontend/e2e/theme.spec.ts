@@ -41,7 +41,7 @@ function json(body: unknown, status = 200) {
 async function stubGuestApi(page: Page): Promise<void> {
   await page.route(`${API}/**`, route => route.fulfill(json({}, 401)));
   await page.route(`${API}/auth/methods`, route =>
-    route.fulfill(json({oidc: false, passwordLogin: true, googleDirect: false}))
+    route.fulfill(json({oidc: false, passwordLogin: true}))
   );
 }
 

@@ -3,7 +3,9 @@ import {defineConfig, devices} from '@playwright/test';
 // Live smoke suite: runs against a REAL deployed stack (no route mocks, real login,
 // production database) — strictly read-only specs. The gateway on the VPS is
 // loopback-bound, so this is runnable from the VPS itself (deploy runner, devclaw)
-// or through an ssh tunnel; override the target with E2E_LIVE_BASE_URL.
+// or through an ssh tunnel. Sign-in goes through Logto and returns to the app's public origin, so set
+// E2E_LIVE_BASE_URL to that origin (the deploy workflow passes FRONTEND_BASE_URL); the default only
+// serves the health check.
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8080';
 
 export default defineConfig({

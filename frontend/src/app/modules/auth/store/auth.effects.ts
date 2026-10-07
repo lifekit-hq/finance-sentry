@@ -1,5 +1,5 @@
 import {DOCUMENT} from '@angular/common';
-import {effect, inject, type Signal, untracked} from '@angular/core';
+import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
@@ -10,7 +10,7 @@ import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {ErrorUtils} from '../../../shared/utils/error.utils';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
-import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
+import {FALLBACK_SIGN_IN_METHODS, SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
 import {
   type AcceptInviteRequest,
   type AuthRequest,
@@ -36,24 +36,30 @@ interface EffectsStore {
 
 interface HookStore extends EffectsStore {
   firstName: Signal<Nullable<string>>;
+  signInMethods: Signal<Nullable<SignInMethods>>;
+  flashMessage: Signal<Nullable<FlashMessage>>;
+  startOidcSignIn: () => void;
   loadProfileName: () => void;
   loadSignInMethods: () => void;
 }
+
+const UNKNOWN_FAILURE_TEXT = 'Sign-in failed. Please try again.';
 
 function flashFromParams(
   info: Nullable<string>,
   error: Nullable<string>,
   resolveCode: (code: string) => string | null
 ): Nullable<FlashMessage> {
-  if (info === 'google_cancelled') {
-    return {kind: 'info', text: 'Google sign-in was cancelled. Try again or use email/password.'};
+  if (info === SIGNED_OUT_INFO) {
+    return {kind: 'info', text: 'You have been signed out.'};
   }
-  if (error === 'google_failed') {
-    return {kind: 'error', text: 'Google sign-in failed. Please try again.'};
-  }
-  // The OIDC callback bounces here with the API's error code (ACCOUNT_NOT_INVITED, ...).
-  const text = error === null ? null : resolveCode(error);
-  return text === null ? null : {kind: 'error', text};
+  // The OIDC callback bounces here with the API's error code (ACCOUNT_NOT_INVITED, ...). Any code is a message:
+  // an unregistered one must still hold the OIDC-only forward, or a failing sign-in would loop.
+  return error === null ? null : {kind: 'error', text: resolveCode(error) ?? UNKNOWN_FAILURE_TEXT};
+}
+
+function pathOf(url: string): string {
+  return url.split('?')[0];
 }
 
 export function authEffects(store: EffectsStore) {
@@ -86,20 +92,6 @@ export function authEffects(store: EffectsStore) {
             tap(res => store.applyAuthResponse(res)),
             catchError((err: unknown) => {
               store.setError(ErrorUtils.extractCode(err), 'acceptInvite');
-              return EMPTY;
-            })
-          )
-        )
-      )
-    ),
-    verifyGoogleCredential: rxMethod<string>(
-      pipe(
-        tap(() => store.setLoading('google')),
-        switchMap(credential =>
-          authService.verifyGoogleCredential(credential).pipe(
-            tap(res => store.applyAuthResponse(res)),
-            catchError((err: unknown) => {
-              store.setError(ErrorUtils.extractCode(err), 'google');
               return EMPTY;
             })
           )
@@ -140,16 +132,19 @@ export function authEffects(store: EffectsStore) {
       }
       authService.logout().subscribe({error: () => undefined});
       store.clearSession();
-      void router.navigate([AppRoute.Login]);
+      void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
     },
   };
 }
 
 export function authHooks(store: HookStore): void {
+  const loginRoute: string = AppRoute.Login;
   const router = inject(Router);
   const errorMessages = inject(ErrorMessageService);
 
   store.loadSignInMethods();
+
+  const routePath = signal(pathOf(router.url));
 
   router.events
     .pipe(
@@ -158,6 +153,7 @@ export function authHooks(store: HookStore): void {
     )
     .subscribe(() => {
       const params = router.routerState.root.snapshot.queryParamMap;
+      routePath.set(pathOf(router.url));
       store.setReturnUrl(params.get('returnUrl'));
       store.setFlashMessage(
         flashFromParams(params.get('info'), params.get('error'), code =>
@@ -165,6 +161,21 @@ export function authHooks(store: HookStore): void {
         )
       );
     });
+
+  // OIDC is the only way in: /login has no form, so it forwards straight to the identity provider. A message
+  // on the page (a failed return, a sign-out) holds the forward so the person reads it and retries by hand.
+  effect(() => {
+    const methods = store.signInMethods();
+    const onLogin = routePath() === loginRoute;
+    if (!onLogin || !methods?.oidc || methods.passwordLogin || store.flashMessage() !== null) {
+      return;
+    }
+    untracked(() => {
+      if (!store.isAuthenticated()) {
+        store.startOidcSignIn();
+      }
+    });
+  });
 
   effect(() => {
     if (!store.isAuthenticated()) {
@@ -175,10 +186,9 @@ export function authHooks(store: HookStore): void {
         store.loadProfileName();
       }
       const target = store.returnUrl() ?? AppRoute.Accounts;
-      const currentPath = router.url.split('?')[0];
-      const loginPath: string = AppRoute.Login;
+      const currentPath = pathOf(router.url);
       const acceptInvitePath: string = AppRoute.AcceptInvite;
-      if (currentPath === loginPath || currentPath === acceptInvitePath) {
+      if (currentPath === loginRoute || currentPath === acceptInvitePath) {
         void router.navigateByUrl(target);
       }
     });

@@ -44,7 +44,6 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         "GET /api/v1/auth/methods",
         "GET /api/v1/auth/oidc/callback",
         "GET /api/v1/auth/oidc/start",
-        "POST /api/v1/auth/google/verify",
         "POST /api/v1/auth/invite/accept",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/logout",

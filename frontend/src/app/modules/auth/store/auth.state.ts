@@ -1,6 +1,6 @@
 import {type SignInMethods} from '../models/auth/auth.model';
 
-export type AuthFlow = 'login' | 'acceptInvite' | 'google' | null;
+export type AuthFlow = 'login' | 'acceptInvite' | null;
 
 export interface FlashMessage {
   kind: 'info' | 'error';

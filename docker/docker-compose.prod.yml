@@ -75,7 +75,6 @@ services:
       Encryption__Keys__1: ${ENCRYPTION_KEY_V1:-}
       Encryption__Keys__2: ${ENCRYPTION_KEY_V2:-}
       Encryption__CurrentKeyVersion: ${ENCRYPTION_CURRENT_KEY_VERSION:-2}
-      GOOGLEOAUTH__CLIENTID: ${GOOGLE_CLIENT_ID:-}
       # TrueLayer (Open Banking EU/UK). Production URLs — creds in .env are the
       # live console.truelayer.com set, not sandbox. Override with
       # TRUELAYER_AUTH_BASE_URL=https://auth.truelayer-sandbox.com to force
@@ -130,11 +129,13 @@ services:
       # Account granted the Owner role at startup (Hangfire dashboard, owner-only features). Empty =
       # promote the sole registered user while nobody holds the role. Not a secret. See the runbook §4.
       Auth__OwnerEmail: ${AUTH_OWNER_EMAIL:-}
-      # Account the post-deploy live smoke signs in with: seeded at startup as a Member with fake data,
-      # never the owner. Empty = no seed. The deploy workflow passes both from GitHub Actions secrets
-      # (E2E_LIVE_EMAIL / E2E_LIVE_PASSWORD), not from docker/.env.sops. See the runbook §4.
+      # Password sign-in (login and invite acceptance) is fixed off in production: Logto is the only way in. The code
+      # default is on, so this literal must stay; there is deliberately no env override.
+      Auth__PasswordLogin__Enabled: "false"
+      # Account the post-deploy live smoke signs in as, through Logto: seeded at startup as a passwordless Member
+      # with fake data, never the owner. It must carry the email of the dedicated Logto smoke user. Empty = no seed.
+      # The deploy workflow passes it from the E2E_LIVE_LOGTO_EMAIL GitHub Actions secret, not docker/.env.sops.
       Auth__SmokeAccount__Email: ${SMOKE_ACCOUNT_EMAIL:-}
-      Auth__SmokeAccount__Password: ${SMOKE_ACCOUNT_PASSWORD:-}
       # Org identity provider (Logto) sign-in. Off unless all of authority, client id, secret and the
       # app's public URL are set. The client secret belongs in docker/.env.sops, never in clear.
       Auth__Oidc__Authority: ${AUTH_OIDC_AUTHORITY:-}
@@ -145,9 +146,6 @@ services:
       # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
-      # Direct Google sign-in button on the login page. Off by default in production (the org provider offers
-      # Google); set AUTH_GOOGLE_DIRECT_ENABLED=true to turn it back on.
-      Auth__GoogleDirect__Enabled: ${AUTH_GOOGLE_DIRECT_ENABLED:-false}
       # Inzhur sign-in runs in the inzhur-browser sidecar (owner-initiated only; the daily sync never opens it).
       Inzhur__BrowserUrl: http://inzhur-browser:9222
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).

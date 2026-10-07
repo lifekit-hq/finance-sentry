@@ -14,7 +14,7 @@ public class ChangePasswordCommandHandler(UserManager<ApplicationUser> userManag
             ?? throw new UserNotFoundException();
 
         if (user.PasswordHash is null)
-            throw new GoogleAccountOnlyException();
+            throw new ExternalAccountOnlyException();
 
         var result = await userManager.ChangePasswordAsync(user, command.CurrentPassword, command.NewPassword);
         if (!result.Succeeded)

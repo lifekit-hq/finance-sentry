@@ -162,7 +162,6 @@ public sealed class AnalyticsQueryOwnerScopeTests : IAsyncLifetime
             builder.UseSetting("Jwt:Secret",
                 "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
             builder.UseSetting("Jwt:ExpiryMinutes", "60");
-            builder.UseSetting("GoogleOAuth:ClientId", "test-client-id");
         }
     }
 }
