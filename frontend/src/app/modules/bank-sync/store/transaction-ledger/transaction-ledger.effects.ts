@@ -65,7 +65,7 @@ interface EffectsStore {
   ) => void;
   nextPage: () => void;
   setError: (errorCode: Nullable<string>) => void;
-  setMonthlyOutflowUsd: (value: number | null) => void;
+  setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
 }
 
 /** Maps the filters onto `GET accounts/transactions`; inactive dimensions are left out. */
@@ -145,7 +145,8 @@ export function transactionLedgerEffects(store: EffectsStore) {
           }).pipe(
             tap(({dashboard$, accounts$}) => {
               store.setMonthlyOutflowUsd(
-                dashboard$ ? sumCurrentMonthOutflow(dashboard$.monthlyFlow) : null
+                dashboard$ ? sumCurrentMonthOutflow(dashboard$.monthlyFlow) : null,
+                dashboard$?.baseCurrency
               );
               store.setAccounts(TransactionGroupUtils.toAccountOptions(accounts$?.accounts ?? []));
             })

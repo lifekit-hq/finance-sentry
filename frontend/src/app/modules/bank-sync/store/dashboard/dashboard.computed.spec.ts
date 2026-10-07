@@ -34,10 +34,11 @@ interface Fixture {
   windowFlow?: MonthlyFlow[];
   totalNetWorthUsd?: number;
   netWorthHistory?: NetWorthSnapshotDto[];
+  baseCurrency?: string;
 }
 
 function build(
-  {monthlyFlow, windowFlow, totalNetWorthUsd = 0, netWorthHistory = []}: Fixture,
+  {monthlyFlow, windowFlow, totalNetWorthUsd = 0, netWorthHistory = [], baseCurrency}: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
   const data: DashboardData = {
@@ -49,6 +50,7 @@ function build(
     windowFlow,
     topCategories: [],
     lastSyncTimestamp: null,
+    baseCurrency,
   } as unknown as DashboardData;
 
   return {
@@ -111,6 +113,46 @@ function steadyHistory(augustInflow: number, augustOutflow: number): MonthlyFlow
 }
 
 describe('dashboardComputed', () => {
+  describe('base currency (#851)', () => {
+    const euroFixture: Fixture = {
+      monthlyFlow: [flow('2026-08', 3000, 3100)],
+      totalNetWorthUsd: 1000,
+      baseCurrency: 'EUR',
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideApiBaseUrl('http://localhost/api/v1'),
+        ],
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('formats the headline and hero totals in the base currency the API names', () => {
+      const c = projectionFor(euroFixture);
+
+      expect(c.windowSpendingFormatted()).toBe('€3,100.00');
+      expect(c.windowInflowFormatted()).toBe('€3,000.00');
+      expect(c.totalBalanceFormatted()).toBe('€1,000.00');
+      expect(c.baseCurrency()).toBe('EUR');
+    });
+
+    it('stays in dollars when the API names no base currency', () => {
+      const c = projectionFor({...euroFixture, baseCurrency: undefined});
+
+      expect(c.windowSpendingFormatted()).toBe('$3,100.00');
+      expect(c.baseCurrency()).toBe('USD');
+    });
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);

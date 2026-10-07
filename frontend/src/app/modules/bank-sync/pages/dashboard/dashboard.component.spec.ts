@@ -18,13 +18,14 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
  * The page reads dozens of store signals; only the ones that matter here are real, every other
  * property is an empty-list signal, which the chart inputs accept and the text bindings render blank.
  */
-function fakeStore(range: HistoryRange) {
+function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCategories: []}) {
   const historyRange = signal<HistoryRange>(range);
   const setHistoryRange = vi.fn((next: HistoryRange) => historyRange.set(next));
   const real: Record<string, unknown> = {
     historyRange,
     setHistoryRange,
-    data: signal({accountCount: 1, topCategories: []}),
+    data: signal(data),
+    baseCurrency: signal('EUR'),
     isLoading: signal(false),
     isHistoryLoading: signal(false),
     hasCashFlow: signal(false),
@@ -41,8 +42,8 @@ function fakeStore(range: HistoryRange) {
   });
 }
 
-function render(range: HistoryRange = '3m') {
-  const store = fakeStore(range);
+function render(range: HistoryRange = '3m', data?: unknown) {
+  const store = fakeStore(range, data);
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -146,5 +147,19 @@ describe('DashboardComponent range presets', () => {
     expect(navigate).toHaveBeenCalledWith([AppRoute.FlowBreakdown], {
       queryParams: {to: '2026-08-12', months: 120},
     });
+  });
+});
+
+describe('DashboardComponent base currency (#851)', () => {
+  it('shows category totals in the base currency the store names, not dollars', () => {
+    const {fixture, el} = render('3m', {
+      accountCount: 1,
+      baseCurrency: 'EUR',
+      topCategories: [{category: 'GROCERIES', totalSpend: 3100, percentOfTotal: 100}],
+    });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('€3,100.00');
+    expect(el.textContent).not.toContain('$3,100.00');
   });
 });

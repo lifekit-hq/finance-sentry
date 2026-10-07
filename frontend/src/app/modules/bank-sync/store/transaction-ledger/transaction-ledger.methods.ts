@@ -1,5 +1,6 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {EMPTY_TRANSACTION_FILTERS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
 import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {
@@ -42,8 +43,8 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         errorCode: null,
       }));
     },
-    setMonthlyOutflowUsd(value: number | null): void {
-      patchState(store, {monthlyOutflowUsd: value});
+    setMonthlyOutflowUsd(value: number | null, currency: string = DEFAULT_BASE_CURRENCY): void {
+      patchState(store, {monthlyOutflowUsd: value, monthlyOutflowCurrency: currency});
     },
     /** Any filter change restarts paging from the first page. */
     setFilters(patch: Partial<TransactionFilters>): void {

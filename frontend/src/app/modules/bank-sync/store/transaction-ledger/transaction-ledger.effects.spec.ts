@@ -221,10 +221,24 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900);
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined);
       expect(store.setAccounts).toHaveBeenCalledWith([
         {accountId: 'acc-1', label: 'Test Bank · 1234'},
       ]);
+    });
+
+    it('passes the dashboard base currency along with the outflow (#851)', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getDashboardData.mockReturnValue(
+        of({...buildDashboardData(2900), baseCurrency: 'EUR'})
+      );
+      service.getAccounts.mockReturnValue(of(ACCOUNTS));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
+
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, 'EUR');
     });
 
     it('sums only the current-month outflowUsd and ignores past-month rows', () => {
@@ -237,7 +251,7 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900); // not 5 900
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(2900, undefined); // not 5 900
     });
 
     it('degrades to null outflow and no accounts when both reads fail', () => {
@@ -249,7 +263,7 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(null);
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(null, undefined);
       expect(store.setAccounts).toHaveBeenCalledWith([]);
       expect(store.setError).not.toHaveBeenCalled();
     });
@@ -263,7 +277,7 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadSummary());
 
-      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(0);
+      expect(store.setMonthlyOutflowUsd).toHaveBeenCalledWith(0, undefined);
     });
   });
 

@@ -125,4 +125,22 @@ public sealed class CurrencyConverterTests : IDisposable
         CurrencyConverter.ToUsd(10m, "EUR").Should().Be(10.8m);
         CurrencyConverter.ToUsd(10m, "GBP").Should().Be(12.7m);
     }
+
+    [Fact]
+    public void FromUsd_InvertsToUsd()
+    {
+        CurrencyConverter.FromUsd(CurrencyConverter.ToUsd(100m, "EUR"), "EUR").Should().Be(100m);
+        CurrencyConverter.FromUsd(5m, "USD").Should().Be(5m);
+        CurrencyConverter.FromUsd(5m, "XXX").Should().Be(5m);
+    }
+
+    [Theory]
+    [InlineData("eur", "EUR")]
+    [InlineData("USD", "USD")]
+    [InlineData("BTC", "USD")]
+    [InlineData(null, "USD")]
+    public void ResolveBase_FallsBackToUsd_WhenThereIsNoRate(string? profile, string expected)
+    {
+        CurrencyConverter.ResolveBase(profile).Should().Be(expected);
+    }
 }

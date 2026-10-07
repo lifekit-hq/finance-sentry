@@ -175,8 +175,8 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <cmn-area-chart
                 [series]="store.netWorthAreaSeries()"
                 [stacked]="true"
+                [currency]="store.baseCurrency()"
                 label="Net worth by sleeve"
-                currency="USD"
               />
               @if (store.netWorthStaleNotice()) {
                 <div class="mt-cmn-2">
@@ -239,8 +239,8 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
             <div>
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
+                [currency]="store.baseCurrency()"
                 label="Income vs Spending (complete months)"
-                currency="USD"
               />
             </div>
           }
@@ -250,7 +250,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <cmn-donut-chart
                 [segments]="store.categoryChartData()"
                 [label]="topCategoriesLabel()"
-                currency="USD"
+                [currency]="store.baseCurrency()"
               />
             </div>
             <div class="lg:col-span-2">
@@ -264,7 +264,9 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
                 </cmn-column>
                 <cmn-column key="spend" header="Total Spend" align="right">
-                  <ng-template let-row cmnCell>{{ row.totalSpend | money }}</ng-template>
+                  <ng-template let-row cmnCell>{{
+                    row.totalSpend | money: store.baseCurrency()
+                  }}</ng-template>
                 </cmn-column>
                 <cmn-column key="pct" header="% of Total" align="right">
                   <ng-template let-row cmnCell

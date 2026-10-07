@@ -4,7 +4,10 @@
       <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Transactions</h1>
       <p class="mt-cmn-1 text-cmn-sm text-text-secondary" data-testid="ledger-summary">
         @if (store.monthlyOutflow() !== null) {
-          <span>{{ store.monthlyOutflow() | money }} out this month</span>
+          <span
+            >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this
+            month</span
+          >
           <span aria-hidden="true"> · </span>
         }
         @if (store.topCategory(); as top) {
