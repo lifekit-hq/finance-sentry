@@ -81,6 +81,7 @@ describe('InvestmentsComponent — positions view', () => {
           pnlPercent: 25.3,
           pnlUsd: 20.2,
           isVenueCash: false,
+          assetClass: 'equity',
         },
         {
           symbol: 'SOL',
@@ -92,6 +93,7 @@ describe('InvestmentsComponent — positions view', () => {
           pnlPercent: null,
           pnlUsd: null,
           isVenueCash: false,
+          assetClass: 'crypto',
         },
       ]),
       positionsByAssetClass: signal<PositionAssetGroup[]>([EQUITY_GROUP, CRYPTO_GROUP]),
@@ -259,6 +261,28 @@ describe('InvestmentsComponent — positions view', () => {
     expect(link?.getAttribute('href')).toBe('/accounts/investments');
     link?.addEventListener('click', e => e.preventDefault());
     link?.click();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('renders no dossier link for a cash row', () => {
+    mockStore.positionsByAssetClass.set([
+      {
+        assetClass: 'cash',
+        label: 'Cash',
+        totalValue: 300,
+        rows: [
+          {...EQUITY_GROUP.rows[0], symbol: 'USD Cash', currentPrice: null, dayChangePct: null},
+        ],
+      },
+    ]);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('USD Cash');
+    root.querySelector<HTMLElement>('[data-testid="list-row"], tbody tr')?.click();
+
     expect(navigate).not.toHaveBeenCalled();
   });
 });

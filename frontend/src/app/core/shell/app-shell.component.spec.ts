@@ -44,7 +44,7 @@ describe('AppShellComponent FAB clearance', () => {
           useValue: {
             load: () =>
               of({
-                holdings: [{symbol: 'AAPL', isVenueCash: false}],
+                holdings: [{symbol: 'AAPL', assetClass: 'equity'}],
                 watchlist: [{ticker: 'NVDA'}],
                 accounts: [{accountId: 'a1', bankName: 'Monobank', accountNumberLast4: '1234'}],
               }),
