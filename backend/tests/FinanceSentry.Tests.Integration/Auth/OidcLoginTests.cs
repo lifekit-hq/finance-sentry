@@ -256,6 +256,40 @@ public class OidcLogoutTests(OidcApiFactory factory) : IClassFixture<OidcApiFact
     }
 
     [Fact]
+    public async Task Refresh_KeepsTheIdTokenCookieAliveAsLongAsTheSession()
+    {
+        await factory.CreatePendingInviteAsync("oidc-refresh@test.com");
+        var callback = await factory.ExternalClient(
+                factory.ExternalCookie("lk-sub-refresh", "oidc-refresh@test.com", idToken: "the.id.token"))
+            .GetAsync("/api/v1/auth/oidc/callback");
+        var refreshToken = AuthApiFactory.CookieValue(callback, "fs_refresh_token");
+
+        var response = await factory
+            .CookieClient(("fs_refresh_token", refreshToken), ("fs_oidc_id_token", "the.id.token"))
+            .PostAsync("/api/v1/auth/refresh", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        AuthApiFactory.CookieValue(response, "fs_oidc_id_token").Should().Be("the.id.token");
+    }
+
+    [Fact]
+    public async Task Refresh_WithoutAnIdTokenCookie_DoesNotInventOne()
+    {
+        await factory.CreatePendingInviteAsync("oidc-refresh-none@test.com");
+        var callback = await factory.ExternalClient(
+                factory.ExternalCookie("lk-sub-refresh-none", "oidc-refresh-none@test.com"))
+            .GetAsync("/api/v1/auth/oidc/callback");
+        var refreshToken = AuthApiFactory.CookieValue(callback, "fs_refresh_token");
+
+        var response = await factory.CookieClient(("fs_refresh_token", refreshToken))
+            .PostAsync("/api/v1/auth/refresh", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.GetValues("Set-Cookie").Should()
+            .NotContain(c => c.StartsWith("fs_oidc_id_token=", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Logout_WithoutAnIdToken_JustClearsTheSession()
     {
         var response = await factory.CookieClient().PostAsync("/api/v1/auth/logout", null);

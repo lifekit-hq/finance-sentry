@@ -118,8 +118,7 @@ public class AuthController(
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
             if (external.Properties?.GetTokenValue(OpenIdConnectParameterNames.IdToken) is { Length: > 0 } idToken)
-                AuthCookies.Write(Response, AuthCookies.OidcIdToken, idToken,
-                    DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
+                SetOidcIdTokenCookie(idToken);
         }
         catch (ApiException ex)
         {
@@ -174,6 +173,8 @@ public class AuthController(
             var result = await refreshHandler.Handle(new RefreshCommand(rawToken), HttpContext.RequestAborted);
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
+            if (AuthCookies.Read(Request.Cookies, AuthCookies.OidcIdToken, SecureCookies) is { Length: > 0 } idToken)
+                SetOidcIdTokenCookie(idToken);
             return Ok(result.Response);
         }
         catch (InvalidRefreshTokenException)
@@ -277,6 +278,10 @@ public class AuthController(
 
     private void SetRefreshTokenCookie(string rawToken) =>
         AuthCookies.Write(Response, AuthCookies.RefreshToken, rawToken,
+            DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
+
+    private void SetOidcIdTokenCookie(string idToken) =>
+        AuthCookies.Write(Response, AuthCookies.OidcIdToken, idToken,
             DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
 
     private void SetAccessTokenCookie(string rawToken, DateTime expiresAt) =>
