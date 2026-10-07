@@ -9,6 +9,7 @@ import {
   ChipComponent,
   CmnTab,
   EmptyStateComponent,
+  PageContainerComponent,
   PageHeaderComponent,
   SkeletonComponent,
   TabGroupComponent,
@@ -43,6 +44,7 @@ const SKELETON_ROWS = 4;
 @Component({
   selector: 'fns-events',
   imports: [
+    PageContainerComponent,
     AlertComponent,
     AsyncStateComponent,
     ButtonComponent,

@@ -7,6 +7,7 @@ import {
   ChipComponent,
   EmptyStateComponent,
   type LucideIconName,
+  PageContainerComponent,
   PageHeaderComponent,
   ToastService,
 } from '@lifekit-hq/ui';
@@ -38,6 +39,7 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
 @Component({
   selector: 'fns-alerts',
   imports: [
+    PageContainerComponent,
     AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,

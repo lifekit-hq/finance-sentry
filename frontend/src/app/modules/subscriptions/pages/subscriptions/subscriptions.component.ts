@@ -13,6 +13,7 @@ import {
   ListItemRowComponent,
   MenuComponent,
   type MenuItem,
+  PageContainerComponent,
   PageHeaderComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
@@ -64,6 +65,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
 @Component({
   selector: 'fns-subscriptions',
   imports: [
+    PageContainerComponent,
     ButtonComponent,
     CardComponent,
     AlertComponent,

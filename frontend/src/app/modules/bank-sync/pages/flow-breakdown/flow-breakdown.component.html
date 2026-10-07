@@ -1,280 +1,286 @@
-<div class="page-container flex flex-col">
-  <div class="mb-cmn-6 flex flex-wrap items-end justify-between gap-cmn-4">
-    <div>
-      @if (store.range(); as range) {
-        <h1 class="font-headline text-cmn-xl font-bold text-text-primary">Window breakdown</h1>
-        <p class="mt-cmn-1 text-cmn-sm text-text-secondary" data-testid="breakdown-window">
-          Every transaction
-          @if (range.from) {
-            from {{ range.from | date: 'mediumDate' }} to {{ range.to | date: 'mediumDate' }}
-          } @else {
-            up to {{ range.to | date: 'mediumDate' }}
-          }
-          and the bucket the savings math put it in
-        </p>
-      } @else {
-        <h1 class="font-headline text-cmn-xl font-bold text-text-primary">Month breakdown</h1>
-        <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-          Every transaction of the month and the bucket the savings math put it in
-        </p>
-      }
-    </div>
-    @if (!store.range()) {
-      <cmn-month-stepper
-        [value]="monthDate()"
-        [max]="currentMonth"
-        (valueChange)="onMonthChange($event)"
-      />
-    }
-  </div>
-
-  <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
-    <a
-      [routerLink]="transactionsRoute"
-      [queryParams]="cardParams('credit')"
-      class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-      data-testid="breakdown-income-link"
-      aria-label="View the income transactions"
-    >
-      <cmn-stat-card
-        [value]="store.incomeFormatted()"
-        [loading]="store.isLoading()"
-        label="Income"
-        icon="TrendingUp"
-      />
-    </a>
-    <a
-      [routerLink]="transactionsRoute"
-      [queryParams]="cardParams('debit')"
-      class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-      data-testid="breakdown-spending-link"
-      aria-label="View the spending transactions"
-    >
-      <cmn-stat-card
-        [value]="store.spendingFormatted()"
-        [loading]="store.isLoading()"
-        label="Spending"
-        icon="TrendingDown"
-      />
-    </a>
-    <cmn-stat-card
-      [value]="store.investedFormatted()"
-      [loading]="store.isLoading()"
-      label="Invested"
-      icon="ChartLine"
-    />
-    <cmn-stat-card
-      [value]="store.savedFormatted()"
-      [loading]="store.isLoading()"
-      label="Saved"
-      icon="PiggyBank"
-    />
-  </div>
-
-  @if (store.accountChips().length > 1) {
-    <div class="mb-cmn-6 flex flex-wrap items-center gap-cmn-2">
-      <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >Account</span
-      >
-      @for (chip of store.accountChips(); track chip.accountId) {
-        <cmn-chip
-          [selected]="store.accountFilter() === chip.accountId"
-          (clicked)="toggleAccount(chip.accountId)"
-        >
-          {{ chip.label }}
-        </cmn-chip>
-      }
-    </div>
-  }
-
-  @if (store.errorMessage()) {
-    <cmn-alert variant="error" class="mb-cmn-6 block">
-      {{ store.errorMessage() }}
-    </cmn-alert>
-  }
-
-  @if (store.isLoading()) {
-    <cmn-card>
-      <div class="space-y-cmn-3 p-cmn-4">
-        @for (_ of skeletonRows; track $index) {
-          <div class="flex gap-cmn-4">
-            <cmn-skeleton height="1rem" width="15%" />
-            <cmn-skeleton height="1rem" width="35%" />
-            <cmn-skeleton height="1rem" width="20%" />
-            <cmn-skeleton height="1rem" width="15%" />
-            <cmn-skeleton height="1rem" width="15%" />
-          </div>
+<cmn-page-container spacing="none">
+  <div class="flex flex-col">
+    <div class="mb-cmn-6 flex flex-wrap items-end justify-between gap-cmn-4">
+      <div>
+        @if (store.range(); as range) {
+          <h1 class="font-headline text-cmn-xl font-bold text-text-primary">Window breakdown</h1>
+          <p class="mt-cmn-1 text-cmn-sm text-text-secondary" data-testid="breakdown-window">
+            Every transaction
+            @if (range.from) {
+              from {{ range.from | date: 'mediumDate' }} to {{ range.to | date: 'mediumDate' }}
+            } @else {
+              up to {{ range.to | date: 'mediumDate' }}
+            }
+            and the bucket the savings math put it in
+          </p>
+        } @else {
+          <h1 class="font-headline text-cmn-xl font-bold text-text-primary">Month breakdown</h1>
+          <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
+            Every transaction of the month and the bucket the savings math put it in
+          </p>
         }
       </div>
-    </cmn-card>
-  } @else if (store.isEmpty()) {
-    <div class="flex flex-1 items-center justify-center">
-      @if (store.range()) {
-        <cmn-empty-state
-          message="No transactions in this window"
-          subMessage="Pick another range on the dashboard or sync your accounts."
-        />
-      } @else {
-        <cmn-empty-state
-          message="No transactions in this month"
-          subMessage="Pick another month or sync your accounts."
+      @if (!store.range()) {
+        <cmn-month-stepper
+          [value]="monthDate()"
+          [max]="currentMonth"
+          (valueChange)="onMonthChange($event)"
         />
       }
     </div>
-  } @else {
-    <div class="space-y-cmn-6">
-      @for (group of store.groups(); track group.bucket) {
-        <cmn-card padding="none">
-          <div
-            class="flex flex-wrap items-baseline justify-between gap-cmn-2 border-b border-border-default px-cmn-4 py-cmn-3"
+
+    <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
+      <a
+        [routerLink]="transactionsRoute"
+        [queryParams]="cardParams('credit')"
+        class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+        data-testid="breakdown-income-link"
+        aria-label="View the income transactions"
+      >
+        <cmn-stat-card
+          [value]="store.incomeFormatted()"
+          [loading]="store.isLoading()"
+          label="Income"
+          icon="TrendingUp"
+        />
+      </a>
+      <a
+        [routerLink]="transactionsRoute"
+        [queryParams]="cardParams('debit')"
+        class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+        data-testid="breakdown-spending-link"
+        aria-label="View the spending transactions"
+      >
+        <cmn-stat-card
+          [value]="store.spendingFormatted()"
+          [loading]="store.isLoading()"
+          label="Spending"
+          icon="TrendingDown"
+        />
+      </a>
+      <cmn-stat-card
+        [value]="store.investedFormatted()"
+        [loading]="store.isLoading()"
+        label="Invested"
+        icon="ChartLine"
+      />
+      <cmn-stat-card
+        [value]="store.savedFormatted()"
+        [loading]="store.isLoading()"
+        label="Saved"
+        icon="PiggyBank"
+      />
+    </div>
+
+    @if (store.accountChips().length > 1) {
+      <div class="mb-cmn-6 flex flex-wrap items-center gap-cmn-2">
+        <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >Account</span
+        >
+        @for (chip of store.accountChips(); track chip.accountId) {
+          <cmn-chip
+            [selected]="store.accountFilter() === chip.accountId"
+            (clicked)="toggleAccount(chip.accountId)"
           >
-            <div class="flex items-center gap-cmn-2">
-              <span class="text-cmn-base font-semibold text-text-primary">{{ group.label }}</span>
-              @if (group.counted) {
-                <cmn-tag variant="success">counted</cmn-tag>
-              } @else {
-                <cmn-tag variant="neutral">excluded</cmn-tag>
-              }
-              <span class="text-cmn-xs text-text-secondary">{{ group.note }}</span>
+            {{ chip.label }}
+          </cmn-chip>
+        }
+      </div>
+    }
+
+    @if (store.errorMessage()) {
+      <cmn-alert variant="error" class="mb-cmn-6 block">
+        {{ store.errorMessage() }}
+      </cmn-alert>
+    }
+
+    @if (store.isLoading()) {
+      <cmn-card>
+        <div class="space-y-cmn-3 p-cmn-4">
+          @for (_ of skeletonRows; track $index) {
+            <div class="flex gap-cmn-4">
+              <cmn-skeleton height="1rem" width="15%" />
+              <cmn-skeleton height="1rem" width="35%" />
+              <cmn-skeleton height="1rem" width="20%" />
+              <cmn-skeleton height="1rem" width="15%" />
+              <cmn-skeleton height="1rem" width="15%" />
             </div>
-            <div class="flex items-center gap-cmn-3">
-              @if (group.sharePct !== null) {
-                <span
-                  [attr.aria-label]="'Share ' + (group.sharePct | number: '1.0-0') + '%'"
-                  class="flex items-center gap-cmn-2"
-                >
+          }
+        </div>
+      </cmn-card>
+    } @else if (store.isEmpty()) {
+      <div class="flex flex-1 items-center justify-center">
+        @if (store.range()) {
+          <cmn-empty-state
+            message="No transactions in this window"
+            subMessage="Pick another range on the dashboard or sync your accounts."
+          />
+        } @else {
+          <cmn-empty-state
+            message="No transactions in this month"
+            subMessage="Pick another month or sync your accounts."
+          />
+        }
+      </div>
+    } @else {
+      <div class="space-y-cmn-6">
+        @for (group of store.groups(); track group.bucket) {
+          <cmn-card padding="none">
+            <div
+              class="flex flex-wrap items-baseline justify-between gap-cmn-2 border-b border-border-default px-cmn-4 py-cmn-3"
+            >
+              <div class="flex items-center gap-cmn-2">
+                <span class="text-cmn-base font-semibold text-text-primary">{{ group.label }}</span>
+                @if (group.counted) {
+                  <cmn-tag variant="success">counted</cmn-tag>
+                } @else {
+                  <cmn-tag variant="neutral">excluded</cmn-tag>
+                }
+                <span class="text-cmn-xs text-text-secondary">{{ group.note }}</span>
+              </div>
+              <div class="flex items-center gap-cmn-3">
+                @if (group.sharePct !== null) {
                   <span
-                    class="h-1 w-16 overflow-hidden rounded-full bg-surface-bg"
-                    aria-hidden="true"
+                    [attr.aria-label]="'Share ' + (group.sharePct | number: '1.0-0') + '%'"
+                    class="flex items-center gap-cmn-2"
                   >
                     <span
-                      [style.width.%]="group.sharePct"
-                      class="block h-full rounded-full bg-accent-default"
-                    ></span>
-                  </span>
-                  <span class="font-mono text-cmn-xs tabular-nums text-text-secondary"
-                    >{{ group.sharePct | number: '1.0-0' }}%</span
-                  >
-                </span>
-              }
-              <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
-                {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
-              </span>
-            </div>
-          </div>
-          <div class="md:hidden" data-testid="breakdown-rows">
-            @for (i of group.items; track i.transactionId) {
-              <div
-                (click)="openTransaction(i)"
-                (keydown.enter)="openTransaction(i)"
-                class="cursor-pointer"
-                role="button"
-                tabindex="0"
-                data-testid="breakdown-row"
-              >
-                <cmn-list-item-row
-                  [label]="i.description"
-                  [sublabel]="
-                    i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')
-                  "
-                >
-                  @if (i.counterpartyName) {
-                    <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
-                  } @else if (i.category) {
-                    <cmn-tag variant="neutral" meta>{{ i.category | merchantCategory }}</cmn-tag>
-                  }
-                  <div amount class="min-w-[72px] text-right">
-                    <div
-                      [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
-                      class="font-mono text-cmn-sm font-semibold tabular-nums"
+                      class="h-1 w-16 overflow-hidden rounded-full bg-surface-bg"
+                      aria-hidden="true"
                     >
-                      {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
-                    </div>
-                    <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
-                      {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
-                    </div>
-                  </div>
-                </cmn-list-item-row>
+                      <span
+                        [style.width.%]="group.sharePct"
+                        class="block h-full rounded-full bg-accent-default"
+                      ></span>
+                    </span>
+                    <span class="font-mono text-cmn-xs tabular-nums text-text-secondary"
+                      >{{ group.sharePct | number: '1.0-0' }}%</span
+                    >
+                  </span>
+                }
+                <span class="font-mono text-cmn-sm font-semibold tabular-nums text-text-primary">
+                  {{ group.totalUsd | money: 'USD' : {maxFractionDigits: 0} }}
+                </span>
               </div>
-            }
-          </div>
-          <div class="hidden overflow-x-auto md:block">
-            <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
-              <tbody>
-                @for (i of group.items; track i.transactionId) {
-                  <tr
-                    (click)="openTransaction(i)"
-                    (keydown.enter)="openTransaction(i)"
-                    class="cursor-pointer border-b border-border-default last:border-0 hover:bg-surface-bg"
-                    role="button"
-                    tabindex="0"
-                    data-testid="breakdown-row"
+            </div>
+            <div class="md:hidden" data-testid="breakdown-rows">
+              @for (i of group.items; track i.transactionId) {
+                <div
+                  (click)="openTransaction(i)"
+                  (keydown.enter)="openTransaction(i)"
+                  class="cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  data-testid="breakdown-row"
+                >
+                  <cmn-list-item-row
+                    [label]="i.description"
+                    [sublabel]="
+                      i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')
+                    "
                   >
-                    <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
-                      {{ i.date | date: 'MMM d' }}
-                    </td>
-                    <td class="max-w-[320px] truncate px-cmn-4 py-cmn-3 text-text-primary">
-                      {{ i.description }}
-                    </td>
-                    <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
-                      <a
-                        [routerLink]="transactionsRoute"
-                        [queryParams]="ledgerParams({account: i.accountId})"
-                        (click)="$event.stopPropagation()"
-                        (keydown.enter)="$event.stopPropagation()"
-                        class="hover:text-accent-default hover:underline"
-                        data-testid="breakdown-account-link"
-                        >{{ i.bankName }} ••{{ i.accountLast4 }}</a
+                    @if (i.counterpartyName) {
+                      <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
+                    } @else if (i.category) {
+                      <cmn-tag variant="neutral" meta>{{ i.category | merchantCategory }}</cmn-tag>
+                    }
+                    <div amount class="min-w-[72px] text-right">
+                      <div
+                        [class]="
+                          i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
+                        "
+                        class="font-mono text-cmn-sm font-semibold tabular-nums"
                       >
-                    </td>
-                    <td class="px-cmn-4 py-cmn-3">
-                      @if (i.counterpartyName) {
-                        @let counterpartyQ = counterpartyQuery(i);
-                        @if (counterpartyQ) {
-                          <a
-                            [routerLink]="transactionsRoute"
-                            [queryParams]="ledgerParams({q: counterpartyQ})"
-                            (click)="$event.stopPropagation()"
-                            (keydown.enter)="$event.stopPropagation()"
-                            data-testid="breakdown-counterparty-link"
-                          >
-                            <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
-                          </a>
-                        } @else {
-                          <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
-                        }
-                      } @else if (i.category) {
+                        {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
+                      </div>
+                      <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
+                        {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
+                      </div>
+                    </div>
+                  </cmn-list-item-row>
+                </div>
+              }
+            </div>
+            <div class="hidden overflow-x-auto md:block">
+              <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
+                <tbody>
+                  @for (i of group.items; track i.transactionId) {
+                    <tr
+                      (click)="openTransaction(i)"
+                      (keydown.enter)="openTransaction(i)"
+                      class="cursor-pointer border-b border-border-default last:border-0 hover:bg-surface-bg"
+                      role="button"
+                      tabindex="0"
+                      data-testid="breakdown-row"
+                    >
+                      <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
+                        {{ i.date | date: 'MMM d' }}
+                      </td>
+                      <td class="max-w-[320px] truncate px-cmn-4 py-cmn-3 text-text-primary">
+                        {{ i.description }}
+                      </td>
+                      <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
                         <a
                           [routerLink]="transactionsRoute"
-                          [queryParams]="ledgerParams({category: i.category})"
+                          [queryParams]="ledgerParams({account: i.accountId})"
                           (click)="$event.stopPropagation()"
                           (keydown.enter)="$event.stopPropagation()"
-                          data-testid="breakdown-category-link"
+                          class="hover:text-accent-default hover:underline"
+                          data-testid="breakdown-account-link"
+                          >{{ i.bankName }} ••{{ i.accountLast4 }}</a
                         >
-                          <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>
-                        </a>
-                      } @else {
-                        <span class="text-cmn-xs text-text-secondary">—</span>
-                      }
-                    </td>
-                    <td
-                      [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
-                      class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums"
-                    >
-                      {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
-                    </td>
-                    <td
-                      class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums text-text-secondary"
-                    >
-                      {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </cmn-card>
-      }
-    </div>
-  }
-</div>
+                      </td>
+                      <td class="px-cmn-4 py-cmn-3">
+                        @if (i.counterpartyName) {
+                          @let counterpartyQ = counterpartyQuery(i);
+                          @if (counterpartyQ) {
+                            <a
+                              [routerLink]="transactionsRoute"
+                              [queryParams]="ledgerParams({q: counterpartyQ})"
+                              (click)="$event.stopPropagation()"
+                              (keydown.enter)="$event.stopPropagation()"
+                              data-testid="breakdown-counterparty-link"
+                            >
+                              <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
+                            </a>
+                          } @else {
+                            <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
+                          }
+                        } @else if (i.category) {
+                          <a
+                            [routerLink]="transactionsRoute"
+                            [queryParams]="ledgerParams({category: i.category})"
+                            (click)="$event.stopPropagation()"
+                            (keydown.enter)="$event.stopPropagation()"
+                            data-testid="breakdown-category-link"
+                          >
+                            <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>
+                          </a>
+                        } @else {
+                          <span class="text-cmn-xs text-text-secondary">—</span>
+                        }
+                      </td>
+                      <td
+                        [class]="
+                          i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
+                        "
+                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums"
+                      >
+                        {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
+                      </td>
+                      <td
+                        class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right font-mono tabular-nums text-text-secondary"
+                      >
+                        {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </cmn-card>
+        }
+      </div>
+    }
+  </div>
+</cmn-page-container>

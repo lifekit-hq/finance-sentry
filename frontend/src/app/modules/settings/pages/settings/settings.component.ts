@@ -14,6 +14,7 @@ import {
   ConfirmDialogComponent,
   FormFieldComponent,
   InputComponent,
+  PageContainerComponent,
   PageHeaderComponent,
   RelativeTimePipe,
   SelectComponent,
@@ -56,6 +57,7 @@ const MIN_PASSWORD_LENGTH = 8;
 @Component({
   selector: 'fns-settings',
   imports: [
+    PageContainerComponent,
     InputHintsDirective,
     ButtonComponent,
     FormFieldComponent,

@@ -1,4 +1,4 @@
-<div class="page-container flex min-h-full flex-col md:h-full">
+<cmn-page-container spacing="none" fill>
   <cmn-page-header
     [subtitle]="alertsSubtitle()"
     [secondaryActionLabel]="store.unreadCount() > 0 ? 'Mark all read' : null"
@@ -94,4 +94,4 @@
       </nav>
     }
   }
-</div>
+</cmn-page-container>

@@ -21,9 +21,7 @@
               "base": "dist/finance-sentry"
             },
             "index": "src/index.html",
-            "polyfills": [
-              "zone.js"
-            ],
+            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
@@ -34,7 +32,8 @@
             "styles": [
               "src/styles.scss",
               "node_modules/@lifekit-hq/tokens/fonts.css",
-              "node_modules/@lifekit-hq/tokens/theme.css"
+              "node_modules/@lifekit-hq/tokens/theme.css",
+              "node_modules/@lifekit-hq/tokens/base.css"
             ],
             "browser": "src/main.ts"
           },
@@ -82,10 +81,7 @@
           "builder": "@angular/build:dev-server",
           "options": {
             "proxyConfig": "proxy.conf.json",
-            "allowedHosts": [
-              "frontend",
-              "localhost"
-            ]
+            "allowedHosts": ["frontend", "localhost"]
           },
           "configurations": {
             "production": {
@@ -100,10 +96,7 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
           }
         },
         "test": {
@@ -111,14 +104,8 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "coverage": true,
-            "coverageExclude": [
-              "src/environments/**",
-              "src/main.ts",
-              "src/main-aot.ts"
-            ],
-            "browsers": [
-              "chromium"
-            ],
+            "coverageExclude": ["src/environments/**", "src/main.ts", "src/main-aot.ts"],
+            "browsers": ["chromium"],
             "headless": true
           },
           "configurations": {
@@ -132,11 +119,7 @@
                 "functions": 30,
                 "lines": 38
               },
-              "coverageExclude": [
-                "src/environments/**",
-                "src/main.ts",
-                "src/main-aot.ts"
-              ]
+              "coverageExclude": ["src/environments/**", "src/main.ts", "src/main-aot.ts"]
             }
           }
         }
@@ -145,9 +128,7 @@
   },
   "cli": {
     "analytics": false,
-    "schematicCollections": [
-      "@schematics/angular"
-    ],
+    "schematicCollections": ["@schematics/angular"],
     "packageManager": "npm"
   }
 }

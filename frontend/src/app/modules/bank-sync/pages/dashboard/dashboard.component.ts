@@ -12,6 +12,7 @@ import {
   DataTableComponent,
   DonutChartComponent,
   IconComponent,
+  PageContainerComponent,
   PageHeaderComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
@@ -42,6 +43,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
 @Component({
   selector: 'fns-dashboard',
   imports: [
+    PageContainerComponent,
     AlertComponent,
     AppDecimalPipe,
     AreaChartComponent,
@@ -64,7 +66,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [DashboardStore],
   template: `
-    <div class="page-container">
+    <cmn-page-container spacing="none">
       <div class="space-y-cmn-6">
         <cmn-page-header
           class="block"
@@ -281,7 +283,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
           </div>
         }
       </div>
-    </div>
+    </cmn-page-container>
   `,
 })
 export class DashboardComponent {
