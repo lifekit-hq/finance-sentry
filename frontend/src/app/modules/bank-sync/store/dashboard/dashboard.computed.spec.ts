@@ -2,9 +2,11 @@ import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {seriesColor} from '@lifekit-hq/charts-core';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {OTHER_SERIES_STEP} from '../../../../shared/constants/chart/chart.constants';
 import {
   type CategoryStat,
   type DashboardData,
@@ -521,7 +523,7 @@ describe('dashboardComputed', () => {
       expect(segments[7]).toEqual({
         label: 'Other categories',
         value: 93 + 92 + 91,
-        color: '#64748b',
+        color: seriesColor(OTHER_SERIES_STEP),
       });
     });
   });

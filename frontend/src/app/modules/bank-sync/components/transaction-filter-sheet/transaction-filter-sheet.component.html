@@ -1,0 +1,92 @@
+<div class="flex flex-col gap-cmn-6 pb-cmn-2">
+  <div class="-mt-cmn-2 flex justify-end">
+    <cmn-button (clicked)="reset()" variant="secondary" size="sm" data-testid="filter-reset">
+      Reset
+    </cmn-button>
+  </div>
+
+  <section class="flex flex-col gap-cmn-2" aria-labelledby="filter-period-heading">
+    <h3
+      id="filter-period-heading"
+      class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Period
+    </h3>
+    <div class="flex flex-wrap gap-cmn-2" role="group" aria-labelledby="filter-period-heading">
+      @for (period of periods; track period.id) {
+        <cmn-chip
+          [selected]="!isCustom() && activePeriod() === period.id"
+          [attr.data-testid]="'period-' + period.id"
+          (clicked)="selectPeriod(period.id)"
+        >
+          {{ period.label }}
+        </cmn-chip>
+      }
+      <cmn-chip [selected]="isCustom()" (clicked)="openCustom()" data-testid="period-custom">
+        Custom...
+      </cmn-chip>
+    </div>
+    @if (isCustom()) {
+      <cmn-date-range [formControl]="rangeControl" groupLabel="Custom period" />
+    }
+  </section>
+
+  <section class="flex flex-col gap-cmn-2" aria-labelledby="filter-type-heading">
+    <h3
+      id="filter-type-heading"
+      class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Type
+    </h3>
+    <div class="flex gap-cmn-2" role="group" aria-labelledby="filter-type-heading">
+      <cmn-chip [selected]="!draft().type" (clicked)="selectType(null)" data-testid="type-all">
+        All
+      </cmn-chip>
+      <cmn-chip
+        [selected]="draft().type === 'credit'"
+        (clicked)="selectType('credit')"
+        data-testid="type-in"
+      >
+        In
+      </cmn-chip>
+      <cmn-chip
+        [selected]="draft().type === 'debit'"
+        (clicked)="selectType('debit')"
+        data-testid="type-out"
+      >
+        Out
+      </cmn-chip>
+    </div>
+  </section>
+
+  @if (categoryStore.filterOptions().length > 0) {
+    <section class="flex flex-col gap-cmn-2" aria-labelledby="filter-category-heading">
+      <h3
+        id="filter-category-heading"
+        class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+      >
+        Category
+      </h3>
+      <div class="flex flex-wrap gap-cmn-2" role="group" aria-labelledby="filter-category-heading">
+        @for (option of categoryStore.filterOptions(); track option.value) {
+          <cmn-chip
+            [selected]="draft().categories.includes(option.value)"
+            [attr.data-testid]="'category-' + option.value"
+            (clicked)="toggleCategory(option.value)"
+          >
+            {{ option.label }}
+          </cmn-chip>
+        }
+      </div>
+    </section>
+  }
+
+  <cmn-button
+    [disabled]="rangeInverted()"
+    (clicked)="apply()"
+    class="block [&_button]:w-full"
+    data-testid="filter-apply"
+  >
+    Show results
+  </cmn-button>
+</div>

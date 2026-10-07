@@ -15,15 +15,26 @@
     <!-- theme-init:start - generated from @lifekit-hq/tokens by scripts/sync-theme-script.mjs; do not edit.
          The CSP admits this inline script by its sha256 (docker/nginx.security-headers.conf). -->
     <!-- prettier-ignore -->
-    <script>// Apply the stored/OS theme before first paint so pages never flash light.
+    <script>// Apply the stored/OS theme and the stored seed colour before first paint so pages never flash.
 (function () {
+  var root = document.documentElement;
   var theme = 'light';
   try {
     var stored = localStorage.getItem('cmn-theme');
     if (stored === 'dark' || stored === 'light') theme = stored;
     else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
   } catch (e) {}
-  document.documentElement.setAttribute('data-theme', theme);
+  root.setAttribute('data-theme', theme);
+  try {
+    var seed = JSON.parse(localStorage.getItem('cmn-theme-seed'));
+    if (!seed || seed.v !== 1 || !seed.css) return;
+    var more = window.matchMedia('(prefers-contrast: more)').matches;
+    var tokens = seed.css[more ? theme + '-more' : theme] || {};
+    for (var name in tokens) {
+      if (/^--color-[a-z0-9-]+$/.test(name) && /^#[0-9a-f]{6}$/i.test(tokens[name]))
+        root.style.setProperty(name, tokens[name]);
+    }
+  } catch (e) {}
 })();
 </script>
     <!-- theme-init:end -->

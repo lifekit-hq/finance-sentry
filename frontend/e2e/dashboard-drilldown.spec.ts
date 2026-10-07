@@ -747,9 +747,9 @@ test.describe('Top spendings → Ledger category drill-down', () => {
 
       await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
       expect(new URL(page.url()).searchParams.get('type')).toBe('debit');
-      // The ledger's chip formats the key itself (MerchantCategoryUtils), e.g. "Food & drink".
-      await expect(page.getByTestId('category-chip')).toContainText(
-        new RegExp(`Category: ${label}`, 'i')
+      await expect(page.getByTestId(`chip-category-${key}`)).toHaveAttribute(
+        'label',
+        `Category: ${label}`
       );
       await expect.poll(() => ledgerQueries.at(-1)?.getAll('category')).toEqual([key]);
       const query = ledgerQueries.at(-1);

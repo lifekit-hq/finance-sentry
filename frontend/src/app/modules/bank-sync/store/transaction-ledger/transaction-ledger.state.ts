@@ -18,8 +18,8 @@ export interface TransactionLedgerState {
   accountId: Nullable<string>;
   /** Server-side filter: credits (In), debits (Out), or null for all. */
   transactionType: Nullable<TransactionType>;
-  /** Server-side filter: a canonical category key, or null for all. */
-  category: Nullable<string>;
+  /** Server-side filter: canonical category keys (any match); empty for all. */
+  categories: string[];
   /** Server-side filter: inclusive `YYYY-MM-DD` date bounds, or null for open-ended. */
   from: Nullable<string>;
   to: Nullable<string>;
@@ -41,7 +41,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
   accountId: null,
   transactionType: null,
-  category: null,
+  categories: [],
   from: null,
   to: null,
   search: '',

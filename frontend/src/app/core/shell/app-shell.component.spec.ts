@@ -18,6 +18,12 @@ import {PaletteEntitiesService} from './services/palette-entities.service';
 })
 class ChatWidgetStubComponent {}
 
+/** `CmnShellService` derives phone / rail / sidebar from these width queries. */
+const wideBreakpoints = (wide: boolean): Record<string, boolean> => ({
+  '(min-width: 600px)': wide,
+  '(min-width: 840px)': wide,
+});
+
 describe('AppShellComponent FAB clearance', () => {
   const canUseAi = signal(true);
 
@@ -26,7 +32,10 @@ describe('AppShellComponent FAB clearance', () => {
       providers: [
         {
           provide: BreakpointObserver,
-          useValue: {observe: () => of({matches: wide}), isMatched: () => wide},
+          useValue: {
+            observe: () => of({matches: wide, breakpoints: wideBreakpoints(wide)}),
+            isMatched: () => wide,
+          },
         },
         provideRouter([{path: '**', children: []}]),
         {

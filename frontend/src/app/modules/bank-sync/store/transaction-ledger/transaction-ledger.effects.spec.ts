@@ -115,7 +115,7 @@ function buildStore(initialOffset = 0) {
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
-    category: signal<string | null>(null),
+    categories: signal<string[]>([]),
     from: signal<string | null>(null),
     to: signal<string | null>(null),
     search: signal(''),
@@ -127,7 +127,7 @@ function buildStore(initialOffset = 0) {
     setMonthlyOutflowUsd: vi.fn(),
     setAccountId: vi.fn(),
     setTransactionType: vi.fn(),
-    setCategory: vi.fn(),
+    setCategories: vi.fn(),
     setDateRange: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
@@ -203,7 +203,7 @@ describe('transactionLedgerEffects', () => {
 
     it('sends the active category to the server', () => {
       const store = buildStore();
-      store.category.set('FAMILY_SUPPORT');
+      store.categories.set(['FAMILY_SUPPORT', 'FOOD_AND_DRINK']);
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
@@ -213,7 +213,7 @@ describe('transactionLedgerEffects', () => {
       expect(service.getAllTransactions).toHaveBeenCalledWith({
         offset: 0,
         limit: PAGE_SIZE,
-        category: 'FAMILY_SUPPORT',
+        category: ['FAMILY_SUPPORT', 'FOOD_AND_DRINK'],
       });
     });
 
@@ -397,18 +397,18 @@ describe('transactionLedgerEffects', () => {
     });
   });
 
-  describe('applyCategory', () => {
-    it('stores a changed category and reloads from the first page', () => {
+  describe('applyCategories', () => {
+    it('stores changed categories and reloads from the first page', () => {
       const store = buildStore();
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
 
       TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyCategory('FOOD_AND_DRINK')
+        transactionLedgerEffects(store).applyCategories(['FOOD_AND_DRINK'])
       );
 
-      expect(store.setCategory).toHaveBeenCalledWith('FOOD_AND_DRINK');
+      expect(store.setCategories).toHaveBeenCalledWith(['FOOD_AND_DRINK']);
       expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
     });
 
@@ -417,9 +417,9 @@ describe('transactionLedgerEffects', () => {
       const service = buildService();
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyCategory(null));
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyCategories([]));
 
-      expect(store.setCategory).not.toHaveBeenCalled();
+      expect(store.setCategories).not.toHaveBeenCalled();
       expect(service.getAllTransactions).not.toHaveBeenCalled();
     });
   });

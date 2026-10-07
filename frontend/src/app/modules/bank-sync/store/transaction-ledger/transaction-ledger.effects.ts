@@ -31,13 +31,13 @@ interface EffectsStore {
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
-  category: Signal<Nullable<string>>;
+  categories: Signal<string[]>;
   from: Signal<Nullable<string>>;
   to: Signal<Nullable<string>>;
   search: Signal<string>;
   setAccountId: (accountId: Nullable<string>) => void;
   setTransactionType: (transactionType: Nullable<TransactionType>) => void;
-  setCategory: (category: Nullable<string>) => void;
+  setCategories: (categories: string[]) => void;
   setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
@@ -63,7 +63,7 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
     limit: PAGE_SIZE,
     accountId: store.accountId() ?? undefined,
     transactionType: store.transactionType() ?? undefined,
-    category: store.category() ?? undefined,
+    category: store.categories().length > 0 ? store.categories() : undefined,
     from: store.from() ?? undefined,
     to: store.to() ?? undefined,
     search: store.search().trim() || undefined,
@@ -140,13 +140,13 @@ export function transactionLedgerEffects(store: EffectsStore) {
       )
     ),
     /**
-     * Follows the `category` query param (dashboard Top spendings drill-down): filtered
-     * server-side so the whole dataset is searched, not only the loaded pages.
+     * Follows the `category` query params (filter sheet, dashboard Top spendings drill-down):
+     * filtered server-side so the whole dataset is searched, not only the loaded pages.
      */
-    applyCategory: rxMethod<Nullable<string>>(
+    applyCategories: rxMethod<string[]>(
       pipe(
-        filter(category => category !== store.category()),
-        tap(category => store.setCategory(category)),
+        filter(categories => categories.join() !== store.categories().join()),
+        tap(categories => store.setCategories(categories)),
         tap(() => load())
       )
     ),

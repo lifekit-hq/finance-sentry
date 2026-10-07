@@ -14,53 +14,49 @@
         }
       </p>
     </div>
-    <div class="flex w-full flex-wrap items-center gap-cmn-2 md:w-auto">
-      <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
-        <cmn-chip [selected]="!activeType()" (clicked)="selectType(null)" data-testid="type-all">
-          All
-        </cmn-chip>
-        <cmn-chip
-          [selected]="activeType() === 'credit'"
-          (clicked)="selectType('credit')"
-          data-testid="type-in"
-        >
-          In
-        </cmn-chip>
-        <cmn-chip
-          [selected]="activeType() === 'debit'"
-          (clicked)="selectType('debit')"
-          data-testid="type-out"
-        >
-          Out
-        </cmn-chip>
-      </div>
-      <div class="w-full md:w-72 [&_cmn-input]:block [&_cmn-input]:w-full">
-        <cmn-input
+    <div class="flex w-full items-center gap-cmn-2 md:w-auto">
+      <div class="min-w-0 flex-1 md:w-72 md:flex-none [&_cmn-search-input]:block">
+        <cmn-search-input
           [formControl]="searchControl"
-          type="search"
           placeholder="Search transactions"
-          autocomplete="off"
+          ariaLabel="Search transactions"
         />
       </div>
+      <cmn-badge [count]="activeFilterCount()" class="shrink-0">
+        <cmn-button
+          (clicked)="openFilters()"
+          variant="secondary"
+          icon="SlidersHorizontal"
+          data-testid="filter-button"
+        >
+          <span class="sr-only">Filters</span>
+        </cmn-button>
+      </cmn-badge>
     </div>
   </div>
 
-  <div
-    class="mb-cmn-4 flex gap-cmn-2 overflow-x-auto pb-cmn-1 md:flex-wrap"
-    role="group"
-    aria-label="Period filter"
-  >
-    @for (period of periods; track period.id) {
-      <cmn-chip
-        [selected]="activePeriod() === period.id"
-        [attr.data-testid]="'period-' + period.id"
-        (clicked)="selectPeriod(period.id)"
-        class="shrink-0"
+  @if (appliedFilters().length > 0) {
+    <div
+      class="mb-cmn-4 flex flex-wrap items-center gap-x-cmn-2 gap-y-3"
+      data-testid="applied-filters"
+    >
+      @for (filter of appliedFilters(); track filter.id) {
+        <lk-dismissible-chip
+          [attr.label]="filter.label"
+          [attr.data-testid]="'chip-' + filter.id"
+          (lk-dismissible-chip-remove)="filter.remove()"
+        />
+      }
+      <cmn-button
+        (clicked)="clearFilters()"
+        variant="secondary"
+        size="sm"
+        data-testid="filter-clear"
       >
-        {{ period.label }}
-      </cmn-chip>
-    }
-  </div>
+        Clear
+      </cmn-button>
+    </div>
+  }
 
   @if (store.accounts().length > 1) {
     <div
@@ -78,26 +74,6 @@
           class="shrink-0"
         >
           {{ account.label }}
-        </cmn-chip>
-      }
-    </div>
-  }
-
-  @if (activeCategoryLabel() || activeDateRangeLabel()) {
-    <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2">
-      <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >Filter</span
-      >
-      @if (activeCategoryLabel(); as label) {
-        <cmn-chip [selected]="true" (clicked)="clearCategory()" data-testid="category-chip">
-          Category: {{ label }}
-          <cmn-icon name="X" size="sm" />
-        </cmn-chip>
-      }
-      @if (activeDateRangeLabel(); as range) {
-        <cmn-chip [selected]="true" (clicked)="clearDateRange()" data-testid="date-range-chip">
-          Dates: {{ range }}
-          <cmn-icon name="X" size="sm" />
         </cmn-chip>
       }
     </div>
@@ -128,7 +104,7 @@
       </div>
     </cmn-card>
     <div empty class="flex min-h-0 flex-1 items-center justify-center">
-      @if (store.hasActiveFilter() || activeCategoryLabel() || activeDateRangeLabel()) {
+      @if (store.hasActiveFilter() || appliedFilters().length > 0) {
         <cmn-empty-state
           message="No matching transactions"
           subMessage="Try a different search or filter."
