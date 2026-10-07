@@ -32,6 +32,28 @@ public sealed class GatewaySecurityHeadersTests(GatewayPublicListenerTests.Publi
         Assert.Equal("strict-origin-when-cross-origin", headers["Referrer-Policy"]);
     }
 
+    // The Angular service worker fetches every cross-origin logo itself, and that fetch is checked
+    // against connect-src, not img-src: each host img-src admits must be in connect-src too.
+    [Fact]
+    public void Policy_LetsTheServiceWorkerConnectToEveryImageHost()
+    {
+        var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+        var csp = GatewaySecurityHeaders.FromConfig(config)["Content-Security-Policy"];
+
+        var imageHosts = RemoteSources(csp, "img-src");
+        var connectHosts = RemoteSources(csp, "connect-src");
+
+        Assert.NotEmpty(imageHosts);
+        Assert.All(imageHosts, host => Assert.Contains(host, connectHosts));
+    }
+
+    private static string[] RemoteSources(string csp, string directive)
+        => csp.Split(';', StringSplitOptions.TrimEntries)
+            .Select(part => part.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Single(parts => parts[0] == directive)
+            .Where(source => source.StartsWith("https://", StringComparison.Ordinal))
+            .ToArray();
+
     [Theory]
     [InlineData("/gateway/health", null)]           // the gateway's own endpoint
     [InlineData("/metrics", null)]
