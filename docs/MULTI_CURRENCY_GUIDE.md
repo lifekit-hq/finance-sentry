@@ -2,35 +2,15 @@
 
 ## Overview
 
-Finance Sentry supports multiple currencies (EUR, USD, GBP, UAH) without automatic conversion.
-
-## How It Works
-
-- Each bank account has a single `currency` field (ISO 4217 code)
-- Transaction amounts are stored in the account's base currency
-- The aggregated dashboard shows totals **separately per currency** — EUR and USD are never summed together
+Finance Sentry supports multiple currencies (EUR, USD, GBP, UAH). Each bank account has a single `currency` field (ISO 4217 code) and its transactions are stored in that currency; rows and per-account balances are shown in the account's own currency.
 
 ## Dashboard Display
 
-The aggregated balance section shows one card per currency:
-```
-€5,000.00
-$1,000.00
-```
-
-Amounts are formatted symbol-first (see [Money Display](claude/frontend-rules.md)); conversion and aggregation rules live in [money-semantics.md](money-semantics.md).
-
-## Monthly Flow Statistics
-
-Monthly inflow/outflow statistics are grouped by currency-month. If you have EUR and USD accounts, you will see separate statistics for each.
-
-## Top Categories
-
-Category statistics aggregate spending across all currencies. Amounts are shown in their original currency — no conversion is performed.
+Dashboard totals (net worth, income, spending, top categories, projection) and the net-worth history chart are shown in the profile's base currency (USD when unset), converted once at the response boundary, and the Transactions month summary uses the same currency. Amounts are formatted symbol-first (see [Money Display](claude/frontend-rules.md)). Which figures are converted, where, and with which rates is owned by [money-semantics.md §3](money-semantics.md); the FIRE card stays in USD.
 
 ## Exchange Rates
 
-Currency conversion is **not supported** in the current version. Exchange rates and currency conversion are deferred to a future feature release.
+Rates come from the process-wide table refreshed daily by the FX job; a currency without a rate falls back 1:1 (see [money-semantics.md §3](money-semantics.md)).
 
 ## GDPR Compliance
 
