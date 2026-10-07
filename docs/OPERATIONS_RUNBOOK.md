@@ -62,7 +62,10 @@ registered account, and only while nobody holds it — so once a second account 
 **Smoke account:** production has password sign-in (login and invite acceptance) fixed off
 (`Auth__PasswordLogin__Enabled: "false"` in `docker-compose.prod.yml`, no env override), so the post-deploy live smoke
 (`frontend/e2e/live/smoke.spec.ts`) signs in through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
-`E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). The API
+`E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). It signs
+in once per run (a serial describe sharing one page: each sign-in spends several requests of the anonymous 10-per-minute
+rate-limit budget, so a second one inside the minute gets 429) and clicks Skip on the "create a passkey" page Logto shows
+on that user's first sign-in (passkey sign-in is on tenant-wide), so it never binds a passkey. The API
 seeds the matching finance-sentry account at startup from `Auth__SmokeAccount__Email` (prod: compose reads
 `SMOKE_ACCOUNT_EMAIL`, which `deploy.yml` fills from `E2E_LIVE_LOGTO_EMAIL`): a passwordless Member marked with the
 `seeded-account: smoke` user claim, plus one fake `seeded` bank account with a few transactions. The first Logto sign-in
