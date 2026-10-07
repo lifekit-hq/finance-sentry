@@ -42,8 +42,6 @@ export class AlertDestinationUtils {
   /** The asset dossier of a ticker label, or null when the label is not a ticker. */
   public static dossier(label: Nullable<string>): Nullable<AlertNavigation> {
     const symbol = label?.trim() ?? '';
-    return TICKER.test(symbol)
-      ? {kind: 'route', commands: [AppRoute.AssetDossier, symbol]}
-      : null;
+    return TICKER.test(symbol) ? {kind: 'route', commands: [AppRoute.AssetDossier, symbol]} : null;
   }
 }
