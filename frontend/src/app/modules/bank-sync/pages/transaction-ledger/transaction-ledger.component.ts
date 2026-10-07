@@ -1,16 +1,22 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {takeUntilDestroyed, toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
   AsyncStateComponent,
   type AsyncStateStatus,
+  BadgeComponent,
   ButtonComponent,
   CardComponent,
   ChipComponent,
   CmnDrawerService,
   EmptyStateComponent,
-  IconComponent,
   InputComponent,
   InstitutionAvatarComponent,
   ListItemRowComponent,
@@ -22,14 +28,21 @@ import {debounceTime, distinctUntilChanged, map} from 'rxjs';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
+import {TransactionFilterSheetComponent} from '../../components/transaction-filter-sheet/transaction-filter-sheet.component';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
 import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
+import {
+  type AppliedTransactionFilter,
+  EMPTY_TRANSACTION_FILTER,
+  type TransactionFilterSelection,
+} from '../../models/transaction/transaction-filter.model';
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
 import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
@@ -44,17 +57,18 @@ function isoDateOrNull(value: string | null): Nullable<string> {
   return value !== null && ISO_DATE.test(value) ? value : null;
 }
 const DRAWER_WIDTH = '480px';
+const FILTER_SHEET_WIDTH = '420px';
 
 @Component({
   selector: 'fns-transaction-ledger',
   imports: [
     PageContainerComponent,
     AsyncStateComponent,
+    BadgeComponent,
     ButtonComponent,
     CardComponent,
     ChipComponent,
     EmptyStateComponent,
-    IconComponent,
     InputComponent,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,
@@ -68,10 +82,12 @@ const DRAWER_WIDTH = '480px';
   ],
   templateUrl: './transaction-ledger.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {class: 'block h-full'},
   providers: [TransactionLedgerStore],
 })
 export class TransactionLedgerComponent {
+  private readonly categoryStore = inject(CategoryStore);
   private readonly drawer = inject(CmnDrawerService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -92,9 +108,9 @@ export class TransactionLedgerComponent {
     {initialValue: null}
   );
 
-  public readonly activeCategory = toSignal(
-    this.route.queryParamMap.pipe(map(p => p.get('category'))),
-    {initialValue: null}
+  public readonly activeCategories = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.getAll('category').filter(c => c !== ''))),
+    {initialValue: []}
   );
 
   public readonly activeType = toSignal(
@@ -136,10 +152,45 @@ export class TransactionLedgerComponent {
     return from && to ? `${from} – ${to}` : from ? `from ${from}` : `until ${to}`;
   });
 
-  public readonly activeCategoryLabel = computed(() => {
-    const cat = this.activeCategory();
-    return cat ? MerchantCategoryUtils.format(cat) : null;
+  /** Filters the sheet edits, as they stand in the URL. */
+  public readonly activeSelection = computed<TransactionFilterSelection>(() => ({
+    ...this.activeDateRange(),
+    type: this.activeType(),
+    categories: this.activeCategories(),
+  }));
+
+  public readonly appliedFilters = computed<AppliedTransactionFilter[]>(() => {
+    const filters: AppliedTransactionFilter[] = [];
+    const range = this.activeDateRangeLabel();
+    if (range) {
+      const period = LEDGER_PERIODS.find(p => p.id === this.activePeriod());
+      filters.push({
+        id: 'date-range',
+        label: period ? `Period: ${period.label}` : `Dates: ${range}`,
+        remove: () => this.clearDateRange(),
+      });
+    }
+    const type = this.activeType();
+    if (type) {
+      filters.push({
+        id: 'type',
+        label: `Type: ${type === 'credit' ? 'In' : 'Out'}`,
+        remove: () => this.selectType(null),
+      });
+    }
+    for (const key of this.activeCategories()) {
+      const label = this.categoryStore.labelMap()[key] ?? MerchantCategoryUtils.format(key);
+      filters.push({
+        id: `category-${key}`,
+        label: `Category: ${label}`,
+        remove: () => this.removeCategory(key),
+      });
+    }
+    return filters;
   });
+
+  /** Badge on the filter button: one per period, type and category in play. */
+  public readonly activeFilterCount = computed(() => this.appliedFilters().length);
 
   public readonly dayGroups = computed(() =>
     TransactionGroupUtils.groupByDay(this.store.transactions())
@@ -148,7 +199,7 @@ export class TransactionLedgerComponent {
   constructor() {
     this.store.applyAccount(this.activeAccount);
     this.store.applyType(this.activeType);
-    this.store.applyCategory(this.activeCategory);
+    this.store.applyCategories(this.activeCategories);
     this.store.applyDateRange(this.activeDateRange);
     this.store.applySearch(
       toSignal(this.searchControl.valueChanges, {initialValue: this.searchControl.value})
@@ -202,8 +253,35 @@ export class TransactionLedgerComponent {
     });
   }
 
-  public clearCategory(): void {
-    void this.router.navigate([], {queryParams: {category: null}, queryParamsHandling: 'merge'});
+  public openFilters(): void {
+    this.drawer
+      .open<
+        TransactionFilterSelection,
+        TransactionFilterSelection,
+        TransactionFilterSheetComponent
+      >(TransactionFilterSheetComponent, {
+        title: 'Filters',
+        data: this.activeSelection(),
+        mode: 'responsive',
+        width: FILTER_SHEET_WIDTH,
+      })
+      .afterClosed()
+      .subscribe(selection => {
+        if (selection) {
+          this.applySelection(selection);
+        }
+      });
+  }
+
+  public clearFilters(): void {
+    this.applySelection(EMPTY_TRANSACTION_FILTER);
+  }
+
+  public removeCategory(key: string): void {
+    this.applySelection({
+      ...this.activeSelection(),
+      categories: this.activeCategories().filter(c => c !== key),
+    });
   }
 
   public selectPeriod(period: LedgerPeriod): void {
@@ -214,13 +292,23 @@ export class TransactionLedgerComponent {
   }
 
   public clearDateRange(): void {
-    void this.router.navigate([], {
-      queryParams: {from: null, to: null},
-      queryParamsHandling: 'merge',
-    });
+    this.applySelection({...this.activeSelection(), from: null, to: null});
   }
 
   public selectType(type: Nullable<TransactionType>): void {
-    void this.router.navigate([], {queryParams: {type}, queryParamsHandling: 'merge'});
+    this.applySelection({...this.activeSelection(), type});
+  }
+
+  /** Writes the sheet filters to the URL; the account and search params are left as they are. */
+  private applySelection(selection: TransactionFilterSelection): void {
+    void this.router.navigate([], {
+      queryParams: {
+        from: selection.from,
+        to: selection.to,
+        type: selection.type,
+        category: selection.categories.length > 0 ? selection.categories : null,
+      },
+      queryParamsHandling: 'merge',
+    });
   }
 }

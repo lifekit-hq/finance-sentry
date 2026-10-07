@@ -25,8 +25,8 @@ export interface GetAllTransactionsParams extends PagedRequest {
   to?: string;
   transactionType?: TransactionType;
   accountId?: string;
-  /** Canonical category key, e.g. from a dashboard Top spendings drill-down. */
-  category?: string;
+  /** Canonical category keys (any match), e.g. from a dashboard Top spendings drill-down. */
+  category?: string[];
   search?: string;
 }
 

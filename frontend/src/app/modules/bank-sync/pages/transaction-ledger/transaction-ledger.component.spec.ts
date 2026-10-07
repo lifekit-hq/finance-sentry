@@ -1,14 +1,20 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap, provideRouter, Router} from '@angular/router';
-import {BehaviorSubject} from 'rxjs';
+import {CmnDrawerService} from '@lifekit-hq/ui';
+import {BehaviorSubject, Subject} from 'rxjs';
 
+import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {type TransactionFilterSelection} from '../../models/transaction/transaction-filter.model';
 import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
+import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
 
-function setup(type: string | null, extra: Record<string, string> = {}) {
+function setup(type: string | null, extra: Record<string, string | string[]> = {}) {
   const params$ = new BehaviorSubject(convertToParamMap({...(type ? {type} : {}), ...extra}));
+  const closed$ = new Subject<TransactionFilterSelection | undefined>();
+  const drawerOpen = vi.fn(() => ({afterClosed: () => closed$}));
   const store = {
     accounts: signal([]),
     monthlyOutflow: signal(null),
@@ -23,7 +29,7 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     transactions: signal([]),
     applyAccount: () => undefined,
     applyType: vi.fn(),
-    applyCategory: vi.fn(),
+    applyCategories: vi.fn(),
     applyDateRange: vi.fn(),
     applySearch: () => undefined,
   };
@@ -31,7 +37,18 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     set: {providers: [{provide: TransactionLedgerStore, useValue: store}]},
   });
   TestBed.configureTestingModule({
-    providers: [provideRouter([]), {provide: ActivatedRoute, useValue: {queryParamMap: params$}}],
+    providers: [
+      provideRouter([]),
+      {provide: ActivatedRoute, useValue: {queryParamMap: params$}},
+      {provide: CmnDrawerService, useValue: {open: drawerOpen}},
+      {
+        provide: CategoryStore,
+        useValue: {
+          labelMap: signal({FAMILY_SUPPORT: 'Family Support', FOOD: 'Food'}),
+          filterOptions: signal([]),
+        },
+      },
+    ],
   });
   const router = TestBed.inject(Router);
   const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -39,101 +56,162 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
   fixture.detectChanges();
   const root = fixture.nativeElement as HTMLElement;
   const chip = (id: string) => root.querySelector(`[data-testid="${id}"]`) as HTMLElement;
-  const selected = (id: string) => chip(id).querySelector('button')?.getAttribute('aria-pressed');
-  return {chip, selected, navigate, root, store, params$, fixture};
+  return {chip, navigate, root, store, params$, fixture, drawerOpen, closed$};
 }
 
-describe('TransactionLedgerComponent type control', () => {
-  it('sets type=credit when In is selected', () => {
-    const {chip, navigate} = setup(null);
-    chip('type-in').querySelector('button')?.click();
+describe('TransactionLedgerComponent filter sheet', () => {
+  it('opens the responsive Filters sheet seeded with the filters in the URL', () => {
+    const {chip, drawerOpen} = setup('credit', {
+      from: '2026-06-01',
+      to: '2026-08-31',
+      category: 'FOOD',
+    });
+    chip('filter-button').querySelector('button')?.click();
+    expect(drawerOpen).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        title: 'Filters',
+        mode: 'responsive',
+        data: {from: '2026-06-01', to: '2026-08-31', type: 'credit', categories: ['FOOD']},
+      })
+    );
+  });
+
+  it('writes the applied Period + Type + Category to the URL and keeps account and search', () => {
+    const {chip, navigate, closed$} = setup(null, {account: 'a1', q: 'x'});
+    chip('filter-button').querySelector('button')?.click();
+    closed$.next({
+      from: '2026-08-01',
+      to: '2026-08-12',
+      type: 'debit',
+      categories: ['FOOD', 'FAMILY_SUPPORT'],
+    });
     expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {type: 'credit'},
+      queryParams: {
+        from: '2026-08-01',
+        to: '2026-08-12',
+        type: 'debit',
+        category: ['FOOD', 'FAMILY_SUPPORT'],
+      },
       queryParamsHandling: 'merge',
     });
   });
 
-  it('sets type=debit when Out is selected', () => {
-    const {chip, navigate} = setup(null);
-    chip('type-out').querySelector('button')?.click();
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {type: 'debit'},
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('clears the type when All is selected', () => {
-    const {chip, navigate} = setup('debit');
-    chip('type-all').querySelector('button')?.click();
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {type: null},
-      queryParamsHandling: 'merge',
-    });
-  });
-
-  it('drives the store type filter from the type query param', () => {
-    const {store} = setup('credit');
-    const followed = store.applyType.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBe('credit');
-  });
-
-  it('treats an unknown type query param as All', () => {
-    const {store, selected} = setup('bogus');
-    const followed = store.applyType.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBeNull();
-    expect(selected('type-all')).toBe('true');
-  });
-
-  it('shows no duplicate removable Type chip for a deep-linked type', () => {
-    const {root} = setup('credit');
-    expect(root.textContent).not.toContain('Type:');
-  });
-
-  it('preselects the control from a deep-linked type', () => {
-    const {selected} = setup('credit');
-    expect(selected('type-in')).toBe('true');
-    expect(selected('type-all')).toBe('false');
-    expect(selected('type-out')).toBe('false');
+  it('changes nothing when the sheet is dismissed', () => {
+    const {chip, navigate, closed$} = setup(null);
+    chip('filter-button').querySelector('button')?.click();
+    closed$.next(undefined);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 
-describe('TransactionLedgerComponent date range', () => {
-  it('shows a clearable chip and drives the store from from/to query params', () => {
-    const {root, store, navigate} = setup(null, {from: '2026-06-01', to: '2026-08-31'});
-    const chip = root.querySelector('[data-testid="date-range-chip"]') as HTMLElement;
-    expect(chip.textContent).toContain('2026-06-01 – 2026-08-31');
-    expect(store.applyDateRange).toHaveBeenCalled();
-    chip.querySelector('button')?.click();
+describe('TransactionLedgerComponent period chips', () => {
+  it('writes the picked period dates to the URL and keeps the other params', () => {
+    const {chip, navigate} = setup('debit', {account: 'a1'});
+    chip('period-last-month').querySelector('button')?.click();
     expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {from: null, to: null},
+      queryParams: LedgerPeriodUtils.dates('last-month'),
       queryParamsHandling: 'merge',
     });
   });
 
-  it('ignores malformed dates', () => {
-    const {root} = setup(null, {from: 'garbage', to: '2026-8-1'});
-    expect(root.querySelector('[data-testid="date-range-chip"]')).toBeNull();
+  it('selects the chip whose dates are in the URL', () => {
+    const {chip} = setup(null, {...LedgerPeriodUtils.dates('3m')});
+    expect(chip('period-3m').querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(chip('period-this-month').querySelector('button')?.getAttribute('aria-pressed')).toBe(
+      'false'
+    );
+  });
+
+  it('selects no period chip for a custom range', () => {
+    const {root} = setup(null, {from: '2020-01-01', to: '2020-01-31'});
+    expect(
+      root.querySelectorAll('[role="group"][aria-label="Period filter"] [aria-pressed="true"]')
+    ).toHaveLength(0);
   });
 });
 
-describe('TransactionLedgerComponent category', () => {
-  it('shows a clearable chip and drives the server-side category from the query param', () => {
-    const {root, store, navigate} = setup(null, {category: 'FAMILY_SUPPORT'});
-    const chip = root.querySelector('[data-testid="category-chip"]') as HTMLElement;
-    expect(chip.textContent).toContain('Category: Family Support');
-    const followed = store.applyCategory.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBe('FAMILY_SUPPORT');
-    chip.querySelector('button')?.click();
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {category: null},
+describe('TransactionLedgerComponent applied filter chips', () => {
+  it('shows no chip row without filters', () => {
+    const {root} = setup(null);
+    expect(root.querySelector('[data-testid="applied-filters"]')).toBeNull();
+  });
+
+  it('shows a chip per period, type and category, dismissible one by one', () => {
+    const {chip, navigate} = setup('credit', {
+      from: '2026-06-01',
+      to: '2026-08-31',
+      category: ['FAMILY_SUPPORT', 'FOOD'],
+    });
+    expect(chip('chip-date-range').getAttribute('label')).toBe('Dates: 2026-06-01 – 2026-08-31');
+    expect(chip('chip-type').getAttribute('label')).toBe('Type: In');
+    expect(chip('chip-category-FAMILY_SUPPORT').getAttribute('label')).toBe(
+      'Category: Family Support'
+    );
+
+    chip('chip-category-FOOD').dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      queryParams: {
+        from: '2026-06-01',
+        to: '2026-08-31',
+        type: 'credit',
+        category: ['FAMILY_SUPPORT'],
+      },
       queryParamsHandling: 'merge',
     });
+
+    chip('chip-type').dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      queryParams: expect.objectContaining({type: null}),
+      queryParamsHandling: 'merge',
+    });
+
+    chip('chip-date-range').dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      queryParams: expect.objectContaining({from: null, to: null}),
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('names a quick period by its label', () => {
+    const {from, to} = LedgerPeriodUtils.dates('last-month');
+    const {chip} = setup(null, {from, to});
+    expect(chip('chip-date-range').getAttribute('label')).toBe('Period: Last month');
+  });
+
+  it('Clear drops every sheet filter and leaves account and search alone', () => {
+    const {chip, navigate} = setup('debit', {account: 'a1', category: 'FOOD', from: '2026-06-01'});
+    chip('filter-clear').querySelector('button')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {from: null, to: null, type: null, category: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('counts the active filters on the filter button badge', () => {
+    const {root} = setup('debit', {category: ['FOOD', 'FAMILY_SUPPORT'], from: '2026-06-01'});
+    expect(root.querySelector('cmn-badge')?.textContent).toContain('4');
+  });
+
+  it('drives the store from the type, category and date params', () => {
+    const {store} = setup('credit', {category: ['FOOD', 'FAMILY_SUPPORT']});
+    expect((store.applyType.mock.calls[0][0] as () => unknown)()).toBe('credit');
+    expect((store.applyCategories.mock.calls[0][0] as () => unknown)()).toEqual([
+      'FOOD',
+      'FAMILY_SUPPORT',
+    ]);
+  });
+
+  it('treats an unknown type and malformed dates as no filter', () => {
+    const {root, store} = setup('bogus', {from: 'garbage', to: '2026-8-1'});
+    expect((store.applyType.mock.calls[0][0] as () => unknown)()).toBeNull();
+    expect(root.querySelector('[data-testid="applied-filters"]')).toBeNull();
   });
 });
 
 describe('TransactionLedgerComponent search param', () => {
   const searchBox = (root: HTMLElement) =>
-    root.querySelector('input[type="search"]') as HTMLInputElement;
+    root.querySelector('input[type="search"], input') as HTMLInputElement;
 
   afterEach(() => vi.useRealTimers());
 

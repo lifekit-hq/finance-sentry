@@ -1,3 +1,4 @@
+import {HttpParams} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
 import {Observable, timer} from 'rxjs';
@@ -31,6 +32,19 @@ const DEFAULT_SYNC_POLL_INTERVAL_MS = 2000;
 export class BankSyncService extends ApiService {
   constructor() {
     super('accounts');
+  }
+
+  /** The base builder drops arrays; a list value becomes one repeated query key per item. */
+  protected override buildParams(input?: object): HttpParams {
+    let params = super.buildParams(input);
+    for (const [key, value] of Object.entries(input ?? {})) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          params = params.append(key, String(item));
+        }
+      }
+    }
+    return params;
   }
 
   public connectMonobank(token: string): Observable<ConnectMonobankResponse> {
