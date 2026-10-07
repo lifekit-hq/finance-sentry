@@ -30,6 +30,7 @@ Both surfaces are the **same brain** — same identity, same finance discipline,
 1. **Core is runtime-agnostic.** No Kit/DevClaw/Telegram/session/cron/file-path mechanics in `persona.core.md` — those belong in an adapter.
 2. **No hard-coded policy.** The core never writes literal IPS targets, risk caps, or allocation numbers; it directs the agent to read them from the live tools (`get_ips`, `get_risk_rules`, `get_allocation_vs_target`) at answer time.
 3. **OpenClaw equivalence.** `core + adapters/openclaw.md` is behaviorally equivalent to the persona the live OpenClaw Ledger runs on — no operating law, guardrail, or tool-use rule lost in the split. (This is the migration safety property, SC-002.)
+4. **OpenClaw size budget.** `core + adapters/openclaw.md` must stay ≤ 20,000 characters (OpenClaw's `agents.defaults.bootstrapMaxChars`; a longer AGENTS.md is truncated live). The tool section names tools and when to reach for them — the MCP server describes arguments and returns at runtime. Pinned by `PersonaParityTests.OpenClawCompose_StaysWithinTheBootstrapLimit`.
 
 ## Coexistence
 

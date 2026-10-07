@@ -32,6 +32,30 @@ public sealed class PersonaParityTests
         RepoPaths.ReadLedgerFile("adapters/openclaw.md").Trim(),
         RepoPaths.ReadLedgerFile("user.md").Trim());
 
+    // OpenClaw truncates a bootstrap file past agents.defaults.bootstrapMaxChars (default 20000); the install
+    // script composes core + adapter and refuses anything longer.
+    private const int OpenClawBootstrapMaxChars = 20_000;
+
+    [Fact]
+    public void OpenClawCompose_StaysWithinTheBootstrapLimit()
+    {
+        var composed = string.Join(
+            "\n\n---\n\n",
+            RepoPaths.ReadLedgerFile("persona.core.md").Trim(),
+            RepoPaths.ReadLedgerFile("adapters/openclaw.md").Trim());
+
+        composed.Length.Should().BeLessThanOrEqualTo(
+            OpenClawBootstrapMaxChars,
+            "OpenClaw truncates a longer AGENTS.md live and the install script refuses it");
+    }
+
+    [Fact]
+    public void BothComposes_CarryTheEventLinkRule()
+    {
+        BrowserPrompt().Should().Contain("`appUrl`").And.Contain("never invent a link");
+        OpenClawPrompt().Should().Contain("`appUrl`").And.Contain("never invent a link");
+    }
+
     [Fact]
     public void BothComposes_ShareTheCoreLaws()
     {
