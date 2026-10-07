@@ -1,9 +1,11 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {describe, expect, it} from 'vitest';
+import {CmnDrawerService} from '@lifekit-hq/ui';
+import {describe, expect, it, vi} from 'vitest';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {FlowBreakdownComponent} from './flow-breakdown.component';
 
@@ -34,6 +36,8 @@ const GROUP = {
   ],
 };
 
+const drawer = {open: vi.fn()};
+
 function render(
   group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP,
   range: Nullable<{from: Nullable<string>; to: string; months: number}> = null
@@ -53,7 +57,11 @@ function render(
     savedFormatted: signal('$0'),
   };
   TestBed.configureTestingModule({
-    providers: [provideRouter([]), {provide: CategoryStore, useValue: {labelMap: signal({})}}],
+    providers: [
+      provideRouter([]),
+      {provide: CategoryStore, useValue: {labelMap: signal({})}},
+      {provide: CmnDrawerService, useValue: drawer},
+    ],
   });
   TestBed.overrideComponent(FlowBreakdownComponent, {
     set: {providers: [{provide: FlowBreakdownStore, useValue: store}]},
@@ -120,5 +128,62 @@ describe('FlowBreakdownComponent window mode', () => {
 
     expect(el.querySelector('cmn-month-stepper')).not.toBeNull();
     expect(el.querySelector('[data-testid="breakdown-window"]')).toBeNull();
+  });
+});
+
+describe('FlowBreakdownComponent drill-downs', () => {
+  const href = (el: HTMLElement, testId: string): Nullable<string> =>
+    el.querySelector(`[data-testid="${testId}"]`)?.getAttribute('href') ?? null;
+
+  it('links the income and spending cards to the month window of credits and debits', () => {
+    const el = render();
+
+    expect(href(el, 'breakdown-income-link')).toBe(
+      '/transactions?type=credit&from=2026-09-01&to=2026-09-30'
+    );
+    expect(href(el, 'breakdown-spending-link')).toBe(
+      '/transactions?type=debit&from=2026-09-01&to=2026-09-30'
+    );
+  });
+
+  it('carries a dashboard window into the card links, open-ended for all time', () => {
+    const windowed = render(GROUP, {from: '2026-10-01', to: '2026-10-17', months: 1});
+    expect(href(windowed, 'breakdown-spending-link')).toBe(
+      '/transactions?type=debit&from=2026-10-01&to=2026-10-17'
+    );
+
+    TestBed.resetTestingModule();
+    const allTime = render(GROUP, {from: null, to: '2026-10-17', months: 120});
+    expect(href(allTime, 'breakdown-income-link')).toBe('/transactions?type=credit&to=2026-10-17');
+  });
+
+  it('links the account text to the ledger for that account and window', () => {
+    expect(href(render(), 'breakdown-account-link')).toBe(
+      '/transactions?account=a1&from=2026-09-01&to=2026-09-30'
+    );
+  });
+
+  it('links the category tag to the ledger for that category and window', () => {
+    const el = render({...GROUP, items: [{...GROUP.items[0], category: 'groceries'}]});
+
+    expect(href(el, 'breakdown-category-link')).toBe(
+      '/transactions?category=groceries&from=2026-09-01&to=2026-09-30'
+    );
+  });
+
+  it('opens the transaction drawer from a row without following the account link', () => {
+    drawer.open.mockClear();
+    const el = render();
+
+    el.querySelector<HTMLElement>('[data-testid="breakdown-account-link"]')?.click();
+    expect(drawer.open).not.toHaveBeenCalled();
+
+    el.querySelector<HTMLElement>('tr[data-testid="breakdown-row"]')?.click();
+    expect(drawer.open).toHaveBeenCalledWith(
+      TransactionDrawerComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({transactionId: 't1', transactionType: 'debit'}),
+      })
+    );
   });
 });
