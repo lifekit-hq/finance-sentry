@@ -24,6 +24,8 @@ const EQUITY_GROUP: PositionAssetGroup = {
       currentValue: 100,
       pnlPercent: 25.3,
       pnlUsd: 20.2,
+      dayChangePct: 1.25,
+      dayChangeUsd: 1.23,
       weightPercent: 100,
     },
   ],
@@ -43,6 +45,8 @@ const CRYPTO_GROUP: PositionAssetGroup = {
       currentValue: 50,
       pnlPercent: null,
       pnlUsd: null,
+      dayChangePct: null,
+      dayChangeUsd: null,
       weightPercent: 100,
     },
   ],
@@ -131,6 +135,36 @@ describe('InvestmentsComponent — positions view', () => {
     expect(text).toContain('+$20.20');
     expect(text).toContain('25.30%');
     expect(text).toContain('—');
+  });
+
+  it('renders the day change coloured by sign, with a placeholder for a row without a quote', () => {
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const cells = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        '[data-testid="holding-day-change"]'
+      )
+    );
+    const up = cells.find(c => c.textContent?.includes('+1.25%'));
+    const none = cells.find(c => c.textContent?.trim() === '—');
+    expect(up?.className).toContain('text-status-success');
+    expect(none?.className).toContain('text-text-secondary');
+  });
+
+  it('colours a negative day change as a loss', () => {
+    mockStore.positionsByAssetClass.set([
+      {...EQUITY_GROUP, rows: [{...EQUITY_GROUP.rows[0], dayChangePct: -0.8, dayChangeUsd: -0.8}]},
+    ]);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const cell = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="holding-day-change"]'
+    );
+    expect(cell?.textContent).toContain('-0.80%');
+    expect(cell?.className).toContain('text-status-error');
   });
 
   it('shows the provider as a subtitle under the symbol', () => {

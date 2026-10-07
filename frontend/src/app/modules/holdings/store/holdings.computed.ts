@@ -6,12 +6,14 @@ import {type DonutSegment} from '@lifekit-hq/ui';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position} from '../models/position/position.model';
+import {DayChangeUtils} from '../utils/day-change.utils';
 import {type HoldingsState} from './holdings.state';
 
 interface StateSignals {
   positions: Signal<Position[]>;
   positionsStatus: Signal<HoldingsState['positionsStatus']>;
   positionsErrorCode: Signal<Nullable<string>>;
+  dayChangePctByTicker: Signal<Record<string, number>>;
 }
 
 const DEFAULT_POSITIONS_ERROR = 'Failed to load positions.';
@@ -28,6 +30,9 @@ export interface PositionRow {
   currentValue: number;
   pnlPercent: Nullable<number>;
   pnlUsd: Nullable<number>;
+  /** Today's move from the research quote; null when the row has no quote. */
+  dayChangePct: Nullable<number>;
+  dayChangeUsd: Nullable<number>;
   weightPercent: number;
 }
 
@@ -60,7 +65,7 @@ const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
   venueCash: SERIES.green,
 };
 
-const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
+export const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
 
 function resolveAssetClass(position: Position): AssetClass {
   if (position.isVenueCash) {
@@ -79,10 +84,13 @@ export function holdingsComputed(store: StateSignals) {
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
     const positions = store.positions();
     const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0);
+    const dayChanges = store.dayChangePctByTicker();
     const groups = new Map<AssetClass, PositionRow[]>();
 
     for (const p of positions) {
       const assetClass = resolveAssetClass(p);
+      const dayChangePct =
+        assetClass === 'equity' ? (dayChanges[p.symbol.toUpperCase()] ?? null) : null;
       const row: PositionRow = {
         symbol: p.symbol,
         provider: p.provider,
@@ -92,6 +100,8 @@ export function holdingsComputed(store: StateSignals) {
         currentValue: p.currentValue,
         pnlPercent: p.pnlPercent,
         pnlUsd: p.pnlUsd,
+        dayChangePct,
+        dayChangeUsd: DayChangeUtils.dayChangeUsd(p.currentValue, dayChangePct),
         weightPercent: totalValue > 0 ? (p.currentValue / totalValue) * WEIGHT_TO_PERCENT : 0,
       };
       const bucket = groups.get(assetClass);

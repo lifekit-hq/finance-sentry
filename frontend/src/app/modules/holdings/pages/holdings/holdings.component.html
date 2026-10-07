@@ -128,6 +128,9 @@
                     × {{ row.currentPrice | money }}</span
                   >
                 }
+                <span class="md:hidden" data-testid="holding-day-change-phone">
+                  <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
+                </span>
               </ng-template>
             </cmn-column>
             <cmn-column key="price" header="Price" align="right">
@@ -137,6 +140,11 @@
                 } @else {
                   <span class="font-mono tabular-nums">{{ row.currentPrice | money }}</span>
                 }
+              </ng-template>
+            </cmn-column>
+            <cmn-column key="day" header="Day" align="right">
+              <ng-template let-row cmnCell>
+                <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
               </ng-template>
             </cmn-column>
             <cmn-column key="value" listSlot="trailing" header="Value" align="right">
@@ -178,3 +186,22 @@
     </cmn-card>
   }
 </div>
+
+<ng-template #dayChange let-row>
+  @if (row.dayChangePct === null) {
+    <span
+      class="inline-block min-w-[4.5rem] text-right font-mono tabular-nums text-text-secondary"
+      data-testid="holding-day-change"
+      title="No quote for this holding"
+      >—</span
+    >
+  } @else {
+    <span
+      [class]="row.dayChangePct >= 0 ? pnlPositiveClass : pnlNegativeClass"
+      [title]="'Today: ' + (row.dayChangeUsd | money: 'USD' : {signed: true})"
+      class="inline-block min-w-[4.5rem] text-right font-mono tabular-nums"
+      data-testid="holding-day-change"
+      >{{ row.dayChangePct > 0 ? '+' : '' }}{{ row.dayChangePct | number: '1.2-2' }}%</span
+    >
+  }
+</ng-template>

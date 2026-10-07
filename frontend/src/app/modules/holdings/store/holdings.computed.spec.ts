@@ -21,13 +21,14 @@ function position(overrides: Partial<Position>): Position {
   };
 }
 
-function build(positions: Position[]) {
+function build(positions: Position[], dayChangePctByTicker: Record<string, number> = {}) {
   TestBed.configureTestingModule({providers: [{provide: ERROR_MESSAGES, useValue: {}}]});
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
       positions: signal(positions),
       positionsStatus: signal<HoldingsState['positionsStatus']>('idle'),
       positionsErrorCode: signal<Nullable<string>>(null),
+      dayChangePctByTicker: signal(dayChangePctByTicker),
     })
   );
 }
@@ -87,5 +88,28 @@ describe('holdingsComputed', () => {
     const computed = build([position({provider: 'mystery', currentValue: 1})]);
 
     expect(computed.positionsByAssetClass()[0].rows[0].providerLabel).toBe('mystery');
+  });
+
+  it('maps the day change onto equity rows and leaves rows without a quote empty', () => {
+    const computed = build(
+      [
+        position({symbol: 'AAPL', provider: 'ibkr', currentValue: 110, currentPrice: 110}),
+        position({symbol: 'MSFT', provider: 'ibkr', currentValue: 50, currentPrice: 50}),
+        position({symbol: 'BTC', provider: 'binance', currentValue: 60}),
+        position({symbol: 'EUR', provider: 'revolut_x', currentValue: 20, isVenueCash: true}),
+      ],
+      {AAPL: 10, BTC: 5}
+    );
+
+    const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
+    const bySymbol = (s: string) => rows.find(r => r.symbol === s);
+
+    expect(bySymbol('AAPL')?.dayChangePct).toBe(10);
+    expect(bySymbol('AAPL')?.dayChangeUsd).toBeCloseTo(10);
+    expect(bySymbol('MSFT')).toEqual(
+      expect.objectContaining({dayChangePct: null, dayChangeUsd: null})
+    );
+    expect(bySymbol('BTC')?.dayChangePct).toBeNull();
+    expect(bySymbol('EUR')?.dayChangePct).toBeNull();
   });
 });
