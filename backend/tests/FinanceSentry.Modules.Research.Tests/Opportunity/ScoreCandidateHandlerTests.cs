@@ -171,4 +171,37 @@ public sealed class ScoreCandidateHandlerTests
         result.Scorecard.Regime!.Rationale.Should().Contain("no_regime_data");
         result.Scorecard.Regime.AdjustedStructureScore.Should().Be(result.Scorecard.StructureScore);
     }
+    // #837: an annual-only filer (20-F, no quarterly facts) gets an evaluable fundamentals score on
+    // fiscal-year periods, and both the returned scorecard and the persisted score say so.
+    [Fact]
+    public async Task Handle_AnnualOnlyFiler_ScoresFundamentalsOnFiscalYearBasis()
+    {
+        static FundamentalFact Annual(string concept, decimal value, int fiscalYear)
+            => new("ZIM", concept, concept, "USD", value, new DateOnly(fiscalYear, 12, 31), "FY", fiscalYear, "20-F");
+
+        var facts = new List<FundamentalFact>
+        {
+            Annual("Revenue", 120m, 2025),
+            Annual("Revenue", 100m, 2024),
+            Annual("GrossProfit", 60m, 2025),
+            Annual("GrossProfit", 40m, 2024),
+            Annual("DilutedEPS", 3m, 2025),
+            Annual("DilutedEPS", 2m, 2024),
+        };
+        var scores = new FakeCandidateScoreRepository();
+        var handler = BuildHandler(new FakeCandidateRepository(), scores, facts: facts);
+
+        var result = await handler.Handle(new ScoreCandidateCommand(Guid.NewGuid(), "ZIM"), CancellationToken.None);
+
+        result.Scorecard.FundamentalsScore.Should().NotBeNull();
+        result.Scorecard.Evidence.FundamentalsBasis.Should().Be("annual");
+        result.Scorecard.Evidence.RevenueYoy.Should().Be(0.2m);
+        result.Scorecard.Evidence.GrossMarginLatest.Should().Be(0.5m);
+        result.Scorecard.Evidence.EpsYoy.Should().Be(0.5m);
+        result.Scorecard.Evidence.FundamentalsNotEvaluableReasons.Should().BeEmpty();
+
+        var persisted = scores.Scores.Should().ContainSingle().Subject;
+        persisted.FundamentalsScore.Should().Be(result.Scorecard.FundamentalsScore);
+        persisted.Evidence.FundamentalsBasis.Should().Be("annual");
+    }
 }

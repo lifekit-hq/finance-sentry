@@ -94,8 +94,8 @@ public static class FundamentalMath
         => prior == 0 ? null : (current - prior) / prior;
 
     /// <summary>
-    /// Latest quarterly year-over-year change of a raw concept (matches the same fiscal period one
-    /// year earlier), or null when not evaluable. Used by 019's fundamentals scorer.
+    /// Latest year-over-year change of a raw concept at the given cadence (default quarterly; matches
+    /// the same fiscal period one year earlier), or null when not evaluable. Used by 019's fundamentals scorer.
     /// </summary>
     public static decimal? LatestYoy(
         IReadOnlyList<FundamentalFact> facts, string concept, ThesisPeriodType periodType = ThesisPeriodType.Quarter)
