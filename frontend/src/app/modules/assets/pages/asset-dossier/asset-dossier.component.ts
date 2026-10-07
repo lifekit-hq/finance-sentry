@@ -5,6 +5,7 @@ import {
   AlertComponent,
   ButtonComponent,
   CardComponent,
+  type ChartDomain,
   type ChartPoint,
   CmnCellDirective,
   CmnColumnComponent,
@@ -30,6 +31,7 @@ import {DossierStore} from '../../store/dossier.store';
 const SEVERITY_VALUE: Record<string, number> = {high: 25, medium: 15, low: 5};
 const SEVERITY_DEFAULT = 5;
 const TREND_MIN_POINTS = 2;
+const TREND_SCALE_MAX = 30;
 const TREND_LABEL_FORMAT = 'mediumDate';
 const TREND_LOCALE = 'en-US';
 
@@ -70,6 +72,8 @@ export class AssetDossierComponent {
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
 
+  public readonly trendDomain: ChartDomain = {min: 0, max: TREND_SCALE_MAX};
+
   public readonly radarTrendPoints = computed((): ChartPoint[] | null => {
     const signals = this.store.dossier()?.radarSignals ?? [];
     if (signals.length < TREND_MIN_POINTS) {
@@ -79,6 +83,7 @@ export class AssetDossierComponent {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(s => ({
         label: formatDate(s.timestamp, TREND_LABEL_FORMAT, TREND_LOCALE),
+        time: new Date(s.timestamp).getTime(),
         value: SEVERITY_VALUE[s.severity] ?? SEVERITY_DEFAULT,
       }));
   });
