@@ -73,16 +73,16 @@ When ≥3 model interfaces share the same fields with identical types, extract a
 
 ## Utility Helpers — always a `*.utils.ts` class
 
-Pure helper functions are NEVER bare `export function`s in a random file. Each helper lives in `<domain>.utils.ts` (e.g. `error.utils.ts`, `time.utils.ts`) under `frontend/src/app/shared/utils/` (cross-module) or `frontend/src/app/modules/<feature>/utils/` (feature-local), as a class with `public static` methods:
+Pure helper functions are NEVER bare `export function`s in a random file. Each helper lives in `<domain>.utils.ts` (e.g. `error.utils.ts`, `money.utils.ts`) under `frontend/src/app/shared/utils/` (cross-module) or `frontend/src/app/modules/<feature>/utils/` (feature-local), as a class with `public static` methods:
 
 ```ts
-export class TimeUtils {
-  public static getRelativeTime(timestamp: Nullable<string>): string { ... }
+export class ErrorUtils {
+  public static extractCode(err: unknown): Nullable<string> { ... }
 }
 ```
 
 Rules:
-- One domain per file. `error.utils.ts` holds error helpers, `time.utils.ts` holds time helpers — never mix.
+- One domain per file. `error.utils.ts` holds error helpers, `money.utils.ts` holds money helpers — never mix.
 - Methods are `public static`, no instance state, no DI, no `inject()`. If you need DI, make it a service in `services/` instead.
 - **Template-bound helpers must have a thin pipe wrapper.** If any `*.html` calls the helper, create `shared/pipes/<name>.pipe.ts` (or `modules/<feature>/pipes/`) whose `transform()` just delegates to the static method. Templates use the pipe; components don't expose the function via `public readonly fooFn = fooFn`.
 - Every `*.utils.ts` ships with `<domain>.utils.spec.ts` (Vitest) — one branch per `it`, edge cases (null/undefined/empty), `vi.useFakeTimers()` for time-dependent helpers. Coverage on the util file: 100%.
