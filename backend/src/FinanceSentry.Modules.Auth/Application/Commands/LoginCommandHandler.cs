@@ -26,10 +26,10 @@ public class LoginCommandHandler(
         if (user is null)
             throw new InvalidCredentialsException();
 
-        // No password: a Google-only account, or an invite that has not been accepted yet.
+        // No password: an SSO-only account, or an invite that has not been accepted yet.
         if (user.PasswordHash is null)
             throw (await userManager.GetLoginsAsync(user)).Count > 0
-                ? new GoogleAccountOnlyException()
+                ? new ExternalAccountOnlyException()
                 : new InvalidCredentialsException();
 
         // Counts failures towards Identity lockout. A throttled account says so, otherwise the user retries blind;

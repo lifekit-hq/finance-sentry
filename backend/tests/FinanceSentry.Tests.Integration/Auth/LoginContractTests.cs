@@ -4,11 +4,8 @@ using FinanceSentry.API.Conventions;
 using System.Net;
 using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
-using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
-using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
-using Moq;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
@@ -20,7 +17,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 /// <summary>
@@ -173,28 +169,6 @@ public class AuthApiFactory : WebApplicationFactory<Program>
                     [1] = "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU="
                 };
             });
-
-            var mockVerifier = new Mock<IGoogleCredentialVerifier>();
-            mockVerifier
-                .Setup(v => v.VerifyAsync("valid-test-credential"))
-                .ReturnsAsync(new GoogleUserInfo("google-sub-123", "google@test.com", "Test User"));
-            mockVerifier
-                .Setup(v => v.VerifyAsync("new-user-credential"))
-                .ReturnsAsync(new GoogleUserInfo("google-sub-new", "newgoogle@test.com", "New User"));
-            mockVerifier
-                .Setup(v => v.VerifyAsync("link-credential"))
-                .ReturnsAsync(new GoogleUserInfo("google-sub-link", "link@test.com", "Link User"));
-            mockVerifier
-                .Setup(v => v.VerifyAsync("invited-credential"))
-                .ReturnsAsync(new GoogleUserInfo("google-sub-invited", "invited-google@test.com", "Invited User"));
-            mockVerifier
-                .Setup(v => v.VerifyAsync("revoked-credential"))
-                .ReturnsAsync(new GoogleUserInfo("google-sub-revoked", "revoked-google@test.com", "Revoked User"));
-            mockVerifier
-                .Setup(v => v.VerifyAsync("invalid-credential"))
-                .ThrowsAsync(new InvalidGoogleCredentialException());
-            services.RemoveAll<IGoogleCredentialVerifier>();
-            services.AddScoped(_ => mockVerifier.Object);
         });
 
         // The test server has no client address, so every anonymous call shares one partition.
@@ -210,7 +184,6 @@ public class AuthApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
         builder.UseSetting("Jwt:ExpiryMinutes", "60");
-        builder.UseSetting("GoogleOAuth:ClientId", "test-client-id");
     }
 
     public async Task EnsureUserExistsAsync(string email, string password)

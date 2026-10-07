@@ -35,7 +35,6 @@ public class ObservabilityApiFactory : WebApplicationFactory<Program>
             "dGVzdC1vbmx5LWtleS1ub3QtdGhlLWxlYWtlZC1vbmU=");
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
-        builder.UseSetting("GoogleOAuth:ClientId", "test-client-id");
     }
 
     private static void ReplaceWithInMemory<TContext>(

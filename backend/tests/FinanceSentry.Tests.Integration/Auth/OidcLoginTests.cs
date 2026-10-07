@@ -213,7 +213,7 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
             .Should().NotContain(c => c.StartsWith("fs_access_token=", StringComparison.Ordinal)
                                       || c.Contains("refresh", StringComparison.OrdinalIgnoreCase));
 
-    private sealed record MethodsShape(bool Oidc, bool PasswordLogin, bool GoogleDirect);
+    private sealed record MethodsShape(bool Oidc, bool PasswordLogin);
 }
 
 /// <summary>Merging the feature changes nothing until it is configured.</summary>
@@ -243,7 +243,7 @@ public class OidcDisabledTests(AuthApiFactory factory) : IClassFixture<AuthApiFa
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private sealed record MethodsShape(bool Oidc, bool PasswordLogin, bool GoogleDirect);
+    private sealed record MethodsShape(bool Oidc, bool PasswordLogin);
 }
 
 /// <summary>An API host whose server-side OIDC calls go to a back-channel address while the browser keeps the public one.</summary>

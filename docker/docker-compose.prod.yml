@@ -75,7 +75,6 @@ services:
       Encryption__Keys__1: ${ENCRYPTION_KEY_V1:-}
       Encryption__Keys__2: ${ENCRYPTION_KEY_V2:-}
       Encryption__CurrentKeyVersion: ${ENCRYPTION_CURRENT_KEY_VERSION:-2}
-      GOOGLEOAUTH__CLIENTID: ${GOOGLE_CLIENT_ID:-}
       # TrueLayer (Open Banking EU/UK). Production URLs — creds in .env are the
       # live console.truelayer.com set, not sandbox. Override with
       # TRUELAYER_AUTH_BASE_URL=https://auth.truelayer-sandbox.com to force
@@ -145,9 +144,6 @@ services:
       # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
-      # Direct Google sign-in button on the login page. Off by default in production (the org provider offers
-      # Google); set AUTH_GOOGLE_DIRECT_ENABLED=true to turn it back on.
-      Auth__GoogleDirect__Enabled: ${AUTH_GOOGLE_DIRECT_ENABLED:-false}
       # Inzhur sign-in runs in the inzhur-browser sidecar (owner-initiated only; the daily sync never opens it).
       Inzhur__BrowserUrl: http://inzhur-browser:9222
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).

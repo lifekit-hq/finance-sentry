@@ -2,7 +2,7 @@ import {expect, type Page, test} from '@playwright/test';
 
 // The e2e server sends the production nginx's security headers (docker/nginx.security-headers.conf,
 // see serve.mjs), so these specs prove the shipped CSP lets the built app run: the inline theme
-// bootstrap, the lazy bundles, and the Google Identity Services sign-in button.
+// bootstrap and the lazy bundles.
 
 // Origin-agnostic glob: the production build calls the relative '/api/v1'.
 const API = '**/api/v1';
@@ -17,28 +17,9 @@ const AUTH_RESPONSE = {
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
-const SIGN_IN_METHODS = {oidc: false, passwordLogin: true, googleDirect: true};
+const SIGN_IN_METHODS = {oidc: false, passwordLogin: true};
 
 const UNAUTHORIZED = 401;
-const GOOGLE_BUTTON_FRAME = 'iframe[src*="accounts.google.com/gsi/button"]';
-const GOOGLE_BUTTON_URL = 'https://accounts.google.com/gsi/button';
-const GOOGLE_TIMEOUT_MS = 20_000;
-const GOOGLE_CLIENT_URL = 'https://accounts.google.com/gsi/client';
-
-// Stand-in for the GIS script: same contract the sign-in button component calls (initialize,
-// renderButton, prompt, cancel), and renderButton injects the same button frame the real one does.
-const GOOGLE_CLIENT_STUB = `
-  window.google = {accounts: {id: {
-    initialize() {},
-    prompt() {},
-    cancel() {},
-    renderButton(container) {
-      const frame = document.createElement('iframe');
-      frame.src = '${GOOGLE_BUTTON_URL}?stub=1';
-      container.appendChild(frame);
-    },
-  }}};
-`;
 
 function json(body: unknown, status = 200) {
   return {status, contentType: 'application/json', body: JSON.stringify(body)};
@@ -94,40 +75,21 @@ test.describe('Security headers', () => {
 
     expect(imgHosts.length).toBeGreaterThan(0);
     expect(connectHosts).toEqual(expect.arrayContaining(imgHosts));
-    expect(connectHosts).toContain('https://accounts.google.com/gsi/');
     expect(csp).toContain("connect-src 'self'");
   });
 
-  // The browser enforces the CSP on the script and the frame before Playwright's route answers, so
-  // stubbing Google's responses keeps this a real CSP check while taking the live accounts.google.com
-  // network (flaky in CI) out of it: the GIS script is admitted and runs, and the browser is allowed
-  // to load the button frame from Google.
-  test('the login page loads the Google sign-in button with no CSP violation', async ({page}) => {
+  // The login page runs under the shipped CSP: the inline theme bootstrap is admitted by its hash and
+  // nothing the page loads is blocked.
+  test('the login page loads with no CSP violation', async ({page}) => {
     const violations = await recordCspViolations(page);
     await page.route(`${API}/**`, route => route.fulfill(json({}, UNAUTHORIZED)));
-    await page.route(GOOGLE_CLIENT_URL, route =>
-      route.fulfill({status: 200, contentType: 'text/javascript', body: GOOGLE_CLIENT_STUB})
-    );
-    await page.route(`${GOOGLE_BUTTON_URL}**`, route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<!doctype html><title>stub</title>',
-      })
-    );
     // Anonymous endpoint: answering it 401 would make the auth interceptor log out in a loop.
     await page.route(`${API}/auth/methods`, route => route.fulfill(json(SIGN_IN_METHODS)));
-    const buttonFrameLoaded = page.waitForResponse(
-      response => response.url().startsWith(GOOGLE_BUTTON_URL),
-      {timeout: GOOGLE_TIMEOUT_MS}
-    );
 
     await page.goto('/login');
 
-    // The inline theme bootstrap ran (admitted by its hash).
     await expect(page.locator('html')).toHaveAttribute('data-theme', /^(light|dark)$/);
-    await expect(page.locator(GOOGLE_BUTTON_FRAME)).toBeAttached({timeout: GOOGLE_TIMEOUT_MS});
-    await buttonFrameLoaded;
+    await expect(page.getByRole('button', {name: /sign in/i}).first()).toBeVisible();
     expect(await violations()).toEqual([]);
   });
 

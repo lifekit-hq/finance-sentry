@@ -32,10 +32,7 @@ function authServiceMock(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     login: vi.fn(),
     acceptInvite: vi.fn(),
-    verifyGoogleCredential: vi.fn(),
-    getSignInMethods: vi
-      .fn()
-      .mockReturnValue(of({oidc: false, passwordLogin: true, googleDirect: true})),
+    getSignInMethods: vi.fn().mockReturnValue(of({oidc: false, passwordLogin: true})),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
     logout: vi.fn().mockReturnValue(of(null)),
     getMe: vi.fn().mockReturnValue(throwError(() => new Error('no session'))),
@@ -86,7 +83,7 @@ describe('AuthStore (integration)', () => {
     const authService = authServiceMock({
       login: vi
         .fn()
-        .mockReturnValue(throwError(() => ({error: {errorCode: 'GOOGLE_ACCOUNT_ONLY'}}))),
+        .mockReturnValue(throwError(() => ({error: {errorCode: 'EXTERNAL_ACCOUNT_ONLY'}}))),
     });
     configure(authService);
 
@@ -94,7 +91,7 @@ describe('AuthStore (integration)', () => {
     store.login({email: 'a@b.c', password: 'pw'});
 
     expect(store.userId()).toBeNull();
-    expect(store.errorMessage()).toContain('Continue with Google');
+    expect(store.errorMessage()).toContain('single sign-on');
   });
 
   it('logout clears userId and email and navigates', () => {

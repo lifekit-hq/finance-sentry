@@ -17,7 +17,6 @@ export interface SignInMethods {
   /** The org identity provider (OIDC) login is configured. */
   oidc: boolean;
   passwordLogin: boolean;
-  googleDirect: boolean;
 }
 
 export interface UserDto {

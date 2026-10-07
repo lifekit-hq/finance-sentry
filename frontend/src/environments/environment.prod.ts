@@ -7,5 +7,4 @@ export const environment = {
   apiBaseUrl: '/api/v1',
   apiVersion: 'v1',
   wsUrl: '/ws',
-  googleClientId: '687161855116-17f9guiugj8cdlat8h8c1vn5ji1irt8p.apps.googleusercontent.com',
 };

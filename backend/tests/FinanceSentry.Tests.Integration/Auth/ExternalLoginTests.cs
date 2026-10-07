@@ -13,8 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// The provider-agnostic external sign-in (<see cref="ExternalLoginCommand"/>) and the switches that turn the
-/// password and direct-Google endpoints off.
+/// The provider-agnostic external sign-in (<see cref="ExternalLoginCommand"/>) and the switch that turns the
+/// password endpoint off.
 /// </summary>
 public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
@@ -83,37 +83,57 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
     }
 
     [Fact]
-    public async Task PasswordLoginDisabled_LoginReturns403AndGoogleStillWorks()
+    public async Task AccountWithOnlyTheRetiredDirectGoogleLogin_IsRelinkedByVerifiedEmail()
     {
-        await factory.EnsureUserExistsAsync("google@test.com", "TestPass123!");
+        // The retired direct-Google path left a "Google" row in AspNetUserLogins and no other login.
+        await factory.EnsureUserExistsAsync("ext-google-only@test.com", "TestPass123!");
+        string userId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByEmailAsync("ext-google-only@test.com"))!;
+            userId = user.Id;
+            (await users.AddLoginAsync(user, new UserLoginInfo("Google", "google-sub-friend", "Google"))).Succeeded.Should().BeTrue();
+        }
+
+        var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-google-only", "ext-google-only@test.com", true));
+
+        result.Response.User.Id.ToString().Should().Be(userId);
+        using var verify = factory.Services.CreateScope();
+        var verifyUsers = verify.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var logins = await verifyUsers.GetLoginsAsync((await verifyUsers.FindByIdAsync(userId))!);
+        logins.Select(l => l.LoginProvider).Should().BeEquivalentTo("Google", Provider);
+    }
+
+    [Fact]
+    public async Task AccountWithOnlyTheRetiredDirectGoogleLogin_IsNotRelinkedByUnverifiedEmail()
+    {
+        await factory.EnsureUserExistsAsync("ext-google-unverified@test.com", "TestPass123!");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            await users.AddLoginAsync((await users.FindByEmailAsync("ext-google-unverified@test.com"))!,
+                new UserLoginInfo("Google", "google-sub-unverified", "Google"));
+        }
+
+        var act = () => SignInAsync(new ExternalLoginCommand(Provider, "sub-google-unverified", "ext-google-unverified@test.com", false));
+
+        await act.Should().ThrowAsync<AccountNotInvitedException>();
+        (await FindByLoginAsync("sub-google-unverified")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PasswordLoginDisabled_LoginReturns403()
+    {
+        await factory.EnsureUserExistsAsync("pw-off@test.com", "TestPass123!");
         using var disabled = factory.WithWebHostBuilder(b => b.UseSetting("Auth:PasswordLogin:Enabled", "false"));
         var client = disabled.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var login = await client.PostAsJsonAsync("/api/v1/auth/login",
-            new { email = "google@test.com", password = "TestPass123!" });
-        var google = await client.PostAsJsonAsync("/api/v1/auth/google/verify",
-            new { credential = "valid-test-credential" });
+            new { email = "pw-off@test.com", password = "TestPass123!" });
 
         login.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await login.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
-        google.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task GoogleDirectDisabled_GoogleVerifyReturns403AndPasswordLoginStillWorks()
-    {
-        await factory.EnsureUserExistsAsync("google@test.com", "TestPass123!");
-        using var disabled = factory.WithWebHostBuilder(b => b.UseSetting("Auth:GoogleDirect:Enabled", "false"));
-        var client = disabled.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-        var google = await client.PostAsJsonAsync("/api/v1/auth/google/verify",
-            new { credential = "valid-test-credential" });
-        var login = await client.PostAsJsonAsync("/api/v1/auth/login",
-            new { email = "google@test.com", password = "TestPass123!" });
-
-        google.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await google.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
-        login.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private async Task<AuthResult> SignInAsync(ExternalLoginCommand command)

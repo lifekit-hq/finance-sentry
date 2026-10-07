@@ -35,10 +35,6 @@ export class AuthService extends ApiService {
     return this.post<AuthResponse>('refresh');
   }
 
-  public verifyGoogleCredential(credential: string): Observable<AuthResponse> {
-    return this.post<AuthResponse>('google/verify', {credential});
-  }
-
   public logout(): Observable<unknown> {
     return this.post<unknown>('logout');
   }

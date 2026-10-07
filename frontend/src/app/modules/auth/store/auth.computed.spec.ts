@@ -105,10 +105,10 @@ describe('authComputed', () => {
   });
 
   describe('errorMessage', () => {
-    it('maps GOOGLE_ACCOUNT_ONLY to the google prompt', () => {
-      const store = build({errorCode: 'GOOGLE_ACCOUNT_ONLY', flow: 'login'});
+    it('maps EXTERNAL_ACCOUNT_ONLY to the single sign-on prompt', () => {
+      const store = build({errorCode: 'EXTERNAL_ACCOUNT_ONLY', flow: 'login'});
       TestBed.runInInjectionContext(() => {
-        expect(authComputed(store).errorMessage()).toContain('Continue with Google');
+        expect(authComputed(store).errorMessage()).toContain('single sign-on');
       });
     });
 
@@ -140,8 +140,8 @@ describe('authComputed', () => {
       });
     });
 
-    it('maps ACCOUNT_NOT_INVITED on the google flow', () => {
-      const store = build({errorCode: 'ACCOUNT_NOT_INVITED', flow: 'google'});
+    it('maps ACCOUNT_NOT_INVITED on the accept-invite flow', () => {
+      const store = build({errorCode: 'ACCOUNT_NOT_INVITED', flow: 'acceptInvite'});
       TestBed.runInInjectionContext(() => {
         expect(authComputed(store).errorMessage()).toContain('Ask the owner for an invite');
       });
@@ -172,8 +172,8 @@ describe('authComputed', () => {
       });
     });
 
-    it('returns empty string for unknown code on google flow', () => {
-      const store = build({errorCode: 'SOME_OTHER_CODE', flow: 'google'});
+    it('returns empty string for unknown code outside a flow', () => {
+      const store = build({errorCode: 'SOME_OTHER_CODE', flow: null});
       TestBed.runInInjectionContext(() => {
         expect(authComputed(store).errorMessage()).toBe('');
       });

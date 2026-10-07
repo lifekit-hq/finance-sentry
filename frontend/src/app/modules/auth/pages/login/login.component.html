@@ -25,6 +25,11 @@
         class="block w-full mb-cmn-6"
         >Sign in</cmn-button
       >
+      @if (oidcOnly() && !flashMessage()) {
+        <p class="text-center text-cmn-sm text-text-secondary mb-cmn-6">
+          Taking you to the sign-in page…
+        </p>
+      }
     }
 
     @if (methods?.passwordLogin) {
@@ -78,28 +83,6 @@
         >
       </form>
     }
-
-    @if (methods?.googleDirect) {
-      @if (methods?.passwordLogin || methods?.oidc) {
-        <div class="flex items-center gap-cmn-3 mb-cmn-6">
-          <div class="flex-1 h-px bg-border-default"></div>
-          <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
-          <div class="flex-1 h-px bg-border-default"></div>
-        </div>
-      }
-    }
-
-    <!-- Always in the DOM: its width is measured once after first render, before the methods have loaded. -->
-    <div #googleContainer [class.mb-cmn-6]="methods?.googleDirect" class="flex justify-center">
-      @if (methods?.googleDirect && googleButtonConfig(); as config) {
-        <cmn-google-sign-in-button
-          [clientId]="googleClientId"
-          [locale]="googleLocale"
-          [buttonConfiguration]="config"
-          (credential)="onGoogleCredential($event)"
-        />
-      }
-    </div>
 
     <p class="text-center text-cmn-sm text-text-secondary">
       New here? Ask the account owner for an invite link.

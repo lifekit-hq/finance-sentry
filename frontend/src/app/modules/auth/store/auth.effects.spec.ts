@@ -12,9 +12,10 @@ import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
-import {type AuthResponse} from '../models/auth/auth.model';
+import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
+import {type FlashMessage} from './auth.state';
 
 const SAMPLE_RESPONSE: AuthResponse = {
   user: {id: 'u-1', email: 'user@test.com', roles: [], permissions: []},
@@ -22,13 +23,14 @@ const SAMPLE_RESPONSE: AuthResponse = {
 };
 
 function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<string>} = {}) {
+  const flashMessage = signal<Nullable<FlashMessage>>(null);
   return {
     applyAuthResponse: vi.fn(),
     clearSession: vi.fn(),
     setLoading: vi.fn(),
     setError: vi.fn(),
     setReturnUrl: vi.fn(),
-    setFlashMessage: vi.fn(),
+    setFlashMessage: vi.fn((message: Nullable<FlashMessage>) => flashMessage.set(message)),
     setProfileName: vi.fn(),
     setSignInMethods: vi.fn(),
     loadProfileName: vi.fn(),
@@ -36,6 +38,9 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     firstName: signal<Nullable<string>>(null),
     isAuthenticated: signal(overrides.isAuthenticated ?? false),
     returnUrl: signal<Nullable<string>>(overrides.returnUrl ?? null),
+    signInMethods: signal<Nullable<SignInMethods>>(null),
+    flashMessage,
+    startOidcSignIn: vi.fn(),
   };
 }
 
@@ -43,7 +48,6 @@ function buildService() {
   return {
     login: vi.fn(),
     acceptInvite: vi.fn(),
-    verifyGoogleCredential: vi.fn(),
     getSignInMethods: vi.fn().mockReturnValue(of(FALLBACK_SIGN_IN_METHODS)),
     logout: vi.fn().mockReturnValue(of(null)),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
@@ -184,23 +188,6 @@ describe('authEffects', () => {
     });
   });
 
-  describe('verifyGoogleCredential', () => {
-    it('tags the flow as google', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.verifyGoogleCredential.mockReturnValue(of(SAMPLE_RESPONSE));
-      configure(service, buildRouter());
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).verifyGoogleCredential('google-credential-string');
-      });
-
-      expect(store.setLoading).toHaveBeenCalledWith('google');
-      expect(service.verifyGoogleCredential).toHaveBeenCalledWith('google-credential-string');
-      expect(store.applyAuthResponse).toHaveBeenCalledWith(SAMPLE_RESPONSE);
-    });
-  });
-
   describe('logout', () => {
     it('calls service.logout, clears session, and navigates to login', () => {
       const store = buildStore({isAuthenticated: true});
@@ -215,7 +202,9 @@ describe('authEffects', () => {
       expect(pushSession.release).toHaveBeenCalled();
       expect(service.logout).toHaveBeenCalled();
       expect(store.clearSession).toHaveBeenCalled();
-      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
+      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
+        queryParams: {info: 'signed_out'},
+      });
     });
 
     it('does not release push when the session is already cleared', () => {
@@ -242,7 +231,9 @@ describe('authEffects', () => {
         TestBed.runInInjectionContext(() => authEffects(store).logout());
       }).not.toThrow();
       expect(store.clearSession).toHaveBeenCalled();
-      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login]);
+      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
+        queryParams: {info: 'signed_out'},
+      });
     });
   });
 
@@ -265,7 +256,7 @@ describe('authEffects', () => {
     it('stores the methods the API reports', () => {
       const store = buildStore();
       const service = buildService();
-      const methods = {oidc: true, passwordLogin: false, googleDirect: false};
+      const methods = {oidc: true, passwordLogin: false};
       service.getSignInMethods.mockReturnValue(of(methods));
       configure(service, buildRouter());
 
@@ -346,7 +337,7 @@ describe('authHooks', () => {
     const router = buildRouter('/login');
     setQueryParams(router, [
       ['returnUrl', '/dashboard'],
-      ['info', 'google_cancelled'],
+      ['info', 'signed_out'],
     ]);
     configure(buildService(), router);
 
@@ -355,7 +346,7 @@ describe('authHooks', () => {
     expect(store.setReturnUrl).toHaveBeenCalledWith('/dashboard');
     expect(store.setFlashMessage).toHaveBeenCalledWith({
       kind: 'info',
-      text: expect.stringContaining('cancelled'),
+      text: 'You have been signed out.',
     });
   });
 
@@ -382,7 +373,7 @@ describe('authHooks', () => {
     });
   });
 
-  it('shows no flash for an error code the registry does not know', () => {
+  it('shows a generic flash for an error code the registry does not know', () => {
     const store = buildStore();
     const router = buildRouter('/login');
     setQueryParams(router, [['error', 'SOMETHING_ELSE']]);
@@ -390,7 +381,10 @@ describe('authHooks', () => {
 
     TestBed.runInInjectionContext(() => authHooks(store));
 
-    expect(store.setFlashMessage).toHaveBeenCalledWith(null);
+    expect(store.setFlashMessage).toHaveBeenCalledWith({
+      kind: 'error',
+      text: 'Sign-in failed. Please try again.',
+    });
   });
 
   it('re-reads query params on NavigationEnd', () => {
@@ -402,14 +396,84 @@ describe('authHooks', () => {
     store.setReturnUrl.mockClear();
     store.setFlashMessage.mockClear();
 
-    setQueryParams(router, [['error', 'google_failed']]);
+    setQueryParams(router, [['error', 'OIDC_FAILED']]);
     router.events.next(
-      new NavigationEnd(1, '/login?error=google_failed', '/login?error=google_failed')
+      new NavigationEnd(1, '/login?error=OIDC_FAILED', '/login?error=OIDC_FAILED')
     );
 
     expect(store.setFlashMessage).toHaveBeenLastCalledWith({
       kind: 'error',
       text: expect.stringContaining('failed'),
+    });
+  });
+
+  describe('OIDC-only forward', () => {
+    const OIDC_ONLY: SignInMethods = {oidc: true, passwordLogin: false};
+
+    function hooksOn(url: string, params: [string, string][] = [], isAuthenticated = false) {
+      const store = buildStore({isAuthenticated});
+      const router = buildRouter(url);
+      setQueryParams(router, params);
+      configure(buildService(), router);
+      TestBed.runInInjectionContext(() => authHooks(store));
+      return {store, router};
+    }
+
+    it('forwards /login straight to the identity provider once the methods say OIDC is the only way in', () => {
+      const {store} = hooksOn('/login');
+
+      store.signInMethods.set(OIDC_ONLY);
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).toHaveBeenCalledOnce();
+    });
+
+    it('keeps the form when password sign-in is still enabled', () => {
+      const {store} = hooksOn('/login');
+
+      store.signInMethods.set({oidc: true, passwordLogin: true});
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).not.toHaveBeenCalled();
+    });
+
+    it('does not forward before the methods are known', () => {
+      const {store} = hooksOn('/login');
+
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a failed return from the provider', 'error', 'OIDC_FAILED'],
+      ['an unregistered error code', 'error', 'SOMETHING_ELSE'],
+      ['a sign-out', 'info', 'signed_out'],
+    ])('holds the forward after %s so the page can show it', (_label, key, value) => {
+      const {store} = hooksOn(`/login?${key}=${value}`, [[key, value]]);
+
+      store.signInMethods.set(OIDC_ONLY);
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).not.toHaveBeenCalled();
+    });
+
+    it('does not forward from other pages such as the invite page', () => {
+      const {store} = hooksOn(`${AppRoute.AcceptInvite}?user=u-1&token=t`);
+
+      store.signInMethods.set(OIDC_ONLY);
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).not.toHaveBeenCalled();
+    });
+
+    it('does not forward a signed-in session', () => {
+      const {store} = hooksOn('/login', [], true);
+
+      store.signInMethods.set(OIDC_ONLY);
+      TestBed.flushEffects();
+
+      expect(store.startOidcSignIn).not.toHaveBeenCalled();
     });
   });
 

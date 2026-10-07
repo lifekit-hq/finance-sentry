@@ -6,8 +6,6 @@ public class AuthSignInOptions
     public const string SectionName = "Auth";
 
     public SignInMethodOptions PasswordLogin { get; set; } = new();
-
-    public SignInMethodOptions GoogleDirect { get; set; } = new();
 }
 
 public class SignInMethodOptions
