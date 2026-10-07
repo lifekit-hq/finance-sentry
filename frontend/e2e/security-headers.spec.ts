@@ -57,6 +57,15 @@ async function recordCspViolations(page: Page): Promise<() => Promise<string[]>>
     page.evaluate(() => (window as unknown as {cspViolations: string[]}).cspViolations ?? []);
 }
 
+/** The remote (https) sources a directive lists in a CSP. */
+function remoteSources(csp: string, directive: string): string[] {
+  const sources = csp
+    .split(';')
+    .map(part => part.trim().split(/\s+/))
+    .find(([name]) => name === directive);
+  return (sources ?? []).filter(source => source.startsWith('https://')).sort();
+}
+
 test.describe('Security headers', () => {
   test('the document carries the CSP and the hardening headers', async ({page}) => {
     await page.route(`${API}/**`, route => route.fulfill(json({}, UNAUTHORIZED)));
@@ -69,6 +78,24 @@ test.describe('Security headers', () => {
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['permissions-policy']).toBeTruthy();
+  });
+
+  // The Angular service worker fetches cross-origin logos itself; that fetch is checked against the
+  // connect-src of the /ngsw-worker.js response, so every host img-src admits must be listed there
+  // too (service-worker-csp.spec.ts proves it loads). Anything else in img-src or connect-src is a
+  // deliberate, separate decision.
+  test('the worker script is served with a connect-src covering every img-src host', async ({
+    request,
+  }) => {
+    const response = await request.get('/ngsw-worker.js');
+    const csp = response.headers()['content-security-policy'] ?? '';
+    const imgHosts = remoteSources(csp, 'img-src');
+    const connectHosts = remoteSources(csp, 'connect-src');
+
+    expect(imgHosts.length).toBeGreaterThan(0);
+    expect(connectHosts).toEqual(expect.arrayContaining(imgHosts));
+    expect(connectHosts).toContain('https://accounts.google.com/gsi/');
+    expect(csp).toContain("connect-src 'self'");
   });
 
   // The browser enforces the CSP on the script and the frame before Playwright's route answers, so
