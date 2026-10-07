@@ -94,6 +94,10 @@ services:
       # needed. Set BaseUrl+Token to enable (auto-selected when no Anthropic key is present).
       Agent__OpenClaw__BaseUrl: ${OPENCLAW_GATEWAY_URL:-}
       Agent__OpenClaw__Token: ${OPENCLAW_GATEWAY_TOKEN:-}
+      # Companion realtime wake (#643): POST to the gateway's finance-sentry-companion hook mapping.
+      # Empty URL = no push; the pulse stays as the backstop either way.
+      Companion__AgentTriggerUrl: ${COMPANION_AGENT_TRIGGER_URL:-}
+      Companion__AgentTriggerToken: ${COMPANION_AGENT_TRIGGER_TOKEN:-}
       # Off-host encrypted backups (feature 024). Empty = backup jobs no-op (dev/local safe).
       Backup__R2Endpoint: ${BACKUP_R2_ENDPOINT:-}
       Backup__R2Bucket: ${BACKUP_R2_BUCKET:-}
