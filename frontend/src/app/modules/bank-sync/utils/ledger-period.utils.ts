@@ -1,23 +1,10 @@
 import {DateRangeUtils} from '../../../shared/utils/date-range.utils';
+import {LEDGER_PERIODS} from '../constants/ledger-period/ledger-period.constants';
+import {
+  type LedgerPeriod,
+  type LedgerPeriodDates,
+} from '../models/ledger-period/ledger-period.model';
 import {DashboardRangeUtils} from './dashboard-range.utils';
-
-export type LedgerPeriod = 'this-month' | 'last-month' | '3m';
-
-export interface LedgerPeriodDates {
-  from: string;
-  to: string;
-}
-
-export interface LedgerPeriodOption {
-  id: LedgerPeriod;
-  label: string;
-}
-
-export const LEDGER_PERIODS: readonly LedgerPeriodOption[] = [
-  {id: 'this-month', label: 'This month'},
-  {id: 'last-month', label: 'Last month'},
-  {id: '3m', label: '3M'},
-];
 
 export class LedgerPeriodUtils {
   /**

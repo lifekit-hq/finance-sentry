@@ -22,6 +22,8 @@ import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.p
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
+import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
+import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
   type TransactionType,
@@ -29,11 +31,7 @@ import {
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
-import {
-  LEDGER_PERIODS,
-  type LedgerPeriod,
-  LedgerPeriodUtils,
-} from '../../utils/ledger-period.utils';
+import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
@@ -158,10 +156,6 @@ export class TransactionLedgerComponent {
   }
 
   public selectPeriod(period: LedgerPeriod): void {
-    if (this.activePeriod() === period) {
-      this.clearDateRange();
-      return;
-    }
     void this.router.navigate([], {
       queryParams: LedgerPeriodUtils.dates(period),
       queryParamsHandling: 'merge',

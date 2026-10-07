@@ -66,13 +66,20 @@ test.describe('Transaction ledger — quick period chips', () => {
     await page.getByTestId('period-this-month').click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
     await expect(page.getByText('Synthetic current row')).toBeVisible();
+    await expect(page.getByTestId('period-this-month').getByRole('button')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await expect(page.getByTestId('date-range-chip')).toBeVisible();
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/);
 
     // A custom range matches no chip; the Dates chip stays, no period chip is selected.
     await page.goto('/transactions?from=2020-01-01&to=2020-01-31');
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
-    await expect(page.getByTestId('period-this-month')).not.toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('period-this-month').getByRole('button')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
 
     // Clearing the dates clears the chip and restores the full list.
     await page.getByTestId('date-range-chip').click();
