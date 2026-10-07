@@ -31,7 +31,7 @@
   <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
     <a
       [routerLink]="transactionsRoute"
-      [queryParams]="ledgerParams({type: 'credit'})"
+      [queryParams]="cardParams('credit')"
       class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
       data-testid="breakdown-income-link"
       aria-label="View the income transactions"
@@ -45,7 +45,7 @@
     </a>
     <a
       [routerLink]="transactionsRoute"
-      [queryParams]="ledgerParams({type: 'debit'})"
+      [queryParams]="cardParams('debit')"
       class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
       data-testid="breakdown-spending-link"
       aria-label="View the spending transactions"

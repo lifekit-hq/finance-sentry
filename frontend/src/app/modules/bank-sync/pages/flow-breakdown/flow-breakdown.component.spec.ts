@@ -40,7 +40,8 @@ const drawer = {open: vi.fn()};
 
 function render(
   group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP,
-  range: Nullable<{from: Nullable<string>; to: string; months: number}> = null
+  range: Nullable<{from: Nullable<string>; to: string; months: number}> = null,
+  accountFilter: Nullable<string> = null
 ) {
   const store = {
     month: signal('2026-09'),
@@ -49,7 +50,7 @@ function render(
     isEmpty: signal(false),
     errorMessage: signal(null),
     accountChips: signal([]),
-    accountFilter: signal(null),
+    accountFilter: signal(accountFilter),
     groups: signal([group]),
     incomeFormatted: signal('$0'),
     spendingFormatted: signal('$100'),
@@ -155,6 +156,21 @@ describe('FlowBreakdownComponent drill-downs', () => {
     TestBed.resetTestingModule();
     const allTime = render(GROUP, {from: null, to: '2026-10-17', months: 120});
     expect(href(allTime, 'breakdown-income-link')).toBe('/transactions?type=credit&to=2026-10-17');
+  });
+
+  it('carries a selected account chip into the card links and omits it otherwise', () => {
+    const chipped = render(GROUP, null, 'a1');
+    expect(href(chipped, 'breakdown-income-link')).toBe(
+      '/transactions?type=credit&account=a1&from=2026-09-01&to=2026-09-30'
+    );
+    expect(href(chipped, 'breakdown-spending-link')).toBe(
+      '/transactions?type=debit&account=a1&from=2026-09-01&to=2026-09-30'
+    );
+
+    TestBed.resetTestingModule();
+    expect(href(render(), 'breakdown-income-link')).toBe(
+      '/transactions?type=credit&from=2026-09-01&to=2026-09-30'
+    );
   });
 
   it('links the account text to the ledger for that account and window', () => {

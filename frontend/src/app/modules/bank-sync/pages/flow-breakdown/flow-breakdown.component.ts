@@ -77,6 +77,11 @@ export class FlowBreakdownComponent {
     return {...extra, ...this.windowDates()};
   }
 
+  public cardParams(type: 'credit' | 'debit'): Record<string, string> {
+    const account = this.store.accountFilter();
+    return this.ledgerParams(account ? {type, account} : {type});
+  }
+
   public openTransaction(item: FlowBreakdownItem): void {
     this.drawer.open(TransactionDrawerComponent, {
       title: item.description,
