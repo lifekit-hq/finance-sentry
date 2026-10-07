@@ -1,16 +1,19 @@
+import {EQUITY_INSTRUMENT_TYPE} from '../constants/position/position.constants';
 import {type Position} from '../models/position/position.model';
 import {type QuoteDto} from '../models/quote/quote.model';
 
 const PERCENT_SCALE = 100;
 
 export class DayChangeUtils {
-  /** Tickers worth quoting: equities only - crypto assets and venue cash have no research quote. */
-  public static quotableTickers(
-    positions: Position[],
-    cryptoProviders: ReadonlySet<string>
-  ): string[] {
+  /** Listed stocks only - cash, bonds, funds and crypto rows have no research quote. */
+  public static isQuotable(position: Position): boolean {
+    return position.instrumentType?.toUpperCase() === EQUITY_INSTRUMENT_TYPE;
+  }
+
+  /** Tickers worth quoting, upper-cased and de-duplicated across brokers. */
+  public static quotableTickers(positions: Position[]): string[] {
     const tickers = positions
-      .filter(p => !p.isVenueCash && !cryptoProviders.has(p.provider))
+      .filter(p => DayChangeUtils.isQuotable(p))
       .map(p => p.symbol.toUpperCase());
     return [...new Set(tickers)];
   }

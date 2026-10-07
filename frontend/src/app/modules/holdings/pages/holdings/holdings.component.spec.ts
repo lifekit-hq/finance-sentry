@@ -71,6 +71,7 @@ describe('InvestmentsComponent — positions view', () => {
         {
           symbol: 'DRAM',
           provider: 'ibkr',
+          instrumentType: 'STK',
           quantity: 10,
           currentValue: 100,
           currentPrice: 10,
@@ -81,6 +82,7 @@ describe('InvestmentsComponent — positions view', () => {
         {
           symbol: 'SOL',
           provider: 'binance',
+          instrumentType: null,
           quantity: 1,
           currentValue: 50,
           currentPrice: 50,

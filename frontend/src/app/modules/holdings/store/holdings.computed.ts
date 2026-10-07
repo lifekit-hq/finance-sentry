@@ -5,6 +5,7 @@ import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
+import {CRYPTO_PROVIDERS} from '../constants/position/position.constants';
 import {type Position} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
 import {type HoldingsState} from './holdings.state';
@@ -65,8 +66,6 @@ const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
   venueCash: SERIES.green,
 };
 
-export const CRYPTO_PROVIDERS = new Set<string>(['binance', 'revolut_x']);
-
 function resolveAssetClass(position: Position): AssetClass {
   if (position.isVenueCash) {
     return 'venueCash';
@@ -89,8 +88,9 @@ export function holdingsComputed(store: StateSignals) {
 
     for (const p of positions) {
       const assetClass = resolveAssetClass(p);
-      const dayChangePct =
-        assetClass === 'equity' ? (dayChanges[p.symbol.toUpperCase()] ?? null) : null;
+      const dayChangePct = DayChangeUtils.isQuotable(p)
+        ? (dayChanges[p.symbol.toUpperCase()] ?? null)
+        : null;
       const row: PositionRow = {
         symbol: p.symbol,
         provider: p.provider,

@@ -8,6 +8,7 @@ function position(overrides: Partial<Position>): Position {
   return {
     symbol: 'AAPL',
     provider: 'ibkr',
+    instrumentType: 'STK',
     quantity: 1,
     currentValue: 100,
     currentPrice: 100,
@@ -32,24 +33,22 @@ function quote(overrides: Partial<QuoteDto>): QuoteDto {
 
 describe('DayChangeUtils', () => {
   describe('quotableTickers', () => {
-    const crypto = new Set(['binance']);
-
-    it('keeps equities, upper-cased and de-duplicated across brokers', () => {
-      const tickers = DayChangeUtils.quotableTickers(
-        [position({symbol: 'aapl'}), position({symbol: 'AAPL', provider: 'other'})],
-        crypto
-      );
+    it('keeps stocks, upper-cased and de-duplicated across brokers', () => {
+      const tickers = DayChangeUtils.quotableTickers([
+        position({symbol: 'aapl'}),
+        position({symbol: 'AAPL', provider: 'other', instrumentType: 'stk'}),
+      ]);
       expect(tickers).toEqual(['AAPL']);
     });
 
-    it('skips crypto venues and venue cash', () => {
-      const tickers = DayChangeUtils.quotableTickers(
-        [
-          position({symbol: 'BTC', provider: 'binance'}),
-          position({symbol: 'EUR', provider: 'revolut_x', isVenueCash: true}),
-        ],
-        crypto
-      );
+    it('skips crypto, venue cash and non-stock brokerage rows', () => {
+      const tickers = DayChangeUtils.quotableTickers([
+        position({symbol: 'BTC', provider: 'binance', instrumentType: null}),
+        position({symbol: 'EUR', provider: 'revolut_x', instrumentType: null, isVenueCash: true}),
+        position({symbol: 'USD Cash', instrumentType: 'CASH'}),
+        position({symbol: 'UA4000227045', instrumentType: 'BOND'}),
+        position({symbol: 'Fund A', provider: 'inzhur', instrumentType: 'REIT'}),
+      ]);
       expect(tickers).toEqual([]);
     });
   });

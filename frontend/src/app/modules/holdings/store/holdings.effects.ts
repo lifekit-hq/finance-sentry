@@ -7,7 +7,6 @@ import {type Position} from '../models/position/position.model';
 import {PositionsService} from '../services/positions.service';
 import {QuotesService} from '../services/quotes.service';
 import {DayChangeUtils} from '../utils/day-change.utils';
-import {CRYPTO_PROVIDERS} from './holdings.computed';
 
 interface StoreMethods {
   setPositionsLoading(): void;
@@ -42,7 +41,7 @@ export function holdingsEffects(store: StoreMethods) {
         positionsService.getPositions().pipe(
           tap(positions => {
             store.setPositions(positions);
-            loadQuotes(DayChangeUtils.quotableTickers(positions, CRYPTO_PROVIDERS));
+            loadQuotes(DayChangeUtils.quotableTickers(positions));
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setPositionsError(code),

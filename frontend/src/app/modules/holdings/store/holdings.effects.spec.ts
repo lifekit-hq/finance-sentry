@@ -11,6 +11,7 @@ const FAKE_POSITIONS: Position[] = [];
 const EQUITY: Position = {
   symbol: 'AAPL',
   provider: 'ibkr',
+  instrumentType: 'STK',
   quantity: 1,
   currentValue: 110,
   currentPrice: 110,
@@ -81,7 +82,11 @@ describe('holdingsEffects', () => {
     const store = buildStore();
     const positions = buildPositions();
     positions.getPositions.mockReturnValue(
-      of([EQUITY, {...EQUITY, provider: 'binance', symbol: 'BTC'}])
+      of([
+        EQUITY,
+        {...EQUITY, provider: 'binance', symbol: 'BTC', instrumentType: null},
+        {...EQUITY, symbol: 'USD Cash', instrumentType: 'CASH'},
+      ])
     );
     const quotes = {
       getQuotes: vi.fn().mockReturnValue(

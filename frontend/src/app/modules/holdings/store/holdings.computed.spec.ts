@@ -11,6 +11,7 @@ function position(overrides: Partial<Position>): Position {
   return {
     symbol: 'BTC',
     provider: 'revolut_x',
+    instrumentType: null,
     quantity: 1,
     currentValue: 0,
     currentPrice: 0,
@@ -90,15 +91,17 @@ describe('holdingsComputed', () => {
     expect(computed.positionsByAssetClass()[0].rows[0].providerLabel).toBe('mystery');
   });
 
-  it('maps the day change onto equity rows and leaves rows without a quote empty', () => {
+  it('maps the day change onto stock rows and leaves rows without a quote empty', () => {
+    const stock = {provider: 'ibkr', instrumentType: 'STK'};
     const computed = build(
       [
-        position({symbol: 'AAPL', provider: 'ibkr', currentValue: 110, currentPrice: 110}),
-        position({symbol: 'MSFT', provider: 'ibkr', currentValue: 50, currentPrice: 50}),
+        position({...stock, symbol: 'AAPL', currentValue: 110, currentPrice: 110}),
+        position({...stock, symbol: 'MSFT', currentValue: 50, currentPrice: 50}),
         position({symbol: 'BTC', provider: 'binance', currentValue: 60}),
         position({symbol: 'EUR', provider: 'revolut_x', currentValue: 20, isVenueCash: true}),
+        position({symbol: 'USD Cash', provider: 'ibkr', instrumentType: 'CASH', currentValue: 5}),
       ],
-      {AAPL: 10, BTC: 5}
+      {AAPL: 10, BTC: 5, 'USD CASH': 1}
     );
 
     const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
@@ -111,5 +114,6 @@ describe('holdingsComputed', () => {
     );
     expect(bySymbol('BTC')?.dayChangePct).toBeNull();
     expect(bySymbol('EUR')?.dayChangePct).toBeNull();
+    expect(bySymbol('USD Cash')?.dayChangePct).toBeNull();
   });
 });
