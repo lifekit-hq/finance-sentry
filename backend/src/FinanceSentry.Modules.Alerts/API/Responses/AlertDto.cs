@@ -13,4 +13,5 @@ public record AlertDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? ResolvedAt,
     int OccurrenceCount,
-    DateTimeOffset LastOccurredAt);
+    DateTimeOffset LastOccurredAt,
+    string? AppPath = null);

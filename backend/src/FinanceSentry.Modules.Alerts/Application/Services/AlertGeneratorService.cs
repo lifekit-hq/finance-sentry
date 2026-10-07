@@ -172,6 +172,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             // An override is a deliberate act by the user: it is recorded every time, never
             // swallowed by an alert the same rule raised earlier.
             Dedup = isOverride ? AlertDedup.Always : AlertDedup.ActiveThenSilence,
+            AppPath = AlertAppPath.ForPolicyViolation(ruleKey, subject, isOverride),
         },
             ct);
     }
@@ -355,7 +356,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             RelativeUnderperformanceReferenceId(userId, scope, scopeKey), label,
             $"{label} trailing {benchmarkTicker}",
             string.Create(CultureInfo.InvariantCulture,
-                $"{label} ({scope.ToLowerInvariant()}) is {excessReturnPct:+0.00;-0.00} pts vs {benchmarkTicker} over {window}, at or below -{thresholdPct:0.##} pts for {runs} consecutive weekly runs.")),
+                $"{label} ({scope.ToLowerInvariant()}) is {excessReturnPct:+0.00;-0.00} pts vs {benchmarkTicker} over {window}, at or below -{thresholdPct:0.##} pts for {runs} consecutive weekly runs."))
+        {
+            AppPath = AlertAppPath.ForRelativeUnderperformance(scope, label),
+        },
             ct);
 
     public Task ResolveRelativeUnderperformanceAlertAsync(
@@ -489,7 +493,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             BudgetBreachReferenceId("near-limit", budgetId, year, month), category,
             $"Budget nearing limit: {category} ({period})",
             $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
-        { Dedup = AlertDedup.OncePerReference },
+        { Dedup = AlertDedup.OncePerReference, AppPath = AlertAppPath.ForBudgetBreach(category, year, month) },
             ct);
     }
 
@@ -505,7 +509,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             BudgetBreachReferenceId("exceeded", budgetId, year, month), category,
             $"Budget limit exceeded: {category} ({period})",
             $"Your {category} budget reached {pct}% of its {limitUsd:F2} USD monthly limit in {period} ({spentUsd:F2} USD spent).")
-        { Dedup = AlertDedup.OncePerReference },
+        { Dedup = AlertDedup.OncePerReference, AppPath = AlertAppPath.ForBudgetBreach(category, year, month) },
             ct);
     }
 
@@ -521,7 +525,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             BudgetBreachReferenceId("pace", budgetId, year, month), category,
             $"Budget off pace: {category} ({period})",
             $"Your {category} budget is on track to finish {period} at {projectedPct}% of its {limitUsd:F2} USD monthly limit ({spentUsd:F2} USD spent so far).")
-        { Dedup = AlertDedup.OncePerReference },
+        { Dedup = AlertDedup.OncePerReference, AppPath = AlertAppPath.ForBudgetBreach(category, year, month) },
             ct);
     }
 
@@ -581,6 +585,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             Message = draft.Message,
             ReferenceId = draft.ReferenceId,
             ReferenceLabel = draft.ReferenceLabel,
+            AppPath = draft.AppPath ?? AlertAppPath.Resolve(draft.Type, draft.ReferenceId, draft.ReferenceLabel, DateTimeOffset.UtcNow),
         }, ct);
     }
 
@@ -672,5 +677,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Resolves a still-open alert on the same reference before recording this one.</summary>
         public bool SupersedeOpen { get; init; }
+
+        /// <summary>Where the alert opens, for an emitter that knows more than type, reference and label say.</summary>
+        public string? AppPath { get; init; }
     }
 }

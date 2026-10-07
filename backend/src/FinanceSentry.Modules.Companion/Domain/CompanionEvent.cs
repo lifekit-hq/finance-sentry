@@ -27,6 +27,12 @@ public sealed class CompanionEvent
     /// <summary>Source row (alert id / thesis id / analyst action id).</summary>
     public Guid? ReferenceId { get; set; }
 
+    /// <summary>
+    /// Where in the app the event opens (a relative path on an existing route, e.g. <c>/assets/NVDA</c>), resolved by the
+    /// source module. Null when nothing in the app shows what it is about, and on events captured before it existed.
+    /// </summary>
+    public string? AppPath { get; set; }
+
     /// <summary>Originating module (<c>alerts</c> / <c>research</c>).</summary>
     public string SourceModule { get; set; } = string.Empty;
 
