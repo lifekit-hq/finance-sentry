@@ -28,6 +28,7 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 }
 
 interface EffectsStore {
+  transactions: Signal<GlobalTransactionDto[]>;
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
@@ -73,22 +74,20 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  const fetchPage = rxMethod<'first' | 'next' | 'retry'>(
+  const fetchPage = rxMethod<'first' | 'next'>(
     pipe(
-      tap(page => {
-        if (page === 'next') {
-          store.nextPage();
-        }
-        store.setLoading(page !== 'first');
-      }),
+      tap(page => store.setLoading(page === 'next')),
       switchMap(page => {
-        const offset = page === 'first' ? 0 : store.offset();
+        const offset = page === 'first' ? 0 : store.offset() + PAGE_SIZE;
         return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
-          tap(res =>
-            offset > 0
-              ? store.appendTransactions(res.items, res.totalCount, res.hasMore)
-              : store.setTransactions(res.items, res.totalCount, res.hasMore)
-          ),
+          tap(res => {
+            if (page === 'next') {
+              store.nextPage();
+              store.appendTransactions(res.items, res.totalCount, res.hasMore);
+            } else {
+              store.setTransactions(res.items, res.totalCount, res.hasMore);
+            }
+          }),
           StoreErrorUtils.catchAndSetError(store)
         );
       })
@@ -103,7 +102,7 @@ export function transactionLedgerEffects(store: EffectsStore) {
     load,
     /** Re-issues the failed request with the rows already on screen kept in place. */
     retry: (): void => {
-      fetchPage('retry');
+      fetchPage(store.transactions().length > 0 ? 'next' : 'first');
     },
     loadSummary: rxMethod<void>(
       pipe(

@@ -109,9 +109,10 @@ const ACCOUNTS: AccountsResponse = {
 };
 
 // Signals are real so the EffectsStore type constraint is satisfied.
-// Pass initialOffset to simulate the state after nextPage() has advanced the cursor.
-function buildStore(initialOffset = 0) {
+// Pass initialOffset to simulate the offset of the last page already on screen.
+function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []) {
   return {
+    transactions: signal(transactions),
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
@@ -301,23 +302,54 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('loadMore', () => {
-    it('calls nextPage, then fetches the next page using the updated offset', () => {
-      // initialOffset=PAGE_SIZE simulates the state after nextPage() has advanced the cursor.
-      // The real nextPage() mutates store state; here it is a vi.fn(), so we seed the offset.
+    it('fetches the page after the loaded one, then advances the offset and appends', () => {
       const store = buildStore(PAGE_SIZE);
       const service = buildService();
-      const PAGE2 = {items: [], totalCount: 1, offset: PAGE_SIZE, limit: PAGE_SIZE, hasMore: false};
-      service.getAllTransactions.mockReturnValue(of(PAGE2));
+      const PAGE3 = {
+        items: [],
+        totalCount: 1,
+        offset: 2 * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        hasMore: false,
+      };
+      service.getAllTransactions.mockReturnValue(of(PAGE3));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
 
-      expect(store.nextPage).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({
+        offset: 2 * PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.nextPage).toHaveBeenCalled();
+      expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+    });
+
+    it('keeps the offset on a failed next page so Load More repeats the same request', () => {
+      const store = buildStore(0, [TX_ITEM]);
+      store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
+      const service = buildService();
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of({...TX_RESPONSE, offset: PAGE_SIZE}));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.loadMore();
+        effects.loadMore();
+      });
+
+      expect(service.getAllTransactions).toHaveBeenNthCalledWith(1, {
         offset: PAGE_SIZE,
         limit: PAGE_SIZE,
       });
-      expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+      expect(service.getAllTransactions).toHaveBeenNthCalledWith(2, {
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.appendTransactions).toHaveBeenCalledTimes(1);
+      expect(store.offset()).toBe(PAGE_SIZE);
     });
 
     it('drops an in-flight next page when a filter change reloads the first page', () => {
@@ -349,7 +381,7 @@ describe('transactionLedgerEffects', () => {
 
   describe('retry', () => {
     it('re-fetches a failed next page at the same offset and appends it', () => {
-      const store = buildStore();
+      const store = buildStore(0, [TX_ITEM]);
       store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
       const service = buildService();
       const PAGE2 = {

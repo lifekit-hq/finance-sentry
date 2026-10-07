@@ -27,6 +27,7 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         transactions,
         totalCount,
         hasMore,
+        offset: 0,
         status: 'idle',
         errorCode: null,
         lastSyncedAt: Date.now(),
