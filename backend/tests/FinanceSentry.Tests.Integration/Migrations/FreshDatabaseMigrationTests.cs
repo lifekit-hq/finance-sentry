@@ -36,26 +36,24 @@ using Xunit;
 /// Requires Docker (<see cref="DockerRequiredFactAttribute"/> skips otherwise; CI has it).
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(PostgresClusterStateCollection.Name)]
 public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
-    public async Task InitializeAsync()
-    {
-        _postgres = new PostgreSqlBuilder("postgres:14-alpine").Build();
-        await _postgres.StartAsync();
-    }
+    public async Task InitializeAsync() =>
+        _database = await PostgresServer.Postgres14.CreateDatabaseAsync(resetsClusterRoles: true);
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     [DockerRequiredFact]
     public async Task StartupMigratesAFreshDatabase_ResearchAndRiskBothFinishCleanly()
     {
-        await using var factory = new FreshDatabaseApiFactory(_postgres!.GetConnectionString());
+        await using var factory = new FreshDatabaseApiFactory(_database!.ConnectionString);
 
         // Building the factory's TestServer runs Program.cs's ordinary startup path — including the
         // unmodified app.MigrateAllModules() call — against the freshly-started, empty database.
@@ -75,7 +73,7 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
 
         // The concrete production symptom: M013 (EntryPrice) never applied because M012 threw
         // before it, so thesis saves had no column to write EntryPrice into.
-        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var conn = new NpgsqlConnection(_database!.ConnectionString);
         await conn.OpenAsync();
         await using var column = new NpgsqlCommand(
             """
@@ -90,13 +88,13 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
     [DockerRequiredFact]
     public async Task RestartOnAMigratedDatabase_KeepsResearchDataAppliedAfterTheRiskDependency()
     {
-        await using (var firstBoot = new FreshDatabaseApiFactory(_postgres!.GetConnectionString()))
+        await using (var firstBoot = new FreshDatabaseApiFactory(_database!.ConnectionString))
         {
             firstBoot.CreateClient().Dispose();
         }
 
         var userId = Guid.NewGuid();
-        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var conn = new NpgsqlConnection(_database!.ConnectionString);
         await conn.OpenAsync();
         await using (var insert = new NpgsqlCommand(
             """
@@ -109,7 +107,7 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
             await insert.ExecuteNonQueryAsync();
         }
 
-        await using (var secondBoot = new FreshDatabaseApiFactory(_postgres!.GetConnectionString()))
+        await using (var secondBoot = new FreshDatabaseApiFactory(_database!.ConnectionString))
         {
             secondBoot.CreateClient().Dispose();
         }
@@ -132,33 +130,24 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
     [DockerRequiredFact]
     public async Task StartupMigrationFailure_HaltsStartupInsteadOfServingAHalfMigratedSchema()
     {
-        var postgres = new PostgreSqlBuilder("postgres:14-alpine").Build();
-        await postgres.StartAsync();
-        try
+        await using (var conn = new NpgsqlConnection(_database!.ConnectionString))
         {
-            await using (var conn = new NpgsqlConnection(postgres.GetConnectionString()))
-            {
-                await conn.OpenAsync();
-                await using var collide = new NpgsqlCommand(
-                    """CREATE TABLE "AspNetRoles" ("Id" text NOT NULL PRIMARY KEY)""", conn);
-                await collide.ExecuteNonQueryAsync();
-            }
-
-            Action buildHost = () =>
-            {
-                using var factory = new FreshDatabaseApiFactory(postgres.GetConnectionString());
-                using var client = factory.CreateClient();
-            };
-
-            buildHost.Should().Throw<Exception>(
-                    "a migration failure must abort startup rather than let the API come up")
-                .Where(ex => ContainsStartupMigrationException(ex),
-                    "the halt must be traceable to the specific failed migration, not a generic crash");
+            await conn.OpenAsync();
+            await using var collide = new NpgsqlCommand(
+                """CREATE TABLE "AspNetRoles" ("Id" text NOT NULL PRIMARY KEY)""", conn);
+            await collide.ExecuteNonQueryAsync();
         }
-        finally
+
+        Action buildHost = () =>
         {
-            await postgres.DisposeAsync();
-        }
+            using var factory = new FreshDatabaseApiFactory(_database!.ConnectionString);
+            using var client = factory.CreateClient();
+        };
+
+        buildHost.Should().Throw<Exception>(
+                "a migration failure must abort startup rather than let the API come up")
+            .Where(ex => ContainsStartupMigrationException(ex),
+                "the halt must be traceable to the specific failed migration, not a generic crash");
     }
 
     /// <summary>
@@ -169,12 +158,9 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
     [DockerRequiredFact]
     public async Task StartupOnAReachableServerWithoutTheDatabase_CreatesAndMigratesIt()
     {
-        var missingDatabase = new NpgsqlConnectionStringBuilder(_postgres!.GetConnectionString())
-        {
-            Database = "not_yet_created",
-        }.ConnectionString;
+        await using var missingDatabase = await PostgresServer.Postgres14.ReserveDatabaseAsync();
 
-        await using var factory = new FreshDatabaseApiFactory(missingDatabase);
+        await using var factory = new FreshDatabaseApiFactory(missingDatabase.ConnectionString);
         using (factory.CreateClient())
         {
             using var scope = factory.Services.CreateScope();
@@ -197,7 +183,7 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
         Action buildHost = () =>
         {
             using var factory = new FreshDatabaseApiFactory(
-                _postgres!.GetConnectionString(),
+                _database!.ConnectionString,
                 services =>
                 {
                     var toRemove = services
@@ -234,6 +220,7 @@ public sealed class FreshDatabaseMigrationTests : IAsyncLifetime
     {
         // Reserve a host port now, boot the API against it while nothing listens, then start Postgres
         // bound to that same port so the very connection string startup could not reach becomes live.
+        // The one test here with its own container: the shared server is already listening.
         var port = ReserveFreeTcpPort();
         var connectionString = new NpgsqlConnectionStringBuilder
         {

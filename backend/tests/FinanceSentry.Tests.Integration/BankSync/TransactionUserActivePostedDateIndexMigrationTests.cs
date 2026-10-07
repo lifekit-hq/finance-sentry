@@ -6,7 +6,6 @@ using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -20,33 +19,30 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class TransactionUserActivePostedDateIndexMigrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     [DockerRequiredFact]
     public async Task Migrate_CreatesTheUserActivePostedDateIndex_OnTheTransactionsTable()
     {
         await using (var ctx = new BankSyncDbContext(new DbContextOptionsBuilder<BankSyncDbContext>()
-            .UseNpgsql(_postgres!.GetConnectionString())
+            .UseNpgsql(_database!.ConnectionString)
             .Options, NoCurrentUser.Instance))
         {
             await ctx.Database.MigrateAsync();
         }
 
-        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var conn = new NpgsqlConnection(_database!.ConnectionString);
         await conn.OpenAsync();
         await using var indexColumns = new NpgsqlCommand(
             """

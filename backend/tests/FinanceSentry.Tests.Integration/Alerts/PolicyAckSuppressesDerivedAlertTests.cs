@@ -16,7 +16,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Moq;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -32,15 +31,14 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
     private const decimal WorseningStep = 0.02m;
     private const decimal Total = 10000m;
 
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Mock<IBookSnapshotReader> _book = new();
     private readonly Mock<IAllocationPolicySource> _allocations = new();
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
         await using var alerts = AlertsContext();
         await alerts.Database.EnsureCreatedAsync();
@@ -52,20 +50,20 @@ public sealed class PolicyAckSuppressesDerivedAlertTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
+        if (_database is not null)
         {
-            await _postgres.DisposeAsync();
+            await _database.DisposeAsync();
         }
     }
 
     // The generator runs from jobs with no person in scope (null); assertion reads act as the user.
     private AlertsDbContext AlertsContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     // The acknowledgement is a request (acting as the user); the alert-side reader runs with no person in scope.
     private RiskDbContext RiskContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     private void GivenCashPct(decimal cashPct)

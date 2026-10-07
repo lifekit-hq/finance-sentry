@@ -15,7 +15,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -36,25 +35,22 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
 
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Guid _credentialId = Guid.NewGuid();
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:14-alpine")
-            .Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres14.CreateDatabaseAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     private CryptoSyncDbContext NewContext() =>
         new(new DbContextOptionsBuilder<CryptoSyncDbContext>()
-            .UseNpgsql(_postgres!.GetConnectionString(), b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public"))
+            .UseNpgsql(_database!.ConnectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public"))
             .Options, NoCurrentUser.Instance);
 
     private static CredentialEncryptionService Encryption(int currentVersion, Dictionary<int, string> keys) =>
@@ -72,7 +68,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
         var key = disclosed.Encrypt(ApiKey);
         var secret = disclosed.Encrypt(ApiSecret);
 
-        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var conn = new NpgsqlConnection(_database!.ConnectionString);
         await conn.OpenAsync();
         await using (var insert = new NpgsqlCommand("""
             INSERT INTO crypto_sync."BinanceCredentials"
@@ -219,7 +215,7 @@ public sealed class ExchangeCredentialsMigrationTests : IAsyncLifetime
             await ctx.GetService<IMigrator>().MigrateAsync(PreviousMigration);
         }
 
-        await using var conn = new NpgsqlConnection(_postgres!.GetConnectionString());
+        await using var conn = new NpgsqlConnection(_database!.ConnectionString);
         await conn.OpenAsync();
         await using var credential = new NpgsqlCommand(
             """SELECT "EncryptedApiKey" FROM crypto_sync."BinanceCredentials" WHERE "Id" = @id""", conn);

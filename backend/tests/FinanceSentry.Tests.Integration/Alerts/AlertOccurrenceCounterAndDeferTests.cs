@@ -6,7 +6,6 @@ using FinanceSentry.Modules.Alerts.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -19,24 +18,23 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class AlertOccurrenceCounterAndDeferTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     // Null acts as a background job (no person in scope); assertion reads and request-path calls act as the user.
     private AlertsDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<AlertsDbContext>()
-            .UseNpgsql(_postgres!.GetConnectionString())
+            .UseNpgsql(_database!.ConnectionString)
             .Options,
             new FixedCurrentUser(actingUser));
 

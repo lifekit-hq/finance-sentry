@@ -30,7 +30,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -56,7 +55,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
     private const string GrabFxAtomeAccession = "0001855612-26-000138";
 
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
@@ -69,8 +68,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
         await using var alerts = AlertsContext();
         await alerts.Database.EnsureCreatedAsync();
@@ -92,9 +90,9 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
+        if (_database is not null)
         {
-            await _postgres.DisposeAsync();
+            await _database.DisposeAsync();
         }
     }
 
@@ -230,15 +228,15 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
 
     // The jobs and the capture run with no person in scope (null), as they do in production; assertion reads act as the user.
     private AlertsDbContext AlertsContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<AlertsDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     private CompanionDbContext CompanionContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     private EventsDbContext EventsContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<EventsDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     /// <summary>Serves the captured provider responses; anything else is a 404, as an unknown ticker is live.</summary>

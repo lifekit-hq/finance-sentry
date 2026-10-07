@@ -14,7 +14,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Moq;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -33,12 +32,11 @@ public sealed class RiskOwnerQueryFilterTests : IAsyncLifetime
 
     private readonly Guid _userA = Guid.NewGuid();
     private readonly Guid _userB = Guid.NewGuid();
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
 
         await using var setup = CreateContext();
         await setup.Database.EnsureCreatedAsync();
@@ -46,13 +44,13 @@ public sealed class RiskOwnerQueryFilterTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     // Null acts as a background job: no person in scope.
     private RiskDbContext CreateContext(Guid? actingUser = null) =>
-        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_postgres!.GetConnectionString()).Options,
+        new(new DbContextOptionsBuilder<RiskDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     private static RiskRuleSet NewRuleSet(Guid userId) =>

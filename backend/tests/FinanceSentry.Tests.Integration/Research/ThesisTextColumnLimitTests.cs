@@ -5,7 +5,6 @@ using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 /// <summary>
@@ -25,24 +24,23 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class ThesisTextColumnLimitTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _postgres;
+    private TestDatabase? _database;
 
     public async Task InitializeAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
-        await _postgres.StartAsync();
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
     }
 
     public async Task DisposeAsync()
     {
-        if (_postgres is not null)
-            await _postgres.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
     }
 
     // Null acting user is no person in scope, as in a job.
     private ResearchDbContext CreateContext(Guid? actingUser = null) =>
         new(new DbContextOptionsBuilder<ResearchDbContext>()
-            .UseNpgsql(_postgres!.GetConnectionString())
+            .UseNpgsql(_database!.ConnectionString)
             .Options, new FixedCurrentUser(actingUser));
 
     [DockerRequiredFact]
