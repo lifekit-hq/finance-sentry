@@ -207,6 +207,25 @@ describe('EventsComponent', () => {
     expect(render().text).toContain('Nothing scheduled');
   });
 
+  it('exposes the views as a tablist with the active one selected', () => {
+    mockStore.view.set('fired');
+
+    const {host} = render();
+
+    expect(host.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBe('Events view');
+    const tabs = Array.from(host.querySelectorAll<HTMLElement>('[role="tab"]'));
+    expect(tabs.map(tab => tab.textContent?.trim())).toEqual(['Calendar', 'Fired']);
+    expect(tabs.map(tab => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+  });
+
+  it('dispatches a view tab click to the store', () => {
+    const {host} = render();
+
+    host.querySelectorAll<HTMLElement>('[role="tab"]')[1].click();
+
+    expect(mockStore.setView).toHaveBeenCalledWith('fired');
+  });
+
   it('dispatches horizon changes to the store', () => {
     const {host} = render();
     const chips = host.querySelectorAll('[data-testid="horizon-chip"]');
