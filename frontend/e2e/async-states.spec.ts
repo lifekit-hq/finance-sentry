@@ -29,7 +29,7 @@ test.describe('cmn-async-state surfaces', () => {
     );
     await page.goto('/transactions');
 
-    const errorAlert = page.locator('cmn-errorAlert');
+    const errorAlert = page.locator('cmn-async-state cmn-alert');
     await expect(errorAlert).toBeVisible();
     fail = false;
     await errorAlert.getByRole('button', {name: 'Retry'}).click();
