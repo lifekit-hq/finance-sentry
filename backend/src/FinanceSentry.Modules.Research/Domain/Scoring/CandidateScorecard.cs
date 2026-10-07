@@ -55,7 +55,8 @@ public sealed record ScoreEvidence(
     string? BaseRateContext = null,
     int? SectorRank = null,
     int? SectorRankDelta = null,
-    decimal? DistanceFrom63dHigh = null)
+    decimal? DistanceFrom63dHigh = null,
+    string? FundamentalsBasis = null)
 {
     public static ScoreEvidence Empty { get; } = new(
         new Dictionary<int, decimal?>(),

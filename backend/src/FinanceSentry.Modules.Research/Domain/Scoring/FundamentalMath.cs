@@ -94,12 +94,13 @@ public static class FundamentalMath
         => prior == 0 ? null : (current - prior) / prior;
 
     /// <summary>
-    /// Latest quarterly year-over-year change of a raw concept (matches the same fiscal period one
-    /// year earlier), or null when not evaluable. Used by 019's fundamentals scorer.
+    /// Latest year-over-year change of a raw concept at the given cadence (default quarterly; matches
+    /// the same fiscal period one year earlier), or null when not evaluable. Used by 019's fundamentals scorer.
     /// </summary>
-    public static decimal? LatestYoy(IReadOnlyList<FundamentalFact> facts, string concept)
+    public static decimal? LatestYoy(
+        IReadOnlyList<FundamentalFact> facts, string concept, ThesisPeriodType periodType = ThesisPeriodType.Quarter)
     {
-        var periods = SelectPeriods(facts, concept, ThesisPeriodType.Quarter);
+        var periods = SelectPeriods(facts, concept, periodType);
         if (periods.Count == 0)
         {
             return null;
@@ -107,33 +108,45 @@ public static class FundamentalMath
 
         var latest = periods[0];
         var prior = PriorYearFact(latest, periods);
-        return prior is null ? null : SafeYoy(latest.Value, prior.Value);
+        if (prior is null)
+        {
+            return null;
+        }
+
+        // Growth off a loss-making base is meaningless ((cur - prior) / prior flips sign: a loss-to-profit
+        // turnaround reads as a collapse). Annual basis treats it as not evaluable; the quarterly path
+        // keeps its historical behaviour so domestic filers score exactly as before.
+        return periodType == ThesisPeriodType.Annual && prior.Value < 0 ? null : SafeYoy(latest.Value, prior.Value);
     }
 
-    /// <summary>Latest quarterly margin (numerator/denominator), or null when not evaluable.</summary>
+    /// <summary>Latest margin (numerator/denominator) of the given cadence, or null when not evaluable.</summary>
     public static decimal? LatestMargin(
-        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept)
+        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept,
+        ThesisPeriodType periodType = ThesisPeriodType.Quarter)
     {
-        var margins = MarginSeries(facts, numeratorConcept, denominatorConcept);
+        var margins = MarginSeries(facts, numeratorConcept, denominatorConcept, periodType);
         return margins.Count == 0 ? null : margins[0].Margin;
     }
 
     /// <summary>
-    /// Change in margin between the latest quarter and the quarter <paramref name="lookback"/> periods
-    /// earlier (default 4 = one year). Null when fewer than <paramref name="lookback"/>+1 margins exist.
+    /// Change in margin between the latest period and the period <paramref name="lookback"/> periods
+    /// earlier (default 4 quarters = one year; pass 1 with annual periods). Null when fewer than
+    /// <paramref name="lookback"/>+1 margins exist.
     /// </summary>
     public static decimal? MarginTrend(
-        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept, int lookback = 4)
+        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept, int lookback = 4,
+        ThesisPeriodType periodType = ThesisPeriodType.Quarter)
     {
-        var margins = MarginSeries(facts, numeratorConcept, denominatorConcept);
+        var margins = MarginSeries(facts, numeratorConcept, denominatorConcept, periodType);
         return margins.Count <= lookback ? null : margins[0].Margin - margins[lookback].Margin;
     }
 
     private static IReadOnlyList<(DateOnly PeriodEnd, decimal Margin)> MarginSeries(
-        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept)
+        IReadOnlyList<FundamentalFact> facts, string numeratorConcept, string denominatorConcept,
+        ThesisPeriodType periodType)
     {
-        var numerators = SelectPeriods(facts, numeratorConcept, ThesisPeriodType.Quarter);
-        var denominators = SelectPeriods(facts, denominatorConcept, ThesisPeriodType.Quarter)
+        var numerators = SelectPeriods(facts, numeratorConcept, periodType);
+        var denominators = SelectPeriods(facts, denominatorConcept, periodType)
             .ToDictionary(f => f.PeriodEnd, f => f.Value);
 
         var series = new List<(DateOnly, decimal)>();
