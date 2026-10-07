@@ -148,12 +148,12 @@ convention above is unchanged — only the label differs. Net worth totals stay 
 - Every DTO crossing an aggregation boundary carries a `…Usd` field; aggregations sum only
   that field.
 - **Presentation currency (#851).** Aggregation stays USD. The dashboard (`GET dashboard/aggregated`),
-  net-worth history and wealth-summary controllers re-express those USD figures in the profile
+  net-worth history, wealth-summary and FIRE-projection (`GET wealth/fire`) controllers re-express those USD figures in the profile
   `baseCurrency` once, at the response boundary (`CurrencyConverter.FromUsd`), and return the code
-  (`baseCurrency` / `currency`). USD, an unset profile, or a currency with no rate (e.g. BTC)
+  (`baseCurrency` / `currency`; FIRE amounts carry no `…Usd` name and are plain base-currency amounts). USD, an unset profile, or a currency with no rate (e.g. BTC)
   resolves to USD (`CurrencyConverter.ResolveBase`). The `…Usd` field names are historical: on
-  those responses they hold base-currency amounts. MCP tools read the handlers directly and stay USD,
-  as does `GET wealth/fire` (the dashboard FIRE card is labelled USD).
+  those responses they hold base-currency amounts. MCP tools and the Telegram FIRE brief read the
+  handlers directly and stay USD.
 - Rate table: process-wide, refreshed daily at midnight UTC by the FX job
   (`Program.cs`), seeded with hardcoded fallbacks until the first refresh.
 - **Unknown currency falls back 1:1.** Use `CurrencyConverter.IsKnown` to flag a total as

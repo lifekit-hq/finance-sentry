@@ -84,4 +84,60 @@ public sealed class WealthSummaryBaseCurrencyTests : IDisposable
         result.TotalNetWorth.Should().Be(1080m);
         result.Categories[0].Institutions[0].Accounts[0].BalanceInBaseCurrency.Should().Be(1080m);
     }
+
+    private static async Task<FireProjectionResponse> GetFire(string? profileCurrency)
+    {
+        var fire = new Mock<IQueryHandler<GetFireProjectionQuery, FireProjectionResponse>>();
+        fire.Setup(h => h.Handle(It.IsAny<GetFireProjectionQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FireProjectionResponse(
+                FireProjectionStatus.Projected, Target: 1080m, CurrentNetWorth: 540m, MonthlySavings: 108m,
+                AnnualSpend: 43.2m, SafeWithdrawalRate: 0.04m, RealAnnualReturn: 0.05m,
+                ProjectedDate: new DateOnly(2040, 1, 1), MonthsToFire: 120m, HasStaleSleeves: false));
+        var reader = new Mock<IUserBaseCurrencyReader>();
+        reader.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(profileCurrency!);
+
+        var controller = new WealthController(
+            Mock.Of<IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse>>(),
+            Mock.Of<IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse>>(),
+            fire.Object,
+            reader.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", UserId.ToString())], "test")),
+                },
+            },
+        };
+
+        var ok = (OkObjectResult)await controller.GetFireProjection(CancellationToken.None);
+        return (FireProjectionResponse)ok.Value!;
+    }
+
+    [Fact]
+    public async Task Fire_EuroBase_ConvertsEveryAmount_AndLabelsThemEur()
+    {
+        var result = await GetFire("EUR");
+
+        result.BaseCurrency.Should().Be("EUR");
+        result.Target.Should().Be(1000m);
+        result.CurrentNetWorth.Should().Be(500m);
+        result.MonthlySavings.Should().Be(100m);
+        result.AnnualSpend.Should().Be(40m);
+        result.SafeWithdrawalRate.Should().Be(0.04m);
+        result.MonthsToFire.Should().Be(120m);
+    }
+
+    [Theory]
+    [InlineData("USD")]
+    [InlineData(null)]
+    public async Task Fire_UsdOrUnsetBase_LeavesAmountsUntouched(string? profile)
+    {
+        var result = await GetFire(profile);
+
+        result.BaseCurrency.Should().Be("USD");
+        result.Target.Should().Be(1080m);
+        result.AnnualSpend.Should().Be(43.2m);
+    }
 }

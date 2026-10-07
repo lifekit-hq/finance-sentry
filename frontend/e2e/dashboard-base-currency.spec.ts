@@ -37,6 +37,20 @@ const EUR_DASHBOARD = {
   lastSyncTimestamp: null,
 };
 
+const EUR_FIRE = {
+  status: 'Projected',
+  target: 930000,
+  currentNetWorth: 2000,
+  monthlySavings: 900,
+  annualSpend: 37200,
+  safeWithdrawalRate: 0.04,
+  realAnnualReturn: 0.05,
+  projectedDate: '2051-03-01',
+  monthsToFire: 300,
+  hasStaleSleeves: false,
+  baseCurrency: 'EUR',
+};
+
 const EUR_TRANSACTIONS = {
   items: [
     {
@@ -73,6 +87,7 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/net-worth/history**`, route =>
     route.fulfill(json({snapshots: [], hasHistory: false}))
   );
+  await page.route(`${API}/wealth/fire`, route => route.fulfill(json(EUR_FIRE)));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts`, route =>
     route.fulfill(
@@ -100,6 +115,17 @@ test.describe('Base-currency totals (#851)', () => {
     );
     await expect(page.getByTestId('net-worth-value')).toContainText('€2,000.00');
     await expect(page.getByTestId('net-worth-value')).not.toContainText('$');
+  });
+
+  test('FIRE card states its arithmetic in euros', async ({page}) => {
+    await page.goto('/dashboard');
+
+    const assumptions = page.getByTestId('fire-assumptions');
+    await expect(assumptions).toContainText('Target €930,000.00');
+    await expect(assumptions).toContainText('€37,200.00');
+    await expect(assumptions).toContainText('€2,000.00 net worth');
+    await expect(assumptions).toContainText('€900.00 a month');
+    await expect(assumptions).not.toContainText('$');
   });
 
   test('ledger header reads in euros above the EUR rows', async ({page}) => {

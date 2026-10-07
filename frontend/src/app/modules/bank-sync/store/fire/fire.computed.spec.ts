@@ -20,6 +20,7 @@ function fire(overrides: Partial<FireProjection> = {}): FireProjection {
     projectedDate: '2041-03-26',
     monthsToFire: 150.2,
     hasStaleSleeves: false,
+    baseCurrency: 'USD',
     ...overrides,
   };
 }
