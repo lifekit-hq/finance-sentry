@@ -17,7 +17,7 @@ const PHONE = {width: 390, height: 1500};
 const SCREENSHOT_OPTIONS = {
   animations: 'disabled',
   // Glyph anti-aliasing differs a little between the machines that render these baselines.
-  maxDiffPixelRatio: 0.02,
+  maxDiffPixelRatio: 0.001,
 } as const;
 
 const DASHBOARD = {
