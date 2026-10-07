@@ -72,13 +72,14 @@ export class FireTileUtils {
   public static assumptions(fire: FireProjection): string {
     const swr = PercentUtils.fromFraction(fire.safeWithdrawalRate);
     const ret = PercentUtils.fromFraction(fire.realAnnualReturn);
+    const money = (amount: number): string => MoneyUtils.format(amount, fire.baseCurrency);
     return (
-      `Target ${MoneyUtils.format(fire.target, 'USD')} = a year of spending ` +
-      `(${MoneyUtils.format(fire.annualSpend, 'USD')}, twelve times your median monthly spending ` +
+      `Target ${money(fire.target)} = a year of spending ` +
+      `(${money(fire.annualSpend)}, twelve times your median monthly spending ` +
       `over complete months) divided by a ${swr}% safe withdrawal rate. ` +
       `Assumes a ${ret}% real (after-inflation) annual return on your ` +
-      `${MoneyUtils.format(fire.currentNetWorth, 'USD')} net worth and on future savings of ` +
-      `${MoneyUtils.format(fire.monthlySavings, 'USD')} a month (your median over complete months), ` +
+      `${money(fire.currentNetWorth)} net worth and on future savings of ` +
+      `${money(fire.monthlySavings)} a month (your median over complete months), ` +
       'compounded monthly.'
     );
   }

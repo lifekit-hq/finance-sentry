@@ -4,7 +4,7 @@ export type FireProjectionStatus =
 
 /**
  * Everything the tile needs to state its own arithmetic in words. Rates are fractions
- * (0.04 = 4%); amounts are USD.
+ * (0.04 = 4%); amounts are in `baseCurrency`.
  */
 export interface FireProjection {
   status: FireProjectionStatus;
@@ -18,4 +18,6 @@ export interface FireProjection {
   projectedDate: Nullable<string>;
   monthsToFire: Nullable<number>;
   hasStaleSleeves: boolean;
+  /** ISO code the amounts are expressed in: the profile base currency, USD when unset. */
+  baseCurrency: string;
 }

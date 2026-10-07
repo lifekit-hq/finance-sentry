@@ -15,6 +15,7 @@ function fire(overrides: Partial<FireProjection> = {}): FireProjection {
     projectedDate: '2041-03-26',
     monthsToFire: 150.2,
     hasStaleSleeves: false,
+    baseCurrency: 'USD',
     ...overrides,
   };
 }
@@ -110,6 +111,15 @@ describe('FireTileUtils.assumptions', () => {
     expect(text).toContain('$250,000.00 net worth');
     expect(text).toContain('$2,000.00 a month');
     expect(text).toContain('compounded monthly');
+  });
+
+  it('formats every amount in the base currency, never as dollars', () => {
+    const text = FireTileUtils.assumptions(fire({baseCurrency: 'EUR'}));
+    expect(text).toContain('Target €1,000,000.00');
+    expect(text).toContain('€40,000.00');
+    expect(text).toContain('€250,000.00 net worth');
+    expect(text).toContain('€2,000.00 a month');
+    expect(text).not.toContain('$');
   });
 
   it('shows a fractional rate as typed', () => {

@@ -24,7 +24,9 @@ public enum FireProjectionStatus
 /// <summary>
 /// Every field the tile needs to state its own arithmetic in words: the target and its two
 /// assumptions, the inputs that produced it, and the outcome. Computed on read — nothing here
-/// is persisted, so changing an assumption changes the next read with no job run.
+/// is persisted, so changing an assumption changes the next read with no job run. The handler
+/// computes in USD; the API controller re-expresses every amount in the profile base currency and
+/// sets <paramref name="BaseCurrency"/> to the code the figures are actually in.
 /// </summary>
 public record FireProjectionResponse(
     FireProjectionStatus Status,
@@ -36,7 +38,8 @@ public record FireProjectionResponse(
     decimal RealAnnualReturn,
     DateOnly? ProjectedDate,
     decimal? MonthsToFire,
-    bool HasStaleSleeves);
+    bool HasStaleSleeves,
+    string BaseCurrency = "USD");
 
 public record GetFireProjectionQuery(Guid UserId) : IQuery<FireProjectionResponse>;
 
@@ -88,7 +91,8 @@ public class GetFireProjectionQueryHandler(
                 userAssumptions.RealAnnualReturn,
                 ProjectedDate: null,
                 MonthsToFire: null,
-                hasStaleSleeves);
+                hasStaleSleeves,
+                "USD");
         }
 
         var annualSpend = MonthsPerYear * Median(completeMonths.Select(f => f.OutflowUsd));
@@ -119,7 +123,8 @@ public class GetFireProjectionQueryHandler(
             userAssumptions.RealAnnualReturn,
             projectedDate,
             calculation.MonthsToFire,
-            hasStaleSleeves);
+            hasStaleSleeves,
+            "USD");
     }
 
     /// <summary>Even-length samples average the two middle values, mirroring the frontend's median helper (<c>dashboard.computed.ts</c>).</summary>

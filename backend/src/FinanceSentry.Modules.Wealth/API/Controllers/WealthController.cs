@@ -102,7 +102,27 @@ public class WealthController(
     [HttpGet("fire")]
     public async Task<IActionResult> GetFireProjection(CancellationToken ct)
     {
-        var result = await _fireProjectionHandler.Handle(new GetFireProjectionQuery(User.RequireUserId()), ct);
-        return Ok(result);
+        var userId = User.RequireUserId();
+        var result = await _fireProjectionHandler.Handle(new GetFireProjectionQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // Same rule as the summary: the projection speaks USD, the base currency is applied once, here.
+    // Rates and the date are untouched; only the five money amounts are re-expressed.
+    private static FireProjectionResponse InBaseCurrency(FireProjectionResponse fire, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return fire with { BaseCurrency = baseCurrency };
+
+        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        return fire with
+        {
+            Target = Fx(fire.Target),
+            CurrentNetWorth = Fx(fire.CurrentNetWorth),
+            MonthlySavings = Fx(fire.MonthlySavings),
+            AnnualSpend = Fx(fire.AnnualSpend),
+            BaseCurrency = baseCurrency,
+        };
     }
 }

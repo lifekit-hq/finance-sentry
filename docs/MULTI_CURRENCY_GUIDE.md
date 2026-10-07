@@ -6,7 +6,7 @@ Finance Sentry supports multiple currencies (EUR, USD, GBP, UAH). Each bank acco
 
 ## Dashboard Display
 
-Dashboard totals (net worth, income, spending, top categories, projection) and the net-worth history chart are shown in the profile's base currency (USD when unset), converted once at the response boundary, and the Transactions month summary uses the same currency. Amounts are formatted symbol-first (see [Money Display](claude/frontend-rules.md)). Which figures are converted, where, and with which rates is owned by [money-semantics.md §3](money-semantics.md); the FIRE card stays in USD.
+Dashboard totals (net worth, income, spending, top categories, projection) and the net-worth history chart are shown in the profile's base currency (USD when unset), converted once at the response boundary, and the Transactions month summary uses the same currency. Amounts are formatted symbol-first (see [Money Display](claude/frontend-rules.md)). Which figures are converted, where, and with which rates is owned by [money-semantics.md §3](money-semantics.md); the FIRE card follows the same rule.
 
 ## Exchange Rates
 
