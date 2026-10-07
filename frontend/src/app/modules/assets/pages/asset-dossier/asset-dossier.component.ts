@@ -12,6 +12,7 @@ import {
   DataTableComponent,
   EmptyStateComponent,
   LineChartComponent,
+  PageContainerComponent,
   RelativeTimePipe,
   SkeletonComponent,
   StatCardComponent,
@@ -38,6 +39,7 @@ const TREND_LOCALE = 'en-US';
 @Component({
   selector: 'fns-asset-dossier',
   imports: [
+    PageContainerComponent,
     AlertComponent,
     ButtonComponent,
     CardComponent,

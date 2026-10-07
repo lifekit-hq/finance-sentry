@@ -11,6 +11,7 @@ import {
   MenuComponent,
   type MenuItem,
   MonthStepperComponent,
+  PageContainerComponent,
   PageHeaderComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
@@ -37,6 +38,7 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
 @Component({
   selector: 'fns-budgets',
   imports: [
+    PageContainerComponent,
     InputHintsDirective,
     AlertComponent,
     CardComponent,

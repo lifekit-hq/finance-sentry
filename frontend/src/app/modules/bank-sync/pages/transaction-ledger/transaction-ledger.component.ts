@@ -13,6 +13,7 @@ import {
   InputComponent,
   InstitutionAvatarComponent,
   ListItemRowComponent,
+  PageContainerComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 import {debounceTime, distinctUntilChanged, map} from 'rxjs';
@@ -46,6 +47,7 @@ const DRAWER_WIDTH = '480px';
 @Component({
   selector: 'fns-transaction-ledger',
   imports: [
+    PageContainerComponent,
     AlertComponent,
     ButtonComponent,
     CardComponent,
