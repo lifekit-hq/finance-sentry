@@ -136,3 +136,18 @@ describe('AlertDestinationUtils.resolve', () => {
     }
   });
 });
+
+describe('AlertDestinationUtils.dossier', () => {
+  it('opens the dossier of a ticker, trimmed', () => {
+    expect(AlertDestinationUtils.dossier(' BRK.B ')).toEqual({
+      kind: 'route',
+      commands: [AppRoute.AssetDossier, 'BRK.B'],
+    });
+  });
+
+  it('returns null for a non-ticker, blank or missing label', () => {
+    expect(AlertDestinationUtils.dossier('US CPI')).toBeNull();
+    expect(AlertDestinationUtils.dossier('  ')).toBeNull();
+    expect(AlertDestinationUtils.dossier(null)).toBeNull();
+  });
+});

@@ -34,11 +34,16 @@ export class AlertDestinationUtils {
       return null;
     }
     if (destination === 'dossier') {
-      const symbol = alert.referenceLabel?.trim() ?? '';
-      return TICKER.test(symbol)
-        ? {kind: 'route', commands: [AppRoute.AssetDossier, symbol]}
-        : null;
+      return AlertDestinationUtils.dossier(alert.referenceLabel);
     }
     return {kind: 'route', commands: [destination]};
+  }
+
+  /** The asset dossier of a ticker label, or null when the label is not a ticker. */
+  public static dossier(label: Nullable<string>): Nullable<AlertNavigation> {
+    const symbol = label?.trim() ?? '';
+    return TICKER.test(symbol)
+      ? {kind: 'route', commands: [AppRoute.AssetDossier, symbol]}
+      : null;
   }
 }
