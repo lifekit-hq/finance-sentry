@@ -14,7 +14,8 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     monthlyOutflow: signal(null),
     monthlyOutflowCurrency: signal('USD'),
     topCategory: signal(null),
-    errorMessage: signal(null),
+    errorMessage: signal<string | null>(null),
+    load: vi.fn(),
     isLoading: signal(false),
     isEmpty: signal(true),
     hasActiveFilter: signal(false),
@@ -179,5 +180,37 @@ describe('TransactionLedgerComponent search param', () => {
     vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
     expect(searchBox(root).value).toBe('spotify');
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('TransactionLedgerComponent async states', () => {
+  it('shows skeleton rows and no ledger rows while loading', () => {
+    const {store, fixture, root} = setup(null);
+    store.isEmpty.set(false);
+    store.isLoading.set(true);
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('cmn-skeleton').length).toBeGreaterThan(0);
+    expect(root.querySelector('[data-testid="ledger-row"]')).toBeNull();
+  });
+
+  it('words the empty state differently with and without an active filter', () => {
+    const {store, fixture, root} = setup(null);
+    fixture.detectChanges();
+    expect(root.textContent).toContain('No transactions found');
+
+    store.hasActiveFilter.set(true);
+    fixture.detectChanges();
+    expect(root.textContent).toContain('No matching transactions');
+  });
+
+  it('shows the error with a Retry that reloads the ledger', () => {
+    const {store, fixture, root} = setup(null);
+    store.errorMessage.set('Failed to load transactions.');
+    fixture.detectChanges();
+
+    expect(root.querySelector('cmn-alert')?.textContent).toContain('Failed to load transactions.');
+    root.querySelector<HTMLElement>('cmn-alert cmn-button button')?.click();
+    expect(store.load).toHaveBeenCalledOnce();
   });
 });

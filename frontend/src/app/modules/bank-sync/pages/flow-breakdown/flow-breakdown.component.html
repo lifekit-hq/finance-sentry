@@ -86,14 +86,14 @@
       </div>
     }
 
-    @if (store.errorMessage()) {
-      <cmn-alert variant="error" class="mb-cmn-6 block">
-        {{ store.errorMessage() }}
-      </cmn-alert>
-    }
-
-    @if (store.isLoading()) {
-      <cmn-card>
+    <cmn-async-state
+      [status]="breakdownStatus()"
+      [errorMessage]="store.errorMessage()"
+      [isEmpty]="store.isEmpty()"
+      class="flex min-h-0 flex-1 flex-col"
+      errorPlacement="above"
+    >
+      <cmn-card skeleton>
         <div class="space-y-cmn-3 p-cmn-4">
           @for (_ of skeletonRows; track $index) {
             <div class="flex gap-cmn-4">
@@ -106,8 +106,7 @@
           }
         </div>
       </cmn-card>
-    } @else if (store.isEmpty()) {
-      <div class="flex flex-1 items-center justify-center">
+      <div empty class="flex flex-1 items-center justify-center">
         @if (store.range()) {
           <cmn-empty-state
             message="No transactions in this window"
@@ -120,7 +119,6 @@
           />
         }
       </div>
-    } @else {
       <div class="space-y-cmn-6">
         @for (group of store.groups(); track group.bucket) {
           <cmn-card padding="none">
@@ -279,6 +277,6 @@
           </cmn-card>
         }
       </div>
-    }
+    </cmn-async-state>
   </div>
 </cmn-page-container>

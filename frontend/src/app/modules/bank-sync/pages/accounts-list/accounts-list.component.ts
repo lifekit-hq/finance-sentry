@@ -1,11 +1,19 @@
 import {BreakpointObserver} from '@angular/cdk/layout';
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject, OnInit, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  ViewContainerRef,
+} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, Router} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
-  AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   ButtonComponent,
   CardComponent,
   CmnDialogService,
@@ -51,8 +59,8 @@ const SKELETON_ROWS = 5;
   selector: 'fns-accounts-list',
   imports: [
     AccountBalancePipe,
-    AlertComponent,
     AssetLogoPipe,
+    AsyncStateComponent,
     ButtonComponent,
     CardComponent,
     DecimalPipe,
@@ -89,6 +97,12 @@ export class AccountsListComponent implements OnInit {
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly accountsStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.isLoading()) {
+      return 'loading';
+    }
+    return this.store.errorMessage() ? 'error' : 'success';
+  });
   public readonly dotClass = SYNC_DOT_CLASS;
 
   public ngOnInit(): void {

@@ -3,7 +3,8 @@ import {takeUntilDestroyed, toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
-  AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   ButtonComponent,
   CardComponent,
   ChipComponent,
@@ -48,7 +49,7 @@ const DRAWER_WIDTH = '480px';
   selector: 'fns-transaction-ledger',
   imports: [
     PageContainerComponent,
-    AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     CardComponent,
     ChipComponent,
@@ -116,6 +117,12 @@ export class TransactionLedgerComponent {
   public readonly periods = LEDGER_PERIODS;
 
   /** The quick period whose bounds equal the date filter; any other range selects none. */
+  public readonly ledgerStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.isLoading()) {
+      return 'loading';
+    }
+    return this.store.errorMessage() ? 'error' : 'success';
+  });
   public readonly activePeriod = computed(() => {
     const {from, to} = this.activeDateRange();
     return LedgerPeriodUtils.match(from, to);

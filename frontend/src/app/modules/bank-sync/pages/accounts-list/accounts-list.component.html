@@ -31,8 +31,13 @@
     </cmn-card>
   }
 
-  @if (store.isLoading()) {
-    <cmn-card>
+  <cmn-async-state
+    [status]="accountsStatus()"
+    [errorMessage]="store.errorMessage()"
+    [isEmpty]="store.isEmpty()"
+    errorPlacement="above"
+  >
+    <cmn-card skeleton>
       <div class="p-cmn-4 space-y-cmn-3">
         @for (_ of skeletonRows; track $index) {
           <div class="flex gap-cmn-4">
@@ -45,24 +50,17 @@
         }
       </div>
     </cmn-card>
-  }
 
-  @if (store.errorMessage()) {
-    <cmn-alert variant="error" class="block mb-cmn-6">
-      {{ store.errorMessage() }}
-      <cmn-button (clicked)="store.load()" variant="secondary" size="sm">Retry</cmn-button>
-    </cmn-alert>
-  }
-
-  @if (!store.isLoading() && store.isEmpty()) {
-    <cmn-empty-state message="No accounts connected yet.">
+    <cmn-empty-state empty message="No accounts connected yet.">
       <cmn-button (clicked)="connectAccount()" cta variant="primary"
         >Connect Your First Account</cmn-button
       >
     </cmn-empty-state>
-  }
 
-  @if (!store.isLoading() && !store.isEmpty()) {
+    <cmn-button (clicked)="store.load()" error-action variant="secondary" size="sm"
+      >Retry</cmn-button
+    >
+
     @for (section of store.categorySections(); track section.category) {
       <div class="mb-cmn-8">
         <div class="flex items-center justify-between mb-cmn-3">
@@ -203,7 +201,7 @@
         </cmn-card>
       </div>
     }
-  }
+  </cmn-async-state>
 </div>
 
 <ng-template #accountRow let-account let-title="title">

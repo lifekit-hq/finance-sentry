@@ -1,6 +1,10 @@
 <div class="space-y-cmn-5">
-  @if (store.isPositionsLoading()) {
-    <cmn-card padding="none">
+  <cmn-async-state
+    [status]="positionsStatus()"
+    [errorMessage]="store.positionsErrorMessage()"
+    [isEmpty]="store.positionsByAssetClass().length === 0"
+  >
+    <cmn-card skeleton padding="none">
       <div class="divide-y divide-border-default" data-testid="holdings-skeleton">
         @for (_ of skeletonRows; track $index) {
           <div class="flex items-center gap-cmn-3 px-cmn-4 py-cmn-3">
@@ -14,10 +18,8 @@
         }
       </div>
     </cmn-card>
-  } @else if (store.positionsErrorMessage()) {
-    <cmn-alert variant="error">{{ store.positionsErrorMessage() }}</cmn-alert>
-  } @else if (store.positionsByAssetClass().length === 0) {
-    <cmn-card>
+
+    <cmn-card empty>
       @if (connectStore.importPending()) {
         <div
           class="py-cmn-8 text-center text-text-secondary text-cmn-sm"
@@ -31,7 +33,7 @@
         </div>
       }
     </cmn-card>
-  } @else {
+
     <cmn-card class="block">
       <div class="flex flex-col gap-cmn-6 md:flex-row md:items-center">
         <div class="min-w-0 flex-1">
@@ -184,7 +186,7 @@
         </section>
       }
     </cmn-card>
-  }
+  </cmn-async-state>
 </div>
 
 <ng-template #dayChange let-row>

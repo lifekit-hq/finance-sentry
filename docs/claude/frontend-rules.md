@@ -125,20 +125,19 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 
 ## Async State — `cmn-async-state`
 
-A region that swaps between loading, error and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Adopters: `events` (upcoming list) and `truelayer-picker`.
+A region that swaps between loading, error, empty and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[errorPlacement]`, `[isEmpty]`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Each page derives an `AsyncStateStatus` computed (`loading` > `error` > `success`) and projects into the primitive's slots: `[skeleton]` (a placeholder shaped like the content), `[empty]` (rich empty state), `[error-action]` (e.g. Retry). `errorPlacement="above"` keeps content under a persistent banner; the default replaces it.
 
-The primitive renders uniform full-width skeleton bars, a bare error alert that replaces the content, and a plain-text empty line. Surfaces that need more keep local markup; each gap:
+Adopters: all eight surfaces - `events`, `truelayer-picker`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`.
 
-| Surface | Missing in the primitive |
+When the primitive wraps several children, put the parent's spacing (`space-y-cmn-5` of `cmn-page-container`, or the page's own `space-y-*`) on the `cmn-async-state` host: the children are no longer direct children of the old parent.
+
+Remaining local markup (a gap in the primitive, not a surface left unconverted):
+
+| Surface | What stays local |
 |---|---|
-| `holdings` | row-shaped skeleton (avatar + two text lines + trailing value) in a card; empty state is a card with a second "import pending" variant |
-| `asset-dossier` | composite skeleton with per-block heights/widths (heading + three card-sized blocks) |
-| `dashboard` | per-widget inline skeletons inside live cards (no region swap); icon + CTA empty state; error banner sits above content that stays rendered |
-| `flow-breakdown` | multi-column row skeleton in a card; persistent error banner above content; empty state with message + sub-message that varies by range |
-| `accounts-list` | multi-column row skeleton in a card; error alert with a Retry action; empty state with a CTA slot |
-| `transaction-ledger` | row-shaped skeleton (avatar + two text lines + trailing value) in a card; persistent error banner; empty state that varies by active filter |
+| `dashboard` | per-widget inline skeletons inside live cards (net worth, window tiles) - there is no region swap, so the primitive only carries the persistent error banner and the connect-account empty state |
 
-Adopt the primitive on these when it gains a skeleton template slot, an error action slot and a rich empty slot; drop the row from this table in the same PR.
+Drop the row when the primitive can express per-widget loading.
 
 ---
 

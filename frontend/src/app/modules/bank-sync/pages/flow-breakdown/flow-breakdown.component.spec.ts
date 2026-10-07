@@ -41,14 +41,15 @@ const drawer = {open: vi.fn()};
 function render(
   group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP,
   range: Nullable<{from: Nullable<string>; to: string; months: number}> = null,
-  accountFilter: Nullable<string> = null
+  accountFilter: Nullable<string> = null,
+  state: {isLoading?: boolean; isEmpty?: boolean; errorMessage?: string} = {}
 ) {
   const store = {
     month: signal('2026-09'),
     range: signal(range),
-    isLoading: signal(false),
-    isEmpty: signal(false),
-    errorMessage: signal(null),
+    isLoading: signal(state.isLoading ?? false),
+    isEmpty: signal(state.isEmpty ?? false),
+    errorMessage: signal(state.errorMessage ?? null),
     accountChips: signal([]),
     accountFilter: signal(accountFilter),
     groups: signal([group]),
@@ -236,5 +237,42 @@ describe('FlowBreakdownComponent drill-downs', () => {
       new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
     );
     expect(drawer.open).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FlowBreakdownComponent async states', () => {
+  const noRange = null;
+  const noFilter = null;
+
+  it('shows skeleton rows and no groups while loading', () => {
+    const el = render(GROUP, noRange, noFilter, {isLoading: true});
+
+    expect(el.querySelectorAll('cmn-skeleton').length).toBeGreaterThan(0);
+    expect(el.querySelector('[data-testid="breakdown-row"]')).toBeNull();
+  });
+
+  it('words the empty state for the month, or for a dashboard window', () => {
+    const month = render(GROUP, noRange, noFilter, {isEmpty: true});
+    expect(month.textContent).toContain('No transactions in this month');
+
+    TestBed.resetTestingModule();
+    const window = render(GROUP, {from: '2026-08-01', to: '2026-09-30', months: 2}, noFilter, {
+      isEmpty: true,
+    });
+    expect(window.textContent).toContain('No transactions in this window');
+  });
+
+  it('keeps the groups under a persistent error banner', () => {
+    const el = render(GROUP, noRange, noFilter, {errorMessage: 'Failed to load.'});
+
+    expect(el.querySelector('cmn-alert')?.textContent).toContain('Failed to load.');
+    expect(el.querySelector('[data-testid="breakdown-row"]')).not.toBeNull();
+  });
+
+  it('shows the groups with no banner when loaded', () => {
+    const el = render();
+
+    expect(el.querySelector('cmn-alert')).toBeNull();
+    expect(el.querySelector('[data-testid="breakdown-row"]')).not.toBeNull();
   });
 });

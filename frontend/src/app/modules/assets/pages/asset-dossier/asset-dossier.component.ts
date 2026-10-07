@@ -3,6 +3,8 @@ import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/cor
 import {RouterLink} from '@angular/router';
 import {
   AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   ButtonComponent,
   CardComponent,
   type ChartDomain,
@@ -44,6 +46,7 @@ const TREND_LOCALE = 'en-US';
   imports: [
     PageContainerComponent,
     AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     CardComponent,
     CmnCellDirective,
@@ -73,6 +76,12 @@ export class AssetDossierComponent {
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
   public readonly accountsRoute = AppRoute.AccountsInvestments;
+  public readonly dossierStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.dossierErrorMessage()) {
+      return 'error';
+    }
+    return this.store.isDossierLoading() ? 'loading' : 'success';
+  });
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
   // Only the delta carries colour; the header itself stays neutral.
