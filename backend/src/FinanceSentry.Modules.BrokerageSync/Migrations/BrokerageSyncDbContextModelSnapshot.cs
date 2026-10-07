@@ -453,6 +453,96 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                     b.ToTable("IBKRFlexCredentials", "brokerage_sync");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.BrokerageSync.Domain.InzhurCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("EncryptedPassword")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("EncryptedPhone")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("EncryptedSession")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("KeyVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime?>("LastSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastSyncError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("LoginAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("LoginAttemptsDay")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("PasswordAuthTag")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("PasswordIv")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("PhoneAuthTag")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("PhoneIv")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("SessionAuthTag")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("SessionIv")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("SessionKeyVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime?>("SessionRefreshedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SessionStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("InzhurCredentials", "brokerage_sync");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.BrokerageSync.Domain.BrokerageHolding", b =>
                 {
                     b.HasOne("FinanceSentry.Modules.BrokerageSync.Domain.BrokerageInstrument", null)
@@ -563,6 +653,56 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
 
                             b1.WithOwner()
                                 .HasForeignKey("IBKRFlexCredentialId");
+                        });
+
+                    b.Navigation("Health")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.BrokerageSync.Domain.InzhurCredential", b =>
+                {
+                    b.OwnsOne("FinanceSentry.Core.Connections.ConnectionHealth", "Health", b1 =>
+                        {
+                            b1.Property<Guid>("InzhurCredentialId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("ConsecutiveFailures")
+                                .HasColumnType("integer");
+
+                            b1.Property<DateTimeOffset?>("FirstFailureAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<DateTimeOffset?>("LastFailureAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("LastFailureClass")
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.Property<string>("LastFailureCode")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)");
+
+                            b1.Property<DateTimeOffset?>("LastSuccessAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("State")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.Property<DateTimeOffset?>("StateChangedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<DateTimeOffset?>("SuspectSince")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.HasKey("InzhurCredentialId");
+
+                            b1.ToTable("InzhurCredentials", "brokerage_sync");
+
+                            b1.WithOwner()
+                                .HasForeignKey("InzhurCredentialId");
                         });
 
                     b.Navigation("Health")

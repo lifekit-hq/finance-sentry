@@ -161,7 +161,9 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
             await setup.SaveChangesAsync();
             await ReapplyHealthMigrationAsync(setup, BrokerageSyncBeforeHealth);
 
-            var defaults = await HealthStateDefaultsAsync(setup, "brokerage_sync");
+            // InzhurCredentials (M012) is created with its health columns, so it has no rows to backfill and no default.
+            var defaults = (await HealthStateDefaultsAsync(setup, "brokerage_sync"))
+                .Where(d => d.Key != "InzhurCredentials").ToDictionary();
             defaults.Keys.Should().BeEquivalentTo("IBKRCredentials", "IBKRFlexCredentials");
             defaults.Values.Should().AllSatisfy(d => d.Should().StartWith("'Healthy'"));
         }

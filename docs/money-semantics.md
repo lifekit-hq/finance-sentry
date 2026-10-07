@@ -96,7 +96,7 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
 
 ### Brokerage holdings (`FinanceSentry.Modules.BrokerageSync`)
 
-A `BrokerageHolding` is one symbol for one user, provider `ibkr`, unique on
+A `BrokerageHolding` is one symbol for one user, provider `ibkr` or `inzhur`, unique on
 `(UserId, Symbol, Provider)`; `UsdValue` is already USD (converted once at ingest via
 `CurrencyConverter.ToUsd`, §3), so sums over holdings are USD sums. Two sources write the same
 rows, so every reader sees one set:
@@ -117,6 +117,27 @@ rows, so every reader sees one set:
   holdings are daily by nature, so they are stale only when the newest `FlexAsOfDate` is more than
   4 calendar days before today (UTC), and the response reports `FlexAsOfDate` so the UI states the
   statement date.
+
+#### Inzhur (`InzhurSyncService`, `InzhurHoldingsMapper`)
+
+Inzhur (Ukrainian REIT funds and war bonds) is read once a day from the owner's own cabinet, read-only.
+Everything Inzhur reports is in UAH and is converted to USD once, at ingest (§3).
+
+- **Funds and bonds** — one row per asset from `user-assets`, instrument type `REIT` for a fund
+  (real estate, so the equity universes built from `STK` never pick it up) and `BOND` for a war
+  bond. Quantity is the certificates held; value is the cabinet's own `totalAmount` when present,
+  else quantity × sell price (NAV when no sell price). Average cost is `invested / quantity`
+  when Inzhur reports an invested amount, else none. Two lots of one asset merge into one row
+  (quantity and value summed, cost quantity-weighted).
+- **Cash** — the broker account's available plus order-blocked UAH is one `UAH Cash` row (`CASH`
+  type), the way IBKR's cash ledger lands; a zero balance writes no row.
+- **Reconcile** — after a successful read, `inzhur` rows Inzhur no longer returns are deleted
+  (sold fund, redeemed bond); rows of other providers are never touched. A failed read changes
+  nothing: the previous day's rows stay, and go stale.
+- **Staleness** — each provider is judged on its own cadence; Inzhur's rows are stale 36 h after
+  their last sync (`BrokerageFreshness.Daily`), so one missed daily run is not yet stale.
+- **Net worth** — the rows are ordinary brokerage holdings, so they enter the brokerage total
+  (§8) with no Inzhur-specific path.
 
 ### Failure behaviour
 

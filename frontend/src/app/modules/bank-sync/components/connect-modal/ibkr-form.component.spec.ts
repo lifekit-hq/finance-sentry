@@ -132,10 +132,10 @@ describe('IbkrFormComponent', () => {
     expect(store.resetError).toHaveBeenCalledOnce();
   });
 
-  it('back() returns to the type picker', () => {
+  it('back() returns to the broker picker', () => {
     const {cmp, store} = setup();
     cmp.back();
-    expect(store.setModalStep).toHaveBeenCalledWith('type-picker');
+    expect(store.setModalStep).toHaveBeenCalledWith('provider-picker');
   });
 
   it('renders the account id and counts from the preview', () => {

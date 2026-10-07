@@ -60,6 +60,8 @@ async function openIbkrForm(page: Page): Promise<void> {
     .first()
     .click();
   await page.getByText('Brokerage', {exact: true}).click();
+  await expect(page.getByText('Choose your broker.')).toBeVisible();
+  await page.getByText('Interactive Brokers', {exact: true}).click();
 }
 
 async function expectNoHorizontalScroll(page: Page): Promise<void> {

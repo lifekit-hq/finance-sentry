@@ -21,7 +21,7 @@ const TILES: readonly TypeTile[] = [
 const PROVIDERS_FOR_TYPE: Record<InstitutionType, readonly Provider[]> = {
   bank: ['monobank', 'truelayer'],
   crypto: ['binance', 'revolut_x'],
-  broker: ['ibkr'],
+  broker: ['ibkr', 'inzhur'],
 };
 
 @Component({

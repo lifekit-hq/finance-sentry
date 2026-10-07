@@ -57,6 +57,28 @@ public interface IIBKRFlexCredentialRepository
     Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default);
 }
 
+public interface IInzhurCredentialRepository
+{
+    Task AddAsync(InzhurCredential credential, CancellationToken ct = default);
+    Task<InzhurCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>The user's credential for the no-person sync. Opts out of the Owner query filter.</summary>
+    Task<InzhurCredential?> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>Every user's credential holding a live session, for the daily sweep. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<InzhurCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores a credential's connection health alone, straight to the row: the shadow recorder runs after the sync's own
+    /// save, whatever state that left the change tracker in. For the no-person sync; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default);
+
+    void Update(InzhurCredential credential);
+    void Delete(InzhurCredential credential);
+    Task SaveChangesAsync(CancellationToken ct = default);
+}
+
 public interface IBrokerageHoldingRepository
 {
     Task UpsertRangeAsync(IEnumerable<BrokerageHolding> holdings, CancellationToken ct = default);
@@ -68,7 +90,8 @@ public interface IBrokerageHoldingRepository
     /// <summary>Marks the given tracked holdings for deletion (used to reconcile sold-out positions).</summary>
     void RemoveRange(IEnumerable<BrokerageHolding> holdings);
 
-    Task DeleteByUserIdAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>Deletes one provider's holdings for the user — a disconnect never touches another provider's rows.</summary>
+    Task DeleteByUserIdAndProviderAsync(Guid userId, string provider, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
 

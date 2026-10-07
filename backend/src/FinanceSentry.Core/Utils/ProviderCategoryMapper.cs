@@ -9,6 +9,7 @@ public static class ProviderCategoryMapper
         ["binance"] = "crypto",
         ["revolut_x"] = "crypto",
         ["ibkr"] = "brokerage",
+        ["inzhur"] = "brokerage",
     };
 
     public static string GetCategory(string? provider)

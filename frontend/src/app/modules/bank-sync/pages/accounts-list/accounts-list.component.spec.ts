@@ -2,6 +2,7 @@ import {BreakpointObserver, type BreakpointState} from '@angular/cdk/layout';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, provideRouter, Router} from '@angular/router';
+import {CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {
@@ -24,7 +25,11 @@ const baseInstitution: Institution = {
   accounts: [],
 };
 
-function setupFixture(isPhone: boolean, overrides: Partial<Institution> = {}) {
+function setupFixture(
+  isPhone: boolean,
+  overrides: Partial<Institution> = {},
+  extraProviders: unknown[] = []
+) {
   const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
     isLoading: signal(false),
@@ -58,6 +63,7 @@ function setupFixture(isPhone: boolean, overrides: Partial<Institution> = {}) {
         provide: BreakpointObserver,
         useValue: {observe: () => of({matches: isPhone, breakpoints: {}} as BreakpointState)},
       },
+      ...(extraProviders as never[]),
     ],
   });
   const fixture = TestBed.createComponent(AccountsListComponent);
@@ -135,5 +141,52 @@ describe('AccountsListComponent account row', () => {
     row?.click();
 
     expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {account: 'acc-1'}});
+  });
+});
+
+describe('AccountsListComponent reconnect and disconnect', () => {
+  function setupActions(provider: string) {
+    const connectStore = {openModal: vi.fn(), selectPickedProvider: vi.fn()};
+    const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
+    const fixture = setupFixture(false, {provider, syncStatus: 'reauth_required'}, [
+      {provide: ConnectStore, useValue: connectStore},
+      {provide: CmnDialogService, useValue: dialog},
+    ]);
+    const store = TestBed.inject(AccountsStore) as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
+    store['disconnectInzhur'] = vi.fn();
+    return {cmp: fixture.componentInstance, connectStore, dialog, store};
+  }
+
+  it.each([
+    ['truelayer', 'Reconnect bank'],
+    ['inzhur', 'Reconnect Inzhur'],
+  ])('reconnect() opens the %s sign-in as "%s"', (provider, title) => {
+    const {cmp, connectStore, dialog} = setupActions(provider);
+
+    expect(cmp.canReconnect({...baseInstitution, provider})).toBe(true);
+    cmp.reconnect({provider});
+
+    expect(connectStore.selectPickedProvider).toHaveBeenCalledWith(provider);
+    expect(dialog.open).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({title}));
+  });
+
+  it('offers no reconnect for a provider that re-authorises outside the connect flow', () => {
+    const {cmp, dialog} = setupActions('ibkr');
+
+    expect(cmp.canReconnect({...baseInstitution, provider: 'ibkr'})).toBe(false);
+    cmp.reconnect({provider: 'ibkr'});
+
+    expect(dialog.open).not.toHaveBeenCalled();
+  });
+
+  it('disconnecting the Inzhur row disconnects Inzhur only', () => {
+    const {cmp, store} = setupActions('inzhur');
+
+    cmp.disconnectInstitution({...baseInstitution, provider: 'inzhur', name: 'Inzhur'});
+
+    expect(store['disconnectInzhur']).toHaveBeenCalled();
   });
 });

@@ -27,7 +27,7 @@ public sealed class DisconnectIBKRCommandHandler(
             credentialRepository.Update(credential);
         }
 
-        await holdingRepository.DeleteByUserIdAsync(command.UserId, cancellationToken);
+        await holdingRepository.DeleteByUserIdAndProviderAsync(command.UserId, "ibkr", cancellationToken);
         await holdingRepository.SaveChangesAsync(cancellationToken);
 
         if (credential is not null)

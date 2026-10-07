@@ -9,12 +9,11 @@ public class WealthAggregationService(
     IBankingAccountsReader bankingAccounts,
     IBankingTransactionReader bankingTransactions,
     ICryptoHoldingsReader? cryptoReader = null,
-    IBrokerageHoldingsReader? brokerageReader = null) : IWealthAggregationService
+    IBrokerageHoldingsReader? brokerageReader = null,
+    IBrokerageConnectionStatusReader? brokerageConnections = null) : IWealthAggregationService
 {
     private static readonly HashSet<string> AllowedCategories =
         new(StringComparer.OrdinalIgnoreCase) { "banking", "crypto", "brokerage", "other" };
-
-    private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(1);
 
     // Banking feeds sync roughly daily (not tick-by-tick like crypto/brokerage prices), so a
     // longer window before we call a bank account "stale". Matches the net-worth snapshot job.
@@ -97,16 +96,23 @@ public class WealthAggregationService(
             }
         }
 
-        if (_brokerageReader is not null && (category is null || category == "brokerage") && (provider is null || provider == "ibkr"))
+        if (_brokerageReader is not null && (category is null || category == "brokerage"))
         {
-            var holdings = await _brokerageReader.GetHoldingsAsync(userId, ct);
+            var holdings = (await _brokerageReader.GetHoldingsAsync(userId, ct))
+                .Where(h => provider is null || string.Equals(h.Provider, provider, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             if (holdings.Count > 0)
             {
+                var now = DateTime.UtcNow;
+                var connectionStatuses = brokerageConnections is null
+                    ? new Dictionary<string, string>()
+                    : await brokerageConnections.GetStatusesAsync(userId, ct);
+
                 var accounts = holdings.Select(h => new AccountBalanceDto(
-                    Guid.Empty, "IBKR", "brokerage",
+                    Guid.Empty, AccountNameFor(h.Provider), "brokerage",
                     h.Symbol.Length >= 4 ? h.Symbol[..4] : h.Symbol,
-                    "ibkr", "brokerage", h.Symbol, h.Quantity, h.UsdValue,
-                    DateTime.UtcNow - h.SyncedAt > StaleThreshold ? "stale" : "synced", h.SyncedAt))
+                    h.Provider.ToLowerInvariant(), "brokerage", h.Symbol, h.Quantity, h.UsdValue,
+                    BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt))
                     .ToList<AccountBalanceDto>();
 
                 var institutionsByProvider = holdings
@@ -117,7 +123,7 @@ public class WealthAggregationService(
                         Name: DisplayNameFor(pg.Key),
                         Category: "brokerage",
                         TotalInBaseCurrency: pg.Sum(h => h.UsdValue),
-                        SyncStatus: DateTime.UtcNow - pg.Max(h => h.SyncedAt) > StaleThreshold ? "stale" : "synced",
+                        SyncStatus: BrokerageSyncStatus(pg.Key, pg.Max(h => h.SyncedAt), now, connectionStatuses),
                         LastSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         LastSuccessfulSyncTimestamp: pg.Max(h => (DateTime?)h.SyncedAt),
                         Accounts: accounts.Where(a => string.Equals(a.Provider, pg.Key, StringComparison.OrdinalIgnoreCase)).ToList()))
@@ -245,11 +251,24 @@ public class WealthAggregationService(
         return min.Status;
     }
 
+    // A lapsed connection (Inzhur's session) outranks the holdings' age: the owner has to reconnect.
+    private static string BrokerageSyncStatus(
+        string provider, DateTime lastSyncedAt, DateTime now, IReadOnlyDictionary<string, string> connectionStatuses)
+    {
+        if (connectionStatuses.TryGetValue(provider, out var status) && status == "reauth_required")
+            return status;
+        return BrokerageFreshness.IsStale(provider, lastSyncedAt, now) ? "stale" : "synced";
+    }
+
+    private static string AccountNameFor(string provider)
+        => string.Equals(provider, "ibkr", StringComparison.OrdinalIgnoreCase) ? "IBKR" : DisplayNameFor(provider);
+
     private static string DisplayNameFor(string provider) => provider.ToLowerInvariant() switch
     {
         "binance" => "Binance",
         "revolut_x" => "Revolut X",
         "ibkr" => "Interactive Brokers",
+        "inzhur" => "Inzhur",
         _ => char.ToUpperInvariant(provider[0]) + provider[1..],
     };
 

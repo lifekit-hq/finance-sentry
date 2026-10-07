@@ -4,7 +4,11 @@ import {TestBed} from '@angular/core/testing';
 import {API_BASE_URL} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
-import {type CryptoHoldingsDto, type Position} from '../models/position/position.model';
+import {
+  type BrokerageHoldingsDto,
+  type CryptoHoldingsDto,
+  type Position,
+} from '../models/position/position.model';
 import {PositionsService} from './positions.service';
 
 const BASE = 'http://api.test';
@@ -65,6 +69,45 @@ describe('PositionsService', () => {
       ['BTC', 'revolut_x', 6_000],
     ]);
     expect(positions.every(p => p.pnlPercent === null)).toBe(true);
+  });
+
+  it('labels each brokerage position with its broker when holdings span several', () => {
+    const brokerage: BrokerageHoldingsDto = {
+      provider: 'mixed',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 1_250,
+      positions: [
+        {
+          symbol: 'AAPL',
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 1_000,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+        {
+          symbol: 'Fund A',
+          instrumentType: 'REIT',
+          quantity: 10,
+          usdValue: 250,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'inzhur',
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(null);
+
+    expect(positions.map(p => [p.symbol, p.provider])).toEqual([
+      ['AAPL', 'ibkr'],
+      ['Fund A', 'inzhur'],
+    ]);
   });
 
   it('marks venue fiat as venue cash with no unit price', () => {

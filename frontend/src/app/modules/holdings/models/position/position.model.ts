@@ -5,6 +5,8 @@ export interface BrokeragePositionDto {
   usdValue: number;
   costBasisUsd: Nullable<number>;
   averageCostUsd: Nullable<number>;
+  /** The broker this position is held with — holdings can span several. */
+  provider?: string;
 }
 
 export interface BrokerageHoldingsDto {

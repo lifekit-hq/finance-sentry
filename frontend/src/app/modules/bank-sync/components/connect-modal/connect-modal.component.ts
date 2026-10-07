@@ -67,6 +67,8 @@ export class ConnectModalComponent {
         return 'revolut_x';
       case 'ibkr-form':
         return 'ibkr';
+      case 'inzhur-form':
+        return 'inzhur';
       default:
         return null;
     }

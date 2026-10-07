@@ -133,6 +133,55 @@ public sealed class IBKRFlexCredentialRepository : IIBKRFlexCredentialRepository
     }
 }
 
+public sealed class InzhurCredentialRepository(BrokerageSyncDbContext context) : IInzhurCredentialRepository
+{
+    public async Task AddAsync(InzhurCredential credential, CancellationToken ct = default)
+    {
+        await context.InzhurCredentials.AddAsync(credential, ct);
+    }
+
+    public async Task<InzhurCredential?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await context.InzhurCredentials
+            .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+    }
+
+    public async Task<InzhurCredential?> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await context.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+    }
+
+    public async Task<IReadOnlyList<InzhurCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default)
+    {
+        return await context.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Status == InzhurConnectionStatus.Active)
+            .ToListAsync(ct);
+    }
+
+    public async Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default)
+    {
+        await context.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Id == credentialId)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), ct);
+    }
+
+    public void Update(InzhurCredential credential)
+    {
+        context.InzhurCredentials.Update(credential);
+    }
+
+    public void Delete(InzhurCredential credential)
+    {
+        context.InzhurCredentials.Remove(credential);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        await context.SaveChangesAsync(ct);
+    }
+}
+
 public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
 {
     private readonly BrokerageSyncDbContext _context;
@@ -184,10 +233,10 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
         _context.BrokerageHoldings.RemoveRange(holdings);
     }
 
-    public async Task DeleteByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task DeleteByUserIdAndProviderAsync(Guid userId, string provider, CancellationToken ct = default)
     {
         await _context.BrokerageHoldings
-            .Where(h => h.UserId == userId)
+            .Where(h => h.UserId == userId && h.Provider == provider)
             .ExecuteDeleteAsync(ct);
     }
 

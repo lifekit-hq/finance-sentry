@@ -116,7 +116,7 @@
                 <!-- On a phone the menu carries Reconnect; the row keeps room for the figure. -->
                 @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
                   <cmn-button
-                    (clicked)="reconnect(); $event.stopPropagation()"
+                    (clicked)="reconnect(inst); $event.stopPropagation()"
                     class="hidden sm:inline-block"
                     variant="primary"
                     size="sm"

@@ -63,7 +63,7 @@ public class BrokerageControllerDisconnectContractTests : IClassFixture<Brokerag
             .Setup(r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _factory.HoldingRepoMock
-            .Setup(r => r.DeleteByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.DeleteByUserIdAndProviderAsync(It.IsAny<Guid>(), "ibkr", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _factory.HoldingRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))

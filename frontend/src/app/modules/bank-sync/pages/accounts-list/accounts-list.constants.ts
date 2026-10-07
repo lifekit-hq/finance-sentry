@@ -1,5 +1,7 @@
 import {type MenuItem} from '@lifekit-hq/ui';
 
+import {type PickableProvider} from '../../../../shared/models/provider/provider.model';
+
 export const MENU_ACTION_RECONNECT = 'reconnect';
 export const MENU_ACTION_DISCONNECT = 'disconnect';
 
@@ -11,8 +13,14 @@ const DISCONNECT_ITEM: MenuItem = {
   destructive: true,
 };
 
-/** Providers that re-authorise through the connect flow; the rest only offer Disconnect. */
-export const RECONNECTABLE_PROVIDER = 'truelayer';
+/**
+ * Providers that re-authorise through the connect flow, with the picker slug and modal title each opens;
+ * the rest only offer Disconnect. An Inzhur reconnect is the owner signing in again (phone, password, SMS code).
+ */
+export const RECONNECT_TARGET: Readonly<Record<string, {slug: PickableProvider; title: string}>> = {
+  truelayer: {slug: 'truelayer', title: 'Reconnect bank'},
+  inzhur: {slug: 'inzhur', title: 'Reconnect Inzhur'},
+};
 
 /** Stable arrays, so the menu input does not change identity on every change-detection pass. */
 export const DISCONNECT_ONLY_MENU: MenuItem[] = [DISCONNECT_ITEM];
