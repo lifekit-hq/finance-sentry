@@ -18,6 +18,8 @@ public interface ISecEdgarService
 
     // Key reported fundamentals (revenue, gross profit, net income, diluted EPS, operating income,
     // shareholders' equity) from EDGAR XBRL, newest first, up to maxPerConcept datapoints each.
+    // us-gaap first; a filer with no us-gaap facts (an IFRS foreign private issuer filing 20-F/40-F)
+    // is read from ifrs-full instead. Each fact names its taxonomy and form.
     Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
         string ticker,
         int maxPerConcept,
