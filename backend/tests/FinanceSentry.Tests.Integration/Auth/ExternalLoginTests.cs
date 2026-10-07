@@ -160,6 +160,34 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
         (await login.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
     }
 
+    [Fact]
+    public async Task PasswordLoginDisabled_AcceptInviteIsRefusedAndTheInviteeSignsInThroughTheProvider()
+    {
+        var (userId, token) = await factory.CreatePendingInviteAsync("pw-off-invitee@test.com");
+        using var disabled = factory.WithWebHostBuilder(b => b.UseSetting("Auth:PasswordLogin:Enabled", "false"));
+        var client = disabled.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var accept = await client.PostAsJsonAsync("/api/v1/auth/invite/accept",
+            new { userId, token, password = "quiet lantern orchard" });
+
+        accept.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await accept.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
+        accept.Headers.Contains("Set-Cookie").Should().BeFalse();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var invitee = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByIdAsync(userId);
+            invitee!.PasswordHash.Should().BeNull();
+        }
+
+        var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-pw-off-invitee", "pw-off-invitee@test.com", true));
+
+        result.Response.User.Id.Should().Be(userId);
+        (await FindByLoginAsync("sub-pw-off-invitee"))!.Id.Should().Be(userId);
+
+        var uninvited = async () => await SignInAsync(new ExternalLoginCommand(Provider, "sub-pw-off-stranger", "pw-off-stranger@test.com", true));
+        await uninvited.Should().ThrowAsync<AccountNotInvitedException>();
+    }
+
     private async Task<AuthResult> SignInAsync(ExternalLoginCommand command)
     {
         using var scope = factory.Services.CreateScope();

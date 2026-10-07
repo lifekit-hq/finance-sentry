@@ -59,9 +59,9 @@ registered account, and only while nobody holds it — so once a second account 
 `auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
 (`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
-**Smoke account:** production has password sign-in off (`Auth__PasswordLogin__Enabled` ← `AUTH_PASSWORD_LOGIN_ENABLED`,
-default `false` in `docker-compose.prod.yml`), so the post-deploy live smoke (`frontend/e2e/live/smoke.spec.ts`) signs in
-through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
+**Smoke account:** production has password sign-in (login and invite acceptance) fixed off
+(`Auth__PasswordLogin__Enabled: "false"` in `docker-compose.prod.yml`, no env override), so the post-deploy live smoke
+(`frontend/e2e/live/smoke.spec.ts`) signs in through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
 `E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). The API
 seeds the matching finance-sentry account at startup from `Auth__SmokeAccount__Email` (prod: compose reads
 `SMOKE_ACCOUNT_EMAIL`, which `deploy.yml` fills from `E2E_LIVE_LOGTO_EMAIL`): a passwordless Member marked with the
@@ -71,8 +71,7 @@ marked account that still carries a password has it removed at startup. Email un
 account it did not create, is never granted Owner, is not shared with anyone, and its `seeded` account is excluded from
 every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from
 any background job. A People-page revoke stays in effect; to retire it, revoke it there, disable the Logto user and delete
-the two secrets. Break-glass if Logto is down: set `AUTH_PASSWORD_LOGIN_ENABLED=true` in the deploy environment and
-redeploy (existing accounts keep their passwords).
+the two secrets. If Logto is down, recovery is restoring Logto; there is no password fallback.
 
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).
