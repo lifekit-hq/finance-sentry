@@ -492,28 +492,16 @@
             }
           </div>
 
-          @if (radarSparklinePoints(); as points) {
+          @if (radarTrendPoints(); as points) {
             <div class="mt-cmn-4">
-              <svg
-                viewBox="0 0 100 30"
-                preserveAspectRatio="none"
-                class="h-10 w-full"
-                aria-hidden="true"
-              >
-                <polyline
-                  [attr.points]="points"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  class="text-brand-primary"
-                />
-                <polyline
-                  [attr.points]="points + sparklineFillClose"
-                  fill="currentColor"
-                  stroke="none"
-                  class="text-brand-primary opacity-10"
-                />
-              </svg>
+              <cmn-line-chart
+                [data]="points"
+                [compact]="true"
+                [yDomain]="trendDomain"
+                xSpacing="time"
+                class="block h-10"
+                valueFormat="number"
+              />
             </div>
           }
 
