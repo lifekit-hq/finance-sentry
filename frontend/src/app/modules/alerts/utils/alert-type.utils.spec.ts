@@ -18,7 +18,7 @@ describe('AlertTypeUtils.meta', () => {
     for (const type of types) {
       expect(AlertTypeUtils.meta(type as AlertType)).not.toBe(DEFAULT_ALERT_TYPE_META);
     }
-    expect(new Set(types.map(t => AlertTypeUtils.meta(t as AlertType).label)).size).toBe(26);
+    expect(new Set(types.map(t => AlertTypeUtils.meta(t as AlertType).label)).size).toBe(27);
   });
 
   it('falls back for a type the registry does not know yet', () => {
