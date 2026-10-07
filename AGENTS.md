@@ -196,7 +196,7 @@ backend/
 ## Test strategy
 
 - **Unit tests** (`FinanceSentry.Tests.Unit`): pure, no DB. Always fast.
-- **Contract/integration tests** (`FinanceSentry.Tests.Integration`): use `WebApplicationFactory<Program>`, mock all external I/O (repos via Moq, DB contexts replaced with `UseInMemoryDatabase`). DB-heavy tests are tagged `[Trait("Category","Integration")]`; tests that need a container carry `[DockerRequiredFact]` (`Shared/DockerRequiredFactAttribute.cs`), which skips them at discovery time when no Docker daemon is reachable.
+- **Contract/integration tests** (`FinanceSentry.Tests.Integration`): use `WebApplicationFactory<Program>`, mock all external I/O (repos via Moq, DB contexts replaced with `UseInMemoryDatabase`). DB-heavy tests are tagged `[Trait("Category","Integration")]`; tests that need a container carry `[DockerRequiredFact]` (`Shared/DockerRequiredFactAttribute.cs`), which skips them at discovery time when no Docker daemon is reachable. A container-backed test takes a fresh database on the run-wide server per image (`Shared/PostgresServer.cs` → `CreateDatabaseAsync`, dropped on dispose) instead of starting its own `PostgreSqlBuilder` container (only a test that needs the server itself to appear mid-test does); classes that run the API's full migrations (which create the cluster-wide `fs_readonly` role) join `PostgresClusterStateCollection` and pass `resetsClusterRoles: true`.
 - **MCP tests** (`FinanceSentry.Mcp.Tests`): contract + schema tests for MCP tools; all run in <5 s with no DB.
 
 CI (`backend-ci.yml`) runs the solution **unfiltered** against a `postgres:14-alpine` service
