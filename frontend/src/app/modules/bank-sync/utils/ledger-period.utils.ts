@@ -1,3 +1,4 @@
+import {DateRangeUtils} from '../../../shared/utils/date-range.utils';
 import {LEDGER_PERIODS} from '../constants/ledger-period/ledger-period.constants';
 import {
   type LedgerPeriod,
@@ -7,12 +8,18 @@ import {DashboardRangeUtils} from './dashboard-range.utils';
 
 export class LedgerPeriodUtils {
   /**
-   * Inclusive `YYYY-MM-DD` bounds of a ledger period: the dashboard range's window, so a
-   * drill-down from a dashboard tile selects the same chip. `all` is unbounded.
+   * Inclusive `YYYY-MM-DD` bounds of a ledger period, UTC-anchored like the dashboard presets.
+   * This month and 3M are the dashboard's MTD and 3M windows; last month is the previous
+   * calendar month, first through last day.
    */
   public static dates(period: LedgerPeriod, now = new Date()): LedgerPeriodDates {
-    const {from, to} = DashboardRangeUtils.windowDates(period, now);
-    return {from: from ?? null, to: to ?? null};
+    if (period === 'last-month') {
+      const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+      return {from: DateRangeUtils.toIsoDate(first), to: DateRangeUtils.toIsoDate(last)};
+    }
+    const {from, to} = DashboardRangeUtils.windowDates(period === '3m' ? '3m' : 'mtd', now);
+    return {from: from as string, to: to as string};
   }
 
   /** The period whose bounds equal the given date filter, or null for any other range. */

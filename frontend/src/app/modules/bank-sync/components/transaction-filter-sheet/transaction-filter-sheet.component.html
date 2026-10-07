@@ -16,13 +16,13 @@
       @for (period of periods; track period.id) {
         <cmn-chip
           [selected]="!isCustom() && activePeriod() === period.id"
-          [attr.data-testid]="'period-' + period.id"
+          [attr.data-testid]="'sheet-period-' + period.id"
           (clicked)="selectPeriod(period.id)"
         >
           {{ period.label }}
         </cmn-chip>
       }
-      <cmn-chip [selected]="isCustom()" (clicked)="openCustom()" data-testid="period-custom">
+      <cmn-chip [selected]="isCustom()" (clicked)="openCustom()" data-testid="sheet-period-custom">
         Custom...
       </cmn-chip>
     </div>

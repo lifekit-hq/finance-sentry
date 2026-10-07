@@ -1,12 +1,8 @@
-import {type HistoryRange} from '../dashboard/dashboard.model';
+export type LedgerPeriod = 'this-month' | 'last-month' | '3m';
 
-/** The ledger's quick periods are the dashboard's history ranges, so a drill-down lands on its chip. */
-export type LedgerPeriod = HistoryRange;
-
-/** Inclusive `YYYY-MM-DD` bounds; either is null for an open end (`all` has neither). */
 export interface LedgerPeriodDates {
-  from: Nullable<string>;
-  to: Nullable<string>;
+  from: string;
+  to: string;
 }
 
 export interface LedgerPeriodOption {

@@ -17,10 +17,10 @@ import {
   ChipComponent,
   CmnDrawerService,
   EmptyStateComponent,
+  InputComponent,
   InstitutionAvatarComponent,
   ListItemRowComponent,
   PageContainerComponent,
-  SearchInputComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 import {debounceTime, distinctUntilChanged, map} from 'rxjs';
@@ -33,6 +33,7 @@ import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {TransactionFilterSheetComponent} from '../../components/transaction-filter-sheet/transaction-filter-sheet.component';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
+import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
   type TransactionType,
@@ -68,13 +69,13 @@ const FILTER_SHEET_WIDTH = '420px';
     CardComponent,
     ChipComponent,
     EmptyStateComponent,
+    InputComponent,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,
     ListItemRowComponent,
     MerchantCategoryPipe,
     MoneyPipe,
     ReactiveFormsModule,
-    SearchInputComponent,
     SkeletonComponent,
     TransactionAmountClassPipe,
     TransactionAmountPipe,
@@ -280,6 +281,13 @@ export class TransactionLedgerComponent {
     this.applySelection({
       ...this.activeSelection(),
       categories: this.activeCategories().filter(c => c !== key),
+    });
+  }
+
+  public selectPeriod(period: LedgerPeriod): void {
+    void this.router.navigate([], {
+      queryParams: LedgerPeriodUtils.dates(period),
+      queryParamsHandling: 'merge',
     });
   }
 

@@ -49,7 +49,10 @@ export class TransactionFilterSheetComponent {
     LedgerPeriodUtils.match(this.draft().from, this.draft().to)
   );
   /** A range no quick period matches is a custom one, so its dates stay editable. */
-  public readonly isCustom = computed(() => this.customOpen() || this.activePeriod() === null);
+  public readonly isCustom = computed(() => {
+    const {from, to} = this.draft();
+    return this.customOpen() || (this.activePeriod() === null && (from !== null || to !== null));
+  });
   public readonly rangeInverted = computed(() => {
     const {from, to} = this.draft();
     return from !== null && to !== null && from > to;

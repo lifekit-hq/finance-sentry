@@ -68,10 +68,12 @@ test.describe('Transaction ledger — filter sheet', () => {
         tx('pay', 'Synthetic pay row', today, 'credit', null),
       ];
       const categories = q.getAll('category');
+      const from = q.get('from');
+      const to = q.get('to');
       const items = all.filter(
         t =>
-          (!q.get('from') || String(t.date) >= q.get('from')!) &&
-          (!q.get('to') || String(t.date) <= q.get('to')!) &&
+          (!from || String(t.date) >= from) &&
+          (!to || String(t.date) <= to) &&
           (!q.get('transactionType') || t.transactionType === q.get('transactionType')) &&
           (categories.length === 0 || categories.includes(String(t.merchantCategory)))
       );
@@ -83,7 +85,7 @@ test.describe('Transaction ledger — filter sheet', () => {
     await expect(page.getByTestId('applied-filters')).toHaveCount(0);
 
     await page.getByTestId('filter-button').getByRole('button').click();
-    await page.getByTestId('period-1y').getByRole('button').click();
+    await page.getByTestId('sheet-period-3m').getByRole('button').click();
     await page.getByTestId('type-out').getByRole('button').click();
     await page.getByTestId('category-FOOD_AND_DRINK').getByRole('button').click();
     await page.getByTestId('filter-apply').getByRole('button').click();
@@ -94,7 +96,7 @@ test.describe('Transaction ledger — filter sheet', () => {
     await expect(page).toHaveURL(/type=debit/);
     await expect(page).toHaveURL(/category=FOOD_AND_DRINK/);
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&/);
-    await expect(page.getByTestId('chip-date-range')).toHaveAttribute('label', 'Period: 1Y');
+    await expect(page.getByTestId('chip-date-range')).toHaveAttribute('label', 'Period: 3M');
     await expect(page.getByTestId('chip-type')).toHaveAttribute('label', 'Type: Out');
     await expect(page.getByTestId('chip-category-FOOD_AND_DRINK')).toHaveAttribute(
       'label',
@@ -139,13 +141,13 @@ test.describe('Transaction ledger — filter sheet', () => {
       'Dates: 2020-01-01 – 2020-01-31'
     );
     await page.getByTestId('filter-button').getByRole('button').click();
-    await expect(page.getByTestId('period-custom').getByRole('button')).toHaveAttribute(
+    await expect(page.getByTestId('sheet-period-custom').getByRole('button')).toHaveAttribute(
       'aria-pressed',
       'true'
     );
   });
 
-  test('at 390px: search + filter button, the account chip row, then rows, with no sideways scroll', async ({
+  test('at 390px: search + filter button, the period and account chip rows, then rows, with no sideways scroll', async ({
     page,
   }) => {
     const json = (body: unknown) => ({
@@ -188,10 +190,12 @@ test.describe('Transaction ledger — filter sheet', () => {
       (await locator.boundingBox())?.y ?? Number.NaN;
     const search = await y(page.getByRole('searchbox', {name: 'Search transactions'}));
     const button = await y(page.getByTestId('filter-button'));
+    const periods = await y(page.getByRole('group', {name: 'Period filter'}));
     const accounts = await y(page.getByRole('group', {name: 'Account filter'}));
     const row = await y(page.getByTestId('ledger-row'));
     expect(Math.abs(search - button)).toBeLessThan(20);
-    expect(accounts).toBeGreaterThan(search);
+    expect(periods).toBeGreaterThan(search);
+    expect(accounts).toBeGreaterThan(periods);
     expect(row).toBeGreaterThan(accounts);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)

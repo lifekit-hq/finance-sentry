@@ -105,6 +105,32 @@ describe('TransactionLedgerComponent filter sheet', () => {
   });
 });
 
+describe('TransactionLedgerComponent period chips', () => {
+  it('writes the picked period dates to the URL and keeps the other params', () => {
+    const {chip, navigate} = setup('debit', {account: 'a1'});
+    chip('period-last-month').querySelector('button')?.click();
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: LedgerPeriodUtils.dates('last-month'),
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('selects the chip whose dates are in the URL', () => {
+    const {chip} = setup(null, {...LedgerPeriodUtils.dates('3m')});
+    expect(chip('period-3m').querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(chip('period-this-month').querySelector('button')?.getAttribute('aria-pressed')).toBe(
+      'false'
+    );
+  });
+
+  it('selects no period chip for a custom range', () => {
+    const {root} = setup(null, {from: '2020-01-01', to: '2020-01-31'});
+    expect(
+      root.querySelectorAll('[role="group"][aria-label="Period filter"] [aria-pressed="true"]')
+    ).toHaveLength(0);
+  });
+});
+
 describe('TransactionLedgerComponent applied filter chips', () => {
   it('shows no chip row without filters', () => {
     const {root} = setup(null);
@@ -148,9 +174,9 @@ describe('TransactionLedgerComponent applied filter chips', () => {
   });
 
   it('names a quick period by its label', () => {
-    const {from, to} = LedgerPeriodUtils.dates('ytd');
-    const {chip} = setup(null, {from: from ?? '', to: to ?? ''});
-    expect(chip('chip-date-range').getAttribute('label')).toBe('Period: YTD');
+    const {from, to} = LedgerPeriodUtils.dates('last-month');
+    const {chip} = setup(null, {from, to});
+    expect(chip('chip-date-range').getAttribute('label')).toBe('Period: Last month');
   });
 
   it('Clear drops every sheet filter and leaves account and search alone', () => {

@@ -15,11 +15,12 @@
       </p>
     </div>
     <div class="flex w-full items-center gap-cmn-2 md:w-auto">
-      <div class="min-w-0 flex-1 md:w-72 md:flex-none [&_cmn-search-input]:block">
-        <cmn-search-input
+      <div class="min-w-0 flex-1 md:w-72 md:flex-none [&_cmn-input]:block [&_cmn-input]:w-full">
+        <cmn-input
           [formControl]="searchControl"
+          type="search"
           placeholder="Search transactions"
-          ariaLabel="Search transactions"
+          autocomplete="off"
         />
       </div>
       <cmn-badge [count]="activeFilterCount()" class="shrink-0">
@@ -33,6 +34,23 @@
         </cmn-button>
       </cmn-badge>
     </div>
+  </div>
+
+  <div
+    class="mb-cmn-4 flex gap-cmn-2 overflow-x-auto pb-cmn-1 md:flex-wrap"
+    role="group"
+    aria-label="Period filter"
+  >
+    @for (period of periods; track period.id) {
+      <cmn-chip
+        [selected]="activePeriod() === period.id"
+        [attr.data-testid]="'period-' + period.id"
+        (clicked)="selectPeriod(period.id)"
+        class="shrink-0"
+      >
+        {{ period.label }}
+      </cmn-chip>
+    }
   </div>
 
   @if (appliedFilters().length > 0) {
