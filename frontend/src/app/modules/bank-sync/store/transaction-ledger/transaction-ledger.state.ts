@@ -1,14 +1,12 @@
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
-import {EMPTY_TRANSACTION_FILTERS} from '../../../../shared/constants/transaction-filters/transaction-filters.constants';
-import {type TransactionFilters} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
+  type TransactionType,
 } from '../../models/transaction/transaction.model';
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
-  /** Server total over the filtered set. */
   totalCount: number;
   hasMore: boolean;
   offset: number;
@@ -16,8 +14,17 @@ export interface TransactionLedgerState {
   errorCode: Nullable<string>;
   monthlyOutflowUsd: number | null;
   monthlyOutflowCurrency: string;
-  /** Server-side filters, synced to the query string; amount bounds are USD. */
-  filters: TransactionFilters;
+  /** Server-side filter: a single account, or null for all. */
+  accountId: Nullable<string>;
+  /** Server-side filter: credits (In), debits (Out), or null for all. */
+  transactionType: Nullable<TransactionType>;
+  /** Server-side filter: a canonical category key, or null for all. */
+  category: Nullable<string>;
+  /** Server-side filter: inclusive `YYYY-MM-DD` date bounds, or null for open-ended. */
+  from: Nullable<string>;
+  to: Nullable<string>;
+  /** Server-side free-text filter (description / merchant). */
+  search: string;
   accounts: TransactionAccountOption[];
 }
 
@@ -32,6 +39,11 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   errorCode: null,
   monthlyOutflowUsd: null,
   monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
-  filters: EMPTY_TRANSACTION_FILTERS,
+  accountId: null,
+  transactionType: null,
+  category: null,
+  from: null,
+  to: null,
+  search: '',
   accounts: [],
 };

@@ -1,8 +1,7 @@
 import {type PagedRequest, type PagedResponse} from '../../../../shared/models/api/api.model';
 import {type Timestamped} from '../../../../shared/models/timestamped/timestamped.model';
-import {type TransactionType} from '../../../../shared/models/transaction-filters/transaction-filters.model';
 
-export type {TransactionType};
+export type TransactionType = 'debit' | 'credit';
 
 export interface GlobalTransactionDto extends Timestamped {
   transactionId: string;
@@ -25,12 +24,9 @@ export interface GetAllTransactionsParams extends PagedRequest {
   from?: string;
   to?: string;
   transactionType?: TransactionType;
-  /** Repeated on the wire (`accountId=a&accountId=b`). */
-  accountId?: string[];
-  /** Canonical category keys, repeated on the wire. */
-  category?: string[];
-  minAmountUsd?: number;
-  maxAmountUsd?: number;
+  accountId?: string;
+  /** Canonical category key, e.g. from a dashboard Top spendings drill-down. */
+  category?: string;
   search?: string;
 }
 

@@ -615,7 +615,7 @@ test.describe('Dashboard → Ledger spending consistency', () => {
 
 // Top spendings counts the range's debits per category, including the computed FAMILY_SUPPORT
 // bucket and UNCATEGORIZED (null category). A row must open the ledger on exactly that slice:
-// the category selected in the filter and the query scoped to debits over the same range.
+// the category shown as the ledger's Category chip and the query scoped to debits over the same range.
 test.describe('Top spendings → Ledger category drill-down', () => {
   const CATEGORIES = [
     {key: 'FOOD_AND_DRINK', label: 'Food & Drink', sortOrder: 10},
@@ -662,7 +662,10 @@ test.describe('Top spendings → Ledger category drill-down', () => {
 
       await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
       expect(new URL(page.url()).searchParams.get('type')).toBe('debit');
-      await expect(page.getByTestId('category-filter')).toContainText(label);
+      // The ledger's chip formats the key itself (MerchantCategoryUtils), e.g. "Food & drink".
+      await expect(page.getByTestId('category-chip')).toContainText(
+        new RegExp(`Category: ${label}`, 'i')
+      );
       await expect.poll(() => ledgerQueries.at(-1)?.getAll('category')).toEqual([key]);
       const query = ledgerQueries.at(-1);
       expect(query?.get('transactionType')).toBe('debit');
