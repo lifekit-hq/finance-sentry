@@ -18,7 +18,7 @@ After writing or modifying **any** Angular `.ts` file, run `npx eslint <file>` f
 
 **Any new UI component MUST be created in [`lifekit-hq/lifekit-common`](https://github.com/lifekit-hq/lifekit-common) first** (`@lifekit-hq/ui`, Storybook-first — see that repo's CLAUDE.md), then consumed here as a published package. Components are never built directly in the host Angular app (`frontend/`). The `cmn-` selector prefix is reserved for library components.
 
-**Before writing any Angular template or UI element**, check the component catalog first — the hosted Storybook at https://lifekit-hq.github.io/lifekit-common/ or `node_modules/@lifekit-hq/ui`. Use `cmn-button`, `cmn-input`, `cmn-form-field`, `cmn-alert`, `cmn-card`, etc. — never raw `<input>`, `<button>`, or `<div class="error">` when the library already has the component.
+**Before writing any Angular template or UI element**, check the component catalog first — the hosted Storybook at https://lifekit-hq.github.io/lifekit-common/ or `node_modules/@lifekit-hq/ui` (after `npm ci` in `frontend/` - a reused worktree's tree can lag `package.json`). Use `cmn-button`, `cmn-input`, `cmn-form-field`, `cmn-alert`, `cmn-card`, etc. — never raw `<input>`, `<button>`, or `<div class="error">` when the library already has the component.
 
 **Registry auth**: `@lifekit-hq/*` installs from GitHub Packages — `frontend/.npmrc` expects `NODE_AUTH_TOKEN` in the environment (`export NODE_AUTH_TOKEN=$(gh auth token)`, token needs `read:packages`). CI passes `secrets.GITHUB_TOKEN` (deploy no longer builds the frontend — it pulls the CI-built image; only the break-glass local build in `docker/deploy.sh` needs it); Docker builds take it as the `npm_token` BuildKit secret.
 

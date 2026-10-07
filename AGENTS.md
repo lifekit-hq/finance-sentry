@@ -105,7 +105,7 @@ The gates below apply to every change — they are imported into context on ever
 Not auto-loaded — follow these links when the task touches them:
 
 - [Money semantics](docs/money-semantics.md) — **source of truth for every money calculation** (balance meaning per provider, liability signs, flow windows, snapshot rules); any PR changing money math updates it in the same diff
-- [App state & key files](docs/claude/app-state.md) — what's built/running per feature; update the relevant block when a feature lands
+- [App state & key files](docs/claude/app-state.md) — what's built/running per feature; refreshed by the periodic instruction pass, not per PR
 - [QA guide](docs/claude/qa.md) — test creds, golden-path scenarios, post-implementation e2e process
 - [AI development pipeline](docs/claude/ai-pipeline.md) — Claude/Qwen roles (Qwen path currently disabled)
 - [Speckit agent context](docs/claude/speckit-context.md) — machine-appended Active Technologies / Recent Changes (owned by `.specify/scripts/bash/update-agent-context.sh`; never hand-grow this file's sections in AGENTS.md again)
@@ -241,37 +241,9 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 - `docker/Dockerfile`, `Dockerfile.mcp` and `Dockerfile.gateway` set `ENV NUGET_PACKAGES=/src/.nuget/packages` and restore straight into the build layer (csproj-first, then `build --no-restore` + `publish --no-build`) instead of a `--mount=type=cache` — a cache mount's contents aren't guaranteed to persist across the image's later `RUN` steps under BuildKit GC/concurrent-build pressure, which was silently dropping packages between restore and publish.
 - `dotnet tool restore` (used for `reportgenerator` in Backend CI) needs its manifest at `.config/dotnet-tools.json` at the **repo root**, not under `backend/` — CI steps run from repo root and `dotnet tool restore` only walks up from CWD.
 
-## MCP Verification
+## MCP tools
 
-Verified 2026-09-03 via `dotnet test FinanceSentry.sln --no-build -c Release` (no filter; the
-plain command needs no flags — `backend/Directory.Build.rsp` pins one build node, because the default
-parallel run needs more than 4 GB of RAM).
-
-| Project | Passed | Skipped | Failed |
-|---|---|---|---|
-| FinanceSentry.Tests.Unit | 541 | 0 | 0 |
-| FinanceSentry.Tests.Integration | 120 | 6 | 0 |
-| FinanceSentry.Mcp.Tests | 103 | 0 | 0 |
-| FinanceSentry.Modules.Research.Tests | 204 | 2 | 0 |
-| FinanceSentry.Modules.Radar.Tests | 80 | 0 | 0 |
-| FinanceSentry.Modules.Risk.Tests | 37 | 0 | 0 |
-| FinanceSentry.Modules.Retention.Tests | 37 | 0 | 0 |
-| FinanceSentry.Modules.Agent.Tests | 35 | 0 | 0 |
-| FinanceSentry.Modules.Analytics.Tests | 35 | 0 | 0 |
-| FinanceSentry.Modules.Companion.Tests | 24 | 0 | 0 |
-| FinanceSentry.Gateway.Tests | 6 | 0 | 0 |
-
-Skips are dependency-gated, not disabled tests: 2 Docker-gated (`[DockerRequiredFact]`) and 6
-needing a live Postgres or a live external page.
-
-### Registered MCP tools (58 total)
-
-Full tool catalogue (input parameters, return schemas, real/stub): [`docs/mcp.md`](docs/mcp.md).
-Canonical list: `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`.
-
-## Frontend attribute ordering
-
-Angular ESLint enforces `@angular-eslint/template/attributes-order`. The expected order is: bound properties `[prop]` first, then plain attribute strings (`icon`, `variant`), then event bindings `(event)`. Structural slot markers (like `cta`, `leading`, `trailing` on projected children) come after event bindings. Run `ng lint` or let lint-staged auto-fix before committing.
+Canonical list: `AgreedToolSurface` in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; catalogue (parameters, return schemas, real/stub): [`docs/mcp.md`](docs/mcp.md). Per-project test counts are not kept here - CI's test report is the record.
 
 ## Memory (vault)
 

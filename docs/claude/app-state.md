@@ -1,7 +1,7 @@
 # Finance Sentry — App State & Key Files
 
 > Reference document (not auto-loaded). Current state of what is built and running.
-> Update the relevant block when a feature lands; keep each feature to ONE paragraph.
+> Refreshed by the periodic instruction pass (not per PR, so feature branches never conflict here); keep each feature to ONE paragraph.
 
 ## Key Files
 
