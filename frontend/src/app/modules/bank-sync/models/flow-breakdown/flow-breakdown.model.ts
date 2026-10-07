@@ -30,6 +30,22 @@ export interface FlowBreakdownItem {
 }
 
 export interface FlowBreakdown {
+  /** `yyyy-MM`, or empty for a day-range breakdown. */
   month: string;
   items: FlowBreakdownItem[];
 }
+
+/**
+ * The UTC calendar days a dashboard window drills into. `from` is null for all-time (no lower
+ * bound); `months` is how much history the backend loads around it for transfer-pair
+ * detection, the same value the dashboard asked for.
+ */
+export interface FlowBreakdownRange {
+  from: Nullable<string>;
+  to: string;
+  months: number;
+}
+
+/** What the page is asked to show: one month, or a dashboard window's day range. */
+export type FlowBreakdownRequest =
+  {kind: 'month'; month: string} | ({kind: 'range'} & FlowBreakdownRange);

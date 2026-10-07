@@ -97,6 +97,19 @@ public interface ICounterpartyClassificationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Day-level form of <see cref="ClassifyForWindowAsync(Guid, int, CancellationToken)"/>:
+    /// the same fetch and the same matching over the whole <paramref name="months"/> window —
+    /// so which transactions count as counterparty movements never changes — but the per-month
+    /// gross flows only accumulate transactions dated on or after <paramref name="from"/>.
+    /// Memoized per (user, window, from) like the plain form.
+    /// </summary>
+    Task<CounterpartyClassificationResult> ClassifyForWindowAsync(
+        Guid userId,
+        int months,
+        DateTime from,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Identifies which transactions belong to a known counterparty and returns:
     /// <list type="bullet">
     ///   <item>The union of matched transaction IDs (to exclude from normal flow).</item>
@@ -138,15 +151,30 @@ public class CounterpartyClassificationService(
     // result explicitly; the standalone money-flow and top-categories query handlers each call
     // this entry point, so within one scope the second call must return the first call's
     // result rather than re-classifying — two passes invite two answers for one month.
-    private readonly Dictionary<(Guid UserId, int Months), CounterpartyClassificationResult> _windowMemo = [];
+    private readonly Dictionary<(Guid UserId, int Months, DateTime? From), CounterpartyClassificationResult> _windowMemo = [];
 
     /// <inheritdoc />
-    public async Task<CounterpartyClassificationResult> ClassifyForWindowAsync(
+    public Task<CounterpartyClassificationResult> ClassifyForWindowAsync(
         Guid userId,
         int months,
         CancellationToken ct = default)
+        => ClassifyWindowAsync(userId, months, null, ct);
+
+    /// <inheritdoc />
+    public Task<CounterpartyClassificationResult> ClassifyForWindowAsync(
+        Guid userId,
+        int months,
+        DateTime from,
+        CancellationToken ct = default)
+        => ClassifyWindowAsync(userId, months, from, ct);
+
+    private async Task<CounterpartyClassificationResult> ClassifyWindowAsync(
+        Guid userId,
+        int months,
+        DateTime? from,
+        CancellationToken ct)
     {
-        if (_windowMemo.TryGetValue((userId, months), out var memoized))
+        if (_windowMemo.TryGetValue((userId, months, from), out var memoized))
             return memoized;
 
         var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
@@ -157,17 +185,28 @@ public class CounterpartyClassificationService(
         var txList = (await _transactions.GetByUserIdSinceUnscopedAsync(
             userId, MonthWindow.StartOfMonthsAgo(months), ct)).ToList();
 
-        var result = await ClassifyAsync(userId, txList, accountCurrencies, ct);
-        _windowMemo[(userId, months)] = result;
+        var result = await ClassifyCoreAsync(userId, txList, accountCurrencies, from, ct);
+        _windowMemo[(userId, months, from)] = result;
         return result;
     }
 
     /// <inheritdoc />
-    public async Task<CounterpartyClassificationResult> ClassifyAsync(
+    public Task<CounterpartyClassificationResult> ClassifyAsync(
         Guid userId,
         IReadOnlyList<Transaction> transactions,
         IReadOnlyDictionary<Guid, string> accountCurrencies,
         CancellationToken ct = default)
+        => ClassifyCoreAsync(userId, transactions, accountCurrencies, null, ct);
+
+    // A non-null `from` keeps every match (a movement outside the window is still a
+    // counterparty movement, so it must stay out of the normal flow) but only accumulates the
+    // gross flows of transactions dated on or after it.
+    private async Task<CounterpartyClassificationResult> ClassifyCoreAsync(
+        Guid userId,
+        IReadOnlyList<Transaction> transactions,
+        IReadOnlyDictionary<Guid, string> accountCurrencies,
+        DateTime? from,
+        CancellationToken ct)
     {
         var knownCounterparties = await _counterparties.GetForUserAsync(userId, ct);
 
@@ -202,6 +241,9 @@ public class CounterpartyClassificationService(
 
             matchedIds.Add(tx.Id);
             matchesById[tx.Id] = new CounterpartyMatch(matched.Name, matched.FlowRole);
+            if (from is { } windowStart && (tx.PostedDate ?? tx.TransactionDate) < windowStart)
+                continue;
+
             var amountUsd = CurrencyConverter.ToUsd(tx.Amount, currency);
             var month = (tx.PostedDate ?? tx.TransactionDate).ToString("yyyy-MM");
             var key = (matched.Name, matched.FlowRole, month);

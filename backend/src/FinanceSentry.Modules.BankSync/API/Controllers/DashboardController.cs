@@ -29,9 +29,10 @@ public class DashboardController(
     public async Task<IActionResult> GetAggregated(
         [FromQuery] int months = 6,
         [FromQuery] int? windowMonths = null,
+        [FromQuery] DateOnly? windowFrom = null,
         CancellationToken ct = default)
     {
-        var data = await _dashboard.GetDashboardDataAsync(User.RequireUserId(), months, windowMonths, ct);
+        var data = await _dashboard.GetDashboardDataAsync(User.RequireUserId(), months, windowMonths, windowFrom, ct);
         return Ok(data);
     }
 
@@ -41,14 +42,31 @@ public class DashboardController(
     /// Every credit/debit of one month labelled with the bucket the flow statistics put it
     /// in — the audit view behind the dashboard tiles. <paramref name="months"/> must be the
     /// window the dashboard was rendered with so pair detection sees the same neighbours.
+    /// <para>
+    /// With <paramref name="from"/> and/or <paramref name="to"/> (open ends default to the
+    /// first day ever and to today) the view is a UTC day range instead of a month — what the
+    /// dashboard's windows drill into — and <paramref name="month"/> is ignored.
+    /// </para>
     /// </summary>
     [HttpGet("flow-breakdown")]
     public async Task<IActionResult> GetFlowBreakdown(
-        [FromQuery] string month,
+        [FromQuery] string? month = null,
         [FromQuery] int months = 6,
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
         CancellationToken ct = default)
     {
-        if (!DateTime.TryParseExact(
+        if (from is not null || to is not null)
+        {
+            var rangeFrom = from ?? DateOnly.MinValue;
+            var rangeTo = to ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            if (rangeTo < rangeFrom)
+                return BadRequest(new { errorCode = "INVALID_RANGE", message = "to must not be before from" });
+
+            return Ok(await _flowBreakdown.GetRangeBreakdownAsync(User.RequireUserId(), rangeFrom, rangeTo, months, ct));
+        }
+
+        if (month is null || !DateTime.TryParseExact(
                 month, "yyyy-MM",
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out _))

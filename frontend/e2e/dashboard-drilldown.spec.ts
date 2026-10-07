@@ -271,7 +271,7 @@ async function mockApisWithLedger(page: Page): Promise<void> {
     })
   );
   // Like the backend, months=N returns N complete months plus the in-progress one, so even the
-  // 1M window arrives with the previous month — the dashboard trims it by month key.
+  // month-to-date window arrives with the previous month — the dashboard trims it by month key.
   await page.route(`${API}/dashboard/aggregated**`, route =>
     route.fulfill({
       status: 200,
@@ -361,9 +361,129 @@ test.describe('Dashboard drill-downs', () => {
 
     // The four bucket tiles are gone from the dashboard; one link replaces them.
     await expect(page.getByText('Flow breakdown (MTD)')).toHaveCount(0);
-    await page.getByRole('link', {name: /breakdown of this month/i}).click();
+    await page.getByRole('link', {name: /breakdown of the selected window/i}).click();
 
     await expect(page).toHaveURL(/\/dashboard\/breakdown/);
+  });
+});
+
+const iso = (d: Date): string => d.toISOString().slice(0, 10);
+
+// UTC calendar days, the way the dashboard anchors every window.
+function utcDay(offsetDays = 0): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offsetDays));
+}
+
+function monthStart(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+test.describe('Dashboard range presets (IBKR set)', () => {
+  test.beforeEach(async ({page}) => {
+    await mockApis(page);
+    await page.route(`${API}/dashboard/flow-breakdown**`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({month: '', items: []}),
+      })
+    );
+  });
+
+  test('offers 1W MTD 1M 3M YTD 1Y ALL, in that order, and no 6M', async ({page}) => {
+    await page.goto('/dashboard');
+    const bar = page.getByRole('group', {name: 'History range'});
+    await expect(bar.getByRole('button')).toHaveText(['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL']);
+    await expect(bar.getByRole('button', {name: '6M', exact: true})).toHaveCount(0);
+  });
+
+  test('1W asks the API for a day window and the tiles drill into the same seven days', async ({
+    page,
+  }) => {
+    const from = iso(utcDay(-6));
+    const to = iso(utcDay());
+    await page.goto('/dashboard');
+    const aggregated = page.waitForRequest(
+      r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
+    );
+    await page
+      .getByRole('group', {name: 'History range'})
+      .getByRole('button', {name: '1W'})
+      .click();
+    await aggregated;
+    await expect(page.getByText('Last 7 days')).toBeVisible();
+
+    await page.getByRole('button', {name: /view spending details/i}).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/transactions\\?.*type=debit.*from=${from}.*to=${to}`)
+    );
+  });
+
+  test('MTD starts on the 1st of the UTC month and the Income tile carries it', async ({page}) => {
+    const from = iso(monthStart());
+    const to = iso(utcDay());
+    await page.goto('/dashboard');
+    const aggregated = page.waitForRequest(
+      r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
+    );
+    await page
+      .getByRole('group', {name: 'History range'})
+      .getByRole('button', {name: 'MTD'})
+      .click();
+    await aggregated;
+    await expect(page.getByText('Month to date')).toBeVisible();
+
+    await page.getByRole('button', {name: /view income details/i}).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/transactions\\?.*type=credit.*from=${from}.*to=${to}`)
+    );
+  });
+
+  test('the Savings tile opens the breakdown on the selected window, not the month', async ({
+    page,
+  }) => {
+    const from = iso(utcDay(-6));
+    const to = iso(utcDay());
+    await page.goto('/dashboard?range=1w');
+    await expect(page.getByText('Last 7 days')).toBeVisible();
+
+    const breakdown = page.waitForRequest(
+      r =>
+        r.url().includes('/dashboard/flow-breakdown') &&
+        r.url().includes(`from=${from}`) &&
+        r.url().includes(`to=${to}`)
+    );
+    await page.getByRole('button', {name: /savings breakdown/i}).click();
+    await breakdown;
+
+    await expect(page).toHaveURL(/\/dashboard\/breakdown\?from=.*&to=.*&months=1/);
+    await expect(page.getByRole('heading', {name: 'Window breakdown'})).toBeVisible();
+    await expect(page.getByTestId('breakdown-window')).toBeVisible();
+  });
+
+  test('the Breakdown link carries the window too', async ({page}) => {
+    const from = iso(monthStart());
+    await page.goto('/dashboard?range=mtd');
+    await expect(page.getByText('Month to date')).toBeVisible();
+
+    await page.getByRole('link', {name: /breakdown of the selected window/i}).click();
+
+    await expect(page).toHaveURL(new RegExp(`/dashboard/breakdown\\?from=${from}&to=`));
+  });
+
+  test('a category row in the table drills into the transactions of the window', async ({page}) => {
+    const from = iso(utcDay(-6));
+    await page.goto('/dashboard?range=1w');
+    await expect(page.getByText('Last 7 days')).toBeVisible();
+
+    await page
+      .getByRole('row', {name: /Food And Drink|FOOD_AND_DRINK|Food/i})
+      .first()
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=.*from=${from}`));
   });
 });
 
@@ -463,8 +583,8 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
 test.describe('Dashboard → Ledger spending consistency', () => {
   test('the Spending tile and Monthly Outflow show the same underlying number', async ({page}) => {
     await mockApisWithLedger(page);
-    // The ledger summary is the current month's outflow, so compare it with the 1M window.
-    await page.goto('/dashboard?range=1m');
+    // The ledger summary is the current month's outflow, so compare it with month to date.
+    await page.goto('/dashboard?range=mtd');
     await expect(page.getByRole('heading', {name: 'Dashboard'})).toBeVisible();
 
     // Read the Spending tile value from the dashboard.
@@ -537,7 +657,7 @@ test.describe('Top spendings → Ledger category drill-down', () => {
         });
       });
 
-      await page.goto('/dashboard?range=1m');
+      await page.goto('/dashboard?range=mtd');
       await page.locator('cmn-data-table').getByText(label, {exact: true}).click();
 
       await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));

@@ -64,7 +64,7 @@ public interface IMoneyFlowStatisticsService
     /// synthetic USD row per month (native amounts zero; the classification is already
     /// currency-normalised), so per-currency rows never mix native sums with a USD adjustment.
     /// The <paramref name="classification"/> is computed once per request by
-    /// <see cref="ICounterpartyClassificationService.ClassifyForWindowAsync"/> and shared with
+    /// <see cref="ICounterpartyClassificationService.ClassifyForWindowAsync(Guid, int, CancellationToken)"/> and shared with
     /// the top-categories reader, so both tell the same story about the same movements.
     /// </para>
     /// </summary>
@@ -72,6 +72,24 @@ public interface IMoneyFlowStatisticsService
         Guid userId,
         CounterpartyClassificationResult classification,
         int months = 6,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Day-level form of <see cref="GetMonthlyFlowAsync(Guid, CounterpartyClassificationResult, int, CancellationToken)"/>:
+    /// the same classification and transfer-pair detection over the whole
+    /// <paramref name="months"/> window (a pair can straddle the window's edge), but only
+    /// transactions dated on or after <paramref name="from"/> are summed. The buckets stay
+    /// keyed by month, so a window that starts mid-month yields a deliberately partial first
+    /// bucket — the figure for exactly the days asked for, not for a whole month.
+    /// <paramref name="classification"/> must come from the matching day-level
+    /// <see cref="ICounterpartyClassificationService"/> call so its counterparty rows are
+    /// windowed the same way.
+    /// </summary>
+    Task<IReadOnlyList<MonthlyFlow>> GetWindowFlowAsync(
+        Guid userId,
+        CounterpartyClassificationResult classification,
+        int months,
+        DateTime from,
         CancellationToken ct = default);
 }
 
@@ -88,11 +106,28 @@ public class MoneyFlowStatisticsService(
     private readonly ICommittedOutflowPolicy _committedOutflow = committedOutflow ?? throw new ArgumentNullException(nameof(committedOutflow));
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<MonthlyFlow>> GetMonthlyFlowAsync(
+    public Task<IReadOnlyList<MonthlyFlow>> GetMonthlyFlowAsync(
           Guid userId,
           CounterpartyClassificationResult classification,
           int months = 6,
           CancellationToken ct = default)
+        => ComputeAsync(userId, classification, months, null, ct);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<MonthlyFlow>> GetWindowFlowAsync(
+          Guid userId,
+          CounterpartyClassificationResult classification,
+          int months,
+          DateTime from,
+          CancellationToken ct = default)
+        => ComputeAsync(userId, classification, months, from, ct);
+
+    private async Task<IReadOnlyList<MonthlyFlow>> ComputeAsync(
+          Guid userId,
+          CounterpartyClassificationResult classification,
+          int months,
+          DateTime? from,
+          CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(classification);
 
@@ -128,7 +163,8 @@ public class MoneyFlowStatisticsService(
             .Where(t => t.IsActive
                         && !matchedIds.Contains(t.Id)
                         && !transferIds.Contains(t.Id)
-                        && !CategoryKeys.IsTransfer(t.MerchantCategory))
+                        && !CategoryKeys.IsTransfer(t.MerchantCategory)
+                        && (from is not { } windowStart || (t.PostedDate ?? t.TransactionDate) >= windowStart))
             .Select(t => new
             {
                 Transaction = t,

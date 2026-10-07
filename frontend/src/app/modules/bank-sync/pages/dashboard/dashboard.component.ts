@@ -30,12 +30,13 @@ import {DashboardStore} from '../../store/dashboard/dashboard.store';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
 const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
+  {label: '1W', value: '1w'},
+  {label: 'MTD', value: 'mtd'},
   {label: '1M', value: '1m'},
   {label: '3M', value: '3m'},
-  {label: '6M', value: '6m'},
   {label: 'YTD', value: 'ytd'},
   {label: '1Y', value: '1y'},
-  {label: 'All', value: 'all'},
+  {label: 'ALL', value: 'all'},
 ];
 
 @Component({
@@ -109,7 +110,11 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 >
                   Net worth
                 </span>
-                <div class="flex gap-cmn-1" role="group" aria-label="History range">
+                <div
+                  class="grid w-full grid-cols-4 justify-items-start gap-cmn-1 sm:flex sm:w-auto"
+                  role="group"
+                  aria-label="History range"
+                >
                   @for (r of ranges; track r.value) {
                     <cmn-chip
                       [selected]="store.historyRange() === r.value"
@@ -197,8 +202,9 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <span class="text-cmn-sm font-medium text-text-secondary">{{ tileHeading() }}</span>
               <a
                 [routerLink]="breakdownRoute"
+                [queryParams]="breakdownParams()"
                 class="text-cmn-xs font-medium text-accent-default hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-                aria-label="View the breakdown of this month's money"
+                aria-label="View the breakdown of the selected window's money"
                 >Breakdown →</a
               >
             </div>
@@ -282,6 +288,9 @@ export class DashboardComponent {
   public readonly showEmptyState = computed(
     () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
   );
+  public readonly breakdownParams = computed(() =>
+    DashboardRangeUtils.breakdownParams(this.store.historyRange())
+  );
   public readonly rangeLabel = computed(() => HISTORY_RANGE_LABELS[this.store.historyRange()]);
   public readonly tileHeading = computed(
     () => HISTORY_RANGE_TILE_HEADINGS[this.store.historyRange()]
@@ -333,8 +342,12 @@ export class DashboardComponent {
     });
   }
 
+  // The breakdown follows the selected window like the tiles do: the same days, and the same
+  // history loaded around them so transfer pairs resolve the way the tiles resolved them.
   public goToBreakdown(): void {
-    void this.router.navigateByUrl(AppRoute.FlowBreakdown);
+    void this.router.navigate([AppRoute.FlowBreakdown], {
+      queryParams: this.breakdownParams(),
+    });
   }
 
   public goToSpending(): void {

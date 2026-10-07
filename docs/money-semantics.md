@@ -245,7 +245,7 @@ convention above is unchanged — only the label differs. Net worth totals stay 
 
 - **Fetch window**: month-aligned — `MonthWindow.StartOfMonthsAgo(months)`, i.e. UTC
   midnight on the first of the month N back. `months` comes from the dashboard's selected
-  range (`DashboardRangeUtils.months`: 1M=1, 3M=3, 6M=6, 1Y=12, All=120; YTD = the closed
+  range (`DashboardRangeUtils.months`: 1W/MTD/1M=1, 3M=3, 1Y=12, All=120; YTD = the closed
   months since January, at least 1). So "3M" spans **three complete calendar months plus the
   one in progress** — the backend always returns N closed months and the current one, so a
   range's *tile totals* (§7) are cut back to the exact window client-side by month key — and
@@ -253,6 +253,18 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   `UtcNow.AddMonths(-n)`, which started mid-month and left the oldest bucket holding a
   handful of days — it charted as a collapsed bar and yielded a savings rate computed
   from a single day.)
+- **Day-level windows (1W, MTD, 1M)**: the presets follow IBKR's set (1W, MTD, 1M, 3M, YTD,
+  1Y, ALL). The day-level ones start mid-month, so `GET /dashboard/aggregated` takes an
+  optional `windowFrom` (a `yyyy-MM-dd` UTC day, clamped to `[history start, today]`) beside
+  `windowMonths`; with it the response also carries `windowFlow` — the same monthly buckets
+  with only the movements on/after that day (`GetWindowFlowAsync`) — which the tiles total, and
+  the top categories and counterparty movements are cut at the same day. `monthlyFlow` stays
+  whole-month so the charts never plot a fragment. Every window is anchored on **UTC calendar
+  days**, like the rest of the dashboard: 1W = today and the 6 days before it, MTD = the 1st of
+  the UTC month, **1M = rolling** (the same day last month, clamped to that month's last day —
+  so it differs from MTD), YTD = 1 January UTC (month-level, via `windowMonths`). The
+  Savings drill-down (`GET /dashboard/flow-breakdown?from=&to=`) takes the same days
+  (inclusive; `to` defaults to today) instead of a month.
 - **Bucketing**: calendar UTC month on `PostedDate ?? TransactionDate`. The trailing
   bucket is month-to-date and is returned deliberately: it feeds the dashboard's
   range-total tiles. Callers must keep it out of month-over-month comparisons
@@ -533,7 +545,7 @@ window (`MonthWindow.StartOfMonthsAgo`), but **flat — not month-bucketed**. Di
 endpoint takes an optional `windowMonths` (calendar months, in-progress one included, clamped
 to `1..months+1`) that moves the window start to the first of that month, so the donut covers
 exactly the range the tiles total (§7) while the charts still get their `months` of closed
-history. Family-support outflow is narrowed to the same start month.
+history (the day-level presets also pass `windowFrom`, which cuts the donut at that day — §5). Family-support outflow is narrowed to the same start month.
 
 Unlike the bar charts (§7) this **includes the in-progress month**. A composition is not a
 period-over-period comparison, so a partial month does not distort it the way it distorts
@@ -557,7 +569,7 @@ category filter still matches those on their stored category.
 
 ## 7. Month-bucketed charts vs. range-total tiles
 
-Frontend-only (`dashboard.computed.ts`). The in-progress month is kept out of the bar
+Frontend (`dashboard.computed.ts`; the day-level `windowFlow` it totals comes from the backend, §5). The in-progress month is kept out of the bar
 charts and included in the range-total tiles, and the split is deliberate.
 
 **Charts plot complete calendar months only** — the *Income vs Spending* chart reads the
@@ -569,15 +581,17 @@ stray small credits.
 
 **The Income / Spending / Savings card totals the selected range, in-progress month
 included** — one range, one story across the hero, tiles, charts and top categories. The
-heading names the window (`HISTORY_RANGE_TILE_HEADINGS`: "This month", "Last 3 months",
-"Year to date", … "All time"). The window is `DashboardRangeUtils.windowMonths` calendar
-months ending with the current one (YTD = months since January), and the tiles sum only the
-`monthlyFlow` buckets from `windowStartKey` on.
+heading names the window (`HISTORY_RANGE_TILE_HEADINGS`: "Last 7 days", "Month to date",
+"Past month", "Last 3 months", "Year to date", … "All time"). For the month-based presets (3M, YTD, 1Y, ALL) the window is
+`DashboardRangeUtils.windowMonths` calendar months ending with the current one (YTD = months
+since January), and the tiles sum only the `monthlyFlow` buckets from `windowStartKey` on. For
+the day-level presets (1W, MTD, 1M — §5) they sum the response's `windowFlow` instead, the
+movements from the exact start day.
 
 - *Income* / *Spending*: the summed USD inflow / outflow over the window, with no pace
   comparison against earlier months.
 - *Savings*: `(inflow − outflow) / inflow` over the window, `—` when the window has no
-  inflow. On the **1M** range only, it is also withheld until inflow reaches
+  inflow. On the **day-level** ranges (1W / MTD / 1M) only, it is also withheld until inflow reaches
   `INCOME_LANDED_FRACTION` (50%) of outflow: salary posts once, often on the last day, so
   early in the month the raw rate is technically correct and completely misleading. Longer
   windows hold whole months of income and need no gate.
@@ -585,9 +599,13 @@ months ending with the current one (YTD = months since January), and the tiles s
 **Drill-downs carry the window.** Clicking the Income / Spending tile or a top-category row
 opens Transactions with `type` / `category` (a top-category row sends `type=debit` too, since
 it totals debits only) plus `from` / `to` (`DashboardRangeUtils.windowDates`):
-inclusive `YYYY-MM-DD` bounds from the first day of the window's first month (`windowStartKey`)
-through the last day of the current month, so the list covers the months the tile totals.
-`All` is unbounded and sends no bounds. The ledger shows the active bounds as a removable
+inclusive `YYYY-MM-DD` bounds — the exact start day for the day-level presets, else the first
+day of the window's first month (`windowStartKey`) — through today for day-level windows
+and the last day of the current month otherwise, so the list covers what the tile totals.
+`All` is unbounded and sends no bounds. The Savings tile and the "Breakdown →" link open
+the breakdown page on the same window (`DashboardRangeUtils.breakdownParams`: `from` / `to`
+through today, plus the `months` of history the dashboard loaded so transfer pairs resolve the
+same way; `All` sends only `to`). The ledger shows the active bounds as a removable
 "Dates" chip and ignores malformed values.
 
 This is the same split Binance and IBKR use: the current period feeds the tiles; the bars

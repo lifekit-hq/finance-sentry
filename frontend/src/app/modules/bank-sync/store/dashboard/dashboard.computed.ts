@@ -48,7 +48,7 @@ const PERCENT = 100;
 // of spending against stray small credits and the rate reads in the hundreds of percent
 // negative. Below this fraction of the window's spending we show nothing rather than a number
 // that is technically correct and completely misleading. Longer windows dilute the partial
-// month, so only the one-month window is gated.
+// month, so only the day-resolution windows (1W, MTD, 1M) are gated.
 const INCOME_LANDED_FRACTION = 0.5;
 
 // Need at least a start and end snapshot to state a change over the window.
@@ -155,10 +155,16 @@ export function dashboardComputed(store: StateSignals) {
   // The tiles total every month in the selected window, in-progress month included: one
   // range, one story across the whole dashboard. (The charts still plot closed months only.)
   // The backend always returns the month before the window's first one too (its `months` clamps
-  // to at least 1), so earlier buckets are cut here by month key.
+  // to at least 1), so earlier buckets are cut here by month key. A day-resolution window
+  // (1W, MTD, 1M) starts mid-month, so the backend totals exactly its days into `windowFlow`
+  // and the tiles read that instead of whole-month buckets.
   const windowTotals = computed(() => {
+    const data = store.data();
+    if (DashboardRangeUtils.isDayWindow(store.historyRange()) && data?.windowFlow) {
+      return sumTotals(groupMonthly(data.windowFlow));
+    }
     const start = DashboardRangeUtils.windowStartKey(store.historyRange());
-    return sumTotals(groupMonthly(store.data()?.monthlyFlow ?? []).filter(([key]) => key >= start));
+    return sumTotals(groupMonthly(data?.monthlyFlow ?? []).filter(([key]) => key >= start));
   });
 
   const windowSavingsRate = computed((): number | null => {
@@ -166,7 +172,7 @@ export function dashboardComputed(store: StateSignals) {
     if (!totals || totals.inflow <= 0) {
       return null;
     }
-    const gated = store.historyRange() === '1m';
+    const gated = DashboardRangeUtils.isDayWindow(store.historyRange());
     return gated && totals.inflow < totals.outflow * INCOME_LANDED_FRACTION
       ? null
       : savingsRateOf(totals);

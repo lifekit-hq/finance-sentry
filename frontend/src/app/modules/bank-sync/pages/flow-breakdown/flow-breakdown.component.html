@@ -1,16 +1,31 @@
 <div class="page-container flex flex-col">
   <div class="mb-cmn-6 flex flex-wrap items-end justify-between gap-cmn-4">
     <div>
-      <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Month breakdown</h1>
-      <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-        Every transaction of the month and the bucket the savings math put it in
-      </p>
+      @if (store.range(); as range) {
+        <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Window breakdown</h1>
+        <p class="mt-cmn-1 text-cmn-sm text-text-secondary" data-testid="breakdown-window">
+          Every transaction
+          @if (range.from) {
+            from {{ range.from | date: 'mediumDate' }} to {{ range.to | date: 'mediumDate' }}
+          } @else {
+            up to {{ range.to | date: 'mediumDate' }}
+          }
+          and the bucket the savings math put it in
+        </p>
+      } @else {
+        <h1 class="font-headline text-cmn-2xl font-bold text-text-primary">Month breakdown</h1>
+        <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
+          Every transaction of the month and the bucket the savings math put it in
+        </p>
+      }
     </div>
-    <cmn-month-stepper
-      [value]="monthDate()"
-      [max]="currentMonth"
-      (valueChange)="onMonthChange($event)"
-    />
+    @if (!store.range()) {
+      <cmn-month-stepper
+        [value]="monthDate()"
+        [max]="currentMonth"
+        (valueChange)="onMonthChange($event)"
+      />
+    }
   </div>
 
   <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
@@ -78,10 +93,17 @@
     </cmn-card>
   } @else if (store.isEmpty()) {
     <div class="flex flex-1 items-center justify-center">
-      <cmn-empty-state
-        message="No transactions in this month"
-        subMessage="Pick another month or sync your accounts."
-      />
+      @if (store.range()) {
+        <cmn-empty-state
+          message="No transactions in this window"
+          subMessage="Pick another range on the dashboard or sync your accounts."
+        />
+      } @else {
+        <cmn-empty-state
+          message="No transactions in this month"
+          subMessage="Pick another month or sync your accounts."
+        />
+      }
     </div>
   } @else {
     <div class="space-y-cmn-6">
