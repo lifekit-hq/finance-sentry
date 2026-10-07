@@ -122,3 +122,9 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 - **Exception — server-composed messages:** `ACCOUNT_LOCKED` (login lockout, 429 + `Retry-After`) is deliberately not in the registry: its text carries the remaining wait, so `auth.computed.ts` shows the server's `error` text (`ErrorUtils.extractMessage`, kept in `AuthStore.errorDetail`) for that code only. Every other unregistered code keeps the flow fallback.
 
 ---
+
+---
+
+## Mobile Keyboards — `inputmode` on numeric fields
+
+Every `<input type="number">` / `<cmn-input type="number">` declares `inputmode` (`decimal` for money, `numeric` for whole counts); the template lint rule `fns/money-inputmode` (`frontend/eslint-rules/money-inputmode.mjs`) fails the build otherwise. Add `enterkeyhint` and a known `autocomplete` token where they apply. `cmn-input` forwards only `autocomplete` to its inner `<input>`, so `InputHintsDirective` (`shared/directives/input-hints.directive.ts`) copies the host's `inputmode` / `enterkeyhint` down — write them as static attributes on `cmn-input`, not bindings.
