@@ -1,5 +1,6 @@
 import {inject} from '@angular/core';
 import {Router, type Routes} from '@angular/router';
+import type {PageChromeData} from '@lifekit-hq/ui';
 
 import {authGuard} from './modules/auth/guards/auth.guard';
 import {guestGuard} from './modules/auth/guards/guest.guard';
@@ -40,6 +41,12 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/pages/flow-breakdown/flow-breakdown.component').then(
             m => m.FlowBreakdownComponent
           ),
+      },
+      {
+        path: AppRoute.More.slice(1),
+        loadComponent: () =>
+          import('./core/shell/more-page/more-page.component').then(m => m.MorePageComponent),
+        data: {title: 'More'} satisfies PageChromeData,
       },
       {
         path: AppRoute.Dashboard.slice(1),

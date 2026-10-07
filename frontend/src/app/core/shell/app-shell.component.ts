@@ -1,20 +1,25 @@
+import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {toSignal} from '@angular/core/rxjs-interop';
 import {Router, RouterOutlet} from '@angular/router';
 import {
   AppLayoutAccount,
   AppLayoutComponent,
+  CMN_MEDIA_MD,
   CommandPaletteItem,
   type MenuItem,
   type NavItem,
   PALETTE_THEME_ACTION,
 } from '@lifekit-hq/ui';
+import {map} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
-import {CONNECT_ACTION_ID, PERMISSION_BY_ENTRY, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {CONNECT_ACTION_ID, NAV_ITEMS, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {NavUtils} from './utils/nav.utils';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
@@ -55,6 +60,7 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       [showThemeToggle]="false"
       [versionLabel]="versionLabel"
       [tabRoutes]="tabRoutes"
+      [moreRoute]="moreRoute"
       [phoneOverlay]="true"
       (navClick)="navigate($event)"
       (paletteAction)="handlePaletteAction($event)"
@@ -71,28 +77,23 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
 })
 export class AppShellComponent {
   private readonly router = inject(Router);
+  private readonly breakpoints = inject(BreakpointObserver);
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
-  private readonly allNavItems: NavItem[] = [
-    {label: 'Home', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
-    {label: 'Accounts', icon: 'Building2', route: AppRoute.Accounts},
-    {label: 'Transactions', icon: 'ArrowLeftRight', route: AppRoute.Transactions},
-    {label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets},
-    {label: 'Subscriptions', icon: 'RefreshCw', route: AppRoute.Subscriptions},
-    {
-      label: 'Alerts',
-      icon: 'Bell',
-      route: AppRoute.Alerts,
-      badge: () => this.alertsStore.unreadCount(),
-    },
-    {label: 'Events', icon: 'CalendarDays', route: AppRoute.Events},
-    {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
-    {label: 'Settings', icon: 'Settings2', route: AppRoute.Settings},
-  ];
+  private readonly sidebarShown = toSignal(
+    this.breakpoints.observe(CMN_MEDIA_MD).pipe(map(state => state.matches)),
+    {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
+  );
+  private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
+    (item.route as AppRoute) === AppRoute.Alerts
+      ? {...item, badge: (): number => this.alertsStore.unreadCount()}
+      : item
+  );
 
   public readonly canUseAi = this.authStore.canUseAi;
   public readonly versionLabel = `v${APP_VERSION}`;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
+  public readonly moreRoute = AppRoute.More;
   public readonly navItems = computed(() =>
     this.allNavItems.filter(item => this.isPermitted(item.route))
   );
@@ -104,8 +105,11 @@ export class AppShellComponent {
     menuItems: AVATAR_MENU_ITEMS,
   }));
 
+  /** The sidebar leaves navigating to the app; the phone tab bar navigates itself (lifekit 2.0). */
   public navigate(item: NavItem): void {
-    void this.router.navigateByUrl(item.route);
+    if (this.sidebarShown()) {
+      void this.router.navigateByUrl(item.route);
+    }
   }
 
   public handleAvatarMenuSelect(item: MenuItem): void {
@@ -127,7 +131,6 @@ export class AppShellComponent {
   }
 
   private isPermitted(entry: string): boolean {
-    const permission = PERMISSION_BY_ENTRY[entry];
-    return permission === undefined || this.authStore.permissions().includes(permission);
+    return NavUtils.isPermitted(entry, this.authStore.permissions());
   }
 }
