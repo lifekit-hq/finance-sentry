@@ -201,3 +201,43 @@ describe('DashboardComponent base currency (#851)', () => {
     expect(el.textContent).not.toContain('$3,100.00');
   });
 });
+
+describe('DashboardComponent async states', () => {
+  it('shows the connect-account empty state when no account is linked', () => {
+    const {el} = render('3m', {accountCount: 0, topCategories: []});
+
+    expect(el.textContent).toContain('Connect your first account');
+    expect(el.querySelector('[data-testid="net-worth-link"]')).toBeNull();
+  });
+
+  it('shows the content and no empty state when accounts exist', () => {
+    const {el} = render();
+
+    expect(el.textContent).not.toContain('Connect your first account');
+    expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+  });
+
+  it('keeps the dashboard rendered under a persistent error banner', () => {
+    const store = fakeStore('3m');
+    (store as unknown as {errorMessage: ReturnType<typeof signal<string | null>>}).errorMessage.set(
+      'Failed to load dashboard data.'
+    );
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withXhr()),
+        provideHttpClientTesting(),
+        provideApiBaseUrl('http://localhost/api/v1'),
+      ],
+    });
+    TestBed.overrideComponent(DashboardComponent, {
+      set: {providers: [{provide: DashboardStore, useValue: store}]},
+    });
+    const fixture = TestBed.createComponent(DashboardComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('cmn-alert')?.textContent).toContain('Failed to load dashboard data.');
+    expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+  });
+});

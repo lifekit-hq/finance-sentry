@@ -28,13 +28,15 @@ const baseInstitution: Institution = {
 function setupFixture(
   isPhone: boolean,
   overrides: Partial<Institution> = {},
-  extraProviders: unknown[] = []
+  extraProviders: unknown[] = [],
+  state: {isLoading?: boolean; isEmpty?: boolean; errorMessage?: string; load?: () => void} = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
-    isLoading: signal(false),
-    isEmpty: signal(false),
-    errorMessage: signal(null),
+    isLoading: signal(state.isLoading ?? false),
+    isEmpty: signal(state.isEmpty ?? false),
+    errorMessage: signal(state.errorMessage ?? null),
+    load: state.load ?? vi.fn(),
     totalNetWorth: signal(0),
     netWorthBreakdown: signal([]),
     baseCurrency: signal('USD'),
@@ -188,5 +190,43 @@ describe('AccountsListComponent reconnect and disconnect', () => {
     cmp.disconnectInstitution({...baseInstitution, provider: 'inzhur', name: 'Inzhur'});
 
     expect(store['disconnectInzhur']).toHaveBeenCalled();
+  });
+});
+
+describe('AccountsListComponent async states', () => {
+  const render = (state: Parameters<typeof setupFixture>[3]): HTMLElement =>
+    setupFixture(false, {}, [], state).nativeElement as HTMLElement;
+
+  it('shows skeleton rows and no institutions while loading', () => {
+    const el = render({isLoading: true});
+
+    expect(el.querySelectorAll('cmn-skeleton').length).toBeGreaterThan(0);
+    expect(el.querySelector('[data-testid="account-row"]')).toBeNull();
+  });
+
+  it('offers to connect the first account when none exist', () => {
+    const el = render({isEmpty: true});
+
+    expect(el.textContent).toContain('No accounts connected yet.');
+    expect(el.textContent).toContain('Connect Your First Account');
+  });
+
+  it('shows the error with a Retry that reloads the accounts', () => {
+    const load = vi.fn();
+    const el = render({errorMessage: 'Failed to load accounts.', load});
+
+    expect(el.querySelector('cmn-alert')?.textContent).toContain('Failed to load accounts.');
+    const retry = Array.from(el.querySelectorAll<HTMLElement>('cmn-alert cmn-button')).find(b =>
+      b.textContent?.includes('Retry')
+    );
+    retry?.querySelector('button')?.click();
+    expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('shows the institutions with no banner when loaded', () => {
+    const el = render({});
+
+    expect(el.querySelector('cmn-alert')).toBeNull();
+    expect(el.textContent).not.toContain('No accounts connected yet.');
   });
 });

@@ -9,6 +9,8 @@ import {Router, RouterLink} from '@angular/router';
 import {
   AlertComponent,
   AreaChartComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   BarChartComponent,
   ButtonComponent,
   CardComponent,
@@ -52,6 +54,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     AlertComponent,
     AppDecimalPipe,
     AreaChartComponent,
+    AsyncStateComponent,
     BarChartComponent,
     ButtonComponent,
     CardComponent,
@@ -71,15 +74,17 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
   providers: [DashboardStore],
   template: `
     <cmn-page-container spacing="none">
-      <div class="space-y-cmn-6">
+      <div>
         <p class="text-cmn-sm text-text-secondary">How your money is trending over time</p>
 
-        @if (store.errorMessage()) {
-          <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
-        }
-
-        @if (showEmptyState()) {
-          <cmn-card>
+        <cmn-async-state
+          [status]="dashboardStatus()"
+          [errorMessage]="store.errorMessage()"
+          [isEmpty]="showEmptyState()"
+          class="block space-y-cmn-6"
+          errorPlacement="above"
+        >
+          <cmn-card empty>
             <div class="flex flex-col items-center gap-cmn-4 py-cmn-10 text-center">
               <div
                 class="flex h-16 w-16 items-center justify-center rounded-cmn-full bg-accent-subtle text-accent-default"
@@ -98,7 +103,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <cmn-button (clicked)="goToAccounts()" icon="Plus">Connect Account</cmn-button>
             </div>
           </cmn-card>
-        } @else {
+
           <!--
             One hero: the headline figure and how it moved, the chart it comes from, then the range
             control under the chart (Robinhood/IBKR hero, #825 pick 2). The control stays page-level:
@@ -277,7 +282,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               </cmn-data-table>
             </div>
           </div>
-        }
+        </cmn-async-state>
       </div>
     </cmn-page-container>
   `,
@@ -291,6 +296,9 @@ export class DashboardComponent {
   public readonly accountsRoute = AppRoute.AccountsList;
   public readonly showEmptyState = computed(
     () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
+  );
+  public readonly dashboardStatus = computed<AsyncStateStatus>(() =>
+    this.store.errorMessage() ? 'error' : 'success'
   );
   public readonly breakdownParams = computed(() =>
     DashboardRangeUtils.breakdownParams(this.store.historyRange())

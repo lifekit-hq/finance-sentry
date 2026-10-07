@@ -230,6 +230,24 @@ describe('AssetDossierComponent', () => {
     });
   });
 
+  it('shows only the error alert when the dossier fails to load', () => {
+    mockStore.dossierErrorMessage.set('Failed to load asset dossier.');
+    fixture.detectChanges();
+
+    expect(root().querySelector('cmn-alert')?.textContent).toContain(
+      'Failed to load asset dossier.'
+    );
+    expect(byTestId('dossier-skeleton')).toBeNull();
+    expect(root().textContent).not.toContain('Updated');
+  });
+
+  it('renders the dossier, not the skeleton, once loaded', () => {
+    fixture.detectChanges();
+
+    expect(byTestId('dossier-skeleton')).toBeNull();
+    expect(root().textContent).toContain('Updated');
+  });
+
   it('leaves the symbol and the way back to the top bar', () => {
     fixture.detectChanges();
 

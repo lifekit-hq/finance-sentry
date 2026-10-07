@@ -63,7 +63,10 @@ describe('InvestmentsComponent — positions view', () => {
     allocationBreakdown: ReturnType<typeof signal<AllocationBreakdownRow[]>>;
   };
 
+  let mockConnectStore: {importPending: ReturnType<typeof signal<boolean>>};
+
   beforeEach(async () => {
+    mockConnectStore = {importPending: signal(false)};
     mockStore = {
       isPositionsLoading: signal(false),
       positionsErrorMessage: signal(''),
@@ -110,7 +113,7 @@ describe('InvestmentsComponent — positions view', () => {
             {provide: HoldingsStore, useValue: mockStore},
             {
               provide: ConnectStore,
-              useValue: {importPending: signal(false)},
+              useValue: mockConnectStore,
             },
           ],
         },
@@ -189,6 +192,18 @@ describe('InvestmentsComponent — positions view', () => {
     expect(root.querySelector('cmn-data-table')).toBeNull();
   });
 
+  it('replaces the content with the error alert when positions fail to load', () => {
+    mockStore.positionsErrorMessage.set('Failed to load positions.');
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('cmn-alert')?.textContent).toContain('Failed to load positions.');
+    expect(root.querySelector('cmn-data-table')).toBeNull();
+    expect(root.querySelector('[data-testid="holdings-skeleton"]')).toBeNull();
+  });
+
   it('hides the donut when there is nothing to draw', () => {
     mockStore.totalPositionsValue.set(0);
 
@@ -206,6 +221,18 @@ describe('InvestmentsComponent — positions view', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('No positions yet');
+  });
+
+  it('says the import is pending instead of the connect prompt while IBKR positions import', () => {
+    mockStore.positionsByAssetClass.set([]);
+    mockConnectStore.importPending.set(true);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="holdings-importing"]')).not.toBeNull();
+    expect(root.textContent).not.toContain('No positions yet');
   });
 
   it('opens the asset page when a holding row is clicked', () => {

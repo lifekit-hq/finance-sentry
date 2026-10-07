@@ -1,8 +1,9 @@
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {
-  AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   CardComponent,
   CmnCellDirective,
   CmnColumnComponent,
@@ -23,8 +24,8 @@ const SKELETON_ROWS = 4;
 @Component({
   selector: 'fns-investments',
   imports: [
-    AlertComponent,
     AssetLogoPipe,
+    AsyncStateComponent,
     CardComponent,
     CmnCellDirective,
     CmnColumnComponent,
@@ -47,6 +48,12 @@ export class InvestmentsComponent {
   public readonly connectStore = inject(ConnectStore);
   public readonly accountsRoute = AppRoute.AccountsInvestments;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly positionsStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.positionsErrorMessage()) {
+      return 'error';
+    }
+    return this.store.isPositionsLoading() ? 'loading' : 'success';
+  });
   public readonly pnlPositiveClass = 'text-status-success';
   public readonly pnlNegativeClass = 'text-status-error';
 

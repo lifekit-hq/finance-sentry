@@ -2,7 +2,8 @@ import {DatePipe, DecimalPipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {
-  AlertComponent,
+  AsyncStateComponent,
+  type AsyncStateStatus,
   CardComponent,
   ChipComponent,
   CmnDrawerService,
@@ -31,7 +32,7 @@ const DRAWER_WIDTH = '480px';
   selector: 'fns-flow-breakdown',
   imports: [
     PageContainerComponent,
-    AlertComponent,
+    AsyncStateComponent,
     CardComponent,
     ChipComponent,
     DatePipe,
@@ -58,6 +59,12 @@ export class FlowBreakdownComponent {
   public readonly store = inject(FlowBreakdownStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
 
+  public readonly breakdownStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.isLoading()) {
+      return 'loading';
+    }
+    return this.store.errorMessage() ? 'error' : 'success';
+  });
   public readonly currentMonth = new Date();
   public readonly monthDate = computed(() => MonthKeyUtils.toDate(this.store.month()));
   public readonly transactionsRoute = AppRoute.Transactions;
