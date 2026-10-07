@@ -8,9 +8,15 @@ import {AlertTypeUtils} from './alert-type.utils';
 // feed-freshness alert says "freshness") has no dossier to open.
 const TICKER = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
 
+/** The alert fields a destination is derived from; a fired event carries the first three. */
+export type AlertDestinationSource = Pick<
+  Alert,
+  'type' | 'message' | 'referenceLabel' | 'appPath'
+>;
+
 export class AlertDestinationUtils {
   /** Where tapping the alert goes: the server-resolved appPath, else the type's coarse destination, or null when the alert only gets marked read. */
-  public static resolve(alert: Alert): Nullable<AlertNavigation> {
+  public static resolve(alert: AlertDestinationSource): Nullable<AlertNavigation> {
     if (alert.type === 'FilingLanded') {
       const url = AlertMessageUtils.filingUrl(alert.message);
       if (url) {
