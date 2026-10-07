@@ -1,4 +1,4 @@
-import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
@@ -125,7 +125,7 @@ describe('dashboardComputed', () => {
       vi.setSystemTime(NOW);
       TestBed.configureTestingModule({
         providers: [
-          provideHttpClient(),
+          provideHttpClient(withXhr()),
           provideHttpClientTesting(),
           provideApiBaseUrl('http://localhost/api/v1'),
         ],
@@ -158,7 +158,7 @@ describe('dashboardComputed', () => {
     vi.setSystemTime(NOW);
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideApiBaseUrl('http://localhost/api/v1'),
       ],

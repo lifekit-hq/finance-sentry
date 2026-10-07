@@ -41,7 +41,7 @@ deliberately, never to silence a warning.
 
 ## Project Overview
 
-Finance Sentry is a personal finance aggregation app built as an ASP.NET Core 10 modular monolith + Angular 21 SPA. It integrates with TrueLayer and Monobank for bank data and Binance and Interactive Brokers for investments, with AI-driven portfolio analytics on top.
+Finance Sentry is a personal finance aggregation app built as an ASP.NET Core 10 modular monolith + Angular 22 SPA. It integrates with TrueLayer and Monobank for bank data and Binance and Interactive Brokers for investments, with AI-driven portfolio analytics on top.
 
 Sole developer: Denys. Spec-driven development via the **speckit** toolchain (constitution → spec → plan → tasks → implement).
 
@@ -52,7 +52,7 @@ Sole developer: Denys. Spec-driven development via the **speckit** toolchain (co
 | Layer | Technology |
 |---|---|
 | Backend | ASP.NET Core 10 (.NET 10, C# 14), EF Core 10, PostgreSQL 14, hand-rolled CQRS (`FinanceSentry.Core.Cqrs`), Hangfire, Serilog |
-| Frontend | Angular 21.2, TypeScript strict, standalone components, NgRx SignalStore (`@ngrx/signals`), lazy-loaded modules |
+| Frontend | Angular 22.2, TypeScript strict, standalone components, NgRx SignalStore (`@ngrx/signals`), lazy-loaded modules |
 | UI library | `@lifekit-hq/ui` + `@lifekit-hq/tokens` + `@lifekit-hq/core` + `@lifekit-hq/elements` (`lk-*` PWA prompt elements) — published from [lifekit-common](https://github.com/lifekit-hq/lifekit-common) (GitHub Packages; `NODE_AUTH_TOKEN` needed for installs). Components, `ToastService`, `ErrorMessageService`, `ThemeService`, `AppUpdateService` (PWA) |
 | Auth | Stock ASP.NET Core JwtBearer authentication with a default-deny fallback policy (backend; every endpoint declares `[Authorize]`, optionally with a permission policy, or `[AllowAnonymous]`); Owner/Member roles are bundles of `permission` claims in Identity's role-claim table, per-person grants are user claims, read per request + `AuthStore` signal store + functional `authInterceptor` (frontend). Access token lives **in memory only** (store signal); refresh token is an httpOnly/Secure/SameSite=Strict cookie set by the backend. Silent refresh fires on app init. |
 | Infra | Docker Compose (single file for full stack) |

@@ -1,6 +1,8 @@
+import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {of} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
@@ -18,9 +20,13 @@ class ChatWidgetStubComponent {}
 describe('AppShellComponent FAB clearance', () => {
   const canUseAi = signal(true);
 
-  const setup = async (url: string): Promise<ComponentFixture<AppShellComponent>> => {
+  const setup = async (url: string, wide = false): Promise<ComponentFixture<AppShellComponent>> => {
     TestBed.configureTestingModule({
       providers: [
+        {
+          provide: BreakpointObserver,
+          useValue: {observe: () => of({matches: wide}), isMatched: () => wide},
+        },
         provideRouter([{path: '**', children: []}]),
         {
           provide: AuthStore,
@@ -47,5 +53,21 @@ describe('AppShellComponent FAB clearance', () => {
   it('shows the store avatar initials in the top bar', async () => {
     const fixture = await setup(AppRoute.Settings);
     expect(fixture.componentInstance.account().label).toBe('DT');
+  });
+
+  it('navigates on a sidebar nav click', async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const router = TestBed.inject(Router);
+    fixture.componentInstance.navigate({label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets});
+    await fixture.whenStable();
+    expect(router.url).toBe(AppRoute.Budgets);
+  });
+
+  it('leaves a phone tab click to the shell, which navigates itself', async () => {
+    const fixture = await setup(AppRoute.Settings);
+    const router = TestBed.inject(Router);
+    fixture.componentInstance.navigate({label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets});
+    await fixture.whenStable();
+    expect(router.url).toBe(AppRoute.Settings);
   });
 });

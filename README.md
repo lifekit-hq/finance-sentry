@@ -179,7 +179,7 @@ cd frontend && npm test -- --no-headless   # visible browser, for debugging
 ## Architecture
 
 ```
-frontend/                             Angular 21 SPA — strict TypeScript, standalone components
+frontend/                             Angular 22 SPA — strict TypeScript, standalone components
                                       NgRx SignalStore, lazy-loaded feature modules
 backend/
   src/

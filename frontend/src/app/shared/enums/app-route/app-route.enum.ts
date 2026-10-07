@@ -18,6 +18,7 @@ export enum AppRoute {
   Ledger = '/ledger',
   Settings = '/settings',
   SettingsPeople = '/settings/people',
+  More = '/more',
   AssetDossier = '/assets',
 }
 

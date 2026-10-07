@@ -1,4 +1,4 @@
-import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClient, withXhr} from '@angular/common/http';
 import {HttpTestingController, provideHttpClientTesting} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap} from '@angular/router';
@@ -15,7 +15,7 @@ function setup(query: Record<string, string>) {
   TestBed.configureTestingModule({
     providers: [
       FlowBreakdownStore,
-      provideHttpClient(),
+      provideHttpClient(withXhr()),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
       {
