@@ -581,8 +581,8 @@ stray small credits.
 
 **The Income / Spending / Savings card totals the selected range, in-progress month
 included** — one range, one story across the hero, tiles, charts and top categories. The
-heading names the window (`HISTORY_RANGE_TILE_HEADINGS`: "This month", "Last 3 months",
-"Year to date", … "All time"). For the month-based presets (3M, YTD, 1Y, ALL) the window is
+heading names the window (`HISTORY_RANGE_TILE_HEADINGS`: "Last 7 days", "Month to date",
+"Past month", "Last 3 months", "Year to date", … "All time"). For the month-based presets (3M, YTD, 1Y, ALL) the window is
 `DashboardRangeUtils.windowMonths` calendar months ending with the current one (YTD = months
 since January), and the tiles sum only the `monthlyFlow` buckets from `windowStartKey` on. For
 the day-level presets (1W, MTD, 1M — §5) they sum the response's `windowFlow` instead, the
