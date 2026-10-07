@@ -24,4 +24,9 @@ describe('initialDossierState', () => {
   it('starts with the thesis collapsed', () => {
     expect(initialDossierState.isThesisExpanded).toBe(false);
   });
+
+  it('starts with no quote', () => {
+    expect(initialDossierState.quote).toBeNull();
+    expect(initialDossierState.quoteStatus).toBe('idle');
+  });
 });

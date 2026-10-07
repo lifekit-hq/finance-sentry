@@ -96,6 +96,7 @@ export const DOSSIER_AAPL = {
   symbol: 'AAPL',
   position: {
     provider: 'ibkr',
+    assetClass: 'Equities',
     quantity: 10,
     currentValueUsd: 17500,
     costBasisUsd: 15000,
@@ -264,6 +265,21 @@ export const EMPTY_LEDGER_READ = {
   cached: false,
 };
 
+export const QUOTE_AAPL = {
+  ticker: 'AAPL',
+  resolvedTicker: 'AAPL',
+  price: 189.3,
+  previousClose: 187,
+  changePct: 1.2299,
+  currency: 'USD',
+  fetchedAt: '2026-09-01T12:00:00Z',
+  marketState: 'REGULAR',
+  session: 'regular',
+  isStale: false,
+  sourcePriceTime: null,
+  regularMarketTime: null,
+};
+
 export const LEDGER_READ_NARRATIVE =
   'You hold 50 AAPL at a 25% unrealised gain; the services thesis is intact.';
 
@@ -315,6 +331,14 @@ export async function mockApis(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(DOSSIER_UNKNOWN),
+    })
+  );
+  // AAPL has a live quote; any other ticker has none, so its header keeps the empty reserved slot.
+  await page.route(`${API}/research/quotes**`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(route.request().url().includes('tickers=AAPL') ? [QUOTE_AAPL] : []),
     })
   );
   // Default: nothing generated yet. Individual tests re-route to cover the cached/stale/error paths.

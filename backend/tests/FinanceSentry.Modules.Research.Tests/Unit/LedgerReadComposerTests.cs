@@ -37,7 +37,7 @@ public class LedgerReadComposerTests
     public void Fingerprint_ChangesWhenPositionChanges()
     {
         var before = Dossier();
-        var after = Dossier(new DossierPositionSection("ibkr", 10m, 1500m, 1200m, 300m, 25m, []));
+        var after = Dossier(new DossierPositionSection("ibkr", "Equities", 10m, 1500m, 1200m, 300m, 25m, []));
 
         LedgerReadComposer.Fingerprint(before).Should().NotBe(LedgerReadComposer.Fingerprint(after));
     }
@@ -68,7 +68,7 @@ public class LedgerReadComposerTests
     public void Prompt_IncludesPositionFiguresWhenHeld()
     {
         var prompt = LedgerReadComposer.Prompt(
-            Dossier(new DossierPositionSection("ibkr", 10m, 1500m, 1200m, 300m, 25m, [])));
+            Dossier(new DossierPositionSection("ibkr", "Equities", 10m, 1500m, 1200m, 300m, 25m, [])));
 
         prompt.Should().Contain("ibkr");
         prompt.Should().Contain("1500");

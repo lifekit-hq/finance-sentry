@@ -2,13 +2,18 @@ import {DOCUMENT} from '@angular/common';
 import {afterNextRender, inject, Injector} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
+import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
 
 interface StoreMethods {
   setDossierLoading(): void;
@@ -17,6 +22,9 @@ interface StoreMethods {
   setLedgerReadLoading(): void;
   setLedgerRead(ledgerRead: AssetLedgerReadDto): void;
   setLedgerReadError(errorCode: Nullable<string>): void;
+  setQuoteLoading(): void;
+  setQuote(quote: Nullable<DossierQuoteDto>): void;
+  setQuoteError(): void;
 }
 
 export function dossierEffects(store: StoreMethods) {
@@ -38,6 +46,22 @@ export function dossierEffects(store: StoreMethods) {
     });
   };
 
+  // Runs once the dossier says the symbol is a listed equity; a failed quote never breaks the page.
+  const loadQuote = rxMethod<string>(
+    pipe(
+      tap(() => store.setQuoteLoading()),
+      switchMap(symbol =>
+        dossierService.getQuotes(symbol).pipe(
+          tap(quotes => store.setQuote(quotes[0] ?? null)),
+          catchError(() => {
+            store.setQuoteError();
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
   const loadDossier = rxMethod<string>(
     pipe(
       tap(() => store.setDossierLoading()),
@@ -45,6 +69,9 @@ export function dossierEffects(store: StoreMethods) {
         dossierService.getDossier(symbol).pipe(
           tap(dossier => {
             store.setDossier(dossier);
+            if (DossierQuoteUtils.isQuotable(dossier)) {
+              loadQuote(dossier.symbol);
+            }
             scrollToFragment();
           }),
           StoreErrorUtils.catchAndSetError({

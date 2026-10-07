@@ -121,6 +121,7 @@ public sealed class GetAssetDossierQueryHandler(
 
         return new DossierPositionSection(
             Provider: pos.Provider,
+            AssetClass: pos.AssetClass,
             Quantity: pos.Quantity,
             CurrentValueUsd: pos.UsdValue,
             CostBasisUsd: pos.CostBasisUsd,

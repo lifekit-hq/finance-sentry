@@ -9,6 +9,7 @@ import {
   type AssetLedgerReadDto,
   type DossierAnalystsSection,
   type DossierPositionSection,
+  type DossierQuoteDto,
   type DossierSignalItem,
   type EarningsEventDto,
   type NewsArticleDto,
@@ -29,6 +30,8 @@ function buildSignals(overrides: Partial<DossierState> = {}) {
     ),
     ledgerReadErrorCode: signal<Nullable<string>>(overrides.ledgerReadErrorCode ?? null),
     isThesisExpanded: signal<boolean>(overrides.isThesisExpanded ?? false),
+    quote: signal<Nullable<DossierQuoteDto>>(overrides.quote ?? null),
+    quoteStatus: signal<DossierState['quoteStatus']>(overrides.quoteStatus ?? 'idle'),
   };
 }
 
@@ -60,6 +63,7 @@ function emptyDossier(overrides: Partial<AssetDossierDto> = {}): AssetDossierDto
 
 const POSITION: DossierPositionSection = {
   provider: 'ibkr',
+  assetClass: 'Equities',
   quantity: 1,
   currentValueUsd: 100,
   costBasisUsd: null,
@@ -314,6 +318,41 @@ describe('dossierComputed', () => {
           buildSignals({dossier: emptyDossier({thesis: {...THESIS, thesisText: 'Only one.'}})})
         );
         expect(computeds.thesisHasMore()).toBe(false);
+      });
+    });
+  });
+
+  describe('quote header', () => {
+    const QUOTE: DossierQuoteDto = {
+      ticker: 'AAPL',
+      price: 189.3,
+      previousClose: 187,
+      changePct: 1.23,
+      currency: 'USD',
+    };
+
+    it('formats the stored quote for the header', () => {
+      const store = buildSignals({quote: QUOTE});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).quoteHeader()).toEqual({
+          priceText: '$189.30',
+          changeText: '+1.23%',
+          direction: 'up',
+        });
+      });
+    });
+
+    it('is null when the quote is missing or failed', () => {
+      const store = buildSignals({quote: null, quoteStatus: 'error'});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).quoteHeader()).toBeNull();
+      });
+    });
+
+    it('isQuoteLoading follows the quote status', () => {
+      const store = buildSignals({quoteStatus: 'loading'});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).isQuoteLoading()).toBe(true);
       });
     });
   });

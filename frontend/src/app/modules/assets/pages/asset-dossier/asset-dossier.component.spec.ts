@@ -4,7 +4,11 @@ import {provideRouter} from '@angular/router';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
-import {type AssetDossierDto, type ThesisDto} from '../../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type DossierQuoteHeader,
+  type ThesisDto,
+} from '../../models/dossier/dossier.model';
 import {DossierStore} from '../../store/dossier.store';
 import {AssetDossierComponent} from './asset-dossier.component';
 
@@ -35,6 +39,7 @@ const DOSSIER: AssetDossierDto = {
   symbol: 'DRAM',
   position: {
     provider: 'ibkr',
+    assetClass: 'Equities',
     quantity: 10,
     currentValueUsd: 431.94,
     costBasisUsd: 400,
@@ -131,6 +136,8 @@ describe('AssetDossierComponent', () => {
     visibleThesisParagraphs: ReturnType<typeof signal<string[]>>;
     thesisHasMore: ReturnType<typeof signal<boolean>>;
     isThesisExpanded: ReturnType<typeof signal<boolean>>;
+    quoteHeader: ReturnType<typeof signal<DossierQuoteHeader | null>>;
+    isQuoteLoading: ReturnType<typeof signal<boolean>>;
     toggleThesisExpanded: ReturnType<typeof vi.fn>;
     generateLedgerRead: ReturnType<typeof vi.fn>;
   };
@@ -154,6 +161,8 @@ describe('AssetDossierComponent', () => {
       visibleThesisParagraphs: signal(['Memory cycle is turning.']),
       thesisHasMore: signal(false),
       isThesisExpanded: signal(false),
+      quoteHeader: signal<DossierQuoteHeader | null>(null),
+      isQuoteLoading: signal(false),
       toggleThesisExpanded: vi.fn(),
       generateLedgerRead: vi.fn(),
     };
@@ -175,6 +184,50 @@ describe('AssetDossierComponent', () => {
     fixture.detectChanges();
 
     expect(byTestId('dossier-skeleton')).not.toBeNull();
+  });
+
+  describe('header quote', () => {
+    it('shows price and a coloured day change beside the symbol', () => {
+      mockStore.quoteHeader.set({priceText: '$189.30', changeText: '+1.23%', direction: 'up'});
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-price')?.textContent).toContain('$189.30');
+      const change = byTestId('dossier-day-change');
+      expect(change?.textContent).toContain('+1.23%');
+      expect(change?.className).toContain('text-status-success');
+      expect(byTestId('dossier-price')?.className).not.toContain('text-status');
+    });
+
+    it('colours a loss as an error delta', () => {
+      mockStore.quoteHeader.set({priceText: '$189.30', changeText: '-0.50%', direction: 'down'});
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-day-change')?.className).toContain('text-status-error');
+    });
+
+    it('keeps an empty reserved slot when the quote is missing', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-quote')).not.toBeNull();
+      expect(byTestId('dossier-price')).toBeNull();
+      expect(byTestId('dossier-day-change')).toBeNull();
+      expect(byTestId('dossier-quote')?.className).toContain('min-h-');
+    });
+
+    it('shows a skeleton inside the slot while the quote loads', () => {
+      mockStore.isQuoteLoading.set(true);
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-quote')?.querySelector('cmn-skeleton')).not.toBeNull();
+    });
+
+    it('shows the price alone when the quote has no day change', () => {
+      mockStore.quoteHeader.set({priceText: '$189.30', changeText: null, direction: 'flat'});
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-price')).not.toBeNull();
+      expect(byTestId('dossier-day-change')).toBeNull();
+    });
   });
 
   it('leaves the symbol and the way back to the top bar', () => {

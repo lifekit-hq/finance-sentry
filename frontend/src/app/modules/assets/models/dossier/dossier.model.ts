@@ -11,6 +11,8 @@ export interface DossierTaxLotEntry {
 
 export interface DossierPositionSection {
   provider: string;
+  /** Canonical asset class (`Equities`, `Crypto`, `Bonds`, ...). */
+  assetClass: string;
   quantity: number;
   currentValueUsd: number;
   costBasisUsd: Nullable<number>;
@@ -173,4 +175,22 @@ export interface AssetLedgerReadDto {
   generatedAt: Nullable<string>;
   isStale: boolean;
   cached: boolean;
+}
+
+/** One entry of `research/quotes`; `changePct` is already a percent (1.5 = +1.5%). */
+export interface DossierQuoteDto {
+  ticker: string;
+  price: number;
+  previousClose: Nullable<number>;
+  changePct: Nullable<number>;
+  currency: string;
+}
+
+export type DossierDeltaDirection = 'up' | 'down' | 'flat';
+
+export interface DossierQuoteHeader {
+  priceText: string;
+  /** Null when the quote has no previous close to measure the day against. */
+  changeText: Nullable<string>;
+  direction: DossierDeltaDirection;
 }

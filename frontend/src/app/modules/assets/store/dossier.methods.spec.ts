@@ -138,4 +138,30 @@ describe('dossierMethods', () => {
     methods.toggleThesisExpanded();
     expect(state.isThesisExpanded()).toBe(false);
   });
+
+  it('setQuote stores the quote and resets status to idle', () => {
+    const state = signalState({...initialDossierState, quoteStatus: 'loading' as const});
+    const quote = {
+      ticker: 'AAPL',
+      price: 189.3,
+      previousClose: 187,
+      changePct: 1.23,
+      currency: 'USD',
+    };
+
+    dossierMethods(state).setQuote(quote);
+
+    expect(state.quote()).toEqual(quote);
+    expect(state.quoteStatus()).toBe('idle');
+  });
+
+  it('setQuoteError clears the quote and never touches the dossier status', () => {
+    const state = signalState({...initialDossierState, dossierStatus: 'idle' as const});
+
+    dossierMethods(state).setQuoteError();
+
+    expect(state.quote()).toBeNull();
+    expect(state.quoteStatus()).toBe('error');
+    expect(state.dossierStatus()).toBe('idle');
+  });
 });

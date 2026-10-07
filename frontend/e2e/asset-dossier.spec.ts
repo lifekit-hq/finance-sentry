@@ -3,6 +3,7 @@ import {expect, type Page, test} from '@playwright/test';
 import {
   API,
   AUTH_RESPONSE,
+  DOSSIER_UNKNOWN,
   EMPTY_LEDGER_READ,
   LEDGER_READ_NARRATIVE,
   mockApis,
@@ -28,6 +29,57 @@ test.describe('Asset Dossier', () => {
   test('dossier page renders symbol header', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByRole('heading', {name: 'AAPL', level: 1})).toBeVisible();
+  });
+
+  test('dossier header shows price and the day change beside the symbol', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    await expect(page.getByTestId('dossier-price')).toHaveText('$189.30');
+    await expect(page.getByTestId('dossier-day-change')).toHaveText('+1.23%');
+  });
+
+  test('dossier header keeps its slot when there is no quote', async ({page}) => {
+    await page.goto('/assets/ZZZZ');
+    await expect(page.getByRole('heading', {name: 'ZZZZ', level: 1})).toBeVisible();
+    await expect(page.getByTestId('dossier-price')).toHaveCount(0);
+    const slot = await page.getByTestId('dossier-quote').boundingBox();
+    expect(slot?.height).toBeGreaterThanOrEqual(48);
+  });
+
+  test('dossier header never quotes a crypto holding by its bare ticker', async ({page}) => {
+    const btcDossier = {
+      ...DOSSIER_UNKNOWN,
+      symbol: 'BTC',
+      position: {
+        provider: 'binance',
+        assetClass: 'Crypto',
+        quantity: 0.5,
+        currentValueUsd: 30000,
+        costBasisUsd: null,
+        unrealizedPnlUsd: null,
+        unrealizedPnlPercent: null,
+        taxLots: [],
+      },
+    };
+    await page.route(`${API}/research/assets/BTC/dossier`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(btcDossier),
+      })
+    );
+    const quoteRequests: string[] = [];
+    page.on('request', req => {
+      if (req.url().includes('/research/quotes')) {
+        quoteRequests.push(req.url());
+      }
+    });
+
+    await page.goto('/assets/BTC');
+    await expect(page.getByRole('heading', {name: 'BTC', level: 1})).toBeVisible();
+    await expect(page.getByTestId('dossier-quote')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('dossier-price')).toHaveCount(0);
+    expect(quoteRequests).toEqual([]);
   });
 
   test('dossier page renders position section', async ({page}) => {

@@ -1,6 +1,10 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
-import {type AssetDossierDto, type AssetLedgerReadDto} from '../models/dossier/dossier.model';
+import {
+  type AssetDossierDto,
+  type AssetLedgerReadDto,
+  type DossierQuoteDto,
+} from '../models/dossier/dossier.model';
 import {type DossierState} from './dossier.state';
 
 export function dossierMethods(store: WritableStateSource<DossierState>) {
@@ -19,6 +23,16 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
     },
     setLedgerRead(ledgerRead: AssetLedgerReadDto): void {
       patchState(store, {ledgerRead, ledgerReadStatus: 'idle', ledgerReadErrorCode: null});
+    },
+    setQuoteLoading(): void {
+      patchState(store, {quoteStatus: 'loading'});
+    },
+    setQuote(quote: Nullable<DossierQuoteDto>): void {
+      patchState(store, {quote, quoteStatus: 'idle'});
+    },
+    // The header price is a nicety: a failed quote leaves the slot empty rather than raising an error.
+    setQuoteError(): void {
+      patchState(store, {quote: null, quoteStatus: 'error'});
     },
     toggleThesisExpanded(): void {
       patchState(store, state => ({isThesisExpanded: !state.isThesisExpanded}));
