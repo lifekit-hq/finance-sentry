@@ -5,7 +5,7 @@ import {MoneyUtils} from '../../../shared/utils/money.utils';
 
 export interface FormattedBalance {
   native: string;
-  usd: Nullable<string>;
+  equivalent: Nullable<string>;
   /** A liability: the amount is what the user owes, so the row reads "Owes …" in the error tone. */
   owed: boolean;
 }
@@ -15,25 +15,23 @@ const LIABILITY_ACCOUNT_TYPE = 'credit';
 
 @Pipe({name: 'accountBalance'})
 export class AccountBalancePipe implements PipeTransform {
-  public transform({
-    accountType,
-    currentBalance,
-    currency,
-    balanceInBaseCurrency,
-  }: AccountBalanceItem): FormattedBalance {
+  public transform(
+    {accountType, currentBalance, currency, balanceInBaseCurrency}: AccountBalanceItem,
+    baseCurrency: string,
+  ): FormattedBalance {
     const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && currentBalance > 0;
     const native = owed
       ? MoneyUtils.formatOwed(currentBalance, currency)
       : MoneyUtils.format(currentBalance, currency);
 
-    if (
-      currency === 'USD' ||
-      balanceInBaseCurrency === null ||
-      balanceInBaseCurrency === currentBalance
-    ) {
-      return {native, usd: null, owed};
+    if (currency === baseCurrency || balanceInBaseCurrency === null) {
+      return {native, equivalent: null, owed};
     }
 
-    return {native, usd: MoneyUtils.formatEquivalent(balanceInBaseCurrency), owed};
+    return {
+      native,
+      equivalent: MoneyUtils.formatEquivalent(balanceInBaseCurrency, baseCurrency),
+      owed,
+    };
   }
 }
