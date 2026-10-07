@@ -29,18 +29,34 @@
   </div>
 
   <div class="mb-cmn-6 grid grid-cols-2 gap-cmn-4 lg:grid-cols-4">
-    <cmn-stat-card
-      [value]="store.incomeFormatted()"
-      [loading]="store.isLoading()"
-      label="Income"
-      icon="TrendingUp"
-    />
-    <cmn-stat-card
-      [value]="store.spendingFormatted()"
-      [loading]="store.isLoading()"
-      label="Spending"
-      icon="TrendingDown"
-    />
+    <a
+      [routerLink]="transactionsRoute"
+      [queryParams]="cardParams('credit')"
+      class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+      data-testid="breakdown-income-link"
+      aria-label="View the income transactions"
+    >
+      <cmn-stat-card
+        [value]="store.incomeFormatted()"
+        [loading]="store.isLoading()"
+        label="Income"
+        icon="TrendingUp"
+      />
+    </a>
+    <a
+      [routerLink]="transactionsRoute"
+      [queryParams]="cardParams('debit')"
+      class="block rounded-cmn-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+      data-testid="breakdown-spending-link"
+      aria-label="View the spending transactions"
+    >
+      <cmn-stat-card
+        [value]="store.spendingFormatted()"
+        [loading]="store.isLoading()"
+        label="Spending"
+        icon="TrendingDown"
+      />
+    </a>
     <cmn-stat-card
       [value]="store.investedFormatted()"
       [loading]="store.isLoading()"
@@ -148,34 +164,52 @@
           </div>
           <div class="md:hidden" data-testid="breakdown-rows">
             @for (i of group.items; track i.transactionId) {
-              <cmn-list-item-row
-                [label]="i.description"
-                [sublabel]="i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')"
+              <div
+                (click)="openTransaction(i)"
+                (keydown.enter)="openTransaction(i)"
+                class="cursor-pointer"
+                role="button"
+                tabindex="0"
+                data-testid="breakdown-row"
               >
-                @if (i.counterpartyName) {
-                  <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
-                } @else if (i.category) {
-                  <cmn-tag variant="neutral" meta>{{ i.category | merchantCategory }}</cmn-tag>
-                }
-                <div amount class="min-w-[72px] text-right">
-                  <div
-                    [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
-                    class="font-mono text-cmn-sm font-semibold tabular-nums"
-                  >
-                    {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
+                <cmn-list-item-row
+                  [label]="i.description"
+                  [sublabel]="
+                    i.bankName + ' ••' + i.accountLast4 + ' · ' + (i.date | date: 'MMM d')
+                  "
+                >
+                  @if (i.counterpartyName) {
+                    <cmn-tag variant="info" meta>{{ i.counterpartyName }}</cmn-tag>
+                  } @else if (i.category) {
+                    <cmn-tag variant="neutral" meta>{{ i.category | merchantCategory }}</cmn-tag>
+                  }
+                  <div amount class="min-w-[72px] text-right">
+                    <div
+                      [class]="i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'"
+                      class="font-mono text-cmn-sm font-semibold tabular-nums"
+                    >
+                      {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
+                    </div>
+                    <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
+                      {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
+                    </div>
                   </div>
-                  <div class="font-mono text-cmn-xs tabular-nums text-text-secondary">
-                    {{ i.amountUsd | money: 'USD' : {maxFractionDigits: 0} }}
-                  </div>
-                </div>
-              </cmn-list-item-row>
+                </cmn-list-item-row>
+              </div>
             }
           </div>
           <div class="hidden overflow-x-auto md:block">
             <table [attr.aria-label]="group.label + ' transactions'" class="w-full text-cmn-sm">
               <tbody>
                 @for (i of group.items; track i.transactionId) {
-                  <tr class="border-b border-border-default last:border-0">
+                  <tr
+                    (click)="openTransaction(i)"
+                    (keydown.enter)="openTransaction(i)"
+                    class="cursor-pointer border-b border-border-default last:border-0 hover:bg-surface-bg"
+                    role="button"
+                    tabindex="0"
+                    data-testid="breakdown-row"
+                  >
                     <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
                       {{ i.date | date: 'MMM d' }}
                     </td>
@@ -183,13 +217,29 @@
                       {{ i.description }}
                     </td>
                     <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
-                      {{ i.bankName }} ••{{ i.accountLast4 }}
+                      <a
+                        [routerLink]="transactionsRoute"
+                        [queryParams]="ledgerParams({account: i.accountId})"
+                        (click)="$event.stopPropagation()"
+                        (keydown.enter)="$event.stopPropagation()"
+                        class="hover:text-accent-default hover:underline"
+                        data-testid="breakdown-account-link"
+                        >{{ i.bankName }} ••{{ i.accountLast4 }}</a
+                      >
                     </td>
                     <td class="px-cmn-4 py-cmn-3">
                       @if (i.counterpartyName) {
                         <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
                       } @else if (i.category) {
-                        <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>
+                        <a
+                          [routerLink]="transactionsRoute"
+                          [queryParams]="ledgerParams({category: i.category})"
+                          (click)="$event.stopPropagation()"
+                          (keydown.enter)="$event.stopPropagation()"
+                          data-testid="breakdown-category-link"
+                        >
+                          <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>
+                        </a>
                       } @else {
                         <span class="text-cmn-xs text-text-secondary">—</span>
                       }
