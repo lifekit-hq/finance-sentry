@@ -38,13 +38,13 @@
 # The docker run goes through scripts/nm-heavy-slot.sh, a 2-slot flock
 # (/tmp/nm-heavy.{1,2}.lock, shared by every home on the box) held only for the
 # run: at most 2 heavy validation jobs at once (compute audit limit L1). Memory is kept in check by: build without the resident Roslyn server
-# (-p:UseSharedCompilation=false + `dotnet build-server shutdown`), test
-# hosts limited to two (-m:2; unset it starts one per logical CPU), and
-# workstation GC (DOTNET_gcServer=0).
+# (backend/Directory.Build.rsp turns the shared compiler off; `dotnet build-server shutdown`
+# stays as a safety net), one build node (same file; unset it starts one per logical CPU),
+# and workstation GC (DOTNET_gcServer=0).
 #
-# Build parallelism: the backend build stays -m:1. Measured on the box under the 2 GB cap
-# with a warm NuGet volume, two runs each (box load ~12-15): -m:1 323 s / 391 s,
-# -m:2 374 s / 423 s, so -m:2 was not faster (no OOM either way).
+# Build parallelism: -m:1, set once in backend/Directory.Build.rsp rather than per command.
+# Measured on the box under the 2 GB cap with a warm NuGet volume, two runs each (box load
+# ~12-15): -m:1 323 s / 391 s, -m:2 374 s / 423 s, so -m:2 was not faster (no OOM either way).
 #
 # Not declared: the backend coverage ratchet step (a reportgenerator summary
 # gate over the test run, not a test; it stays a CI-only check) and the
@@ -78,11 +78,11 @@ commands:
     if [ "$be" = 1 ]; then
       dn='set -e
       dotnet restore backend/FinanceSentry.sln
-      dotnet build backend/FinanceSentry.sln --configuration Release --no-restore -m:1 -p:UseSharedCompilation=false
+      dotnet build backend/FinanceSentry.sln --configuration Release --no-restore
       dotnet build-server shutdown
       for p in backend/tests/*/*.csproj; do
         case "$p" in *Tests.Integration*) continue ;; esac
-        dotnet test "$p" --configuration Release --no-build -m:2 --verbosity normal
+        dotnet test "$p" --configuration Release --no-build --verbosity normal
       done'
       if command -v dotnet >/dev/null 2>&1; then
         sh -c "$dn"

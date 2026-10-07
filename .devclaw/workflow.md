@@ -25,8 +25,9 @@ the same diff** — that file is the source of truth for every money calculation
 ## Build / test / verify
 
 `.devclaw/verify` runs what Backend CI runs: restore → `dotnet build` (Release) →
-`dotnet test` over the **whole solution, unfiltered**. Everything is serialised
-with `-m:1`; the default parallel run gets OOM-killed inside the sandbox.
+`dotnet test` over the **whole solution, unfiltered**. Build parallelism is one
+node (`backend/Directory.Build.rsp`), so no flags are needed; the default parallel run gets OOM-killed
+inside the sandbox.
 
 Not covered by that script, run by hand when the change touches them:
 

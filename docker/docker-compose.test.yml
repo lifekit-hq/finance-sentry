@@ -1,0 +1,29 @@
+# Backend build + full test suite in a memory-capped SDK container:
+#   docker compose -f docker/docker-compose.test.yml run --rm backend-tests
+# (scripts/test-backend.sh wraps this). Build parallelism comes from backend/Directory.Build.rsp,
+# so no -m flags are needed. No Docker socket is passed in: container-backed tests skip themselves
+# (run them on the host, or in CI, where a daemon is reachable). mem_limit matches the production host's per-build-container limit.
+services:
+  backend-tests:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    mem_limit: 2g
+    working_dir: /src/backend
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      HOME: /tmp
+      DOTNET_CLI_HOME: /tmp
+      DOTNET_NOLOGO: "1"
+      DOTNET_gcServer: "0"
+      NUGET_PACKAGES: /nuget
+    volumes:
+      - ..:/src
+      - fs-backend-tests-nuget:/nuget
+    network_mode: host
+    command:
+      - sh
+      - -c
+      - dotnet restore FinanceSentry.sln && dotnet build FinanceSentry.sln --no-restore -c Release && dotnet test FinanceSentry.sln --no-build -c Release
+
+volumes:
+  fs-backend-tests-nuget:
+    name: fs-backend-tests-nuget

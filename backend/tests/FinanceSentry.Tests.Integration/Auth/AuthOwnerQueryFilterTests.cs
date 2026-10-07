@@ -108,7 +108,7 @@ public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
         return await read.RefreshTokens.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().ToListAsync();
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public void Every_per_user_credential_entity_declares_the_Owner_filter()
     {
         using var ctx = CreateContext();

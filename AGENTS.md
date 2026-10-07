@@ -7,7 +7,9 @@
 cd backend && dotnet restore FinanceSentry.sln
 dotnet build FinanceSentry.sln --no-restore -c Release
 
-# Run tests — no filter. CI runs the full solution too; container-backed tests
+# Run tests — no filter, no -m flags (`backend/Directory.Build.rsp` pins one build node).
+# `scripts/test-backend.sh` runs the same in a 2 GB SDK container (docker/docker-compose.test.yml),
+# the production host's per-build limit. CI runs the full solution too; container-backed tests
 # report themselves as Skipped where no Docker daemon is reachable.
 dotnet test FinanceSentry.sln --no-build -c Release
 ```
@@ -241,8 +243,9 @@ Deduplication:MasterKeyBase64 = "<base64-key>"
 
 ## MCP Verification
 
-Verified 2026-09-03 via `dotnet test FinanceSentry.sln --no-build -c Release -m:1` (no filter;
-`-m:1` serialises the test projects — the default parallel run needs more than 4 GB of RAM).
+Verified 2026-09-03 via `dotnet test FinanceSentry.sln --no-build -c Release` (no filter; the
+plain command needs no flags — `backend/Directory.Build.rsp` pins one build node, because the default
+parallel run needs more than 4 GB of RAM).
 
 | Project | Passed | Skipped | Failed |
 |---|---|---|---|

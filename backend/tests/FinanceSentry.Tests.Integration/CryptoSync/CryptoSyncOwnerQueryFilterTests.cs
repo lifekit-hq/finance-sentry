@@ -69,7 +69,7 @@ public sealed class CryptoSyncOwnerQueryFilterTests : IAsyncLifetime
             .ToListAsync();
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public void Every_per_user_entity_declares_the_Owner_filter()
     {
         using var ctx = CreateContext();

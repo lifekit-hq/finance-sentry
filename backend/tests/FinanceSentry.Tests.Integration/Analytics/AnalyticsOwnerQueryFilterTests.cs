@@ -43,7 +43,7 @@ public sealed class AnalyticsOwnerQueryFilterTests : IAsyncLifetime
     private static QueryAuditRecord NewAudit(Guid userId) =>
         new() { UserId = userId, Sql = "SELECT 1", Outcome = QueryOutcome.Executed };
 
-    [Fact]
+    [DockerRequiredFact]
     public void Every_per_user_entity_declares_the_Owner_filter()
     {
         using var ctx = CreateContext();
