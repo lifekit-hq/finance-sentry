@@ -59,8 +59,9 @@ Returns the effective settings (defaults if no row yet). `mode` ∈ `quiet|diges
 
 For `realtime` mode the dispatch relay POSTs to `Companion:AgentTriggerUrl` (if configured):
 ```json
-{ "eventId": "…", "userId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…" }
+{ "eventId": "…", "userId": "…", "kind": "ThesisBreak", "subject": "MU", "severity": "critical", "occurredAt": "…", "appUrl": "https://app.example.com/assets/MU" }
 ```
+`appUrl` (#466 N-B) is the absolute link to the app page the event is about (`Companion:PublicBaseUrl` + the event's `AppPath`, see `CompanionAppUrl.For`). The key is omitted, never null or relative, when no public base URL is configured or the event has no target page. The same field is on each event returned by `get_pending_companion_events` (`docs/mcp.md`).
 Headers: `Authorization: Bearer <Companion:AgentTriggerToken>` (runtime configuration, omitted when empty) and `Idempotency-Key: <eventId>` so the receiver dedups the relay's retries (up to `MaxDispatchAttempts`). The digest wake (`{ "kind": "Digest", "userId": "…", "count": n, "includeHeldForDigest": true, "heldOverrideReason": "daily digest" }`) carries the bearer header only.
 
 No secrets, no full detail — the agent resolves specifics via the tools above using its own authenticated identity (FR-016). A missing URL ⇒ no push; the agent pulls instead.
