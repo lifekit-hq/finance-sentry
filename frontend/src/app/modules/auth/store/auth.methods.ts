@@ -1,7 +1,12 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
-import {type AuthFlow, type AuthState, type FlashMessage} from './auth.state';
+import {
+  type AuthFlow,
+  type AuthState,
+  type FlashMessage,
+  type SignInMethodsStatus,
+} from './auth.state';
 
 export function authMethods(store: WritableStateSource<AuthState>) {
   return {
@@ -52,7 +57,10 @@ export function authMethods(store: WritableStateSource<AuthState>) {
       patchState(store, {returnUrl});
     },
     setSignInMethods(signInMethods: SignInMethods): void {
-      patchState(store, {signInMethods});
+      patchState(store, {signInMethods, signInMethodsStatus: 'success'});
+    },
+    setSignInMethodsStatus(signInMethodsStatus: SignInMethodsStatus): void {
+      patchState(store, {signInMethodsStatus});
     },
     setFlashMessage(flashMessage: Nullable<FlashMessage>): void {
       patchState(store, {flashMessage});

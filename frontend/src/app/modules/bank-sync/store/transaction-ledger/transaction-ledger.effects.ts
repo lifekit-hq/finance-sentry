@@ -41,7 +41,7 @@ interface EffectsStore {
   setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
-  setLoading: () => void;
+  setLoading: (keepRows?: boolean) => void;
   setTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
@@ -73,13 +73,13 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  const fetchPage = rxMethod<'first' | 'next'>(
+  const fetchPage = rxMethod<'first' | 'next' | 'retry'>(
     pipe(
       tap(page => {
         if (page === 'next') {
           store.nextPage();
         }
-        store.setLoading();
+        store.setLoading(page !== 'first');
       }),
       switchMap(page =>
         bankSyncService
@@ -102,6 +102,10 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
   return {
     load,
+    /** Re-issues the failed request with the rows already on screen kept in place. */
+    retry: (): void => {
+      fetchPage('retry');
+    },
     loadSummary: rxMethod<void>(
       pipe(
         switchMap(() =>

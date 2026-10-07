@@ -109,4 +109,22 @@ describe('AuthStore (integration)', () => {
     expect(store.email()).toBeNull();
     expect(router.navigate).toHaveBeenCalled();
   });
+
+  it('a failed auth/methods call is an error, not a guessed method set, and Retry recovers', () => {
+    const methods = {oidc: true, passwordLogin: false};
+    const getSignInMethods = vi
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(methods));
+    configure(authServiceMock({getSignInMethods}));
+
+    const store = TestBed.inject(AuthStore);
+    expect(store.signInMethodsStatus()).toBe('error');
+    expect(store.signInMethods()).toBeNull();
+
+    store.loadSignInMethods();
+
+    expect(store.signInMethodsStatus()).toBe('success');
+    expect(store.signInMethods()).toEqual(methods);
+  });
 });

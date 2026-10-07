@@ -10,15 +10,27 @@ import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
-    setLoading(): void {
-      patchState(store, {status: 'loading', errorCode: null});
+    /** `keepRows` holds the rows on screen while a retry or the next page loads. */
+    setLoading(keepRows = false): void {
+      patchState(store, {
+        status: 'loading',
+        errorCode: null,
+        ...(keepRows ? {} : {transactions: [], totalCount: 0, hasMore: false}),
+      });
     },
     setTransactions(
       transactions: GlobalTransactionDto[],
       totalCount: number,
       hasMore: boolean
     ): void {
-      patchState(store, {transactions, totalCount, hasMore, status: 'idle', errorCode: null});
+      patchState(store, {
+        transactions,
+        totalCount,
+        hasMore,
+        status: 'idle',
+        errorCode: null,
+        lastSyncedAt: Date.now(),
+      });
     },
     setError(errorCode: Nullable<string>): void {
       patchState(store, {status: 'error', errorCode});
@@ -40,6 +52,7 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         hasMore,
         status: 'idle' as AsyncStatus,
         errorCode: null,
+        lastSyncedAt: Date.now(),
       }));
     },
     setMonthlyOutflowUsd(value: number | null, currency: string = DEFAULT_BASE_CURRENCY): void {

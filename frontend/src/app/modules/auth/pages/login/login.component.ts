@@ -1,6 +1,12 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {AlertComponent, ButtonComponent, FormFieldComponent, InputComponent} from '@lifekit-hq/ui';
+import {
+  AlertComponent,
+  ButtonComponent,
+  FormFieldComponent,
+  InputComponent,
+  SkeletonComponent,
+} from '@lifekit-hq/ui';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AuthStore} from '../../store/auth.store';
@@ -14,6 +20,7 @@ import {AuthStore} from '../../store/auth.store';
     ButtonComponent,
     FormFieldComponent,
     InputComponent,
+    SkeletonComponent,
   ],
   templateUrl: './login.component.html',
   host: {class: 'block h-full'},
@@ -32,6 +39,10 @@ export class LoginComponent {
     const methods = this.signInMethods();
     return methods !== null && methods.oidc && !methods.passwordLogin;
   });
+  public readonly methodsFailed = computed(() => this.authStore.signInMethodsStatus() === 'error');
+  public readonly methodsPending = computed(
+    () => this.authStore.signInMethods() === null && !this.methodsFailed()
+  );
   public readonly loading = this.authStore.isLoading;
   public readonly errorMessage = this.authStore.errorMessage;
   public readonly flashMessage = this.authStore.flashMessage;
@@ -42,6 +53,10 @@ export class LoginComponent {
     }
     const {email, password} = this.form.value;
     this.authStore.login({email: email ?? '', password: password ?? ''});
+  }
+
+  public retryMethods(): void {
+    this.authStore.loadSignInMethods();
   }
 
   public onOidcSignIn(): void {

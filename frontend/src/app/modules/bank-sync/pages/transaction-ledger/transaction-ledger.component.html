@@ -103,14 +103,20 @@
     </div>
   }
 
+  @if (view().offlineNotice; as notice) {
+    <cmn-alert variant="info" class="mb-cmn-4 block" data-testid="offline-notice">{{
+      notice
+    }}</cmn-alert>
+  }
+
   <cmn-async-state
-    [status]="ledgerStatus()"
-    [errorMessage]="store.errorMessage()"
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
     [isEmpty]="store.isEmpty()"
     class="flex min-h-0 flex-1 flex-col"
     errorPlacement="above"
   >
-    <cmn-button (clicked)="store.load()" error-action variant="secondary" size="sm"
+    <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
       >Retry</cmn-button
     >
     <cmn-card skeleton padding="none" class="min-h-0 flex-1">

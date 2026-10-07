@@ -10,7 +10,7 @@ import {type DashboardState} from './dashboard.state';
 export function dashboardMethods(store: WritableStateSource<DashboardState>) {
   return {
     setData(data: DashboardData): void {
-      patchState(store, {data});
+      patchState(store, {data, lastSyncedAt: Date.now()});
     },
     setNetWorthHistory(snapshots: NetWorthSnapshotDto[]): void {
       patchState(store, {netWorthHistory: snapshots, scrubIndex: null});

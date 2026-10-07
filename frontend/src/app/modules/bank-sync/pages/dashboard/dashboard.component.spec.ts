@@ -36,7 +36,11 @@ function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCat
     hasCashFlow: signal(false),
     hasProjection: signal(false),
     historyHasHistory: signal(true),
-    errorMessage: signal(null),
+    errorMessage: signal(''),
+    hasError: signal(false),
+    lastSyncedAt: signal<number | null>(null),
+    load: vi.fn(),
+    loadNetWorthHistory: vi.fn(),
     historyErrorMessage: signal(null),
     netWorthStaleNotice: signal(null),
     netWorthChangeFormatted: signal(null),
@@ -219,7 +223,7 @@ describe('DashboardComponent async states', () => {
 
   it('keeps the dashboard rendered under a persistent error banner', () => {
     const store = fakeStore('3m');
-    (store as unknown as {errorMessage: ReturnType<typeof signal<string | null>>}).errorMessage.set(
+    (store as unknown as {errorMessage: ReturnType<typeof signal<string>>}).errorMessage.set(
       'Failed to load dashboard data.'
     );
     TestBed.configureTestingModule({
@@ -239,5 +243,60 @@ describe('DashboardComponent async states', () => {
 
     expect(el.querySelector('cmn-alert')?.textContent).toContain('Failed to load dashboard data.');
     expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+  });
+
+  describe('honest states', () => {
+    function renderFailed(data: unknown, offline = false) {
+      if (offline) {
+        vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+      }
+      const store = fakeStore('3m', data) as unknown as Record<
+        string,
+        ReturnType<typeof signal<never>>
+      >;
+      store['errorMessage'].set('Failed to load dashboard data.' as never);
+      store['hasError'].set(true as never);
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(withXhr()),
+          provideHttpClientTesting(),
+          provideApiBaseUrl('http://localhost/api/v1'),
+        ],
+      });
+      TestBed.overrideComponent(DashboardComponent, {
+        set: {providers: [{provide: DashboardStore, useValue: store}]},
+      });
+      const fixture = TestBed.createComponent(DashboardComponent);
+      fixture.detectChanges();
+      return {store, el: fixture.nativeElement as HTMLElement};
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('shows an error with Retry, never the connect-account empty state, when nothing loaded', () => {
+      const {el, store} = renderFailed(null);
+
+      expect(el.querySelector('cmn-alert')?.textContent).toContain(
+        'Failed to load dashboard data.'
+      );
+      expect(el.textContent).not.toContain('Connect your first account');
+      expect(el.querySelector('[data-testid="net-worth-link"]')).toBeNull();
+      el.querySelector<HTMLElement>('cmn-alert cmn-button button')?.click();
+      expect(store['load']).toHaveBeenCalledOnce();
+      expect(store['loadNetWorthHistory']).toHaveBeenCalledOnce();
+    });
+
+    it('shows the last data with a last-synced notice instead of an error while offline', () => {
+      const {el} = renderFailed({accountCount: 1, topCategories: []}, true);
+
+      expect(el.textContent).not.toContain('Failed to load dashboard data.');
+      expect(el.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+        "You're offline"
+      );
+      expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+    });
   });
 });

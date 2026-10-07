@@ -6,6 +6,8 @@ import {
 
 export interface DashboardState {
   data: Nullable<DashboardData>;
+  /** Epoch ms of the last successful dashboard load; drives the offline "last synced" notice. */
+  lastSyncedAt: Nullable<number>;
   netWorthHistory: NetWorthSnapshotDto[];
   historyRange: HistoryRange;
   historyHasHistory: boolean;
@@ -17,6 +19,7 @@ export interface DashboardState {
 
 export const initialDashboardState: DashboardState = {
   data: null,
+  lastSyncedAt: null,
   netWorthHistory: [],
   historyRange: '3m',
   historyHasHistory: false,

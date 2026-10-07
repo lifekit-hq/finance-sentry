@@ -17,7 +17,19 @@
 
     @let methods = signInMethods();
 
-    @if (methods?.oidc) {
+    @if (methodsFailed()) {
+      <cmn-alert variant="error" class="block mb-cmn-4" data-testid="methods-error"
+        >Couldn't load the sign-in options.
+        <cmn-button (clicked)="retryMethods()" variant="secondary" size="sm" class="ml-cmn-2"
+          >Retry</cmn-button
+        ></cmn-alert
+      >
+    } @else if (methodsPending()) {
+      <!-- Sized like the sign-in button so the card does not jump when the methods land. -->
+      <cmn-skeleton height="2.5rem" class="block w-full mb-cmn-6" />
+    }
+
+    @if (methods?.oidc || methodsFailed()) {
       <cmn-button
         (click)="onOidcSignIn()"
         type="button"
