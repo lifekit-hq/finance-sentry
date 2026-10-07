@@ -1,5 +1,6 @@
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,12 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 // tables (users, roles, user claims/roles/logins/tokens) stay unfiltered: sign-in, token refresh, invite acceptance,
 // the per-request principal load and the role seed read them before a person is in scope, and managing people reads
 // them across users. McpServiceToken is not filtered yet: its revocation check runs while the MCP host is still
-// authenticating, before a person is in scope.
+// authenticating, before a person is in scope. DataProtectionKeys is the platform's key ring, shared by every
+// instance and read by the key manager with no person in scope, so it is unfiltered too.
 public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser currentUser)
-    : IdentityDbContext<ApplicationUser>(options)
+    : IdentityDbContext<ApplicationUser>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<McpAuthorizationCode> McpAuthorizationCodes => Set<McpAuthorizationCode>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<McpServiceToken> McpServiceTokens => Set<McpServiceToken>();

@@ -33,6 +33,8 @@ public static class AuthModule
 
         services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 
+        services.AddAuthDataProtection(config);
+
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
                 // Length plus a common-password check (CommonPasswordValidator), no composition rules.
