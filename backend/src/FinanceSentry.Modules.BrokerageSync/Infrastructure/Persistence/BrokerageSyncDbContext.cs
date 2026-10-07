@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,6 +53,7 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.EncryptionKeyIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.EncryptionKeyAuthTag).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
+            entity.HasConnectionHealth(e => e.Health);
         });
 
         modelBuilder.Entity<IBKRFlexCredential>(entity =>
@@ -68,6 +70,7 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.TokenIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.TokenAuthTag).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
+            entity.HasConnectionHealth(e => e.Health);
         });
 
         modelBuilder.Entity<BrokerageHolding>(entity =>

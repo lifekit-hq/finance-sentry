@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +44,7 @@ public sealed class CryptoSyncDbContext : DbContext
             entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.LastSyncError).HasMaxLength(1000);
+            entity.HasConnectionHealth(e => e.Health);
         });
 
         modelBuilder.Entity<CryptoHolding>(entity =>

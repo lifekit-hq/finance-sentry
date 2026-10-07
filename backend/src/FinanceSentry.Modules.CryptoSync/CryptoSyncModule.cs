@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.CryptoSync;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
@@ -39,6 +40,7 @@ public static class CryptoSyncModule
     public static IServiceCollection AddCryptoSyncModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddConnectionHealthShadow(config);
         services.AddDbContext<CryptoSyncDbContext>(
             o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
 

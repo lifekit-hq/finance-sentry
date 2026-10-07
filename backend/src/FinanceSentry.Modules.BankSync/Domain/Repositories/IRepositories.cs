@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Domain.Repositories;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
 
 /// <summary>
@@ -50,6 +51,12 @@ public interface IBankAccountRepository
     /// Update existing bank account.
     /// </summary>
     Task<BankAccount> UpdateAsync(BankAccount account, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores an account's connection health alone, straight to the row: the shadow recorder runs after the sync's own
+    /// save, whatever state that left the change tracker in. For the no-person sync; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveHealthUnscopedAsync(Guid accountId, ConnectionHealth health, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete bank account (soft delete by setting IsActive = false).

@@ -1,9 +1,11 @@
 using System.Net;
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Infrastructure.Retry;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
+using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -16,6 +18,7 @@ public sealed class IBKRSyncJob(
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
     IJobFailureStreakStore failureStreaks,
+    IConnectionHealthShadow connectionHealth,
     ILogger<IBKRSyncJob> logger)
 {
     private const string Provider = "ibkr";
@@ -41,6 +44,8 @@ public sealed class IBKRSyncJob(
                 await syncHandler.Handle(new SyncIBKRHoldingsCommand(credential.UserId), CancellationToken.None);
                 failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
                 await TryResolveSyncFailureAsync(credential.UserId);
+                await connectionHealth.RecordSuccessAsync(
+                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
             }
             catch (Exception ex)
             {
@@ -50,6 +55,11 @@ public sealed class IBKRSyncJob(
                     credential.UserId);
 
                 await HandleFailureAsync(credential.UserId, ex);
+                await connectionHealth.RecordFailureAsync(
+                    HealthSubject(credential),
+                    credential.Health,
+                    ToProviderFailure(ex),
+                    (health, ct) => SaveHealthAsync(credential, health, ct));
             }
         }
     }
@@ -94,6 +104,32 @@ public sealed class IBKRSyncJob(
         ex is BrokerAuthException { UpstreamStatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden }
             ? SyncFailureClass.Credential
             : SyncFailureClass.Unknown;
+
+    private static ConnectionHealthSubject HealthSubject(IBKRCredential credential) =>
+        new(Provider, nameof(IBKRCredential), credential.Id, credential.UserId);
+
+    private Task SaveHealthAsync(IBKRCredential credential, ConnectionHealth health, CancellationToken ct)
+    {
+        credential.ApplyHealth(health);
+        return credentialRepository.SaveHealthUnscopedAsync(credential.Id, health, ct);
+    }
+
+    /// <summary>
+    /// Shadow mode (Option B, S1): this job's own failure decision, read into the policy's taxonomy so the
+    /// policy's verdict can be compared with the alert this job raises. The IBKR classifier (S3) replaces it.
+    /// A 401/403 without "backend down" is only suspect: IBKR sends it for other reasons too (report §5).
+    /// </summary>
+    private static ProviderFailure ToProviderFailure(Exception ex)
+    {
+        var code = ex is BrokerAuthException { UpstreamStatusCode: { } status } ? $"HTTP_{(int)status}" : ex.GetType().Name;
+
+        if (IsTransient(ex))
+            return ProviderFailure.Transient(code);
+
+        return ClassifyPermanent(ex) == SyncFailureClass.Credential
+            ? ProviderFailure.CredentialSuspect(code)
+            : ProviderFailure.Unknown(code);
+    }
 
     private async Task TryResolveSyncFailureAsync(Guid userId)
     {

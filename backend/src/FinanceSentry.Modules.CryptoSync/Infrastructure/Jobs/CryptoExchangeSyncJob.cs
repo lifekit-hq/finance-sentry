@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net;
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
@@ -33,6 +35,7 @@ public abstract class CryptoExchangeSyncJob(
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
     IJobFailureStreakStore failureStreaks,
+    IConnectionHealthShadow connectionHealth,
     ILogger logger)
 {
     // A venue blip heals within a tick or two; 15-minute ticks make three of them ~45 minutes, which
@@ -55,6 +58,8 @@ public abstract class CryptoExchangeSyncJob(
                     new SyncExchangeHoldingsCommand(credential.UserId, Provider), CancellationToken.None);
                 failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
                 await TryResolveSyncFailureAsync(credential.UserId);
+                await connectionHealth.RecordSuccessAsync(
+                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
             }
             catch (Exception ex)
             {
@@ -66,6 +71,11 @@ public abstract class CryptoExchangeSyncJob(
 
                 failures.Add(ex);
                 await HandleFailureAsync(credential.UserId, ex);
+                await connectionHealth.RecordFailureAsync(
+                    HealthSubject(credential),
+                    credential.Health,
+                    ToProviderFailure(ex),
+                    (health, ct) => SaveHealthAsync(credential, health, ct));
             }
         }
 
@@ -127,6 +137,42 @@ public abstract class CryptoExchangeSyncJob(
         return credentialRejected ? SyncFailureClass.Credential : SyncFailureClass.Unknown;
     }
 
+    private ConnectionHealthSubject HealthSubject(ExchangeCredential credential) =>
+        new(Provider, nameof(ExchangeCredential), credential.Id, credential.UserId);
+
+    private Task SaveHealthAsync(ExchangeCredential credential, ConnectionHealth health, CancellationToken ct)
+    {
+        credential.ApplyHealth(health);
+        return credentialRepository.SaveHealthUnscopedAsync(credential.Id, health, ct);
+    }
+
+    /// <summary>
+    /// Shadow mode (Option B, S1): this job's own failure decision, read into the policy's taxonomy so the
+    /// policy's verdict can be compared with the alert this job raises. The venue classifiers (S3) replace it.
+    /// A Binance invalid-key code is definitive; a bare 401/403 is only suspect (report §5).
+    /// </summary>
+    private static ProviderFailure ToProviderFailure(Exception ex)
+    {
+        var cause = ex is CryptoTradeHistoryException { InnerException: { } inner } ? inner : ex;
+        var code = cause switch
+        {
+            BinanceException { BinanceErrorCode: { } binanceCode } => binanceCode.ToString(CultureInfo.InvariantCulture),
+            BinanceException { VenueStatusCode: { } status } => $"HTTP_{status}",
+            RevolutXException { VenueStatusCode: { } status } => $"HTTP_{status}",
+            _ => cause.GetType().Name,
+        };
+
+        if (IsTransient(cause))
+            return ProviderFailure.Transient(code);
+
+        if (cause is BinanceException { BinanceErrorCode: { } errorCode } && BinanceCredentialErrorCodes.Contains(errorCode))
+            return ProviderFailure.CredentialDefinitive(code);
+
+        return ClassifyPermanent(cause) == SyncFailureClass.Credential
+            ? ProviderFailure.CredentialSuspect(code)
+            : ProviderFailure.Unknown(code);
+    }
+
     private async Task TryResolveSyncFailureAsync(Guid userId)
     {
         try
@@ -162,8 +208,9 @@ public sealed class BinanceSyncJob(
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
     IJobFailureStreakStore failureStreaks,
+    IConnectionHealthShadow connectionHealth,
     ILogger<BinanceSyncJob> logger)
-    : CryptoExchangeSyncJob(credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, logger)
+    : CryptoExchangeSyncJob(credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, connectionHealth, logger)
 {
     protected override string Provider => CryptoExchangeProvider.Binance;
 }
@@ -174,8 +221,9 @@ public sealed class RevolutXSyncJob(
     IAlertGeneratorService alerts,
     IUserAlertPreferencesReader userPreferences,
     IJobFailureStreakStore failureStreaks,
+    IConnectionHealthShadow connectionHealth,
     ILogger<RevolutXSyncJob> logger)
-    : CryptoExchangeSyncJob(credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, logger)
+    : CryptoExchangeSyncJob(credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, connectionHealth, logger)
 {
     protected override string Provider => CryptoExchangeProvider.RevolutX;
 }

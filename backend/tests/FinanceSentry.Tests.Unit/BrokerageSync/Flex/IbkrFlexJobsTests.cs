@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BrokerageSync.Flex;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
@@ -27,7 +28,7 @@ public class IbkrFlexJobsTests
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
 
         var job = new IbkrFlexIncrementalSyncJob(
-            credentialRepo.Object, syncService.Object, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            credentialRepo.Object, syncService.Object, Mock.Of<IConnectionHealthShadow>(), NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -56,7 +57,7 @@ public class IbkrFlexJobsTests
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
-            credentialRepo.Object, syncService.Object, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            credentialRepo.Object, syncService.Object, Mock.Of<IConnectionHealthShadow>(), NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -130,7 +131,7 @@ public class IbkrFlexJobsTests
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
-            credentialRepo.Object, syncService.Object, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            credentialRepo.Object, syncService.Object, Mock.Of<IConnectionHealthShadow>(), NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -161,5 +162,45 @@ public class IbkrFlexJobsTests
         var windows = IbkrFlexBackfillJob.BuildYearlyWindows(new DateOnly(2026, 9, 26));
 
         windows.Should().OnlyContain(w => w.ToDate.DayNumber - w.FromDate.DayNumber <= 365);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_RecordsEachAttemptWithTheConnectionHealthShadow()
+    {
+        var failingUser = Guid.NewGuid();
+        var okUser = Guid.NewGuid();
+        var failing = new IBKRFlexCredential(failingUser, "999999", [1], [2], [3], 1);
+        var ok = new IBKRFlexCredential(okUser, "999999", [1], [2], [3], 1);
+        var credentialRepo = new Mock<IIBKRFlexCredentialRepository>();
+        credentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[failing, ok]);
+        var syncService = new Mock<IIbkrFlexTradeSyncService>();
+        syncService
+            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("persist blew up"));
+        syncService
+            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+        var shadow = new Mock<IConnectionHealthShadow>();
+
+        var job = new IbkrFlexIncrementalSyncJob(
+            credentialRepo.Object, syncService.Object, shadow.Object, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+
+        await job.ExecuteAsync();
+
+        shadow.Verify(s => s.RecordFailureAsync(
+            It.Is<ConnectionHealthSubject>(subject =>
+                subject.Id == failing.Id && subject.Provider == "ibkr-flex" && subject.Kind == nameof(IBKRFlexCredential)),
+            It.IsAny<ConnectionHealth>(),
+            It.Is<ProviderFailure>(f => f.Class == FailureClass.Unknown),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        shadow.Verify(s => s.RecordSuccessAsync(
+            It.Is<ConnectionHealthSubject>(subject => subject.Id == ok.Id),
+            It.IsAny<ConnectionHealth>(),
+            It.IsAny<Func<ConnectionHealth, CancellationToken, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // The existing LastError bookkeeping is unchanged.
+        failing.LastError.Should().Be("persist blew up");
     }
 }

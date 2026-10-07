@@ -1,3 +1,5 @@
+using FinanceSentry.Core.Connections;
+
 namespace FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 
 public interface IIBKRCredentialRepository
@@ -14,6 +16,13 @@ public interface IIBKRCredentialRepository
 
     /// <summary>Every user's active credentials, for the sync sweep. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<IBKRCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores a credential's connection health alone, straight to the row: the shadow recorder runs after the sync's own
+    /// save, whatever state that left the change tracker in. For the no-person sync; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default);
+
     void Update(IBKRCredential credential);
     void Delete(IBKRCredential credential);
     Task SaveChangesAsync(CancellationToken ct = default);
@@ -40,6 +49,12 @@ public interface IIBKRFlexCredentialRepository
     /// Opts out of the Owner query filter.
     /// </summary>
     Task SaveLastErrorUnscopedAsync(IBKRFlexCredential credential, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores a credential's connection health alone, straight to the row: the shadow recorder runs after the sync's own
+    /// save, whatever state that left the change tracker in. For the no-person sync; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default);
 }
 
 public interface IBrokerageHoldingRepository

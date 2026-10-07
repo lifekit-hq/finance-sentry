@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
 public class BankAccount : Entity
@@ -180,4 +181,12 @@ public class BankAccount : Entity
         if (AccountNumberLast4.Length != 4)
             throw new ArgumentException("AccountNumberLast4 must be exactly 4 characters");
     }
+
+    /// <summary>
+    /// Health of this connection by the connection-health policy. Shadow mode (Option B, S1): recorded on
+    /// each sync, read by nothing that alerts yet.
+    /// </summary>
+    public ConnectionHealth Health { get; private set; } = new();
+
+    public void ApplyHealth(ConnectionHealth health) => Health = health;
 }

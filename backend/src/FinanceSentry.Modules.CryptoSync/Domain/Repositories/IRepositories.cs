@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 
 namespace FinanceSentry.Modules.CryptoSync.Domain.Repositories;
@@ -12,6 +13,13 @@ public interface IExchangeCredentialRepository
 
     /// <summary>Every user's active credentials for the venue, for the sync sweep. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<ExchangeCredential>> GetAllActiveUnscopedAsync(string provider, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores a credential's connection health alone, straight to the row: the shadow recorder runs after the sync's own
+    /// save, whatever state that left the change tracker in. For the no-person sync; opts out of the Owner query filter.
+    /// </summary>
+    Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default);
+
     void Update(ExchangeCredential credential);
     void Delete(ExchangeCredential credential);
     Task SaveChangesAsync(CancellationToken ct = default);

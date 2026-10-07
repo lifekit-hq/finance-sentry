@@ -1,4 +1,6 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
@@ -36,6 +38,13 @@ public sealed class ExchangeCredentialRepository(CryptoSyncDbContext context) : 
         return await _context.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.IsActive && c.Provider == provider)
             .ToListAsync(ct);
+    }
+
+    public async Task SaveHealthUnscopedAsync(Guid credentialId, ConnectionHealth health, CancellationToken ct = default)
+    {
+        await _context.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.Id == credentialId)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), ct);
     }
 
     public void Update(ExchangeCredential credential)

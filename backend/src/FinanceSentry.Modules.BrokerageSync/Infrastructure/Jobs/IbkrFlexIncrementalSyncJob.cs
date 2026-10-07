@@ -1,3 +1,5 @@
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
@@ -17,9 +19,11 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 public sealed class IbkrFlexIncrementalSyncJob(
     IIBKRFlexCredentialRepository credentialRepository,
     IIbkrFlexTradeSyncService syncService,
+    IConnectionHealthShadow connectionHealth,
     ILogger<IbkrFlexIncrementalSyncJob> logger)
 {
     private const int LookbackDays = 7;
+    private const string Provider = "ibkr-flex";
 
     public async Task ExecuteAsync()
     {
@@ -38,11 +42,18 @@ public sealed class IbkrFlexIncrementalSyncJob(
             try
             {
                 await syncService.SyncAsync(credential.UserId, window, CancellationToken.None);
+                await connectionHealth.RecordSuccessAsync(
+                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to sync IBKR Flex trades for user {UserId}", credential.UserId);
                 await RecordFailureAsync(credential, ex);
+                await connectionHealth.RecordFailureAsync(
+                    HealthSubject(credential),
+                    credential.Health,
+                    ToProviderFailure(ex),
+                    (health, ct) => SaveHealthAsync(credential, health, ct));
             }
         }
     }
@@ -62,4 +73,22 @@ public sealed class IbkrFlexIncrementalSyncJob(
             logger.LogWarning(saveEx, "Failed to record IBKR Flex error for user {UserId}", credential.UserId);
         }
     }
+
+    private static ConnectionHealthSubject HealthSubject(IBKRFlexCredential credential) =>
+        new(Provider, nameof(IBKRFlexCredential), credential.Id, credential.UserId);
+
+    private Task SaveHealthAsync(IBKRFlexCredential credential, ConnectionHealth health, CancellationToken ct)
+    {
+        credential.ApplyHealth(health);
+        return credentialRepository.SaveHealthUnscopedAsync(credential.Id, health, ct);
+    }
+
+    /// <summary>
+    /// Shadow mode (Option B, S1): the job's transient test read into the policy's taxonomy; anything else is
+    /// Unknown until the Flex classifier (S3) can tell a revoked token from a parse failure.
+    /// </summary>
+    private static ProviderFailure ToProviderFailure(Exception ex) =>
+        JobFailureTransientClassifier.IsTransient(ex)
+            ? ProviderFailure.Transient(ex.GetType().Name)
+            : ProviderFailure.Unknown(ex.GetType().Name);
 }
