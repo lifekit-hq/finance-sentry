@@ -32,6 +32,7 @@
                 [ngModel]="profile.firstName"
                 (ngModelChange)="store.updateProfile({firstName: $event})"
                 id="s-first"
+                autocomplete="given-name"
               />
             </cmn-form-field>
             <cmn-form-field label="Last Name" fieldId="s-last">
@@ -39,6 +40,7 @@
                 [ngModel]="profile.lastName"
                 (ngModelChange)="store.updateProfile({lastName: $event})"
                 id="s-last"
+                autocomplete="family-name"
               />
             </cmn-form-field>
           </div>
@@ -48,6 +50,7 @@
               (ngModelChange)="store.updateProfile({email: $event})"
               id="s-email"
               type="email"
+              autocomplete="email"
             />
           </cmn-form-field>
           <div class="flex justify-end pb-cmn-4">
@@ -141,6 +144,7 @@
                 (ngModelChange)="store.updateProfile({lowBalanceThreshold: +$event || 0})"
                 id="s-thresh"
                 type="text"
+                inputmode="decimal"
               />
             </cmn-form-field>
           }
@@ -253,6 +257,7 @@
               (ngModelChange)="setWithdrawalRate($event)"
               id="s-swr"
               type="text"
+              inputmode="decimal"
             />
           </cmn-form-field>
           <cmn-form-field
@@ -266,6 +271,7 @@
               (ngModelChange)="setRealReturn($event)"
               id="s-real-return"
               type="text"
+              inputmode="decimal"
             />
           </cmn-form-field>
         </div>

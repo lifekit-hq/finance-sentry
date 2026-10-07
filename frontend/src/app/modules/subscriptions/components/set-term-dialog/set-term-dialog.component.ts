@@ -9,12 +9,14 @@ import {
   InputComponent,
 } from '@lifekit-hq/ui';
 
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {type SetTermDialogData} from '../../models/subscription/set-term-dialog.model';
 
 @Component({
   selector: 'fns-set-term-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InputHintsDirective,
     ButtonComponent,
     DialogActionsComponent,
     FormFieldComponent,

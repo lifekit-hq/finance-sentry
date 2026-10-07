@@ -4,7 +4,13 @@
     label="Total payments"
     hint="Leave empty if the plan has no fixed term"
   >
-    <cmn-input [formControl]="control" type="number" placeholder="e.g. 12" />
+    <cmn-input
+      [formControl]="control"
+      type="number"
+      inputmode="numeric"
+      enterkeyhint="done"
+      placeholder="e.g. 12"
+    />
   </cmn-form-field>
   <cmn-dialog-actions align="end">
     <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>

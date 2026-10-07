@@ -22,7 +22,12 @@
   </div>
 
   <cmn-form-field [control]="searchControl" label="Search">
-    <cmn-input [formControl]="searchControl" type="search" placeholder="Filter banks by name" />
+    <cmn-input
+      [formControl]="searchControl"
+      type="search"
+      enterkeyhint="search"
+      placeholder="Filter banks by name"
+    />
   </cmn-form-field>
 
   @if (loadError()) {

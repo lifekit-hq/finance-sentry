@@ -18,6 +18,7 @@ import {
 } from '@lifekit-hq/ui';
 
 import {environment} from '../../../../../environments/environment';
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AuthStore} from '../../store/auth.store';
 import {
   GOOGLE_BUTTON_BASE_CONFIG,
@@ -29,6 +30,7 @@ import {
 @Component({
   selector: 'fns-login',
   imports: [
+    InputHintsDirective,
     ReactiveFormsModule,
     AlertComponent,
     ButtonComponent,

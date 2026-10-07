@@ -14,7 +14,13 @@
     />
   </div>
   <cmn-form-field [control]="form.controls.monthlyLimit" label="Monthly limit">
-    <cmn-input formControlName="monthlyLimit" type="number" placeholder="0.00" />
+    <cmn-input
+      formControlName="monthlyLimit"
+      type="number"
+      inputmode="decimal"
+      enterkeyhint="done"
+      placeholder="0.00"
+    />
   </cmn-form-field>
   <cmn-dialog-actions align="end">
     <cmn-button (clicked)="cancel()" variant="secondary">Cancel</cmn-button>

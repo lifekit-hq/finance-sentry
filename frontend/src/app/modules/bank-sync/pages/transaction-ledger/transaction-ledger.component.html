@@ -80,6 +80,8 @@
       (ngModelChange)="store.applyAmount({bound: 'minAmount', raw: $event})"
       class="md:w-28"
       type="number"
+      inputmode="decimal"
+      enterkeyhint="search"
       placeholder="Min $"
       data-testid="min-amount-filter"
     />
@@ -88,6 +90,8 @@
       (ngModelChange)="store.applyAmount({bound: 'maxAmount', raw: $event})"
       class="md:w-28"
       type="number"
+      inputmode="decimal"
+      enterkeyhint="search"
       placeholder="Max $"
       data-testid="max-amount-filter"
     />

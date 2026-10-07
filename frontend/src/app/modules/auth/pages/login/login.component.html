@@ -43,7 +43,12 @@
           formControlName="email"
           class="block mb-cmn-5"
         >
-          <cmn-input type="email" placeholder="name@organization.com" />
+          <cmn-input
+            type="email"
+            autocomplete="username"
+            enterkeyhint="next"
+            placeholder="name@organization.com"
+          />
         </cmn-form-field>
 
         <div class="mb-cmn-6">
@@ -52,7 +57,12 @@
             label="Password"
             formControlName="password"
           >
-            <cmn-input type="password" placeholder="••••••••" />
+            <cmn-input
+              type="password"
+              autocomplete="current-password"
+              enterkeyhint="go"
+              placeholder="••••••••"
+            />
           </cmn-form-field>
         </div>
 
