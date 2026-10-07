@@ -46,6 +46,23 @@
     </div>
   </div>
 
+  <div
+    class="mb-cmn-4 flex gap-cmn-2 overflow-x-auto pb-cmn-1 md:flex-wrap"
+    role="group"
+    aria-label="Period filter"
+  >
+    @for (period of periods; track period.id) {
+      <cmn-chip
+        [selected]="activePeriod() === period.id"
+        [attr.data-testid]="'period-' + period.id"
+        (clicked)="selectPeriod(period.id)"
+        class="shrink-0"
+      >
+        {{ period.label }}
+      </cmn-chip>
+    }
+  </div>
+
   @if (store.accounts().length > 1) {
     <div
       class="mb-cmn-4 -mx-cmn-4 flex gap-cmn-2 overflow-x-auto px-cmn-4 pb-cmn-1 md:mx-0 md:flex-wrap md:px-0"

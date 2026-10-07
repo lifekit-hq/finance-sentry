@@ -22,6 +22,8 @@ import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.p
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
+import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
+import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
   type GlobalTransactionDto,
   type TransactionType,
@@ -29,6 +31,7 @@ import {
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
+import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
@@ -100,6 +103,14 @@ export class TransactionLedgerComponent {
     {initialValue: {from: null, to: null}}
   );
 
+  public readonly periods = LEDGER_PERIODS;
+
+  /** The quick period whose bounds equal the date filter; any other range selects none. */
+  public readonly activePeriod = computed(() => {
+    const {from, to} = this.activeDateRange();
+    return LedgerPeriodUtils.match(from, to);
+  });
+
   public readonly activeDateRangeLabel = computed(() => {
     const {from, to} = this.activeDateRange();
     if (!from && !to) {
@@ -142,6 +153,13 @@ export class TransactionLedgerComponent {
 
   public clearCategory(): void {
     void this.router.navigate([], {queryParams: {category: null}, queryParamsHandling: 'merge'});
+  }
+
+  public selectPeriod(period: LedgerPeriod): void {
+    void this.router.navigate([], {
+      queryParams: LedgerPeriodUtils.dates(period),
+      queryParamsHandling: 'merge',
+    });
   }
 
   public clearDateRange(): void {
