@@ -6,8 +6,10 @@ import {API, AUTH_RESPONSE} from './support/dossier-mocks';
 // a clock that starts at a pinned time so month keys and relative timestamps are stable, CSS
 // animations disabled by the screenshot options. Light theme (the default), desktop and 390 px phone.
 // The clock is installed (ticking) rather than frozen: Chart.js animates off Date.now, so a frozen
-// clock leaves the bar chart at zero height; toHaveScreenshot retries until the canvas settles.
+// clock leaves the bar chart at zero height. Capture waits for the chart canvas, then advances the
+// fake clock past the animation (CHART_SETTLE_MS) so the bars are drawn at their full data height.
 const FROZEN_NOW = new Date('2026-09-15T12:30:00Z');
+const CHART_SETTLE_MS = 3000;
 // The app shell scrolls inside its own container, so a full-page capture only sees the viewport:
 // the viewports are tall enough to hold the whole dashboard.
 const DESKTOP = {width: 1280, height: 1200};
@@ -75,6 +77,8 @@ async function openDashboard(page: Page): Promise<void> {
   await page.goto('/dashboard');
   await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
   await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('canvas').first()).toBeVisible();
+  await page.clock.runFor(CHART_SETTLE_MS);
 }
 
 async function expectBaseline(page: Page, name: string): Promise<void> {
