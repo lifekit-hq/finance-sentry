@@ -20,6 +20,7 @@ using Xunit;
 public class OidcApiFactory : AuthApiFactory
 {
     public const string AuthorizationEndpoint = "https://idp.test/oidc/auth";
+    public const string EndSessionEndpoint = "https://idp.test/oidc/session/end";
     public const string PublicBaseUrl = "https://app.test";
 
     /// <summary>What the stubbed discovery document advertises as the authorize endpoint.</summary>
@@ -39,6 +40,7 @@ public class OidcApiFactory : AuthApiFactory
                 Issuer = "https://idp.test/oidc",
                 AuthorizationEndpoint = DiscoveredAuthorizationEndpoint,
                 TokenEndpoint = "https://idp.test/oidc/token",
+                EndSessionEndpoint = EndSessionEndpoint,
             };
             o.Configuration = discovery;
             o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(discovery);
@@ -46,7 +48,7 @@ public class OidcApiFactory : AuthApiFactory
     }
 
     /// <summary>The external-cookie value the OIDC handler would leave after a successful provider round trip.</summary>
-    public string ExternalCookie(string subject, string? email, string emailVerified = "true", string? returnUrl = null)
+    public string ExternalCookie(string subject, string? email, string emailVerified = "true", string? returnUrl = null, string? idToken = null)
     {
         var claims = new List<Claim> { new("sub", subject), new("email_verified", emailVerified) };
         if (email is not null)
@@ -55,6 +57,8 @@ public class OidcApiFactory : AuthApiFactory
         var properties = new AuthenticationProperties();
         if (returnUrl is not null)
             properties.Items["returnUrl"] = returnUrl;
+        if (idToken is not null)
+            properties.StoreTokens([new AuthenticationToken { Name = "id_token", Value = idToken }]);
 
         var ticket = new AuthenticationTicket(
             new ClaimsPrincipal(new ClaimsIdentity(claims, "lifekit")), properties, IdentityConstants.ExternalScheme);
@@ -128,6 +132,17 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
         using var scope = factory.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         (await users.FindByLoginAsync("lifekit", "lk-sub-invited")).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Callback_KeepsTheIdTokenInItsOwnCookieForSignOut()
+    {
+        await factory.CreatePendingInviteAsync("oidc-idtoken@test.com");
+
+        var cookie = factory.ExternalCookie("lk-sub-idtoken", "oidc-idtoken@test.com", idToken: "the.id.token");
+        var response = await factory.ExternalClient(cookie).GetAsync("/api/v1/auth/oidc/callback");
+
+        AuthApiFactory.CookieValue(response, "fs_oidc_id_token").Should().Be("the.id.token");
     }
 
     [Fact]
@@ -216,6 +231,41 @@ public class OidcLoginTests(OidcApiFactory factory) : IClassFixture<OidcApiFacto
     private sealed record MethodsShape(bool Oidc, bool PasswordLogin);
 }
 
+/// <summary>POST /api/v1/auth/logout also ends the provider's session (RP-initiated logout) for a session that came from it.</summary>
+public class OidcLogoutTests(OidcApiFactory factory) : IClassFixture<OidcApiFactory>
+{
+    [Fact]
+    public async Task Logout_WithAnIdToken_ReturnsTheEndSessionUrlAndClearsEveryCookie()
+    {
+        var client = factory.CookieClient(("fs_oidc_id_token", "the.id.token"));
+
+        var response = await client.PostAsync("/api/v1/auth/logout", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<LogoutShape>();
+        var url = new Uri(body!.EndSessionUrl);
+        (url.GetLeftPart(UriPartial.Path)).Should().Be(OidcApiFactory.EndSessionEndpoint);
+        var query = System.Web.HttpUtility.ParseQueryString(url.Query);
+        query["id_token_hint"].Should().Be("the.id.token");
+        query["post_logout_redirect_uri"].Should().Be(OidcApiFactory.PublicBaseUrl + "/login?info=signed_out");
+        query["client_id"].Should().Be("finance-sentry");
+        response.Headers.GetValues("Set-Cookie").Should()
+            .Contain(c => c.StartsWith("fs_oidc_id_token=;", StringComparison.Ordinal))
+            .And.Contain(c => c.StartsWith("fs_refresh_token=;", StringComparison.Ordinal))
+            .And.Contain(c => c.StartsWith("fs_access_token=;", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Logout_WithoutAnIdToken_JustClearsTheSession()
+    {
+        var response = await factory.CookieClient().PostAsync("/api/v1/auth/logout", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    private sealed record LogoutShape(string EndSessionUrl);
+}
+
 /// <summary>Merging the feature changes nothing until it is configured.</summary>
 public class OidcDisabledTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
@@ -233,6 +283,14 @@ public class OidcDisabledTests(AuthApiFactory factory) : IClassFixture<AuthApiFa
         var response = await factory.CookieClient().GetAsync("/api/v1/auth/oidc/start");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Logout_WhenNotConfigured_JustClearsTheSessionEvenWithAnIdToken()
+    {
+        var response = await factory.CookieClient(("fs_oidc_id_token", "stale")).PostAsync("/api/v1/auth/logout", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]

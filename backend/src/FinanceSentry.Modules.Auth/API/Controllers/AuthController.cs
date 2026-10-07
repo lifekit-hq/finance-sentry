@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
 
 namespace FinanceSentry.Modules.Auth.API.Controllers;
@@ -116,6 +117,9 @@ public class AuthController(
                 HttpContext.RequestAborted);
             SetRefreshTokenCookie(result.RawRefreshToken);
             SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
+            if (external.Properties?.GetTokenValue(OpenIdConnectParameterNames.IdToken) is { Length: > 0 } idToken)
+                AuthCookies.Write(Response, AuthCookies.OidcIdToken, idToken,
+                    DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieDays), SecureCookies);
         }
         catch (ApiException ex)
         {
@@ -250,9 +254,22 @@ public class AuthController(
         if (!string.IsNullOrWhiteSpace(rawToken))
             await logoutHandler.Handle(new LogoutCommand(rawToken), HttpContext.RequestAborted);
 
+        var idToken = AuthCookies.Read(Request.Cookies, AuthCookies.OidcIdToken, SecureCookies);
         DeleteRefreshTokenCookie();
         DeleteAccessTokenCookie();
-        return NoContent();
+        AuthCookies.Delete(Response, AuthCookies.OidcIdToken, SecureCookies);
+
+        // A session that came from the provider ends there too (RP-initiated logout); otherwise the next sign-in
+        // would re-enter silently on the provider's still-live session.
+        if (!oidcOptions.Value.IsConfigured || string.IsNullOrWhiteSpace(idToken))
+            return NoContent();
+
+        var properties = new AuthenticationProperties();
+        properties.StoreTokens([new AuthenticationToken { Name = OpenIdConnectParameterNames.IdToken, Value = idToken }]);
+        await HttpContext.SignOutAsync(OidcLoginOptions.Scheme, properties);
+        return HttpContext.Items[OidcLoginExtensions.EndSessionUrlItem] is string endSessionUrl
+            ? Ok(new LogoutResponse(endSessionUrl))
+            : NoContent();
     }
 
     private string? ReadRefreshTokenCookie() =>

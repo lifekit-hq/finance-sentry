@@ -19,6 +19,11 @@ export interface SignInMethods {
   passwordLogin: boolean;
 }
 
+/** Body of `auth/logout` when the identity provider's session must end too; absent (204) otherwise. */
+export interface LogoutResponse {
+  endSessionUrl: string;
+}
+
 export interface UserDto {
   id: string;
   email: string;

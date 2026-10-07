@@ -3,7 +3,7 @@ import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, filter, pipe, startWith, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
 
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
@@ -133,9 +133,19 @@ export function authEffects(store: EffectsStore) {
       if (store.isAuthenticated()) {
         pushSession.release().subscribe();
       }
-      authService.logout().subscribe({error: () => undefined});
-      store.clearSession();
-      void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+      // Navigate only once the API has answered: /login forwards straight to the identity provider, so landing
+      // there before the provider's session is ended would sign the person right back in.
+      authService
+        .logout()
+        .pipe(catchError(() => of(null)))
+        .subscribe(res => {
+          store.clearSession();
+          if (res?.endSessionUrl) {
+            doc.location.assign(res.endSessionUrl);
+          } else {
+            void router.navigate([AppRoute.Login], {queryParams: {info: SIGNED_OUT_INFO}});
+          }
+        });
     },
   };
 }

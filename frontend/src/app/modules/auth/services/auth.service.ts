@@ -6,6 +6,7 @@ import {
   AcceptInviteRequest,
   AuthRequest,
   AuthResponse,
+  LogoutResponse,
   SignInMethods,
 } from '../models/auth/auth.model';
 
@@ -35,7 +36,7 @@ export class AuthService extends ApiService {
     return this.post<AuthResponse>('refresh');
   }
 
-  public logout(): Observable<unknown> {
-    return this.post<unknown>('logout');
+  public logout(): Observable<Nullable<LogoutResponse>> {
+    return this.post<Nullable<LogoutResponse>>('logout');
   }
 }

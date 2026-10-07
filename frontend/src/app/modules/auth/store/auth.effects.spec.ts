@@ -207,6 +207,22 @@ describe('authEffects', () => {
       });
     });
 
+    it('ends the identity provider session by navigating to the URL the API returns', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of({endSessionUrl: 'https://idp.test/oidc/session/end?x=1'}));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).logout());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).toHaveBeenCalledWith('https://idp.test/oidc/session/end?x=1');
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
     it('does not release push when the session is already cleared', () => {
       const store = buildStore({isAuthenticated: false});
       pushSession.release.mockClear();
