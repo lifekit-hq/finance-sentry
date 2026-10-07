@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -27,7 +28,7 @@ public sealed class ScoreCandidateCommandHandler(
     ICandidateRepository candidateRepo,
     ICandidateScoreRepository scoreRepo,
     IMarketStructureReader structureReader,
-    ISecEdgarService secEdgar,
+    IFundamentalsService fundamentals,
     IIpsRepository ipsRepo,
     IPositionCapSource positionCapSource,
     IBrokerageHoldingsReader holdingsReader,
@@ -65,7 +66,7 @@ public sealed class ScoreCandidateCommandHandler(
         }
 
         var structureSnapshot = await structureReader.GetStructureAsync(ticker, ct);
-        var fundamentalFacts = await secEdgar.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct);
+        var fundamentalFacts = (await fundamentals.GetFundamentalsAsync(ticker, FundamentalsScorer.FactsPerConcept, ct)).Facts;
         var ips = await ipsRepo.GetCurrentUnscopedAsync(command.UserId, ct);
         // 039: the single-position cap now lives in its single home (the Risk rule set), read via port.
         var maxPositionCap = await positionCapSource.GetMaxPositionWeightAsync(command.UserId, ct);

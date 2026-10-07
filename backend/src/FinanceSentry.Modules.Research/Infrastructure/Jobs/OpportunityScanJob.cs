@@ -4,6 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Hangfire;
@@ -21,7 +22,7 @@ using Microsoft.Extensions.Options;
 /// </summary>
 public sealed class OpportunityScanJob(
     IMarketStructureReader structureReader,
-    ISecEdgarService secEdgar,
+    IFundamentalsService fundamentals,
     Domain.Repositories.IIpsRepository ipsRepo,
     ICommandHandler<ScoreCandidateCommand, ScoreCandidateResult> scorer,
     IOptions<OpportunityOptions> options,
@@ -46,7 +47,7 @@ public sealed class OpportunityScanJob(
         var shortlist = nominations.Take(shortlistSize).ToList();
         var ranked = ScanNominationRules.RankByQualityMomentum(
             shortlist,
-            await FundamentalsGrading.GradeAsync(secEdgar, logger, shortlist.Select(n => n.Ticker), ct),
+            await FundamentalsGrading.GradeAsync(fundamentals, logger, shortlist.Select(n => n.Ticker), ct),
             _options);
         var capped = ranked.Take(_options.ScanMaxNominationsPerRun).ToList();
         if (capped.Count < nominations.Count)

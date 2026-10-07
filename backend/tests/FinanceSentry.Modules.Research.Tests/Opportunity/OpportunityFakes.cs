@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Tests.Opportunity;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -96,18 +97,6 @@ internal sealed class FakeMarketStructureReader(MarketStructureSnapshot? snapsho
             snapshot is null ? [] : [new UniverseStructureEntry(snapshot.Ticker, false, snapshot)]);
 }
 
-internal sealed class FakeSecEdgarService(IReadOnlyList<FundamentalFact>? facts = null) : ISecEdgarService
-{
-    public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
-            bool surfaceProviderFailure = false)
-        => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
-
-    public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
-        string ticker, int maxPerConcept, CancellationToken ct = default)
-        => Task.FromResult(facts ?? []);
-}
-
 /// <summary>Structure reader over a fixed universe, for scan-job tests that need many tickers.</summary>
 internal sealed class FakeUniverseStructureReader(IReadOnlyList<UniverseStructureEntry> universe) : IMarketStructureReader
 {
@@ -123,28 +112,24 @@ internal sealed class FakeUniverseStructureReader(IReadOnlyList<UniverseStructur
         => Task.FromResult(universe);
 }
 
-/// <summary>EDGAR double serving per-ticker facts and recording which tickers were asked for.</summary>
-internal sealed class RecordingSecEdgarService(
+/// <summary>Fundamentals double serving per-ticker facts and recording which tickers were asked for.</summary>
+internal sealed class RecordingFundamentalsService(
     IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>> factsByTicker,
-    IReadOnlyCollection<string>? failingTickers = null) : ISecEdgarService
+    IReadOnlyCollection<string>? failingTickers = null) : IFundamentalsService
 {
     public List<string> FundamentalsRequests { get; } = [];
 
-    public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
-            bool surfaceProviderFailure = false)
-        => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
-
-    public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+    public Task<FundamentalsResult> GetFundamentalsAsync(
         string ticker, int maxPerConcept, CancellationToken ct = default)
     {
         FundamentalsRequests.Add(ticker);
         if (failingTickers?.Contains(ticker, StringComparer.OrdinalIgnoreCase) == true)
         {
-            throw new InvalidOperationException($"EDGAR unavailable for {ticker}");
+            throw new InvalidOperationException($"Fundamentals unavailable for {ticker}");
         }
 
-        return Task.FromResult(factsByTicker.TryGetValue(ticker, out var facts) ? facts : []);
+        return Task.FromResult(FakeFundamentalsService.ResultFor(
+            ticker, factsByTicker.TryGetValue(ticker, out var facts) ? facts : []));
     }
 }
 

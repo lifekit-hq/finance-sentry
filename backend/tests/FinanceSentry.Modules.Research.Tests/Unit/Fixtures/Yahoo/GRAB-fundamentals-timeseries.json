@@ -1,0 +1,769 @@
+{
+    "timeseries": {
+        "result": [
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyNetIncomeCommonStockholders"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyNetIncomeCommonStockholders": [
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 35000000.0,
+                            "fmt": "35.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 37000000.0,
+                            "fmt": "37.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 172000000.0,
+                            "fmt": "172.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 136000000.0,
+                            "fmt": "136.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 253000000.0,
+                            "fmt": "253.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualGrossProfit"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualGrossProfit": [
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 77000000.0,
+                            "fmt": "77.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 860000000.0,
+                            "fmt": "860.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 1174000000.0,
+                            "fmt": "1.17B"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 1456000000.0,
+                            "fmt": "1.46B"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyTotalRevenue"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyTotalRevenue": [
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 819000000.0,
+                            "fmt": "819.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 873000000.0,
+                            "fmt": "873.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 906000000.0,
+                            "fmt": "906.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 955000000.0,
+                            "fmt": "955.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 998000000.0,
+                            "fmt": "998.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyOperatingIncome"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyOperatingIncome": [
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 39000000.0,
+                            "fmt": "39.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 67000000.0,
+                            "fmt": "67.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 98000000.0,
+                            "fmt": "98.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 74000000.0,
+                            "fmt": "74.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 93000000.0,
+                            "fmt": "93.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualTotalRevenue"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualTotalRevenue": [
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 1433000000.0,
+                            "fmt": "1.43B"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 2359000000.0,
+                            "fmt": "2.36B"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 2797000000.0,
+                            "fmt": "2.80B"
+                        }
+                    },
+                    {
+                        "dataId": 20100,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 3370000000.0,
+                            "fmt": "3.37B"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyDilutedEPS"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyDilutedEPS": [
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 0.01,
+                            "fmt": "0.01"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 0.01,
+                            "fmt": "0.01"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 0.0,
+                            "fmt": "0.00"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -0.01,
+                            "fmt": "-0.01"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 0.06,
+                            "fmt": "0.06"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualStockholdersEquity"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualStockholdersEquity": [
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6603000000.0,
+                            "fmt": "6.60B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6449000000.0,
+                            "fmt": "6.45B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6399000000.0,
+                            "fmt": "6.40B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6728000000.0,
+                            "fmt": "6.73B"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualNetIncomeCommonStockholders"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualNetIncomeCommonStockholders": [
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -1683000000.0,
+                            "fmt": "-1.68B"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -434000000.0,
+                            "fmt": "-434.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -105000000.0,
+                            "fmt": "-105.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20093,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 268000000.0,
+                            "fmt": "268.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualOperatingIncome"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualOperatingIncome": [
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -1295000000.0,
+                            "fmt": "-1.29B"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -387000000.0,
+                            "fmt": "-387.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -55000000.0,
+                            "fmt": "-55.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20109,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 222000000.0,
+                            "fmt": "222.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "annualDilutedEPS"
+                    ]
+                },
+                "timestamp": [
+                    1672444800,
+                    1703980800,
+                    1735603200,
+                    1767139200
+                ],
+                "annualDilutedEPS": [
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2022-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -0.44,
+                            "fmt": "-0.44"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2023-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -0.11,
+                            "fmt": "-0.11"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2024-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": -0.03,
+                            "fmt": "-0.03"
+                        }
+                    },
+                    {
+                        "dataId": 29009,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "12M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 0.06,
+                            "fmt": "0.06"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyGrossProfit"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyGrossProfit": [
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 354000000.0,
+                            "fmt": "354.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 382000000.0,
+                            "fmt": "382.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 397000000.0,
+                            "fmt": "397.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 414000000.0,
+                            "fmt": "414.00M"
+                        }
+                    },
+                    {
+                        "dataId": 20046,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 437000000.0,
+                            "fmt": "437.00M"
+                        }
+                    }
+                ]
+            },
+            {
+                "meta": {
+                    "symbol": [
+                        "GRAB"
+                    ],
+                    "type": [
+                        "quarterlyStockholdersEquity"
+                    ]
+                },
+                "timestamp": [
+                    1751241600,
+                    1759190400,
+                    1767139200,
+                    1774915200,
+                    1782777600
+                ],
+                "quarterlyStockholdersEquity": [
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2025-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6362000000.0,
+                            "fmt": "6.36B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2025-09-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6471000000.0,
+                            "fmt": "6.47B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2025-12-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6728000000.0,
+                            "fmt": "6.73B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2026-03-31",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6517000000.0,
+                            "fmt": "6.52B"
+                        }
+                    },
+                    {
+                        "dataId": 23215,
+                        "asOfDate": "2026-06-30",
+                        "periodType": "3M",
+                        "currencyCode": "USD",
+                        "reportedValue": {
+                            "raw": 6766000000.0,
+                            "fmt": "6.77B"
+                        }
+                    }
+                ]
+            }
+        ],
+        "error": null
+    }
+}

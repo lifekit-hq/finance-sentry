@@ -23,7 +23,7 @@ public sealed class ScoreCandidateHandlerTests
             candidates,
             scores,
             new FakeMarketStructureReader(structure),
-            new FakeSecEdgarService(facts),
+            new FakeFundamentalsService(facts),
             new FakeIpsRepository(ips),
             new FakePositionCapSource(maxPositionCap),
             new FakeBrokerageHoldingsReader(holdings),

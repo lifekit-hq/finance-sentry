@@ -83,7 +83,7 @@ When fundamentals are missing (ETF/basket with no EDGAR facts, foreign/OTC name,
 
 - **FR-001**: The system MUST run a thesis-break monitor on a schedule (recurring Hangfire job) that evaluates all active theses for every user.
 - **FR-002**: The system MUST expose an on-demand evaluation entry point through the MCP surface (`run_thesis_monitor`).
-- **FR-003**: The system MUST evaluate each thesis's `InvalidationTriggers` against reported fundamentals obtained from the existing EDGAR fundamentals source (`SecEdgarService.GetFundamentalsAsync`); price-based metrics evaluate against daily closes from the existing market-data source (`IMarketDataService`), fetched per run — non-evaluable (FR-013) when price history since thesis creation is unavailable.
+- **FR-003**: The system MUST evaluate each thesis's `InvalidationTriggers` against reported fundamentals obtained from the fundamentals provider chain (`IFundamentalsService`, #837: SEC EDGAR us-gaap, then EDGAR ifrs-full, then Yahoo Finance only for a period basis EDGAR cannot supply fresh); price-based metrics evaluate against daily closes from the existing market-data source (`IMarketDataService`), fetched per run — non-evaluable (FR-013) when price history since thesis creation is unavailable.
 - **FR-004**: Each invalidation trigger MUST be evaluated deterministically from a **closed metric vocabulary** (see Metric Vocabulary). No free-text parsing and **no LLM** in the evaluation path.
 - **FR-005**: A trigger MUST support an optional **proxy ticker** — the ticker whose fundamentals are evaluated (defaults to the thesis ticker when absent). This lets an ETF/basket thesis be judged by a filing bellwether (e.g. DRAM → MU).
 - **FR-006**: A trigger MUST support an optional **consecutive-periods** qualifier (default 1). The trigger breaches only when the condition holds for the most recent N reported periods of the trigger's period type.
@@ -97,6 +97,7 @@ When fundamentals are missing (ETF/basket with no EDGAR facts, foreign/OTC name,
 - **FR-014**: When one thesis or ticker fails evaluation, the run MUST continue for all remaining theses and record the failure in the run summary.
 - **FR-015**: The system MUST expose `list_thesis_breaks` through MCP, returning each broken thesis with ticker, breached metric, observed value(s) + period(s), threshold, and reason.
 - **FR-016**: The run summary MUST report counts: theses evaluated, triggers evaluated, breaks raised, breaks cleared, triggers skipped, errors.
+- **FR-016a** (#837): The run summary MUST also list every thesis with at least one non-evaluable trigger — `UNMONITORABLE` when no trigger was evaluable, `PARTIALLY_MONITORABLE` otherwise — naming each blind trigger's metric, period type, subject ticker, non-evaluable reason and, for a fundamentals metric, the subject's data coverage (which provider supplied which period basis, or why none could). A blind thesis is never reported as intact.
 - **FR-017**: The feature MUST NOT execute trades or account actions.
 
 ### Metric Vocabulary *(the deterministic core)*
@@ -159,7 +160,7 @@ Price metrics use `PeriodType` = `Quarter`/`Annual` **not applicable**; they eva
 
 ## Assumptions & Dependencies
 
-- `SecEdgarService.GetFundamentalsAsync(ticker, maxPerConcept)` is the fundamentals source; it returns a per-concept series of `FundamentalFact(Concept, Value, PeriodEnd, FiscalPeriod, FiscalYear, Form, …)` sufficient to derive margins and YoY. Request enough periods (≥8) to cover 2-quarter + YoY windows.
+- `IFundamentalsService.GetFundamentalsAsync(ticker, maxPerConcept)` (the #837 provider chain; originally `SecEdgarService.GetFundamentalsAsync`) is the fundamentals source; it returns its coverage plus a per-concept series of `FundamentalFact(Concept, Value, PeriodEnd, FiscalPeriod, FiscalYear, Form, …)` sufficient to derive margins and YoY. Request enough periods (≥8) to cover 2-quarter + YoY windows.
 - The Alerts module (`012-alerts-system`) is the emission target; its repository already provides active-alert and recent-alert dedup.
 - Hangfire recurring-job scheduling is already established in the codebase (Wealth `NetWorthSnapshotJob`, Alerts `AlertPurgeJob`); follow that pattern.
 - Constitution gates apply: `dotnet build` to zero warnings, xUnit coverage on the evaluator, CQRS/MediatR for the on-demand path, MCP tools registered via `WithToolsFromAssembly`.

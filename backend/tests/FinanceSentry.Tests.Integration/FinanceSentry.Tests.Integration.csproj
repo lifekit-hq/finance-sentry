@@ -27,6 +27,12 @@
   <ItemGroup>
     <!-- Captured real provider responses the #698 look-ahead replay harness serves. -->
     <None Include="Research\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The recorded EDGAR / Yahoo fundamentals responses the Research unit tests own, reused by the
+         provider-chain integration tests (#837) rather than copied. -->
+    <None Include="..\FinanceSentry.Modules.Research.Tests\Unit\Fixtures\Edgar\*.json"
+          Link="Research\Fixtures\Fundamentals\Edgar\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\FinanceSentry.Modules.Research.Tests\Unit\Fixtures\Yahoo\*.json"
+          Link="Research\Fixtures\Fundamentals\Yahoo\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

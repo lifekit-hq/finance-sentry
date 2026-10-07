@@ -3,7 +3,9 @@ namespace FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using Microsoft.Extensions.Logging;
@@ -14,11 +16,13 @@ public record RunThesisMonitorCommand(Guid UserId) : ICommand<ThesisMonitorRunSu
 /// Evaluates every trigger of every thesis owned by a user and marks unbroken theses broken on
 /// the first breaching trigger (OR semantics). Also auto-clears a broken thesis when a fresh
 /// evaluation holds for every evaluable trigger (US3) — but never on an all-non-evaluable result,
-/// since missing data must not un-break a thesis (FR-013).
+/// since missing data must not un-break a thesis (FR-013). Every trigger it cannot evaluate is
+/// reported in <see cref="ThesisMonitorRunSummary.Unmonitorable"/> with its reason and the data
+/// coverage behind it (#837), so a blind thesis is never reported as quietly intact.
 /// </summary>
 public class RunThesisMonitorCommandHandler(
     IThesisRepository thesisRepo,
-    ISecEdgarService secEdgar,
+    IFundamentalsService fundamentals,
     IMarketDataService marketData,
     IAlertGeneratorService alertGenerator,
     IThesisEventRecorder eventRecorder,
@@ -42,8 +46,9 @@ public class RunThesisMonitorCommandHandler(
         var breaksCleared = 0;
         var skipped = 0;
         var errors = 0;
+        var unmonitorable = new List<UnmonitorableThesis>();
 
-        var fundamentalsCache = new Dictionary<string, IReadOnlyList<FundamentalFact>>(StringComparer.OrdinalIgnoreCase);
+        var fundamentalsCache = new Dictionary<string, FundamentalsResult>(StringComparer.OrdinalIgnoreCase);
         var closesCache = new Dictionary<string, IReadOnlyList<DailyClose>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var thesis in theses)
@@ -80,6 +85,12 @@ public class RunThesisMonitorCommandHandler(
                     triggersEvaluated++;
                     evaluations.Add((trigger, await EvaluateTriggerAsync(
                         trigger, thesis, fundamentalsCache, closesCache, ct)));
+                }
+
+                var blind = DescribeUnmonitorable(thesis, evaluations, fundamentalsCache);
+                if (blind is not null)
+                {
+                    unmonitorable.Add(blind);
                 }
 
                 var verdicts = evaluations.Select(e => e.Verdict).ToList();
@@ -128,13 +139,13 @@ public class RunThesisMonitorCommandHandler(
         }
 
         return new ThesisMonitorRunSummary(
-            thesesEvaluated, triggersEvaluated, breaksRaised, breaksCleared, skipped, errors);
+            thesesEvaluated, triggersEvaluated, breaksRaised, breaksCleared, skipped, errors, unmonitorable);
     }
 
     private async Task<TriggerVerdict> EvaluateTriggerAsync(
         ThesisInvalidationTrigger trigger,
         InvestmentThesis thesis,
-        Dictionary<string, IReadOnlyList<FundamentalFact>> fundamentalsCache,
+        Dictionary<string, FundamentalsResult> fundamentalsCache,
         Dictionary<string, IReadOnlyList<DailyClose>> closesCache,
         CancellationToken ct)
     {
@@ -163,8 +174,8 @@ public class RunThesisMonitorCommandHandler(
             return ThesisBreakEvaluator.Evaluate(trigger, thesis.CreatedAt, [], closes, thesis.EntryPrice);
         }
 
-        var facts = await GetFundamentalsAsync(targetTicker, fundamentalsCache, ct);
-        return ThesisBreakEvaluator.Evaluate(trigger, thesis.CreatedAt, facts, []);
+        var fundamentalsResult = await GetFundamentalsAsync(targetTicker, fundamentalsCache, ct);
+        return ThesisBreakEvaluator.Evaluate(trigger, thesis.CreatedAt, fundamentalsResult.Facts, []);
     }
 
     private static DateTimeOffset RelativeReturnLookbackSince(ThesisInvalidationTrigger trigger)
@@ -175,9 +186,9 @@ public class RunThesisMonitorCommandHandler(
         return DateTimeOffset.UtcNow.AddDays(-calendarDays);
     }
 
-    private async Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+    private async Task<FundamentalsResult> GetFundamentalsAsync(
         string ticker,
-        Dictionary<string, IReadOnlyList<FundamentalFact>> cache,
+        Dictionary<string, FundamentalsResult> cache,
         CancellationToken ct)
     {
         if (cache.TryGetValue(ticker, out var cached))
@@ -185,10 +196,54 @@ public class RunThesisMonitorCommandHandler(
             return cached;
         }
 
-        var facts = await secEdgar.GetFundamentalsAsync(ticker, MaxFundamentalsPerConcept, ct);
-        cache[ticker] = facts;
-        return facts;
+        var result = await fundamentals.GetFundamentalsAsync(ticker, MaxFundamentalsPerConcept, ct);
+        cache[ticker] = result;
+        return result;
     }
+
+    /// <summary>
+    /// The thesis's blind spots this run, or null when every trigger was evaluated. A fundamentals
+    /// trigger carries its subject's coverage, so "no data" says which providers were asked and why
+    /// none (or not enough) answered.
+    /// </summary>
+    private static UnmonitorableThesis? DescribeUnmonitorable(
+        InvestmentThesis thesis,
+        IReadOnlyList<(ThesisInvalidationTrigger Trigger, TriggerVerdict Verdict)> evaluations,
+        IReadOnlyDictionary<string, FundamentalsResult> fundamentalsCache)
+    {
+        var blind = evaluations
+            .Where(e => e.Verdict is TriggerVerdict.NonEvaluable)
+            .Select(e =>
+            {
+                var subject = e.Trigger.ProxyTicker ?? thesis.Ticker;
+                var isFundamentals = !ThesisMetric.IsPriceMetric(e.Trigger.Metric)
+                    && !ThesisMetric.IsRelativeMetric(e.Trigger.Metric);
+                var coverage = isFundamentals && fundamentalsCache.TryGetValue(subject, out var result)
+                    ? result.Coverage
+                    : null;
+                return new UnmonitorableTrigger(
+                    e.Trigger.Metric,
+                    isFundamentals ? PeriodTypeName(e.Trigger.PeriodType) : null,
+                    subject,
+                    ((TriggerVerdict.NonEvaluable)e.Verdict).Reason,
+                    coverage);
+            })
+            .ToList();
+
+        if (blind.Count == 0)
+        {
+            return null;
+        }
+
+        var status = blind.Count == evaluations.Count
+            ? ThesisMonitorability.Unmonitorable
+            : ThesisMonitorability.PartiallyMonitorable;
+        return new UnmonitorableThesis(thesis.Id, thesis.Ticker, status, blind);
+    }
+
+    private static string PeriodTypeName(ThesisPeriodType periodType) => periodType == ThesisPeriodType.Annual
+        ? FundamentalsBasis.Annual
+        : FundamentalsBasis.Quarterly;
 
     private async Task<IReadOnlyList<DailyClose>> GetClosesAsync(
         string ticker,

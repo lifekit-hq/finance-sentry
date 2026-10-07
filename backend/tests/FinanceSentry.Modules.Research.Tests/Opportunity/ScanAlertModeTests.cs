@@ -104,7 +104,7 @@ public sealed class ScanAlertModeTests
             candidates ?? new FakeCandidateRepository(),
             new FakeCandidateScoreRepository(),
             new FakeMarketStructureReader(),
-            new FakeSecEdgarService(RevenueGrowthFacts(revenueYoy)),
+            new FakeFundamentalsService(RevenueGrowthFacts(revenueYoy)),
             new FakeIpsRepository(),
             new FakePositionCapSource(),
             new FakeBrokerageHoldingsReader(),

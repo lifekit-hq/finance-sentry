@@ -27,6 +27,7 @@ using FinanceSentry.Modules.Budgets.Infrastructure.Persistence;
 using FinanceSentry.Modules.Budgets.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Domain.Ports;
@@ -151,8 +152,8 @@ public sealed class ToolParityTests
         // Thesis monitor: real AlertGeneratorService (so alert side effects are exercised) backed by
         // deterministic fakes for EDGAR fundamentals / market data (no live HTTP in a parity test).
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
-        services.AddSingleton<ISecEdgarService>(
-            new FakeSecEdgarService(edgarFactsByTicker ?? new Dictionary<string, IReadOnlyList<FundamentalFact>>()));
+        services.AddSingleton<IFundamentalsService>(
+            new FakeFundamentalsService(edgarFactsByTicker ?? new Dictionary<string, IReadOnlyList<FundamentalFact>>()));
         services.AddSingleton<IMarketDataService>(new FakeMarketDataService(quotesByTicker, closesByTicker));
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();

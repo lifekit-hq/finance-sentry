@@ -2,22 +2,25 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
-using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 
 public record GetFundamentalsQuery(
     string Ticker,
-    int MaxPerConcept) : IQuery<IReadOnlyList<FundamentalFactDto>>;
+    int MaxPerConcept) : IQuery<FundamentalsDto>;
 
-public class GetFundamentalsQueryHandler(ISecEdgarService svc)
-    : IQueryHandler<GetFundamentalsQuery, IReadOnlyList<FundamentalFactDto>>
+public class GetFundamentalsQueryHandler(IFundamentalsService fundamentals)
+    : IQueryHandler<GetFundamentalsQuery, FundamentalsDto>
 {
-    public async Task<IReadOnlyList<FundamentalFactDto>> Handle(GetFundamentalsQuery query, CancellationToken ct)
+    public async Task<FundamentalsDto> Handle(GetFundamentalsQuery query, CancellationToken ct)
     {
-        var facts = await svc.GetFundamentalsAsync(query.Ticker, query.MaxPerConcept, ct);
-        return facts
-            .Select(f => new FundamentalFactDto(
-                f.Ticker, f.Concept, f.Label, f.Unit, f.Value,
-                f.PeriodEnd, f.FiscalPeriod, f.FiscalYear, f.Form, f.Taxonomy))
-            .ToList();
+        var result = await fundamentals.GetFundamentalsAsync(query.Ticker, query.MaxPerConcept, ct);
+        return new FundamentalsDto(
+            result.Ticker,
+            result.Coverage,
+            result.Facts
+                .Select(f => new FundamentalFactDto(
+                    f.Ticker, f.Concept, f.Label, f.Unit, f.Value,
+                    f.PeriodEnd, f.FiscalPeriod, f.FiscalYear, f.Form, f.Taxonomy, f.SourceProvenance))
+                .ToList());
     }
 }

@@ -3,7 +3,9 @@ namespace FinanceSentry.Modules.Research.Tests.ThesisMonitor;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using FluentAssertions;
@@ -30,11 +32,11 @@ public class RunThesisMonitorHandlerTests
 
     private static RunThesisMonitorCommandHandler BuildHandler(
         FakeThesisRepository repo,
-        FakeSecEdgarService secEdgar,
+        StubFundamentalsService fundamentals,
         FakeAlertGeneratorService alerts,
         FakeMarketDataService? marketData = null)
         => new(
-            repo, secEdgar, marketData ?? new FakeMarketDataService(), alerts, new FakeThesisEventRecorder(),
+            repo, fundamentals, marketData ?? new FakeMarketDataService(), alerts, new FakeThesisEventRecorder(),
             NullLogger<RunThesisMonitorCommandHandler>.Instance);
 
     [Fact]
@@ -53,9 +55,9 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q2]";
 
         var repo = new FakeThesisRepository([thesis]);
-        var secEdgar = new FakeSecEdgarService(breachingFacts);
+        var fundamentals = new StubFundamentalsService(breachingFacts);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -81,9 +83,9 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenReason = "gross_margin lessThan 0.35 — observed [0.30] over [2026Q1]";
 
         var repo = new FakeThesisRepository([thesis]);
-        var secEdgar = new FakeSecEdgarService(healthyFacts);
+        var fundamentals = new StubFundamentalsService(healthyFacts);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -109,9 +111,9 @@ public class RunThesisMonitorHandlerTests
         thesis.BrokenReason = null;
 
         var repo = new FakeThesisRepository([thesis]);
-        var secEdgar = new FakeSecEdgarService(breachingFacts);
+        var fundamentals = new StubFundamentalsService(breachingFacts);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -128,15 +130,86 @@ public class RunThesisMonitorHandlerTests
         var thesis = Thesis([trigger]);
 
         var repo = new FakeThesisRepository([thesis]);
-        var secEdgar = new FakeSecEdgarService([]); // no EDGAR filer for this ticker
+        var fundamentals = new StubFundamentalsService([]); // no EDGAR filer for this ticker
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
         summary.BreaksRaised.Should().Be(0);
         summary.Skipped.Should().Be(1);
         thesis.BrokenAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NoSourceForAnyTrigger_ReportsTheThesisUnmonitorable_WithItsCoverage()
+    {
+        // #837: a thesis whose triggers have no data must say so, never read as quietly intact.
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.OperatingMargin, "lessThan", 0m, ConsecutivePeriods: 2);
+        var thesis = Thesis([trigger]);
+        var coverage = new FundamentalsCoverage(
+            FundamentalsCoverageStatus.NoSourceAvailable, FundamentalsIssuerType.NotSecRegistrant,
+            "sec-edgar-us-gaap: not in the SEC ticker map; yahoo-finance: no fundamentals timeseries", []);
+
+        var repo = new FakeThesisRepository([thesis]);
+        var handler = BuildHandler(repo, new StubFundamentalsService([], coverage: coverage), new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var blind = summary.Unmonitorable.Should().ContainSingle().Subject;
+        blind.ThesisId.Should().Be(thesis.Id);
+        blind.Status.Should().Be(ThesisMonitorability.Unmonitorable);
+        blind.Triggers.Should().ContainSingle().Which.Should().BeEquivalentTo(new UnmonitorableTrigger(
+            ThesisMetric.OperatingMargin, FundamentalsBasis.Quarterly, "MU", NonEvaluableReason.NoFundamentals, coverage));
+        thesis.BrokenAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OneBlindTrigger_ReportsThesisPartiallyMonitorable_ListingOnlyThatTrigger()
+    {
+        // GRAB's shape: five quarters evaluate an operating-margin trigger, but a two-quarter revenue
+        // YoY trigger needs six (two prior-year pairs).
+        var facts = new List<FundamentalFact>();
+        foreach (var end in new[] { new DateOnly(2026, 6, 30), new DateOnly(2026, 3, 31), new DateOnly(2025, 12, 31),
+                     new DateOnly(2025, 9, 30), new DateOnly(2025, 6, 30) })
+        {
+            facts.Add(new FundamentalFact("MU", "Revenue", "Revenue", "USD", 1000m, end, "3M", null, string.Empty));
+            facts.Add(new FundamentalFact("MU", "OperatingIncome", "OperatingIncome", "USD", 90m, end, "3M", null, string.Empty));
+        }
+
+        var margin = new ThesisInvalidationTrigger(ThesisMetric.OperatingMargin, "lessThan", 0m, ConsecutivePeriods: 2);
+        var growth = new ThesisInvalidationTrigger(ThesisMetric.RevenueYoy, "lessThan", 0.10m, ConsecutivePeriods: 2);
+        var thesis = Thesis([margin, growth]);
+
+        var repo = new FakeThesisRepository([thesis]);
+        var handler = BuildHandler(repo, new StubFundamentalsService(facts), new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        var blind = summary.Unmonitorable.Should().ContainSingle().Subject;
+        blind.Status.Should().Be(ThesisMonitorability.PartiallyMonitorable);
+        blind.Triggers.Should().ContainSingle().Which.Should().Match<UnmonitorableTrigger>(t =>
+            t.Metric == ThesisMetric.RevenueYoy && t.Reason == NonEvaluableReason.InsufficientPeriods
+            && t.Coverage != null && t.Coverage.Status == FundamentalsCoverageStatus.Covered);
+        summary.Skipped.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EveryTriggerEvaluated_ReportsNothingUnmonitorable()
+    {
+        var facts = new List<FundamentalFact>
+        {
+            Fact("GrossProfit", 40m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+            Fact("Revenue", 100m, 2026, "Q2", new DateOnly(2026, 5, 31)),
+        };
+        var trigger = new ThesisInvalidationTrigger(ThesisMetric.GrossMargin, "lessThan", 0.35m, ConsecutivePeriods: 1);
+
+        var repo = new FakeThesisRepository([Thesis([trigger])]);
+        var handler = BuildHandler(repo, new StubFundamentalsService(facts), new FakeAlertGeneratorService());
+
+        var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
+
+        summary.Unmonitorable.Should().BeEmpty();
     }
 
     [Fact]
@@ -152,9 +225,9 @@ public class RunThesisMonitorHandlerTests
         var thesis = Thesis([trigger]);
 
         var repo = new FakeThesisRepository([thesis]);
-        var secEdgar = new FakeSecEdgarService(oneFact);
+        var fundamentals = new StubFundamentalsService(oneFact);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -177,9 +250,9 @@ public class RunThesisMonitorHandlerTests
         var okThesis = Thesis([trigger]);
 
         var repo = new FakeThesisRepository([failingThesis, okThesis]);
-        var secEdgar = new FakeSecEdgarService(healthyFacts, throwForTicker: "BOOM");
+        var fundamentals = new StubFundamentalsService(healthyFacts, throwForTicker: "BOOM");
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, secEdgar, alerts);
+        var handler = BuildHandler(repo, fundamentals, alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -199,7 +272,7 @@ public class RunThesisMonitorHandlerTests
 
         var repo = new FakeThesisRepository([thesis]);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, new FakeSecEdgarService([]), alerts);
+        var handler = BuildHandler(repo, new StubFundamentalsService([]), alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -218,7 +291,7 @@ public class RunThesisMonitorHandlerTests
 
         var repo = new FakeThesisRepository([thesis]);
         var alerts = new FakeAlertGeneratorService();
-        var handler = BuildHandler(repo, new FakeSecEdgarService([]), alerts);
+        var handler = BuildHandler(repo, new StubFundamentalsService([]), alerts);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -264,7 +337,7 @@ public class RunThesisMonitorHandlerTests
             ["MU"] = subjectCloses,
             ["SPY"] = benchmarkCloses,
         });
-        var handler = BuildHandler(repo, new FakeSecEdgarService([]), alerts, marketData);
+        var handler = BuildHandler(repo, new StubFundamentalsService([]), alerts, marketData);
 
         var summary = await handler.Handle(new RunThesisMonitorCommand(UserId), CancellationToken.None);
 
@@ -298,23 +371,21 @@ public class RunThesisMonitorHandlerTests
         public Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default) => Task.FromResult(true);
     }
 
-    private sealed class FakeSecEdgarService(IReadOnlyList<FundamentalFact> facts, string? throwForTicker = null)
-        : ISecEdgarService
+    private sealed class StubFundamentalsService(
+        IReadOnlyList<FundamentalFact> facts,
+        string? throwForTicker = null,
+        FundamentalsCoverage? coverage = null) : IFundamentalsService
     {
-        public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-            string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
-            bool surfaceProviderFailure = false)
-            => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
-
-        public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+        public Task<FundamentalsResult> GetFundamentalsAsync(
             string ticker, int maxPerConcept, CancellationToken ct = default)
         {
             if (throwForTicker is not null && string.Equals(ticker, throwForTicker, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException($"EDGAR fetch failed for {ticker}");
+                throw new InvalidOperationException($"Fundamentals fetch failed for {ticker}");
             }
 
-            return Task.FromResult(facts);
+            var result = FakeFundamentalsService.ResultFor(ticker, facts);
+            return Task.FromResult(coverage is null ? result : result with { Coverage = coverage });
         }
     }
 

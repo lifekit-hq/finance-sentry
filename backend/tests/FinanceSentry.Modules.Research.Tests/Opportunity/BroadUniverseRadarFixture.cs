@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
@@ -65,7 +66,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
         RadarDbContext db,
         MarketStructureReader reader,
         IReadOnlyList<string> shortlist,
-        RecordingSecEdgarService edgar)
+        RecordingFundamentalsService edgar)
     {
         this.db = db;
         Reader = reader;
@@ -83,7 +84,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
     /// The one EDGAR truth for the whole funnel. Production shares a cached singleton between stage 1
     /// and the scan job's own grading, so a fixture with two doubles could disagree with itself.
     /// </summary>
-    public RecordingSecEdgarService Edgar { get; }
+    public RecordingFundamentalsService Edgar { get; }
 
     public static async Task<BroadUniverseRadarFixture> CreateAsync(Guid? userId = null)
     {
@@ -165,7 +166,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
     /// signal the stage reads. The decoys are quoted and gradeable — they lose the cut, they do not
     /// dodge it.
     /// </summary>
-    private static ScanShortlistService StageOne(ISecEdgarService edgar)
+    private static ScanShortlistService StageOne(IFundamentalsService edgar)
     {
         var constituents = new Mock<IIndexConstituentSource>();
         constituents.Setup(c => c.GetConstituents()).Returns([Constituent, .. Decoys]);
@@ -202,7 +203,7 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
             NullLogger<ScanShortlistService>.Instance);
     }
 
-    private static RecordingSecEdgarService StageOneEdgar()
+    private static RecordingFundamentalsService StageOneEdgar()
         => new(new Dictionary<string, IReadOnlyList<FundamentalFact>>(StringComparer.OrdinalIgnoreCase)
         {
             [Constituent] = RevenueGrowthFacts(Constituent, ConstituentRevenueYoy),

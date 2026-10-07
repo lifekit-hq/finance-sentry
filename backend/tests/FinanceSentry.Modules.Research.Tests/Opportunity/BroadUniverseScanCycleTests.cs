@@ -132,8 +132,8 @@ public sealed class BroadUniverseScanCycleTests
     /// A second cycle therefore re-reads its candidate from the database rather than finding the
     /// instance the first one left in a change tracker.
     ///
-    /// Stage 2 grades through the fixture's EDGAR double — the same instance stage 1 screened on, as
-    /// production shares one cached <see cref="ISecEdgarService"/> across the funnel. A null
+    /// Stage 2 grades through the fixture's fundamentals double — the same instance stage 1 screened on,
+    /// as production shares one cached fundamentals chain across the funnel. A null
     /// <paramref name="alertMode"/> leaves the production default in place, so the acceptance test's
     /// posture is the shipped one rather than the test's own.
     /// </summary>

@@ -1,24 +1,26 @@
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Fundamentals;
 
 namespace FinanceSentry.Mcp.Tests.IntegrationTests;
 
 /// <summary>
-/// Deterministic test double for <see cref="ISecEdgarService"/> — the parity tests never hit
-/// the live SEC EDGAR API. Returns whatever facts were seeded for the requested ticker.
+/// Deterministic test double for <see cref="IFundamentalsService"/> — the parity tests never hit
+/// a live provider. Returns whatever facts were seeded for the requested ticker.
 /// </summary>
-public sealed class FakeSecEdgarService(IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>> factsByTicker)
-    : ISecEdgarService
+public sealed class FakeFundamentalsService(IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>> factsByTicker)
+    : IFundamentalsService
 {
-    public Task<IReadOnlyList<EdgarFiling>> GetRecentFilingsAsync(
-        string ticker, IReadOnlyCollection<string>? formTypes, int limit, CancellationToken ct = default,
-            bool surfaceProviderFailure = false)
-        => Task.FromResult<IReadOnlyList<EdgarFiling>>([]);
-
-    public Task<IReadOnlyList<FundamentalFact>> GetFundamentalsAsync(
+    public Task<FundamentalsResult> GetFundamentalsAsync(
         string ticker, int maxPerConcept, CancellationToken ct = default)
-        => Task.FromResult(
-            factsByTicker.TryGetValue(ticker, out var facts) ? facts : (IReadOnlyList<FundamentalFact>)[]);
+    {
+        IReadOnlyList<FundamentalFact> facts = factsByTicker.TryGetValue(ticker, out var seeded) ? seeded : [];
+        var coverage = facts.Count > 0
+            ? new FundamentalsCoverage(FundamentalsCoverageStatus.Covered, null, null, [])
+            : new FundamentalsCoverage(FundamentalsCoverageStatus.NoSourceAvailable, null, "no facts seeded", []);
+        return Task.FromResult(new FundamentalsResult(ticker, facts, coverage));
+    }
 }
 
 /// <summary>

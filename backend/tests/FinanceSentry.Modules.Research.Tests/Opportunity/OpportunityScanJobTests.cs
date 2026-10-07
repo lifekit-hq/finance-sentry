@@ -47,14 +47,14 @@ public sealed class OpportunityScanJobTests
             new(ticker, "Revenue", "Revenue", "USD", 100m, new DateOnly(2025, 5, 31), "Q2", 2025, "10-Q"),
         ];
 
-    private static (OpportunityScanJob Job, RecordingScoreCandidateHandler Scorer, RecordingSecEdgarService Edgar) BuildJob(
+    private static (OpportunityScanJob Job, RecordingScoreCandidateHandler Scorer, RecordingFundamentalsService Edgar) BuildJob(
         IReadOnlyList<UniverseStructureEntry> universe,
         IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>> facts,
         OpportunityOptions options,
         IReadOnlyCollection<string>? edgarFailures = null)
     {
         var scorer = new RecordingScoreCandidateHandler();
-        var edgar = new RecordingSecEdgarService(facts, edgarFailures);
+        var edgar = new RecordingFundamentalsService(facts, edgarFailures);
         var job = new OpportunityScanJob(
             new FakeUniverseStructureReader(universe),
             edgar,
