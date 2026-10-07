@@ -21,6 +21,15 @@ export class AlertDestinationUtils {
       }
     }
 
+    // The server keeps merchant names out of the path it stores (it rides on push payloads), so a
+    // duplicate charge narrows to its merchant's charges here, from the normalized key it labels itself with.
+    if (alert.type === 'DuplicateCharge') {
+      const merchantKey = alert.referenceLabel?.trim();
+      if (merchantKey) {
+        return {kind: 'url', url: `${AppRoute.Transactions}?q=${encodeURIComponent(merchantKey)}`};
+      }
+    }
+
     const appPath = alert.appPath?.trim();
     if (appPath && appPath.startsWith('/') && !appPath.startsWith('//')) {
       return {kind: 'url', url: appPath};

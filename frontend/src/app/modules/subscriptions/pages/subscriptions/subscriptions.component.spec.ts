@@ -1,4 +1,5 @@
 import {TestBed} from '@angular/core/testing';
+import {provideRouter, Router} from '@angular/router';
 
 import {type Subscription} from '../../models/subscription/subscription.model';
 import {SubscriptionsComponent} from './subscriptions.component';
@@ -46,5 +47,35 @@ describe('SubscriptionsComponent', () => {
     expect(ids(component.subscriptionMenuItems({isTracked: false}))).toContain('link');
     expect(ids(component.installmentMenuItems({isTracked: true}))).not.toContain('link');
     expect(ids(component.installmentMenuItems({isTracked: false}))).toContain('link');
+  });
+
+  it('offers View charges on every subscription and installment row', () => {
+    TestBed.configureTestingModule({});
+    const component = TestBed.runInInjectionContext(() =>
+      Object.create(SubscriptionsComponent.prototype)
+    ) as SubscriptionsComponent;
+    const ids = (items: {id: string}[]) => items.map(i => i.id);
+
+    for (const isTracked of [true, false]) {
+      expect(ids(component.subscriptionMenuItems({isTracked}))).toContain('charges');
+      expect(ids(component.installmentMenuItems({isTracked}))).toContain('charges');
+    }
+  });
+
+  it('opens the ledger searched by merchant from the View charges action', () => {
+    TestBed.configureTestingModule({providers: [provideRouter([])]});
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const component = TestBed.runInInjectionContext(() => {
+      const c = Object.create(SubscriptionsComponent.prototype) as {router: Router};
+      c.router = TestBed.inject(Router);
+      return c as unknown as SubscriptionsComponent;
+    });
+    const sub = {id: 's1', merchantName: 'Netflix'} as unknown as Subscription;
+
+    component.onSubscriptionAction('charges', sub);
+    component.onInstallmentAction('charges', sub);
+
+    expect(navigate).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {q: 'Netflix'}});
   });
 });

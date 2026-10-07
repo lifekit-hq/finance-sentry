@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {toSignal} from '@angular/core/rxjs-interop';
+import {takeUntilDestroyed, toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {
@@ -15,7 +15,7 @@ import {
   ListItemRowComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
-import {map} from 'rxjs';
+import {debounceTime, distinctUntilChanged, map} from 'rxjs';
 
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
@@ -30,6 +30,7 @@ import {
 } from '../../models/transaction/transaction.model';
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
+import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
@@ -74,7 +75,14 @@ export class TransactionLedgerComponent {
 
   public readonly store = inject(TransactionLedgerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
-  public readonly searchControl = new FormControl('', {nonNullable: true});
+
+  /** The search text in the `q` query param: a shared link or back/forward restores the search. */
+  public readonly activeSearch = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('q') ?? '')),
+    {initialValue: ''}
+  );
+
+  public readonly searchControl = new FormControl(this.activeSearch(), {nonNullable: true});
 
   public readonly activeAccount = toSignal(
     this.route.queryParamMap.pipe(map(p => p.get('account'))),
@@ -133,7 +141,41 @@ export class TransactionLedgerComponent {
     this.store.applyType(this.activeType);
     this.store.applyCategory(this.activeCategory);
     this.store.applyDateRange(this.activeDateRange);
-    this.store.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
+    this.store.applySearch(
+      toSignal(this.searchControl.valueChanges, {initialValue: this.searchControl.value})
+    );
+    this.followSearchParam();
+    this.syncSearchParam();
+  }
+
+  /** URL → box: back/forward (or a new deep link) rewrites the box when it differs. */
+  private followSearchParam(): void {
+    this.route.queryParamMap
+      .pipe(
+        map(p => p.get('q') ?? ''),
+        takeUntilDestroyed()
+      )
+      .subscribe(q => {
+        if (q !== this.searchControl.value) {
+          this.searchControl.setValue(q);
+        }
+      });
+  }
+
+  /** Box → URL: debounced, replacing the history entry, merged with the other filters. */
+  private syncSearchParam(): void {
+    this.searchControl.valueChanges
+      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), distinctUntilChanged(), takeUntilDestroyed())
+      .subscribe(search => {
+        if (search.trim() === this.activeSearch().trim()) {
+          return;
+        }
+        void this.router.navigate([], {
+          queryParams: {q: search.trim() === '' ? null : search},
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
   }
 
   public openDrawer(tx: GlobalTransactionDto): void {

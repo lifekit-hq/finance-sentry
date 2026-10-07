@@ -1,5 +1,6 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
+import {Router} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
@@ -17,6 +18,7 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
@@ -40,19 +42,31 @@ const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
 
 const LINK_MENU_ITEM: MenuItem = {id: 'link', label: 'Link transaction', icon: 'Link'};
 
+const CHARGES_MENU_ITEM: MenuItem = {id: 'charges', label: 'View charges', icon: 'Receipt'};
+
 const INSTALLMENT_MENU_ITEMS: MenuItem[] = [
+  CHARGES_MENU_ITEM,
   {id: 'term', label: 'Set term', icon: 'Pencil'},
   {id: 'done', label: 'Mark as done', icon: 'Check'},
   {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
 ];
 
-const UNLINKED_INSTALLMENT_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...INSTALLMENT_MENU_ITEMS];
+const UNLINKED_INSTALLMENT_MENU_ITEMS: MenuItem[] = [
+  CHARGES_MENU_ITEM,
+  LINK_MENU_ITEM,
+  ...INSTALLMENT_MENU_ITEMS.slice(1),
+];
 
 const SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
+  CHARGES_MENU_ITEM,
   {id: 'dismiss', label: 'Dismiss', icon: 'X', destructive: true},
 ];
 
-const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRIPTION_MENU_ITEMS];
+const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [
+  CHARGES_MENU_ITEM,
+  LINK_MENU_ITEM,
+  ...SUBSCRIPTION_MENU_ITEMS.slice(1),
+];
 
 @Component({
   selector: 'fns-subscriptions',
@@ -80,6 +94,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
 })
 export class SubscriptionsComponent {
   private readonly dialog = inject(CmnDialogService);
+  private readonly router = inject(Router);
   private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(SubscriptionsStore);
@@ -92,6 +107,11 @@ export class SubscriptionsComponent {
 
   public installmentMenuItems(item: Pick<Subscription, 'isTracked'>): MenuItem[] {
     return item.isTracked ? INSTALLMENT_MENU_ITEMS : UNLINKED_INSTALLMENT_MENU_ITEMS;
+  }
+
+  /** Opens the ledger narrowed to the merchant's charges (its search box reads `q`). */
+  public viewCharges(item: Pick<Subscription, 'merchantName'>): void {
+    void this.router.navigate([AppRoute.Transactions], {queryParams: {q: item.merchantName}});
   }
 
   public setSort(sort: SubscriptionSort): void {
@@ -132,7 +152,9 @@ export class SubscriptionsComponent {
   }
 
   public onInstallmentAction(action: string, item: Subscription): void {
-    if (action === 'link') {
+    if (action === 'charges') {
+      this.viewCharges(item);
+    } else if (action === 'link') {
       this.openLink(item);
     } else if (action === 'term') {
       this.openSetTerm(item);
@@ -144,7 +166,9 @@ export class SubscriptionsComponent {
   }
 
   public onSubscriptionAction(action: string, sub: Subscription): void {
-    if (action === 'link') {
+    if (action === 'charges') {
+      this.viewCharges(sub);
+    } else if (action === 'link') {
       this.openLink(sub);
     } else if (action === 'dismiss') {
       this.dismiss(sub);

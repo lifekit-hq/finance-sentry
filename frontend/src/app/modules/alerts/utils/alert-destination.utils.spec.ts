@@ -28,6 +28,20 @@ const FILING_URL =
   'https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240630.htm';
 
 describe('AlertDestinationUtils.resolve', () => {
+  it('opens the ledger searched by merchant key for a duplicate charge, over the bare server path', () => {
+    expect(
+      AlertDestinationUtils.resolve(
+        makeAlert({type: 'DuplicateCharge', referenceLabel: 'uber eats', appPath: '/transactions'})
+      )
+    ).toEqual({kind: 'url', url: '/transactions?q=uber%20eats'});
+  });
+
+  it('falls back to the plain ledger for a duplicate charge with no merchant key', () => {
+    expect(
+      AlertDestinationUtils.resolve(makeAlert({type: 'DuplicateCharge', referenceLabel: null}))
+    ).toEqual({kind: 'route', commands: [AppRoute.Transactions]});
+  });
+
   it('prefers the server appPath, query string included, over the type destination', () => {
     const appPath = '/transactions?account=acc-1';
     expect(AlertDestinationUtils.resolve(makeAlert({type: 'LowBalance', appPath}))).toEqual({
