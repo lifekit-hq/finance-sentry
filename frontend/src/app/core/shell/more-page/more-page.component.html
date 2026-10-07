@@ -15,4 +15,18 @@
       }
     </nav>
   </cmn-card>
+
+  <!-- The account items the avatar menu holds on desktop; the avatar leaves the phone top bar -->
+  <cmn-card padding="none" class="mt-cmn-4 block">
+    <button
+      (click)="logout()"
+      class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+      type="button"
+      data-testid="more-logout"
+    >
+      <cmn-list-item-row [label]="'Log out'" [sublabel]="email() ?? ''">
+        <cmn-icon name="LogOut" size="md" class="text-status-error" avatar />
+      </cmn-list-item-row>
+    </button>
+  </cmn-card>
 </cmn-page-container>

@@ -9,18 +9,10 @@
   } @else if (store.dossierErrorMessage()) {
     <cmn-alert variant="error">{{ store.dossierErrorMessage() }}</cmn-alert>
   } @else if (store.dossier(); as dossier) {
-    <!-- Header: back link on its own line so it never competes with the symbol on a phone -->
-    <header>
-      <cmn-button (clicked)="goBack()" variant="secondary" size="sm" data-testid="dossier-back">
-        ← Investments
-      </cmn-button>
-      <h1 class="mt-cmn-3 font-headline text-cmn-2xl font-bold text-text-primary">
-        {{ dossier.symbol }}
-      </h1>
-      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-        Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
-      </p>
-    </header>
+    <!-- The top bar owns the symbol and the way back (route data) -->
+    <p class="text-cmn-xs text-text-secondary">
+      Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
+    </p>
 
     @if (!store.hasDossierSections()) {
       <cmn-card class="block" data-testid="dossier-no-data">

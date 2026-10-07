@@ -1,12 +1,6 @@
 <cmn-page-container spacing="none">
   <div class="space-y-cmn-5">
-    <!-- Header -->
-    <cmn-page-header
-      (actionClick)="openAdd()"
-      title="Subscriptions"
-      subtitle="Recurring charges detected from your transactions"
-      actionLabel="Add"
-    />
+    <p class="text-cmn-sm text-text-secondary">Recurring charges detected from your transactions</p>
 
     @if (store.addErrorMessage()) {
       <cmn-alert variant="error">{{ store.addErrorMessage() }}</cmn-alert>

@@ -177,11 +177,12 @@ describe('AssetDossierComponent', () => {
     expect(byTestId('dossier-skeleton')).not.toBeNull();
   });
 
-  it('puts the back button above the symbol', () => {
+  it('leaves the symbol and the way back to the top bar', () => {
     fixture.detectChanges();
 
-    expect(byTestId('dossier-back')).not.toBeNull();
-    expect(root().querySelector('h1')?.textContent).toContain('DRAM');
+    expect(byTestId('dossier-back')).toBeNull();
+    expect(root().querySelector('h1')).toBeNull();
+    expect(root().textContent).toContain('Updated');
   });
 
   it('formats money through the money pipe and names the provider', () => {

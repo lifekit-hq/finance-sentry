@@ -1,6 +1,6 @@
 import {DatePipe, DecimalPipe, formatDate} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {Router, RouterLink} from '@angular/router';
+import {RouterLink} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
@@ -67,7 +67,6 @@ const TREND_LOCALE = 'en-US';
   providers: [DossierStore],
 })
 export class AssetDossierComponent {
-  private readonly router = inject(Router);
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
   public readonly accountsRoute = AppRoute.AccountsInvestments;
@@ -102,9 +101,5 @@ export class AssetDossierComponent {
 
   public generateLedgerRead(symbol: string, force: boolean): void {
     this.store.generateLedgerRead({symbol, force});
-  }
-
-  public goBack(): void {
-    void this.router.navigate([AppRoute.AccountsInvestments]);
   }
 }

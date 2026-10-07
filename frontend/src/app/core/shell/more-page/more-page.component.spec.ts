@@ -7,11 +7,16 @@ import {Permission} from '../../../shared/enums/permission/permission.enum';
 import {MorePageComponent} from './more-page.component';
 
 describe('MorePageComponent', () => {
+  const logout = vi.fn();
+
   const render = (permissions: string[]): HTMLElement => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        {provide: AuthStore, useValue: {permissions: signal(permissions)}},
+        {
+          provide: AuthStore,
+          useValue: {permissions: signal(permissions), email: signal('me@test.dev'), logout},
+        },
       ],
     });
     const fixture = TestBed.createComponent(MorePageComponent);
@@ -34,5 +39,15 @@ describe('MorePageComponent', () => {
 
   it('leaves out Ledger without the AI permission, as the sidebar does', () => {
     expect(links(render([]))).not.toContain('/ledger');
+  });
+
+  it('signs out from the account row, which names the signed-in email', () => {
+    const host = render([]);
+    const row = host.querySelector<HTMLButtonElement>('[data-testid="more-logout"]');
+
+    expect(row?.textContent).toContain('Log out');
+    expect(row?.textContent).toContain('me@test.dev');
+    row?.click();
+    expect(logout).toHaveBeenCalledOnce();
   });
 });
