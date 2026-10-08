@@ -168,6 +168,7 @@ public class ScheduledSyncService(
             catch (Exception releaseEx)
             {
                 _logger.SyncFailed(correlationId, accountId, ClaimReleaseFailedCode, releaseEx.Message, job.RetryCount);
+                await ReleaseClaimAsync(accountId, CancellationToken.None);
             }
 
             await _connectionHealth.RecordFailureAsync(
@@ -198,20 +199,16 @@ public class ScheduledSyncService(
     }
 
     /// <summary>
-    /// Frees the claim when a failure hits between the claim and the sync proper, where there is no job to
-    /// fail yet. Only a startup sweep would otherwise release it, so the account would refuse every sync
-    /// until the next restart. A failed release is logged; the original exception is the one that propagates.
+    /// Frees the claim with a single conditional UPDATE that does not depend on the change tracker, so it holds
+    /// when a failed save has left the context unusable. Used where there is no job to fail yet and as the
+    /// fallback when the failure bookkeeping itself throws; only a startup sweep would otherwise release it.
+    /// A failed release is logged.
     /// </summary>
     private async Task ReleaseClaimAsync(Guid accountId, CancellationToken ct)
     {
         try
         {
-            var claimed = await _accounts.GetByIdUnscopedAsync(accountId, ct);
-            if (claimed is { SyncStatus: "syncing" })
-            {
-                claimed.MarkTransientRetry();
-                await _accounts.UpdateAsync(claimed, ct);
-            }
+            await _accounts.ReleaseSyncUnscopedAsync(accountId, ct);
         }
         catch (Exception releaseEx)
         {

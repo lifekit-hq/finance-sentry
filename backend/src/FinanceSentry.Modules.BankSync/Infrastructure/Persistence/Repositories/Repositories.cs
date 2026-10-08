@@ -130,11 +130,22 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
         // (the coordinator reads the account first) so it does not report the pre-claim status.
         if (claimed == 1)
         {
-            foreach (var entry in _context.ChangeTracker.Entries<BankAccount>().Where(e => e.Entity.Id == accountId))
+            foreach (var entry in _context.ChangeTracker.Entries<BankAccount>().Where(e => e.Entity.Id == accountId).ToList())
                 await entry.ReloadAsync(cancellationToken);
         }
 
         return claimed == 1;
+    }
+
+    public async Task ReleaseSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        await AllUsers
+            .Where(ba => ba.Id == accountId && ba.SyncStatus == "syncing")
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.SyncStatus, "active")
+                    .SetProperty(ba => ba.LastSyncError, (string?)null)
+                    .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default)

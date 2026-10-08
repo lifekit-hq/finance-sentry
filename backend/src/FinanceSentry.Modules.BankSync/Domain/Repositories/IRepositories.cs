@@ -79,6 +79,13 @@ public interface IBankAccountRepository
     Task<bool> TryClaimSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Releases a claim: one conditional UPDATE moves <c>SyncStatus</c> from "syncing" to "active" and clears the
+    /// last error. It bypasses the change tracker, so a context left holding pending changes by a failed save
+    /// cannot block it. Opts out of the Owner query filter.
+    /// </summary>
+    Task ReleaseSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get accounts of every user with specific sync status. Opts out of the Owner query filter.
     /// </summary>
     Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);

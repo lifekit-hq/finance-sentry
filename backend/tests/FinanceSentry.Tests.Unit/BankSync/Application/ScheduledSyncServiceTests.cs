@@ -161,8 +161,7 @@ public class ScheduledSyncServiceTests
         var act = () => h.Sut.PerformFullSyncAsync(h.Account.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("db down");
-        h.Account.SyncStatus.Should().Be("active");
-        h.AccountRepo.Verify(r => r.UpdateAsync(h.Account, It.IsAny<CancellationToken>()), Times.Once);
+        h.AccountRepo.Verify(r => r.ReleaseSyncUnscopedAsync(h.Account.Id, It.IsAny<CancellationToken>()), Times.Once);
         h.Provider.VerifyNoOtherCalls();
     }
 
@@ -217,6 +216,24 @@ public class ScheduledSyncServiceTests
 
         result.Success.Should().BeFalse();
         h.Account.SyncStatus.Should().NotBe("syncing");
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_FailureBookkeepingThrows_FallsBackToTheTrackerFreeRelease()
+    {
+        var h = BuildSut();
+        h.Provider
+            .Setup(p => p.SyncTransactionsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("provider broke"));
+        h.AccountRepo.Setup(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("tracker poisoned"));
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeFalse();
+        h.AccountRepo.Verify(r => r.ReleaseSyncUnscopedAsync(h.Account.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── T313-1: Account not found ───────────────────────────────────────────

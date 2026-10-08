@@ -119,6 +119,29 @@ public sealed class SyncClaimConcurrencyTests : IAsyncLifetime
         results.Count(r => r.ErrorCode == "SYNC_IN_PROGRESS").Should().Be(1);
     }
 
+    [DockerRequiredFact]
+    public async Task Release_frees_the_claim_after_a_failed_save_leaves_the_context_unusable()
+    {
+        await using var context = CreateContext();
+        var accounts = new BankAccountRepository(context);
+        (await accounts.TryClaimSyncUnscopedAsync(_account.Id)).Should().BeTrue();
+
+        var duplicate = new BankAccount(
+            _userId, _account.ExternalAccountId, "Bank", "checking", "5678", "Owner", "UAH", _userId, "monobank");
+        context.BankAccounts.Add(duplicate);
+        await context.Invoking(c => c.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
+
+        var claimed = (await accounts.GetByIdUnscopedAsync(_account.Id))!;
+        await accounts.Invoking(a => a.UpdateAsync(claimed)).Should().ThrowAsync<DbUpdateException>();
+
+        await accounts.ReleaseSyncUnscopedAsync(_account.Id);
+
+        await using var verify = CreateContext();
+        var stored = await new BankAccountRepository(verify).GetByIdUnscopedAsync(_account.Id);
+        stored!.SyncStatus.Should().Be("active");
+        (await new BankAccountRepository(verify).TryClaimSyncUnscopedAsync(_account.Id)).Should().BeTrue();
+    }
+
     private async Task<SyncResult> TriggerManualSyncAsync(StartGate startGate, IBankProvider provider)
     {
         await using var context = CreateContext(new FirstReadBarrier(startGate));
