@@ -166,6 +166,59 @@ public class ScheduledSyncServiceTests
         h.Provider.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task PerformFullSyncAsync_CallerCancelledMidSync_StillReleasesTheClaimAndFailsTheJob()
+    {
+        var h = BuildSut();
+        using var cts = new CancellationTokenSource();
+        h.Provider
+            .Setup(p => p.SyncTransactionsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+        h.JobRepo.Setup(r => r.UpdateAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
+            .Returns((SyncJob j, CancellationToken c) =>
+            {
+                c.ThrowIfCancellationRequested();
+                return Task.FromResult(j);
+            });
+        h.AccountRepo.Setup(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()))
+            .Returns((BankAccount a, CancellationToken c) =>
+            {
+                c.ThrowIfCancellationRequested();
+                return Task.FromResult(a);
+            });
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id, cts.Token);
+
+        result.Success.Should().BeFalse();
+        h.Account.SyncStatus.Should().NotBe("syncing");
+        h.JobRepo.Verify(r => r.UpdateAsync(
+            It.Is<SyncJob>(j => j.Status == "failed"), CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformFullSyncAsync_JobUpdateFailsDuringFailureHandling_StillReleasesTheClaim()
+    {
+        var h = BuildSut();
+        h.Provider
+            .Setup(p => p.SyncTransactionsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("provider broke"));
+        h.JobRepo.Setup(r => r.UpdateAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeFalse();
+        h.Account.SyncStatus.Should().NotBe("syncing");
+    }
+
     // ── T313-1: Account not found ───────────────────────────────────────────
 
     [Fact]

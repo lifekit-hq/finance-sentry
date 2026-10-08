@@ -136,12 +136,23 @@ public class ScheduledSyncService(
             var (errorCode, failureClass) = Classify(ex, account.Provider);
             var isTransient = failureClass == FailureKind.Transient;
 
-            job.MarkFailed(ex.Message, errorCode);
-            await _syncJobs.UpdateAsync(job, ct);
+            var correlationId = job.CorrelationId ?? job.Id.ToString();
+
+            // Bookkeeping that frees the claim runs on CancellationToken.None: a cancelled caller token
+            // must not leave the account "syncing" with a "running" job.
+            try
+            {
+                job.MarkFailed(ex.Message, errorCode);
+                await _syncJobs.UpdateAsync(job, CancellationToken.None);
+            }
+            catch (Exception jobEx)
+            {
+                _logger.SyncFailed(correlationId, accountId, JobUpdateFailedCode, jobEx.Message, job.RetryCount);
+            }
 
             try
             {
-                var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, ct);
+                var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, CancellationToken.None);
                 if (freshAccount != null)
                 {
                     if (failureClass == FailureKind.Reauth)
@@ -151,13 +162,12 @@ public class ScheduledSyncService(
                     else if (freshAccount.SyncStatus == "syncing")
                         freshAccount.MarkFailed(DescribeFailure(errorCode, ex));
 
-                    await _accounts.UpdateAsync(freshAccount, ct);
+                    await _accounts.UpdateAsync(freshAccount, CancellationToken.None);
                 }
             }
             catch (Exception releaseEx)
             {
-                _logger.SyncFailed(job.CorrelationId ?? job.Id.ToString(), accountId,
-                    ClaimReleaseFailedCode, releaseEx.Message, job.RetryCount);
+                _logger.SyncFailed(correlationId, accountId, ClaimReleaseFailedCode, releaseEx.Message, job.RetryCount);
             }
 
             await _connectionHealth.RecordFailureAsync(
@@ -529,6 +539,7 @@ public class ScheduledSyncService(
         ex.StatusCode >= ServerErrorStatus && !LocalFailureCodes.Contains(ex.ErrorCode);
     private const int MaxLastSyncErrorLength = 500;
     private const string ClaimReleaseFailedCode = "SYNC_CLAIM_RELEASE_FAILED";
+    private const string JobUpdateFailedCode = "SYNC_JOB_UPDATE_FAILED";
 
     /// <summary>
     /// Classifies a failed sync from the typed exception (<see cref="TrueLayerException"/> /
