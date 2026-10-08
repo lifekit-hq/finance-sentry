@@ -98,6 +98,13 @@ public class ScheduledSyncServiceTests
 
         accountRepo.Setup(r => r.GetByIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(account);
         accountRepo.Setup(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        // The real claim is a conditional UPDATE that leaves the account "syncing" in the database.
+        accountRepo.Setup(r => r.TryClaimSyncUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                account.BeginSync();
+                return true;
+            });
         jobRepo.Setup(r => r.AddAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync((SyncJob j, CancellationToken _) => j);
         jobRepo.Setup(r => r.UpdateAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
@@ -129,6 +136,21 @@ public class ScheduledSyncServiceTests
                 It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((candidates, (DateTime?)null));
 
+    [Fact]
+    public async Task PerformFullSyncAsync_ClaimRefused_ReturnsSyncInProgressWithoutCreatingAJob()
+    {
+        var h = BuildSut();
+        h.AccountRepo.Setup(r => r.TryClaimSyncUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("SYNC_IN_PROGRESS");
+        h.JobRepo.Verify(r => r.AddAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Provider.VerifyNoOtherCalls();
+    }
+
     // ── T313-1: Account not found ───────────────────────────────────────────
 
     [Fact]
@@ -136,6 +158,8 @@ public class ScheduledSyncServiceTests
     {
         var h = BuildSut();
 
+        h.AccountRepo.Setup(r => r.TryClaimSyncUnscopedAsync(AccountId, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(false);
         h.AccountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>()))
                      .ReturnsAsync((BankAccount?)null);
 
@@ -182,7 +206,7 @@ public class ScheduledSyncServiceTests
 
         h.JobRepo.Verify(r => r.AddAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()), Times.Once);
         h.TxRepo.Verify(r => r.AddRangeAsync(It.IsAny<IEnumerable<Transaction>>(), It.IsAny<CancellationToken>()), Times.Once);
-        h.AccountRepo.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+        h.AccountRepo.Verify(r => r.UpdateAsync(It.IsAny<BankAccount>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     // ── In-batch duplicate hashes must not be double-inserted ───────────────
@@ -696,46 +720,21 @@ public class ScheduledSyncServiceTests
         h.JobRepo.Verify(r => r.UpdateAsync(It.Is<SyncJob>(j => j.Status == "failed"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    // ── T313-5: Idempotency — coordinator blocks concurrent runs ────────────
-
-    [Fact]
-    public async Task TriggerScheduledSyncAsync_AlreadyRunning_ReturnsEarlyWithoutNewSync()
-    {
-        var syncJobRepo = new Mock<ISyncJobRepository>();
-        var syncService = new Mock<IScheduledSyncService>();
-
-        syncJobRepo.Setup(r => r.HasRunningJobUnscopedAsync(AccountId, default)).ReturnsAsync(true);
-
-        var coordinator = new TransactionSyncCoordinator(
-            syncJobRepo.Object, new Mock<IBankAccountRepository>().Object, syncService.Object,
-            new Mock<IBackgroundJobClient>().Object);
-
-        var result = await coordinator.TriggerScheduledSyncAsync(AccountId);
-
-        result.Success.Should().BeFalse();
-        result.ErrorCode.Should().Be("SYNC_IN_PROGRESS");
-        syncService.Verify(
-            s => s.PerformFullSyncAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()),
-            Times.Never);
-    }
-
     // A consent-expired account (reauth_required) must be skipped by the recurring scheduler so it stops
     // failing every cycle — the loop that logged errorCode=UNKNOWN ~48x/day for an expired TrueLayer consent.
     [Fact]
     public async Task TriggerScheduledSyncAsync_ReauthRequiredAccount_SkipsWithoutSyncing()
     {
-        var syncJobRepo = new Mock<ISyncJobRepository>();
         var accountRepo = new Mock<IBankAccountRepository>();
         var syncService = new Mock<IScheduledSyncService>();
 
-        syncJobRepo.Setup(r => r.HasRunningJobUnscopedAsync(AccountId, default)).ReturnsAsync(false);
         var account = new BankAccount { Provider = "truelayer" };
         account.BeginSync();
         account.MarkReauthRequired();
         accountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
 
         var coordinator = new TransactionSyncCoordinator(
-            syncJobRepo.Object, accountRepo.Object, syncService.Object,
+            accountRepo.Object, syncService.Object,
             new Mock<IBackgroundJobClient>().Object);
 
         var result = await coordinator.TriggerScheduledSyncAsync(AccountId);

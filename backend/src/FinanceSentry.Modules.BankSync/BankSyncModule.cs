@@ -95,10 +95,9 @@ public static class BankSyncModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily());
 
-            mgr.AddOrUpdate<StaleSyncReaperJob>(
-                "stale-sync-reaper",
-                job => job.ReapAsync(),
-                "*/15 * * * *");
+            // Retired by the atomic sync claim (#931): the reaper is crash recovery only, run by the startup
+            // sweep. Hangfire keeps recurring definitions in storage, so withdraw the old schedule by name.
+            mgr.RemoveIfExists("stale-sync-reaper");
 
             mgr.AddOrUpdate<ConsentExpiryReminderJob>(
                 "consent-expiry-reminder",
@@ -116,7 +115,7 @@ public static class BankSyncModule
 
     /// <summary>
     /// Startup sweep: any job still "running"/account still "syncing" after a restart was orphaned
-    /// mid-sync and would otherwise deadlock the scheduler — reap them all first, then (re)schedule
+    /// mid-sync and would otherwise stay claimed forever — reap them all first, then (re)schedule
     /// the active accounts.
     /// </summary>
     private sealed class StartupSweep : IStartupSweep
@@ -126,7 +125,7 @@ public static class BankSyncModule
             var jobs = sp.GetRequiredService<IBackgroundJobClient>();
 
             jobs.Enqueue<StaleSyncReaperJob>(
-                job => job.ExecuteAsync(true, CancellationToken.None));
+                job => job.ExecuteAsync(CancellationToken.None));
 
             jobs.Enqueue<SyncScheduler>(
                 s => s.ScheduleAllActiveAccounts(CancellationToken.None));

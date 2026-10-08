@@ -81,9 +81,17 @@ public class ScheduledSyncService(
     {
         var startedAt = DateTime.UtcNow;
 
-        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
-        if (account == null)
-            return new SyncResult(false, 0, 0, "ACCOUNT_NOT_FOUND", "Account not found.");
+        // The atomic claim is the only lock: of any concurrent starts for this account exactly one wins.
+        // It runs before the account is loaded, so the entity read below already carries "syncing".
+        if (!await _accounts.TryClaimSyncUnscopedAsync(accountId, ct))
+        {
+            return await _accounts.GetByIdUnscopedAsync(accountId, ct) is null
+                ? new SyncResult(false, 0, 0, "ACCOUNT_NOT_FOUND", "Account not found.")
+                : new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
+        }
+
+        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct)
+            ?? throw new InvalidOperationException($"Account {accountId} vanished after its sync was claimed.");
 
         var job = new SyncJob(accountId, account.UserId)
         {
@@ -96,9 +104,6 @@ public class ScheduledSyncService(
 
         try
         {
-            account.BeginSync();
-            await _accounts.UpdateAsync(account, ct);
-
             SyncResult result;
 
             if (account.Provider == "monobank")
