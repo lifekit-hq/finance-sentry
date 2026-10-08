@@ -21,6 +21,10 @@ import {
   TagComponent,
 } from '@lifekit-hq/ui';
 
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
@@ -82,12 +86,12 @@ export class AssetDossierComponent {
     }
     return this.store.isDossierLoading() ? 'loading' : 'success';
   });
-  public readonly pnlPositiveClass = 'text-status-success';
-  public readonly pnlNegativeClass = 'text-status-error';
+  public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
+  public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
   // Only the delta carries colour; the header itself stays neutral.
   public readonly deltaClass: Record<DossierDeltaDirection, string> = {
-    up: 'text-status-success',
-    down: 'text-status-error',
+    up: GAIN_TEXT_CLASS,
+    down: LOSS_TEXT_CLASS,
     flat: 'text-text-secondary',
   };
 

@@ -1,8 +1,14 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {CATEGORICAL_STEPS, seriesColor} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
+import {
+  CASH_COLOUR,
+  CRYPTO_COLOUR,
+  EQUITY_COLOUR,
+} from '../../../shared/constants/chart-colour/chart-colour.constants';
+import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position, type PositionAssetClass} from '../models/position/position.model';
@@ -66,13 +72,15 @@ const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   crypto: 'Crypto',
 };
 
-// Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
-const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
-  cash: CATEGORICAL_STEPS[2],
-  bonds: CATEGORICAL_STEPS[3],
-  realEstate: CATEGORICAL_STEPS[4],
-  equity: CATEGORICAL_STEPS[0],
-  crypto: CATEGORICAL_STEPS[1],
+// Equity, crypto and cash wear their fixed asset tokens (never the theme); bonds and real estate
+// have no fixed meaning and take series steps. A canvas cannot read a CSS var, so the donut resolves
+// the colour when it is built.
+export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
+  cash: CASH_COLOUR,
+  bonds: {step: CATEGORICAL_STEPS[3]},
+  realEstate: {step: CATEGORICAL_STEPS[4]},
+  equity: EQUITY_COLOUR,
+  crypto: CRYPTO_COLOUR,
 };
 
 export function holdingsComputed(store: StateSignals) {
@@ -140,7 +148,7 @@ export function holdingsComputed(store: StateSignals) {
       positionsByAssetClass().map(group => ({
         label: group.label,
         value: group.totalValue,
-        color: seriesColor(ASSET_CLASS_SERIES[group.assetClass]),
+        color: ChartColorUtils.canvas(ASSET_CLASS_COLOUR[group.assetClass]),
       }))
     ),
     allocationBreakdown: computed((): AllocationBreakdownRow[] => {
@@ -148,7 +156,7 @@ export function holdingsComputed(store: StateSignals) {
       const total = groups.reduce((sum, g) => sum + g.totalValue, 0);
       return groups.map(group => ({
         label: group.label,
-        color: ChartColorUtils.series(ASSET_CLASS_SERIES[group.assetClass]),
+        color: ChartColorUtils.css(ASSET_CLASS_COLOUR[group.assetClass]),
         value: group.totalValue,
         percent: total > 0 ? (group.totalValue / total) * WEIGHT_TO_PERCENT : 0,
       }));

@@ -2,8 +2,16 @@ import {computed, inject, type Signal} from '@angular/core';
 import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
 import {type AreaSeries, type BarSeries, type DonutSegment} from '@lifekit-hq/ui';
 
+import {
+  CASH_COLOUR,
+  CRYPTO_COLOUR,
+  EQUITY_COLOUR,
+  FLOW_IN_COLOUR,
+  FLOW_OUT_COLOUR,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
@@ -47,16 +55,16 @@ function formatMonthYear(date: Date): string {
 const SHORT_SPAN_DAYS = 92;
 const MS_PER_DAY = 86_400_000;
 
-// Chart-series steps (positions in the seed's categorical ramp); resolved when a chart is built,
-// since a canvas cannot read a CSS var. Colour carries no gain/loss meaning here: that is the
-// delta text's job alone.
-const SLEEVE_SERIES = {
-  banking: CATEGORICAL_STEPS[2],
-  brokerage: CATEGORICAL_STEPS[0],
-  crypto: CATEGORICAL_STEPS[1],
+// Sleeves keep the colour of the asset class they hold, and income / spending the money-in and
+// money-out colours: none of them follow the theme. Resolved when a chart is built, since a canvas
+// cannot read a CSS var.
+export const SLEEVE_COLOUR = {
+  banking: CASH_COLOUR,
+  brokerage: EQUITY_COLOUR,
+  crypto: CRYPTO_COLOUR,
 } as const;
-const INCOME_SERIES = CATEGORICAL_STEPS[0];
-const SPENDING_SERIES = CATEGORICAL_STEPS[5];
+const INCOME_COLOUR = FLOW_IN_COLOUR;
+const SPENDING_COLOUR = FLOW_OUT_COLOUR;
 const PERCENT = 100;
 const OTHER_CATEGORIES_LABEL = 'Other categories';
 
@@ -246,17 +254,17 @@ export function dashboardComputed(store: StateSignals) {
     return [
       {
         label: 'Banking',
-        color: seriesColor(SLEEVE_SERIES.banking),
+        color: ChartColorUtils.canvas(SLEEVE_COLOUR.banking),
         points: toPoints(carryForward(s => s.bankingTotal)),
       },
       {
         label: 'Brokerage',
-        color: seriesColor(SLEEVE_SERIES.brokerage),
+        color: ChartColorUtils.canvas(SLEEVE_COLOUR.brokerage),
         points: toPoints(carryForward(s => s.brokerageTotal)),
       },
       {
         label: 'Crypto',
-        color: seriesColor(SLEEVE_SERIES.crypto),
+        color: ChartColorUtils.canvas(SLEEVE_COLOUR.crypto),
         points: toPoints(carryForward(s => s.cryptoTotal)),
       },
     ];
@@ -349,12 +357,12 @@ export function dashboardComputed(store: StateSignals) {
       return [
         {
           label: 'Income',
-          color: seriesColor(INCOME_SERIES),
+          color: ChartColorUtils.canvas(INCOME_COLOUR),
           points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.inflow})),
         },
         {
           label: 'Spending',
-          color: seriesColor(SPENDING_SERIES),
+          color: ChartColorUtils.canvas(SPENDING_COLOUR),
           points: grouped.map(([key, v]) => ({label: formatMonthKey(key), value: v.outflow})),
         },
       ];

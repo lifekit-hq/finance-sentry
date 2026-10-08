@@ -182,9 +182,7 @@
                     }
                     <div amount class="min-w-[72px] text-right">
                       <div
-                        [class]="
-                          i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
-                        "
+                        [class]="i.direction === 'in' ? 'text-flow-in' : 'text-text-primary'"
                         class="text-cmn-sm font-semibold tabular-nums"
                       >
                         {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
@@ -257,9 +255,7 @@
                         }
                       </td>
                       <td
-                        [class]="
-                          i.direction === 'in' ? 'text-positive-default' : 'text-text-primary'
-                        "
+                        [class]="i.direction === 'in' ? 'text-flow-in' : 'text-text-primary'"
                         class="whitespace-nowrap px-cmn-4 py-cmn-3 text-right tabular-nums"
                       >
                         {{ i.direction === 'in' ? '+' : '−' }}{{ i.amount | money: i.currency }}
