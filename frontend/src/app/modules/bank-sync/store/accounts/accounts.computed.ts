@@ -1,7 +1,13 @@
 import {computed, type Signal} from '@angular/core';
-import {CATEGORICAL_STEPS, NEUTRAL_STEP, seriesColor} from '@lifekit-hq/charts-core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
+import {
+  CASH_COLOUR,
+  CRYPTO_COLOUR,
+  EQUITY_COLOUR,
+  NEUTRAL_COLOUR,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
+import {type ChartColour} from '../../../../shared/models/chart-colour/chart-colour.model';
 import {
   type AccountCategory,
   type CategorySection,
@@ -24,12 +30,13 @@ const CATEGORY_LABEL: Record<AccountCategory, string> = {
   other: 'Other',
 };
 
-// Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
-const CATEGORY_SERIES: Record<AccountCategory, number> = {
-  banking: CATEGORICAL_STEPS[2],
-  brokerage: CATEGORICAL_STEPS[0],
-  crypto: CATEGORICAL_STEPS[1],
-  other: NEUTRAL_STEP,
+// Each sleeve keeps the colour of the asset class it holds: banking is cash, brokerage is equity.
+// Resolved when the donut is built, since a canvas cannot read a CSS var.
+export const CATEGORY_COLOUR: Record<AccountCategory, ChartColour> = {
+  banking: CASH_COLOUR,
+  brokerage: EQUITY_COLOUR,
+  crypto: CRYPTO_COLOUR,
+  other: NEUTRAL_COLOUR,
 };
 
 const SECTION_ORDER: Omit<CategorySection, 'summary'>[] = [
@@ -60,7 +67,7 @@ export function accountsComputed(store: StateSignals) {
         .map(cat => ({
           label: CATEGORY_LABEL[cat.category],
           value: cat.totalInBaseCurrency,
-          color: seriesColor(CATEGORY_SERIES[cat.category]),
+          color: ChartColorUtils.canvas(CATEGORY_COLOUR[cat.category]),
         }))
     ),
     netWorthBreakdown: computed((): NetWorthBreakdownRow[] => {
@@ -71,7 +78,7 @@ export function accountsComputed(store: StateSignals) {
       return positive
         .map(cat => ({
           label: CATEGORY_LABEL[cat.category],
-          color: ChartColorUtils.series(CATEGORY_SERIES[cat.category]),
+          color: ChartColorUtils.css(CATEGORY_COLOUR[cat.category]),
           value: cat.totalInBaseCurrency,
           institutionCount: cat.institutionCount,
           percent: total > 0 ? (cat.totalInBaseCurrency / total) * PERCENT : 0,

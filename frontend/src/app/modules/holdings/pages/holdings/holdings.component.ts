@@ -13,6 +13,10 @@ import {
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
@@ -55,8 +59,8 @@ export class InvestmentsComponent {
     }
     return this.store.isPositionsLoading() ? 'loading' : 'success';
   });
-  public readonly pnlPositiveClass = 'text-status-success';
-  public readonly pnlNegativeClass = 'text-status-error';
+  public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
+  public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
 
   /** Cash rows are currency balances, not holdings - they have no dossier to open. */
   public openDossier(assetClass: AssetClass, symbol: string): void {

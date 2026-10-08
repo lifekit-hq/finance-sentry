@@ -23,6 +23,10 @@ import {
 } from '@lifekit-hq/ui';
 
 import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
@@ -385,7 +389,7 @@ export class DashboardComponent {
     if (!delta) {
       return 'text-text-secondary';
     }
-    return delta > 0 ? 'text-status-success' : 'text-status-error';
+    return delta > 0 ? GAIN_TEXT_CLASS : LOSS_TEXT_CLASS;
   }
 
   public onRangeChange(event: Event): void {

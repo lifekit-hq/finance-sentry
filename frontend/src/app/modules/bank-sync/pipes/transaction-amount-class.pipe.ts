@@ -1,5 +1,6 @@
 import {Pipe, type PipeTransform} from '@angular/core';
 
+import {FLOW_IN_TEXT_CLASS} from '../../../shared/constants/chart-colour/chart-colour.constants';
 import {type GlobalTransactionDto} from '../models/transaction/transaction.model';
 
 /** Credits read green, pending rows muted, everything else in the primary text colour. */
@@ -11,6 +12,6 @@ export class TransactionAmountClassPipe implements PipeTransform {
     if (transaction.isPending) {
       return 'text-text-secondary';
     }
-    return transaction.transactionType === 'credit' ? 'text-status-success' : 'text-text-primary';
+    return transaction.transactionType === 'credit' ? FLOW_IN_TEXT_CLASS : 'text-text-primary';
   }
 }

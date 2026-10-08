@@ -100,8 +100,8 @@ describe('InvestmentsComponent — positions view', () => {
       totalPositionsValue: signal(150),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
-        {label: 'Equities', color: 'var(--color-chart-series-1)', value: 100, percent: 67},
-        {label: 'Crypto', color: 'var(--color-chart-series-2)', value: 50, percent: 33},
+        {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},
+        {label: 'Crypto', color: 'var(--color-asset-crypto)', value: 50, percent: 33},
       ]),
     };
 
@@ -155,7 +155,7 @@ describe('InvestmentsComponent — positions view', () => {
     );
     const up = cells.find(c => c.textContent?.includes('+1.25%'));
     const none = cells.find(c => c.textContent?.trim() === '—');
-    expect(up?.className).toContain('text-status-success');
+    expect(up?.className).toContain('text-gain');
     expect(none?.className).toContain('text-text-secondary');
   });
 
@@ -171,7 +171,7 @@ describe('InvestmentsComponent — positions view', () => {
       '[data-testid="holding-day-change"]'
     );
     expect(cell?.textContent).toContain('-0.80%');
-    expect(cell?.className).toContain('text-status-error');
+    expect(cell?.className).toContain('text-loss');
   });
 
   it('shows the provider as a subtitle under the symbol', () => {
