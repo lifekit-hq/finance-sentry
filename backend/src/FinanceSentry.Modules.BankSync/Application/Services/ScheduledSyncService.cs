@@ -90,15 +90,25 @@ public class ScheduledSyncService(
                 : new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
         }
 
-        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct)
-            ?? throw new InvalidOperationException($"Account {accountId} vanished after its sync was claimed.");
-
-        var job = new SyncJob(accountId, account.UserId)
+        Domain.BankAccount account;
+        SyncJob job;
+        try
         {
-            Status = "running",
-            StartedAt = startedAt
-        };
-        await _syncJobs.AddAsync(job, ct);
+            account = await _accounts.GetByIdUnscopedAsync(accountId, ct)
+                ?? throw new InvalidOperationException($"Account {accountId} vanished after its sync was claimed.");
+
+            job = new SyncJob(accountId, account.UserId)
+            {
+                Status = "running",
+                StartedAt = startedAt
+            };
+            await _syncJobs.AddAsync(job, ct);
+        }
+        catch
+        {
+            await ReleaseClaimAsync(accountId, CancellationToken.None);
+            throw;
+        }
 
         _logger.SyncStarted(job.CorrelationId ?? job.Id.ToString(), accountId);
 
@@ -144,9 +154,10 @@ public class ScheduledSyncService(
                     await _accounts.UpdateAsync(freshAccount, ct);
                 }
             }
-            catch
+            catch (Exception releaseEx)
             {
-                // best-effort
+                _logger.SyncFailed(job.CorrelationId ?? job.Id.ToString(), accountId,
+                    ClaimReleaseFailedCode, releaseEx.Message, job.RetryCount);
             }
 
             await _connectionHealth.RecordFailureAsync(
@@ -173,6 +184,28 @@ public class ScheduledSyncService(
             }
 
             return new SyncResult(false, 0, 0, errorCode, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Frees the claim when a failure hits between the claim and the sync proper, where there is no job to
+    /// fail yet. Only a startup sweep would otherwise release it, so the account would refuse every sync
+    /// until the next restart. A failed release is logged; the original exception is the one that propagates.
+    /// </summary>
+    private async Task ReleaseClaimAsync(Guid accountId, CancellationToken ct)
+    {
+        try
+        {
+            var claimed = await _accounts.GetByIdUnscopedAsync(accountId, ct);
+            if (claimed is { SyncStatus: "syncing" })
+            {
+                claimed.MarkTransientRetry();
+                await _accounts.UpdateAsync(claimed, ct);
+            }
+        }
+        catch (Exception releaseEx)
+        {
+            _logger.SyncFailed(accountId.ToString(), accountId, ClaimReleaseFailedCode, releaseEx.Message, 0);
         }
     }
 
@@ -495,6 +528,7 @@ public class ScheduledSyncService(
     private static bool IsUpstreamServerError(ApiException ex) =>
         ex.StatusCode >= ServerErrorStatus && !LocalFailureCodes.Contains(ex.ErrorCode);
     private const int MaxLastSyncErrorLength = 500;
+    private const string ClaimReleaseFailedCode = "SYNC_CLAIM_RELEASE_FAILED";
 
     /// <summary>
     /// Classifies a failed sync from the typed exception (<see cref="TrueLayerException"/> /

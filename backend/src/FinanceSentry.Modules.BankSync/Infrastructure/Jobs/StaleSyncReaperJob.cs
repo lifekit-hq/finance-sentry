@@ -9,8 +9,8 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 /// between the claim and completion leaves the account "syncing" and its <see cref="Domain.SyncJob"/>
 /// "running", and the claim would refuse every later sync for that account.
 ///
-/// No sync survives a process restart, so on startup every in-flight job is failed and every
-/// "syncing" account is released, before the host serves and before Hangfire starts.
+/// No sync survives a process restart, so a sweep enqueued at startup (it runs on a Hangfire worker) fails
+/// every in-flight job and releases every "syncing" account.
 /// </summary>
 public class StaleSyncReaperJob(
     ISyncJobRepository syncJobs,

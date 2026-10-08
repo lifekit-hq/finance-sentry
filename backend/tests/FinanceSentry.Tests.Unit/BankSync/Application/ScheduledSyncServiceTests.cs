@@ -151,6 +151,21 @@ public class ScheduledSyncServiceTests
         h.Provider.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task PerformFullSyncAsync_JobCreationThrowsAfterClaim_ReleasesTheClaimAndRethrows()
+    {
+        var h = BuildSut();
+        h.JobRepo.Setup(r => r.AddAsync(It.IsAny<SyncJob>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        var act = () => h.Sut.PerformFullSyncAsync(h.Account.Id);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("db down");
+        h.Account.SyncStatus.Should().Be("active");
+        h.AccountRepo.Verify(r => r.UpdateAsync(h.Account, It.IsAny<CancellationToken>()), Times.Once);
+        h.Provider.VerifyNoOtherCalls();
+    }
+
     // ── T313-1: Account not found ───────────────────────────────────────────
 
     [Fact]
