@@ -207,7 +207,7 @@ public class BankSyncController(
         if (account == null || account.UserId != userId)
             return NotFound(new ApiErrorBody("Account not found.", "ACCOUNT_NOT_FOUND"));
 
-        if (await _syncJobs.HasRunningJobAsync(accountId, ct))
+        if (account.SyncStatus == "syncing")
             return Conflict(new ApiErrorBody("A sync is already in progress for this account.", "SYNC_IN_PROGRESS"));
 
         var hangfireJobId = _backgroundJobs.Enqueue<Infrastructure.Jobs.ScheduledSyncJob>(

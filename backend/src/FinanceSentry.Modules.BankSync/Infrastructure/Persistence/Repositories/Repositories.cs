@@ -118,6 +118,36 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
         return true;
     }
 
+    public async Task<bool> TryClaimSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        var claimed = await AllUsers
+            .Where(ba => ba.Id == accountId && ba.IsActive && ba.SyncStatus != "syncing")
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.SyncStatus, "syncing").SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+
+        // ExecuteUpdate bypasses the change tracker; refresh an instance this scope already loaded
+        // (the coordinator reads the account first) so it does not report the pre-claim status.
+        if (claimed == 1)
+        {
+            foreach (var entry in _context.ChangeTracker.Entries<BankAccount>().Where(e => e.Entity.Id == accountId).ToList())
+                await entry.ReloadAsync(cancellationToken);
+        }
+
+        return claimed == 1;
+    }
+
+    public async Task ReleaseSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        await AllUsers
+            .Where(ba => ba.Id == accountId && ba.SyncStatus == "syncing")
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.SyncStatus, "active")
+                    .SetProperty(ba => ba.LastSyncError, (string?)null)
+                    .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+    }
+
     public async Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default)
     {
         return await AllUsers
@@ -443,18 +473,6 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
         _context.SyncJobs.Remove(job);
         await _context.SaveChangesAsync(cancellationToken);
         return true;
-    }
-
-    public async Task<bool> HasRunningJobAsync(Guid accountId, CancellationToken cancellationToken = default)
-    {
-        return await _context.SyncJobs
-            .AnyAsync(sj => sj.AccountId == accountId && sj.Status == "running", cancellationToken);
-    }
-
-    public async Task<bool> HasRunningJobUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
-    {
-        return await AllUsers
-            .AnyAsync(sj => sj.AccountId == accountId && sj.Status == "running", cancellationToken);
     }
 
     public async Task<SyncJob?> GetLatestSuccessfulByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)

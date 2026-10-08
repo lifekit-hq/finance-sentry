@@ -71,6 +71,21 @@ public interface IBankAccountRepository
     Task<bool> HardDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically claims the account for a sync: one conditional UPDATE moves <c>SyncStatus</c> to
+    /// "syncing" unless it already is, so of any number of concurrent callers exactly one gets true.
+    /// False when another sync holds the account (or it is missing or inactive). Opts out of the Owner
+    /// query filter; the claim is released by the sync's own completion or by <c>StaleSyncReaperJob</c>.
+    /// </summary>
+    Task<bool> TryClaimSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Releases a claim: one conditional UPDATE moves <c>SyncStatus</c> from "syncing" to "active" and clears the
+    /// last error. It bypasses the change tracker, so a context left holding pending changes by a failed save
+    /// cannot block it. Opts out of the Owner query filter.
+    /// </summary>
+    Task ReleaseSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get accounts of every user with specific sync status. Opts out of the Owner query filter.
     /// </summary>
     Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default);
@@ -234,19 +249,6 @@ public interface ISyncJobRepository
     /// Delete sync job (hard delete, safe for job records).
     /// </summary>
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Returns true if there is at least one SyncJob with the given status for the account.
-    /// Used to check for a currently running job before starting a new one. Runs under the Owner
-    /// query filter.
-    /// </summary>
-    Task<bool> HasRunningJobAsync(Guid accountId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// <see cref="HasRunningJobAsync"/> for the scheduled sync, which has no person in scope. Opts out of
-    /// the Owner query filter.
-    /// </summary>
-    Task<bool> HasRunningJobUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get the most recent successful sync job for any account owned by the user.

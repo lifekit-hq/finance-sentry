@@ -6,7 +6,7 @@ using Hangfire;
 
 /// <summary>
 /// Coordinates sync requests from multiple trigger sources (scheduler, manual).
-/// Ensures only one sync runs at a time per account — additional requests are silently dropped.
+/// Ensures only one sync runs at a time per account — <see cref="IScheduledSyncService"/> claims the account atomically and refuses a second start.
 /// </summary>
 public interface ITransactionSyncCoordinator
 {
@@ -19,12 +19,10 @@ public interface ITransactionSyncCoordinator
 
 /// <inheritdoc />
 public class TransactionSyncCoordinator(
-    ISyncJobRepository syncJobs,
     IBankAccountRepository accounts,
     IScheduledSyncService syncService,
     IBackgroundJobClient backgroundJobs) : ITransactionSyncCoordinator
 {
-    private readonly ISyncJobRepository _syncJobs = syncJobs;
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly IScheduledSyncService _syncService = syncService;
     private readonly IBackgroundJobClient _backgroundJobs = backgroundJobs;
@@ -32,9 +30,6 @@ public class TransactionSyncCoordinator(
     /// <inheritdoc />
     public async Task<SyncResult> TriggerScheduledSyncAsync(Guid accountId, CancellationToken ct = default)
     {
-        if (await _syncJobs.HasRunningJobUnscopedAsync(accountId, ct))
-            return new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
-
         // An account whose provider consent has expired/been revoked cannot sync until the user
         // reconnects. Skip it in the recurring scheduler so it stops failing every cycle; the reconnect
         // flow clears the state via MarkActive. Manual syncs are unaffected.
@@ -48,9 +43,6 @@ public class TransactionSyncCoordinator(
     /// <inheritdoc />
     public async Task<SyncResult> TriggerManualSyncAsync(Guid accountId, CancellationToken ct = default)
     {
-        if (await _syncJobs.HasRunningJobUnscopedAsync(accountId, ct))
-            return new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
-
         return ChaseWithDetection(await _syncService.PerformFullSyncAsync(accountId, ct: ct));
     }
 
