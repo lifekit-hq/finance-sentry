@@ -67,18 +67,22 @@ const json = (body: unknown) => ({
 });
 
 // Enough snapshots for the hero chart, so the baseline shows the figure, chart and range control as one card.
+// The first two days predate the cash / invested split (drawn as the "No split" band); the last two
+// carry it, with cash as the remainder, so the baseline shows the stacked Cash / invested chart and the
+// invested change beside the net-worth change.
 const HISTORY = [
-  ['2026-07-15', 41_000, 5_000, 1_000],
-  ['2026-08-15', 42_500, 5_500, 1_200],
-  ['2026-09-01', 43_000, 5_800, 1_100],
-  ['2026-09-15', 43_000, 5_800, 1_200],
-].map(([snapshotDate, bankingTotal, brokerageTotal, cryptoTotal]) => ({
+  ['2026-07-15', 41_000, 5_000, 1_000, null],
+  ['2026-08-15', 42_500, 5_500, 1_200, null],
+  ['2026-09-01', 43_000, 5_800, 1_100, [43_900, 5_300, 700]],
+  ['2026-09-15', 43_000, 5_800, 1_200, [43_400, 5_600, 1_000]],
+].map(([snapshotDate, bankingTotal, brokerageTotal, cryptoTotal, split]) => ({
   snapshotDate,
   bankingTotal,
   brokerageTotal,
   cryptoTotal,
   totalNetWorth: Number(bankingTotal) + Number(brokerageTotal) + Number(cryptoTotal),
   currency: 'USD',
+  ...(split && {cashTotal: split[0], brokerageInvested: split[1], cryptoInvested: split[2]}),
 }));
 
 async function openDashboard(page: Page): Promise<void> {

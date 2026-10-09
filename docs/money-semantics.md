@@ -701,6 +701,24 @@ are closed periods.
   book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
   records 0 invested for it even when the previous row has no split. Idempotent and bounded: it fills only null columns, never
   overwrites, and reads at most one history window per user.
+- **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
+  has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
+  Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
+  its stored `totalNetWorth` (a negative cash band is drawn as it is). A charted day with no split is
+  never dropped and never drawn as zeros in the three bands: it is one neutral **No split** band
+  carrying the day's total (its sleeves summed, with the carry-forward below), so the stack top is the
+  total on every day and a long range shows the split only where it exists. A window with no split
+  day at all keeps the old Banking / Brokerage / Crypto sleeve stack. The figure under the headline
+  is labelled **Change** (last minus first `totalNetWorth` in the range, in amount and percent): it
+  is a change in net worth, savings and cash included, not a return. Beside it, **Invested change**
+  is the change in `brokerageInvested + cryptoInvested` from the first to the last day that has a
+  split in the range (percent of the starting invested value, omitted when that is 0). It is a change
+  in invested value, so deposits into the brokerage or a venue count in it - it is not a return - and
+  it is hidden when the range has fewer than two days with a split. It carries the headline's range
+  label when the split covers the whole range, and "since <first split date>" when the split starts
+  later. While scrubbing, it runs from the
+  first split day to the scrubbed day, and is hidden when the scrubbed day has no split. The
+  "At this pace" projection is untouched (built from savings, not from this line).
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,

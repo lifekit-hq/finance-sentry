@@ -24,7 +24,8 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
 function fakeStore(
   range: HistoryRange,
   data: unknown = {accountCount: 1, topCategories: []},
-  bookSplit: string | null = null
+  bookSplit: string | null = null,
+  overrides: Record<string, unknown> = {}
 ) {
   const historyRange = signal<HistoryRange>(range);
   const setScrubIndex = vi.fn();
@@ -49,15 +50,26 @@ function fakeStore(
     netWorthStaleNotice: signal(null),
     netWorthChangeFormatted: signal(null),
     netWorthChangePercentFormatted: signal(null),
+    investedChangeFormatted: signal(''),
+    investedChangePercentFormatted: signal(''),
+    investedChangeDirection: signal(0),
+    investedChangeSinceFormatted: signal(null),
+    netWorthChartLabel: signal('Net worth by sleeve'),
     bookSplitFormatted: signal(bookSplit),
+    ...overrides,
   };
   return new Proxy(real, {
     get: (target, prop: string) => target[prop] ?? signal([]),
   });
 }
 
-function render(range: HistoryRange = '3m', data?: unknown, bookSplit: string | null = null) {
-  const store = fakeStore(range, data, bookSplit);
+function render(
+  range: HistoryRange = '3m',
+  data?: unknown,
+  bookSplit: string | null = null,
+  overrides: Record<string, unknown> = {}
+) {
+  const store = fakeStore(range, data, bookSplit, overrides);
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -139,6 +151,50 @@ describe('DashboardComponent range presets', () => {
 
     expect(el.querySelector('[data-testid="net-worth-split-slot"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="net-worth-split"]')).toBeNull();
+  });
+
+  it('labels the net-worth figure a change, with the invested change on the line below', () => {
+    const el = render('3m', undefined, null, {
+      netWorthChangeFormatted: signal('+$320'),
+      netWorthChangePercentFormatted: signal('+3.2%'),
+      netWorthChangeDirection: signal(1),
+      scrubDateFormatted: signal(null),
+      investedChangeFormatted: signal('+$500'),
+      investedChangePercentFormatted: signal('+8.3%'),
+      investedChangeDirection: signal(1),
+    }).el;
+    const change = el.querySelector('[data-testid="net-worth-change"]');
+    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
+
+    expect(change?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Change +$320 (+3.2%) · 3M');
+    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Invested change +$500 (+8.3%) · 3M'
+    );
+    expect(change?.compareDocumentPosition(invested as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('dates the invested change from its first split day when that is after the range start', () => {
+    const el = render('1y', undefined, null, {
+      scrubDateFormatted: signal(null),
+      investedChangeFormatted: signal('+$500'),
+      investedChangePercentFormatted: signal('+8.3%'),
+      investedChangeDirection: signal(1),
+      investedChangeSinceFormatted: signal('since Jul 8, 2026'),
+    }).el;
+    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
+
+    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Invested change +$500 (+8.3%) · since Jul 8, 2026'
+    );
+  });
+
+  it('keeps the invested-change slot but leaves it empty below two split days', () => {
+    const el = render().el;
+
+    expect(el.querySelector('[data-testid="net-worth-invested-change-slot"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="net-worth-invested-change"]')).toBeNull();
   });
 
   it('scrubs the hero figure to the point under the pointer and snaps back on release', () => {
