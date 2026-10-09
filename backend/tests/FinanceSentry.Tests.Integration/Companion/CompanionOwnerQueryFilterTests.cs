@@ -110,7 +110,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(4);
+        perUser.Should().HaveCount(5);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -123,6 +123,69 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         P256dh = "p256dh-key",
         Auth = "auth-secret",
     };
+
+    private static ProblemReport NewReport(Guid userId, ProblemReportStatus status = ProblemReportStatus.Pending, DateTimeOffset? nextAttemptAt = null) => new()
+    {
+        UserId = userId,
+        Role = "member",
+        Text = "broken",
+        RoutePattern = "/accounts/:id",
+        AppVersion = "1.15.0",
+        Device = ProblemReportDevice.Phone,
+        Client = "iOS Safari",
+        CorrelationId = "corr",
+        CreatedAt = DateTimeOffset.UtcNow,
+        Status = status,
+        NextAttemptAt = nextAttemptAt,
+    };
+
+    [DockerRequiredFact]
+    public async Task Problem_reports_are_scoped_to_their_owner_and_invisible_with_no_person_in_scope()
+    {
+        await SeedAsync(NewReport(_userA), NewReport(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ProblemReportRepository(asA);
+            (await asA.ProblemReports.Select(r => r.UserId).ToListAsync()).Should().Equal(_userA);
+            (await repo.ListCreatedAtSinceAsync(_userB, DateTimeOffset.UtcNow.AddDays(-1))).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+            (await repo.ListCreatedAtSinceAsync(_userA, DateTimeOffset.UtcNow.AddDays(-1))).Should().HaveCount(1);
+        }
+
+        await using (var asB = CreateContext(_userB))
+            (await asB.ProblemReports.AnyAsync(r => r.UserId == _userA)).Should().BeFalse();
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.ProblemReports.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task The_problem_report_forwarder_reads_and_updates_across_users_with_no_person_in_scope()
+    {
+        var due = NewReport(_userA);
+        var later = NewReport(_userB, nextAttemptAt: DateTimeOffset.UtcNow.AddHours(1));
+        var done = NewReport(_userB, ProblemReportStatus.Forwarded);
+        await SeedAsync(due, later, done);
+
+        await using (var job = CreateContext())
+        {
+            var repo = new ProblemReportRepository(job);
+            var found = await repo.ListDueUnscopedAsync(DateTimeOffset.UtcNow, 50);
+            found.Select(r => r.Id).Should().Equal(due.Id);
+
+            found[0].Status = ProblemReportStatus.Forwarded;
+            found[0].ForwardedAt = DateTimeOffset.UtcNow;
+            await repo.UpdateUnscopedAsync(found[0]);
+        }
+
+        await using (var job = CreateContext())
+            (await new ProblemReportRepository(job).ListDueUnscopedAsync(DateTimeOffset.UtcNow, 50)).Should().BeEmpty();
+
+        await using var asA = CreateContext(_userA);
+        (await asA.ProblemReports.SingleAsync()).Status.Should().Be(ProblemReportStatus.Forwarded,
+            "the update the job made with no person in scope reached A's row");
+    }
 
     [DockerRequiredFact]
     public async Task Push_rows_are_scoped_to_their_owner()

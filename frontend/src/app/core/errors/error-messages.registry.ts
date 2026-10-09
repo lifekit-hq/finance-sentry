@@ -88,6 +88,8 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   COMMITMENT_ALREADY_LINKED: 'This row already follows its transactions.',
   INVALID_COMMITMENT_KIND: 'Choose subscription or installment.',
   INVALID_COMMITMENT_CADENCE: 'Choose monthly or yearly.',
+  REPORT_RATE_LIMITED: "You've sent several reports recently. Try again later.",
+  REPORT_NOT_ALLOWED: "Reporting isn't available for this account.",
   // Feature 040 agent error codes are lowercase snake_case by contract (chat-endpoint.md).
   /* eslint-disable @typescript-eslint/naming-convention */
   agent_not_configured:

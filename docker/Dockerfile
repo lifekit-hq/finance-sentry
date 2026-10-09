@@ -37,10 +37,11 @@ WORKDIR /app
 # curl/tzdata for health + timezones; postgresql16-client (pg_dump/pg_restore/createdb/dropdb) + age
 # power the feature-024 off-host backup + restore-drill jobs. A v16 client dumps/restores the v14
 # server (supported newer-client→older-server direction); backups no-op when BACKUP_* is unset.
+# openssh-client: problem reports reach the fleet inbox over the host's kit-relay forced command (ssh only; no sshd).
 # apk upgrade first: the aspnet base image lags Alpine security releases (openssl/libpq CVEs)
 # and the Trivy HIGH/CRITICAL gate in docker-build.yml fails the build until they're patched.
 RUN apk upgrade --no-cache && \
-    apk add --no-cache curl tzdata postgresql16-client age krb5-libs
+    apk add --no-cache curl tzdata postgresql16-client age krb5-libs openssh-client
 
 COPY --from=build /app/publish .
 

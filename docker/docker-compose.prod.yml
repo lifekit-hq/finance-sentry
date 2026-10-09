@@ -160,6 +160,13 @@ services:
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
       # Inzhur sign-in runs in the inzhur-browser sidecar (owner-initiated only; the daily sync never opens it).
       Inzhur__BrowserUrl: http://inzhur-browser:9222
+      # Problem reports are saved, then forwarded to the fleet inbox through the host's kit-relay (ssh forced command,
+      # `fs-` sender). The forwarder runs only while this file exists; without it reports stay saved and pending, so
+      # the api starts and serves the same either way. The ssh_config and key come with the relay sender (see FS_RELAY_DIR).
+      ProblemReports__RelayConfigPath: /run/lifekit/fs-relay/ssh_config
+    # host.docker.internal is how the relay's ssh_config reaches the host's sshd from inside the container.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
@@ -179,6 +186,10 @@ services:
       start_period: 40s
     volumes:
       - api_logs:/app/logs
+      # The relay sender's key dir (id_ed25519, pinned known_hosts, ssh_config), read-only. Inert until the operator
+      # sets FS_RELAY_DIR=/srv/lifekit-secrets/fs-relay in docker/.env.sops: unset, it binds /dev/null (always present),
+      # so a missing key dir can never stop the api container from starting.
+      - ${FS_RELAY_DIR:-/dev/null}:/run/lifekit/fs-relay:ro
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

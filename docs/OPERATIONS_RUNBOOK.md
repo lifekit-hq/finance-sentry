@@ -138,6 +138,15 @@ GET /health/ready → 503
 - Dry run: dispatch *Prune Host Images* with `dry_run` ticked, or run `docker/prune-host-images.sh --dry-run` on the host. The job log lists every `removed` / `would remove` / `keep` decision.
 - Change the retention: edit the `KEEP_NEWEST` constant in `docker/prune-host-images.sh`.
 
+## 10. Problem Reports Not Reaching the Fleet Inbox
+
+`POST /api/v1/feedback` saves the report (`companion.problem_reports`, status `Pending`) and answers `202` with `FS-R-<id>`; the Hangfire job `problem-reports-forward` (every minute) then sends it through the host's `kit-relay` over ssh as request id `fs-report-<id>`. A report is never lost to a relay problem: it stays saved, and a retry is the same note because the relay dedups on the request id.
+
+- **Pending and no errors in the log**: the relay sender is not set up. The job runs only when `ProblemReports__RelayConfigPath` (`/run/lifekit/fs-relay/ssh_config`) exists in the api container, and the compose bind for that directory is `${FS_RELAY_DIR:-/dev/null}`. Provision the `fs-` relay key dir (`id_ed25519`, pinned `known_hosts`, `ssh_config`, readable by `nobody`) on the host, set `FS_RELAY_DIR=/srv/lifekit-secrets/fs-relay` in `docker/.env.sops` and redeploy; the pending reports go out on the next run.
+- **Warnings `Problem report <id> not forwarded (attempt n)`**: ssh or the relay refused it; `LastError` on the row carries the exit code and stderr. Retried with backoff 1 min, 5 min, 15 min, 1 h, 4 h.
+- **Error `Problem report <id> failed after 6 attempts`**: status `Failed`, no further retries. Fix the cause, then `UPDATE companion.problem_reports SET "Status" = 'Pending', "Attempts" = 0, "NextAttemptAt" = NULL WHERE "Id" = <id>`.
+- The relay itself limits a sender to 30 notes per hour; past that the job pauses the batch without counting an attempt. Rows are purged after 90 days.
+
 ## Contact
 
 - On-call channel: `#finance-sentry-oncall`
