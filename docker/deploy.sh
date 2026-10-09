@@ -179,6 +179,26 @@ done
 
 echo "[deploy] ok — api reachable via gateway on 127.0.0.1:8080"
 
+# The gateway's passive health check marks the api destination unhealthy when a request meets
+# "Connection refused" during the api's startup, and keeps it so for the cluster's
+# ReactivationPeriod (1 minute, appsettings.json). The health wait above still passes (YARP
+# forwards when every destination is unhealthy), but /gateway/ready — the contract's ready item
+# for the gateway — answers 503 for that whole minute, longer than the contract's retries span.
+# So wait for it here, with a budget well past the reactivation period, before the contract runs.
+GATEWAY_READY_BUDGET_SECONDS=180
+echo "[deploy] wait for gateway ready (every cluster has an available destination)"
+deadline=$((SECONDS + GATEWAY_READY_BUDGET_SECONDS))
+until curl -sf http://127.0.0.1:8080/gateway/ready >/dev/null 2>&1; do
+  if [[ $SECONDS -gt $deadline ]]; then
+    echo "error: gateway readiness timed out after ${GATEWAY_READY_BUDGET_SECONDS}s" >&2
+    curl -s http://127.0.0.1:8080/gateway/ready >&2 || true
+    "${COMPOSE[@]}" logs --tail 60 gateway
+    exit 1
+  fi
+  sleep 2
+done
+echo "[deploy] ok — gateway ready"
+
 # Runtime gate: probe the running containers (health, ready, metrics, scraped, logs).
 # Bounded retry: the health wait above returns the moment the api answers, but the
 # `scraped` item reads Prometheus' LAST scrape of each target, and a container

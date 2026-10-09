@@ -1,4 +1,8 @@
-import {expect, type Page, test} from '@playwright/test';
+import {existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+
+import {type Browser, expect, type Page, test} from '@playwright/test';
 
 // READ-ONLY smoke against the deployed stack. This suite hits the production
 // database as the seeded smoke account (a Member with fake data, seeded by the
@@ -15,6 +19,15 @@ const PASSWORD = process.env['E2E_LIVE_LOGTO_PASSWORD'];
 const LOGTO_STEP_TIMEOUT_MS = 30_000;
 const SIGNED_IN_TIMEOUT_MS = 30_000;
 const SIGN_IN_SETUP_TIMEOUT_MS = 120_000;
+// A freshly recreated api answers its first data requests slowly (cold start); the page's own data
+// call, not a fixed heading wait, decides when the ledger has loaded.
+const LEDGER_DATA_TIMEOUT_MS = 30_000;
+const LEDGER_TEST_TIMEOUT_MS = 60_000;
+const RESTORED_SESSION_TIMEOUT_MS = 15_000;
+// The signed-in session, kept after every test. A failed test makes Playwright retry the whole serial
+// group in a fresh worker, which would otherwise sign in to Logto a second time (and, inside the
+// API's anonymous rate budget, may be answered 429). Outside test-results/ so nothing clears it.
+const SESSION_FILE = join(tmpdir(), 'live-smoke-session.json');
 
 async function login(page: Page): Promise<void> {
   if (!EMAIL || !PASSWORD) {
@@ -48,6 +61,27 @@ async function login(page: Page): Promise<void> {
   await expect(dashboard).toBeVisible({timeout: SIGNED_IN_TIMEOUT_MS});
 }
 
+// The retry reuses the session the first attempt saved; only when that does not land on the dashboard
+// (no file, expired cookies) does it fall back to a real sign-in.
+async function openSession(browser: Browser): Promise<Page> {
+  if (existsSync(SESSION_FILE)) {
+    const context = await browser.newContext({storageState: SESSION_FILE});
+    const restored = await context.newPage();
+    try {
+      await restored.goto('/');
+      await expect(restored.getByRole('heading', {name: 'Dashboard'})).toBeVisible({
+        timeout: RESTORED_SESSION_TIMEOUT_MS,
+      });
+      return restored;
+    } catch {
+      await context.close();
+    }
+  }
+  const page = await browser.newPage();
+  await login(page);
+  return page;
+}
+
 test.describe('Live smoke — deployed stack', () => {
   // One Logto sign-in per run, shared by the tests that need a session: a sign-in spends several
   // requests of the API's 10-per-minute anonymous budget per address, so a second one inside the
@@ -58,8 +92,11 @@ test.describe('Live smoke — deployed stack', () => {
 
   test.beforeAll(async ({browser}) => {
     test.setTimeout(SIGN_IN_SETUP_TIMEOUT_MS);
-    page = await browser.newPage();
-    await login(page);
+    page = await openSession(browser);
+  });
+
+  test.afterEach(async () => {
+    await page.context().storageState({path: SESSION_FILE});
   });
 
   test.afterAll(async () => {
@@ -80,7 +117,17 @@ test.describe('Live smoke — deployed stack', () => {
   });
 
   test('transaction ledger renders with live data', async () => {
+    test.setTimeout(LEDGER_TEST_TIMEOUT_MS);
+    // Only a successful response counts: the auth interceptor may retry a 401 after a token refresh.
+    const ledgerData = page.waitForResponse(
+      response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname.endsWith('/accounts/transactions') &&
+        response.ok(),
+      {timeout: LEDGER_DATA_TIMEOUT_MS}
+    );
     await page.goto('/transactions');
+    await ledgerData;
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     await expect(page.getByRole('searchbox', {name: 'Search transactions'})).toBeVisible();
   });
