@@ -40,6 +40,14 @@ jobs:
     - name: Check sops recipients
       run: .github/scripts/check-sops-recipients.sh
 
+    # The prod compose project was renamed from "docker" to "finance-sentry"; every named volume must
+    # stay pinned to its docker_* name or the stack would mount fresh empty ones.
+    - name: Check prod compose volume names
+      run: .github/scripts/check-compose-volume-names.sh
+
+    - name: Check deploy.sh legacy project retirement
+      run: .github/scripts/test-deploy-legacy-project.sh
+
     - name: Select images to build
       id: matrix
       env:

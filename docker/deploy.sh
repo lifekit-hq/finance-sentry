@@ -138,6 +138,21 @@ docker network inspect identity-oidc >/dev/null 2>&1 || docker network create id
 echo "[deploy] pull published images @ $IMAGE_TAG"
 "${COMPOSE[@]}" pull "${PUBLISHED[@]}"
 
+# --- One-shot project rename: "docker" -> "finance-sentry" ---------------------
+# The stack used to run as compose project "docker" (the directory name) and is now pinned to
+# `name: finance-sentry`. container_name is fixed, so the old project's containers must be gone
+# before the new project's can start. Its named volumes are pinned in the compose file to their
+# docker_* names, so the new project mounts the same data. `down` without -v removes only
+# containers and the project's networks; it never touches a volume. Once the old project is gone
+# this finds nothing and does nothing. Only a project whose containers came from this compose
+# file counts: another stack that happens to live in a directory named "docker" is left alone.
+legacy_files="$(docker ps -a --filter label=com.docker.compose.project=docker \
+  --format '{{.Label "com.docker.compose.project.config_files"}}')"
+if grep -q 'docker-compose\.prod\.yml' <<<"$legacy_files"; then
+  echo "[deploy] retire legacy compose project 'docker' (containers only; volumes kept)"
+  docker compose -p docker -f docker/docker-compose.prod.yml --env-file docker/.env --env-file "$DEPLOY_ENV_FILE" down
+fi
+
 echo "[deploy] docker compose up (no build)"
 "${COMPOSE[@]}" up -d --no-build --remove-orphans
 

@@ -21,6 +21,11 @@
 # sets no-new-privileges and a pids limit, and mounts its root filesystem read-only with tmpfs for
 # the paths it writes at runtime. Named volumes stay writable.
 
+# Project name pinned instead of inherited from the directory ("docker"). Compose prefixes every
+# unpinned named volume with it, so the volumes below carry explicit `name:`s: the live data sits
+# under the old "docker_" prefix and a renamed project would otherwise mount fresh empty ones.
+name: finance-sentry
+
 services:
   api:
     build:
@@ -437,10 +442,15 @@ services:
   # api reaches the moved Loki unchanged: it is on the `lifekit-shared` network,
   # where lifekit-stack's `loki` service name resolves.
 
+# Every named volume is pinned to the name it had under the old "docker" project; never drop a pin.
+# .github/scripts/check-compose-volume-names.sh fails CI when one is missing.
 volumes:
   postgres_data:
+    name: docker_postgres_data
   api_logs:
+    name: docker_api_logs
   gateway_keys:   # data-protection key cache for the non-root gateway (025) — only used when TLS/ACME is enabled
+    name: docker_gateway_keys
 
 networks:
   finance-sentry:
