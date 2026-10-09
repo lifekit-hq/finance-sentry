@@ -59,6 +59,18 @@ describe('parseChangelog', () => {
     );
   });
 
+  it('strips issue references that survive link removal', () => {
+    // Shapes taken from release-please output: "([#419](url) S3)" and ", closes [#704](url)".
+    assert.equal(
+      cleanSubject('auto-resolve alerts ([#419](https://x/issues/419) S3) ([#701](https://x/issues/701)) ([bffd437](https://x/commit/bffd437))'),
+      'Auto-resolve alerts'
+    );
+    assert.equal(
+      cleanSubject('let promotions skip the floor ([#728](https://x/issues/728)) ([ef8b715](https://x/commit/ef8b715)), closes [#704](https://x/issues/704)'),
+      'Let promotions skip the floor'
+    );
+  });
+
   it('keeps a version with no kept entries and reads the heading without a link', () => {
     const text = ['## 0.9.0 (2026-01-02)', '', '### Documentation', '', entry('docs', 'words'), ''].join('\n');
 

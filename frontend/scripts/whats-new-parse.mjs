@@ -44,7 +44,8 @@ const VERSION_HEADING = /^## \[?(\d+\.\d+\.\d+)\]?(?:\([^)]*\))?\s*(?:\((\d{4}-\
 const ENTRY = /^\* (?:\*\*([^*]+?):\*\* )?(.+)$/;
 const ISSUE_LINK = /\s*\(\[#\d+\]\([^)]*\)\)/g;
 const HASH_LINK = /\s*\(\[[0-9a-f]{7,40}\]\([^)]*\)\)/g;
-const BARE_ISSUE = /\s*\(#\d+\)/g;
+// Issue references left once links are reduced to text: "(#419 S3)", "(#695)", ", closes #704".
+const BARE_ISSUE = /\s*\(#\d+[^)]*\)|,?\s*\b(?:closes|fixes|resolves)\s+#\d+/gi;
 const MARKDOWN_LINK = /\[([^\]]+)\]\([^)]*\)/g;
 const ENTITIES = {'&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&amp;': '&'};
 
@@ -61,8 +62,8 @@ export function cleanSubject(raw) {
   const text = raw
     .replace(ISSUE_LINK, '')
     .replace(HASH_LINK, '')
-    .replace(BARE_ISSUE, '')
-    .replace(MARKDOWN_LINK, '$1');
+    .replace(MARKDOWN_LINK, '$1')
+    .replace(BARE_ISSUE, '');
   return capitalise(decodeEntities(text).trim());
 }
 
