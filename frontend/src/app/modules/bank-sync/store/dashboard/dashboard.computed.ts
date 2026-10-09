@@ -8,6 +8,7 @@ import {
   EQUITY_COLOUR,
   FLOW_IN_COLOUR,
   FLOW_OUT_COLOUR,
+  NEUTRAL_COLOUR,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
@@ -23,8 +24,10 @@ import {
   type HistoryRange,
   type MonthlyFlow,
   type NetWorthSnapshotDto,
+  type NetWorthSplit,
 } from '../../models/dashboard/dashboard.model';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
+import {NetWorthSplitUtils} from '../../utils/net-worth-split.utils';
 
 interface StateSignals {
   data: Signal<Nullable<DashboardData>>;
@@ -63,6 +66,16 @@ export const SLEEVE_COLOUR = {
   brokerage: EQUITY_COLOUR,
   crypto: CRYPTO_COLOUR,
 } as const;
+// The split chart's three bands keep the asset-class colours; days with no split are drawn as one
+// neutral band so they read as "total only", not as a share of any class.
+export const SPLIT_COLOUR = {
+  cash: CASH_COLOUR,
+  brokerageInvested: EQUITY_COLOUR,
+  cryptoInvested: CRYPTO_COLOUR,
+  unsplit: NEUTRAL_COLOUR,
+} as const;
+export const NET_WORTH_BY_SLEEVE_LABEL = 'Net worth by sleeve';
+export const NET_WORTH_BY_SPLIT_LABEL = 'Net worth by cash and invested';
 const INCOME_COLOUR = FLOW_IN_COLOUR;
 const SPENDING_COLOUR = FLOW_OUT_COLOUR;
 const PERCENT = 100;
@@ -99,6 +112,22 @@ function median(values: number[]): number {
 // Cents on a twelve-month forecast are noise.
 const WHOLE_DOLLARS = {maxFractionDigits: 0} as const;
 const CHANGE_PERCENT_DIGITS = 1;
+
+interface Change {
+  delta: number;
+  percent: number | null;
+}
+
+function changeOf(start: number, end: number): Change {
+  const delta = end - start;
+  return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
+}
+
+function formatPercent(percent: number | null | undefined): string {
+  return percent === null || percent === undefined
+    ? ''
+    : `${percent > 0 ? '+' : ''}${percent.toFixed(CHANGE_PERCENT_DIGITS)}%`;
+}
 
 function currentMonthKey(): string {
   const now = new Date();
@@ -228,8 +257,18 @@ export function dashboardComputed(store: StateSignals) {
     return s => label(new Date(s.snapshotDate));
   });
 
-  // Stacked net-worth composition (banking / brokerage / crypto) over time — the snapshots
-  // already carry each sleeve, so we plot the mix rather than throwing it away for one line.
+  // The cash / invested split of each charted snapshot; null on a day with no split.
+  const splitHistory = computed((): Nullable<NetWorthSplit>[] =>
+    validHistory().map(NetWorthSplitUtils.of)
+  );
+
+  // Once any charted day has a split the chart stacks cash / invested; a window with none keeps
+  // the sleeve stack, so ranges reaching before the backfill lose nothing they show today.
+  const hasSplit = computed(() => splitHistory().some(split => split !== null));
+
+  // Stacked net-worth composition over time. A split day's three bands add up to its stored
+  // total. A day with no split is drawn as a single "No split" band (its sleeves summed), never
+  // as zeros in the three bands and never dropped, so the stack top is the total on every day.
   const netWorthAreaSeries = computed((): AreaSeries[] => {
     const history = validHistory();
     if (history.length === 0) {
@@ -251,21 +290,57 @@ export function dashboardComputed(store: StateSignals) {
       });
     };
     const toPoints = (values: number[]) => values.map((value, i) => ({label: labels[i], value}));
+    const banking = carryForward(s => s.bankingTotal);
+    const brokerage = carryForward(s => s.brokerageTotal);
+    const crypto = carryForward(s => s.cryptoTotal);
+    const splits = splitHistory();
+    if (!hasSplit()) {
+      return [
+        {
+          label: 'Banking',
+          color: ChartColorUtils.canvas(SLEEVE_COLOUR.banking),
+          points: toPoints(banking),
+        },
+        {
+          label: 'Brokerage',
+          color: ChartColorUtils.canvas(SLEEVE_COLOUR.brokerage),
+          points: toPoints(brokerage),
+        },
+        {
+          label: 'Crypto',
+          color: ChartColorUtils.canvas(SLEEVE_COLOUR.crypto),
+          points: toPoints(crypto),
+        },
+      ];
+    }
+    const bands: AreaSeries[] = [
+      {
+        label: 'Cash',
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.cash),
+        points: toPoints(splits.map(split => split?.cash ?? 0)),
+      },
+      {
+        label: 'Brokerage invested',
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.brokerageInvested),
+        points: toPoints(splits.map(split => split?.brokerageInvested ?? 0)),
+      },
+      {
+        label: 'Crypto invested',
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.cryptoInvested),
+        points: toPoints(splits.map(split => split?.cryptoInvested ?? 0)),
+      },
+    ];
+    if (splits.every(split => split !== null)) {
+      return bands;
+    }
     return [
+      ...bands,
       {
-        label: 'Banking',
-        color: ChartColorUtils.canvas(SLEEVE_COLOUR.banking),
-        points: toPoints(carryForward(s => s.bankingTotal)),
-      },
-      {
-        label: 'Brokerage',
-        color: ChartColorUtils.canvas(SLEEVE_COLOUR.brokerage),
-        points: toPoints(carryForward(s => s.brokerageTotal)),
-      },
-      {
-        label: 'Crypto',
-        color: ChartColorUtils.canvas(SLEEVE_COLOUR.crypto),
-        points: toPoints(carryForward(s => s.cryptoTotal)),
+        label: 'No split',
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
+        points: toPoints(
+          splits.map((split, i) => (split === null ? banking[i] + brokerage[i] + crypto[i] : 0))
+        ),
       },
     ];
   });
@@ -292,7 +367,7 @@ export function dashboardComputed(store: StateSignals) {
 
   // Net-worth change from the window start to the figure shown: while scrubbing, both ends come
   // off the charted series; at rest, off the snapshots. Null until there are two usable snapshots.
-  const netWorthChange = computed((): {delta: number; percent: number | null} | null => {
+  const netWorthChange = computed((): Change | null => {
     const history = validHistory();
     if (history.length < MIN_POINTS_FOR_DELTA) {
       return null;
@@ -300,8 +375,21 @@ export function dashboardComputed(store: StateSignals) {
     const held = scrubbedTotal();
     const start = held === null ? history[0].totalNetWorth : chartedTotals()[0];
     const end = held ?? history[history.length - 1].totalNetWorth;
-    const delta = end - start;
-    return {delta, percent: start > 0 ? (delta / start) * PERCENT : null};
+    return changeOf(start, end);
+  });
+
+  // Change in the invested book (brokerage + crypto positions, cash excluded), over the days that
+  // have a split only: from the first split day to the last, or to the scrubbed day. It is a
+  // change in invested value, deposits included, not a return. Null until two split days exist
+  // (and while scrubbing a day with no split, or one before the first split day).
+  const investedChange = computed((): Change | null => {
+    const splits = splitHistory();
+    const first = splits.findIndex(split => split !== null);
+    const scrub = store.scrubIndex();
+    const endIndex = scrub ?? splits.map(split => split !== null).lastIndexOf(true);
+    const start = splits[first];
+    const end = splits[endIndex];
+    return start && end && endIndex > first ? changeOf(start.invested, end.invested) : null;
   });
 
   return {
@@ -335,14 +423,19 @@ export function dashboardComputed(store: StateSignals) {
         ? MoneyUtils.format(change.delta, baseCurrency(), {...WHOLE_DOLLARS, signed: true})
         : '';
     }),
-    netWorthChangePercentFormatted: computed(() => {
-      const percent = netWorthChange()?.percent;
-      return percent === null || percent === undefined
-        ? ''
-        : `${percent > 0 ? '+' : ''}${percent.toFixed(CHANGE_PERCENT_DIGITS)}%`;
-    }),
+    netWorthChangePercentFormatted: computed(() => formatPercent(netWorthChange()?.percent)),
     // Sign of the change, for colouring: 1 up, -1 down, 0 flat or unknown.
     netWorthChangeDirection: computed(() => Math.sign(netWorthChange()?.delta ?? 0)),
+
+    // The invested book's change beside it; '' (line hidden) below two days with a split.
+    investedChangeFormatted: computed(() => {
+      const change = investedChange();
+      return change
+        ? MoneyUtils.format(change.delta, baseCurrency(), {...WHOLE_DOLLARS, signed: true})
+        : '';
+    }),
+    investedChangePercentFormatted: computed(() => formatPercent(investedChange()?.percent)),
+    investedChangeDirection: computed(() => Math.sign(investedChange()?.delta ?? 0)),
 
     windowSpendingFormatted: computed(() => {
       const totals = windowTotals();
@@ -360,6 +453,9 @@ export function dashboardComputed(store: StateSignals) {
     }),
 
     netWorthAreaSeries,
+    netWorthChartLabel: computed(() =>
+      hasSplit() ? NET_WORTH_BY_SPLIT_LABEL : NET_WORTH_BY_SLEEVE_LABEL
+    ),
 
     incomeVsSpendingBars: computed((): BarSeries[] => {
       const grouped = completeMonths();

@@ -173,6 +173,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                     class="font-label text-cmn-sm font-medium leading-5"
                     data-testid="net-worth-change"
                   >
+                    <span class="font-normal text-text-secondary">Change</span>
                     {{ store.netWorthChangeFormatted() }}
                     @if (store.netWorthChangePercentFormatted()) {
                       ({{ store.netWorthChangePercentFormatted() }})
@@ -181,6 +182,28 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
                     >
                   </p>
+                }
+              </div>
+              <!--
+                The invested book's change (brokerage + crypto positions, cash excluded) over the
+                days that have a split. A change in value, deposits included, not a return. Empty
+                below two split days, so a range reaching before the backfill shows nothing here.
+              -->
+              <div class="h-4 leading-4" data-testid="net-worth-invested-change-slot">
+                @if (!store.isLoading() && !store.isHistoryLoading()) {
+                  @if (store.investedChangeFormatted()) {
+                    <p
+                      [class]="investedChangeClass()"
+                      class="font-label text-cmn-xs font-medium leading-4"
+                      data-testid="net-worth-invested-change"
+                    >
+                      <span class="font-normal text-text-secondary">Invested change</span>
+                      {{ store.investedChangeFormatted() }}
+                      @if (store.investedChangePercentFormatted()) {
+                        ({{ store.investedChangePercentFormatted() }})
+                      }
+                    </p>
+                  }
                 }
               </div>
               <!--
@@ -216,9 +239,9 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   [stacked]="true"
                   [currency]="store.baseCurrency()"
                   [scrubbable]="true"
+                  [label]="store.netWorthChartLabel()"
                   (scrub)="store.setScrubIndex($event.index)"
                   (scrubEnd)="store.setScrubIndex(null)"
-                  label="Net worth by sleeve"
                 />
                 @if (store.netWorthStaleNotice()) {
                   <div class="mt-cmn-2">
@@ -373,6 +396,9 @@ export class DashboardComponent {
   );
   public readonly changeClass = computed(() =>
     this.paceClass(this.store.netWorthChangeDirection())
+  );
+  public readonly investedChangeClass = computed(() =>
+    this.paceClass(this.store.investedChangeDirection())
   );
   // The three window figures read as one card. Savings opens the audit view, which
   // shows every money bucket at once.
