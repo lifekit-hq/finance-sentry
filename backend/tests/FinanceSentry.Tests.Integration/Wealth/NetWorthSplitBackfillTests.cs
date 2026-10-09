@@ -152,6 +152,39 @@ public sealed class NetWorthSplitBackfillTests : IDisposable
     }
 
     [Fact]
+    public async Task Backfill_FillsRowsWhoseCarriedSleeveIsEmpty()
+    {
+        await SeedAsync(Row(FirstCapturedDay, 2_000m, 800m, 0m, stale: "crypto"));
+
+        (await Backfill(new DailyInvestedBySleeve(FirstCapturedDay, 750m, 0m)).BackfillAsync()).Should().Be(1);
+
+        var stored = (await StoredAsync()).Single();
+        stored.CryptoInvested.Should().Be(0m);
+        stored.CashTotal.Should().Be(2_050m);
+    }
+
+    [Fact]
+    public async Task Backfill_LeavesTheSplitNull_WhenASleeveHasStoredValueButNoInvestedPositions()
+    {
+        await SeedAsync(
+            Row(FirstCapturedDay, 2_000m, 800m, 350m),
+            Row(FirstCapturedDay.AddDays(1), 2_000m, 800m, 350m),
+            Row(FirstCapturedDay.AddDays(2), 2_000m, 0m, 350m));
+
+        var filled = await Backfill(
+            new DailyInvestedBySleeve(FirstCapturedDay, BrokerageUsd: 0m, CryptoUsd: 300m),
+            new DailyInvestedBySleeve(FirstCapturedDay.AddDays(1), BrokerageUsd: 750m, CryptoUsd: 0m),
+            new DailyInvestedBySleeve(FirstCapturedDay.AddDays(2), BrokerageUsd: 0m, CryptoUsd: 300m)).BackfillAsync();
+
+        filled.Should().Be(1, "only the day whose empty sleeve really is empty is filled");
+        var rows = await StoredAsync();
+        rows[0].CashTotal.Should().BeNull("the brokerage source was missing, so its value would land whole in cash");
+        rows[1].CashTotal.Should().BeNull("the crypto source was missing");
+        rows[2].CashTotal.Should().Be(2_050m);
+        rows[2].BrokerageInvested.Should().Be(0m);
+    }
+
+    [Fact]
     public async Task Backfill_WithNoHistory_TouchesNothing()
     {
         await SeedAsync(Row(FirstCapturedDay, 2_000m, 800m, 350m));

@@ -24,8 +24,8 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);
 
         var total = banking + brokerage + crypto;
-        var brokerageInvested = ResolveInvested(data.BrokerageInvested, previous?.BrokerageInvested, stale.Contains("brokerage"));
-        var cryptoInvested = ResolveInvested(data.CryptoInvested, previous?.CryptoInvested, stale.Contains("crypto"));
+        var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, stale.Contains("brokerage"));
+        var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
         var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
 
         var snapshot = new NetWorthSnapshot
@@ -55,10 +55,18 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
 
     /// <summary>
     /// The invested part of a sleeve: as measured this run, or - when the sleeve was carried forward - the
-    /// previous snapshot's invested part (null if that had no split).
+    /// previous snapshot's invested part. A carried sleeve that is empty (carried total 0, nothing measured
+    /// this run) has nothing invested, so its split starts at 0 even when the previous row predates the split.
     /// </summary>
-    private static decimal? ResolveInvested(decimal? measured, decimal? previous, bool carriedForward)
-        => carriedForward ? previous : measured;
+    private static decimal? ResolveInvested(
+        decimal measuredTotal, decimal? measuredInvested, decimal recordedTotal, decimal? previousInvested, bool carriedForward)
+    {
+        if (!carriedForward)
+            return measuredInvested;
+
+        var emptySleeve = recordedTotal == 0m && measuredTotal == 0m && measuredInvested == 0m;
+        return previousInvested ?? (emptySleeve ? 0m : null);
+    }
 
     /// <summary>
     /// Returns the value to record for a sleeve. Uses the fresh value when the feed is

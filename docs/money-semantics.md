@@ -690,12 +690,16 @@ are closed periods.
   the columns are nullable and additive, `totalNetWorth` and the sleeve totals are untouched.
 - **Split backfill** (`NetWorthSplitBackfillService`, run by the worker's background catch-up
   `NetWorthSnapshotCatchUpHostedService` after the missed-day backfill - not in the migration, and it
-  never blocks startup): fills the split of older rows **exactly** from the invested positions in
-  Risk's `holding_snapshots` (latest run per UTC day, via `IInvestedHistoryReader`), using the row's
-  own stored total for the cash remainder. That table keeps 180 days (about 2026-07-08 onward at
+  never blocks startup): fills the split of older rows from the invested positions in
+  Risk's `holding_snapshots` (latest run per UTC day, via `IInvestedHistoryReader`): cash is the row's
+  own stored total minus that day's Risk-run invested value. The two are captured at different
+  moments, so intraday moves can shift a little between cash and invested. That table keeps 180 days (about 2026-07-08 onward at
   the time of writing), so days before it keep a null split. Rows flagged `IsApproximate` or
-  with a brokerage/crypto sleeve in `StaleSleeves` are skipped (their stored sleeve value is not
-  what the positions describe). Idempotent and bounded: it fills only null columns, never
+  with a non-empty brokerage/crypto sleeve in `StaleSleeves` are skipped (their stored sleeve value is not
+  what the positions describe), as is a day where a sleeve's stored total is non-zero but
+  `holding_snapshots` holds no positions for it (a source that failed when Risk ran), so a stale
+  book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
+  records 0 invested for it even when the previous row has no split. Idempotent and bounded: it fills only null columns, never
   overwrites, and reads at most one history window per user.
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads

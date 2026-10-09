@@ -242,4 +242,55 @@ public class NetWorthSnapshotServiceTests
         snapshot.BrokerageInvested.Should().BeNull();
         snapshot.CryptoInvested.Should().BeNull();
     }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_PermanentlyEmptySleeveWhosePreviousPredatesTheSplit_StartsTheSplitAtZeroInvested()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 0m,
+            TotalNetWorth = 1_380m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 0m,
+            CryptoFresh: false, BrokerageInvested: 400m, CryptoInvested: 0m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.StaleSleeves.Should().Be("crypto");
+        snapshot.CryptoInvested.Should().Be(0m);
+        snapshot.BrokerageInvested.Should().Be(400m);
+        snapshot.CashTotal.Should().Be(1_100m);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_CarriedNonEmptySleeveWhosePreviousHadNoSplit_DoesNotInventZeroInvested()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 240m,
+            TotalNetWorth = 1_620m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 0m,
+            CryptoFresh: false, BrokerageInvested: 400m, CryptoInvested: 0m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.CryptoTotal.Should().Be(240m);
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.CryptoInvested.Should().BeNull();
+    }
 }
