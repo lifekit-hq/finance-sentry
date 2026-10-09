@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
 
-/// <summary>Key rotation for <c>InzhurCredentials</c>: phone, password and session jar (mirrors <see cref="IBKRFlexCredentialRotationTarget"/>).</summary>
+/// <summary>Key rotation for <c>InzhurCredentials</c>: the session jar (mirrors <see cref="IBKRFlexCredentialRotationTarget"/>).</summary>
 public sealed class InzhurCredentialRotationTarget(
     BrokerageSyncDbContext db,
     ICredentialEncryptionService encryption) : ICredentialRotationTarget
@@ -16,16 +16,14 @@ public sealed class InzhurCredentialRotationTarget(
     public async Task<int> RotateAsync(int targetKeyVersion, CancellationToken cancellationToken)
     {
         var stale = await db.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .Where(c => c.KeyVersion != targetKeyVersion || c.SessionKeyVersion != targetKeyVersion)
+            .Where(c => c.SessionKeyVersion != targetKeyVersion)
             .ToListAsync(cancellationToken);
 
         foreach (var row in stale)
         {
-            var phone = row.HasLoginSecrets ? Reencrypt(row.EncryptedPhone, row.PhoneIv, row.PhoneAuthTag, row.KeyVersion) : null;
-            var password = row.HasLoginSecrets ? Reencrypt(row.EncryptedPassword, row.PasswordIv, row.PasswordAuthTag, row.KeyVersion) : null;
             var session = row.HasSession ? Reencrypt(row.EncryptedSession, row.SessionIv, row.SessionAuthTag, row.SessionKeyVersion) : null;
 
-            row.RotateEncryption(targetKeyVersion, phone, password, session);
+            row.RotateEncryption(targetKeyVersion, session);
 
             await db.SaveChangesAsync(cancellationToken);
         }

@@ -5,14 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceSentry.Modules.BrokerageSync.API.Controllers;
 
-/// <summary>Phone and password are optional: omitted, the saved ones are used and only the SMS code is asked for.</summary>
-public sealed record StartInzhurLoginRequest(string? Phone, string? Password);
-
-public sealed record VerifyInzhurLoginRequest(string Code);
+/// <summary>The value of the cabinet's <c>refreshToken</c> cookie. A secret: <see cref="ToString"/> is redacted.</summary>
+public sealed record ConnectInzhurSessionRequest(string? RefreshToken)
+{
+    public override string ToString() => "ConnectInzhurSessionRequest { RefreshToken = [redacted] }";
+}
 
 /// <summary>
-/// The owner's Inzhur cabinet connection. Starting a sign-in can make Inzhur send the owner an SMS, so only these
-/// owner-initiated endpoints sign in; the daily sync only refreshes the stored session.
+/// The owner's Inzhur cabinet connection. finance-sentry never signs in to Inzhur: the owner signs in on inzhur.reit
+/// and hands over the session here; the daily sync only refreshes it.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -23,17 +24,11 @@ public sealed class InzhurController(IInzhurConnector connector) : ControllerBas
     public async Task<IActionResult> GetStatus(CancellationToken ct)
         => Ok(await connector.GetStatusAsync(User.RequireUserId(), ct));
 
-    /// <summary>Signs in; answers <c>connected</c> or <c>code_required</c> (an SMS is on its way).</summary>
+    /// <summary>Takes over the pasted session once one refresh proves it; answers <c>connected</c>.</summary>
     [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
-    [HttpPost("login/start")]
-    public async Task<IActionResult> Start([FromBody] StartInzhurLoginRequest request, CancellationToken ct)
-        => Ok(await connector.StartAsync(User.RequireUserId(), request.Phone, request.Password, ct));
-
-    /// <summary>Submits the SMS code; answers <c>connected</c> or <c>invalid_code</c> with the attempts left.</summary>
-    [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
-    [HttpPost("login/verify")]
-    public async Task<IActionResult> Verify([FromBody] VerifyInzhurLoginRequest request, CancellationToken ct)
-        => Ok(await connector.VerifyAsync(User.RequireUserId(), request.Code, ct));
+    [HttpPost("session")]
+    public async Task<IActionResult> ConnectSession([FromBody] ConnectInzhurSessionRequest request, CancellationToken ct)
+        => Ok(await connector.ConnectSessionAsync(User.RequireUserId(), request.RefreshToken, ct));
 
     [Authorize(Policy = AuthPolicies.RequireConnectionsManage)]
     [HttpDelete("disconnect")]

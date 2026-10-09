@@ -16,7 +16,7 @@ export type ProviderFormShape =
   | 'key-secret'
   | 'key-private-key'
   | 'user-pass'
-  | 'phone-password-sms'
+  | 'pasted-session'
   | 'open-banking-picker';
 
 export interface ProviderDescriptor {

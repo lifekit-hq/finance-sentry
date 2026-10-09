@@ -3,22 +3,18 @@ using FinanceSentry.Core.Connections;
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
 /// <summary>
-/// A user's own Inzhur cabinet connection. Inzhur has no API, so finance-sentry signs in the way the web
-/// cabinet does (phone + password + an SMS code the owner types into finance-sentry's reconnect modal) and
-/// then keeps that one session alive: the daily sync refreshes it and reads the portfolio, read-only.
+/// A user's own Inzhur cabinet connection. Inzhur has no API and its sign-in is guarded by a reCAPTCHA v3 that rejects
+/// a server's datacenter IP, so the owner signs in on inzhur.reit in his own browser and pastes the session's refresh
+/// cookie into finance-sentry. The daily sync then keeps that one session alive: it refreshes it and reads the
+/// portfolio, read-only. finance-sentry never signs in, so it never holds the phone number or password.
 ///
-/// Three secrets live here, each AES-256-GCM encrypted at rest under the same key version (the IBKR path):
-/// the phone number and password (so a reconnect asks only for the SMS code) and the session jar (the
-/// cabinet's refresh cookie and short-lived access token, replaced after every refresh in case it rotated).
-/// None of them is ever logged.
+/// One secret lives here, AES-256-GCM encrypted at rest (the IBKR path): the session jar (the cabinet's refresh cookie
+/// and short-lived access token, replaced after every refresh in case it rotated). It is never logged.
 /// </summary>
 public sealed class InzhurCredential
 {
     /// <summary>Column width of <see cref="LastSyncError"/>.</summary>
     public const int LastErrorMaxLength = 1000;
-
-    /// <summary>Login attempts allowed per UTC day; each one may send the owner an SMS.</summary>
-    public const int MaxLoginAttemptsPerDay = 2;
 
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
@@ -30,31 +26,16 @@ public sealed class InzhurCredential
     public DateTime? LastSyncAt { get; private set; }
     public string? LastSyncError { get; private set; }
 
-    /// <summary>When the current session was obtained by a login, to measure how long one lives.</summary>
+    /// <summary>When the current session was handed over by the owner, to measure how long one lives.</summary>
     public DateTime? SessionStartedAt { get; private set; }
 
     /// <summary>When the session was last refreshed successfully.</summary>
     public DateTime? SessionRefreshedAt { get; private set; }
 
-    /// <summary>The UTC day <see cref="LoginAttempts"/> counts.</summary>
-    public DateOnly? LoginAttemptsDay { get; private set; }
-    public int LoginAttempts { get; private set; }
-
-    public byte[] EncryptedPhone { get; private set; } = [];
-    public byte[] PhoneIv { get; private set; } = [];
-    public byte[] PhoneAuthTag { get; private set; } = [];
-
-    public byte[] EncryptedPassword { get; private set; } = [];
-    public byte[] PasswordIv { get; private set; } = [];
-    public byte[] PasswordAuthTag { get; private set; } = [];
-
     /// <summary>The serialized session jar; empty while no session is held.</summary>
     public byte[] EncryptedSession { get; private set; } = [];
     public byte[] SessionIv { get; private set; } = [];
     public byte[] SessionAuthTag { get; private set; } = [];
-
-    /// <summary>Key version of the phone and password ciphertexts.</summary>
-    public int KeyVersion { get; private set; } = 1;
 
     /// <summary>Key version of the session ciphertext, which is re-encrypted on every refresh.</summary>
     public int SessionKeyVersion { get; private set; } = 1;
@@ -67,52 +48,16 @@ public sealed class InzhurCredential
 
     public bool HasSession => EncryptedSession.Length > 0;
 
-    /// <summary>Whether a phone and password are saved, so a reconnect needs only the SMS code.</summary>
-    public bool HasLoginSecrets => EncryptedPhone.Length > 0 && EncryptedPassword.Length > 0;
-
     private InzhurCredential() { }
 
-    public InzhurCredential(Guid userId, EncryptedSecret phone, EncryptedSecret password)
+    public InzhurCredential(Guid userId)
     {
         Id = Guid.NewGuid();
         UserId = userId;
         CreatedAt = DateTime.UtcNow;
-        SetLoginSecrets(phone, password);
     }
 
-    /// <summary>Stores the phone/password a successful login used (the owner may have typed new ones).</summary>
-    public void SetLoginSecrets(EncryptedSecret phone, EncryptedSecret password)
-    {
-        (EncryptedPhone, PhoneIv, PhoneAuthTag) = (phone.Ciphertext, phone.Iv, phone.AuthTag);
-        (EncryptedPassword, PasswordIv, PasswordAuthTag) = (password.Ciphertext, password.Iv, password.AuthTag);
-        KeyVersion = phone.KeyVersion;
-    }
-
-    /// <summary>Inzhur rejected the saved phone/password: forget them so the next connect asks for both.</summary>
-    public void ClearLoginSecrets()
-    {
-        (EncryptedPhone, PhoneIv, PhoneAuthTag) = ([], [], []);
-        (EncryptedPassword, PasswordIv, PasswordAuthTag) = ([], [], []);
-    }
-
-    /// <summary>Whether another login may be attempted today; counts it when it may.</summary>
-    public bool TryCountLoginAttempt(DateTime nowUtc)
-    {
-        var today = DateOnly.FromDateTime(nowUtc);
-        if (LoginAttemptsDay != today)
-        {
-            LoginAttemptsDay = today;
-            LoginAttempts = 0;
-        }
-
-        if (LoginAttempts >= MaxLoginAttemptsPerDay)
-            return false;
-
-        LoginAttempts++;
-        return true;
-    }
-
-    /// <summary>A login produced a fresh session: the connection is active again.</summary>
+    /// <summary>The owner handed over a fresh session that refreshed: the connection is active again.</summary>
     public void StartSession(EncryptedSecret session, DateTime nowUtc)
     {
         SetSession(session);
@@ -129,7 +74,7 @@ public sealed class InzhurCredential
         SessionRefreshedAt = nowUtc;
     }
 
-    /// <summary>The refresh chain broke: only the owner can sign in again. The dead session is dropped.</summary>
+    /// <summary>The refresh chain broke: only the owner can hand over a new session. The dead session is dropped.</summary>
     public void MarkReauthRequired(string reason)
     {
         Status = InzhurConnectionStatus.ReauthRequired;
@@ -149,15 +94,12 @@ public sealed class InzhurCredential
         => LastSyncError = error.Length > LastErrorMaxLength ? error[..LastErrorMaxLength] : error;
 
     /// <summary>
-    /// Replaces this row's ciphertexts with the same plaintexts re-encrypted under <paramref name="keyVersion"/>
-    /// (mirrors <see cref="IBKRFlexCredential.RotateEncryption"/>); a secret the row does not hold is passed as null.
-    /// Not a business update.
+    /// Replaces the session ciphertext with the same plaintext re-encrypted under <paramref name="keyVersion"/>
+    /// (mirrors <see cref="IBKRFlexCredential.RotateEncryption"/>); null when the row holds no session. Not a business
+    /// update.
     /// </summary>
-    public void RotateEncryption(int keyVersion, EncryptedSecret? phone, EncryptedSecret? password, EncryptedSecret? session)
+    public void RotateEncryption(int keyVersion, EncryptedSecret? session)
     {
-        if (phone is not null && password is not null)
-            SetLoginSecrets(phone, password);
-        KeyVersion = keyVersion;
         if (session is not null)
             SetSession(session);
         else

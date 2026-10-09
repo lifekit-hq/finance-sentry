@@ -18,6 +18,13 @@ public sealed record InzhurSession(string AccessToken, IReadOnlyList<InzhurCooki
         => JsonSerializer.Deserialize<InzhurSession>(json, JsonOptions)
            ?? throw new InvalidOperationException("Stored Inzhur session is empty.");
 
+    /// <summary>
+    /// The session as the owner hands it over: only the auth host's refresh cookie, copied from his browser after a
+    /// sign-in on inzhur.reit. No access token yet; the first refresh fetches one and completes the jar.
+    /// </summary>
+    public static InzhurSession FromRefreshCookie(string cookieName, string value, Uri authBaseUrl)
+        => new(string.Empty, [new InzhurCookie(cookieName, value, authBaseUrl.Host, "/", null, Secure: true, HttpOnly: true)]);
+
     /// <summary>A cookie container holding the jar, for one sync's requests and the Set-Cookie headers they return.</summary>
     public CookieContainer ToContainer()
     {
