@@ -53,6 +53,7 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.EncryptedEncryptionKey).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.EncryptionKeyIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.EncryptionKeyAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
             entity.HasConnectionHealth(e => e.Health);
         });
 
@@ -69,6 +70,7 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.EncryptedToken).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.TokenIv).IsRequired().HasColumnType("bytea");
             entity.Property(e => e.TokenAuthTag).IsRequired().HasColumnType("bytea");
+            entity.Property(e => e.KeyVersion).IsRequired().HasDefaultValue(1);
             entity.HasConnectionHealth(e => e.Health);
         });
 
