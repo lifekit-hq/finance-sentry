@@ -21,6 +21,12 @@ services:
       # (EACCES on vite dep re-optimization, unremovable without sudo).
       - /app/node_modules
       - /app/.angular
+      # build-whats-new.mjs reads ../CHANGELOG.md, which from /app is /CHANGELOG.md (the prod image COPYs
+      # it to the same place). public/ is likewise a container-owned volume: the generated, git-ignored
+      # public/whats-new.json would otherwise land root-owned on the host and break a host-side `npm start`.
+      # Its content is seeded from the image, so after editing frontend/public/ recreate it (`up -V`).
+      - ../CHANGELOG.md:/CHANGELOG.md:ro
+      - /app/public
 
   api:
     build:
