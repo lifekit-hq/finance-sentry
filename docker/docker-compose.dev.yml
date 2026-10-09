@@ -21,6 +21,9 @@ services:
       # (EACCES on vite dep re-optimization, unremovable without sudo).
       - /app/node_modules
       - /app/.angular
+      # build-whats-new.mjs reads ../CHANGELOG.md, which from /app is /CHANGELOG.md (the prod image COPYs
+      # it to the same place).
+      - ../CHANGELOG.md:/CHANGELOG.md:ro
 
   api:
     build:

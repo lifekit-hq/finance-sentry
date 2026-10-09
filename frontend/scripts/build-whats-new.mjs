@@ -2,7 +2,7 @@
 // notes in src/whats-new/notes.md, written to public/whats-new.json. The app fetches that file when
 // the "What's new" panel opens, so it stays out of the initial bundle.
 // Usage: node scripts/build-whats-new.mjs   (runs before start/build via the npm pre-scripts)
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -14,7 +14,8 @@ const notesPath = join(frontend, 'src', 'whats-new', 'notes.md');
 const outputPath = join(frontend, 'public', 'whats-new.json');
 
 if (!existsSync(changelogPath)) {
-  // The production image copies CHANGELOG.md next to frontend/; a missing file means that COPY went.
+  // The production image copies CHANGELOG.md next to frontend/ and docker-compose.dev.yml mounts it
+  // there; a missing file means that COPY or mount went.
   console.error(`build-whats-new: ${changelogPath} not found`);
   process.exit(1);
 }
@@ -23,5 +24,9 @@ const notes = existsSync(notesPath) ? readFileSync(notesPath, 'utf8') : '';
 const data = buildWhatsNew(readFileSync(changelogPath, 'utf8'), notes);
 
 mkdirSync(dirname(outputPath), {recursive: true});
-writeFileSync(outputPath, `${JSON.stringify(data, null, 2)}\n`);
+// Replace by rename: it needs only write access to public/, so a root-owned whats-new.json left by the
+// dev container on the bind mount cannot make a host-side `npm start` fail with EACCES.
+const tempPath = `${outputPath}.${process.pid}.tmp`;
+writeFileSync(tempPath, `${JSON.stringify(data, null, 2)}\n`);
+renameSync(tempPath, outputPath);
 console.log(`build-whats-new: ${data.versions.length} versions -> public/whats-new.json`);
