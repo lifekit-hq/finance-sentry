@@ -48,6 +48,10 @@ jobs:
     - name: Check deploy.sh legacy project retirement
       run: .github/scripts/test-deploy-legacy-project.sh
 
+    # deploy.sh must wait out the gateway's passive-health reactivation before the platform contract.
+    - name: Check deploy.sh gateway readiness wait
+      run: .github/scripts/test-deploy-gateway-wait.sh
+
     - name: Select images to build
       id: matrix
       env:
