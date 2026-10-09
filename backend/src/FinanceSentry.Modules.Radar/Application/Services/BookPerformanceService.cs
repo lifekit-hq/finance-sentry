@@ -18,7 +18,7 @@ public sealed class BookPerformanceService(
 
     private const decimal OutperformThreshold = 0.001m;
 
-    private const int MaxBookStartGapDays = 7;
+    private const int MaxBookEdgeGapDays = 7;
 
     public async Task<BookPerformanceResult> GetAsync(
         Guid userId,
@@ -53,7 +53,7 @@ public sealed class BookPerformanceService(
         IReadOnlyList<DailyPortfolioValue> portfolioSnapshots)
     {
         var spyTwr = ComputeSpyTwr(spyBars, since);
-        var bookTwr = ComputeBookTwr(portfolioSnapshots, since);
+        var bookTwr = ComputeBookTwr(portfolioSnapshots, since, today);
 
         if (spyTwr is null && bookTwr is null)
         {
@@ -93,7 +93,7 @@ public sealed class BookPerformanceService(
         return Math.Round((endBar.AdjClose - startBar.AdjClose) / startBar.AdjClose, 4);
     }
 
-    private static decimal? ComputeBookTwr(IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since)
+    private static decimal? ComputeBookTwr(IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since, DateOnly today)
     {
         var startSnapshot = snapshots.FirstOrDefault(s => s.Date >= since);
         var endSnapshot = snapshots.LastOrDefault();
@@ -103,7 +103,8 @@ public sealed class BookPerformanceService(
             return null;
         }
 
-        if (startSnapshot.Date > since.AddDays(MaxBookStartGapDays))
+        if (startSnapshot.Date > since.AddDays(MaxBookEdgeGapDays)
+            || endSnapshot.Date < today.AddDays(-MaxBookEdgeGapDays))
         {
             return null;
         }

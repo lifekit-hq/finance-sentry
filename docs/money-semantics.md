@@ -853,11 +853,12 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 - **Days with no split are skipped.** A snapshot whose `brokerage_invested` is null (a row from before the
   split, or one the split could not be measured for) is left out of the series - never counted as zero and
   never replaced by the cash-inclusive total. The window opens on the first split day at or after its start
-  and closes on the latest split day. SPY's window always opens at the period's start, so the two must
+  and closes on the latest split day. SPY's window runs from the period's start to today, so the two must
   cover the same span: when the first split day is more than 7 days after the period's start (split history
-  is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), the book side is
-  unavailable rather than compared over a shorter window. With fewer than two split days, a zero opening
-  value, or such a late first split day, `bookTwr` is null (and so are `delta` and `verdict`; the period is
+  is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), or the latest split day
+  is more than 7 days before today, the book side is unavailable rather than compared over a shorter
+  window. With fewer than two split days, a zero opening value, or such a late first or early last split
+  day, `bookTwr` is null (and so are `delta` and `verdict`; the period is
   dropped when SPY is missing too), as it already is with too little history. The brief shows it as
   `Book N/A`.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no

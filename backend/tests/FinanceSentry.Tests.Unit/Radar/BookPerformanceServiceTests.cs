@@ -343,4 +343,42 @@ public sealed class BookPerformanceServiceTests
         period.Delta.Should().BeNull();
         period.Verdict.Should().BeNull();
     }
+
+    [Theory]
+    [InlineData(7, true)]
+    [InlineData(8, false)]
+    public async Task GetAsync_ComparesBookOnlyWhenLatestInvestedDayWithinToleranceOfToday(int daysBeforeToday, bool compared)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddMonths(-1);
+        var lastSplitDay = today.AddDays(-daysBeforeToday);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                Bar("SPY", since, 400m),
+                Bar("SPY", today, 404m),
+            ]);
+
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(since, 100_000m),
+                new DailyPortfolioValue(lastSplitDay, 103_000m),
+            ]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
+
+        var period = result.Periods.Single();
+        period.SpyTwr.Should().Be(0.01m);
+        if (compared)
+        {
+            period.BookTwr.Should().Be(0.03m);
+            period.Verdict.Should().Be("outperform");
+        }
+        else
+        {
+            period.BookTwr.Should().BeNull();
+            period.Delta.Should().BeNull();
+            period.Verdict.Should().BeNull();
+        }
+    }
 }
