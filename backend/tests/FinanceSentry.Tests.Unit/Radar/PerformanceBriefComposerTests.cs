@@ -213,6 +213,22 @@ public sealed class PerformanceBriefComposerTests
     }
 
     [Fact]
+    public void Scoreboard_ShowsBookNotAvailableAndNoDelta_WhenBookSideUnavailable()
+    {
+        var result = new BookPerformanceResult(
+            [new PeriodTwr(
+                BookPerformancePeriod.OneYear,
+                DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1)),
+                null, 0.2m, null, null)],
+            DateOnly.FromDateTime(DateTime.UtcNow));
+
+        var brief = PerformanceBriefComposer.Compose(result, [], null);
+
+        BodyLines(brief).Should().Contain(l => l.StartsWith("• 1Y: Book N/A | SPY +20%") && !l.Contains('Δ'));
+        brief.Headline.Should().Be("Weekly brief: N/A");
+    }
+
+    [Fact]
     public void HeadlineOmitsDelta_WhenWeeklyDataMissing()
     {
         var result = new BookPerformanceResult(

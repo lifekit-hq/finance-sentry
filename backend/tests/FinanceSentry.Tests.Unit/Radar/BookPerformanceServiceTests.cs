@@ -287,4 +287,60 @@ public sealed class BookPerformanceServiceTests
 
         result.Periods.Single().BookTwr.Should().Be(0.05m);
     }
+
+    [Fact]
+    public async Task GetAsync_ComparesBook_WhenFirstInvestedDayWithinToleranceOfPeriodStart()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddMonths(-1);
+        var firstSplitDay = since.AddDays(7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                Bar("SPY", since, 400m),
+                Bar("SPY", today, 404m),
+            ]);
+
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(firstSplitDay, 100_000m),
+                new DailyPortfolioValue(today, 103_000m),
+            ]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
+
+        var period = result.Periods.Single();
+        period.BookTwr.Should().Be(0.03m);
+        period.SpyTwr.Should().Be(0.01m);
+        period.Verdict.Should().Be("outperform");
+    }
+
+    [Fact]
+    public async Task GetAsync_LeavesBookUnavailable_WhenFirstInvestedDayBeyondToleranceOfPeriodStart()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddMonths(-1);
+        var firstSplitDay = since.AddDays(8);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                Bar("SPY", since, 400m),
+                Bar("SPY", today, 404m),
+            ]);
+
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(firstSplitDay, 100_000m),
+                new DailyPortfolioValue(today, 103_000m),
+            ]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
+
+        var period = result.Periods.Single();
+        period.BookTwr.Should().BeNull();
+        period.SpyTwr.Should().Be(0.01m);
+        period.Since.Should().Be(since);
+        period.Delta.Should().BeNull();
+        period.Verdict.Should().BeNull();
+    }
 }

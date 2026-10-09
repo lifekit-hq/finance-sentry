@@ -18,6 +18,8 @@ public sealed class BookPerformanceService(
 
     private const decimal OutperformThreshold = 0.001m;
 
+    private const int MaxBookStartGapDays = 7;
+
     public async Task<BookPerformanceResult> GetAsync(
         Guid userId,
         IReadOnlyList<BookPerformancePeriod> periods,
@@ -97,6 +99,11 @@ public sealed class BookPerformanceService(
         var endSnapshot = snapshots.LastOrDefault();
 
         if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageInvestedUsd == 0m)
+        {
+            return null;
+        }
+
+        if (startSnapshot.Date > since.AddDays(MaxBookStartGapDays))
         {
             return null;
         }
