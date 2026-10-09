@@ -8,6 +8,10 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 /// Aggregated dashboard payload for a user. The service computes every <c>…Usd</c> figure in USD;
 /// the controller re-expresses them in the profile base currency and stamps <see cref="BaseCurrency"/>
 /// (the field names keep their historical suffix so the API shape does not change).
+/// <see cref="CashUsd"/> and <see cref="InvestedUsd"/> are the canonical book split
+/// (<see cref="BookFigures.CashUsd"/> / <see cref="BookFigures.InvestedValueUsd"/>) shown as a
+/// sub-line under the net-worth total; they are null when the book could not be read in full,
+/// so the sub-line is hidden rather than showing a partial split. The total is not derived from them.
 /// </summary>
 public record DashboardData(
     Dictionary<string, decimal> AggregatedBalance,
@@ -18,7 +22,9 @@ public record DashboardData(
     IReadOnlyList<CategoryStat> TopCategories,
     DateTime? LastSyncTimestamp,
     IReadOnlyList<MonthlyFlow>? WindowFlow = null,
-    string BaseCurrency = "USD");
+    string BaseCurrency = "USD",
+    decimal? CashUsd = null,
+    decimal? InvestedUsd = null);
 
 /// <summary>
 /// Composes all dashboard data in a single call.
@@ -54,7 +60,8 @@ public class DashboardQueryService(
     ISyncJobRepository syncJobs,
     ICryptoHoldingsReader? cryptoHoldingsReader = null,
     IBrokerageHoldingsReader? brokerageHoldingsReader = null,
-    TimeProvider? clock = null) : IDashboardQueryService
+    TimeProvider? clock = null,
+    IBookFiguresService? bookFigures = null) : IDashboardQueryService
 {
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly IAggregationService _aggregation = aggregation ?? throw new ArgumentNullException(nameof(aggregation));
@@ -64,6 +71,7 @@ public class DashboardQueryService(
     private readonly ISyncJobRepository _syncJobs = syncJobs ?? throw new ArgumentNullException(nameof(syncJobs));
     private readonly ICryptoHoldingsReader? _cryptoHoldingsReader = cryptoHoldingsReader;
     private readonly IBrokerageHoldingsReader? _brokerageHoldingsReader = brokerageHoldingsReader;
+    private readonly IBookFiguresService? _bookFigures = bookFigures;
 
     private const int MinMonths = 1;
     private const int MaxMonths = 120;
@@ -137,6 +145,11 @@ public class DashboardQueryService(
 
         var accountCount = byType.Values.Sum();
 
+        // Cash vs invested comes straight from the canonical book figures (no new math here).
+        // A stale source means the split would be partial, so it is withheld.
+        var book = _bookFigures is not null ? await _bookFigures.ReadAsync(userId, ct) : null;
+        var split = book is { IsStale: false } ? book : null;
+
         return new DashboardData(
             balance,
             bankTotalUsd + cryptoTotalUsd + brokerageTotalUsd,
@@ -145,7 +158,9 @@ public class DashboardQueryService(
             flow,
             topCats,
             lastSync?.CompletedAt,
-            windowFlow);
+            windowFlow,
+            CashUsd: split?.CashUsd,
+            InvestedUsd: split?.InvestedValueUsd);
     }
 
     // Midnight UTC of the requested day — the dashboard anchors every date in UTC — held

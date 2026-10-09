@@ -146,6 +146,19 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   {{ store.totalBalanceFormatted() }}
                 </p>
               }
+              <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
+              <div class="h-4 leading-4" data-testid="net-worth-split-slot">
+                @if (store.isLoading()) {
+                  <cmn-skeleton height="0.875rem" width="45%" />
+                } @else if (store.bookSplitFormatted()) {
+                  <p
+                    class="text-cmn-xs leading-4 text-text-secondary tabular-nums"
+                    data-testid="net-worth-split"
+                  >
+                    {{ store.bookSplitFormatted() }}
+                  </p>
+                }
+              </div>
               <!--
                 Both lines under the figure own a fixed-height slot, so the hero keeps one height
                 across every range, while the history loads and while scrubbing: a line that does

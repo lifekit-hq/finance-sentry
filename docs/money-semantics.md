@@ -656,6 +656,16 @@ are closed periods.
 - **Headline stat** ("Net Worth" card): computed **live** per request —
   banking (signed per §2, USD per §3) + crypto holdings + brokerage holdings
   (`DashboardQueryService`).
+- **Cash / invested sub-line** ("invested X · cash Y" under the headline): `cashUsd` and
+  `investedUsd` on the dashboard payload are `IBookFiguresService`'s `CashUsd` and
+  `InvestedValueUsd` (bank + broker + venue cash vs everything else), converted to the
+  profile base currency at the controller like the headline. Credit-card debt nets against
+  cash (§2: cash is what you would have after paying the cards, so it can be negative), and
+  USDT/USDC are crypto positions, not cash. The split is presentation only: the headline
+  total stays the live sum above and is not derived from the two figures. When a book source
+  was stale (`BookFigures.IsStale`) both are null and the sub-line is hidden rather than
+  showing a partial split; it is also hidden while the chart is being scrubbed, as the split
+  is live only.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point

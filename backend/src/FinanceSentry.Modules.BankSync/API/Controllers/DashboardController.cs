@@ -64,6 +64,8 @@ public class DashboardController(
         return data with
         {
             TotalNetWorthUsd = Fx(data.TotalNetWorthUsd),
+            CashUsd = data.CashUsd is { } cash ? Fx(cash) : null,
+            InvestedUsd = data.InvestedUsd is { } invested ? Fx(invested) : null,
             MonthlyFlow = [.. data.MonthlyFlow.Select(Flow)],
             WindowFlow = data.WindowFlow?.Select(Flow).ToList(),
             TopCategories = [.. data.TopCategories.Select(c => c with { TotalSpend = Fx(c.TotalSpend) })],

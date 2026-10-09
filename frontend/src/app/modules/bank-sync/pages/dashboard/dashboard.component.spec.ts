@@ -21,7 +21,11 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
  * The page reads dozens of store signals; only the ones that matter here are real, every other
  * property is an empty-list signal, which the chart inputs accept and the text bindings render blank.
  */
-function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCategories: []}) {
+function fakeStore(
+  range: HistoryRange,
+  data: unknown = {accountCount: 1, topCategories: []},
+  bookSplit: string | null = null
+) {
   const historyRange = signal<HistoryRange>(range);
   const setScrubIndex = vi.fn();
   const setHistoryRange = vi.fn((next: HistoryRange) => historyRange.set(next));
@@ -45,14 +49,15 @@ function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCat
     netWorthStaleNotice: signal(null),
     netWorthChangeFormatted: signal(null),
     netWorthChangePercentFormatted: signal(null),
+    bookSplitFormatted: signal(bookSplit),
   };
   return new Proxy(real, {
     get: (target, prop: string) => target[prop] ?? signal([]),
   });
 }
 
-function render(range: HistoryRange = '3m', data?: unknown) {
-  const store = fakeStore(range, data);
+function render(range: HistoryRange = '3m', data?: unknown, bookSplit: string | null = null) {
+  const store = fakeStore(range, data, bookSplit);
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -118,6 +123,22 @@ describe('DashboardComponent range presets', () => {
     expect(order[1]?.compareDocumentPosition(order[2] as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
+  });
+
+  it('states the invested / cash split under the hero figure', () => {
+    const el = render('3m', undefined, 'invested €9,300 · cash €700').el;
+    const split = el.querySelector('[data-testid="net-worth-split"]');
+    const value = el.querySelector('[data-testid="net-worth-value"]');
+
+    expect(split?.textContent?.trim()).toBe('invested €9,300 · cash €700');
+    expect(value?.compareDocumentPosition(split as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps the split slot but leaves it empty when the split is unknown', () => {
+    const el = render().el;
+
+    expect(el.querySelector('[data-testid="net-worth-split-slot"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="net-worth-split"]')).toBeNull();
   });
 
   it('scrubs the hero figure to the point under the pointer and snaps back on release', () => {

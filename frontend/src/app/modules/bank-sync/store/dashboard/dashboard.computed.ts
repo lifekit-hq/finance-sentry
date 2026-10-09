@@ -310,6 +310,18 @@ export function dashboardComputed(store: StateSignals) {
     totalBalanceFormatted: computed(() =>
       MoneyUtils.format(scrubbedTotal() ?? store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
     ),
+    // "invested X · cash Y" under the live headline; null while scrubbing (the split is live
+    // only) and when the book was not read in full.
+    bookSplitFormatted: computed((): string | null => {
+      const data = store.data();
+      const {cashUsd, investedUsd} = data ?? {};
+      if (scrubbedTotal() !== null || cashUsd == null || investedUsd == null) {
+        return null;
+      }
+      const money = (amount: number): string =>
+        MoneyUtils.format(amount, baseCurrency(), WHOLE_DOLLARS);
+      return `invested ${money(investedUsd)} · cash ${money(cashUsd)}`;
+    }),
     // The scrubbed snapshot's date, replacing the range label beside the delta; null at rest.
     scrubDateFormatted: computed((): string | null => {
       const snapshot = scrubbed();

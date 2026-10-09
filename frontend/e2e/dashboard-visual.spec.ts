@@ -23,6 +23,8 @@ const SCREENSHOT_OPTIONS = {
 const DASHBOARD = {
   aggregatedBalance: {USD: 50000},
   totalNetWorthUsd: 50000,
+  cashUsd: 12000,
+  investedUsd: 38000,
   baseCurrency: 'USD',
   accountCount: 3,
   accountsByType: {banking: 2, brokerage: 1},
