@@ -60,4 +60,8 @@ export interface DashboardData {
   /** Currency every `…Usd` figure and category total is expressed in — the profile's base
    * currency (the field names keep their historical suffix). */
   baseCurrency?: string;
+  /** Cash and invested split of the book (`IBookFiguresService`), in `baseCurrency`. Cash nets
+   * card debt, so it can be negative. Null when the book was not read in full. */
+  cashUsd?: Nullable<number>;
+  investedUsd?: Nullable<number>;
 }

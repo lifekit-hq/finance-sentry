@@ -38,6 +38,8 @@ interface Fixture {
   baseCurrency?: string;
   topCategories?: CategoryStat[];
   scrubIndex?: number | null;
+  cashUsd?: number | null;
+  investedUsd?: number | null;
 }
 
 function build(
@@ -49,6 +51,8 @@ function build(
     baseCurrency,
     topCategories = [],
     scrubIndex = null,
+    cashUsd,
+    investedUsd,
   }: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
@@ -62,6 +66,8 @@ function build(
     topCategories,
     lastSyncTimestamp: null,
     baseCurrency,
+    cashUsd,
+    investedUsd,
   } as unknown as DashboardData;
 
   return {
@@ -407,6 +413,56 @@ describe('dashboardComputed', () => {
       expect(c.netWorthChangeFormatted()).toBe('-$500');
       expect(c.netWorthChangePercentFormatted()).toBe('-5.0%');
       expect(c.netWorthChangeDirection()).toBe(-1);
+    });
+
+    describe('invested / cash sub-line', () => {
+      it('reads invested then cash in whole dollars, leaving the headline as is', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          totalNetWorthUsd: 10_000.5,
+          cashUsd: 700.4,
+          investedUsd: 9_300,
+        });
+
+        expect(c.bookSplitFormatted()).toBe('invested $9,300 · cash $700');
+        expect(c.totalBalanceFormatted()).toBe('$10,000.50');
+      });
+
+      it('shows negative cash, as card debt nets against it', () => {
+        const c = projectionFor({monthlyFlow: [], cashUsd: -1_200, investedUsd: 5_000});
+
+        expect(c.bookSplitFormatted()).toBe('invested $5,000 · cash -$1,200');
+      });
+
+      it('follows the base currency', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          baseCurrency: 'EUR',
+          cashUsd: 500,
+          investedUsd: 500,
+        });
+
+        expect(c.bookSplitFormatted()).toBe('invested €500 · cash €500');
+      });
+
+      it('is empty when the book split is unknown', () => {
+        expect(projectionFor({monthlyFlow: []}).bookSplitFormatted()).toBeNull();
+        expect(
+          projectionFor({monthlyFlow: [], cashUsd: null, investedUsd: null}).bookSplitFormatted()
+        ).toBeNull();
+      });
+
+      it('is empty while scrubbing, as the split is live only', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          cashUsd: 700,
+          investedUsd: 9_300,
+          netWorthHistory: [snapshot(10_000, 0, 0), snapshot(12_000, 0, 0)],
+          scrubIndex: 1,
+        });
+
+        expect(c.bookSplitFormatted()).toBeNull();
+      });
     });
 
     describe('while scrubbing', () => {
