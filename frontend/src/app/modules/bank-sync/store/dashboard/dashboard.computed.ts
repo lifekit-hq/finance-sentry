@@ -436,6 +436,14 @@ export function dashboardComputed(store: StateSignals) {
     }),
     investedChangePercentFormatted: computed(() => formatPercent(investedChange()?.percent)),
     investedChangeDirection: computed(() => Math.sign(investedChange()?.delta ?? 0)),
+    // "since <first split day>" when the split starts after the loaded window does; null when it
+    // covers the whole window, so the page labels it with the headline's own range.
+    investedChangeSinceFormatted: computed((): string | null => {
+      const first = splitHistory().findIndex(split => split !== null);
+      return first > 0
+        ? `since ${FULL_DATE_FORMATTER.format(new Date(validHistory()[first].snapshotDate))}`
+        : null;
+    }),
 
     windowSpendingFormatted: computed(() => {
       const totals = windowTotals();

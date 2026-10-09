@@ -53,6 +53,7 @@ function fakeStore(
     investedChangeFormatted: signal(''),
     investedChangePercentFormatted: signal(''),
     investedChangeDirection: signal(0),
+    investedChangeSinceFormatted: signal(null),
     netWorthChartLabel: signal('Net worth by sleeve'),
     bookSplitFormatted: signal(bookSplit),
     ...overrides,
@@ -167,10 +168,25 @@ describe('DashboardComponent range presets', () => {
 
     expect(change?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Change +$320 (+3.2%) · 3M');
     expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Invested change +$500 (+8.3%)'
+      'Invested change +$500 (+8.3%) · 3M'
     );
     expect(change?.compareDocumentPosition(invested as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('dates the invested change from its first split day when that is after the range start', () => {
+    const el = render('1y', undefined, null, {
+      scrubDateFormatted: signal(null),
+      investedChangeFormatted: signal('+$500'),
+      investedChangePercentFormatted: signal('+8.3%'),
+      investedChangeDirection: signal(1),
+      investedChangeSinceFormatted: signal('since Jul 8, 2026'),
+    }).el;
+    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
+
+    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Invested change +$500 (+8.3%) · since Jul 8, 2026'
     );
   });
 

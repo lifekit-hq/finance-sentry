@@ -202,6 +202,14 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       @if (store.investedChangePercentFormatted()) {
                         ({{ store.investedChangePercentFormatted() }})
                       }
+                      <span class="font-normal text-text-secondary"
+                        >·
+                        {{
+                          store.investedChangeSinceFormatted() ??
+                            store.scrubDateFormatted() ??
+                            rangeLabel()
+                        }}</span
+                      >
                     </p>
                   }
                 }

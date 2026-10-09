@@ -752,6 +752,31 @@ describe('dashboardComputed', () => {
         expect(c.investedChangePercentFormatted()).toBe('');
       });
 
+      it('names the first split day when it is after the start of the window', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: [
+            noSplitDay('2026-07-01', 100, 100, 100),
+            splitDay('2026-07-08', 4_000, 5_000, 1_000),
+            splitDay('2026-07-09', 4_000, 5_500, 1_000),
+          ],
+        });
+
+        expect(c.investedChangeSinceFormatted()).toBe('since Jul 8, 2026');
+      });
+
+      it('leaves the window to the range label when the split covers all of it', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: [
+            splitDay('2026-07-08', 4_000, 5_000, 1_000),
+            splitDay('2026-07-09', 4_000, 5_500, 1_000),
+          ],
+        });
+
+        expect(c.investedChangeSinceFormatted()).toBeNull();
+      });
+
       describe('while scrubbing', () => {
         const days = [
           noSplitDay('2026-07-01', 100, 100, 100),
