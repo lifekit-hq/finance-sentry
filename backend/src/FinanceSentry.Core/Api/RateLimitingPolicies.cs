@@ -14,4 +14,7 @@ public static class RateLimitingPolicies
 
     /// <summary>Exempt from all rate limiting (health checks).</summary>
     public const string Exempt = "exempt";
+
+    /// <summary>5 problem reports/hour per user (the handler also holds the 20/day cap from the saved rows).</summary>
+    public const string ProblemReport = "problem-report";
 }
