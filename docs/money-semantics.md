@@ -151,6 +151,21 @@ non-fiat crypto is Crypto. A row's weight is its share of the whole page total, 
 so Cash is a slice and cash never inflates the Equities rows. Cash rows are not holdings with a
 dossier: they link nowhere, and the command palette omits them.
 
+**Cash rows elsewhere.** The same cash definition (`AssetClassNormalizer.Cash` on a broker
+`InstrumentType`, `IsVenueFiat` on a venue balance) tags cash on three more surfaces; none of them
+changes a number:
+
+- **Accounts list** (`GET /wealth/summary`): a broker `CASH` row has `accountType = "cash"` (venue
+  fiat already did) instead of `"brokerage"`, and the page shows a **Cash** label on it and does
+  not link it to a dossier. The type is read only by `AccountBalanceMath` (credit accounts), so the
+  institution, category and net-worth totals and the category % are exactly as before: cash stays
+  in its sleeve, because that page is where the money is held.
+- **MCP `get_account_summary`**: each entry carries `isCash`, true for bank accounts, broker cash
+  and venue fiat, false for invested positions - the same split as `BookFigures.CashUsd`. A credit
+  account is still listed with its provider balance (the amount owed, §2), as before.
+- **MCP `get_tax_lots`**: cash rows are not lots and are left out. They have no cost basis or gain
+  to report.
+
 ### Failure behaviour
 
 A failed balance fetch **keeps the prior stored balance** — never zeroes it. Both the

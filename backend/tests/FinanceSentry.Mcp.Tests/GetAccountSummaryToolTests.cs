@@ -153,4 +153,32 @@ public sealed class GetAccountSummaryToolTests
         result.Single().Balance.Should().Be(0m);
         result.Single().Currency.Should().Be("EUR");
     }
+
+    [Fact]
+    public async Task ExecuteAsync_FlagsCashEntries_AndLeavesPositionsUnflagged()
+    {
+        _bankingReader.Setup(r => r.GetAccountSummariesAsync(UserId, default))
+            .ReturnsAsync([
+                new BankingAccountSummary(
+                    Guid.NewGuid(), "Chase", "checking", "1234",
+                    "truelayer", "USD", 1000m, 1000m, "synced", null)
+            ]);
+        _cryptoReader.Setup(r => r.GetHoldingsAsync(UserId, default))
+            .ReturnsAsync([
+                new CryptoHoldingSummary("BTC", 0.5m, 0m, 25000m, DateTime.UtcNow, "binance"),
+                new CryptoHoldingSummary("EUR", 100m, 0m, 110m, DateTime.UtcNow, "revolutx", IsVenueFiat: true)
+            ]);
+        _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
+            .ReturnsAsync([
+                new BrokerageHoldingSummary("AAPL", "STK", 10m, 1800m, DateTime.UtcNow, "ibkr"),
+                new BrokerageHoldingSummary("USD Cash", "CASH", 500m, 500m, DateTime.UtcNow, "ibkr"),
+                new BrokerageHoldingSummary("UAH Cash", "CASH", 1000m, 24m, DateTime.UtcNow, "inzhur")
+            ]);
+
+        var result = await CreateSut().ExecuteAsync();
+
+        result.Where(e => e.IsCash).Select(e => e.AccountId)
+            .Should().BeEquivalentTo(result.Single(e => e.Provider == "truelayer").AccountId, "EUR", "USD Cash", "UAH Cash");
+        result.Where(e => !e.IsCash).Select(e => e.AccountId).Should().BeEquivalentTo("BTC", "AAPL");
+    }
 }

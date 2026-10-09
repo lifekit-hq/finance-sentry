@@ -35,6 +35,17 @@ public class GetTaxLotsProviderTests
     }
 
     [Fact]
+    public async Task Broker_cash_rows_are_not_tax_lots()
+    {
+        var response = await QueryAsync(
+            new BrokerageHolding(UserId, "AAPL", "STK", 1m, 200m, "ibkr"),
+            new BrokerageHolding(UserId, "USD Cash", "CASH", 500m, 500m, "ibkr"),
+            new BrokerageHolding(UserId, "EUR Cash", "CASH", 100m, 110m, "ibkr"));
+
+        response.Items.Select(i => i.Symbol).Should().Equal("AAPL");
+    }
+
+    [Fact]
     public async Task A_user_with_only_Inzhur_rows_has_no_tax_lots()
     {
         var response = await QueryAsync(new BrokerageHolding(UserId, "Fund A", "REIT", 10m, 30m, "inzhur"));
