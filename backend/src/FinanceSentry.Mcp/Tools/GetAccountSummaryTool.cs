@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Mcp.Abstractions;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -21,7 +23,7 @@ public sealed class GetAccountSummaryTool(
     private readonly ILogger<GetAccountSummaryTool> _logger = logger;
 
     [McpServerTool(Name = "get_account_summary")]
-    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers.")]
+    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers. isCash is true for cash held (non-credit bank accounts, broker cash such as \"USD Cash\", and fiat held on a crypto venue) and false for invested positions and credit accounts, whose balance is the amount owed. Summing the isCash entries gives cash held; the cashUsd of get_portfolio_snapshot also nets owed credit balances.")]
     public async Task<IReadOnlyList<AccountSummaryEntry>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
@@ -40,7 +42,8 @@ public sealed class GetAccountSummaryTool(
                 a.BankName,
                 a.Provider,
                 a.Currency,
-                a.CurrentBalance ?? 0m)));
+                a.CurrentBalance ?? 0m,
+                IsCash: !AccountBalanceMath.IsLiability(a.AccountType))));
         }
         catch (Exception ex)
         {
@@ -56,7 +59,8 @@ public sealed class GetAccountSummaryTool(
                 h.Asset,
                 h.Provider,
                 "USD",
-                h.UsdValue)));
+                h.UsdValue,
+                IsCash: h.IsVenueFiat)));
         }
         catch (Exception ex)
         {
@@ -72,7 +76,8 @@ public sealed class GetAccountSummaryTool(
                 h.Symbol,
                 h.Provider,
                 "USD",
-                h.UsdValue)));
+                h.UsdValue,
+                IsCash: AssetClassNormalizer.Normalize(h.InstrumentType) == AssetClassNormalizer.Cash)));
         }
         catch (Exception ex)
         {
@@ -88,4 +93,5 @@ public sealed record AccountSummaryEntry(
     string Name,
     string Provider,
     string Currency,
-    decimal Balance);
+    decimal Balance,
+    bool IsCash = false);

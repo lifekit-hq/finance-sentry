@@ -50,12 +50,12 @@ function setupFixture(
     baseCurrency: signal('USD'),
     categorySections: signal([
       {
-        category: 'banking',
+        category: institution.category,
         title: 'Banks',
         institutionNoun: 'bank',
         rowNoun: 'account',
         summary: {
-          category: 'banking',
+          category: institution.category,
           totalInBaseCurrency: 100,
           institutionCount: 1,
           institutions: [institution],
@@ -151,6 +151,54 @@ describe('AccountsListComponent account row', () => {
     row?.click();
 
     expect(navigate).toHaveBeenCalledWith(['/transactions'], {queryParams: {account: 'acc-1'}});
+  });
+});
+
+describe('AccountsListComponent cash rows', () => {
+  function brokerageRow(
+    accountId: string,
+    symbol: string,
+    accountType: string
+  ): AccountBalanceItem {
+    return {
+      accountId,
+      bankName: 'Interactive Brokers',
+      accountType,
+      accountNumberLast4: symbol.slice(0, 4),
+      currency: symbol,
+      provider: 'ibkr',
+      category: 'brokerage',
+      currentBalance: 400,
+      balanceInBaseCurrency: 400,
+      syncStatus: 'synced',
+      lastSyncTimestamp: null,
+    };
+  }
+
+  function brokerageElement(): HTMLElement {
+    const fixture = setupFixture(false, {
+      provider: 'ibkr',
+      category: 'brokerage',
+      syncStatus: 'synced',
+      accounts: [brokerageRow('a1', 'AAPL', 'brokerage'), brokerageRow('a2', 'USD Cash', 'cash')],
+    });
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('tags a cash row with a Cash label and leaves positions untagged', () => {
+    const element = brokerageElement();
+
+    const labels = element.querySelectorAll('[data-testid="cash-label"]');
+    expect(labels).toHaveLength(1);
+    expect(labels[0].textContent?.trim()).toBe('Cash');
+    expect(element.querySelector('[data-testid="cash-row"]')?.textContent).toContain('USD Cash');
+  });
+
+  it('does not link a cash row to an asset dossier', () => {
+    const element = brokerageElement();
+
+    expect(element.querySelector('[data-testid="cash-row"] button')).toBeNull();
+    expect(element.textContent).toContain('AAPL');
   });
 });
 

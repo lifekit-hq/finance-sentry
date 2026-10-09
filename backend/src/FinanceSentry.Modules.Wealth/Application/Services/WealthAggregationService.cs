@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Wealth.Application.Services;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
@@ -109,7 +110,8 @@ public class WealthAggregationService(
                     : await brokerageConnections.GetStatusesAsync(userId, ct);
 
                 var accounts = holdings.Select(h => new AccountBalanceDto(
-                    Guid.Empty, AccountNameFor(h.Provider), "brokerage",
+                    Guid.Empty, AccountNameFor(h.Provider),
+                    AssetClassNormalizer.Normalize(h.InstrumentType) == AssetClassNormalizer.Cash ? "cash" : "brokerage",
                     h.Symbol.Length >= 4 ? h.Symbol[..4] : h.Symbol,
                     h.Provider.ToLowerInvariant(), "brokerage", h.Symbol, h.Quantity, h.UsdValue,
                     BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt))

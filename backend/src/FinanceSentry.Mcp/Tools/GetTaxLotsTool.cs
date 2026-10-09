@@ -18,7 +18,7 @@ public sealed class GetTaxLotsTool(
     private readonly ILogger<GetTaxLotsTool> _logger = logger;
 
     [McpServerTool(Name = "get_tax_lots")]
-    [Description("Returns brokerage tax lots — one lot per current position. basisState is \"Verified\", \"Unverified\" or \"Unknown\" (fs-688): cost basis is independently recomputed from persisted fills and reconciled against the stored figure. Whenever basisState is not \"Verified\" — no fill history covers the full held quantity, or the recomputed cost basis disagrees with the stored one — averageCostUsd, costBasisUsd, unrealizedPnlUsd and unrealizedPnlPercent are null. Do not state or infer gain/loss for a lot whose basisState is not \"Verified\".")]
+    [Description("Returns brokerage tax lots — one lot per current position (cash balances such as \"USD Cash\" are not lots). basisState is \"Verified\", \"Unverified\" or \"Unknown\" (fs-688): cost basis is independently recomputed from persisted fills and reconciled against the stored figure. Whenever basisState is not \"Verified\" — no fill history covers the full held quantity, or the recomputed cost basis disagrees with the stored one — averageCostUsd, costBasisUsd, unrealizedPnlUsd and unrealizedPnlPercent are null. Do not state or infer gain/loss for a lot whose basisState is not \"Verified\".")]
     public async Task<IReadOnlyList<TaxLotEntry>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {

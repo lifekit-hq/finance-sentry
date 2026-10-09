@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 
@@ -59,7 +60,7 @@ public sealed class GetTaxLotsQueryHandler(
         var now = DateTime.UtcNow;
 
         var items = holdings
-            .Where(h => h.Quantity > 0m)
+            .Where(h => h.Quantity > 0m && AssetClassNormalizer.Normalize(h.InstrumentType) != AssetClassNormalizer.Cash)
             .OrderByDescending(h => h.UsdValue)
             .Select(h =>
             {
