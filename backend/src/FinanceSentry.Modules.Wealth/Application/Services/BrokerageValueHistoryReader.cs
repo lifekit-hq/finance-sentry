@@ -11,7 +11,7 @@ public sealed class BrokerageValueHistoryReader(INetWorthSnapshotRepository snap
     {
         var raw = await snapshots.GetByUserIdUnscopedAsync(userId, from, to, ct);
         return raw
-            .Select(s => new DailyBrokerageValue(s.SnapshotDate, s.BrokerageTotal))
+            .Select(s => new DailyBrokerageValue(s.SnapshotDate, s.BrokerageTotal, s.BrokerageInvested))
             .ToList();
     }
 }

@@ -84,4 +84,23 @@ public sealed class GetBookPerformanceToolTests
             s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default),
             Times.Once);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ReturnsUnavailableBookSideUnchanged_WhenServiceReportsNoComparableWindow()
+    {
+        var expected = new BookPerformanceResult(
+            [new PeriodTwr(BookPerformancePeriod.OneYear, Today.AddYears(-1), null, 0.2m, null, null)],
+            Today);
+
+        _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
+            .ReturnsAsync(expected);
+
+        var result = await CreateSut().ExecuteAsync(periods: [BookPerformancePeriod.OneYear]);
+
+        var period = result.Periods.Single();
+        period.BookTwr.Should().BeNull();
+        period.SpyTwr.Should().Be(0.2m);
+        period.Delta.Should().BeNull();
+        period.Verdict.Should().BeNull();
+    }
 }
