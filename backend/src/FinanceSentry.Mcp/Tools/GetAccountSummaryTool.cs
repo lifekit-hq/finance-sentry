@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Mcp.Abstractions;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -22,7 +23,7 @@ public sealed class GetAccountSummaryTool(
     private readonly ILogger<GetAccountSummaryTool> _logger = logger;
 
     [McpServerTool(Name = "get_account_summary")]
-    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers. isCash is true for cash entries (bank accounts, broker cash such as \"USD Cash\", and fiat held on a crypto venue) and false for invested positions; it uses the same cash definition as get_portfolio_snapshot.")]
+    [Description("Returns a consolidated account summary across banking, crypto, and brokerage providers. isCash is true for cash held (non-credit bank accounts, broker cash such as \"USD Cash\", and fiat held on a crypto venue) and false for invested positions and credit accounts, whose balance is the amount owed. Summing the isCash entries gives cash held; the cashUsd of get_portfolio_snapshot also nets owed credit balances.")]
     public async Task<IReadOnlyList<AccountSummaryEntry>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
@@ -42,7 +43,7 @@ public sealed class GetAccountSummaryTool(
                 a.Provider,
                 a.Currency,
                 a.CurrentBalance ?? 0m,
-                IsCash: true)));
+                IsCash: !AccountBalanceMath.IsLiability(a.AccountType))));
         }
         catch (Exception ex)
         {

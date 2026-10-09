@@ -181,4 +181,28 @@ public sealed class GetAccountSummaryToolTests
             .Should().BeEquivalentTo(result.Single(e => e.Provider == "truelayer").AccountId, "EUR", "USD Cash", "UAH Cash");
         result.Where(e => !e.IsCash).Select(e => e.AccountId).Should().BeEquivalentTo("BTC", "AAPL");
     }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotFlagCreditAccountAsCash()
+    {
+        var creditId = Guid.NewGuid();
+        _bankingReader.Setup(r => r.GetAccountSummariesAsync(UserId, default))
+            .ReturnsAsync([
+                new BankingAccountSummary(
+                    creditId, "Amex", "credit", "4321",
+                    "truelayer", "USD", 300m, 300m, "synced", null),
+                new BankingAccountSummary(
+                    Guid.NewGuid(), "Chase", "checking", "1234",
+                    "truelayer", "USD", 1000m, 1000m, "synced", null)
+            ]);
+        _cryptoReader.Setup(r => r.GetHoldingsAsync(UserId, default)).ReturnsAsync([]);
+        _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default)).ReturnsAsync([]);
+
+        var result = await CreateSut().ExecuteAsync();
+
+        var credit = result.Single(e => e.AccountId == creditId.ToString());
+        credit.IsCash.Should().BeFalse();
+        credit.Balance.Should().Be(300m);
+        result.Single(e => e.Name == "Chase").IsCash.Should().BeTrue();
+    }
 }

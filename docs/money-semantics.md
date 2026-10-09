@@ -160,9 +160,11 @@ changes a number:
   not link it to a dossier. The type is read only by `AccountBalanceMath` (credit accounts), so the
   institution, category and net-worth totals and the category % are exactly as before: cash stays
   in its sleeve, because that page is where the money is held.
-- **MCP `get_account_summary`**: each entry carries `isCash`, true for bank accounts, broker cash
-  and venue fiat, false for invested positions - the same split as `BookFigures.CashUsd`. A credit
-  account is still listed with its provider balance (the amount owed, §2), as before.
+- **MCP `get_account_summary`**: each entry carries `isCash`, true for non-credit bank accounts,
+  broker cash and venue fiat, false for invested positions and for credit accounts (a debt is not
+  cash). The `isCash` entries sum to cash held; `BookFigures.CashUsd` also nets the owed credit
+  balances. A credit account is still listed with its provider balance (the amount owed, §2), as
+  before.
 - **MCP `get_tax_lots`**: cash rows are not lots and are left out. They have no cost basis or gain
   to report.
 
