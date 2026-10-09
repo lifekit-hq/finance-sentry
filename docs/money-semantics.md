@@ -714,7 +714,9 @@ are closed periods.
   is the change in `brokerageInvested + cryptoInvested` from the first to the last day that has a
   split in the range (percent of the starting invested value, omitted when that is 0). It is a change
   in invested value, so deposits into the brokerage or a venue count in it - it is not a return - and
-  it is hidden when the range has fewer than two days with a split. While scrubbing, it runs from the
+  it is hidden when the range has fewer than two days with a split. It carries the headline's range
+  label when the split covers the whole range, and "since <first split date>" when the split starts
+  later. While scrubbing, it runs from the
   first split day to the scrubbed day, and is hidden when the scrubbed day has no split. The
   "At this pace" projection is untouched (built from savings, not from this line).
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
