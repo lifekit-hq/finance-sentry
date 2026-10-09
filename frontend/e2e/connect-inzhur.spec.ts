@@ -27,17 +27,13 @@ const EMPTY_WEALTH = {
   appliedFilters: {category: null, provider: null},
 };
 
-// Placeholders only: no real phone number, password or SMS code ever appears in a test.
-const PHONE = '+380 00 000 0000';
-const PASSWORD = 'placeholder-password';
-const CODE = '000000';
+// Placeholder only: no real Inzhur cookie ever appears in a test.
+const PASTED = 'fake-refresh-token';
 
 const NOT_CONNECTED = {
   status: 'not_connected',
-  hasSavedCredentials: false,
   lastSyncAt: null,
   sessionStartedAt: null,
-  loginAvailable: true,
 };
 
 function json(body: unknown, status = 200) {
@@ -65,106 +61,77 @@ async function openInzhurForm(page: Page): Promise<void> {
   await expect(page.getByText('Interactive Brokers', {exact: true})).toBeVisible();
   await page.getByText('Inzhur', {exact: true}).click();
 
-  await expect(page.getByRole('button', {name: 'Send code'})).toBeVisible();
+  await expect(page.getByText('Paste Inzhur session')).toBeVisible();
 }
 
-async function fillCredentials(page: Page): Promise<void> {
-  // cmn-input repeats attributes on its host element; fill the native inputs.
-  await page.locator('input[type="tel"]').fill(PHONE);
-  await page.locator('input[type="password"]').fill(PASSWORD);
+async function pasteSession(page: Page, value = PASTED): Promise<void> {
+  // cmn-input repeats attributes on its host element; fill the native input.
+  await page.locator('input[type="password"]').fill(value);
+  await page.getByRole('button', {name: 'Connect', exact: true}).click();
 }
 
 test.describe('Connect Inzhur', () => {
-  test('phone and password send the code, the code finishes the connection', async ({page}) => {
+  test('a pasted session connects and lands on investments', async ({page}) => {
     await mockApis(page);
-    let startRequest: Request | undefined;
-    let verifyRequest: Request | undefined;
-    await page.route(`${API}/brokerage/inzhur/login/start`, route => {
-      startRequest = route.request();
-      return route.fulfill(
-        json({status: 'code_required', codeExpiresAt: '2026-10-07T10:04:00Z', attemptsLeft: null})
-      );
-    });
-    await page.route(`${API}/brokerage/inzhur/login/verify`, route => {
-      verifyRequest = route.request();
-      return route.fulfill(json({status: 'connected', codeExpiresAt: null, attemptsLeft: null}));
+    let sessionRequest: Request | undefined;
+    await page.route(`${API}/brokerage/inzhur/session`, route => {
+      sessionRequest = route.request();
+      return route.fulfill(json({status: 'connected'}));
     });
 
     await openInzhurForm(page);
     await expect(page.getByText('Read-only', {exact: true})).toBeVisible();
-    await fillCredentials(page);
-    await page.getByRole('button', {name: 'Send code'}).click();
-
-    await expect(page.getByText(/Inzhur sent a code to your phone/)).toBeVisible();
-    await page.locator('input[autocomplete="one-time-code"]').fill(CODE);
-    await page.getByRole('button', {name: 'Connect', exact: true}).click();
+    await expect(page.getByText(/without signing out/)).toBeVisible();
+    await pasteSession(page, ` ${PASTED} `);
 
     await expect(page).toHaveURL(/\/accounts\/investments/);
-    expect(startRequest?.method()).toBe('POST');
-    expect(startRequest?.postDataJSON()).toEqual({phone: PHONE, password: PASSWORD});
-    expect(verifyRequest?.method()).toBe('POST');
-    expect(verifyRequest?.postDataJSON()).toEqual({code: CODE});
+    expect(sessionRequest?.method()).toBe('POST');
+    expect(sessionRequest?.postDataJSON()).toEqual({refreshToken: PASTED});
   });
 
-  test('a wrong code stays on the code step with the attempts left', async ({page}) => {
+  test('a session Inzhur refuses is explained and the form stays open', async ({page}) => {
     await mockApis(page);
-    await page.route(`${API}/brokerage/inzhur/login/start`, route =>
-      route.fulfill(json({status: 'code_required', codeExpiresAt: null, attemptsLeft: null}))
-    );
-    await page.route(`${API}/brokerage/inzhur/login/verify`, route =>
-      route.fulfill(json({status: 'invalid_code', codeExpiresAt: null, attemptsLeft: 2}))
-    );
-
-    await openInzhurForm(page);
-    await fillCredentials(page);
-    await page.getByRole('button', {name: 'Send code'}).click();
-    await page.locator('input[autocomplete="one-time-code"]').fill(CODE);
-    await page.getByRole('button', {name: 'Connect', exact: true}).click();
-
-    await expect(page.getByText(/didn't match/)).toBeVisible();
-    await expect(page.getByRole('button', {name: 'Connect', exact: true})).toBeVisible();
-  });
-
-  test('the daily sign-in limit is explained and no code step opens', async ({page}) => {
-    await mockApis(page);
-    await page.route(`${API}/brokerage/inzhur/login/start`, route =>
+    await page.route(`${API}/brokerage/inzhur/session`, route =>
       route.fulfill(
-        json({error: 'Daily Inzhur sign-in limit reached.', errorCode: 'INZHUR_LOGIN_LIMIT'}, 429)
+        json(
+          {error: 'Inzhur did not accept that session.', errorCode: 'INZHUR_SESSION_REJECTED'},
+          422
+        )
       )
     );
 
     await openInzhurForm(page);
-    await fillCredentials(page);
-    await page.getByRole('button', {name: 'Send code'}).click();
+    await pasteSession(page);
 
-    await expect(page.getByText(/limited to two attempts a day/)).toBeVisible();
-    await expect(page.getByText(/Inzhur sent a code to your phone/)).toHaveCount(0);
+    await expect(page.getByText(/didn't accept that session/)).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Connect', exact: true})).toBeVisible();
   });
 
-  test('a reconnect with saved credentials asks only to send the code', async ({page}) => {
+  test('an empty paste is not sent', async ({page}) => {
+    await mockApis(page);
+    let sent = false;
+    await page.route(`${API}/brokerage/inzhur/session`, route => {
+      sent = true;
+      return route.fulfill(json({status: 'connected'}));
+    });
+
+    await openInzhurForm(page);
+    await page.getByRole('button', {name: 'Connect', exact: true}).click();
+
+    await expect(page.getByText('Paste Inzhur session')).toBeVisible();
+    expect(sent).toBe(false);
+  });
+
+  test('an ended session asks for a fresh one', async ({page}) => {
     await mockApis(page, {
       status: 'reauth_required',
-      hasSavedCredentials: true,
       lastSyncAt: '2026-10-06T07:00:00Z',
       sessionStartedAt: '2026-10-01T09:00:00Z',
-      loginAvailable: true,
-    });
-    let startRequest: Request | undefined;
-    await page.route(`${API}/brokerage/inzhur/login/start`, route => {
-      startRequest = route.request();
-      return route.fulfill(
-        json({status: 'code_required', codeExpiresAt: null, attemptsLeft: null})
-      );
     });
 
     await openInzhurForm(page);
 
-    await expect(page.getByText('Inzhur needs you to sign in again')).toBeVisible();
-    await expect(page.locator('input[type="password"]')).toHaveCount(0);
-    await page.getByRole('button', {name: 'Send code'}).click();
-
-    await expect(page.getByText(/Inzhur sent a code to your phone/)).toBeVisible();
-    expect(startRequest?.postDataJSON()).toEqual({phone: null, password: null});
+    await expect(page.getByText('Inzhur needs a new session')).toBeVisible();
   });
 
   test('back from the Inzhur form returns to the broker picker', async ({page}) => {

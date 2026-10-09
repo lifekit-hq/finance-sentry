@@ -56,10 +56,9 @@ export const PROVIDER_CATALOG: readonly ProviderDescriptor[] = Object.freeze([
     slug: 'inzhur',
     displayName: 'Inzhur',
     institutionType: 'broker',
-    description:
-      'Connect your Inzhur cabinet with your phone, password and an SMS code. Read-only.',
+    description: 'Connect your Inzhur cabinet by pasting the session from your browser. Read-only.',
     iconAsset: '/assets/providers/inzhur.svg',
-    formShape: 'phone-password-sms',
+    formShape: 'pasted-session',
     helpUrl: 'https://inzhur.reit',
   }),
 ] as const);

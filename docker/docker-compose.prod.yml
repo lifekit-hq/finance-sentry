@@ -153,8 +153,6 @@ services:
       # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
-      # Inzhur sign-in runs in the inzhur-browser sidecar (owner-initiated only; the daily sync never opens it).
-      Inzhur__BrowserUrl: http://inzhur-browser:9222
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
@@ -165,7 +163,6 @@ services:
       identity-oidc: {}    # back channel to the org identity provider (Logto) by name
       finance-sentry-edge:
         aliases: [api-edge]   # the gateway's upstream — see finance-sentry-edge below
-      inzhur-browser: {}   # DevTools hop to the Inzhur sign-in sidecar, shared with nothing else
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
       interval: 30s
@@ -350,41 +347,6 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  # Headless Chromium for the owner's Inzhur sign-in. Inzhur has no API and guards its login with reCAPTCHA v3,
-  # which only scores a real page, so the api drives the cabinet's own sign-in page here over the DevTools
-  # protocol when the owner taps Connect/Reconnect and types the SMS code; the daily sync never uses it (it
-  # refreshes the stored session over plain HTTPS). DevTools is unauthenticated, so the sidecar sits alone with
-  # the api on the inzhur-browser network and publishes no port. Not a product: no contract probes.
-  inzhur-browser:
-    image: chromedp/headless-shell:155.0.8059.40
-    container_name: finance-sentry-inzhur-browser
-    restart: unless-stopped
-    user: "65534:65534"     # nobody; Chromium runs unsandboxed (--no-sandbox in the image's run.sh) inside the container
-    mem_limit: 768m         # idle 45 MiB; one sign-in page is a few hundred
-    shm_size: 256m          # Chromium's renderer shared memory; the 64m default crashes tabs
-    pids_limit: 256
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    read_only: true
-    tmpfs:
-      - /tmp:size=128m      # profile, cache and crash dumps; HOME points here
-    environment:
-      HOME: /tmp
-    labels:
-      lifekit.contract: "none"   # platform piece (upstream image), not a product
-    networks:
-      - inzhur-browser
-    healthcheck:
-      # The image has no curl; a TCP connect to Chromium's own DevTools port shows the browser is up.
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9223"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
-
   postgres:
     image: postgres:14-alpine
     container_name: finance-sentry-postgres
@@ -452,9 +414,6 @@ networks:
   # Gateway <-> API hop with pinned addresses: forwarded-header trust on both hosts names these
   # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender. ip_range
   # keeps dynamic allocation (the API) on .4-.7 so it can never take the gateway's pinned .2.
-  # api <-> inzhur-browser only. Not `internal`: the browser must reach www.inzhur.reit to load the sign-in page.
-  inzhur-browser:
-    name: finance-sentry-inzhur-browser
   finance-sentry-edge:
     name: finance-sentry-edge
     ipam:

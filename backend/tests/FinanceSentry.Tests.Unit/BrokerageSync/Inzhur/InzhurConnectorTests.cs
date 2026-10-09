@@ -6,30 +6,34 @@ using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
 namespace FinanceSentry.Tests.Unit.BrokerageSync.Inzhur;
 
-/// <summary>The owner-initiated sign-in against a fake browser: the only path that can make Inzhur send an SMS.</summary>
+/// <summary>The owner hands over the session he signed in to on inzhur.reit; finance-sentry proves it with one refresh.</summary>
 public class InzhurConnectorTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
+    private const string Pasted = "fake-pasted-refresh";
+
+    private static readonly DateTimeOffset Now = new(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
 
     private readonly Guid _userId = Guid.NewGuid();
     private readonly FakeEncryption _encryption = new();
     private readonly ManualClock _clock = new(Now);
     private readonly Mock<IInzhurCredentialRepository> _credentials = new(MockBehavior.Loose);
     private readonly Mock<IBrokerageHoldingRepository> _holdings = new(MockBehavior.Loose);
-    private readonly Mock<IInzhurBrowserLogin> _browser = new(MockBehavior.Strict);
+    private readonly Mock<IInzhurApiClient> _api = new(MockBehavior.Strict);
     private readonly Mock<IInzhurSyncService> _sync = new(MockBehavior.Loose);
     private readonly Mock<IAlertGeneratorService> _alerts = new(MockBehavior.Loose);
+    private readonly CapturingLogger _logger = new();
+    private readonly List<InzhurSession> _refreshed = [];
     private InzhurCredential? _stored;
 
     public InzhurConnectorTests()
     {
-        _browser.SetupGet(b => b.IsAvailable).Returns(true);
         _credentials.Setup(r => r.GetByUserIdAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(() => _stored);
         _credentials.Setup(r => r.AddAsync(It.IsAny<InzhurCredential>(), It.IsAny<CancellationToken>()))
             .Callback<InzhurCredential, CancellationToken>((c, _) => _stored = c)
@@ -37,125 +41,153 @@ public class InzhurConnectorTests
     }
 
     private InzhurConnector Connector() => new(
-        _credentials.Object, _holdings.Object, _browser.Object, _sync.Object, _encryption, _alerts.Object, _clock,
-        NullLogger<InzhurConnector>.Instance);
+        _credentials.Object, _holdings.Object, _api.Object, _sync.Object, _encryption, _alerts.Object,
+        Options.Create(new InzhurOptions()), _clock, _logger);
 
-    private void BrowserStartReturns(InzhurLoginOutcome outcome)
-        => _browser.Setup(b => b.StartAsync(_userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(outcome);
+    private void RefreshReturns(InzhurSession session)
+        => _api.Setup(a => a.RefreshAsync(It.IsAny<InzhurSession>(), It.IsAny<CancellationToken>()))
+            .Callback<InzhurSession, CancellationToken>((s, _) => _refreshed.Add(s))
+            .ReturnsAsync(session);
+
+    private void RefreshThrows(InzhurFailureKind kind)
+        => _api.Setup(a => a.RefreshAsync(It.IsAny<InzhurSession>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InzhurApiException(kind, "Inzhur refresh returned 401."));
 
     private string Plain(byte[] ciphertext) => _encryption.Decrypt(ciphertext, [], [], 1);
 
     [Fact]
-    public async Task Typed_credentials_are_stored_encrypted_and_the_sign_in_waits_for_the_SMS_code()
+    public async Task A_pasted_session_that_refreshes_is_stored_encrypted_activated_and_read_once()
     {
-        var expires = Now.UtcDateTime.AddMinutes(3);
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(expires));
+        RefreshReturns(InzhurFakes.Session(refreshValue: "fake-rotated"));
 
-        var result = await Connector().StartAsync(_userId, "+00 000 000-00-00", InzhurFakes.Password, default);
+        var result = await Connector().ConnectSessionAsync(_userId, Pasted, default);
 
-        result.Should().Be(new InzhurConnectResult(InzhurConnectResult.CodeRequired, CodeExpiresAt: expires));
-        _browser.Verify(b => b.StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, It.IsAny<CancellationToken>()), Times.Once);
-        Plain(_stored!.EncryptedPhone).Should().Be(InzhurFakes.Phone, "the cabinet sends the phone as digits only");
-        _stored.Status.Should().Be(InzhurConnectionStatus.ReauthRequired, "nothing is connected until the code is accepted");
-    }
-
-    [Fact]
-    public async Task A_correct_code_stores_the_session_activates_the_connection_and_reads_once()
-    {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        _browser.Setup(b => b.VerifyAsync(_userId, "123456", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new InzhurLoginOutcome.Authenticated(InzhurFakes.Session()));
-        await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
-
-        var result = await Connector().VerifyAsync(_userId, "123 456", default);
-
-        result.Status.Should().Be(InzhurConnectResult.Connected);
+        result.Should().Be(new InzhurConnectResult(InzhurConnectResult.Connected));
+        var sent = _refreshed.Should().ContainSingle().Subject;
+        sent.Cookies.Should().ContainSingle().Which.Should().Match<InzhurCookie>(c =>
+            c.Name == "refreshToken" && c.Value == Pasted && c.Domain == "api.inzhur.reit" && c.Secure && c.HttpOnly);
         _stored!.Status.Should().Be(InzhurConnectionStatus.Active);
         _stored.SessionStartedAt.Should().Be(Now.UtcDateTime);
-        InzhurSession.Deserialize(Plain(_stored.EncryptedSession)).AccessToken.Should().Be(InzhurFakes.AccessToken);
+        var stored = InzhurSession.Deserialize(Plain(_stored.EncryptedSession));
+        stored.AccessToken.Should().Be(InzhurFakes.AccessToken);
+        stored.Cookies.Should().ContainSingle().Which.Value.Should().Be("fake-rotated", "the jar as the refresh left it is stored");
+        _credentials.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _sync.Verify(s => s.SyncAsync(_userId, It.IsAny<CancellationToken>()), Times.Once);
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(_userId, "inzhur", null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public async Task A_wrong_code_reports_the_attempts_left_and_keeps_waiting()
+    [Theory]
+    [InlineData("  fake-pasted-refresh\n")]
+    [InlineData("refreshToken=fake-pasted-refresh")]
+    [InlineData("\"fake-pasted-refresh\"")]
+    public async Task The_cookie_name_quotes_and_surrounding_space_are_stripped(string pasted)
     {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        _browser.Setup(b => b.VerifyAsync(_userId, "000000", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new InzhurLoginOutcome.InvalidCode(2));
-        await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
+        RefreshReturns(InzhurFakes.Session());
 
-        var result = await Connector().VerifyAsync(_userId, "000000", default);
+        await Connector().ConnectSessionAsync(_userId, pasted, default);
 
-        result.Should().Be(new InzhurConnectResult(InzhurConnectResult.InvalidCode, AttemptsLeft: 2));
-        _stored!.Status.Should().Be(InzhurConnectionStatus.ReauthRequired);
+        _refreshed.Single().Cookies.Single().Value.Should().Be(Pasted);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    [InlineData("refreshToken=")]
+    public async Task Nothing_pasted_is_refused_before_Inzhur_is_called(string? pasted)
+    {
+        var act = () => Connector().ConnectSessionAsync(_userId, pasted, default);
+
+        var error = (await act.Should().ThrowAsync<InzhurConnectException>()).Which;
+        error.ErrorCode.Should().Be(InzhurErrorCodes.SessionRequired);
+        error.StatusCode.Should().Be(400);
+        _api.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("refreshToken=fake; Path=/")]
+    [InlineData("fake value")]
+    [InlineData("fake,value")]
+    public async Task A_paste_that_is_not_a_bare_cookie_value_is_refused_before_Inzhur_is_called(string pasted)
+    {
+        var act = () => Connector().ConnectSessionAsync(_userId, pasted, default);
+
+        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.ErrorCode.Should().Be(InzhurErrorCodes.SessionInvalid);
+        _api.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task A_reconnect_reuses_the_saved_phone_and_password()
+    public async Task An_oversized_paste_is_refused()
     {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
+        var act = () => Connector().ConnectSessionAsync(_userId, new string('x', InzhurConnector.MaxRefreshCookieLength + 1), default);
 
-        await Connector().StartAsync(_userId, null, null, default);
-
-        _browser.Verify(b => b.StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.ErrorCode.Should().Be(InzhurErrorCodes.SessionInvalid);
     }
 
-    [Fact]
-    public async Task Without_saved_or_typed_credentials_nothing_is_sent_to_Inzhur()
+    [Theory]
+    [InlineData(InzhurFailureKind.ReauthRequired, InzhurErrorCodes.SessionRejected, 422)]
+    [InlineData(InzhurFailureKind.RateLimited, InzhurErrorCodes.Unavailable, 503)]
+    [InlineData(InzhurFailureKind.Unavailable, InzhurErrorCodes.Unavailable, 503)]
+    [InlineData(InzhurFailureKind.Unexpected, InzhurErrorCodes.ConnectFailed, 502)]
+    public async Task A_session_Inzhur_refuses_is_not_stored(InzhurFailureKind kind, string errorCode, int status)
     {
-        var act = () => Connector().StartAsync(_userId, null, null, default);
+        RefreshThrows(kind);
 
-        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.ErrorCode.Should().Be(InzhurErrorCodes.CredentialsRequired);
-        _browser.Verify(b => b.StartAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
+        var act = () => Connector().ConnectSessionAsync(_userId, Pasted, default);
 
-    [Fact]
-    public async Task Sign_ins_are_capped_per_day_so_the_owner_gets_at_most_that_many_SMS()
-    {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        for (var i = 0; i < InzhurCredential.MaxLoginAttemptsPerDay; i++)
-            await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
-
-        var act = () => Connector().StartAsync(_userId, null, null, default);
-
-        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.ErrorCode.Should().Be(InzhurErrorCodes.LoginLimit);
-        _browser.Verify(
-            b => b.StartAsync(_userId, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(InzhurCredential.MaxLoginAttemptsPerDay));
-
-        _clock.Now = Now.AddDays(1);
-        await Connector().StartAsync(_userId, null, null, default);
-    }
-
-    [Fact]
-    public async Task Rejected_credentials_are_forgotten_so_the_next_connect_asks_for_them()
-    {
-        BrowserStartReturns(new InzhurLoginOutcome.Failed(InzhurErrorCodes.InvalidCredentials, "rejected"));
-
-        var act = () => Connector().StartAsync(_userId, InzhurFakes.Phone, "wrong-placeholder", default);
-
-        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.StatusCode.Should().Be(422);
-        _stored!.HasLoginSecrets.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task Without_a_sign_in_browser_the_connect_is_unavailable()
-    {
-        _browser.SetupGet(b => b.IsAvailable).Returns(false);
-
-        var act = () => Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
-
-        (await act.Should().ThrowAsync<InzhurConnectException>()).Which.StatusCode.Should().Be(503);
+        var error = (await act.Should().ThrowAsync<InzhurConnectException>()).Which;
+        error.ErrorCode.Should().Be(errorCode);
+        error.StatusCode.Should().Be(status);
         _stored.Should().BeNull();
+        _credentials.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _sync.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task A_refused_session_leaves_an_existing_connection_untouched()
+    {
+        RefreshReturns(InzhurFakes.Session(refreshValue: "fake-first"));
+        await Connector().ConnectSessionAsync(_userId, Pasted, default);
+        var before = _stored!.EncryptedSession;
+        RefreshThrows(InzhurFailureKind.ReauthRequired);
+
+        var act = () => Connector().ConnectSessionAsync(_userId, "fake-stale", default);
+
+        await act.Should().ThrowAsync<InzhurConnectException>();
+        _stored.EncryptedSession.Should().Equal(before);
+        _stored.Status.Should().Be(InzhurConnectionStatus.Active);
+    }
+
+    [Fact]
+    public async Task A_new_session_reactivates_a_connection_that_needed_the_owner()
+    {
+        _stored = new InzhurCredential(_userId);
+        _stored.MarkReauthRequired("Inzhur refresh returned 401.");
+        RefreshReturns(InzhurFakes.Session());
+
+        await Connector().ConnectSessionAsync(_userId, Pasted, default);
+
+        _credentials.Verify(r => r.AddAsync(It.IsAny<InzhurCredential>(), It.IsAny<CancellationToken>()), Times.Never);
+        _stored.Status.Should().Be(InzhurConnectionStatus.Active);
+        _stored.LastSyncError.Should().BeNull();
+        _stored.HasSession.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task The_pasted_value_never_reaches_a_log_line()
+    {
+        RefreshThrows(InzhurFailureKind.ReauthRequired);
+        await FluentActions.Awaiting(() => Connector().ConnectSessionAsync(_userId, Pasted, default)).Should().ThrowAsync<InzhurConnectException>();
+        RefreshReturns(InzhurFakes.Session());
+        await Connector().ConnectSessionAsync(_userId, Pasted, default);
+
+        _logger.Lines.Should().NotBeEmpty().And.OnlyContain(line => !line.Contains(Pasted) && !line.Contains("fake-refresh-1"));
     }
 
     [Fact]
     public async Task Disconnect_removes_the_connection_and_only_Inzhur_holdings()
     {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
+        RefreshReturns(InzhurFakes.Session());
+        await Connector().ConnectSessionAsync(_userId, Pasted, default);
 
         await Connector().DisconnectAsync(_userId, default);
 
@@ -166,12 +198,24 @@ public class InzhurConnectorTests
     [Fact]
     public async Task Status_never_carries_a_secret()
     {
-        BrowserStartReturns(new InzhurLoginOutcome.CodeRequired(Now.UtcDateTime.AddMinutes(3)));
-        await Connector().StartAsync(_userId, InzhurFakes.Phone, InzhurFakes.Password, default);
+        RefreshReturns(InzhurFakes.Session());
+        await Connector().ConnectSessionAsync(_userId, Pasted, default);
 
         var status = await Connector().GetStatusAsync(_userId, default);
 
-        status.HasSavedCredentials.Should().BeTrue();
-        System.Text.Json.JsonSerializer.Serialize(status).Should().NotContain(InzhurFakes.Phone).And.NotContain(InzhurFakes.Password);
+        status.Should().Be(new InzhurConnectionStatusResult(InzhurConnectionStatus.Active, null, Now.UtcDateTime));
+        System.Text.Json.JsonSerializer.Serialize(status).Should().NotContain(Pasted).And.NotContain("fake-refresh-1");
+    }
+
+    private sealed class CapturingLogger : ILogger<InzhurConnector>
+    {
+        public List<string> Lines { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Lines.Add(formatter(state, exception) + (exception is null ? string.Empty : " " + exception));
     }
 }

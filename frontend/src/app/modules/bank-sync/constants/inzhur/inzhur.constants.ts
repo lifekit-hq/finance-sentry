@@ -1,20 +1,18 @@
-/**
- * A wrong SMS code is a 200 from the backend (`invalid_code`); the strategy raises it under this
- * code so the connect store shows the registry's message like any other failure.
- */
-export const INZHUR_INVALID_CODE = 'INZHUR_INVALID_CODE';
-
-/** The backend's catch-all sign-in failure; also used for a failure that carries no code. */
-export const INZHUR_LOGIN_FAILED = 'INZHUR_LOGIN_FAILED';
-
-/** A phone as typed: digits with optional +, spaces, dashes and brackets (the server keeps digits only). */
-export const INZHUR_PHONE_PATTERN = /^\s*\+?[\d\s()-]{9,20}$/;
-
-/** Inzhur's SMS codes are short numeric codes; spaces from a pasted code are dropped. */
-export const INZHUR_CODE_PATTERN = /^\s*(\d\s*){4,8}$/;
+/** Mirrors the backend's cap (`InzhurConnector.MaxRefreshCookieLength`); a longer paste is not a cookie. */
+export const INZHUR_SESSION_MAX_LENGTH = 8192;
 
 export const INZHUR_READ_ONLY_NOTE =
   'Finance Sentry only reads your portfolio once a day. It never trades, withdraws or changes anything in your cabinet.';
 
-export const INZHUR_SMS_NOTE =
-  'Inzhur will text a code to your phone. Each sign-in can send an SMS, so Finance Sentry allows two a day.';
+/**
+ * How the owner hands over his session. Inzhur's sign-in turns this server away with a bot check,
+ * so he signs in in his own desktop browser and copies the session's refresh cookie.
+ */
+export const INZHUR_SESSION_STEPS: readonly string[] = [
+  'Sign in to your cabinet on inzhur.reit in a desktop browser.',
+  'Open DevTools → Application → Cookies → https://api.inzhur.reit and copy the Value of refreshToken.',
+  'Paste it below, then close the tab without signing out: signing out ends the session.',
+];
+
+export const INZHUR_SESSION_NOTE =
+  'Stored encrypted and used only to refresh your own session. Finance Sentry never sees your phone or password.';

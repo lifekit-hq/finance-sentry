@@ -46,8 +46,7 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
         new(new DbContextOptionsBuilder<BrokerageSyncDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
-    private static InzhurCredential NewInzhurCredential(Guid userId) =>
-        new(userId, new EncryptedSecret([1], [1], [1], 1), new EncryptedSecret([2], [2], [2], 1));
+    private static InzhurCredential NewInzhurCredential(Guid userId) => new(userId);
 
     private static BrokerageHolding NewHolding(Guid userId, string symbol = "AAPL", decimal quantity = 1m) =>
         new(userId, symbol, "STK", quantity, quantity * 100m, Provider);
@@ -245,7 +244,7 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
         await using var read = CreateContext();
         var rows = await read.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(c => c.UserId == _userA || c.UserId == _userB).ToListAsync();
-        rows.Should().OnlyContain(c => c.KeyVersion == 2 && c.SessionKeyVersion == 2);
+        rows.Should().OnlyContain(c => c.SessionKeyVersion == 2);
         rows.Single(c => c.UserId == _userA).EncryptedSession.Should().Equal(9);
         rows.Single(c => c.UserId == _userB).EncryptedSession.Should().BeEmpty("a missing session is not invented by a rotation");
     }
