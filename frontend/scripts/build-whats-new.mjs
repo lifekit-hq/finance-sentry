@@ -14,7 +14,8 @@ const notesPath = join(frontend, 'src', 'whats-new', 'notes.md');
 const outputPath = join(frontend, 'public', 'whats-new.json');
 
 if (!existsSync(changelogPath)) {
-  // The production image copies CHANGELOG.md next to frontend/; a missing file means that COPY went.
+  // The production image copies CHANGELOG.md next to frontend/ and docker-compose.dev.yml mounts it
+  // there; a missing file means that COPY or mount went.
   console.error(`build-whats-new: ${changelogPath} not found`);
   process.exit(1);
 }
