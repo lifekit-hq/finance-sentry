@@ -96,8 +96,6 @@
     <!-- Ed25519 request signing (Revolut X, #472) — the BCL has no Ed25519 -->
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
 
-    <!-- Browser automation over CDP (Inzhur sign-in runs in a headless-shell sidecar) -->
-
     <!-- HTML parsing (companion data layer — MarketBeat / TrendForce) -->
     <PackageVersion Include="AngleSharp" Version="1.8.3" />
 
