@@ -2,8 +2,8 @@ import {DOCUMENT} from '@angular/common';
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {OWNER_ROLE} from '../../../../shared/constants/role/role.constants';
 import {AuthStore} from '../../../auth/store/auth.store';
-import {OWNER_ROLE} from '../../constants/person/person.constants';
 import {type Invite, type Person, type PersonRow} from '../../models/person/person.model';
 import {InviteLinkUtils} from '../../utils/invite-link.utils';
 
