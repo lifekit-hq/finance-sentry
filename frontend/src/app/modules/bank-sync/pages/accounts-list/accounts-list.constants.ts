@@ -15,7 +15,7 @@ const DISCONNECT_ITEM: MenuItem = {
 
 /**
  * Providers that re-authorise through the connect flow, with the picker slug and modal title each opens;
- * the rest only offer Disconnect. An Inzhur reconnect is the owner signing in again (phone, password, SMS code).
+ * the rest only offer Disconnect. An Inzhur reconnect is the owner pasting a fresh session.
  */
 export const RECONNECT_TARGET: Readonly<Record<string, {slug: PickableProvider; title: string}>> = {
   truelayer: {slug: 'truelayer', title: 'Reconnect bank'},

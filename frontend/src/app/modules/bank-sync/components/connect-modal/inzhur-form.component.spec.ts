@@ -2,32 +2,21 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {INZHUR_SESSION_MAX_LENGTH} from '../../constants/inzhur/inzhur.constants';
 import {ConnectStore} from '../../store/connect/connect.store';
-import {type InzhurFormStep} from '../../store/inzhur-connect/inzhur-connect.state';
 import {InzhurConnectStore} from '../../store/inzhur-connect/inzhur-connect.store';
 import {type ConnectStrategy} from '../../strategies/connect-strategy';
 import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
 import {InzhurFormComponent} from './inzhur-form.component';
 
-// Placeholder values only; no real phone or password belongs in a test.
-const PHONE = '+000 000 0000';
-const PASSWORD = 'placeholder';
+// Placeholder value only; no real cookie belongs in a test.
+const PASTED = 'fake-refresh';
 
-function buildInzhurStore(opts: {asksForCredentials?: boolean; step?: InzhurFormStep} = {}) {
+function buildInzhurStore(opts: {isReconnect?: boolean} = {}) {
   return {
     asyncStatus: signal('success'),
     loadErrorMessage: signal(''),
-    loginAvailable: signal(true),
-    isReconnect: signal(false),
-    asksForCredentials: signal(opts.asksForCredentials ?? true),
-    hasSavedCredentials: signal(!(opts.asksForCredentials ?? true)),
-    isStarting: signal(false),
-    startErrorMessage: signal(''),
-    step: signal<InzhurFormStep>(opts.step ?? 'credentials'),
-    codeExpiresAt: signal<Nullable<string>>(null),
-    start: vi.fn(),
-    editCredentials: vi.fn(),
-    backToCredentials: vi.fn(),
+    isReconnect: signal(opts.isReconnect ?? false),
   };
 }
 
@@ -67,81 +56,50 @@ describe('InzhurFormComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('does not start a sign-in while the phone or password is missing', () => {
-    const {cmp, inzhur} = setup();
+  it('asks for the session in a masked field that is never autofilled', () => {
+    const {fixture} = setup();
+    const host = (fixture.nativeElement as HTMLElement).querySelector('cmn-input');
 
-    cmp.sendCode();
-
-    expect(inzhur.start).not.toHaveBeenCalled();
-    expect(cmp.credentialsForm.touched).toBe(true);
+    expect(host?.getAttribute('type')).toBe('password');
+    expect(host?.getAttribute('autocomplete')).toBe('off');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Paste Inzhur session');
   });
 
-  it('rejects a phone that is not a phone number', () => {
-    const {cmp, inzhur} = setup();
-    cmp.credentialsForm.setValue({phone: 'not a phone', password: PASSWORD});
+  it('does not connect while the field is empty or blank', () => {
+    const {cmp, store} = setup();
 
-    cmp.sendCode();
+    cmp.connect();
+    cmp.sessionForm.setValue({refreshToken: '   '});
+    cmp.connect();
 
-    expect(inzhur.start).not.toHaveBeenCalled();
+    expect(store.connect).not.toHaveBeenCalled();
+    expect(cmp.sessionForm.touched).toBe(true);
   });
 
-  it('sendCode() starts the sign-in with the typed phone and password', () => {
-    const {cmp, inzhur, store} = setup();
-    cmp.credentialsForm.setValue({phone: ` ${PHONE} `, password: PASSWORD});
+  it('does not connect a paste longer than any cookie', () => {
+    const {cmp, store} = setup();
+    cmp.sessionForm.setValue({refreshToken: 'x'.repeat(INZHUR_SESSION_MAX_LENGTH + 1)});
 
-    cmp.sendCode();
-
-    expect(store.resetError).toHaveBeenCalled();
-    expect(inzhur.start).toHaveBeenCalledWith({phone: PHONE, password: PASSWORD});
-  });
-
-  it('sendCode() reuses the saved phone and password without asking for them', () => {
-    const {cmp, inzhur, fixture} = setup(buildInzhurStore({asksForCredentials: false}));
-
-    cmp.sendCode();
-
-    expect(inzhur.start).toHaveBeenCalledWith({phone: null, password: null});
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector('input[type="password"]')
-    ).toBeNull();
-  });
-
-  it('verify() submits the SMS code (spaces dropped) through the connect store', () => {
-    const {cmp, store, strategy} = setup(buildInzhurStore({step: 'code'}));
-    cmp.codeForm.setValue({code: '000 000'});
-
-    cmp.verify();
-
-    expect(store.connect).toHaveBeenCalledWith({strategy, payload: {code: '000000'}});
-  });
-
-  it('verify() does nothing without a well-formed code', () => {
-    const {cmp, store} = setup(buildInzhurStore({step: 'code'}));
-    cmp.codeForm.setValue({code: 'abc'});
-
-    cmp.verify();
+    cmp.connect();
 
     expect(store.connect).not.toHaveBeenCalled();
   });
 
-  it('asks for the code with a one-time-code numeric field', () => {
-    const {fixture} = setup(buildInzhurStore({step: 'code'}));
-    const host = (fixture.nativeElement as HTMLElement).querySelector('cmn-input');
+  it('connect() hands the trimmed paste to the connect store', () => {
+    const {cmp, store, strategy} = setup();
+    cmp.sessionForm.setValue({refreshToken: ` ${PASTED} `});
 
-    expect(host?.getAttribute('inputmode')).toBe('numeric');
-    expect(host?.getAttribute('autocomplete')).toBe('one-time-code');
+    cmp.connect();
+
+    expect(store.connect).toHaveBeenCalledWith({strategy, payload: {refreshToken: PASTED}});
   });
 
-  it('startOver() returns to the first step and clears the code', () => {
-    const {cmp, inzhur, store} = setup(buildInzhurStore({step: 'code'}));
-    cmp.codeForm.setValue({code: '000000'});
+  it('says why when the saved session ended', () => {
+    const {fixture} = setup(buildInzhurStore({isReconnect: true}));
 
-    cmp.startOver();
-
-    expect(cmp.codeForm.getRawValue().code).toBe('');
-    expect(store.resetError).toHaveBeenCalled();
-    expect(inzhur.backToCredentials).toHaveBeenCalled();
-    expect(inzhur.start).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Inzhur needs a new session'
+    );
   });
 
   it('back() returns to the broker picker', () => {

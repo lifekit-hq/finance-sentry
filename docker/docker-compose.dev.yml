@@ -79,8 +79,6 @@ services:
       Observability__Loki__Url: http://loki:3100
       # Trace spine (spec 023 amendment) OTLP exporter — empty so dev boots without a collector.
       Observability__Otlp__Endpoint: ""
-      # Inzhur sign-in sidecar (see inzhur-browser below).
-      Inzhur__BrowserUrl: http://inzhur-browser:9222
     ports:
       - "5001:5000"
     depends_on:
@@ -142,24 +140,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    networks:
-      - finance-sentry-network
-
-  # Headless Chromium the api drives for the owner's Inzhur sign-in (reCAPTCHA v3 needs a real page). No host
-  # port: DevTools is unauthenticated. Hardening mirrors docker-compose.prod.yml.
-  inzhur-browser:
-    image: chromedp/headless-shell:155.0.8059.40
-    container_name: finance-sentry-inzhur-browser
-    restart: unless-stopped
-    user: "65534:65534"
-    shm_size: 256m
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    read_only: true
-    tmpfs:
-      - /tmp:size=128m
-    environment:
-      HOME: /tmp
     networks:
       - finance-sentry-network
 

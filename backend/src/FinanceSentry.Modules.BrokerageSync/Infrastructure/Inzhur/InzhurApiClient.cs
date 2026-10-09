@@ -54,7 +54,8 @@ public sealed class InzhurApiClient(
         AddCookies(request, jar, uri);
 
         using var response = await SendAsync(request, "refresh", ct);
-        StoreCookies(response, jar, uri);
+        var issued = new CookieContainer();
+        StoreCookies(response, issued, uri);
 
         if (!response.IsSuccessStatusCode)
             throw await FailureAsync(response, "refresh", ct);
@@ -63,7 +64,20 @@ public sealed class InzhurApiClient(
         if (string.IsNullOrEmpty(body?.AccessToken))
             throw new InzhurApiException(InzhurFailureKind.Unexpected, "Inzhur refresh returned no access token.");
 
-        return InzhurSession.FromContainer(body.AccessToken, jar);
+        return InzhurSession.FromContainer(body.AccessToken, Merge(jar, issued));
+    }
+
+    // A cookie the auth host sets again supersedes every stored cookie of that name, whatever its domain or path: the
+    // pasted refresh cookie is stored host-wide on "/", and a rotated one set under another path would otherwise sit
+    // beside it and send both on the next refresh.
+    private static CookieContainer Merge(CookieContainer jar, CookieContainer issued)
+    {
+        var reissued = issued.GetAllCookies().Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
+        var merged = new CookieContainer();
+        foreach (var cookie in jar.GetAllCookies().Where(c => !reissued.Contains(c.Name)))
+            merged.Add(cookie);
+        merged.Add(issued.GetAllCookies());
+        return merged;
     }
 
     public async Task<InzhurPortfolio> GetPortfolioAsync(InzhurSession session, CancellationToken ct = default)

@@ -1,4 +1,3 @@
-import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
@@ -10,12 +9,11 @@ import {
   InputComponent,
 } from '@lifekit-hq/ui';
 
-import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {
-  INZHUR_CODE_PATTERN,
-  INZHUR_PHONE_PATTERN,
   INZHUR_READ_ONLY_NOTE,
-  INZHUR_SMS_NOTE,
+  INZHUR_SESSION_MAX_LENGTH,
+  INZHUR_SESSION_NOTE,
+  INZHUR_SESSION_STEPS,
 } from '../../constants/inzhur/inzhur.constants';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {InzhurConnectStore} from '../../store/inzhur-connect/inzhur-connect.store';
@@ -28,11 +26,9 @@ import {CONNECT_STRATEGY} from '../../strategies/connect-strategy.token';
     AlertComponent,
     AsyncStateComponent,
     ButtonComponent,
-    DatePipe,
     DialogActionsComponent,
     FormFieldComponent,
     InputComponent,
-    InputHintsDirective,
     ReactiveFormsModule,
   ],
   providers: [InzhurConnectStore],
@@ -45,54 +41,24 @@ export class InzhurFormComponent {
   public readonly inzhur = inject(InzhurConnectStore);
 
   public readonly readOnlyNote = INZHUR_READ_ONLY_NOTE;
-  public readonly smsNote = INZHUR_SMS_NOTE;
+  public readonly sessionNote = INZHUR_SESSION_NOTE;
+  public readonly sessionSteps = INZHUR_SESSION_STEPS;
 
-  public readonly credentialsForm = new FormGroup({
-    phone: new FormControl<string>('', {
+  public readonly sessionForm = new FormGroup({
+    refreshToken: new FormControl<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.pattern(INZHUR_PHONE_PATTERN)],
-    }),
-    password: new FormControl<string>('', {nonNullable: true, validators: [Validators.required]}),
-  });
-
-  public readonly codeForm = new FormGroup({
-    code: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.pattern(INZHUR_CODE_PATTERN)],
+      validators: [Validators.required, Validators.maxLength(INZHUR_SESSION_MAX_LENGTH)],
     }),
   });
 
-  /** Starts the sign-in, which makes Inzhur text the owner a code. */
-  public sendCode(): void {
-    if (!this.inzhur.asksForCredentials()) {
-      this.store.resetError();
-      this.inzhur.start({phone: null, password: null});
+  /** Hands the pasted session to the backend, which proves it with one refresh. */
+  public connect(): void {
+    const refreshToken = this.sessionForm.getRawValue().refreshToken.trim();
+    if (this.sessionForm.invalid || !refreshToken) {
+      this.sessionForm.markAllAsTouched();
       return;
     }
-    if (this.credentialsForm.invalid) {
-      this.credentialsForm.markAllAsTouched();
-      return;
-    }
-    const {phone, password} = this.credentialsForm.getRawValue();
-    this.store.resetError();
-    this.inzhur.start({phone: phone.trim(), password});
-  }
-
-  public verify(): void {
-    if (this.codeForm.invalid) {
-      this.codeForm.markAllAsTouched();
-      return;
-    }
-    this.store.connect({
-      strategy: this.strategy,
-      payload: {code: this.codeForm.getRawValue().code.replace(/\s+/g, '')},
-    });
-  }
-
-  public startOver(): void {
-    this.codeForm.reset();
-    this.store.resetError();
-    this.inzhur.backToCredentials();
+    this.store.connect({strategy: this.strategy, payload: {refreshToken}});
   }
 
   public back(): void {

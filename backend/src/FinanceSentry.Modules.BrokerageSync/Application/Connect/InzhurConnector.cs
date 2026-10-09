@@ -7,24 +7,18 @@ using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.BrokerageSync.Application.Connect;
 
-/// <summary>Where a connect step left the caller: signed in, or waiting for the SMS code (possibly after a wrong one).</summary>
-public sealed record InzhurConnectResult(string Status, DateTime? CodeExpiresAt = null, int? AttemptsLeft = null)
+/// <summary>The handed-over session refreshed and is stored: the connection is active.</summary>
+public sealed record InzhurConnectResult(string Status)
 {
     public const string Connected = "connected";
-    public const string CodeRequired = "code_required";
-    public const string InvalidCode = "invalid_code";
 }
 
 /// <summary>The caller's Inzhur connection as the connect modal and the accounts list need it. Never carries a secret.</summary>
-public sealed record InzhurConnectionStatusResult(
-    string Status,
-    bool HasSavedCredentials,
-    DateTime? LastSyncAt,
-    DateTime? SessionStartedAt,
-    bool LoginAvailable)
+public sealed record InzhurConnectionStatusResult(string Status, DateTime? LastSyncAt, DateTime? SessionStartedAt)
 {
     public const string NotConnected = "not_connected";
 }
@@ -32,88 +26,76 @@ public sealed record InzhurConnectionStatusResult(
 public interface IInzhurConnector
 {
     /// <summary>
-    /// Signs in with the typed phone/password, or the saved ones when none are typed. Inzhur then either signs in at
-    /// once or sends the owner an SMS; at most <see cref="InzhurCredential.MaxLoginAttemptsPerDay"/> starts a day.
+    /// Takes over the session the owner signed in to on inzhur.reit, given as the value of its refresh cookie: one
+    /// refresh proves it before anything is stored, then the session is stored encrypted and read once.
     /// </summary>
-    Task<InzhurConnectResult> StartAsync(Guid userId, string? phone, string? password, CancellationToken ct);
+    Task<InzhurConnectResult> ConnectSessionAsync(Guid userId, string? refreshCookie, CancellationToken ct);
 
-    /// <summary>Submits the SMS code for the waiting sign-in; on success the session is stored and read once.</summary>
-    Task<InzhurConnectResult> VerifyAsync(Guid userId, string code, CancellationToken ct);
-
-    /// <summary>Forgets the connection, its secrets and its holdings. Inzhur itself is not called.</summary>
+    /// <summary>Forgets the connection, its session and its holdings. Inzhur itself is not called.</summary>
     Task DisconnectAsync(Guid userId, CancellationToken ct);
 
     Task<InzhurConnectionStatusResult> GetStatusAsync(Guid userId, CancellationToken ct);
 }
 
 /// <summary>
-/// The owner-initiated half of the Inzhur sync (design report §3, "Door C"): the only path that signs in, and so the
-/// only path that can make Inzhur send an SMS. The daily job never comes here.
+/// The owner-initiated half of the Inzhur sync. finance-sentry never signs in to Inzhur: its sign-in sits behind a
+/// reCAPTCHA v3 that rejects this server's datacenter IP (data/fs-inzhur-recaptcha), so the owner signs in in his own
+/// browser and hands over the session's refresh cookie. The refresh endpoint has no bot check; the daily job keeps the
+/// session alive from there.
 /// </summary>
 public sealed class InzhurConnector(
     IInzhurCredentialRepository credentialRepository,
     IBrokerageHoldingRepository holdingRepository,
-    IInzhurBrowserLogin browserLogin,
+    IInzhurApiClient api,
     IInzhurSyncService syncService,
     ICredentialEncryptionService encryption,
     IAlertGeneratorService alerts,
+    IOptions<InzhurOptions> options,
     TimeProvider clock,
     ILogger<InzhurConnector> logger) : IInzhurConnector
 {
     private const string Provider = InzhurHoldingsMapper.Provider;
 
-    public async Task<InzhurConnectResult> StartAsync(Guid userId, string? phone, string? password, CancellationToken ct)
+    /// <summary>Far above any real refresh token; a longer paste is not one.</summary>
+    public const int MaxRefreshCookieLength = 8192;
+
+    public async Task<InzhurConnectResult> ConnectSessionAsync(Guid userId, string? refreshCookie, CancellationToken ct)
     {
-        if (!browserLogin.IsAvailable)
-            throw Error(StatusCodes.Status503ServiceUnavailable, InzhurErrorCodes.LoginUnavailable, "Inzhur sign-in is not available on this server.");
+        var value = Normalize(refreshCookie);
+        var handedOver = InzhurSession.FromRefreshCookie(options.Value.RefreshCookieName, value, new Uri(options.Value.AuthBaseUrl));
+
+        InzhurSession session;
+        try
+        {
+            session = await api.RefreshAsync(handedOver, ct);
+        }
+        catch (InzhurApiException ex)
+        {
+            // The kind only: the exception never carries the cookie, and neither does this line.
+            logger.LogWarning("Inzhur refused the handed-over session for user {UserId}: {FailureKind}", userId, ex.Kind);
+            throw ex.Kind switch
+            {
+                InzhurFailureKind.ReauthRequired => Error(StatusCodes.Status422UnprocessableEntity, InzhurErrorCodes.SessionRejected,
+                    "Inzhur did not accept that session. Sign in on inzhur.reit again and copy a fresh refreshToken."),
+                InzhurFailureKind.RateLimited or InzhurFailureKind.Unavailable => Error(StatusCodes.Status503ServiceUnavailable,
+                    InzhurErrorCodes.Unavailable, "Inzhur is unavailable right now. Try again later."),
+                _ => Error(StatusCodes.Status502BadGateway, InzhurErrorCodes.ConnectFailed, "Inzhur answered the session check unexpectedly."),
+            };
+        }
 
         var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
-        var identifier = Digits(phone);
-        var typed = identifier.Length > 0 && !string.IsNullOrEmpty(password);
-
-        if (typed)
+        if (credential is null)
         {
-            if (credential is null)
-            {
-                credential = new InzhurCredential(userId, Encrypt(identifier), Encrypt(password!));
-                await credentialRepository.AddAsync(credential, ct);
-            }
-            else
-            {
-                credential.SetLoginSecrets(Encrypt(identifier), Encrypt(password!));
-            }
-        }
-        else if (credential is null || !credential.HasLoginSecrets)
-        {
-            throw Error(StatusCodes.Status400BadRequest, InzhurErrorCodes.CredentialsRequired, "Enter the phone number and password of the Inzhur account.");
-        }
-        else
-        {
-            identifier = Decrypt(credential.EncryptedPhone, credential.PhoneIv, credential.PhoneAuthTag, credential.KeyVersion);
-            password = Decrypt(credential.EncryptedPassword, credential.PasswordIv, credential.PasswordAuthTag, credential.KeyVersion);
+            credential = new InzhurCredential(userId);
+            await credentialRepository.AddAsync(credential, ct);
         }
 
-        // Counted and stored before Inzhur is called, so a crash mid-sign-in still uses up the attempt.
-        var allowed = credential.TryCountLoginAttempt(Now);
+        credential.StartSession(Encrypt(session.Serialize()), Now);
         await credentialRepository.SaveChangesAsync(ct);
-        if (!allowed)
-            throw Error(StatusCodes.Status429TooManyRequests, InzhurErrorCodes.LoginLimit, "Today's Inzhur sign-in attempts are used up. Try again tomorrow.");
-
-        var outcome = await browserLogin.StartAsync(userId, identifier, password!, ct);
-        return await ApplyAsync(credential, outcome, ct);
-    }
-
-    public async Task<InzhurConnectResult> VerifyAsync(Guid userId, string code, CancellationToken ct)
-    {
-        var credential = await credentialRepository.GetByUserIdAsync(userId, ct)
-            ?? throw Error(StatusCodes.Status404NotFound, InzhurErrorCodes.NotConnected, "No Inzhur sign-in is in progress.");
-
-        var digits = Digits(code);
-        if (digits.Length == 0)
-            return new InzhurConnectResult(InzhurConnectResult.InvalidCode);
-
-        var outcome = await browserLogin.VerifyAsync(userId, digits, ct);
-        return await ApplyAsync(credential, outcome, ct);
+        logger.LogInformation("Inzhur connected for user {UserId}", userId);
+        await TryResolveAlertAsync(userId);
+        await TrySyncAsync(userId, ct);
+        return new InzhurConnectResult(InzhurConnectResult.Connected);
     }
 
     public async Task DisconnectAsync(Guid userId, CancellationToken ct)
@@ -132,45 +114,11 @@ public sealed class InzhurConnector(
     {
         var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
         return credential is null
-            ? new InzhurConnectionStatusResult(InzhurConnectionStatusResult.NotConnected, false, null, null, browserLogin.IsAvailable)
-            : new InzhurConnectionStatusResult(
-                credential.Status, credential.HasLoginSecrets, credential.LastSyncAt, credential.SessionStartedAt, browserLogin.IsAvailable);
+            ? new InzhurConnectionStatusResult(InzhurConnectionStatusResult.NotConnected, null, null)
+            : new InzhurConnectionStatusResult(credential.Status, credential.LastSyncAt, credential.SessionStartedAt);
     }
 
-    private async Task<InzhurConnectResult> ApplyAsync(InzhurCredential credential, InzhurLoginOutcome outcome, CancellationToken ct)
-    {
-        switch (outcome)
-        {
-            case InzhurLoginOutcome.Authenticated authenticated:
-                credential.StartSession(Encrypt(authenticated.Session.Serialize()), Now);
-                await credentialRepository.SaveChangesAsync(ct);
-                logger.LogInformation("Inzhur connected for user {UserId}", credential.UserId);
-                await TryResolveAlertAsync(credential.UserId);
-                await TrySyncAsync(credential.UserId, ct);
-                return new InzhurConnectResult(InzhurConnectResult.Connected);
-
-            case InzhurLoginOutcome.CodeRequired codeRequired:
-                return new InzhurConnectResult(InzhurConnectResult.CodeRequired, CodeExpiresAt: codeRequired.CodeExpiresAt);
-
-            case InzhurLoginOutcome.InvalidCode invalidCode:
-                return new InzhurConnectResult(InzhurConnectResult.InvalidCode, AttemptsLeft: invalidCode.AttemptsLeft);
-
-            case InzhurLoginOutcome.Failed failed:
-                if (failed.ErrorCode == InzhurErrorCodes.InvalidCredentials)
-                {
-                    credential.ClearLoginSecrets();
-                    await credentialRepository.SaveChangesAsync(ct);
-                }
-
-                logger.LogWarning("Inzhur sign-in for user {UserId} ended with {ErrorCode}", credential.UserId, failed.ErrorCode);
-                throw Error(StatusFor(failed.ErrorCode), failed.ErrorCode, MessageFor(failed.ErrorCode));
-
-            default:
-                throw new InvalidOperationException($"Unhandled Inzhur sign-in outcome {outcome.GetType().Name}.");
-        }
-    }
-
-    // The first read right after a sign-in, so the holdings show at once; a failure here leaves the connection in
+    // The first read right after a hand-over, so the holdings show at once; a failure here leaves the connection in
     // place for the daily job.
     private async Task TrySyncAsync(Guid userId, CancellationToken ct)
     {
@@ -180,7 +128,7 @@ public sealed class InzhurConnector(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning("First Inzhur read after sign-in failed for user {UserId}: {ErrorType}", userId, ex.GetType().Name);
+            logger.LogWarning("First Inzhur read after connecting failed for user {UserId}: {ErrorType}", userId, ex.GetType().Name);
         }
     }
 
@@ -196,27 +144,25 @@ public sealed class InzhurConnector(
         }
     }
 
-    private static int StatusFor(string errorCode) => errorCode switch
-    {
-        InzhurErrorCodes.LoginUnavailable => StatusCodes.Status503ServiceUnavailable,
-        InzhurErrorCodes.LoginLimit => StatusCodes.Status429TooManyRequests,
-        _ => StatusCodes.Status422UnprocessableEntity,
-    };
-
-    private static string MessageFor(string errorCode) => errorCode switch
-    {
-        InzhurErrorCodes.RecaptchaRejected => "Inzhur's bot check rejected the sign-in.",
-        InzhurErrorCodes.InvalidCredentials => "Inzhur did not accept the phone number or password.",
-        InzhurErrorCodes.ChallengeExpired => "The SMS code expired. Start the sign-in again.",
-        InzhurErrorCodes.TooManyAttempts => "Too many wrong codes. Start the sign-in again.",
-        InzhurErrorCodes.LoginUnavailable => "Inzhur sign-in is unavailable right now. Try again later.",
-        _ => "Inzhur sign-in failed.",
-    };
-
     private static InzhurConnectException Error(int status, string code, string message) => new(status, code, message);
 
-    // The cabinet sends the phone as digits only (its sign-in form strips everything else); codes likewise.
-    private static string Digits(string? value) => new((value ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+    // What the owner copied may carry the cookie's name or quotes around it (DevTools copies either way). What is left
+    // must be a bare cookie value: no whitespace, separators or control characters.
+    private string Normalize(string? pasted)
+    {
+        var value = (pasted ?? string.Empty).Trim();
+        var prefix = options.Value.RefreshCookieName + "=";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..].Trim();
+        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+            value = value[1..^1];
+
+        if (value.Length == 0)
+            throw Error(StatusCodes.Status400BadRequest, InzhurErrorCodes.SessionRequired, "Paste the value of the refreshToken cookie.");
+        if (value.Length > MaxRefreshCookieLength || value.Any(c => c is ';' or ',' or '"' or '\\' || char.IsWhiteSpace(c) || char.IsControl(c)))
+            throw Error(StatusCodes.Status400BadRequest, InzhurErrorCodes.SessionInvalid, "That is not a refreshToken cookie value. Copy only the Value column.");
+        return value;
+    }
 
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
 
@@ -225,7 +171,4 @@ public sealed class InzhurConnector(
         var result = encryption.Encrypt(plaintext);
         return new EncryptedSecret(result.Ciphertext, result.Iv, result.AuthTag, result.KeyVersion);
     }
-
-    private string Decrypt(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
-        => encryption.Decrypt(ciphertext, iv, authTag, keyVersion);
 }

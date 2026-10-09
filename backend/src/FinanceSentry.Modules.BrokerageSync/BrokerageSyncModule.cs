@@ -102,9 +102,10 @@ public static class BrokerageSyncModule
         // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
-        // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in from the connect modal
-        // through a headless Chromium sidecar (reCAPTCHA v3 scores the real sign-in page); the daily job only
-        // refreshes that session and reads the portfolio. Read-only: no trade or other write call to Inzhur exists.
+        // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in on inzhur.reit in his own
+        // browser and pastes the session's refresh cookie (the sign-in's reCAPTCHA rejects this server's IP,
+        // data/fs-inzhur-recaptcha); the daily job only refreshes that session and reads the portfolio. Read-only: no
+        // trade or other write call to Inzhur exists.
         services.Configure<InzhurOptions>(config.GetSection(InzhurOptions.SectionName));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IInzhurCredentialRepository, InzhurCredentialRepository>();
@@ -117,7 +118,6 @@ public static class BrokerageSyncModule
             // The session's cookies are kept in the encrypted jar, not a handler-wide container shared across users.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
             .RedactLoggedHeaders(_ => true);
-        services.AddSingleton<IInzhurBrowserLogin, PuppeteerInzhurBrowserLogin>();
         services.AddScoped<IInzhurSyncService, InzhurSyncService>();
         services.AddScoped<IInzhurConnector, InzhurConnector>();
         services.AddScoped<InzhurSyncJob>();

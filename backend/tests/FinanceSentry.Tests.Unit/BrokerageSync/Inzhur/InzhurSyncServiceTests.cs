@@ -38,7 +38,7 @@ public class InzhurSyncServiceTests
 
     private InzhurCredential ActiveCredential()
     {
-        var credential = new InzhurCredential(_userId, Secret(InzhurFakes.Phone), Secret(InzhurFakes.Password));
+        var credential = new InzhurCredential(_userId);
         credential.StartSession(Secret(InzhurFakes.Session().Serialize()), Now.UtcDateTime.AddDays(-3));
         _credentials.Setup(r => r.GetByUserIdUnscopedAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
         return credential;
@@ -127,8 +127,7 @@ public class InzhurSyncServiceTests
         (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.ReauthRequired);
         credential.Status.Should().Be(InzhurConnectionStatus.ReauthRequired);
         credential.HasSession.Should().BeFalse();
-        credential.HasLoginSecrets.Should().BeTrue("a reconnect then asks only for the SMS code");
-        _cabinet.Requests.Should().ContainSingle("nothing is read and no sign-in is tried once the session is gone");
+        _cabinet.Requests.Should().ContainSingle("nothing is read once the session is gone");
     }
 
     [Fact]

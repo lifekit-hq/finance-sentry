@@ -34,7 +34,7 @@ public class InzhurSyncJobTests
     {
         var encryption = new FakeEncryption();
         EncryptedSecret Secret(string s) { var r = encryption.Encrypt(s); return new(r.Ciphertext, r.Iv, r.AuthTag, r.KeyVersion); }
-        _credential = new InzhurCredential(_userId, Secret(InzhurFakes.Phone), Secret(InzhurFakes.Password));
+        _credential = new InzhurCredential(_userId);
         _credential.StartSession(Secret(InzhurFakes.Session().Serialize()), Now.UtcDateTime.AddDays(-2));
         _credential.RecordSyncSuccess(Now.UtcDateTime.AddDays(-1));
 
