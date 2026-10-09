@@ -29,4 +29,23 @@
       </cmn-list-item-row>
     </button>
   </cmn-card>
+
+  <!-- What's new while unread (a dot, never a tab-bar badge) and the running version -->
+  <cmn-card padding="none" class="mt-cmn-4 block">
+    <button
+      (click)="openWhatsNew()"
+      class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+      type="button"
+      data-testid="more-whats-new"
+    >
+      <cmn-list-item-row [label]="whatsNewLabel">
+        <cmn-badge [dot]="hasUnread()" status="processing" avatar>
+          <cmn-icon name="Megaphone" size="md" />
+        </cmn-badge>
+      </cmn-list-item-row>
+    </button>
+    <cmn-list-item-row [label]="versionLabel" data-testid="more-version">
+      <cmn-icon name="Info" size="md" avatar />
+    </cmn-list-item-row>
+  </cmn-card>
 </cmn-page-container>

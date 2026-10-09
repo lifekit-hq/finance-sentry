@@ -15,6 +15,8 @@ import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
+import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../whats-new/constants/whats-new.constants';
+import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
 import {CONNECT_ACTION_ID, NAV_ITEMS, PHONE_TAB_ROUTES} from './app-shell.constants';
 import {PaletteEntitiesStore} from './store/palette-entities.store';
 import {NavUtils} from './utils/nav.utils';
@@ -37,12 +39,14 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
   {id: AppRoute.SettingsPeople, label: 'People', icon: 'Users', group: 'Pages'},
   {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
+  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone', group: 'Actions'},
   {id: PALETTE_THEME_ACTION, label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
   {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},
 ];
 
 const AVATAR_MENU_ITEMS: MenuItem[] = [
   {id: '/settings', label: 'Settings', icon: 'Settings2'},
+  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone'},
   {id: '_logout', label: 'Log out', icon: 'LogOut', destructive: true},
 ];
 
@@ -79,6 +83,7 @@ export class AppShellComponent {
   private readonly shell = inject(CmnShellService);
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
+  private readonly whatsNewPanel = inject(WhatsNewPanelService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
     (item.route as AppRoute) === AppRoute.Alerts
@@ -113,6 +118,10 @@ export class AppShellComponent {
       void this.router.navigateByUrl(AppRoute.Settings);
       return;
     }
+    if (item.id === WHATS_NEW_ACTION_ID) {
+      this.whatsNewPanel.open();
+      return;
+    }
     if (item.id === '_logout') {
       this.authStore.logout();
     }
@@ -123,6 +132,8 @@ export class AppShellComponent {
       this.authStore.logout();
     } else if (id === CONNECT_ACTION_ID) {
       void this.router.navigateByUrl(AppRoute.AccountsList);
+    } else if (id === WHATS_NEW_ACTION_ID) {
+      this.whatsNewPanel.open();
     }
   }
 

@@ -12,6 +12,8 @@ FROM node:26-alpine AS build
 WORKDIR /app
 
 COPY frontend/ ./
+# build-whats-new.mjs reads ../CHANGELOG.md, which from /app is /CHANGELOG.md.
+COPY CHANGELOG.md /CHANGELOG.md
 
 # @lifekit-hq/* packages come from npm.pkg.github.com (see frontend/.npmrc);
 # the token arrives as a BuildKit secret so it never lands in a layer.
