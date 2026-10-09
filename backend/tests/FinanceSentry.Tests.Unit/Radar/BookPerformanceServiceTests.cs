@@ -240,4 +240,51 @@ public sealed class BookPerformanceServiceTests
         period.Delta.Should().Be(0m);
         period.Verdict.Should().Be("inline");
     }
+
+    [Fact]
+    public async Task GetAsync_ReturnsSpyOnly_WhenOnlyOneInvestedDayInWindow()
+    {
+        // The source skips days with no cash/invested split, so one split day is all that is left:
+        // the same "too little history" outcome as a single snapshot, not a new state.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                Bar("SPY", since, 400m),
+                Bar("SPY", today, 404m),
+            ]);
+
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([new DailyPortfolioValue(today, 100_000m)]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
+
+        var period = result.Periods.Single();
+        period.BookTwr.Should().BeNull();
+        period.Delta.Should().BeNull();
+        period.Verdict.Should().BeNull();
+        period.SpyTwr.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetAsync_MeasuresFirstToLastInvestedDay_WhenEarlierDaysHaveNoSplit()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var firstSplitDay = today.AddDays(-4);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([]);
+
+        // Days before firstSplitDay are absent from the series; the return runs from the first one present.
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(firstSplitDay, 80_000m),
+                new DailyPortfolioValue(today, 84_000m),
+            ]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
+
+        result.Periods.Single().BookTwr.Should().Be(0.05m);
+    }
 }

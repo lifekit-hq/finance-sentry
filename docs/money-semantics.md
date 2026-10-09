@@ -844,6 +844,22 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   invalidation trigger is for. Settings:
   `ThesisTrackRecord:RelativePerformance` (`ThresholdPct`, `SustainedRuns`, `Window`).
 
+### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
+
+- **Invested brokerage only.** The book return is measured on `net_worth_snapshots.brokerage_invested`
+  (the brokerage sleeve without idle broker cash, §8), not on `brokerage_total`. SPY holds no cash, so
+  comparing a return that includes cash with it would be apples to oranges. Crypto, banking and venue
+  fiat are not in the series.
+- **Days with no split are skipped.** A snapshot whose `brokerage_invested` is null (a row from before the
+  split, or one the split could not be measured for) is left out of the series - never counted as zero and
+  never replaced by the cash-inclusive total. The window opens on the first split day at or after its start
+  and closes on the latest split day. With fewer than two such days, or a zero opening value, the book side
+  is unavailable (`bookTwr` null; the period is dropped when SPY is missing too), as it already is with too
+  little history.
+- **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
+  contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
+  loss. It is a holding-period return approximation, not a time-weighted or money-weighted return.
+
 ## 11. FIRE projection (#433)
 
 `GET /wealth/fire` (`GetFireProjectionQuery`, math in `FireCalculator`) projects the date net worth

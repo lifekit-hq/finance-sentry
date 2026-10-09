@@ -5,9 +5,10 @@ using FinanceSentry.Modules.Radar.Domain.Repositories;
 namespace FinanceSentry.Modules.Radar.Application.Services;
 
 /// <summary>
-/// Computes time-weighted return (HPR approximation) for the brokerage book versus SPY over
-/// configurable lookback windows. Uses adjusted close from daily bars for SPY and brokerage-sleeve
-/// totals from net-worth snapshots for the portfolio.
+/// Computes time-weighted return (HPR approximation) for the invested brokerage book versus SPY over
+/// configurable lookback windows. Uses adjusted close from daily bars for SPY and the invested brokerage
+/// value (idle broker cash excluded) from net-worth snapshots for the portfolio. Deposits and withdrawals
+/// are not adjusted for, so a contribution reads as a gain.
 /// </summary>
 public sealed class BookPerformanceService(
     IDailyBarRepository bars,
@@ -95,7 +96,7 @@ public sealed class BookPerformanceService(
         var startSnapshot = snapshots.FirstOrDefault(s => s.Date >= since);
         var endSnapshot = snapshots.LastOrDefault();
 
-        if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageValueUsd == 0m)
+        if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageInvestedUsd == 0m)
         {
             return null;
         }
@@ -106,7 +107,7 @@ public sealed class BookPerformanceService(
         }
 
         return Math.Round(
-            (endSnapshot.BrokerageValueUsd - startSnapshot.BrokerageValueUsd) / startSnapshot.BrokerageValueUsd,
+            (endSnapshot.BrokerageInvestedUsd - startSnapshot.BrokerageInvestedUsd) / startSnapshot.BrokerageInvestedUsd,
             4);
     }
 
