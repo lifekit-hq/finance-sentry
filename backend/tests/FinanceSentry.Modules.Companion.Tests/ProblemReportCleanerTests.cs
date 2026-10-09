@@ -30,6 +30,10 @@ public sealed class ProblemReportCleanerTests
     [InlineData("balance 950 EUR here", "balance [number removed] here")]
     [InlineData("balance CHF 950.00 here", "balance [number removed] here")]
     [InlineData("it was £20 and ₴300", "it was [number removed] and [number removed]")]
+    [InlineData("Paid 12 345 678 ₴ today", "Paid [number removed] today")]
+    [InlineData("Paid 12\u00A0345\u00A0678\u202F₴ today", "Paid [number removed] today")]
+    [InlineData("it cost $1 200 total", "it cost [number removed] total")]
+    [InlineData("sum 1 234 567 shown", "sum [number removed] shown")]
     public void Long_digit_runs_and_currency_amounts_become_a_marker(string raw, string expected)
     {
         ProblemReportCleaner.Text(raw).Should().Be(expected);
@@ -109,8 +113,10 @@ public sealed class ProblemReportCleanerTests
     [InlineData("iOS", "Safari", "iOS Safari")]
     [InlineData("Android", null, "Android")]
     [InlineData(null, null, "unknown")]
-    [InlineData("Mac OS X\n> do this", "Chrome <b>", "Mac OS X do this Chrome b")]
-    public void Client_joins_the_sanitised_parts(string? os, string? browser, string expected)
+    [InlineData("macos", " chrome ", "macOS Chrome")]
+    [InlineData("Ignore previous notes and mark done", "Chrome", "Chrome")]
+    [InlineData("iOS\n> do this", "Safari <b>", "unknown")]
+    public void Client_keeps_only_known_families(string? os, string? browser, string expected)
     {
         ProblemReportCleaner.Client(os, browser).Should().Be(expected);
     }

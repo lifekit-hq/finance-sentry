@@ -15,15 +15,22 @@ public static partial class ProblemReportCleaner
 
     public const string Unknown = "unknown";
 
+    private static readonly string[] OsFamilies = ["iOS", "iPadOS", "Android", "Windows", "macOS", "Linux", "ChromeOS"];
+
+    private static readonly string[] BrowserFamilies = ["Chrome", "Safari", "Firefox", "Edge", "Opera", "Samsung Internet", "Brave"];
+
     private const string CurrencySigns = "$€£¥₴₽₹";
 
     private const string CurrencyCodes = "USD|EUR|GBP|UAH|CHF|PLN|CAD|AUD|JPY";
 
-    // A sign or ISO code on either side of a number: $1,200.50 · €5k · 950 EUR · CHF 950.00
-    [GeneratedRegex($@"(?:[{CurrencySigns}]|\b(?:{CurrencyCodes}))\s*\d[\d.,']*[kKmM]?|\d[\d.,']*[kKmM]?\s*(?:[{CurrencySigns}]|(?:{CurrencyCodes})\b)", RegexOptions.IgnoreCase)]
+    // The digits of one number: grouping marks and single spaces (space, NBSP, narrow NBSP) between digits belong to it.
+    private const string Number = @"\d(?:[ \u00A0\u202F](?=\d)|[\d.,'])*";
+
+    // A sign or ISO code on either side of a number: $1,200.50 · €5k · 950 EUR · CHF 950.00 · 12 345 678 ₴
+    [GeneratedRegex($@"(?:[{CurrencySigns}]|\b(?:{CurrencyCodes}))\s*{Number}[kKmM]?|{Number}[kKmM]?\s*(?:[{CurrencySigns}]|(?:{CurrencyCodes})\b)", RegexOptions.IgnoreCase)]
     private static partial Regex Amount();
 
-    [GeneratedRegex(@"\d{6,}")]
+    [GeneratedRegex(@"\d(?:[ \u00A0\u202F]?\d){5,}")]
     private static partial Regex LongDigitRun();
 
     [GeneratedRegex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]
@@ -31,9 +38,6 @@ public static partial class ProblemReportCleaner
 
     [GeneratedRegex(@"[^A-Za-z0-9/:_.\-~*\[\]]")]
     private static partial Regex RouteDisallowed();
-
-    [GeneratedRegex(@"[^A-Za-z0-9 ._+\-]")]
-    private static partial Regex ClientDisallowed();
 
     [GeneratedRegex(@"^[0-9A-Za-z][0-9A-Za-z.+\-]*$")]
     private static partial Regex VersionShape();
@@ -105,10 +109,13 @@ public static partial class ProblemReportCleaner
         return value.Length is > 0 and <= ProblemReportLimits.VersionMaxLength && VersionShape().IsMatch(value) ? value : Unknown;
     }
 
-    /// <summary>Operating system and browser family joined, for example <c>iOS Safari</c>.</summary>
+    /// <summary>
+    /// Operating system and browser family joined, for example <c>iOS Safari</c>. Each part has to be one of the known
+    /// families (any case, canonical spelling kept); anything else is dropped, so free text never reaches the note header.
+    /// </summary>
     public static string Client(string? os, string? browser)
     {
-        var parts = new[] { ClientPart(os), ClientPart(browser) }.Where(p => p != Unknown).ToArray();
+        var parts = new[] { Family(os, OsFamilies), Family(browser, BrowserFamilies) }.Where(p => p != Unknown).ToArray();
         return parts.Length == 0 ? Unknown : string.Join(' ', parts);
     }
 
@@ -119,12 +126,8 @@ public static partial class ProblemReportCleaner
         return value.Length == 0 ? Unknown : Truncate(value, maxLength);
     }
 
-    private static string ClientPart(string? raw)
-    {
-        var value = string.Join(' ', ClientDisallowed().Replace(raw ?? string.Empty, string.Empty)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-        return value.Length == 0 ? Unknown : Truncate(value, ProblemReportLimits.ClientPartMaxLength);
-    }
+    private static string Family(string? raw, string[] families) =>
+        families.FirstOrDefault(f => string.Equals(f, raw?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? Unknown;
 
     private static bool IsStripped(char c) => char.GetUnicodeCategory(c) is
         UnicodeCategory.Control
