@@ -140,7 +140,7 @@ GET /health/ready → 503
 
 ## 10. Problem Reports Not Reaching the Fleet Inbox
 
-`POST /api/v1/feedback/problem-reports` saves the report (`companion.problem_reports`, status `Pending`) and answers `202` with `FS-R-<id>`; the Hangfire job `problem-reports-forward` (every minute) then sends it through the host's `kit-relay` over ssh as request id `fs-report-<id>`. A report is never lost to a relay problem: it stays saved, and a retry is the same note because the relay dedups on the request id.
+`POST /api/v1/feedback` saves the report (`companion.problem_reports`, status `Pending`) and answers `202` with `FS-R-<id>`; the Hangfire job `problem-reports-forward` (every minute) then sends it through the host's `kit-relay` over ssh as request id `fs-report-<id>`. A report is never lost to a relay problem: it stays saved, and a retry is the same note because the relay dedups on the request id.
 
 - **Pending and no errors in the log**: the relay sender is not set up. The job runs only when `ProblemReports__RelayConfigPath` (`/run/lifekit/fs-relay/ssh_config`) exists in the api container, and the compose bind for that directory is `${FS_RELAY_DIR:-/dev/null}`. Provision the `fs-` relay key dir (`id_ed25519`, pinned `known_hosts`, `ssh_config`, readable by `nobody`) on the host, set `FS_RELAY_DIR=/srv/lifekit-secrets/fs-relay` in `docker/.env.sops` and redeploy; the pending reports go out on the next run.
 - **Warnings `Problem report <id> not forwarded (attempt n)`**: ssh or the relay refused it; `LastError` on the row carries the exit code and stderr. Retried with backoff 1 min, 5 min, 15 min, 1 h, 4 h.

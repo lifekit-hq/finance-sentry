@@ -22,7 +22,7 @@ public class ProblemReportsController(
     ICommandHandler<SubmitProblemReportCommand, SubmittedProblemReport> submit,
     ICorrelationIdAccessor correlation) : ControllerBase
 {
-    [HttpPost("problem-reports")]
+    [HttpPost]
     [EnableRateLimiting(RateLimitingPolicies.ProblemReport)]
     public async Task<IActionResult> Submit([FromBody] SubmitProblemReportRequest body, CancellationToken ct)
     {

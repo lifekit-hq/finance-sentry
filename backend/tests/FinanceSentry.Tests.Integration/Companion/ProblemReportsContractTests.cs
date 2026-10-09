@@ -21,7 +21,7 @@ using Xunit;
 
 public class ProblemReportsContractTests
 {
-    private const string Route = "/api/v1/feedback/problem-reports";
+    private const string Route = "/api/v1/feedback";
 
     private static object Body(string text = "The balance never refreshes.") => new
     {
