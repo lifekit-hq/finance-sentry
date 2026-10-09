@@ -271,7 +271,7 @@ public sealed class BookPerformanceServiceTests
     public async Task GetAsync_MeasuresFirstToLastInvestedDay_WhenEarlierDaysHaveNoSplit()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var firstSplitDay = today.AddDays(-4);
+        var firstSplitDay = today.AddDays(-6);
 
         _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
             .ReturnsAsync([]);
@@ -288,12 +288,18 @@ public sealed class BookPerformanceServiceTests
         result.Periods.Single().BookTwr.Should().Be(0.05m);
     }
 
-    [Fact]
-    public async Task GetAsync_ComparesBook_WhenFirstInvestedDayWithinToleranceOfPeriodStart()
+    [Theory]
+    [InlineData(BookPerformancePeriod.OneWeek, 1, true)]
+    [InlineData(BookPerformancePeriod.OneWeek, 2, false)]
+    [InlineData(BookPerformancePeriod.OneMonth, 3, true)]
+    [InlineData(BookPerformancePeriod.OneMonth, 4, false)]
+    [InlineData(BookPerformancePeriod.OneYear, 7, true)]
+    [InlineData(BookPerformancePeriod.OneYear, 8, false)]
+    public async Task GetAsync_ComparesBookOnlyWhenFirstInvestedDayWithinToleranceOfPeriodStart(
+        BookPerformancePeriod period, int daysAfterStart, bool compared)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var since = today.AddMonths(-1);
-        var firstSplitDay = since.AddDays(7);
+        var since = PeriodStart(today, period);
 
         _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
             .ReturnsAsync([
@@ -303,55 +309,27 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(firstSplitDay, 100_000m),
+                new DailyPortfolioValue(since.AddDays(daysAfterStart), 100_000m),
                 new DailyPortfolioValue(today, 103_000m),
             ]);
 
-        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
+        var result = await CreateSut().GetAsync(UserId, [period]);
 
-        var period = result.Periods.Single();
-        period.BookTwr.Should().Be(0.03m);
-        period.SpyTwr.Should().Be(0.01m);
-        period.Verdict.Should().Be("outperform");
-    }
-
-    [Fact]
-    public async Task GetAsync_LeavesBookUnavailable_WhenFirstInvestedDayBeyondToleranceOfPeriodStart()
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var since = today.AddMonths(-1);
-        var firstSplitDay = since.AddDays(8);
-
-        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
-            .ReturnsAsync([
-                Bar("SPY", since, 400m),
-                Bar("SPY", today, 404m),
-            ]);
-
-        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
-            .ReturnsAsync([
-                new DailyPortfolioValue(firstSplitDay, 100_000m),
-                new DailyPortfolioValue(today, 103_000m),
-            ]);
-
-        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
-
-        var period = result.Periods.Single();
-        period.BookTwr.Should().BeNull();
-        period.SpyTwr.Should().Be(0.01m);
-        period.Since.Should().Be(since);
-        period.Delta.Should().BeNull();
-        period.Verdict.Should().BeNull();
+        AssertBookCompared(result.Periods.Single(), compared);
     }
 
     [Theory]
-    [InlineData(7, true)]
-    [InlineData(8, false)]
-    public async Task GetAsync_ComparesBookOnlyWhenLatestInvestedDayWithinToleranceOfToday(int daysBeforeToday, bool compared)
+    [InlineData(BookPerformancePeriod.OneWeek, 1, true)]
+    [InlineData(BookPerformancePeriod.OneWeek, 2, false)]
+    [InlineData(BookPerformancePeriod.OneMonth, 3, true)]
+    [InlineData(BookPerformancePeriod.OneMonth, 4, false)]
+    [InlineData(BookPerformancePeriod.OneYear, 7, true)]
+    [InlineData(BookPerformancePeriod.OneYear, 8, false)]
+    public async Task GetAsync_ComparesBookOnlyWhenLatestInvestedDayWithinToleranceOfToday(
+        BookPerformancePeriod period, int daysBeforeToday, bool compared)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var since = today.AddMonths(-1);
-        var lastSplitDay = today.AddDays(-daysBeforeToday);
+        var since = PeriodStart(today, period);
 
         _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
             .ReturnsAsync([
@@ -362,12 +340,47 @@ public sealed class BookPerformanceServiceTests
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
                 new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(lastSplitDay, 103_000m),
+                new DailyPortfolioValue(today.AddDays(-daysBeforeToday), 103_000m),
             ]);
 
-        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth]);
+        var result = await CreateSut().GetAsync(UserId, [period]);
 
-        var period = result.Periods.Single();
+        AssertBookCompared(result.Periods.Single(), compared);
+    }
+
+    [Fact]
+    public async Task GetAsync_LeavesBookUnavailable_WhenOneWeekBookHoldsOnlyTheLastDay()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                Bar("SPY", since, 400m),
+                Bar("SPY", today, 404m),
+            ]);
+
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(today.AddDays(-1), 100_000m),
+                new DailyPortfolioValue(today, 103_000m),
+            ]);
+
+        var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
+
+        AssertBookCompared(result.Periods.Single(), compared: false);
+    }
+
+    private static DateOnly PeriodStart(DateOnly today, BookPerformancePeriod period) => period switch
+    {
+        BookPerformancePeriod.OneWeek => today.AddDays(-7),
+        BookPerformancePeriod.OneMonth => today.AddMonths(-1),
+        BookPerformancePeriod.OneYear => today.AddYears(-1),
+        _ => throw new ArgumentOutOfRangeException(nameof(period), period, null),
+    };
+
+    private static void AssertBookCompared(PeriodTwr period, bool compared)
+    {
         period.SpyTwr.Should().Be(0.01m);
         if (compared)
         {

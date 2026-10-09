@@ -854,13 +854,14 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   split, or one the split could not be measured for) is left out of the series - never counted as zero and
   never replaced by the cash-inclusive total. The window opens on the first split day at or after its start
   and closes on the latest split day. SPY's window runs from the period's start to today, so the two must
-  cover the same span: when the first split day is more than 7 days after the period's start (split history
-  is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), or the latest split day
-  is more than 7 days before today, the book side is unavailable rather than compared over a shorter
-  window. With fewer than two split days, a zero opening value, or such a late first or early last split
-  day, `bookTwr` is null (and so are `delta` and `verdict`; the period is
-  dropped when SPY is missing too), as it already is with too little history. The brief shows it as
-  `Book N/A`.
+  cover the same span. Both ends of the book window are held to one tolerance,
+  `clamp(round(periodDays × 0.1), 1, 7)` days (`periodDays` = today minus the period's start; 1W → 1,
+  1M → 3, 3M and 1Y → 7): when the first split day is later than that after the period's start (split
+  history is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), or the latest
+  split day is earlier than that before today, the book side is unavailable rather than compared over a
+  shorter window. With fewer than two split days, a zero opening value, or a first or last split day
+  outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
+  SPY is missing too), as it already is with too little history. The brief shows it as `Book N/A`.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
   contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
   loss. It is a holding-period return approximation, not a time-weighted or money-weighted return.

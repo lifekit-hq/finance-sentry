@@ -18,7 +18,11 @@ public sealed class BookPerformanceService(
 
     private const decimal OutperformThreshold = 0.001m;
 
-    private const int MaxBookEdgeGapDays = 7;
+    private const decimal EdgeGapPeriodRatio = 0.1m;
+
+    private const int MinEdgeGapDays = 1;
+
+    private const int MaxEdgeGapDays = 7;
 
     public async Task<BookPerformanceResult> GetAsync(
         Guid userId,
@@ -103,8 +107,9 @@ public sealed class BookPerformanceService(
             return null;
         }
 
-        if (startSnapshot.Date > since.AddDays(MaxBookEdgeGapDays)
-            || endSnapshot.Date < today.AddDays(-MaxBookEdgeGapDays))
+        var allowedGapDays = AllowedEdgeGapDays(today.DayNumber - since.DayNumber);
+        if (startSnapshot.Date > since.AddDays(allowedGapDays)
+            || endSnapshot.Date < today.AddDays(-allowedGapDays))
         {
             return null;
         }
@@ -118,6 +123,12 @@ public sealed class BookPerformanceService(
             (endSnapshot.BrokerageInvestedUsd - startSnapshot.BrokerageInvestedUsd) / startSnapshot.BrokerageInvestedUsd,
             4);
     }
+
+    private static int AllowedEdgeGapDays(int periodDays) =>
+        Math.Clamp(
+            (int)Math.Round(periodDays * EdgeGapPeriodRatio, MidpointRounding.AwayFromZero),
+            MinEdgeGapDays,
+            MaxEdgeGapDays);
 
     private static DateOnly StartDate(DateOnly today, BookPerformancePeriod period) => period switch
     {
