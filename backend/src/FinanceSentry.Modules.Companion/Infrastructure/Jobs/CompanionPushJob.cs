@@ -16,7 +16,7 @@ using Microsoft.Extensions.Options;
 /// rate limit, so it runs alongside the agent/Telegram path without affecting it. Everyone gets their own events;
 /// <see cref="CompanionEventKind.OperationalFailure"/> goes to <c>ops.admin</c> holders only. The deduped rating-change alert
 /// (<see cref="PushDeliveryPolicy.PushedAlertTypes"/>) is pushed from the alert row itself, once per (alert, subscription),
-/// and the per-firm <see cref="CompanionEventKind.AnalystAction"/> event is not pushed, so one upgrade is one push. Overlap-protected, and a
+/// and the per-firm upgrade and downgrade <see cref="CompanionEventKind.AnalystAction"/> events are not pushed, so one upgrade is one push; other analyst actions push as events. Overlap-protected, and a
 /// keyless deployment (no VAPID keys) does nothing.
 /// </summary>
 [DisableConcurrentExecution(timeoutInSeconds: 120)]

@@ -4,7 +4,7 @@ namespace FinanceSentry.Modules.Companion.Domain;
 public static class PushDeliveryPolicy
 {
     /// <summary>Alert types pushed straight from the alert row, not through a companion event. The deduped analyst
-    /// rating-change alert replaces the per-firm <see cref="CompanionEventKind.AnalystAction"/> push, which is excluded.</summary>
+    /// rating-change alert replaces the per-firm upgrade and downgrade <see cref="CompanionEventKind.AnalystAction"/> push, which is excluded.</summary>
     public static readonly IReadOnlyCollection<string> PushedAlertTypes = ["AnalystRatingChange"];
 
     /// <summary>Attempts before a delivery that keeps hitting transient errors is marked Failed.</summary>

@@ -50,7 +50,8 @@ public sealed class CompanionPushJobTests
                 .. Events
                     .Where(e => e.UserId == userId
                                 && e.CapturedAt >= since
-                                && e.Kind != CompanionEventKind.AnalystAction
+                                && !(e.Kind == CompanionEventKind.AnalystAction
+                                     && (e.Summary.Contains(" Upgrade " + e.Subject) || e.Summary.Contains(" Downgrade " + e.Subject)))
                                 && (includeOperational || e.Kind != CompanionEventKind.OperationalFailure)
                                 && !Deliveries.Any(d => d.EventId == e.Id && d.SubscriptionId == subscriptionId))
                     .OrderBy(e => e.CapturedAt)
@@ -152,6 +153,18 @@ public sealed class CompanionPushJobTests
             Disposition = disposition,
             CapturedAt = capturedAt ?? DateTimeOffset.UtcNow.AddMinutes(-1),
         };
+
+    private static CompanionEvent AnalystEvt(Guid userId, string actionType) => new()
+    {
+        UserId = userId,
+        Kind = CompanionEventKind.AnalystAction,
+        Subject = "NVDA",
+        Severity = "info",
+        Summary = $"Morgan Stanley {actionType} NVDA (target $150)",
+        DedupKey = $"analyst:{Guid.NewGuid():N}",
+        SourceModule = "research",
+        CapturedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+    };
 
     private static MaterialAlertRecord RatingAlert(Guid userId, string ticker = "NVDA") => new(
         Guid.NewGuid(), userId, "AnalystRatingChange", "info", $"Analyst upgrade: {ticker}", Guid.NewGuid(), ticker,
@@ -482,13 +495,30 @@ public sealed class CompanionPushJobTests
     }
 
     [Fact]
+    public async Task Other_analyst_actions_still_push_as_events_while_upgrades_and_downgrades_do_not()
+    {
+        var repo = new FakeRepository();
+        repo.Subscriptions.Add(Sub(Member));
+        var initiate = AnalystEvt(Member, "Initiate");
+        var targetChange = AnalystEvt(Member, "TargetChange");
+        repo.Events.AddRange([AnalystEvt(Member, "Upgrade"), AnalystEvt(Member, "Downgrade"), initiate, targetChange]);
+        var sender = new FakeSender();
+
+        await Job(repo, sender).ExecuteAsync();
+
+        sender.Sent.Should().HaveCount(2);
+        repo.Deliveries.Select(d => d.EventId).Should().BeEquivalentTo([initiate.Id, targetChange.Id]);
+        repo.Deliveries.Should().OnlyContain(d => d.Status == PushDeliveryStatus.Sent);
+    }
+
+    [Fact]
     public async Task One_deduped_rating_change_alert_is_one_push_even_with_its_AnalystAction_events_and_repeated_runs()
     {
         var repo = new FakeRepository();
         var device = Sub(Member);
         repo.Subscriptions.Add(device);
         // The same upgrade also captured one companion AnalystAction event per firm: those stay in-app.
-        repo.Events.AddRange([Evt(Member, CompanionEventKind.AnalystAction), Evt(Member, CompanionEventKind.AnalystAction)]);
+        repo.Events.AddRange([AnalystEvt(Member, "Upgrade"), AnalystEvt(Member, "Downgrade")]);
         var alerts = new FakeAlerts();
         alerts.Alerts.Add(RatingAlert(Member));
         var sender = new FakeSender();

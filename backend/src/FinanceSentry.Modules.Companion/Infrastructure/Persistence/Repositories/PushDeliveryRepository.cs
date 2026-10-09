@@ -25,7 +25,9 @@ public class PushDeliveryRepository(CompanionDbContext db) : IPushDeliveryReposi
         return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(e => e.UserId == userId
                         && e.CapturedAt >= since
-                        && e.Kind != CompanionEventKind.AnalystAction
+                        && !(e.Kind == CompanionEventKind.AnalystAction
+                             && (EF.Functions.Like(e.Summary, "% Upgrade " + e.Subject + "%")
+                                 || EF.Functions.Like(e.Summary, "% Downgrade " + e.Subject + "%")))
                         && (includeOperational || e.Kind != CompanionEventKind.OperationalFailure)
                         && !deliveries.Any(d => d.EventId == e.Id && d.SubscriptionId == subscriptionId))
             .OrderBy(e => e.CapturedAt)

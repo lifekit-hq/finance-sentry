@@ -84,6 +84,15 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         DispatchedAt = dispatchedAt,
     };
 
+    private static CompanionEvent NewAnalystEvent(Guid userId, string actionType)
+    {
+        var evt = NewEvent(userId, EventDisposition.Pending);
+        evt.Kind = CompanionEventKind.AnalystAction;
+        evt.Subject = "NVDA";
+        evt.Summary = $"Morgan Stanley {actionType} NVDA (target $150)";
+        return evt;
+    }
+
     private async Task SeedAsync(params object[] entities)
     {
         // Inserts are not filtered, so a no-person context writes any user's rows.
@@ -179,8 +188,13 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         var operational = NewEvent(_userA, EventDisposition.Pending);
         operational.Kind = CompanionEventKind.OperationalFailure;
         var delivered = NewEvent(_userA, EventDisposition.Delivered);
+        var upgrade = NewAnalystEvent(_userA, "Upgrade");
+        var downgrade = NewAnalystEvent(_userA, "Downgrade");
+        var initiate = NewAnalystEvent(_userA, "Initiate");
+        var targetChange = NewAnalystEvent(_userA, "TargetChange");
         await SeedAsync(
-            optedIn, optedOut, subA, subADisabled, subB, plain, operational, delivered, NewEvent(_userB, EventDisposition.Pending),
+            optedIn, optedOut, subA, subADisabled, subB, plain, operational, delivered, upgrade, downgrade, initiate, targetChange,
+            NewEvent(_userB, EventDisposition.Pending),
             new PushDelivery { EventId = delivered.Id, SubscriptionId = subA.Id, UserId = _userA });
 
         await using var job = CreateContext();
@@ -190,9 +204,9 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         (await repo.ListActiveSubscriptionsUnscopedAsync()).Select(s => s.Id).Should().Equal(subA.Id);
 
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: false, 50))
-            .Select(e => e.Id).Should().Equal(plain.Id);
+            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, initiate.Id, targetChange.Id]);
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: true, 50))
-            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, operational.Id]);
+            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, operational.Id, initiate.Id, targetChange.Id]);
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, DateTimeOffset.UtcNow.AddMinutes(1), includeOperational: true, 50))
             .Should().BeEmpty();
 
