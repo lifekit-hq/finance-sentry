@@ -29,4 +29,19 @@ public sealed class NetWorthSnapshot
     /// cannot be reconstructed from transaction history.
     /// </summary>
     public bool IsApproximate { get; init; }
+
+    /// <summary>
+    /// Cash apart from invested assets, USD: bank balances (signed, card debt netted in), idle broker cash and
+    /// fiat on crypto venues - the <see cref="FinanceSentry.Core.Interfaces.BookFigures.CashUsd"/> definition.
+    /// Always <see cref="TotalNetWorth"/> - <see cref="BrokerageInvested"/> - <see cref="CryptoInvested"/>.
+    /// Null = no split for this day (a row from before the split existed, or one the split cannot be
+    /// measured for) - never zero.
+    /// </summary>
+    public decimal? CashTotal { get; init; }
+
+    /// <summary>Brokerage sleeve without its idle cash (the invested positions); null = no split, as <see cref="CashTotal"/>.</summary>
+    public decimal? BrokerageInvested { get; init; }
+
+    /// <summary>Crypto sleeve without venue fiat (the invested positions); null = no split, as <see cref="CashTotal"/>.</summary>
+    public decimal? CryptoInvested { get; init; }
 }

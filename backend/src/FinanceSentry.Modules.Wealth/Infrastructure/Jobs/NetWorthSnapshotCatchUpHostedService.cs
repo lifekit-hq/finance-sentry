@@ -19,6 +19,11 @@ public sealed class NetWorthSnapshotCatchUpHostedService(
             using var scope = scopeFactory.CreateScope();
             var catchUpService = scope.ServiceProvider.GetRequiredService<NetWorthSnapshotBackfillService>();
             await catchUpService.BackfillAsync(stoppingToken);
+
+            // After the catch-up so rows it adds are covered too. Idempotent: fills only null split columns.
+            var splitBackfill = scope.ServiceProvider.GetRequiredService<NetWorthSplitBackfillService>();
+            var filled = await splitBackfill.BackfillAsync(stoppingToken);
+            logger.LogInformation("Net worth cash/invested split backfill filled {Rows} snapshot rows.", filled);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

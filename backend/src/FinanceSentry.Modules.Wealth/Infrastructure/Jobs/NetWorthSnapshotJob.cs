@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using Hangfire;
 
@@ -7,12 +8,14 @@ public class NetWorthSnapshotJob(
     IBankingTotalsReader bankingTotals,
     ICryptoHoldingsReader cryptoReader,
     IBrokerageHoldingsReader brokerageReader,
-    INetWorthSnapshotService snapshotService)
+    INetWorthSnapshotService snapshotService,
+    IBookFiguresService bookFigures)
 {
     private readonly IBankingTotalsReader _bankingTotals = bankingTotals ?? throw new ArgumentNullException(nameof(bankingTotals));
     private readonly ICryptoHoldingsReader _cryptoReader = cryptoReader ?? throw new ArgumentNullException(nameof(cryptoReader));
     private readonly IBrokerageHoldingsReader _brokerageReader = brokerageReader ?? throw new ArgumentNullException(nameof(brokerageReader));
     private readonly INetWorthSnapshotService _snapshotService = snapshotService ?? throw new ArgumentNullException(nameof(snapshotService));
+    private readonly IBookFiguresService _bookFigures = bookFigures ?? throw new ArgumentNullException(nameof(bookFigures));
 
     [AutomaticRetry(Attempts = 2)]
     public async Task ExecuteAsync(CancellationToken ct = default)
@@ -58,8 +61,21 @@ public class NetWorthSnapshotJob(
         var brokerageFresh = brokerageHoldings.Count > 0
             && brokerageHoldings.Max(h => h.SyncedAt) >= now - StaleWindow;
 
+        // The invested part of each sleeve comes from the canonical book figures, so the stored cash is the
+        // dashboard's "cash" for the same moment. A stale source would make the split partial, so it is
+        // withheld (null), as the dashboard hides its sub-line.
+        var book = await _bookFigures.ReadAsync(userId, ct);
+        var measured = !book.IsStale;
+        decimal? brokerageInvested = measured
+            ? book.Positions.Where(p => p.AssetClass != AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
+            : null;
+        decimal? cryptoInvested = measured
+            ? book.Positions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
+            : null;
+
         await _snapshotService.PersistSnapshotAsync(userId, new NetWorthSnapshotData(
             snapshotDate, bankingTotal, brokerageTotal, cryptoTotal,
-            BankingFresh: bankingFresh, BrokerageFresh: brokerageFresh, CryptoFresh: cryptoFresh), ct);
+            BankingFresh: bankingFresh, BrokerageFresh: brokerageFresh, CryptoFresh: cryptoFresh,
+            BrokerageInvested: brokerageInvested, CryptoInvested: cryptoInvested), ct);
     }
 }

@@ -35,4 +35,15 @@ public interface INetWorthSnapshotRepository
     /// which is what makes a backfill run idempotent and safe to repeat.
     /// </summary>
     Task<int> InsertMissingAsync(IReadOnlyCollection<NetWorthSnapshot> snapshots, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes the cash/invested split onto existing rows, one entry per (user, date), setting only the columns that
+    /// are still null - a value already on a row is never replaced, so re-running changes nothing. Rows with no entry
+    /// are untouched. Opts out of the Owner query filter (a startup job runs with no person in scope). Returns the
+    /// number of rows changed.
+    /// </summary>
+    Task<int> FillMissingSplitAsync(Guid userId, IReadOnlyCollection<NetWorthSplit> splits, CancellationToken ct = default);
 }
+
+/// <summary>The cash/invested split for one snapshot date. Cash + both invested parts equal that day's total.</summary>
+public sealed record NetWorthSplit(DateOnly SnapshotDate, decimal CashTotal, decimal BrokerageInvested, decimal CryptoInvested);

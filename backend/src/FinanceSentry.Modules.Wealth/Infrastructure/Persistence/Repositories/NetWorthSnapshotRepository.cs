@@ -4,6 +4,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 // Reads run under the Owner filter. The snapshot job, the startup catch-up and the cross-module brokerage history
 // reader run with no person in scope, so they call the <c>…Unscoped…</c> methods, which opt out explicitly and keep
@@ -76,6 +77,45 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
         _db.NetWorthSnapshots.AddRange(toInsert);
         await _db.SaveChangesAsync(ct);
         return toInsert.Count;
+    }
+
+    public async Task<int> FillMissingSplitAsync(Guid userId, IReadOnlyCollection<NetWorthSplit> splits, CancellationToken ct = default)
+    {
+        if (splits.Count == 0)
+            return 0;
+
+        var byDate = splits.ToDictionary(s => s.SnapshotDate);
+        var from = byDate.Keys.Min();
+        var to = byDate.Keys.Max();
+        var rows = await _db.NetWorthSnapshots.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(s => s.UserId == userId && s.SnapshotDate >= from && s.SnapshotDate <= to)
+            .ToListAsync(ct);
+
+        var changed = 0;
+        foreach (var row in rows)
+        {
+            if (!byDate.TryGetValue(row.SnapshotDate, out var split))
+                continue;
+
+            var entry = _db.Entry(row);
+            var touched = FillIfNull(entry.Property(s => s.CashTotal), split.CashTotal)
+                | FillIfNull(entry.Property(s => s.BrokerageInvested), split.BrokerageInvested)
+                | FillIfNull(entry.Property(s => s.CryptoInvested), split.CryptoInvested);
+            if (touched)
+                changed++;
+        }
+
+        if (changed > 0)
+            await _db.SaveChangesAsync(ct);
+        return changed;
+    }
+
+    private static bool FillIfNull(PropertyEntry<NetWorthSnapshot, decimal?> property, decimal value)
+    {
+        if (property.CurrentValue is not null)
+            return false;
+        property.CurrentValue = value;
+        return true;
     }
 
     private static Task<NetWorthSnapshot?> LatestByUserId(
