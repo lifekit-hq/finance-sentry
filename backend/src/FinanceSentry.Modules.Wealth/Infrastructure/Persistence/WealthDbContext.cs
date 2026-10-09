@@ -29,6 +29,9 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         e.Property(s => s.TakenAt).HasDefaultValueSql("now()");
         e.Property(s => s.StaleSleeves).HasColumnName("stale_sleeves").HasMaxLength(64);
         e.Property(s => s.IsApproximate).HasColumnName("is_approximate").HasDefaultValue(false).IsRequired();
+        e.Property(s => s.CashTotal).HasColumnName("cash_total").HasColumnType("numeric(18,2)");
+        e.Property(s => s.BrokerageInvested).HasColumnName("brokerage_invested").HasColumnType("numeric(18,2)");
+        e.Property(s => s.CryptoInvested).HasColumnName("crypto_invested").HasColumnType("numeric(18,2)");
 
         e.HasIndex(s => new { s.UserId, s.SnapshotDate })
             .IsDescending(false, true)

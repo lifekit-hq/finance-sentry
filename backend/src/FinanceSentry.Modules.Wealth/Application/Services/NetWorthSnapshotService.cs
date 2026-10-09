@@ -23,6 +23,11 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var brokerage = ResolveSleeve("brokerage", data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, stale);
         var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);
 
+        var total = banking + brokerage + crypto;
+        var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, stale.Contains("brokerage"));
+        var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
+        var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
+
         var snapshot = new NetWorthSnapshot
         {
             Id = Guid.NewGuid(),
@@ -31,15 +36,36 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             BankingTotal = banking,
             BrokerageTotal = brokerage,
             CryptoTotal = crypto,
-            TotalNetWorth = banking + brokerage + crypto,
+            TotalNetWorth = total,
             Currency = data.Currency,
             TakenAt = DateTimeOffset.UtcNow,
             StaleSleeves = stale.Count > 0 ? string.Join(',', stale) : null,
+            // Cash is the remainder, so cash + invested always equals the stored total - including when a
+            // sleeve was carried forward (its invested part is carried with it; a carried banking balance
+            // stays in cash). One unknown invested part leaves the whole split null rather than half-filled.
+            CashTotal = hasSplit ? total - brokerageInvested!.Value - cryptoInvested!.Value : null,
+            BrokerageInvested = hasSplit ? brokerageInvested : null,
+            CryptoInvested = hasSplit ? cryptoInvested : null,
         };
 
         // Upsert: the day's row is refreshed on every successful sync rather than frozen
         // at first write, so the chart's newest point tracks the live position.
         await _repository.UpsertAsync(snapshot, ct);
+    }
+
+    /// <summary>
+    /// The invested part of a sleeve: as measured this run, or - when the sleeve was carried forward - the
+    /// previous snapshot's invested part. A carried sleeve that is empty (carried total 0, nothing measured
+    /// this run) has nothing invested, so its split starts at 0 even when the previous row predates the split.
+    /// </summary>
+    private static decimal? ResolveInvested(
+        decimal measuredTotal, decimal? measuredInvested, decimal recordedTotal, decimal? previousInvested, bool carriedForward)
+    {
+        if (!carriedForward)
+            return measuredInvested;
+
+        var emptySleeve = recordedTotal == 0m && measuredTotal == 0m && measuredInvested == 0m;
+        return previousInvested ?? (emptySleeve ? 0m : null);
     }
 
     /// <summary>

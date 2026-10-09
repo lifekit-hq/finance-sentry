@@ -33,6 +33,7 @@ public class NetWorthHistoryController(
 
         // Snapshots are stored in USD; the profile's base currency is applied at the boundary.
         decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
+        decimal? FxOrNull(decimal? usd) => usd is null ? null : Fx(usd.Value);
         return Ok(result with
         {
             Snapshots = [.. result.Snapshots.Select(s => s with
@@ -41,6 +42,9 @@ public class NetWorthHistoryController(
                 BrokerageTotal = Fx(s.BrokerageTotal),
                 CryptoTotal = Fx(s.CryptoTotal),
                 TotalNetWorth = Fx(s.TotalNetWorth),
+                CashTotal = FxOrNull(s.CashTotal),
+                BrokerageInvested = FxOrNull(s.BrokerageInvested),
+                CryptoInvested = FxOrNull(s.CryptoInvested),
                 Currency = baseCurrency,
             })],
         });

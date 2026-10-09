@@ -169,7 +169,8 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         await using (var asNoOne = CreateContext())
         {
             var repo = new NetWorthSnapshotRepository(asNoOne);
-            var job = new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, new NetWorthSnapshotService(repo));
+            var job = new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, new NetWorthSnapshotService(repo),
+                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)));
             await new NetWorthSnapshotBackfillService(banking.Object, repo, job).BackfillAsync();
         }
 

@@ -11,7 +11,10 @@ public record NetWorthSnapshotDto(
     decimal TotalNetWorth,
     string Currency,
     string? StaleSleeves,
-    bool IsApproximate);
+    bool IsApproximate,
+    decimal? CashTotal = null,
+    decimal? BrokerageInvested = null,
+    decimal? CryptoInvested = null);
 
 public record NetWorthHistoryResponse(
     IReadOnlyList<NetWorthSnapshotDto> Snapshots,
@@ -31,7 +34,8 @@ public class GetNetWorthHistoryQueryHandler(INetWorthSnapshotRepository reposito
         var dtos = snapshots
             .Select(s => new NetWorthSnapshotDto(
                 s.SnapshotDate, s.BankingTotal, s.BrokerageTotal,
-                s.CryptoTotal, s.TotalNetWorth, s.Currency, s.StaleSleeves, s.IsApproximate))
+                s.CryptoTotal, s.TotalNetWorth, s.Currency, s.StaleSleeves, s.IsApproximate,
+                s.CashTotal, s.BrokerageInvested, s.CryptoInvested))
             .ToList();
 
         return new NetWorthHistoryResponse(dtos, dtos.Count > 0);
