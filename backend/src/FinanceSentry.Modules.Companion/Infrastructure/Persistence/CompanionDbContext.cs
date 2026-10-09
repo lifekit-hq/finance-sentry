@@ -72,6 +72,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.ToTable("push_deliveries");
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.EventId, x.SubscriptionId }).IsUnique();
+            e.HasIndex(x => new { x.AlertId, x.SubscriptionId }).IsUnique();
             e.HasIndex(x => new { x.Status, x.NextAttemptAt });
             e.HasOne<CompanionEvent>().WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<PushSubscription>().WithMany().HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Cascade);

@@ -3,6 +3,10 @@ namespace FinanceSentry.Modules.Companion.Domain;
 /// <summary>Bounds for the Web Push sender (spec 859).</summary>
 public static class PushDeliveryPolicy
 {
+    /// <summary>Alert types pushed straight from the alert row, not through a companion event. The deduped analyst
+    /// rating-change alert replaces the per-firm upgrade and downgrade <see cref="CompanionEventKind.AnalystAction"/> push, which is excluded.</summary>
+    public static readonly IReadOnlyCollection<string> PushedAlertTypes = ["AnalystRatingChange"];
+
     /// <summary>Attempts before a delivery that keeps hitting transient errors is marked Failed.</summary>
     public const int MaxAttempts = 5;
 
