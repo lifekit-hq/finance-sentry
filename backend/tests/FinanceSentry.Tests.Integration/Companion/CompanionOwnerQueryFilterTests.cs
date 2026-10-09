@@ -9,6 +9,8 @@ using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -273,6 +275,56 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         (await Settings(asNoOne).GetOrDefaultUnscopedAsync(_userA)).Mode.Should().Be(NotificationMode.Realtime);
         (await new CompanionEventRepository(asNoOne).ListRealtimePendingUnscopedAsync(10))
             .Select(e => e.Id).Should().BeEquivalentTo([eventA.Id, eventB.Id]);
+    }
+
+    [DockerRequiredFact]
+    public async Task Events_captured_from_analyst_actions_are_pushed_except_upgrades_and_downgrades()
+    {
+        await SeedAsync(NewSetting(_userA, NotificationMode.Realtime));
+        var sub = NewSubscription(_userA);
+        await SeedAsync(sub);
+
+        var researchOptions = new DbContextOptionsBuilder<ResearchDbContext>()
+            .UseInMemoryDatabase($"analyst-push-{Guid.NewGuid():N}").Options;
+        await using var research = new ResearchDbContext(researchOptions, NoCurrentUser.Instance);
+        var actionTypes = Enum.GetValues<AnalystActionType>();
+        research.AnalystActions.AddRange(actionTypes.Select(t => new AnalystAction
+        {
+            Ticker = "NVDA",
+            Firm = "Acme",
+            ActionType = t,
+            NewTarget = 150m,
+            ActionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            Source = "marketbeat",
+        }));
+        await research.SaveChangesAsync();
+
+        var alerts = new Mock<IMaterialAlertReader>();
+        alerts.Setup(a => a.GetNewSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var banking = new Mock<IBankingTotalsReader>();
+        banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([_userA]);
+        var holdings = new Mock<IBrokerageHoldingsReader>();
+        holdings.Setup(h => h.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new BrokerageHoldingSummary("NVDA", "Equity", 1m, 100m, DateTime.UtcNow, "ibkr")]);
+
+        await using (var ctx = CreateContext())
+        {
+            var capture = new CompanionEventCapture(
+                alerts.Object, new AnalystActionFeedReader(research), holdings.Object, banking.Object,
+                Mock.Of<IBankingAccountsReader>(), Settings(ctx), new CompanionEventRepository(ctx),
+                new CompanionCaptureStateRepository(ctx), _policy, Options.Create(new CompanionOptions()),
+                NullLogger<CompanionEventCapture>.Instance);
+            (await capture.CaptureAsync()).Should().Be(actionTypes.Length);
+        }
+
+        await using var job = CreateContext();
+        var pushed = await new PushDeliveryRepository(job).ListUndeliveredEventsUnscopedAsync(
+            _userA, sub.Id, DateTimeOffset.UtcNow.AddHours(-1), includeOperational: false, 50);
+
+        var expected = actionTypes.Where(t => t is not (AnalystActionType.Upgrade or AnalystActionType.Downgrade)).Select(t => t.ToString());
+        pushed.Should().OnlyContain(e => e.Kind == CompanionEventKind.AnalystAction);
+        pushed.Select(e => e.Summary.Split(' ')[1]).Should().BeEquivalentTo(expected);
     }
 
     [DockerRequiredFact]
