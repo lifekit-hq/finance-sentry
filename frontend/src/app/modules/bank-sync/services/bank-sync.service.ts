@@ -1,7 +1,6 @@
 import {Injectable} from '@angular/core';
-import {ApiService} from '@lifekit-hq/core';
-import {Observable, timer} from 'rxjs';
-import {shareReplay, switchMap, takeWhile} from 'rxjs/operators';
+import {ApiService, poll} from '@lifekit-hq/core';
+import {Observable} from 'rxjs';
 
 import {environment} from '../../../../environments/environment';
 import {DateRangeUtils} from '../../../shared/utils/date-range.utils';
@@ -69,11 +68,10 @@ export class BankSyncService extends ApiService {
     accountId: string,
     intervalMs = DEFAULT_SYNC_POLL_INTERVAL_MS
   ): Observable<SyncStatusResponse> {
-    return timer(0, intervalMs).pipe(
-      switchMap(() => this.getSyncStatus(accountId)),
-      takeWhile(s => s.status !== 'success' && s.status !== 'failed', true),
-      shareReplay(1)
-    );
+    return poll(() => this.getSyncStatus(accountId), {
+      intervalMs,
+      isDone: s => s.status === 'success' || s.status === 'failed',
+    });
   }
 
   public disconnectAccount(accountId: string): Observable<void> {
