@@ -1,8 +1,9 @@
-import {existsSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {chmodSync, existsSync} from 'node:fs';
 import {join} from 'node:path';
 
 import {type Browser, expect, type Page, test} from '@playwright/test';
+
+import {SESSION_DIR_ENV} from './global-setup';
 
 // READ-ONLY smoke against the deployed stack. This suite hits the production
 // database as the seeded smoke account (a Member with fake data, seeded by the
@@ -24,10 +25,13 @@ const SIGN_IN_SETUP_TIMEOUT_MS = 120_000;
 const LEDGER_DATA_TIMEOUT_MS = 30_000;
 const LEDGER_TEST_TIMEOUT_MS = 60_000;
 const RESTORED_SESSION_TIMEOUT_MS = 15_000;
-// The signed-in session, kept after every test. A failed test makes Playwright retry the whole serial
+// The signed-in session, kept after every test in the run's private directory (global-setup.ts
+// creates it and removes it when the run ends). A failed test makes Playwright retry the whole serial
 // group in a fresh worker, which would otherwise sign in to Logto a second time (and, inside the
-// API's anonymous rate budget, may be answered 429). Outside test-results/ so nothing clears it.
-const SESSION_FILE = join(tmpdir(), 'live-smoke-session.json');
+// API's anonymous rate budget, may be answered 429). Without the directory nothing is persisted.
+const SESSION_DIR = process.env[SESSION_DIR_ENV];
+const SESSION_FILE = SESSION_DIR ? join(SESSION_DIR, 'session.json') : undefined;
+const OWNER_ONLY = 0o600;
 
 async function login(page: Page): Promise<void> {
   if (!EMAIL || !PASSWORD) {
@@ -64,7 +68,7 @@ async function login(page: Page): Promise<void> {
 // The retry reuses the session the first attempt saved; only when that does not land on the dashboard
 // (no file, expired cookies) does it fall back to a real sign-in.
 async function openSession(browser: Browser): Promise<Page> {
-  if (existsSync(SESSION_FILE)) {
+  if (SESSION_FILE && existsSync(SESSION_FILE)) {
     const context = await browser.newContext({storageState: SESSION_FILE});
     const restored = await context.newPage();
     try {
@@ -96,7 +100,10 @@ test.describe('Live smoke — deployed stack', () => {
   });
 
   test.afterEach(async () => {
-    await page.context().storageState({path: SESSION_FILE});
+    if (SESSION_FILE) {
+      await page.context().storageState({path: SESSION_FILE});
+      chmodSync(SESSION_FILE, OWNER_ONLY);
+    }
   });
 
   test.afterAll(async () => {
