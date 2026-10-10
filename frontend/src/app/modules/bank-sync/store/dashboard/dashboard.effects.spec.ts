@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, Router} from '@angular/router';
@@ -50,7 +51,9 @@ describe('dashboardHooks auto-refresh', () => {
   it('keeps refreshing after one failed refresh', () => {
     const store = buildStore();
     service.getDashboardData
-      .mockReturnValueOnce(throwError(() => ({error: {errorCode: 'DOWN'}})))
+      .mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'DOWN'}}))
+      )
       .mockReturnValue(of(DATA));
 
     TestBed.runInInjectionContext(() => dashboardHooks(store));

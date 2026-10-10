@@ -1,16 +1,16 @@
 import {inject} from '@angular/core';
+import {extractErrorCode} from '@lifekit-hq/core';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
-import {ErrorUtils} from '../../../../shared/utils/error.utils';
 import {type ConnectIbkrFlexRequest} from '../../models/ibkr/ibkr.model';
 import {IBKRService} from '../../services/ibkr.service';
 import {type IbkrConnectState} from './ibkr-connect.state';
 
 function extractCode(err: unknown): Nullable<string> {
   const direct = (err as {errorCode?: string}).errorCode;
-  return direct ?? ErrorUtils.extractCode(err);
+  return direct ?? extractErrorCode(err);
 }
 
 export function ibkrConnectEffects(store: WritableStateSource<IbkrConnectState>) {

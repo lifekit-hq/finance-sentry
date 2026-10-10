@@ -1,5 +1,6 @@
 import {effect, inject} from '@angular/core';
 import {Router} from '@angular/router';
+import {extractErrorCode} from '@lifekit-hq/core';
 import {BankSyncService} from '@modules/bank-sync/services/bank-sync.service';
 import {ConnectStrategy} from '@modules/bank-sync/strategies/connect-strategy';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
@@ -10,7 +11,6 @@ import {
   type InstitutionType,
   type Provider,
 } from '../../../../shared/models/provider/provider.model';
-import {ErrorUtils} from '../../../../shared/utils/error.utils';
 import {AccountsStore} from '../accounts/accounts.store';
 import {type ConnectStatus} from './connect.state';
 
@@ -44,7 +44,7 @@ function extractCode(err: unknown): Nullable<string> {
   if (direct) {
     return direct;
   }
-  return ErrorUtils.extractCode(err);
+  return extractErrorCode(err);
 }
 
 function institutionTypeForSlug(strategy: ConnectStrategy): InstitutionType {

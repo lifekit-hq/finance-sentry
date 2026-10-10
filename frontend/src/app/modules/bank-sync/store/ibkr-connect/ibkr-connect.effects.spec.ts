@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {of, throwError} from 'rxjs';
@@ -49,7 +50,9 @@ describe('IbkrConnectStore', () => {
 
   it('validate() maps a registered IBKR error code to its message', () => {
     ibkr.validateFlex.mockReturnValue(
-      throwError(() => ({error: {errorCode: 'IBKR_FLEX_INVALID_TOKEN'}}))
+      throwError(
+        () => new HttpErrorResponse({status: 400, error: {errorCode: 'IBKR_FLEX_INVALID_TOKEN'}})
+      )
     );
     const store = TestBed.inject(IbkrConnectStore);
 

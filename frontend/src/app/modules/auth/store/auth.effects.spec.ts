@@ -111,7 +111,9 @@ describe('authEffects', () => {
       const store = buildStore();
       const service = buildService();
       service.login.mockReturnValue(
-        throwError(() => ({error: {errorCode: 'INVALID_CREDENTIALS'}}))
+        throwError(
+          () => new HttpErrorResponse({status: 400, error: {errorCode: 'INVALID_CREDENTIALS'}})
+        )
       );
       const router = buildRouter();
       configure(service, router);
@@ -129,7 +131,9 @@ describe('authEffects', () => {
       const service = buildService();
       const error = 'Too many failed sign-in attempts. Try again in 3 minutes.';
       service.login.mockReturnValue(
-        throwError(() => ({error: {errorCode: 'ACCOUNT_LOCKED', error}}))
+        throwError(
+          () => new HttpErrorResponse({status: 400, error: {errorCode: 'ACCOUNT_LOCKED', error}})
+        )
       );
       configure(service, buildRouter());
 
