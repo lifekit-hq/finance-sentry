@@ -161,14 +161,7 @@
             </div>
             <div class="md:hidden" data-testid="breakdown-rows">
               @for (i of group.items; track i.transactionId) {
-                <div
-                  (click)="openTransaction(i)"
-                  (keydown.enter)="openTransaction(i)"
-                  class="cursor-pointer"
-                  role="button"
-                  tabindex="0"
-                  data-testid="breakdown-row"
-                >
+                <div class="relative" data-testid="breakdown-row">
                   <cmn-list-item-row
                     [label]="i.description"
                     [sublabel]="
@@ -192,6 +185,13 @@
                       </div>
                     </div>
                   </cmn-list-item-row>
+                  <button
+                    [attr.aria-label]="i.description"
+                    (click)="openTransaction(i)"
+                    class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                    type="button"
+                    data-testid="breakdown-row-open"
+                  ></button>
                 </div>
               }
             </div>
@@ -200,26 +200,27 @@
                 <tbody>
                   @for (i of group.items; track i.transactionId) {
                     <tr
-                      (click)="openTransaction(i)"
-                      (keydown.enter)="openTransaction(i)"
-                      class="cursor-pointer border-b border-border-default last:border-0 hover:bg-surface-bg"
-                      role="button"
-                      tabindex="0"
+                      class="relative border-b border-border-default last:border-0 hover:bg-surface-bg"
                       data-testid="breakdown-row"
                     >
                       <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
                         {{ i.date | date: 'MMM d' }}
                       </td>
                       <td class="max-w-[320px] truncate px-cmn-4 py-cmn-3 text-text-primary">
-                        {{ i.description }}
+                        <button
+                          (click)="openTransaction(i)"
+                          class="block max-w-full cursor-pointer truncate text-left after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                          type="button"
+                          data-testid="breakdown-row-open"
+                        >
+                          {{ i.description }}
+                        </button>
                       </td>
                       <td class="whitespace-nowrap px-cmn-4 py-cmn-3 text-text-secondary">
                         <a
                           [routerLink]="transactionsRoute"
                           [queryParams]="ledgerParams({account: i.accountId})"
-                          (click)="$event.stopPropagation()"
-                          (keydown.enter)="$event.stopPropagation()"
-                          class="hover:text-accent-default hover:underline"
+                          class="relative z-10 hover:text-accent-default hover:underline"
                           data-testid="breakdown-account-link"
                           >{{ i.bankName }} ••{{ i.accountLast4 }}</a
                         >
@@ -231,8 +232,7 @@
                             <a
                               [routerLink]="transactionsRoute"
                               [queryParams]="ledgerParams({q: counterpartyQ})"
-                              (click)="$event.stopPropagation()"
-                              (keydown.enter)="$event.stopPropagation()"
+                              class="relative z-10"
                               data-testid="breakdown-counterparty-link"
                             >
                               <cmn-tag variant="info">{{ i.counterpartyName }}</cmn-tag>
@@ -244,8 +244,7 @@
                           <a
                             [routerLink]="transactionsRoute"
                             [queryParams]="ledgerParams({category: i.category})"
-                            (click)="$event.stopPropagation()"
-                            (keydown.enter)="$event.stopPropagation()"
+                            class="relative z-10"
                             data-testid="breakdown-category-link"
                           >
                             <cmn-tag variant="neutral">{{ i.category | merchantCategory }}</cmn-tag>

@@ -24,12 +24,8 @@
         <div
           [class.opacity-60]="alert.isResolved"
           [attr.data-resolved]="alert.isResolved"
-          (click)="openAlert(alert)"
-          (keydown.enter)="onRowKey($event, alert)"
-          (keydown.space)="onRowKey($event, alert)"
-          class="rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          role="button"
-          tabindex="0"
+          class="relative rounded-cmn-md"
+          data-testid="alert-row"
         >
           <cmn-alert-item
             [title]="alert.title"
@@ -42,8 +38,16 @@
             [isRead]="alert.isRead || alert.isResolved"
             [description]="alert | alertCaption"
             (dismissed)="dismiss(alert.id)"
+            class="[&_button]:relative [&_button]:z-10"
             density="flat"
           />
+          <button
+            [attr.aria-label]="alert.title"
+            (click)="openAlert(alert)"
+            class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+            type="button"
+            data-testid="alert-row-open"
+          ></button>
         </div>
       }
     </div>

@@ -209,6 +209,25 @@ describe('TransactionLedgerComponent search param', () => {
   });
 });
 
+describe('TransactionLedgerComponent rows', () => {
+  it('opens the drawer from a native button stretched over the row', () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    const openDrawer = vi.spyOn(fixture.componentInstance, 'openDrawer').mockReturnValue();
+    fixture.detectChanges();
+
+    const row = root.querySelector('[data-testid="ledger-row"]');
+    const open = row?.querySelector<HTMLButtonElement>('button[data-testid="ledger-row-open"]');
+    expect(row?.hasAttribute('role')).toBe(false);
+    expect(open?.type).toBe('button');
+    expect(open?.getAttribute('aria-label')).toBe('Coffee');
+
+    open?.click();
+    expect(openDrawer).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('TransactionLedgerComponent async states', () => {
   it('shows skeleton rows and no ledger rows while loading', () => {
     const {store, fixture, root} = setup(null);
