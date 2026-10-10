@@ -11,6 +11,7 @@ using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -35,6 +36,7 @@ public class BankSyncController(
     IBankAccountRepository accounts,
     ITransactionRepository transactions,
     IBackgroundJobClient backgroundJobs,
+    IRecurringJobManager recurringJobs,
     ISyncJobRepository syncJobs,
     ITransactionSyncCoordinator coordinator,
     FinanceSentry.Core.Interfaces.IAlertGeneratorService alerts,
@@ -278,6 +280,7 @@ public class BankSyncController(
 
         await _transactions.SoftDeleteByAccountIdAsync(accountId, ct);
         await _accounts.DeleteAsync(accountId, ct);
+        recurringJobs.RemoveIfExists(SyncAccountJob.IdFor(accountId));
         await alerts.DeleteAlertsForAccountAsync(accountId, ct);
 
         return NoContent();

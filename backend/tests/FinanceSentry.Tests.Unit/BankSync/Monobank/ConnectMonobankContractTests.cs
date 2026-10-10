@@ -189,6 +189,7 @@ public class ConnectMonobankContractTests
             _accounts.Object,
             new Mock<ITransactionRepository>().Object,
             _backgroundJobs.Object,
+            new Mock<IRecurringJobManager>().Object,
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,

@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using Hangfire;
 using Hangfire.InMemory;
 using Hangfire.PostgreSql;
+using Hangfire.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -69,9 +70,18 @@ public static class HangfireSetup
     }
 }
 
+/// <summary>The recurring per-account sync job's id: one place for the scheduler, reconciliation and disconnect paths.</summary>
+public static class SyncAccountJob
+{
+    public const string IdPrefix = "sync-account-";
+
+    public static string IdFor(Guid accountId) => $"{IdPrefix}{accountId}";
+}
+
 public class SyncScheduler(
     IBankAccountRepository accounts,
     IRecurringJobManager recurringJobs,
+    JobStorage jobStorage,
     IAccountDiscoveryService accountDiscovery,
     ILogger<SyncScheduler> logger)
 {
@@ -79,6 +89,7 @@ public class SyncScheduler(
 
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly IRecurringJobManager _recurringJobs = recurringJobs;
+    private readonly JobStorage _jobStorage = jobStorage;
     private readonly IAccountDiscoveryService _accountDiscovery = accountDiscovery;
     private readonly ILogger<SyncScheduler> _logger = logger;
 
@@ -103,9 +114,33 @@ public class SyncScheduler(
         foreach (var account in activeAccounts)
         {
             _recurringJobs.AddOrUpdate<ScheduledSyncJob>(
-                $"sync-account-{account.Id}",
+                SyncAccountJob.IdFor(account.Id),
                 job => job.ExecuteSyncAsync(account.Id),
                 PerAccountCron);
+        }
+
+        RemoveJobsOfInactiveAccounts(activeIds);
+    }
+
+    // A deactivated or deleted account stops being listed above, but its recurring job would otherwise keep firing
+    // (and failing) every 30 minutes for good.
+    private void RemoveJobsOfInactiveAccounts(HashSet<Guid> activeIds)
+    {
+        List<string> scheduledIds;
+        using (var connection = _jobStorage.GetConnection())
+        {
+            scheduledIds = [.. connection.GetRecurringJobs()
+                .Select(job => job.Id)
+                .Where(id => id.StartsWith(SyncAccountJob.IdPrefix, StringComparison.Ordinal))];
+        }
+
+        foreach (var jobId in scheduledIds)
+        {
+            if (Guid.TryParse(jobId.AsSpan(SyncAccountJob.IdPrefix.Length), out var accountId) && activeIds.Contains(accountId))
+                continue;
+
+            _recurringJobs.RemoveIfExists(jobId);
+            _logger.LogInformation("Removed recurring sync job {JobId}: its account is gone or no longer active.", jobId);
         }
     }
 }
