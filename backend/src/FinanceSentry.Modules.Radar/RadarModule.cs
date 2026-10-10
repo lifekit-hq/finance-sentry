@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class RadarModule
 {
@@ -67,10 +68,11 @@ public static class RadarModule
     public static IServiceCollection AddRadarModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<RadarDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<RadarOptions>(config.GetSection(RadarOptions.SectionName));
         services.Configure<RegimeOptions>(config.GetSection(RegimeOptions.SectionName));

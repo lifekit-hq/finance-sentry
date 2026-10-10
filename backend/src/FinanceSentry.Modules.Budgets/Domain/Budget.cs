@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.Budgets.Domain;
 
-public class Budget
+using FinanceSentry.Core.Domain;
+
+public class Budget : IHasUpdatedAt
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
@@ -29,6 +31,5 @@ public class Budget
     public void UpdateLimit(decimal newLimit)
     {
         MonthlyLimit = newLimit;
-        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

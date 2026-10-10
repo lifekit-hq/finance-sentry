@@ -86,7 +86,6 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         if (alert is null) return false;
         if (alert.IsRead) return true;
         alert.IsRead = true;
-        alert.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return true;
     }
@@ -106,7 +105,6 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         var alert = await _db.Alerts.FirstOrDefaultAsync(a => a.Id == alertId && a.UserId == userId, ct);
         if (alert is null) return false;
         alert.IsDismissed = true;
-        alert.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return true;
     }
@@ -118,7 +116,6 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         var now = DateTimeOffset.UtcNow;
         alert.IsResolved = true;
         alert.ResolvedAt = now;
-        alert.UpdatedAt = now;
         await _db.SaveChangesAsync(ct);
     }
 
@@ -187,7 +184,6 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
         var now = DateTimeOffset.UtcNow;
         alert.AcknowledgementDecision = decision;
         alert.AcknowledgedAt = now;
-        alert.UpdatedAt = now;
 
         if (decision == "Accept")
         {

@@ -24,6 +24,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class BankSyncModule
 {
@@ -139,7 +140,8 @@ public static class BankSyncModule
         services.AddConnectionHealthShadow(config);
         var connectionString = config.GetConnectionString("Default")!;
 
-        services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+        services.AddUpdatedAtStamping();
+        services.AddDbContext<BankSyncDbContext>((sp, o) => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
 

@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class AuthModule
 {
@@ -31,7 +32,8 @@ public static class AuthModule
     {
         var connectionString = config.GetConnectionString("Default")!;
 
-        services.AddDbContext<AuthDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+        services.AddUpdatedAtStamping();
+        services.AddDbContext<AuthDbContext>((sp, o) => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.AddAuthDataProtection(config);
 

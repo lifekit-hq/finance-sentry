@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
+using FinanceSentry.Infrastructure.Persistence;
 
 /// <summary>
 /// Registers the in-app finance agent (feature 040): the Anthropic LLM client, the MCP-tool bridge, the
@@ -30,10 +31,11 @@ public static class AgentModule
 
     public static IServiceCollection AddAgentModule(this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<AgentDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<AgentOptions>(config.GetSection(AgentOptions.SectionName));
 

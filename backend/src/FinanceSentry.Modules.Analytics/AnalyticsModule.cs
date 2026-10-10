@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Analytics.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class AnalyticsModule
 {
@@ -21,10 +22,11 @@ public static class AnalyticsModule
         this IServiceCollection services, IConfiguration config)
     {
         // Writable context: owns query_audit + the migration home (views/role/RLS created via raw SQL).
+        services.AddUpdatedAtStamping();
         services.AddDbContext<AnalyticsDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_analytics", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_analytics", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<AnalyticsOptions>(config.GetSection(AnalyticsOptions.SectionName));
 

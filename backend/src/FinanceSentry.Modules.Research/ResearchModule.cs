@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class ResearchModule
 {
@@ -198,10 +199,11 @@ public static class ResearchModule
     public static IServiceCollection AddResearchModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<ResearchDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_research", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_research", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IWatchlistRepository, WatchlistRepository>();
         services.AddScoped<IWatchlistReader, WatchlistReader>();

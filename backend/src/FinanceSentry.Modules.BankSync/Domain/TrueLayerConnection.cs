@@ -3,7 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
-public class TrueLayerConnection : Entity
+public class TrueLayerConnection : Entity, IHasUpdatedAt
 {
     public Guid UserId { get; private set; }
     public string ProviderId { get; private set; } = string.Empty;
@@ -53,20 +53,17 @@ public class TrueLayerConnection : Entity
         Iv = iv;
         AuthTag = authTag;
         KeyVersion = keyVersion;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkLinked(DateTime? expiresAt)
     {
         Status = "LINKED";
         ConnectionExpiresAt = expiresAt;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkExpired()
     {
         Status = "EXPIRED";
-        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -83,14 +80,13 @@ public class TrueLayerConnection : Entity
 
         Reference = newReference;
         Status = "CREATED";
-        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>
     /// Replaces this row's ciphertext with the same plaintext re-encrypted under a newer key
     /// (issue #493). The payload and the key version move together — a row is never left with new
-    /// ciphertext and an old version, or the reverse. Not a business update: the credential is
-    /// unchanged, so no domain timestamp moves.
+    /// ciphertext and an old version, or the reverse. The credential itself is unchanged, but the row
+    /// was written, so the save stamps <c>UpdatedAt</c> like any other modification.
     /// </summary>
     public void RotateEncryption(byte[] ciphertext, byte[] iv, byte[] authTag, int keyVersion)
     {
