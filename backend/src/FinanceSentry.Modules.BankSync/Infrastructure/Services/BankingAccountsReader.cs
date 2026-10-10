@@ -45,7 +45,6 @@ public class BankingAccountsReader(
     {
         var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return list
-            .Where(a => a.IsActive)
             .Select(a => new AccountBalanceSnapshot(a.Id, a.BankName, a.AccountType, a.AccountNumberLast4, a.Currency, a.CurrentBalance))
             .ToList();
     }

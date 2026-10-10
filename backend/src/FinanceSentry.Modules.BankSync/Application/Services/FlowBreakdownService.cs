@@ -153,7 +153,7 @@ public class FlowBreakdownService(
         // map, same shared classification entry point (memoized per request), same transfer
         // detection over the non-counterparty remainder.
         var accountList = await _accounts.GetByUserIdAsync(userId, ct);
-        var accountsById = accountList.Where(a => a.IsActive).ToDictionary(a => a.Id);
+        var accountsById = accountList.ToDictionary(a => a.Id);
         var accountCurrencies = accountsById.ToDictionary(kv => kv.Key, kv => kv.Value.Currency);
 
         var txList = (await _transactions.GetByUserIdSinceAsync(

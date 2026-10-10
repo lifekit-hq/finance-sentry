@@ -29,7 +29,7 @@ public static class RecategorizationCommand
             userIds = [userId];
         else
             // Offline command: no person in scope, so it opts out of the Owner filter to enumerate every user.
-            userIds = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).Select(a => a.UserId).Distinct().ToListAsync();
+            userIds = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.AccountActiveFilterName]).Select(a => a.UserId).Distinct().ToListAsync();
 
         // The service is intentionally not DI-registered — this is a one-off, so build it inline.
         var service = ActivatorUtilities.CreateInstance<TransactionRecategorizationService>(sp);

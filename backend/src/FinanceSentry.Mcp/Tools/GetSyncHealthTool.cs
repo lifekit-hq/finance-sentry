@@ -61,7 +61,7 @@ public sealed class GetSyncHealthTool(
             // MonobankCredential has no LastSyncError; derive error state from associated accounts.
             var failedAccount = await _bankSync.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.UserId == userId && a.Provider == "monobank" && a.IsActive
+                .Where(a => a.UserId == userId && a.Provider == "monobank"
                     && (a.SyncStatus == "failed" || a.SyncStatus == ReauthRequiredStatus))
                 .Select(a => new { a.SyncStatus, a.LastSyncError })
                 .FirstOrDefaultAsync(ct);
@@ -89,7 +89,7 @@ public sealed class GetSyncHealthTool(
         {
             var accounts = await _bankSync.BankAccounts
                 .AsNoTracking()
-                .Where(a => a.UserId == userId && a.Provider == "truelayer" && a.IsActive)
+                .Where(a => a.UserId == userId && a.Provider == "truelayer")
                 .Select(a => new { a.SyncStatus, a.LastSyncError, a.UpdatedAt })
                 .ToListAsync(ct);
 
