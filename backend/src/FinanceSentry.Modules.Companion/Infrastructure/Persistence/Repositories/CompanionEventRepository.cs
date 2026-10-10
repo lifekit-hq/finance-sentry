@@ -90,18 +90,14 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
             return 0;
         }
 
-        var rows = await db.Events
-            .Where(e => e.UserId == userId && ids.Contains(e.Id) && e.Disposition != EventDisposition.Delivered)
-            .ToListAsync(ct);
         var now = DateTimeOffset.UtcNow;
-        foreach (var row in rows)
-        {
-            row.Disposition = EventDisposition.Delivered;
-            row.DeliveredAt = now;
-        }
-
-        await db.SaveChangesAsync(ct);
-        return rows.Count;
+        return await db.Events
+            .Where(e => e.UserId == userId && ids.Contains(e.Id) && e.Disposition != EventDisposition.Delivered)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(e => e.Disposition, EventDisposition.Delivered)
+                    .SetProperty(e => e.DeliveredAt, now),
+                ct);
     }
 
     public async Task<IReadOnlyList<CompanionEvent>> ListByDedupKeysAsync(

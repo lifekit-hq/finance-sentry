@@ -93,7 +93,8 @@ public sealed class ToolParityTests
         IReadOnlyDictionary<string, IReadOnlyList<FundamentalFact>>? edgarFactsByTicker = null,
         IReadOnlyDictionary<string, QuoteCacheEntry>? quotesByTicker = null,
         IReadOnlyDictionary<string, IReadOnlyList<DailyClose>>? closesByTicker = null,
-        Guid? actingUserId = null)
+        Guid? actingUserId = null,
+        Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
 
@@ -293,6 +294,7 @@ public sealed class ToolParityTests
         services.AddScoped<RejectCandidateTool>();
         services.AddScoped<GetAllocationVsTargetTool>();
 
+        configure?.Invoke(services);
         return services.BuildServiceProvider();
     }
 
@@ -1210,7 +1212,13 @@ public sealed class ToolParityTests
     public async Task GetBenchmarkTrackRecord_ReadsTheMaterializedRun()
     {
         var userId = Guid.NewGuid();
-        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        // ReplaceRunAsync is a set-based delete plus insert in a transaction, which the in-memory provider cannot run;
+        // BenchmarkRelativeRecordRepositoryTests covers the real repository on Postgres.
+        await using var sp = BuildProvider(
+            Guid.NewGuid().ToString("N"),
+            actingUserId: userId,
+            configure: services => services.AddSingleton<IBenchmarkRelativeRecordRepository>(
+                new InMemoryBenchmarkRecordRepository()));
         await using var scope = sp.CreateAsyncScope();
         var svc = scope.ServiceProvider;
 
@@ -1917,5 +1925,24 @@ public sealed class ToolParityTests
         packet.Groups.Should().ContainSingle(g => g.Name == "recent_news");
         packet.Groups.SelectMany(g => g.Items)
             .Should().OnlyContain(i => i.DocumentId != Guid.Empty && i.ChunkId != Guid.Empty);
+    }
+
+    private sealed class InMemoryBenchmarkRecordRepository : IBenchmarkRelativeRecordRepository
+    {
+        private readonly SortedDictionary<DateTimeOffset, IReadOnlyList<BenchmarkRelativeRecord>> runs = [];
+
+        public Task ReplaceRunAsync(
+            Guid userId, DateTimeOffset asOf, IReadOnlyList<BenchmarkRelativeRecord> rows, CancellationToken ct = default)
+        {
+            runs[asOf] = rows;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<BenchmarkRelativeRecord>> ListPreviousRunUnscopedAsync(
+            Guid userId, DateTimeOffset asOf, CancellationToken ct = default)
+            => Task.FromResult(runs.LastOrDefault(r => r.Key < asOf).Value ?? []);
+
+        public Task<IReadOnlyList<BenchmarkRelativeRecord>> ListLatestRunAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult(runs.Count == 0 ? [] : runs.Last().Value);
     }
 }

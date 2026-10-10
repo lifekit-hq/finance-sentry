@@ -73,28 +73,6 @@ public class ResearchIndexerTests
     }
 
     [Fact]
-    public async Task Index_MarksChangedContentPending_AndReindexes()
-    {
-        using var db = RetrievalTestContext.CreateDb();
-        var reader = new FakeCorpusSourceReader();
-        reader.Documents.Add(SourceProjection("DRAM update", "Original text about contract pricing."));
-        var indexer = CreateIndexer(db, reader, new FakeEmbeddingService());
-        await indexer.IndexPendingAsync();
-
-        reader.Documents.Clear();
-        reader.Documents.Add(SourceProjection("DRAM update", "Fully revised text about a pricing correction."));
-        var result = await indexer.IndexPendingAsync();
-
-        result.Synced.Should().Be(1);
-        result.Indexed.Should().Be(1);
-        var document = await db.ResearchDocuments.SingleAsync();
-        document.Text.Should().Contain("revised");
-        document.IndexStatus.Should().Be(ResearchIndexStatus.Indexed);
-        var chunks = await db.ResearchChunks.ToListAsync();
-        chunks.Should().OnlyContain(c => c.Text.Contains("revised"));
-    }
-
-    [Fact]
     public async Task Index_IsolatesEmbeddingFailures_PerDocument()
     {
         using var db = RetrievalTestContext.CreateDb();

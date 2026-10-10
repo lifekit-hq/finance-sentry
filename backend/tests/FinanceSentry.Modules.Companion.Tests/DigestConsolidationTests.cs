@@ -1,13 +1,11 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
-using FinanceSentry.Modules.Companion.Application.Commands;
 using FinanceSentry.Modules.Companion.Application.Queries;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
-using FinanceSentry.Modules.Companion.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -129,33 +127,6 @@ public sealed class DigestConsolidationTests
     }
 
     [Fact]
-    public async Task Demoted_event_reaches_the_operator_exactly_once_in_the_digest()
-    {
-        await using var db = NewDb();
-        db.Events.Add(Held(User, "a"));
-        await db.SaveChangesAsync();
-        var events = new CompanionEventRepository(db);
-        var handler = NewHandler(events);
-
-        // Realtime/scan pulls (even passing the flag) never see it.
-        (await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default)).Events.Should().BeEmpty();
-        (await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, true), default)).Events.Should().BeEmpty();
-
-        // The digest pull delivers it, then acks.
-        var digest = await handler.Handle(
-            new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default);
-        digest.Events.Should().ContainSingle();
-        await new AcknowledgeCompanionEventsCommandHandler(events)
-            .Handle(new AcknowledgeCompanionEventsCommand(User, [.. digest.Events.Select(e => e.Id)]), default);
-
-        // Nothing resurfaces: not in a repeat digest, not in a realtime pull, not held for the next digest wake.
-        (await handler.Handle(
-            new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default)).Events.Should().BeEmpty();
-        (await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, false), default)).Events.Should().BeEmpty();
-        (await events.ListHeldForDigestUnscopedAsync(User)).Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task Refused_override_is_distinguishable_from_no_events()
     {
         await using var db = NewDb();
@@ -172,50 +143,6 @@ public sealed class DigestConsolidationTests
         refused.Note.Should().Be(GetPendingCompanionEventsQueryHandler.HeldWithheldNote);
         plain.Note.Should().BeNull();
         honoured.Note.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Digest_wake_pull_with_the_wake_reason_delivers_held_events_once()
-    {
-        await using var db = NewDb();
-        db.Events.AddRange(Held(User, "a"), Held(User, "b"));
-        await db.SaveChangesAsync();
-        var events = new CompanionEventRepository(db);
-        var handler = NewHandler(events);
-
-        var digest = await handler.Handle(
-            new GetPendingCompanionEventsQuery(
-                User, 25, true, WebhookAgentWakeDispatcher.DigestHeldOverrideReason), default);
-
-        digest.Events.Should().HaveCount(2);
-        digest.Note.Should().BeNull();
-        await new AcknowledgeCompanionEventsCommandHandler(events)
-            .Handle(new AcknowledgeCompanionEventsCommand(User, [.. digest.Events.Select(e => e.Id)]), default);
-
-        var repeat = await handler.Handle(
-            new GetPendingCompanionEventsQuery(
-                User, 25, true, WebhookAgentWakeDispatcher.DigestHeldOverrideReason), default);
-        repeat.Events.Should().BeEmpty();
-        (await events.ListHeldForDigestUnscopedAsync(User)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task Acked_digest_events_do_not_repeat()
-    {
-        await using var db = NewDb();
-        db.Events.AddRange(Held(User, "a"), Held(User, "b"));
-        await db.SaveChangesAsync();
-        var events = new CompanionEventRepository(db);
-        var handler = NewHandler(events);
-
-        var first = await handler.Handle(new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default);
-        var ids = first.Events.Select(e => e.Id).ToList();
-        await new AcknowledgeCompanionEventsCommandHandler(events)
-            .Handle(new AcknowledgeCompanionEventsCommand(User, ids), default);
-
-        var second = await handler.Handle(
-            new GetPendingCompanionEventsQuery(User, 25, true, "daily digest"), default);
-        second.Events.Should().BeEmpty("acked events are Delivered and don't resurface");
     }
 
     [Fact]

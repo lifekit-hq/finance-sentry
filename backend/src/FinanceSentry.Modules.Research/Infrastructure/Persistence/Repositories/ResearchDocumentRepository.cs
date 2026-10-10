@@ -54,13 +54,9 @@ public class ResearchDocumentRepository(ResearchDbContext db) : IResearchDocumen
 
     public async Task RemoveChunksAsync(IReadOnlyList<Guid> chunkIds, CancellationToken ct = default)
     {
-        // Explicit two-step delete instead of ExecuteDeleteAsync/cascade so the same path works
-        // on the EF InMemory provider used by unit and parity tests.
-        var embeddings = await db.ResearchEmbeddings.Where(e => chunkIds.Contains(e.ChunkId)).ToListAsync(ct);
-        db.ResearchEmbeddings.RemoveRange(embeddings);
-        var chunks = await db.ResearchChunks.Where(c => chunkIds.Contains(c.Id)).ToListAsync(ct);
-        db.ResearchChunks.RemoveRange(chunks);
-        await db.SaveChangesAsync(ct);
+        // One DELETE; the embeddings go with their chunks through the research_embeddings → research_chunks
+        // ON DELETE CASCADE foreign key.
+        await db.ResearchChunks.Where(c => chunkIds.Contains(c.Id)).ExecuteDeleteAsync(ct);
     }
 
     public async Task<IReadOnlyList<ResearchEmbedding>> ListEmbeddingsForChunksAsync(
