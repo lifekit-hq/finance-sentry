@@ -387,19 +387,15 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
         var now = DateTime.UtcNow;
         // Opting out of the IsActive filter covers already-inactive rows too, making this operation
         // idempotent; the Owner filter stays on (a request acting for another person matches nothing).
-        var transactions = await _context.Transactions
+        await _context.Transactions
             .IgnoreQueryFilters([BankSyncDbContext.ActiveFilterName])
             .Where(t => t.AccountId == accountId && t.IsActive)
-            .ToListAsync(cancellationToken);
-
-        foreach (var t in transactions)
-        {
-            t.IsActive = false;
-            t.DeletedAt = now;
-            t.ArchivedReason = "account_deleted";
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(t => t.IsActive, false)
+                    .SetProperty(t => t.DeletedAt, now)
+                    .SetProperty(t => t.ArchivedReason, "account_deleted"),
+                cancellationToken);
     }
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
