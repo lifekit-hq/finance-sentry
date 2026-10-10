@@ -2,6 +2,7 @@ import {inject} from '@angular/core';
 import {type ActivatedRouteSnapshot, Router, type Routes} from '@angular/router';
 import type {PageChromeData} from '@lifekit-hq/ui';
 
+import {RouteTitleUtils} from './core/title/route-title.utils';
 import {authGuard} from './modules/auth/guards/auth.guard';
 import {guestGuard} from './modules/auth/guards/guest.guard';
 import {permissionGuard} from './modules/auth/guards/permission.guard';
@@ -19,6 +20,7 @@ export const APP_ROUTES: Routes = [
     loadComponent: () =>
       import('./modules/auth/pages/login/login.component').then(m => m.LoginComponent),
     canActivate: [guestGuard],
+    ...RouteTitleUtils.of('Sign in'),
   },
   {
     path: AppRoute.AcceptInvite.slice(1),
@@ -27,6 +29,7 @@ export const APP_ROUTES: Routes = [
         m => m.AcceptInviteComponent
       ),
     canActivate: [guestGuard],
+    ...RouteTitleUtils.of('Accept invitation'),
   },
   {
     path: AppRoute.McpConnect.slice(1),
@@ -34,6 +37,7 @@ export const APP_ROUTES: Routes = [
       import('./modules/auth/pages/mcp-connect/mcp-connect.component').then(
         m => m.McpConnectComponent
       ),
+    ...RouteTitleUtils.of('Connect MCP'),
   },
   {
     path: '',
@@ -49,18 +53,17 @@ export const APP_ROUTES: Routes = [
         data: {parent: AppRoute.Dashboard} satisfies PageChromeData,
         // A dashboard window (`from`/`to`) and a calendar month are different breakdowns.
         runGuardsAndResolvers: 'paramsOrQueryParamsChange',
-        resolve: {
-          title: (route: ActivatedRouteSnapshot) =>
-            route.queryParamMap.has('from') || route.queryParamMap.has('to')
-              ? 'Window breakdown'
-              : 'Month breakdown',
-        },
+        ...RouteTitleUtils.of((route: ActivatedRouteSnapshot) =>
+          route.queryParamMap.has('from') || route.queryParamMap.has('to')
+            ? 'Window breakdown'
+            : 'Month breakdown'
+        ),
       },
       {
         path: AppRoute.More.slice(1),
         loadComponent: () =>
           import('./core/shell/more-page/more-page.component').then(m => m.MorePageComponent),
-        data: {title: 'More'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('More'),
       },
       {
         path: AppRoute.Dashboard.slice(1),
@@ -68,7 +71,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/pages/dashboard/dashboard.component').then(
             m => m.DashboardComponent
           ),
-        data: {title: 'Dashboard'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('Dashboard'),
       },
       {
         path: AppRoute.Accounts.slice(1),
@@ -83,7 +86,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/pages/transaction-ledger/transaction-ledger.component').then(
             m => m.TransactionLedgerComponent
           ),
-        data: {title: 'Transactions'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('Transactions'),
       },
       {
         // The Income page was the transaction ledger filtered to credits, plus charts the
@@ -101,8 +104,8 @@ export const APP_ROUTES: Routes = [
         path: AppRoute.Budgets.slice(1),
         loadComponent: () =>
           import('./modules/budgets/pages/budgets/budgets.component').then(m => m.BudgetsComponent),
+        ...RouteTitleUtils.of('Budgets'),
         data: {
-          title: 'Budgets',
           actions: [{id: BUDGETS_ADD_ACTION, label: 'Add budget', icon: 'Plus'}],
         } satisfies PageChromeData,
       },
@@ -112,8 +115,8 @@ export const APP_ROUTES: Routes = [
           import('./modules/subscriptions/pages/subscriptions/subscriptions.component').then(
             m => m.SubscriptionsComponent
           ),
+        ...RouteTitleUtils.of('Subscriptions'),
         data: {
-          title: 'Subscriptions',
           actions: [{id: SUBSCRIPTIONS_ADD_ACTION, label: 'Add subscription', icon: 'Plus'}],
         } satisfies PageChromeData,
       },
@@ -121,8 +124,8 @@ export const APP_ROUTES: Routes = [
         path: AppRoute.Alerts.slice(1),
         loadComponent: () =>
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),
+        ...RouteTitleUtils.of('Alerts'),
         data: {
-          title: 'Alerts',
           actions: [{id: ALERTS_MARK_ALL_READ_ACTION, label: 'Mark all read', icon: 'CheckCheck'}],
         } satisfies PageChromeData,
       },
@@ -130,7 +133,7 @@ export const APP_ROUTES: Routes = [
         path: AppRoute.Events.slice(1),
         loadComponent: () =>
           import('./modules/events/pages/events/events.component').then(m => m.EventsComponent),
-        data: {title: 'Events'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('Events'),
       },
       {
         path: AppRoute.Ledger.slice(1),
@@ -139,14 +142,15 @@ export const APP_ROUTES: Routes = [
           import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
             m => m.LedgerChatComponent
           ),
-        data: {title: 'Ledger'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('Ledger'),
       },
       {
         path: AppRoute.SettingsPeople.slice(1),
         canMatch: [permissionGuard(Permission.UsersManage)],
         loadComponent: () =>
           import('./modules/settings/pages/people/people.component').then(m => m.PeopleComponent),
-        data: {title: 'People', parent: AppRoute.Settings} satisfies PageChromeData,
+        ...RouteTitleUtils.of('People'),
+        data: {parent: AppRoute.Settings} satisfies PageChromeData,
       },
       {
         path: AppRoute.Settings.slice(1),
@@ -154,7 +158,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/settings/pages/settings/settings.component').then(
             m => m.SettingsComponent
           ),
-        data: {title: 'Settings'} satisfies PageChromeData,
+        ...RouteTitleUtils.of('Settings'),
       },
       {
         path: `${AppRoute.AssetDossier.slice(1)}/:${ASSET_DOSSIER_SYMBOL_PARAM}`,
@@ -162,12 +166,12 @@ export const APP_ROUTES: Routes = [
           import('./modules/assets/pages/asset-dossier/asset-dossier.component').then(
             m => m.AssetDossierComponent
           ),
-        // The top bar's title is the symbol; the path names it, so a resolver lifts it into the data.
+        // The title is the symbol; the path names it, so the title resolves from the param.
         data: {parent: AppRoute.AccountsInvestments} satisfies PageChromeData,
-        resolve: {
-          title: (route: ActivatedRouteSnapshot) =>
-            route.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM)?.toUpperCase() ?? 'Asset',
-        },
+        ...RouteTitleUtils.of(
+          (route: ActivatedRouteSnapshot) =>
+            route.paramMap.get(ASSET_DOSSIER_SYMBOL_PARAM)?.toUpperCase() ?? 'Asset'
+        ),
       },
       {path: '', redirectTo: AppRoute.Dashboard, pathMatch: 'full'},
     ],
