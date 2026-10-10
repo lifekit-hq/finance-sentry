@@ -46,13 +46,12 @@
         >
           Active · {{ store.activeSubscriptions().length }}
         </span>
-        <div class="flex items-center gap-cmn-1 overflow-x-auto">
-          @for (opt of sortOptions; track opt.value) {
-            <cmn-chip [selected]="store.sort() === opt.value" (clicked)="setSort(opt.value)">
-              {{ opt.label }}
-            </cmn-chip>
-          }
-        </div>
+        <lk-segmented
+          [options]="sortOptions"
+          [value]="store.sort()"
+          (lk-segmented-change)="onSortChange($event)"
+          label="Sort subscriptions"
+        />
       </div>
 
       @for (section of store.activeSections(); track section.id) {

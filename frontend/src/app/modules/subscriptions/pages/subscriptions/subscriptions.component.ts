@@ -1,12 +1,17 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+  ViewContainerRef,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
   ButtonComponent,
   CardComponent,
-  ChipComponent,
   CmnDialogService,
   CmnPageActionsService,
   ConfirmDialogComponent,
@@ -71,7 +76,6 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     ButtonComponent,
     CardComponent,
     AlertComponent,
-    ChipComponent,
     DatePipe,
     EmptyStateComponent,
     IconComponent,
@@ -85,6 +89,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     UpperCasePipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [SubscriptionsStore],
   templateUrl: './subscriptions.component.html',
 })
@@ -120,6 +125,11 @@ export class SubscriptionsComponent {
     if (q) {
       void this.router.navigate([AppRoute.Transactions], {queryParams: {q}});
     }
+  }
+
+  public onSortChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionSort}>).detail;
+    this.setSort(value);
   }
 
   public setSort(sort: SubscriptionSort): void {

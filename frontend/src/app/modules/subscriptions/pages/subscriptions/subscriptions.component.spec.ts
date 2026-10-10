@@ -98,4 +98,16 @@ describe('SubscriptionsComponent', () => {
 
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('sorts through the store when the sort control changes', () => {
+    TestBed.configureTestingModule({});
+    const component = TestBed.runInInjectionContext(() =>
+      Object.create(SubscriptionsComponent.prototype)
+    ) as SubscriptionsComponent;
+    const setSort = vi.spyOn(component, 'setSort').mockImplementation(() => undefined);
+
+    component.onSortChange(new CustomEvent('lk-segmented-change', {detail: {value: 'amount'}}));
+
+    expect(setSort).toHaveBeenCalledWith('amount');
+  });
 });

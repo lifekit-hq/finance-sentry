@@ -267,4 +267,61 @@ describe('AddCommitmentDialogComponent', () => {
     component.cancel();
     expect(close).toHaveBeenCalledWith();
   });
+
+  describe('single-choice controls', () => {
+    function render(data?: CommitmentDialogData) {
+      setup(data);
+      const fixture = TestBed.createComponent(AddCommitmentDialogComponent);
+      fixture.detectChanges();
+      return {fixture, component: fixture.componentInstance};
+    }
+
+    function segmented(fixture: {nativeElement: HTMLElement}, label: string) {
+      return fixture.nativeElement.querySelector<
+        HTMLElement & {options: {label: string; value: string}[]; value: string}
+      >(`lk-segmented[label="${label}"]`);
+    }
+
+    function choose(control: HTMLElement | null, value: string) {
+      control?.dispatchEvent(new CustomEvent('lk-segmented-change', {detail: {value}}));
+    }
+
+    it('offers the kind as a segmented control on the current kind', () => {
+      const {fixture} = render();
+      const control = segmented(fixture, 'Type');
+
+      expect(control?.options.map(o => o.value)).toEqual(['subscription', 'installment']);
+      expect(control?.value).toBe('subscription');
+    });
+
+    it('changes the kind and re-reads the anchor when the control changes', () => {
+      const {fixture, component} = render();
+      const setKind = vi.spyOn(component, 'setKind');
+
+      choose(segmented(fixture, 'Type'), 'installment');
+
+      expect(setKind).toHaveBeenCalledWith('installment');
+      expect(component.form.controls.kind.value).toBe('installment');
+    });
+
+    it('does not offer the kind when linking an existing row', () => {
+      const {fixture} = render({linkTo: 'Apple Store', kind: 'installment'});
+
+      expect(segmented(fixture, 'Type')).toBeNull();
+    });
+
+    it('offers the billing cadence once a charge is picked and applies the choice', () => {
+      const {fixture, component} = render();
+      expect(segmented(fixture, 'Billed')).toBeNull();
+
+      component.pick(CANDIDATE);
+      fixture.detectChanges();
+      const control = segmented(fixture, 'Billed');
+      choose(control, 'annual');
+
+      expect(control?.options.map(o => o.value)).toEqual(['monthly', 'annual']);
+      expect(component.form.controls.cadence.value).toBe('annual');
+      expect(component.form.controls.cadence.dirty).toBe(true);
+    });
+  });
 });

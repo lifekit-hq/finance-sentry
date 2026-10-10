@@ -1,12 +1,11 @@
 import {DialogRef} from '@angular/cdk/dialog';
 import {DatePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, inject} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   AlertComponent,
   ButtonComponent,
-  ChipComponent,
   CMN_DIALOG_DATA,
   DialogActionsComponent,
   EmptyStateComponent,
@@ -40,11 +39,11 @@ import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-pi
 @Component({
   selector: 'fns-add-commitment-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     InputHintsDirective,
     AlertComponent,
     ButtonComponent,
-    ChipComponent,
     DatePipe,
     DialogActionsComponent,
     EmptyStateComponent,
@@ -87,6 +86,16 @@ export class AddCommitmentDialogComponent {
 
   constructor() {
     this.picker.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
+  }
+
+  public onKindChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionKind}>).detail;
+    this.setKind(value);
+  }
+
+  public onCadenceChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionCadence}>).detail;
+    this.setCadence(value);
   }
 
   public setKind(kind: SubscriptionKind): void {
