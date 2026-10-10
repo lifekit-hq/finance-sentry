@@ -4,9 +4,9 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
-import {type ChartScrubPoint} from '@lifekit-hq/charts-core';
+import {type ChartPointClick, type ChartScrubPoint} from '@lifekit-hq/charts-core';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {AreaChartComponent} from '@lifekit-hq/ui';
+import {AreaChartComponent, BarChartComponent, DonutChartComponent} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -265,6 +265,121 @@ describe('DashboardComponent range presets', () => {
 
     expect(navigate).toHaveBeenCalledWith([AppRoute.FlowBreakdown], {
       queryParams: {to: '2026-08-12', months: 120},
+    });
+  });
+});
+
+describe('DashboardComponent chart click-through', () => {
+  const pointClick = (seriesLabel: string, index = 0): ChartPointClick => ({
+    index,
+    seriesIndex: 0,
+    label: 'x',
+    seriesLabel,
+    value: 1,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({toFake: ['Date']});
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function chart<T>(fixture: ReturnType<typeof render>['fixture'], type: new (...a: never[]) => T) {
+    return fixture.debugElement.query(By.directive(type)).componentInstance as T;
+  }
+
+  describe('net-worth area chart', () => {
+    it.each([
+      ['Banking', '/accounts/list'],
+      ['Cash', '/accounts/list'],
+      ['Brokerage', '/accounts/investments'],
+      ['Brokerage invested', '/accounts/investments'],
+      ['Crypto', '/accounts/investments'],
+      ['Crypto invested', '/accounts/investments'],
+    ])('opens the accounts page behind the %s band', (label, url) => {
+      const {fixture} = render();
+      const navigateByUrl = vi
+        .spyOn(TestBed.inject(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
+
+      chart(fixture, AreaChartComponent).pointClick.emit(pointClick(label));
+
+      expect(navigateByUrl).toHaveBeenCalledWith(url);
+    });
+
+    it('opens nothing for the unsplit total band', () => {
+      const {fixture} = render();
+      const navigateByUrl = vi
+        .spyOn(TestBed.inject(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
+
+      chart(fixture, AreaChartComponent).pointClick.emit(pointClick('No split'));
+
+      expect(navigateByUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('income vs spending bar chart', () => {
+    const overrides = {
+      hasCashFlow: signal(true),
+      incomeVsSpendingMonthKeys: signal(['2026-06', '2026-07']),
+    };
+
+    it('lists the credits of the clicked month for an Income bar', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Income', 1));
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'credit', from: '2026-07-01', to: '2026-07-31'},
+      });
+    });
+
+    it('lists the debits of the clicked month for a Spending bar', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Spending', 0));
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'debit', from: '2026-06-01', to: '2026-06-30'},
+      });
+    });
+
+    it('opens nothing for a month the chart no longer holds', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Income', 5));
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('category donut', () => {
+    const overrides = {categoryChartKeys: signal<(string | null)[]>(['groceries', null])};
+
+    it('lists the clicked category in the selected window', () => {
+      const {fixture, navigate} = render('mtd', undefined, null, overrides);
+
+      chart(fixture, DonutChartComponent).segmentClick.emit({
+        index: 0,
+        label: 'Groceries',
+        value: 1,
+      });
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'debit', category: 'groceries', from: '2026-08-01', to: '2026-08-12'},
+      });
+    });
+
+    it('opens nothing for the folded "Other categories" slice', () => {
+      const {fixture, navigate} = render('mtd', undefined, null, overrides);
+
+      chart(fixture, DonutChartComponent).segmentClick.emit({index: 1, label: 'Other', value: 1});
+
+      expect(navigate).not.toHaveBeenCalled();
     });
   });
 });

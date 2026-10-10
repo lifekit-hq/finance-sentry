@@ -83,6 +83,15 @@ export class DashboardRangeUtils {
     };
   }
 
+  /** Inclusive `YYYY-MM-DD` bounds of one `YYYY-MM` calendar month (UTC). */
+  public static monthDates(monthKey: string): {from: string; to: string} {
+    const [year, month] = monthKey.split('-').map(Number);
+    return {
+      from: DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month - 1, 1))),
+      to: DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month, 0))),
+    };
+  }
+
   /**
    * Query params that open the flow breakdown on the range's window: the same bounds the
    * other drill-downs carry, plus the `months` of history the dashboard loaded for it. `all`
