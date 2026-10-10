@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
+using FinanceSentry.Core.Domain;
+
 /// <summary>
 /// One IBKR trade execution pulled from the Flex Web Service Activity Flex Query
 /// (fs-435 S5). Keyed per user on IBKR's own execution id so re-pulling an
@@ -11,7 +13,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// at the reader boundary via <c>CurrencyConverter.ToUsd</c> using <see cref="Currency"/>
 /// / <see cref="FxRateToBase"/> — never sum the native amounts directly.
 /// </summary>
-public sealed class BrokerageTrade
+public sealed class BrokerageTrade : IHasUpdatedAt
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
@@ -146,6 +148,5 @@ public sealed class BrokerageTrade
         Taxes = taxes;
         Currency = currency;
         FxRateToBase = fxRateToBase;
-        UpdatedAt = DateTime.UtcNow;
     }
 }

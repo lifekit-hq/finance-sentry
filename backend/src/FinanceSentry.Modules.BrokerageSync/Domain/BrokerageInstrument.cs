@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using FinanceSentry.Core.Domain;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
@@ -30,7 +31,7 @@ public enum InstrumentClassification
 /// position sells out, this row is never deleted, because the tax classification
 /// a human attaches to it must outlive the position.
 /// </summary>
-public sealed class BrokerageInstrument
+public sealed class BrokerageInstrument : IHasUpdatedAt
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
@@ -81,13 +82,11 @@ public sealed class BrokerageInstrument
         // one (or never had one) must not blank out an ISIN captured earlier.
         if (!string.IsNullOrWhiteSpace(isin))
             Isin = isin;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>The one and only human-set path. Null clears the classification.</summary>
     public void SetClassification(InstrumentClassification? classification)
     {
         Classification = classification;
-        UpdatedAt = DateTime.UtcNow;
     }
 }

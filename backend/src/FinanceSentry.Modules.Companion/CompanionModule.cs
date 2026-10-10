@@ -12,6 +12,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class CompanionModule
 {
@@ -51,10 +52,11 @@ public static class CompanionModule
     public static IServiceCollection AddCompanionModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<CompanionDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<CompanionOptions>(config.GetSection(CompanionOptions.SectionName));
 

@@ -12,6 +12,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class WealthModule
 {
@@ -53,9 +54,10 @@ public static class WealthModule
     public static IServiceCollection AddWealthModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<WealthDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_wealth", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!,
+                b => b.MigrationsHistoryTable("__ef_migrations_history_wealth", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         // #673: published read port - the Integration adapter reaches the snapshots only through it.

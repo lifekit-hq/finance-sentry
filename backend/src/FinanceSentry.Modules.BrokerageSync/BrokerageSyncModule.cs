@@ -22,6 +22,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class BrokerageSyncModule
 {
@@ -57,8 +58,9 @@ public static class BrokerageSyncModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddConnectionHealthShadow(config);
+        services.AddUpdatedAtStamping();
         services.AddDbContext<BrokerageSyncDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         // Blocking connect: request-scoped, awaited by the controller. No
         // session store, no polling — the HTTP request itself is the state

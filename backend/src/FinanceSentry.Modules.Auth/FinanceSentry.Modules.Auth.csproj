@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FinanceSentry.Core\FinanceSentry.Core.csproj" />
+    <ProjectReference Include="..\FinanceSentry.Infrastructure\FinanceSentry.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

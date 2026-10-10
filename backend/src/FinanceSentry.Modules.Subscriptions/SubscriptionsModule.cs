@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositorie
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class SubscriptionsModule
 {
@@ -20,8 +21,9 @@ public static class SubscriptionsModule
     public static IServiceCollection AddSubscriptionsModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<SubscriptionsDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<ISubscriptionDetectionResultService, SubscriptionDetectionResultService>();

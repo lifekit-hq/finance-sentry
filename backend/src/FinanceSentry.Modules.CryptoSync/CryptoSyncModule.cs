@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class CryptoSyncModule
 {
@@ -41,8 +42,9 @@ public static class CryptoSyncModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddConnectionHealthShadow(config);
+        services.AddUpdatedAtStamping();
         services.AddDbContext<CryptoSyncDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();

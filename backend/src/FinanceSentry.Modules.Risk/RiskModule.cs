@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class RiskModule
 {
@@ -39,10 +40,11 @@ public static class RiskModule
     {
         services.Configure<RiskOptions>(config.GetSection(RiskOptions.SectionName));
 
+        services.AddUpdatedAtStamping();
         services.AddDbContext<RiskDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_risk", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_risk", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IRiskRuleSetRepository, RiskRuleSetRepository>();
         // #673: published read port - the Integration adapters reach the rule set only through it.
