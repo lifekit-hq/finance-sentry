@@ -137,7 +137,6 @@ public class MoneyFlowStatisticsService(
         // 1. Build currency map from active accounts
         var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var accountCurrencies = accountList
-            .Where(a => a.IsActive)
             .ToDictionary(a => a.Id, a => a.Currency);
 
         // 2. Fetch transactions in window

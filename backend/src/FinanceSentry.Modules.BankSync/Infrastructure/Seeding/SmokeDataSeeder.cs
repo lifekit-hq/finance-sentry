@@ -29,7 +29,7 @@ public static class SmokeDataSeeder
     /// <summary>Seeds the fake data for <paramref name="userId"/>; returns whether anything was written.</summary>
     public static bool Seed(BankSyncDbContext db, Guid userId, DateTime utcNow)
     {
-        if (db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).Any(a => a.UserId == userId))
+        if (db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.AccountActiveFilterName]).Any(a => a.UserId == userId))
             return false;
 
         var account = new BankAccount(userId, $"{BankAccount.SeededProvider}-{userId:N}", "Demo Bank", "checking",

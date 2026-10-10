@@ -179,7 +179,6 @@ public class CounterpartyClassificationService(
 
         var accountList = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var accountCurrencies = accountList
-            .Where(a => a.IsActive)
             .ToDictionary(a => a.Id, a => a.Currency);
 
         var txList = (await _transactions.GetByUserIdSinceUnscopedAsync(

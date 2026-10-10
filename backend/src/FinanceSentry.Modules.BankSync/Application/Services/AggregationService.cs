@@ -36,7 +36,7 @@ public class AggregationService(IBankAccountRepository accounts) : IAggregationS
         var accounts = await _accounts.GetByUserIdAsync(userId, ct);
 
         return accounts
-            .Where(a => a.IsActive && a.CurrentBalance.HasValue)
+            .Where(a => a.CurrentBalance.HasValue)
             .GroupBy(a => a.Currency)
             .ToDictionary(g => g.Key, g => g.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.CurrentBalance!.Value)));
     }
@@ -47,7 +47,7 @@ public class AggregationService(IBankAccountRepository accounts) : IAggregationS
         var accounts = await _accounts.GetByUserIdAsync(userId, ct);
 
         return accounts
-            .Where(a => a.IsActive && a.CurrentBalance.HasValue)
+            .Where(a => a.CurrentBalance.HasValue)
             .Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, CurrencyConverter.ToUsd(a.CurrentBalance!.Value, a.Currency)));
     }
 
@@ -57,7 +57,6 @@ public class AggregationService(IBankAccountRepository accounts) : IAggregationS
         var accounts = await _accounts.GetByUserIdAsync(userId, ct);
 
         return accounts
-            .Where(a => a.IsActive)
             .GroupBy(a => a.AccountType)
             .ToDictionary(g => g.Key, g => g.Count());
     }

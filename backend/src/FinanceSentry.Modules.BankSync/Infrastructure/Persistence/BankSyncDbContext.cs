@@ -10,6 +10,9 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     /// <summary>Name of the soft-delete filter on <see cref="Transaction"/>; paths that need archived rows opt out by name.</summary>
     public const string ActiveFilterName = "Active";
 
+    /// <summary>Name of the soft-delete filter on <see cref="BankAccount"/>; paths that must see removed accounts opt out by name.</summary>
+    public const string AccountActiveFilterName = "IsActive";
+
     // Read by the Owner query filters on every query this context runs; null (no person in scope) matches no row.
     private Guid? CurrentUserId => currentUser.UserId;
 
@@ -33,6 +36,7 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
 
         var bab = modelBuilder.Entity<BankAccount>();
         bab.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
+        bab.HasQueryFilter(AccountActiveFilterName, ba => ba.IsActive);
         bab.HasKey(ba => ba.Id);
         bab.HasIndex(ba => ba.UserId).HasDatabaseName("idx_bank_account_user_id");
         bab.HasIndex(ba => ba.SyncStatus).HasDatabaseName("idx_bank_account_sync_status");

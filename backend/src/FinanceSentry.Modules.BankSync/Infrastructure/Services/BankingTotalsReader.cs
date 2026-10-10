@@ -21,14 +21,14 @@ public class BankingTotalsReader(
     {
         var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         return accounts
-            .Where(a => a.IsActive && a.CurrentBalance.HasValue)
+            .Where(a => a.CurrentBalance.HasValue)
             .Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, CurrencyConverter.ToUsd(a.CurrentBalance!.Value, a.Currency)));
     }
 
     public async Task<DateTime?> GetLatestSuccessfulSyncAsync(Guid userId, CancellationToken ct = default)
     {
         var accounts = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
-        var activeIds = accounts.Where(a => a.IsActive).Select(a => a.Id).ToHashSet();
+        var activeIds = accounts.Select(a => a.Id).ToHashSet();
         if (activeIds.Count == 0)
             return null;
 

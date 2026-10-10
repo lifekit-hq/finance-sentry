@@ -182,6 +182,14 @@ public interface ITransactionRepository
     Task<IEnumerable<Transaction>> GetByUserIdSinceUnscopedAsync(Guid userId, DateTime since, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get a user's transactions whose effective date (<c>PostedDate ?? TransactionDate</c>) falls in
+    /// [<paramref name="fromUtc"/>, <paramref name="toUtc"/>] for the no-person callers (cross-module
+    /// readers, background jobs). The window is applied in SQL. Opts out of the Owner query filter and
+    /// keeps the explicit user predicate.
+    /// </summary>
+    Task<IEnumerable<Transaction>> GetByUserIdInRangeUnscopedAsync(Guid userId, DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Composed, server-side filtered read for the global ledger: applies every dimension of
     /// <paramref name="filter"/> in SQL (account, category, date range, amount, search, type),
     /// orders by <c>PostedDate ?? TransactionDate</c> descending, and pages the result. The
