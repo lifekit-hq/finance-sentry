@@ -1,11 +1,16 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
   ButtonComponent,
-  ChipComponent,
   CmnPageActionsService,
   EmptyStateComponent,
   type LucideIconName,
@@ -46,10 +51,10 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertItemComponent,
     AlertMessagePipe,
     ButtonComponent,
-    ChipComponent,
     EmptyStateComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {class: 'block h-full'},
   templateUrl: './alerts.component.html',
 })
@@ -75,19 +80,23 @@ export class AlertsComponent {
     this.store.filter() === 'all' ? 'All your accounts are healthy.' : 'Try a different filter.'
   );
 
-  public readonly filterOptions: {id: AlertFilter; label: () => string}[] = [
-    {id: 'all', label: () => 'All'},
+  // lk-segmented reads `value` as a string, so the options carry the filter ids and the page sizes
+  // as strings; the change handlers convert back.
+  public readonly filterOptions = computed<{value: AlertFilter; label: string}[]>(() => [
+    {value: 'all', label: 'All'},
     {
-      id: 'unread',
-      label: () =>
-        this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
+      value: 'unread',
+      label: this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
     },
-    {id: 'error', label: () => 'Errors'},
-    {id: 'warning', label: () => 'Warnings'},
-    {id: 'info', label: () => 'Info'},
-  ];
+    {value: 'error', label: 'Errors'},
+    {value: 'warning', label: 'Warnings'},
+    {value: 'info', label: 'Info'},
+  ]);
 
-  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS;
+  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS.map(size => ({
+    value: String(size),
+    label: `${size} per page`,
+  }));
 
   // Everything fits on one page of the smallest size → no pager to show.
   public readonly showPager = computed(
@@ -99,6 +108,16 @@ export class AlertsComponent {
       .on(ALERTS_MARK_ALL_READ_ACTION)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.markAllRead());
+  }
+
+  public onFilterChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: AlertFilter}>).detail;
+    this.store.setFilter(value);
+  }
+
+  public onPageSizeChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: string}>).detail;
+    this.store.setPageSize(Number(value));
   }
 
   public iconFor(type: AlertType): LucideIconName {

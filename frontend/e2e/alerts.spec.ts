@@ -126,7 +126,7 @@ test.describe('Alerts page', () => {
     await page.getByTestId('alerts-next').click();
     await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 2 of 3');
 
-    await page.getByRole('button', {name: '50 per page'}).click();
+    await page.getByRole('radio', {name: '50 per page'}).click();
 
     await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 1 of 1');
     const last = new URL(listRequests[listRequests.length - 1].url());

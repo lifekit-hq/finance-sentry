@@ -1,13 +1,13 @@
 <cmn-page-container spacing="none" fill>
   <p class="text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
 
-  <div class="mt-cmn-4 flex gap-cmn-2 overflow-x-auto">
-    @for (opt of filterOptions; track opt.id) {
-      <cmn-chip [selected]="store.filter() === opt.id" (clicked)="store.setFilter(opt.id)">
-        {{ opt.label() }}
-      </cmn-chip>
-    }
-  </div>
+  <lk-segmented
+    [options]="filterOptions()"
+    [value]="store.filter()"
+    (lk-segmented-change)="onFilterChange($event)"
+    class="mt-cmn-4 block"
+    label="Filter alerts"
+  />
 
   @if (store.alerts().length === 0) {
     <div class="flex min-h-0 flex-1 items-center justify-center">
@@ -82,13 +82,12 @@
             >Next</cmn-button
           >
         </div>
-        <div class="flex items-center gap-cmn-2">
-          @for (size of pageSizeOptions; track size) {
-            <cmn-chip [selected]="store.pageSize() === size" (clicked)="store.setPageSize(size)">
-              {{ size }} per page
-            </cmn-chip>
-          }
-        </div>
+        <lk-segmented
+          [options]="pageSizeOptions"
+          [value]="'' + store.pageSize()"
+          (lk-segmented-change)="onPageSizeChange($event)"
+          label="Alerts per page"
+        />
       </nav>
     }
   }

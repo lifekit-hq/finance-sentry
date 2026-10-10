@@ -1,15 +1,11 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-4">
   @if (!isLinking) {
-    <div class="flex items-center gap-cmn-1" role="group" aria-label="Type">
-      @for (opt of kindOptions; track opt.value) {
-        <cmn-chip
-          [selected]="form.controls.kind.value === opt.value"
-          (clicked)="setKind(opt.value)"
-        >
-          {{ opt.label }}
-        </cmn-chip>
-      }
-    </div>
+    <lk-segmented
+      [options]="kindOptions"
+      [value]="form.controls.kind.value"
+      (lk-segmented-change)="onKindChange($event)"
+      label="Type"
+    />
   }
 
   <cmn-form-field
@@ -62,16 +58,12 @@
   }
 
   @if (picker.selected()) {
-    <div class="flex items-center gap-cmn-1" role="group" aria-label="Billed">
-      @for (opt of cadenceOptions; track opt.value) {
-        <cmn-chip
-          [selected]="form.controls.cadence.value === opt.value"
-          (clicked)="setCadence(opt.value)"
-        >
-          {{ opt.label }}
-        </cmn-chip>
-      }
-    </div>
+    <lk-segmented
+      [options]="cadenceOptions"
+      [value]="form.controls.cadence.value"
+      (lk-segmented-change)="onCadenceChange($event)"
+      label="Billed"
+    />
   }
 
   @if (picker.selected() && !isLinking) {
