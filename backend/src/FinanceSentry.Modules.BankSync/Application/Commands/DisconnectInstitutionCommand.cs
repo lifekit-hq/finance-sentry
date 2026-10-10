@@ -3,6 +3,8 @@ namespace FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
+using Hangfire;
 
 /// <summary>
 /// Disconnects one banking institution (Monobank credential or TrueLayer
@@ -19,7 +21,8 @@ public sealed class DisconnectInstitutionCommandHandler(
     IBankAccountRepository accounts,
     IMonobankCredentialRepository monobankCredentials,
     ITrueLayerConnectionRepository trueLayerConnections,
-    IAlertGeneratorService alerts)
+    IAlertGeneratorService alerts,
+    IRecurringJobManager recurringJobs)
     : ICommandHandler<DisconnectInstitutionCommand, DisconnectInstitutionResult>
 {
     public async Task<DisconnectInstitutionResult> Handle(DisconnectInstitutionCommand command, CancellationToken ct)
@@ -36,6 +39,7 @@ public sealed class DisconnectInstitutionCommandHandler(
         {
             await alerts.DeleteAlertsForAccountAsync(account.Id, ct);
             await accounts.HardDeleteAsync(account.Id, ct);
+            recurringJobs.RemoveIfExists(SyncAccountJob.IdFor(account.Id));
         }
 
         switch (provider)
