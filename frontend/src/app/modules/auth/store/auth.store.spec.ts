@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {Router} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
@@ -83,7 +84,11 @@ describe('AuthStore (integration)', () => {
     const authService = authServiceMock({
       login: vi
         .fn()
-        .mockReturnValue(throwError(() => ({error: {errorCode: 'EXTERNAL_ACCOUNT_ONLY'}}))),
+        .mockReturnValue(
+          throwError(
+            () => new HttpErrorResponse({status: 400, error: {errorCode: 'EXTERNAL_ACCOUNT_ONLY'}})
+          )
+        ),
     });
     configure(authService);
 

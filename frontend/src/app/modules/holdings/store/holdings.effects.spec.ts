@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
@@ -68,7 +69,9 @@ describe('holdingsEffects', () => {
     const store = buildStore();
     const positions = buildPositions();
     positions.getPositions.mockReturnValue(
-      throwError(() => ({error: {errorCode: 'POSITIONS_FETCH_FAILED'}}))
+      throwError(
+        () => new HttpErrorResponse({status: 400, error: {errorCode: 'POSITIONS_FETCH_FAILED'}})
+      )
     );
     configure(positions);
 

@@ -1,9 +1,9 @@
 import {inject} from '@angular/core';
+import {extractErrorCode} from '@lifekit-hq/core';
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
-import {ErrorUtils} from '../../../../shared/utils/error.utils';
 import {INZHUR_LOGIN_FAILED} from '../../constants/inzhur/inzhur.constants';
 import {type StartInzhurLoginRequest} from '../../models/inzhur/inzhur.model';
 import {InzhurService} from '../../services/inzhur.service';
@@ -57,7 +57,7 @@ export function inzhurConnectEffects(store: WritableStateSource<InzhurConnectSta
             // A failure without a code (network, 5xx page) still has to be shown.
             patchState(store, {
               starting: false,
-              errorCode: ErrorUtils.extractCode(err) ?? INZHUR_LOGIN_FAILED,
+              errorCode: extractErrorCode(err) ?? INZHUR_LOGIN_FAILED,
             });
             return EMPTY;
           })

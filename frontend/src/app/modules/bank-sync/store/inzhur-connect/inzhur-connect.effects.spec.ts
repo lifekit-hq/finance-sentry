@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
@@ -132,7 +133,9 @@ describe('InzhurConnectStore', () => {
 
   it('start() maps a registered error code to its message', () => {
     inzhur.startLogin.mockReturnValue(
-      throwError(() => ({error: {errorCode: 'INZHUR_LOGIN_LIMIT'}}))
+      throwError(
+        () => new HttpErrorResponse({status: 400, error: {errorCode: 'INZHUR_LOGIN_LIMIT'}})
+      )
     );
     const store = TestBed.inject(InzhurConnectStore);
 

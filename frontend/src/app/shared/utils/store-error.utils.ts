@@ -1,6 +1,5 @@
+import {extractErrorCode} from '@lifekit-hq/core';
 import {catchError, EMPTY, type MonoTypeOperatorFunction} from 'rxjs';
-
-import {ErrorUtils} from './error.utils';
 
 interface ErrorSink {
   setError(code: Nullable<string>): void;
@@ -9,7 +8,7 @@ interface ErrorSink {
 export class StoreErrorUtils {
   public static catchAndSetError<T>(sink: ErrorSink): MonoTypeOperatorFunction<T> {
     return catchError<T, typeof EMPTY>((err: unknown) => {
-      sink.setError(ErrorUtils.extractCode(err));
+      sink.setError(extractErrorCode(err));
       return EMPTY;
     });
   }

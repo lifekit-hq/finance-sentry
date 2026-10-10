@@ -1,7 +1,7 @@
 import {DOCUMENT} from '@angular/common';
 import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {ErrorMessageService, extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
 
@@ -88,7 +88,7 @@ export function authEffects(store: EffectsStore) {
           authService.login(req).pipe(
             tap(res => store.applyAuthResponse(res)),
             catchError((err: unknown) => {
-              store.setError(ErrorUtils.extractCode(err), 'login', ErrorUtils.extractMessage(err));
+              store.setError(extractErrorCode(err), 'login', ErrorUtils.extractMessage(err));
               return EMPTY;
             })
           )
@@ -102,7 +102,7 @@ export function authEffects(store: EffectsStore) {
           authService.acceptInvite(req).pipe(
             tap(res => store.applyAuthResponse(res)),
             catchError((err: unknown) => {
-              store.setError(ErrorUtils.extractCode(err), 'acceptInvite');
+              store.setError(extractErrorCode(err), 'acceptInvite');
               return EMPTY;
             })
           )

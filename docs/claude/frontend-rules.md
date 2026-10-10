@@ -77,7 +77,7 @@ Pure helper functions are NEVER bare `export function`s in a random file. Each h
 
 ```ts
 export class ErrorUtils {
-  public static extractCode(err: unknown): Nullable<string> { ... }
+  public static extractMessage(err: unknown): Nullable<string> { ... }
 }
 ```
 
@@ -118,7 +118,7 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 - Mechanism lives in `@lifekit-hq/ui`: `ERROR_MESSAGES` injection token + `ErrorMessageService.resolve(code)` → `string | null`.
 - App provides the registry: `src/app/core/errors/error-messages.registry.ts` holds the flat `Record<string, string>` covering all backend `errorCode` values. Wired via `provideErrorMessages()` in `app.config.ts`.
 - Stores consume via `inject(ErrorMessageService)` inside `*.computed.ts`, falling back to a feature-specific default (`'Failed to load dashboard data.'`, `'Invalid email or password.'`, etc.) when `resolve()` returns `null`.
-- **When adding a new error code on the backend:** append the message to the registry in the same PR. The `error?.errorCode` extraction helper stays local to `*.effects.ts` (the `extractErrorCode(err)` pattern).
+- **When adding a new error code on the backend:** append the message to the registry in the same PR. Stores read the code with `extractErrorCode(err)` from `@lifekit-hq/core` (it only recognizes a real `HttpErrorResponse`, so specs must throw `new HttpErrorResponse({status, error: {errorCode}})`, not a plain object); do not write a local extractor.
 - **Exception — server-composed messages:** `ACCOUNT_LOCKED` (login lockout, 429 + `Retry-After`) is deliberately not in the registry: its text carries the remaining wait, so `auth.computed.ts` shows the server's `error` text (`ErrorUtils.extractMessage`, kept in `AuthStore.errorDetail`) for that code only. Every other unregistered code keeps the flow fallback.
 
 ---

@@ -46,7 +46,7 @@ export class <Domain>Utils {
 Rules:
 - File name: `<domain>.utils.ts`. The `<domain>` is a noun (`error`, `time`, `currency`), not a verb. Singular.
 - Class name: `<Domain>Utils` (PascalCase). One class per file.
-- Methods: `public static`, named with imperative verbs (`extractCode`, `toIsoDate`, `formatBalance`).
+- Methods: `public static`, named with imperative verbs (`extractMessage`, `toIsoDate`, `formatBalance`).
 - No instance state. No constructor. No DI. No `inject()`.
 - No private instance fields — module-level `const`s for magic numbers (named, no inline literals).
 - Methods are pure: same input → same output, no clocks/randomness/IO unless the method *is* about that (e.g. `DateRangeUtils.fromRelativeRange` defaults `now` to `new Date()` — that's the point of the method).
@@ -116,7 +116,7 @@ If a util starts feature-local and gets reached for from a second module, **move
 | Concept | File | Class | Method |
 |---|---|---|---|
 | Resolve a relative range to dates | `date-range.utils.ts` | `DateRangeUtils` | `fromRelativeRange(range)` |
-| Pull `errorCode` from an HTTP error | `error.utils.ts` | `ErrorUtils` | `extractCode(err)` |
+| Pull the server message from an HTTP error body | `error.utils.ts` | `ErrorUtils` | `extractMessage(err)` |
 | Capitalize / titlecase strings | `string.utils.ts` | `StringUtils` | `capitalize(s)`, `truncate(s, max)` |
 | Currency math (no formatting — use a pipe for that) | `currency.utils.ts` | `CurrencyUtils` | `convertToBase(amount, rate)` |
 
@@ -141,6 +141,6 @@ Run from `frontend/`:
 If you encounter an existing `shared/utils/<name>.ts` that just `export function`s, refactor it the same PR you touch it:
 1. Rename `<name>.ts` → `<domain>.utils.ts`
 2. Wrap the functions as `public static` methods on `<Domain>Utils`
-3. Update every importer (`extractErrorCode` → `ErrorUtils.extractCode`, etc.)
+3. Update every importer (`extractMessage` → `ErrorUtils.extractMessage`, etc.)
 4. If template usage exists, add the pipe and remove the `public readonly someFn = someFn` boilerplate
 5. Add the spec if missing

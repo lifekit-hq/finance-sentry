@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {of, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
@@ -15,7 +16,7 @@ describe('StoreErrorUtils', () => {
 
   it('extracts error code, calls setError, swallows error', () => {
     const sink = {setError: vi.fn()};
-    const apiErr = {error: {errorCode: 'X_ERR'}};
+    const apiErr = new HttpErrorResponse({status: 400, error: {errorCode: 'X_ERR'}});
 
     let completed = false;
     throwError(() => apiErr)
