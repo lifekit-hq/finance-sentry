@@ -143,28 +143,28 @@ test.describe('Alerts page', () => {
     await expect(resolved).toContainText('Resolved');
     await expect(resolved).toHaveClass(/opacity-60/);
 
-    const repeated = page.getByRole('button').filter({hasText: 'Possible duplicate charge'});
+    const repeated = page.getByTestId('alert-row').filter({hasText: 'Possible duplicate charge'});
     await expect(repeated).toContainText('×7');
     await expect(repeated).not.toHaveClass(/opacity-60/);
   });
 
   test('routes each alert type to its own page', async ({page}) => {
     await page.goto('/alerts');
-    await page.getByRole('button').filter({hasText: 'Possible duplicate charge'}).click();
+    await page.getByRole('button', {name: 'Possible duplicate charge'}).click();
     await expect(page).toHaveURL(/\/transactions$/);
 
     await page.goto('/alerts');
-    await page.getByRole('button').filter({hasText: 'Groceries budget exceeded'}).click();
+    await page.getByRole('button', {name: 'Groceries budget exceeded'}).click();
     await expect(page).toHaveURL(/\/budgets$/);
 
     await page.goto('/alerts');
-    await page.getByRole('button').filter({hasText: 'AAPL reports earnings soon'}).click();
+    await page.getByRole('button', {name: 'AAPL reports earnings soon'}).click();
     await expect(page).toHaveURL(/\/assets\/AAPL$/);
   });
 
   test('an alert with no destination stays on /alerts', async ({page}) => {
     await page.goto('/alerts');
-    await page.getByRole('button').filter({hasText: 'A background job failed'}).click();
+    await page.getByRole('button', {name: 'A background job failed'}).click();
     await expect(page).toHaveURL(/\/alerts$/);
   });
 });

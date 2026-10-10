@@ -156,14 +156,7 @@
           </h2>
           <cmn-card padding="none">
             @for (t of group.items; track t.transactionId) {
-              <div
-                (click)="openDrawer(t)"
-                (keydown.enter)="openDrawer(t)"
-                class="cursor-pointer"
-                role="button"
-                tabindex="0"
-                data-testid="ledger-row"
-              >
+              <div class="relative" data-testid="ledger-row">
                 <cmn-list-item-row
                   [label]="t.description"
                   [sublabel]="
@@ -187,6 +180,13 @@
                     {{ t | transactionAmount }}
                   </span>
                 </cmn-list-item-row>
+                <button
+                  [attr.aria-label]="t.description"
+                  (click)="openDrawer(t)"
+                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                  type="button"
+                  data-testid="ledger-row-open"
+                ></button>
               </div>
             }
           </cmn-card>
