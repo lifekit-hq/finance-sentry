@@ -49,12 +49,8 @@ function create() {
       template: '',
     },
   });
-  return {
-    store,
-    toast,
-    appearance,
-    component: TestBed.createComponent(SettingsComponent).componentInstance,
-  };
+  const fixture = TestBed.createComponent(SettingsComponent);
+  return {store, toast, appearance, fixture, component: fixture.componentInstance};
 }
 
 function setup() {
@@ -125,6 +121,18 @@ describe('SettingsComponent financial independence assumptions', () => {
     form.controls.safeWithdrawalRate.setValue('4');
     component.saveProfile();
     expect(store.saveProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Save while an assumption is invalid and enables it once corrected', () => {
+    const {component, fixture, form} = setup();
+    fixture.detectChanges();
+    expect(component.assumptionsInvalid()).toBe(false);
+    form.controls.safeWithdrawalRate.setValue('12');
+    fixture.detectChanges();
+    expect(component.assumptionsInvalid()).toBe(true);
+    form.controls.safeWithdrawalRate.setValue('4');
+    fixture.detectChanges();
+    expect(component.assumptionsInvalid()).toBe(false);
   });
 
   it('does not toast from the component on dispatch', () => {

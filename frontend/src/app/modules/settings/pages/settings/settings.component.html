@@ -54,7 +54,10 @@
             />
           </cmn-form-field>
           <div class="flex justify-end pb-cmn-4">
-            <cmn-button [loading]="store.profileSaving()" (clicked)="saveProfile()"
+            <cmn-button
+              [disabled]="assumptionsInvalid()"
+              [loading]="store.profileSaving()"
+              (clicked)="saveProfile()"
               >Save Profile</cmn-button
             >
           </div>
