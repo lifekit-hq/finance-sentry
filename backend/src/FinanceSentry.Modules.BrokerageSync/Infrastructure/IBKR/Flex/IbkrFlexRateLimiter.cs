@@ -10,7 +10,8 @@ using System.Threading.RateLimiting;
 /// </summary>
 public sealed class IbkrFlexRateLimiter : IDisposable
 {
-    // One-second segments across a minute: a permit returns at most a second after its window ends, never early.
+    // One-second segments across a minute. Each window is padded by one segment (see Create), so a permit
+    // returns between the window and the window plus one segment after it was taken - never early.
     private const int SegmentsPerWindow = 60;
 
     private readonly SlidingWindowRateLimiter _perWindow;
@@ -49,8 +50,8 @@ public sealed class IbkrFlexRateLimiter : IDisposable
         new SlidingWindowRateLimiterOptions
         {
             PermitLimit = permitLimit,
-            Window = window,
-            SegmentsPerWindow = segments,
+            Window = window + window / segments,
+            SegmentsPerWindow = segments + 1,
             QueueLimit = int.MaxValue,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true,

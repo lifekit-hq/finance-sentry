@@ -3,6 +3,8 @@ namespace FinanceSentry.Infrastructure.Observability.Hangfire;
 using System.Net.Http;
 using System.Net.Sockets;
 using FinanceSentry.Infrastructure.Http;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 /// <summary>
 /// Classifies a failed job's exception as transient/self-healing (US4) so throttling and network blips
@@ -26,7 +28,8 @@ public static class JobFailureTransientClassifier
             return inner.Count > 0 && inner.All(IsTransient);
         }
 
-        if (exception is TimeoutException or TaskCanceledException or OperationCanceledException or SocketException)
+        if (exception is TimeoutException or TaskCanceledException or OperationCanceledException or SocketException
+            or TimeoutRejectedException or BrokenCircuitException)
             return true;
 
         if (exception is HttpRequestException http

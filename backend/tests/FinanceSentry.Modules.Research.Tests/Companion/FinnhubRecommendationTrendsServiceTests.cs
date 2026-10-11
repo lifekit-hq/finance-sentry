@@ -106,7 +106,7 @@ public sealed class FinnhubRecommendationTrendsServiceTests
     }
 
     [Fact]
-    public async Task FetchAsync_retries_429_once_then_skips_the_ticker()
+    public async Task FetchAsync_does_not_retry_429_itself_and_skips_the_ticker()
     {
         var attempts = 0;
         var handler = new StubHandler(req =>
@@ -123,7 +123,7 @@ public sealed class FinnhubRecommendationTrendsServiceTests
 
         var result = await sut.FetchAsync(["MU", "NVDA"]);
 
-        attempts.Should().Be(2, "one bounded retry after 429, then give up on the ticker");
+        attempts.Should().Be(1, "retrying a 429 is the registered client's resilience handler's job, not the service's");
         result.Should().ContainSingle(t => t.Ticker == "NVDA");
     }
 
