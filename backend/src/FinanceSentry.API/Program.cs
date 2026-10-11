@@ -207,7 +207,25 @@ GlobalJobFilters.Filters.Add(
 GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertFilter(
     app.Services,
     new DashboardObservability.HangfireJobFailureStreakStore(),
+    app.Services.GetRequiredService<JobMetrics>(),
     app.Configuration.GetValue("Observability:JobFailureAlertThreshold", 3)));
+
+// Publish each registered recurring job's persisted streak so finance_job_consecutive_failures exists from
+// startup (the streak is durable; the gauge is in-memory). Best-effort: storage may be unreachable.
+if (!app.Services.GetRequiredService<StartupMigrationStatus>().MigrationsSkipped)
+{
+    try
+    {
+        DashboardObservability.JobFailureGaugePrimer.Seed(
+            app.Services.GetRequiredService<JobStorage>(),
+            new DashboardObservability.HangfireJobFailureStreakStore(),
+            app.Services.GetRequiredService<JobMetrics>());
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not seed finance_job_consecutive_failures; it will populate on each job's next outcome.");
+    }
+}
 
 // Propagate trace context into job execution spans (spec 023 amendment, #616).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter());

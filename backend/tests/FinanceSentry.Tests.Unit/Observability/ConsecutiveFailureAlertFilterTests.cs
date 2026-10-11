@@ -1,6 +1,8 @@
 namespace FinanceSentry.Tests.Unit.Observability;
 
 using FinanceSentry.Core.Interfaces;
+using System.Diagnostics.Metrics;
+using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +14,7 @@ using Xunit;
 /// terminal failure, none before it, reset-on-success then re-alert, transient errors excluded, and
 /// fire-and-forget dispatch that never throws into the job.
 /// </summary>
-public class ConsecutiveFailureAlertFilterTests
+public class ConsecutiveFailureAlertFilterTests : IDisposable
 {
     private const int Threshold = 3;
     private const string Job = "SyncScheduler.ScheduleAllActiveAccounts";
@@ -20,6 +22,7 @@ public class ConsecutiveFailureAlertFilterTests
     private readonly Mock<IAlertGeneratorService> _generator = new();
     private readonly Mock<IBankingTotalsReader> _banking = new();
     private readonly InMemoryStreakStore _store = new();
+    private readonly JobMetrics _metrics = new();
 
     public ConsecutiveFailureAlertFilterTests()
     {
@@ -27,6 +30,8 @@ public class ConsecutiveFailureAlertFilterTests
             .Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<Guid>)[Guid.NewGuid()]);
     }
+
+    public void Dispose() => _metrics.Dispose();
 
     [Fact]
     public void NthConsecutiveFailure_RaisesExactlyOneAlertWithCount()
@@ -128,12 +133,90 @@ public class ConsecutiveFailureAlertFilterTests
             Times.Never);
     }
 
+    [Fact]
+    public void Gauge_IncrementsAcrossConsecutiveFailures_AndResetsOnSuccess_PerJob()
+    {
+        const string otherJob = "IBKRSyncJob.Run";
+        var filter = Build();
+
+        Fail(filter, times: 2);
+        filter.RecordOutcome(otherJob, succeeded: false, error: new Exception("boom"));
+
+        ConsecutiveFailures().Should().BeEquivalentTo(
+            new Dictionary<string, int> { [Job] = 2, [otherJob] = 1 });
+
+        filter.RecordOutcome(Job, succeeded: true, error: null);
+
+        ConsecutiveFailures().Should().BeEquivalentTo(
+            new Dictionary<string, int> { [Job] = 0, [otherJob] = 1 });
+
+        Fail(filter, times: 1);
+        ConsecutiveFailures()[Job].Should().Be(1);
+    }
+
+    [Fact]
+    public void Gauge_IgnoresTransientFailures()
+    {
+        var filter = Build();
+
+        Fail(filter, times: 2);
+        filter.RecordOutcome(Job, succeeded: false, error: new TimeoutException());
+
+        ConsecutiveFailures()[Job].Should().Be(2);
+    }
+
+    [Fact]
+    public void Primer_PublishesPersistedStreaks_ForRecurringJobs_WithoutNewOutcome()
+    {
+        _store.Set("SampleJobs.A", new JobFailureStreak(5, true));
+        using var freshMetrics = new JobMetrics();
+
+        JobFailureGaugePrimer.Seed(
+            [global::Hangfire.Common.Job.FromExpression(() => SampleJobs.A()), global::Hangfire.Common.Job.FromExpression(() => SampleJobs.B()), null],
+            _store,
+            freshMetrics);
+
+        ConsecutiveFailures().Should().BeEquivalentTo(new Dictionary<string, int>
+        {
+            ["SampleJobs.A"] = 5,
+            ["SampleJobs.B"] = 0,
+        });
+    }
+
+    public static class SampleJobs
+    {
+        public static void A() { }
+
+        public static void B() { }
+    }
+
+    // Reads finance_job_consecutive_failures the way the OpenTelemetry/Prometheus pipeline would.
+    private static Dictionary<string, int> ConsecutiveFailures()
+    {
+        var observed = new Dictionary<string, int>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == JobMetrics.MeterName && instrument.Name == "finance_job_consecutive_failures")
+                l.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<int>((_, value, tags, _) =>
+        {
+            foreach (var tag in tags)
+                if (tag.Key == "job")
+                    observed[(string)tag.Value!] = value;
+        });
+        listener.Start();
+        listener.RecordObservableInstruments();
+        return observed;
+    }
+
     private ConsecutiveFailureAlertFilter Build()
     {
         var services = new ServiceCollection();
         services.AddSingleton(_banking.Object);
         services.AddSingleton(_generator.Object);
-        return new ConsecutiveFailureAlertFilter(services.BuildServiceProvider(), _store, Threshold);
+        return new ConsecutiveFailureAlertFilter(services.BuildServiceProvider(), _store, _metrics, Threshold);
     }
 
     private static void Fail(ConsecutiveFailureAlertFilter filter, int times)
