@@ -48,9 +48,9 @@ public sealed class OpenClawAgentConversationServiceTests
     public async Task RunAsync_StreamsDeltas_AndAssemblesCompletion()
     {
         var sse = string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n",
-            "data: {\"choices\":[{\"delta\":{\"content\":\"Your net worth \"}}]}\n",
-            "data: {\"choices\":[{\"delta\":{\"content\":\"is $1.8M.\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Your net worth \"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"is $1.8M.\"}}]}\n\n",
             "data: [DONE]\n");
         var handler = new StubHandler(_ => Sse(sse));
         var service = CreateSut(handler);
@@ -71,8 +71,8 @@ public sealed class OpenClawAgentConversationServiceTests
         // Ledger stays silent on trivial openers ("hi") by emitting NO_REPLY — the browser widget must never
         // render the raw sentinel.
         var sse = string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"content\":\"NO\"}}]}\n",
-            "data: {\"choices\":[{\"delta\":{\"content\":\"_REPLY\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"NO\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"_REPLY\"}}]}\n\n",
             "data: [DONE]\n");
         var service = CreateSut(new StubHandler(_ => Sse(sse)));
 
@@ -90,8 +90,8 @@ public sealed class OpenClawAgentConversationServiceTests
     public async Task RunAsync_StripsLeadingNoReply_WhenAgentSelfCorrects()
     {
         var sse = string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY\"}}]}\n",
-            "data: {\"choices\":[{\"delta\":{\"content\":\" Morning, Denys.\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\" Morning, Denys.\"}}]}\n\n",
             "data: [DONE]\n");
         var service = CreateSut(new StubHandler(_ => Sse(sse)));
 
@@ -106,8 +106,8 @@ public sealed class OpenClawAgentConversationServiceTests
     {
         // A genuine reply that merely mentions the sentinel mid-sentence must pass through untouched.
         var sse = string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"content\":\"You'll see \"}}]}\n",
-            "data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY when I stay quiet.\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"You'll see \"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY when I stay quiet.\"}}]}\n\n",
             "data: [DONE]\n");
         var service = CreateSut(new StubHandler(_ => Sse(sse)));
 
@@ -165,7 +165,7 @@ public sealed class OpenClawAgentConversationServiceTests
         // #635: once the 200 headers are out, the gateway reports a failed turn (every model failed auth)
         // as an `error` chunk then [DONE]. It must surface as an error, not as silence and a greeting.
         var sse = string.Concat(
-            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n",
+            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n\n",
             "data: [DONE]\n");
         var service = CreateSut(new StubHandler(_ => Sse(sse)));
 
@@ -181,8 +181,8 @@ public sealed class OpenClawAgentConversationServiceTests
     public async Task RunAsync_MapsStreamErrorAfterPartialText_ToLlmUnavailable()
     {
         var sse = string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"content\":\"CBRS is \"}}]}\n",
-            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"CBRS is \"}}]}\n\n",
+            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n\n",
             "data: [DONE]\n");
         var service = CreateSut(new StubHandler(_ => Sse(sse)));
 
@@ -190,6 +190,26 @@ public sealed class OpenClawAgentConversationServiceTests
 
         events.OfType<AgentErrorEvent>().Should().ContainSingle();
         events.OfType<AgentCompletionEvent>().Should().BeEmpty("a truncated answer is not a completed one");
+    }
+
+    [Fact]
+    public async Task RunAsync_HandlesMultiLineData_Comments_AndIdRetryFields()
+    {
+        var sse = string.Concat(
+            ": keep-alive comment\n",
+            "id: 7\n",
+            "retry: 1500\n",
+            "data: {\"choices\":[{\"delta\":\n",
+            "data: {\"content\":\"Hello\"}}]}\n",
+            "\n",
+            ": another comment\n\n",
+            "data: [DONE]\n\n");
+        var sut = CreateSut(new StubHandler(_ => Sse(sse)));
+
+        var events = await DrainAsync(sut, "hi");
+
+        events.OfType<AgentTextEvent>().Select(e => e.Delta).Should().Equal("Hello");
+        events.Last().Should().BeOfType<AgentCompletionEvent>().Which.FinalText.Should().Be("Hello");
     }
 
     private static OpenClawAgentConversationService CreateSut(
