@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Agent.Infrastructure;
 
 using System.Net.Http.Headers;
+using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -103,7 +104,7 @@ public sealed class OpenClawAgentConversationService(
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var reader = new StreamReader(stream, Encoding.UTF8);
+            await using var events = SseParser.Create(stream).EnumerateAsync(ct).GetAsyncEnumerator(ct);
 
             // `visible` is what we actually emit to the client; `held` buffers the opening text while it's
             // still ambiguous whether the whole reply is just the NO_REPLY silence sentinel. Once `decided`,
@@ -114,12 +115,11 @@ public sealed class OpenClawAgentConversationService(
 
             while (true)
             {
-                string? line;
+                bool hasEvent;
                 AgentErrorEvent? failure = null;
                 try
                 {
-                    ct.ThrowIfCancellationRequested();
-                    line = await reader.ReadLineAsync(ct);
+                    hasEvent = await events.MoveNextAsync();
                 }
                 catch (OperationCanceledException)
                 {
@@ -129,7 +129,7 @@ public sealed class OpenClawAgentConversationService(
                 {
                     _logger.LogWarning(ex, "OpenClaw stream read failed.");
                     failure = new AgentErrorEvent("llm_unavailable", "The finance agent stream was interrupted.");
-                    line = null;
+                    hasEvent = false;
                 }
 
                 if (failure is not null)
@@ -138,17 +138,12 @@ public sealed class OpenClawAgentConversationService(
                     yield break;
                 }
 
-                if (line is null)
+                if (!hasEvent)
                 {
                     break;
                 }
 
-                if (!line.StartsWith("data:", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var data = line["data:".Length..].Trim();
+                var data = events.Current.Data.Trim();
                 if (data.Length == 0)
                 {
                     continue;

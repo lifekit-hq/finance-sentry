@@ -24,7 +24,7 @@ public sealed class LedgerNarratorAdapterTests
     public async Task NarrateAsync_ReturnsAnswer_WhenAgentReplies()
     {
         var narrator = CreateSut(string.Concat(
-            "data: {\"choices\":[{\"delta\":{\"content\":\"CBRS is a small position.\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"CBRS is a small position.\"}}]}\n\n",
             "data: [DONE]\n"));
 
         var narrative = await narrator.NarrateAsync(Prompt);
@@ -37,7 +37,7 @@ public sealed class LedgerNarratorAdapterTests
     {
         // The production CBRS stream: every model failed auth, so the gateway sent an error chunk.
         var narrator = CreateSut(string.Concat(
-            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n",
+            "data: {\"error\":{\"message\":\"internal error\",\"type\":\"api_error\"}}\n\n",
             "data: [DONE]\n"));
 
         var narrative = await narrator.NarrateAsync(Prompt);
@@ -47,7 +47,7 @@ public sealed class LedgerNarratorAdapterTests
 
     [Theory]
     [InlineData("data: [DONE]\n")]
-    [InlineData("data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY\"}}]}\ndata: [DONE]\n")]
+    [InlineData("data: {\"choices\":[{\"delta\":{\"content\":\"NO_REPLY\"}}]}\n\ndata: [DONE]\n")]
     public async Task NarrateAsync_ReturnsNull_WhenAgentStaysSilent(string sse)
     {
         var narrator = CreateSut(sse);
