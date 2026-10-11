@@ -3,7 +3,6 @@ import {DateRangeUtils, type DayWindowRange} from '../../../shared/utils/date-ra
 import {HISTORY_RANGE_MONTHS} from '../constants/dashboard/dashboard.constants';
 import {type HistoryRange} from '../models/dashboard/dashboard.model';
 
-const ISO_DATE_LENGTH = 10;
 const MONTHS_PER_YEAR = 12;
 
 export class DashboardRangeUtils {
@@ -79,7 +78,7 @@ export class DashboardRangeUtils {
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
     return {
       from: `${DashboardRangeUtils.windowStartKey(range, now)}-01`,
-      to: monthEnd.toISOString().slice(0, ISO_DATE_LENGTH),
+      to: DateUtils.isoDateUtc(monthEnd),
     };
   }
 

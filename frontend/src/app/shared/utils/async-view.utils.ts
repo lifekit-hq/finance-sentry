@@ -1,4 +1,10 @@
+import {formatDate} from '@angular/common';
+
+import {APP_LOCALE} from '../constants/date/date.constants';
 import {type AsyncView, type AsyncViewInput} from '../models/async-view/async-view.model';
+
+const SYNC_TIME_FORMAT = 'HH:mm';
+const SYNC_DATE_TIME_FORMAT = 'd MMM, HH:mm';
 
 export const OFFLINE_ERROR_MESSAGE = "You're offline. Reconnect to load this page.";
 
@@ -35,14 +41,7 @@ export class AsyncViewUtils {
     }
     const at = new Date(lastSyncedAt);
     const sameDay = at.toDateString() === now.toDateString();
-    return sameDay
-      ? at.toLocaleTimeString(undefined, {hour: '2-digit', minute: '2-digit'})
-      : at.toLocaleString(undefined, {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+    return formatDate(at, sameDay ? SYNC_TIME_FORMAT : SYNC_DATE_TIME_FORMAT, APP_LOCALE);
   }
 
   public static offlineNotice(lastSyncedAt: Nullable<number>, now: Date = new Date()): string {

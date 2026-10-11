@@ -16,7 +16,7 @@ import {type WhatsNewVersion} from '../../models/whats-new.model';
         </h2>
         @if (version().date; as date) {
           <time [attr.datetime]="date" class="text-cmn-xs text-text-secondary">{{
-            date | date: 'MMM d, y'
+            date | date: 'mediumDate'
           }}</time>
         }
       </header>

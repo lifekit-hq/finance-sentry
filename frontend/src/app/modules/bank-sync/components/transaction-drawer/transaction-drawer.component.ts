@@ -28,7 +28,7 @@ import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.p
           {{ tx | transactionAmount }}
         </p>
         <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
-          {{ tx.postedDate ?? tx.date | date: 'MMMM d, y' }}
+          {{ tx.postedDate ?? tx.date | date: 'longDate' }}
         </p>
       </div>
 

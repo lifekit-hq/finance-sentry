@@ -56,7 +56,7 @@ function formatMonthYear(date: Date): string {
 }
 
 // Below this span the snapshots are effectively daily, so month-year labels ("Jul '26")
-// collapse to a single repeated value — use day-level labels ("Jul 5") instead.
+// collapse to a single repeated value — use day-level labels ("5 Jul") instead.
 const SHORT_SPAN_DAYS = 92;
 
 // Sleeves keep the colour of the asset class they hold, and income / spending the money-in and
