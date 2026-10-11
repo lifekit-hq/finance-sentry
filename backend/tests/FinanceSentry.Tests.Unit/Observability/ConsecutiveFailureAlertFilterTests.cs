@@ -165,8 +165,33 @@ public class ConsecutiveFailureAlertFilterTests : IDisposable
         ConsecutiveFailures()[Job].Should().Be(2);
     }
 
+    [Fact]
+    public void Primer_PublishesPersistedStreaks_ForRecurringJobs_WithoutNewOutcome()
+    {
+        _store.Set("SampleJobs.A", new JobFailureStreak(5, true));
+        using var freshMetrics = new JobMetrics();
+
+        JobFailureGaugePrimer.Seed(
+            [global::Hangfire.Common.Job.FromExpression(() => SampleJobs.A()), global::Hangfire.Common.Job.FromExpression(() => SampleJobs.B()), null],
+            _store,
+            freshMetrics);
+
+        ConsecutiveFailures().Should().BeEquivalentTo(new Dictionary<string, int>
+        {
+            ["SampleJobs.A"] = 5,
+            ["SampleJobs.B"] = 0,
+        });
+    }
+
+    public static class SampleJobs
+    {
+        public static void A() { }
+
+        public static void B() { }
+    }
+
     // Reads finance_job_consecutive_failures the way the OpenTelemetry/Prometheus pipeline would.
-    private Dictionary<string, int> ConsecutiveFailures()
+    private static Dictionary<string, int> ConsecutiveFailures()
     {
         var observed = new Dictionary<string, int>();
         using var listener = new MeterListener();
