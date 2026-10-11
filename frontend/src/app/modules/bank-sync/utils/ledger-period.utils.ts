@@ -1,4 +1,4 @@
-import {DateRangeUtils} from '../../../shared/utils/date-range.utils';
+import {DateUtils} from '../../../shared/utils/date.utils';
 import {LEDGER_PERIODS} from '../constants/ledger-period/ledger-period.constants';
 import {
   type LedgerPeriod,
@@ -16,7 +16,7 @@ export class LedgerPeriodUtils {
     if (period === 'last-month') {
       const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
       const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
-      return {from: DateRangeUtils.toIsoDate(first), to: DateRangeUtils.toIsoDate(last)};
+      return {from: DateUtils.isoDateUtc(first), to: DateUtils.isoDateUtc(last)};
     }
     const {from, to} = DashboardRangeUtils.windowDates(period === '3m' ? '3m' : 'mtd', now);
     return {from: from as string, to: to as string};

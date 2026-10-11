@@ -10,6 +10,7 @@ import {provideAppInit} from './core/providers/app-init.provider';
 import {provideDecimalPipe} from './core/providers/decimal-pipe.provider';
 import {provideErrorHandler} from './core/providers/error-handler.provider';
 import {provideErrorMessages} from './core/providers/error-messages.provider';
+import {provideAppLocale} from './core/providers/locale.provider';
 import {provideAppServiceWorker} from './core/providers/service-worker.provider';
 import {provideTitleStrategy} from './core/providers/title-strategy.provider';
 import {authInterceptor} from './modules/auth/interceptors/auth.interceptor';
@@ -21,6 +22,7 @@ export const appConfig: ApplicationConfig = {
     provideApiBaseUrl(environment.apiBaseUrl),
     provideErrorHandler(),
     provideErrorMessages(),
+    provideAppLocale(),
     provideAppIcons(),
     provideAppInit(),
     provideDecimalPipe(),

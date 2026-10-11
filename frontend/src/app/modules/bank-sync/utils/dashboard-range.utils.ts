@@ -1,8 +1,8 @@
+import {DateUtils} from '../../../shared/utils/date.utils';
 import {DateRangeUtils, type DayWindowRange} from '../../../shared/utils/date-range.utils';
 import {HISTORY_RANGE_MONTHS} from '../constants/dashboard/dashboard.constants';
 import {type HistoryRange} from '../models/dashboard/dashboard.model';
 
-const MONTH_KEY_PAD = 2;
 const ISO_DATE_LENGTH = 10;
 const MONTHS_PER_YEAR = 12;
 
@@ -18,7 +18,7 @@ export class DashboardRangeUtils {
   /** `YYYY-MM-DD` the day-resolution range starts on (UTC); `undefined` for month-based ranges. */
   public static windowFrom(range: HistoryRange, now = new Date()): string | undefined {
     return DashboardRangeUtils.isDayWindow(range)
-      ? DateRangeUtils.toIsoDate(DateRangeUtils.dayWindowStart(range, now))
+      ? DateUtils.isoDateUtc(DateRangeUtils.dayWindowStart(range, now))
       : undefined;
   }
 
@@ -57,7 +57,7 @@ export class DashboardRangeUtils {
         1
       )
     );
-    return `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(MONTH_KEY_PAD, '0')}`;
+    return DateUtils.monthKeyUtc(start);
   }
 
   /**
@@ -73,7 +73,7 @@ export class DashboardRangeUtils {
     if (DashboardRangeUtils.isDayWindow(range)) {
       return {
         from: DashboardRangeUtils.windowFrom(range, now),
-        to: DateRangeUtils.toIsoDate(now),
+        to: DateUtils.isoDateUtc(now),
       };
     }
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
@@ -87,8 +87,8 @@ export class DashboardRangeUtils {
   public static monthDates(monthKey: string): {from: string; to: string} {
     const [year, month] = monthKey.split('-').map(Number);
     return {
-      from: DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month - 1, 1))),
-      to: DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month, 0))),
+      from: DateUtils.isoDateUtc(new Date(Date.UTC(year, month - 1, 1))),
+      to: DateUtils.isoDateUtc(new Date(Date.UTC(year, month, 0))),
     };
   }
 
@@ -103,12 +103,12 @@ export class DashboardRangeUtils {
   ): {from?: string; to: string; months: number} {
     const months = DashboardRangeUtils.months(range, now);
     if (range === 'all') {
-      return {to: DateRangeUtils.toIsoDate(now), months};
+      return {to: DateUtils.isoDateUtc(now), months};
     }
     // Month-based ranges run to month end; the breakdown stops at today, where the data does.
     return {
       from: DashboardRangeUtils.windowDates(range, now).from,
-      to: DateRangeUtils.toIsoDate(now),
+      to: DateUtils.isoDateUtc(now),
       months,
     };
   }

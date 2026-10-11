@@ -1,5 +1,6 @@
 import {computed, type Signal} from '@angular/core';
 
+import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
 import {type BudgetSummaryItem} from '../../models/budget/budget.model';
 
 const PCT_MAX = 100;
@@ -23,7 +24,7 @@ export function budgetsComputed(store: StateSignals) {
     }),
     selectedMonthDate: computed(() => new Date(store.selectedYear(), store.selectedMonth() - 1, 1)),
     monthName: computed(() =>
-      new Date(store.selectedYear(), store.selectedMonth() - 1, 1).toLocaleDateString('en-US', {
+      new Date(store.selectedYear(), store.selectedMonth() - 1, 1).toLocaleDateString(APP_LOCALE, {
         month: 'long',
       })
     ),

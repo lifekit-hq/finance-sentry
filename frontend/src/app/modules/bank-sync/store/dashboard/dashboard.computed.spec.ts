@@ -479,7 +479,7 @@ describe('dashboardComputed', () => {
         expect(c.totalBalanceFormatted()).toBe('$12,000.00');
         expect(c.netWorthChangeFormatted()).toBe('+$2,000');
         expect(c.netWorthChangePercentFormatted()).toBe('+20.0%');
-        expect(c.scrubDateFormatted()).toBe('Jul 31, 2026');
+        expect(c.scrubDateFormatted()).toBe('31 Jul 2026');
       });
 
       it('colours the delta by the scrubbed point, not the window end', () => {
@@ -762,7 +762,7 @@ describe('dashboardComputed', () => {
           ],
         });
 
-        expect(c.investedChangeSinceFormatted()).toBe('since Jul 8, 2026');
+        expect(c.investedChangeSinceFormatted()).toBe('since 8 Jul 2026');
       });
 
       it('leaves the window to the range label when the split covers all of it', () => {

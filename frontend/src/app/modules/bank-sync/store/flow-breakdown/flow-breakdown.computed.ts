@@ -1,7 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
-import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
+import {DateUtils} from '../../../../shared/utils/date.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
   type FlowBreakdown,
@@ -101,7 +101,7 @@ export function flowBreakdownComputed(store: StateSignals) {
     if (from === null && to === null) {
       return null;
     }
-    return {from, to: to ?? DateRangeUtils.toIsoDate(new Date()), months: store.months()};
+    return {from, to: to ?? DateUtils.isoDateUtc(new Date()), months: store.months()};
   });
   const month = computed(() =>
     range() ? '' : store.selectedMonth() || MonthKeyUtils.currentUtc()
