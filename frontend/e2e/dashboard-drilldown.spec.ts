@@ -1,5 +1,10 @@
 import {expect, type Page, test} from '@playwright/test';
 
+const LOWER_PLOT_FRACTION = 0.7;
+// The category donut's ring starts at twelve o'clock and runs clockwise, and its legend sits
+// under the ring, so the first slice is hit just right of the top edge, inside the ring's width.
+const RING_TOP_OFFSET_PX = 20;
+
 // Parse compact ($2.9K) or full-precision ($2,900.00) currency strings to a number.
 // Both formats are used: dashboard uses compact notation, ledger uses decimal pipe.
 function extractAmount(cardText: string): number {
@@ -567,6 +572,45 @@ test.describe('Dashboard range presets (IBKR set)', () => {
       .click();
 
     await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=.*from=${from}`));
+  });
+
+  test('clicking a slice of the category donut drills into that category over the window', async ({
+    page,
+  }) => {
+    const from = iso(utcDay(-6));
+    await page.goto('/dashboard?range=1w');
+    const canvas = page.locator('cmn-donut-chart canvas');
+    await expect(canvas).toBeVisible();
+    // The donut sits below the fold; measure it only once it is where the click will land.
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    if (!box) {
+      throw new Error('donut canvas has no box');
+    }
+
+    // Food (800 of 1300) is the first slice, running clockwise from twelve o'clock.
+    await page.mouse.click(box.x + box.width / 2 + RING_TOP_OFFSET_PX, box.y + RING_TOP_OFFSET_PX);
+
+    await expect(page).toHaveURL(
+      new RegExp(`/transactions\\?.*type=debit.*category=FOOD_AND_DRINK.*from=${from}`)
+    );
+  });
+
+  test('clicking the net-worth chart opens the accounts page behind the band', async ({page}) => {
+    await mockHistory(page);
+    await page.goto('/dashboard');
+    await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
+    const canvas = page.locator('cmn-area-chart canvas');
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    if (!box) {
+      throw new Error('chart canvas has no box');
+    }
+
+    // The mocked history is all banking, so the banking band fills the plot.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * LOWER_PLOT_FRACTION);
+
+    await expect(page).toHaveURL(/\/accounts\/list$/);
   });
 });
 

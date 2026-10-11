@@ -1,7 +1,9 @@
 import {DecimalPipe} from '@angular/common';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
+import {DonutChartComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
@@ -284,5 +286,41 @@ describe('InvestmentsComponent — positions view', () => {
     root.querySelector<HTMLElement>('[data-testid="list-row"], tbody tr')?.click();
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  describe('allocation donut click-through', () => {
+    function clickSegment(index: number): ReturnType<typeof vi.fn> {
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const fixture = TestBed.createComponent(InvestmentsComponent);
+      fixture.detectChanges();
+      const donut = fixture.debugElement.query(By.directive(DonutChartComponent))
+        .componentInstance as DonutChartComponent;
+      donut.segmentClick.emit({index, label: 'x', value: 1});
+      return navigate;
+    }
+
+    it('opens the dossier of the only position in a clicked asset class', () => {
+      expect(clickSegment(0)).toHaveBeenCalledWith(['/assets', 'DRAM']);
+    });
+
+    it('opens the crypto position of the clicked crypto slice', () => {
+      expect(clickSegment(1)).toHaveBeenCalledWith(['/assets', 'SOL']);
+    });
+
+    it('opens nothing for a class holding several positions', () => {
+      mockStore.positionsByAssetClass.set([
+        {...EQUITY_GROUP, rows: [EQUITY_GROUP.rows[0], {...EQUITY_GROUP.rows[0], symbol: 'VOO'}]},
+      ]);
+
+      expect(clickSegment(0)).not.toHaveBeenCalled();
+    });
+
+    it('opens nothing for the cash slice', () => {
+      mockStore.positionsByAssetClass.set([
+        {assetClass: 'cash', label: 'Cash', totalValue: 300, rows: [EQUITY_GROUP.rows[0]]},
+      ]);
+
+      expect(clickSegment(0)).not.toHaveBeenCalled();
+    });
   });
 });

@@ -76,6 +76,7 @@
               [segments]="store.allocationSegments()"
               [chrome]="false"
               [showLegend]="false"
+              (segmentClick)="openSegment($event)"
               currency="USD"
             />
           </div>

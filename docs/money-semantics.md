@@ -663,7 +663,10 @@ and the last day of the current month otherwise, so the list covers what the til
 the breakdown page on the same window (`DashboardRangeUtils.breakdownParams`: `from` / `to`
 through today, plus the `months` of history the dashboard loaded so transfer pairs resolve the
 same way; `All` sends only `to`). The ledger shows the active bounds as a removable
-"Dates" chip and ignores malformed values.
+"Dates" chip and ignores malformed values. The charts drill the same way: a Top spendings
+donut slice behaves as its category row (the folded "Other categories" slice opens nothing),
+and an Income-vs-Spending bar opens that one calendar month's credits or debits
+(`DashboardRangeUtils.monthDates`, not the selected window, since the bars are closed months).
 
 This is the same split Binance and IBKR use: the current period feeds the tiles; the bars
 are closed periods.

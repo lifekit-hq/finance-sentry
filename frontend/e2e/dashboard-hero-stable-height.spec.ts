@@ -132,10 +132,10 @@ for (const [name, viewport] of [
       }
 
       const heights = sampleHeights(card, SAMPLE_WINDOW_MS);
+      // A mouse scrubs on hover; pressing and releasing on the canvas is a click, which opens the
+      // band's accounts page and leaves the dashboard.
       await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
-      await page.mouse.down();
       await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, {steps: 10});
-      await page.mouse.up();
       expect(await heights).toEqual([baseline]);
       await expectNoHorizontalScroll(page);
     });

@@ -207,4 +207,25 @@ describe('DashboardRangeUtils', () => {
       });
     });
   });
+
+  describe('monthDates', () => {
+    it('bounds a month from its first to its last day', () => {
+      expect(DashboardRangeUtils.monthDates('2026-07')).toEqual({
+        from: '2026-07-01',
+        to: '2026-07-31',
+      });
+    });
+
+    it('ends February on the 28th, or the 29th in a leap year', () => {
+      expect(DashboardRangeUtils.monthDates('2026-02').to).toBe('2026-02-28');
+      expect(DashboardRangeUtils.monthDates('2028-02').to).toBe('2028-02-29');
+    });
+
+    it('rolls December into the same year', () => {
+      expect(DashboardRangeUtils.monthDates('2026-12')).toEqual({
+        from: '2026-12-01',
+        to: '2026-12-31',
+      });
+    });
+  });
 });
