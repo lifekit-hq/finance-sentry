@@ -528,6 +528,19 @@ export function dashboardComputed(store: StateSignals) {
       ];
     }),
 
+    // Index-aligned with `categoryChartData`: the category each slice stands for, null for the
+    // folded "Other categories" slice, which is no single category and so has no drill-down.
+    categoryChartKeys: computed((): Nullable<string>[] => {
+      const categories = (store.data()?.topCategories ?? []).map(c => c.category);
+      if (categories.length <= CATEGORICAL_STEPS.length) {
+        return categories;
+      }
+      return [...categories.slice(0, CATEGORICAL_STEPS.length - 1), null];
+    }),
+
+    // Index-aligned with the x positions of `incomeVsSpendingBars`: the `YYYY-MM` each bar pair covers.
+    incomeVsSpendingMonthKeys: computed((): string[] => completeMonths().map(([key]) => key)),
+
     netWorthStaleNotice: computed((): string | null => {
       const history = store.netWorthHistory();
       const latest = history[history.length - 1];

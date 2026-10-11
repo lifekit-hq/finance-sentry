@@ -6,6 +6,7 @@ import {
   inject,
 } from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
+import {type ChartPointClick, type DonutSegmentClick} from '@lifekit-hq/charts-core';
 import {
   AlertComponent,
   AreaChartComponent,
@@ -34,8 +35,10 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {
+  CASH_FLOW_SERIES_TYPES,
   HISTORY_RANGE_LABELS,
   HISTORY_RANGE_TILE_HEADINGS,
+  NET_WORTH_SERIES_ROUTES,
 } from '../../constants/dashboard/dashboard.constants';
 import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
@@ -249,6 +252,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   [scrubbable]="true"
                   [label]="store.netWorthChartLabel()"
                   (scrub)="store.setScrubIndex($event.index)"
+                  (pointClick)="onNetWorthClick($event)"
                   (scrubEnd)="store.setScrubIndex(null)"
                 />
                 @if (store.netWorthStaleNotice()) {
@@ -322,6 +326,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
                 [currency]="store.baseCurrency()"
+                (barClick)="onCashFlowBarClick($event)"
                 label="Income vs Spending (complete months)"
               />
             </div>
@@ -333,6 +338,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 [segments]="store.categoryChartData()"
                 [label]="topCategoriesLabel()"
                 [currency]="store.baseCurrency()"
+                (segmentClick)="onCategorySegmentClick($event)"
               />
             </div>
             <div class="lg:col-span-2">
@@ -475,8 +481,40 @@ export class DashboardComponent {
 
   // Top spendings counts outflows only, so the drill-down lists the category's debits.
   public onCategoryClick(row: CategoryStat): void {
+    this.openCategory(row.category);
+  }
+
+  // A band is a sleeve of the book, so it opens the accounts page that lists that sleeve.
+  public onNetWorthClick(click: ChartPointClick): void {
+    const route = NET_WORTH_SERIES_ROUTES.get(click.seriesLabel);
+    if (route) {
+      void this.router.navigateByUrl(route);
+    }
+  }
+
+  // A bar is one month of income or spending, so it lists that month's credits or debits.
+  public onCashFlowBarClick(click: ChartPointClick): void {
+    const type = CASH_FLOW_SERIES_TYPES.get(click.seriesLabel);
+    const monthKey = this.store.incomeVsSpendingMonthKeys()[click.index];
+    if (!type || !monthKey) {
+      return;
+    }
     void this.router.navigate([AppRoute.Transactions], {
-      queryParams: {type: 'debit', category: row.category, ...this.rangeDates()},
+      queryParams: {type, ...DashboardRangeUtils.monthDates(monthKey)},
+    });
+  }
+
+  // The folded "Other categories" slice stands for several categories, so it opens nothing.
+  public onCategorySegmentClick(click: DonutSegmentClick): void {
+    const category = this.store.categoryChartKeys()[click.index];
+    if (category) {
+      this.openCategory(category);
+    }
+  }
+
+  private openCategory(category: string): void {
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {type: 'debit', category, ...this.rangeDates()},
     });
   }
 

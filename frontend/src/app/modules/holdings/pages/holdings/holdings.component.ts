@@ -1,6 +1,7 @@
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
+import {type DonutSegmentClick} from '@lifekit-hq/charts-core';
 import {
   AsyncStateComponent,
   type AsyncStateStatus,
@@ -68,5 +69,17 @@ export class InvestmentsComponent {
       return;
     }
     void this.router.navigate([AppRoute.AssetDossier, symbol]);
+  }
+
+  /**
+   * A slice is an asset class, which has no page of its own; the one case with an entity behind it
+   * is a class holding a single position, which opens that position's dossier. Cash and classes
+   * with several positions open nothing.
+   */
+  public openSegment(click: DonutSegmentClick): void {
+    const group = this.store.positionsByAssetClass()[click.index];
+    if (group?.rows.length === 1) {
+      this.openDossier(group.assetClass, group.rows[0].symbol);
+    }
   }
 }
