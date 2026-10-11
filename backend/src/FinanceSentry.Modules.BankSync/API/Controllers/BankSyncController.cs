@@ -89,8 +89,8 @@ public class BankSyncController(
         if (toDateError != null)
             return BadRequest(toDateError);
 
-        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
-        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
             ?? TransactionFilterValidator.ValidateAmountRange(minAmountUsd, maxAmountUsd)
@@ -148,8 +148,8 @@ public class BankSyncController(
         if (toDateError != null)
             return BadRequest(toDateError);
 
-        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
-        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
             ?? TransactionFilterValidator.ValidateAmountRange(minAmount, maxAmount)
