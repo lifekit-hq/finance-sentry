@@ -1,16 +1,23 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
   type FlowBreakdown,
   type FlowBreakdownItem,
+  type FlowBreakdownRange,
+  type FlowBreakdownRequest,
   type FlowBucket,
 } from '../../models/flow-breakdown/flow-breakdown.model';
+import {MonthKeyUtils} from '../../utils/month-key.utils';
 
 interface StateSignals {
   breakdown: Signal<Nullable<FlowBreakdown>>;
-  month: Signal<string>;
+  selectedMonth: Signal<string>;
+  from: Signal<Nullable<string>>;
+  to: Signal<Nullable<string>>;
+  months: Signal<number>;
   accountFilter: Signal<Nullable<string>>;
   status: Signal<AsyncStatus>;
   errorCode: Signal<Nullable<string>>;
@@ -85,6 +92,25 @@ function wholeUsd(value: number): string {
 export function flowBreakdownComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
 
+  // A `from` and/or `to` date is a dashboard window's day range (with `months` as the history the
+  // dashboard loaded around it); otherwise the page shows one month, where an absent or invalid
+  // `month` means "now".
+  const range = computed((): Nullable<FlowBreakdownRange> => {
+    const from = store.from();
+    const to = store.to();
+    if (from === null && to === null) {
+      return null;
+    }
+    return {from, to: to ?? DateRangeUtils.toIsoDate(new Date()), months: store.months()};
+  });
+  const month = computed(() =>
+    range() ? '' : store.selectedMonth() || MonthKeyUtils.currentUtc()
+  );
+  const request = computed((): FlowBreakdownRequest => {
+    const window = range();
+    return window ? {kind: 'range', ...window} : {kind: 'month', month: month()};
+  });
+
   const filteredItems = computed((): FlowBreakdownItem[] => {
     const items = store.breakdown()?.items ?? [];
     const account = store.accountFilter();
@@ -106,6 +132,9 @@ export function flowBreakdownComputed(store: StateSignals) {
   };
 
   return {
+    range,
+    month,
+    request,
     isLoading: computed(() => store.status() === 'loading'),
     isEmpty: computed(() => store.status() === 'idle' && filteredItems().length === 0),
     errorMessage: computed(() => {

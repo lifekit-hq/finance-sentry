@@ -1,7 +1,6 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, Router} from '@angular/router';
 import {of, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -22,7 +21,6 @@ function buildStore() {
     setHistoryLoading: vi.fn(),
     setHistoryError: vi.fn(),
     setHistoryHasHistory: vi.fn(),
-    setHistoryRange: vi.fn(),
     load: vi.fn(),
     loadNetWorthHistory: vi.fn(),
     historyRange: signal<HistoryRange>('1m'),
@@ -36,11 +34,7 @@ describe('dashboardHooks auto-refresh', () => {
     vi.useFakeTimers();
     service.getDashboardData.mockReset();
     TestBed.configureTestingModule({
-      providers: [
-        {provide: BankSyncService, useValue: service},
-        {provide: Router, useValue: {navigate: vi.fn()}},
-        {provide: ActivatedRoute, useValue: {snapshot: {queryParamMap: {get: () => null}}}},
-      ],
+      providers: [{provide: BankSyncService, useValue: service}],
     });
   });
 
