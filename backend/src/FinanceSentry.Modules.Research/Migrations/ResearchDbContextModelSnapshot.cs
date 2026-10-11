@@ -323,7 +323,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<decimal?>("EmergencyCushionUsd")
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("Exclusions")
+                    b.PrimitiveCollection<List<string>>("Exclusions")
                         .IsRequired()
                         .HasColumnType("jsonb");
 

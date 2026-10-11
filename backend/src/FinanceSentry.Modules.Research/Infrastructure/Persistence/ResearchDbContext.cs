@@ -175,11 +175,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .HasConversion(
                 v => JsonSerializer.Serialize(v, jsonOptions),
                 v => JsonSerializer.Deserialize<List<AllocationTarget>>(v, jsonOptions) ?? new());
-        ib.Property(x => x.Exclusions)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
+        ib.PrimitiveCollection(x => x.Exclusions).HasColumnType("jsonb");
         ib.Property(x => x.RebalancingRule)
             .HasColumnType("jsonb")
             .HasConversion(
