@@ -534,7 +534,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("Categories")
+                    b.PrimitiveCollection<List<string>>("Categories")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -560,11 +560,11 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<string>("ThesisIds")
+                    b.PrimitiveCollection<List<Guid>>("ThesisIds")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("Tickers")
+                    b.PrimitiveCollection<List<string>>("Tickers")
                         .IsRequired()
                         .HasColumnType("jsonb");
 

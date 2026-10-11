@@ -114,22 +114,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         nb.Property(x => x.ContentHash).IsRequired().HasMaxLength(64);
         nb.Property(x => x.PublishedAt).IsRequired();
         nb.Property(x => x.IngestedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        nb.Property(x => x.Tickers)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
-        nb.Property(x => x.Categories)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
-        nb.Property(x => x.ThesisIds)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<Guid>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(GuidListComparer);
+        nb.PrimitiveCollection(x => x.Tickers).HasColumnType("jsonb");
+        nb.PrimitiveCollection(x => x.Categories).HasColumnType("jsonb");
+        nb.PrimitiveCollection(x => x.ThesisIds).HasColumnType("jsonb");
         nb.HasIndex(x => x.ContentHash).IsUnique().HasDatabaseName("idx_news_hash");
         nb.HasIndex(x => x.PublishedAt).IsDescending().HasDatabaseName("idx_news_published");
 
