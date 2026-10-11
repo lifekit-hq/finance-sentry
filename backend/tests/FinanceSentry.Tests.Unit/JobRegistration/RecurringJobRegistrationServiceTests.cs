@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.JobRegistration;
 using FinanceSentry.API.Hangfire;
 using FinanceSentry.API.Migrations;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Tests.Unit.Http;
 using FluentAssertions;
 using global::Hangfire;
 using global::Hangfire.PostgreSql;
@@ -23,7 +24,8 @@ public class RecurringJobRegistrationServiceTests
     private readonly ScriptedRegistrar _registrar = new();
     private readonly CapturingLogger _logger = new();
 
-    private RecurringJobRegistrationService CreateService(RecurringJobRegistrationOptions? options = null)
+    private RecurringJobRegistrationService CreateService(
+        RecurringJobRegistrationOptions? options = null, TimeProvider? timeProvider = null)
     {
         var services = new ServiceCollection()
             .AddSingleton<IJobRegistrar>(_registrar)
@@ -32,7 +34,7 @@ public class RecurringJobRegistrationServiceTests
             .BuildServiceProvider();
 
         return new RecurringJobRegistrationService(
-            services, Mock.Of<IHostApplicationLifetime>(), _status, _migrations, options ?? FastOptions, _logger);
+            services, Mock.Of<IHostApplicationLifetime>(), _status, _migrations, options ?? FastOptions, _logger, timeProvider);
     }
 
     private static PostgreSqlDistributedLockException LockTimeout() => new("hangfire:lock:recurring-job:x");
@@ -64,16 +66,20 @@ public class RecurringJobRegistrationServiceTests
     }
 
     [Fact]
-    public async Task LockTimeoutPastBudget_LogsErrorAndFails()
+    public async Task LockTimeoutPastBudget_StopsWhenTheNextWaitNoLongerFitsAndFails()
     {
+        // Delays double 10 s -> 20 s -> 40 s (capped): waits at t=0, 10, 30 fit a 100 s budget, the 40 s wait at t=70 does not.
+        var time = new RecordingTimeProvider();
         _registrar.OnCall = _ => throw LockTimeout();
+        var options = new RecurringJobRegistrationOptions(
+            TimeSpan.FromSeconds(100), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(40));
 
-        await CreateService(new(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(10)))
-            .RunAsync(CancellationToken.None);
+        await time.RunAsync(CreateService(options, time).RunAsync(CancellationToken.None), _ => true);
 
+        time.Waits.Should().Equal(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(40));
+        _registrar.Calls.Should().Be(4);
         _status.State.Should().Be(RecurringJobRegistrationState.Failed);
         _logger.Levels.Should().Contain(LogLevel.Error);
-        _registrar.Calls.Should().BeGreaterThan(1);
     }
 
     [Fact]

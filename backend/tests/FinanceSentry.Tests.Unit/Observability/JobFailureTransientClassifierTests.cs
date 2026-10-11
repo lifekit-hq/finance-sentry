@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Net.Sockets;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FluentAssertions;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 using Xunit;
 
 /// <summary>
@@ -21,6 +23,18 @@ public sealed class JobFailureTransientClassifierTests
     [Fact]
     public void SelfHealingError_IsTransient() =>
         JobFailureTransientClassifier.IsTransient(new SocketException()).Should().BeTrue();
+
+    [Fact]
+    public void ResiliencePipelineTimeout_IsTransient() =>
+        JobFailureTransientClassifier
+            .IsTransient(new TimeoutRejectedException("attempt timed out"))
+            .Should().BeTrue();
+
+    [Fact]
+    public void OpenCircuit_IsTransient() =>
+        JobFailureTransientClassifier
+            .IsTransient(new BrokenCircuitException())
+            .Should().BeTrue();
 
     [Fact]
     public void TransientErrorWrappedInAChain_IsTransient() =>

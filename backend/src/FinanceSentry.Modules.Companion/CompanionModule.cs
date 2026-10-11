@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Http;
 
 public static class CompanionModule
 {
@@ -75,12 +76,16 @@ public static class CompanionModule
         services.AddScoped<IOutboxDeliveryReader, OutboxDeliveryReader>();
         services.AddScoped<IAgentWakeDispatcher, WebhookAgentWakeDispatcher>();
 
+        var wakeTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(WebhookAgentWakeDispatcher.HttpClientName, client =>
-            client.Timeout = TimeSpan.FromSeconds(10));
+            client.Timeout = wakeTimeout)
+            .AddProviderResilience(wakeTimeout, maxRetries: 0);
 
         services.AddScoped<IPushSender, WebPushSender>();
         // No redirects: an allow-listed push service must not be able to bounce the request to another host.
-        services.AddHttpClient(WebPushSender.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+        var webPushTimeout = TimeSpan.FromSeconds(15);
+        services.AddHttpClient(WebPushSender.HttpClientName, client => client.Timeout = webPushTimeout)
+            .AddProviderResilience(webPushTimeout, maxRetries: 0)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 
         services.Configure<ProblemReportOptions>(config.GetSection(ProblemReportOptions.SectionName));

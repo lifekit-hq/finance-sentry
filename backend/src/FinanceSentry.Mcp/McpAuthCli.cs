@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using FinanceSentry.Mcp.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Mcp;
@@ -16,7 +17,12 @@ internal static class McpAuthCli
         var command = args[1].ToLowerInvariant();
         var logger = loggerFactory.CreateLogger("FinanceSentry.Mcp.AuthCli");
         var store = new LocalMcpCredentialStore(configuration);
-        var tokenClient = new McpOAuthTokenClient(loggerFactory.CreateLogger<McpOAuthTokenClient>());
+        await using var services = new ServiceCollection()
+            .AddSingleton(loggerFactory)
+            .AddLogging()
+            .AddMcpOAuthTokenClient()
+            .BuildServiceProvider();
+        var tokenClient = services.GetRequiredService<McpOAuthTokenClient>();
 
         return command switch
         {

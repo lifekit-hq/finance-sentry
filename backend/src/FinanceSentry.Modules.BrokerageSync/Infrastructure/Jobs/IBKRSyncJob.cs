@@ -2,8 +2,8 @@ using System.Net;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
-using FinanceSentry.Infrastructure.Retry;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
@@ -91,7 +91,7 @@ public sealed class IBKRSyncJob(
         // BrokerAuthException always maps to the same 422 INVALID_CREDENTIALS API error
         // regardless of cause, so a genuine credential/consent failure (401/403) and an
         // upstream IBKR blip (5xx) are only distinguishable via the original status code.
-        if (ex is BrokerAuthException { UpstreamStatusCode: { } status } && RetryPolicies.IsTransientHttpError(status))
+        if (ex is BrokerAuthException { UpstreamStatusCode: { } status } && TransientHttpStatus.IsTransient(status))
             return true;
 
         // During an outage IBKR answers the token request with 401 and {"error":"backend down"}, so

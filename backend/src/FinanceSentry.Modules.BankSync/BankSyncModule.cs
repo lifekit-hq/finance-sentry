@@ -19,6 +19,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -168,7 +169,8 @@ public static class BankSyncModule
         services.AddScoped<ICategoryReadService, CategoryReadService>();
 
         services.AddHttpClient<MonobankHttpClient>(client =>
-            client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"));
+                client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"))
+            .AddMonobankResilience();
         services.AddSingleton<MonobankBalanceCache>();
         services.AddScoped<IMonobankAdapter, MonobankAdapter>();
         services.AddScoped<MonobankAdapter>();
@@ -176,8 +178,10 @@ public static class BankSyncModule
 
         var trueLayerAuthBase = new Uri(config["TrueLayer:AuthBaseUrl"] ?? "https://auth.truelayer-sandbox.com");
         var trueLayerApiBase = new Uri(config["TrueLayer:ApiBaseUrl"] ?? "https://api.truelayer-sandbox.com");
-        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, c => c.BaseAddress = trueLayerAuthBase);
-        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, c => c.BaseAddress = trueLayerApiBase);
+        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, c => c.BaseAddress = trueLayerAuthBase)
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
+        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, c => c.BaseAddress = trueLayerApiBase)
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
         services.AddSingleton<ITrueLayerClient, TrueLayerHttpClient>();
         services.AddSingleton<TrueLayerCategoryMapper>();
         services.AddScoped<TrueLayerAdapter>();

@@ -3,8 +3,8 @@ using System.Net;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
-using FinanceSentry.Infrastructure.Retry;
 using FinanceSentry.Modules.CryptoSync.Application.Commands;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
@@ -115,7 +115,7 @@ public abstract class CryptoExchangeSyncJob(
         // Binance keeps its status on the exception rather than as an HttpRequestException; a
         // Revolut X HTTP failure is already covered through its inner HttpRequestException.
         return ex is BinanceException { VenueStatusCode: { } status }
-            && RetryPolicies.IsTransientHttpError((HttpStatusCode)status);
+            && TransientHttpStatus.IsTransient((HttpStatusCode)status);
     }
 
     // Binance codes for a key the venue will not honour: -1002 unauthorized, -1022 bad signature,

@@ -19,7 +19,7 @@
 | 8  | Sync idempotency | Trigger sync twice rapidly | Second request returns 409 "sync already running" |
 | 9  | Sync completion | Wait for sync to finish | Status changes to "active", transaction count updated |
 | 10 | Duplicate deduplication | Sync same transactions twice | No duplicates in transaction list |
-| 11 | Provider outage | Provider API returns 503 | Error recorded in SyncJob, account status = "failed"; the next scheduled cycle (30 min) retries - there is no inline retry |
+| 11 | Provider outage | Provider API returns 503 | Error recorded in SyncJob, account status = "failed"; the provider call is retried inline first (short backoff, `ProviderHttpResilience`), then the next scheduled cycle (30 min) retries |
 | 12 | Credential expiry | TrueLayer consent expires (invalid_grant) | Account status = "reauth_required", user prompted; MCP `get_sync_health` reports TrueLayer as "error" (also for an EXPIRED connection) |
 | 13 | Webhook TRANSACTIONS_READY | POST webhook with valid HMAC | Sync enqueued for affected account |
 | 14 | Webhook invalid HMAC | POST webhook with tampered body | 401 returned, sync NOT enqueued |
@@ -38,7 +38,7 @@
 
 | Scenario | Expected Behaviour |
 |----------|--------------------|
-| Network timeout during sync | Sync fails with the error recorded in SyncJob; no inline retry - the next scheduled cycle (30 min) re-runs the account |
+| Network timeout during sync | Sync fails with the error recorded in SyncJob; after the provider call's inline retries (`ProviderHttpResilience`), the next scheduled cycle (30 min) re-runs the account |
 | Bank returns 0 transactions | Sync completes successfully; count = 0 |
 | > 500 transactions in one sync | All pages fetched, all deduplicated |
 | Token expired mid-request | 401 returned, Angular redirects to login |

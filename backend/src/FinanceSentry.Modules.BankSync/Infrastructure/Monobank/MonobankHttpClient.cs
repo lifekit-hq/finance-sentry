@@ -37,7 +37,7 @@ public class MonobankHttpClient(HttpClient http)
         using var request = new HttpRequestMessage(HttpMethod.Get, "/personal/client-info");
         request.Headers.Add("X-Token", token);
 
-        var response = await SendWithRetryAsync(request, token, ct);
+        using var response = await SendAsync(request, ct);
         var raw = await response.Content.ReadFromJsonAsync<ClientInfoResponse>(JsonOpts, ct)
             ?? throw new MonobankException("MONOBANK_PARSE_ERROR", "Failed to parse client info response.");
 
@@ -68,7 +68,7 @@ public class MonobankHttpClient(HttpClient http)
             $"/personal/statement/{accountId}/{fromUnix}/{toUnix}");
         request.Headers.Add("X-Token", token);
 
-        var response = await SendWithRetryAsync(request, token, ct);
+        using var response = await SendAsync(request, ct);
         var raw = await response.Content.ReadFromJsonAsync<List<StatementEntry>>(JsonOpts, ct) ?? [];
 
         return raw.Select(e => new MonobankTransaction(
@@ -96,33 +96,25 @@ public class MonobankHttpClient(HttpClient http)
         using var request = new HttpRequestMessage(HttpMethod.Post, "/personal/webhook");
         request.Headers.Add("X-Token", token);
         request.Content = JsonContent.Create(new { webHookUrl = url });
-        await SendWithRetryAsync(request, token, ct);
+        using var response = await SendAsync(request, ct);
     }
 
     private const int MaxErrorBodyLength = 500;
     private const int ServerErrorStatus = 500;
 
-    private async Task<HttpResponseMessage> SendWithRetryAsync(
-        HttpRequestMessage request, string token, CancellationToken ct)
+    /// <summary>
+    /// Sends once; 429 retries (and their <c>Retry-After</c> waits) belong to the client's
+    /// <see cref="MonobankResilience"/> pipeline. Returns a successful response the caller disposes; every
+    /// failure path disposes it before throwing.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        int[] delaysSec = [0, 60, 120];
-
-        for (var attempt = 0; attempt < delaysSec.Length; attempt++)
+        var response = await http.SendAsync(request, ct);
+        try
         {
-            if (delaysSec[attempt] > 0)
-                await Task.Delay(TimeSpan.FromSeconds(delaysSec[attempt]), ct);
-
-            // HttpRequestMessage can only be sent once; clone it each attempt
-            var clone = await CloneRequestAsync(request);
-            var response = await http.SendAsync(clone, ct);
-
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            {
-                if (attempt == delaysSec.Length - 1)
-                    throw new MonobankException("MONOBANK_RATE_LIMITED",
-                        "Monobank API rate limit exceeded. Please try again in 60 seconds.", 429);
-                continue;
-            }
+                throw new MonobankException("MONOBANK_RATE_LIMITED",
+                    "Monobank API rate limit exceeded. Please try again in 60 seconds.", 429);
 
             // Monobank returns 403 (not 401) for a bad/unknown X-Token; treat both as invalid token.
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
@@ -145,25 +137,11 @@ public class MonobankHttpClient(HttpClient http)
 
             return response;
         }
-
-        throw new MonobankException("MONOBANK_RATE_LIMITED", "Rate limit exhausted after retries.", 429);
-    }
-
-    private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage original)
-    {
-        var clone = new HttpRequestMessage(original.Method, original.RequestUri);
-        foreach (var h in original.Headers)
-            clone.Headers.TryAddWithoutValidation(h.Key, h.Value);
-
-        if (original.Content != null)
+        catch
         {
-            var bytes = await original.Content.ReadAsByteArrayAsync();
-            clone.Content = new ByteArrayContent(bytes);
-            foreach (var h in original.Content.Headers)
-                clone.Content.Headers.TryAddWithoutValidation(h.Key, h.Value);
+            response.Dispose();
+            throw;
         }
-
-        return clone;
     }
 
     private static string MapAccountType(string monoType) => monoType switch

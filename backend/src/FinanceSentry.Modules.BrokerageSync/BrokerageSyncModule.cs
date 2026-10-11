@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BrokerageSync;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -73,7 +74,8 @@ public static class BrokerageSyncModule
         // sign requests directly against IBKR's Web API.
         services.Configure<IbkrOAuthOptions>(config.GetSection(IbkrOAuthOptions.SectionName));
         services.AddScoped<IIbkrCredentialResolver, IbkrCredentialResolver>();
-        services.AddHttpClient<IbkrOAuthClient>();
+        services.AddHttpClient<IbkrOAuthClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddScoped<IBrokerAdapter, IbkrOAuthAdapter>();
 
         services.AddScoped<IIBKRCredentialRepository, IBKRCredentialRepository>();
@@ -87,7 +89,8 @@ public static class BrokerageSyncModule
         services.AddScoped<IIbkrFlexConnector, IbkrFlexConnector>();
         services.AddScoped<IIbkrFlexCredentialResolver, IbkrFlexCredentialResolver>();
         services.AddSingleton<IbkrFlexRateLimiter>();
-        services.AddHttpClient<IIbkrFlexClient, IbkrFlexClient>();
+        services.AddHttpClient<IIbkrFlexClient, IbkrFlexClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddScoped<IIbkrFlexStatementFetcher, IbkrFlexStatementFetcher>();
         services.AddScoped<IIBKRFlexCredentialRepository, IBKRFlexCredentialRepository>();
         services.AddScoped<ICredentialRotationTarget, IBKRFlexCredentialRotationTarget>();
@@ -116,6 +119,7 @@ public static class BrokerageSyncModule
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(sp.GetRequiredService<IOptions<InzhurOptions>>().Value.UserAgent);
                 client.Timeout = InzhurApiClient.RequestTimeout;
             })
+            .AddProviderResilience(InzhurApiClient.RequestTimeout)
             // The session's cookies are kept in the encrypted jar, not a handler-wide container shared across users.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
             .RedactLoggedHeaders(_ => true);

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FluentAssertions;
 using Xunit;
@@ -8,44 +7,43 @@ namespace FinanceSentry.Tests.Unit.BrokerageSync.Flex;
 public class IbkrFlexRateLimiterTests
 {
     [Fact]
-    public async Task WaitAsync_EnforcesMinimumIntervalBetweenCalls()
+    public async Task WaitAsync_AllowsMaxRequestsPerWindow_ThenHoldsTheNext()
     {
-        var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.FromMilliseconds(100));
-        var stopwatch = Stopwatch.StartNew();
+        const int maxPerWindow = 3;
+        using var limiter = new IbkrFlexRateLimiter(maxPerWindow, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.Zero);
 
-        await limiter.WaitAsync();
-        await limiter.WaitAsync();
-        await limiter.WaitAsync();
+        for (var i = 0; i < maxPerWindow; i++)
+            limiter.WaitAsync().IsCompletedSuccessfully.Should().BeTrue($"call {i + 1} fits in the window");
 
-        stopwatch.Stop();
-        stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(190));
+        using var cts = new CancellationTokenSource();
+        var overflow = limiter.WaitAsync(cts.Token);
+        overflow.IsCompleted.Should().BeFalse("the window holds only 3 requests until the first expires");
+
+        await cts.CancelAsync();
+        await overflow.Invoking(t => t).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
-    public async Task WaitAsync_EnforcesMaxRequestsPerWindow()
+    public async Task WaitAsync_HoldsASecondCallInsideTheMinimumInterval()
     {
-        var limiter = new IbkrFlexRateLimiter(maxPerWindow: 2, window: TimeSpan.FromMilliseconds(200), minInterval: TimeSpan.Zero);
-        var stopwatch = Stopwatch.StartNew();
+        using var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.FromSeconds(1));
 
-        await limiter.WaitAsync();
-        await limiter.WaitAsync();
-        // The window only holds 2 requests; the 3rd must wait for the first to expire.
-        await limiter.WaitAsync();
+        limiter.WaitAsync().IsCompletedSuccessfully.Should().BeTrue();
 
-        stopwatch.Stop();
-        stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(180));
+        using var cts = new CancellationTokenSource();
+        var second = limiter.WaitAsync(cts.Token);
+        second.IsCompleted.Should().BeFalse("IBKR allows one request per second");
+
+        await cts.CancelAsync();
+        await second.Invoking(t => t).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
-    public async Task WaitAsync_UnderTheLimit_DoesNotDelay()
+    public void WaitAsync_UnderTheLimit_DoesNotDelay()
     {
-        var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.Zero);
-        var stopwatch = Stopwatch.StartNew();
+        using var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.Zero);
 
-        await limiter.WaitAsync();
-        await limiter.WaitAsync();
-
-        stopwatch.Stop();
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100));
+        limiter.WaitAsync().IsCompletedSuccessfully.Should().BeTrue();
+        limiter.WaitAsync().IsCompletedSuccessfully.Should().BeTrue();
     }
 }

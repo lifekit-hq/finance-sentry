@@ -1,5 +1,6 @@
 namespace FinanceSentry.Infrastructure.Fx;
 
+using FinanceSentry.Infrastructure.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,11 +25,13 @@ public static class ExchangeRateServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(baseUrl))
             baseUrl = DefaultBaseUrl;
 
+        var latestRatesTimeout = TimeSpan.FromSeconds(RequestTimeoutSeconds);
         services.AddHttpClient<IExchangeRateProvider, OpenErApiExchangeRateProvider>(client =>
         {
             client.BaseAddress = new Uri(baseUrl);
-            client.Timeout = TimeSpan.FromSeconds(RequestTimeoutSeconds);
-        });
+            client.Timeout = latestRatesTimeout;
+        })
+            .AddProviderResilience(latestRatesTimeout);
 
         services.AddTransient<ExchangeRateRefreshJob>();
 
@@ -49,17 +52,20 @@ public static class ExchangeRateServiceCollectionExtensions
 
         // Historical windows can span years, so these get a longer timeout than the
         // single-shot latest-rates call.
+        var historyTimeout = TimeSpan.FromSeconds(HistoryRequestTimeoutSeconds);
         services.AddHttpClient<NbuHistoricalExchangeRateProvider>(client =>
         {
             client.BaseAddress = new Uri(nbuBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(HistoryRequestTimeoutSeconds);
-        });
+            client.Timeout = historyTimeout;
+        })
+            .AddProviderResilience(historyTimeout);
 
         services.AddHttpClient<FrankfurterHistoricalExchangeRateProvider>(client =>
         {
             client.BaseAddress = new Uri(frankfurterBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(HistoryRequestTimeoutSeconds);
-        });
+            client.Timeout = historyTimeout;
+        })
+            .AddProviderResilience(historyTimeout);
 
         // Registered as the interface so the caching service receives both, and routes by
         // currency: NBU is the only free feed carrying UAH, ECB covers the rest.
