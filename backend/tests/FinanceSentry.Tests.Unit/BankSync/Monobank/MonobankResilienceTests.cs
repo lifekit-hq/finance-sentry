@@ -84,15 +84,42 @@ public class MonobankResilienceTests
     }
 
     [Fact]
-    public async Task RateLimited_RetryAfterBeyondTheCap_IsCapped()
+    public async Task RateLimited_RetryAfterBeyondTheBudget_ReturnsThe429WithoutWaiting()
     {
-        var (client, _, time) = Build(call => call == 1
-            ? RateLimited(_ => new RetryConditionHeaderValue(TimeSpan.FromHours(1)))
+        var (client, handler, time) = Build(_ => RateLimited(_ => new RetryConditionHeaderValue(TimeSpan.FromHours(1))));
+
+        var act = () => time.RunAsync(client.GetClientInfoAsync("token"), IsRetryWait);
+
+        (await act.Should().ThrowAsync<MonobankException>()).Which.StatusCode.Should().Be(429);
+        handler.Calls.Should().Be(1);
+        time.Waits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RateLimited_WaitsAddUpToTheBudgetAndNeverPastIt()
+    {
+        var (client, handler, time) = Build(_ => RateLimited(_ => new RetryConditionHeaderValue(120 * Second)));
+
+        var act = () => time.RunAsync(client.GetClientInfoAsync("token"), IsRetryWait);
+
+        (await act.Should().ThrowAsync<MonobankException>()).Which.StatusCode.Should().Be(429);
+        handler.Calls.Should().Be(2, "a second 120 s wait would make 240 s, past the 180 s budget");
+        time.Waits.Should().Equal(120 * Second);
+        time.Waits.Aggregate(TimeSpan.Zero, (sum, wait) => sum + wait).Should().BeLessThanOrEqualTo(MonobankResilience.TotalWaitBudget);
+    }
+
+    [Fact]
+    public async Task RateLimited_TheBudgetIsPerCall()
+    {
+        var (client, handler, time) = Build(call => call % 2 == 1
+            ? RateLimited(_ => new RetryConditionHeaderValue(120 * Second))
             : OkClientInfo());
 
         await time.RunAsync(client.GetClientInfoAsync("token"), IsRetryWait);
+        await time.RunAsync(client.GetClientInfoAsync("token"), IsRetryWait);
 
-        time.Waits.Should().Equal(MonobankResilience.MaxRetryDelay);
+        handler.Calls.Should().Be(4);
+        time.Waits.Should().Equal(120 * Second, 120 * Second);
     }
 
     [Fact]
