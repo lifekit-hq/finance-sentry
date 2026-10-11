@@ -4,12 +4,13 @@ using System.Text;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Modules.Auth.API.Authentication;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FinanceSentry.Modules.Auth.Infrastructure.Services;
 
-public class JwtTokenService(IConfiguration configuration) : ITokenService
+public class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private const string McpScope = "mcp.full_access";
     private const string McpServiceScope = "mcp.service";
@@ -17,8 +18,10 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
     // Short JWT name; inbound validation maps it to ClaimTypes.Role, which IsInRole/RequireRole read.
     private const string RoleClaimType = "role";
 
-    private readonly string _secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
-    private readonly int _expiryMinutes = int.TryParse(configuration["Jwt:ExpiryMinutes"], out var minutes) ? minutes : 60;
+    private readonly string _secret = options.Value.HasSecret
+        ? options.Value.Secret!
+        : throw new InvalidOperationException("Jwt:Secret is not configured.");
+    private readonly int _expiryMinutes = options.Value.ExpiryMinutes;
 
     public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user, IEnumerable<string> roles)
     {

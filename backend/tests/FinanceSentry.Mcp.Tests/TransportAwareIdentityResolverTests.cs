@@ -2,11 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using FinanceSentry.Mcp.Abstractions;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -76,7 +78,7 @@ public sealed class TransportAwareIdentityResolverTests
             store,
             new ServiceCollection().AddLogging().AddMcpOAuthTokenClient().BuildServiceProvider()
                 .GetRequiredService<McpOAuthTokenClient>(),
-            config,
+            Options.Create(new JwtOptions { Secret = secret }),
             NullLogger<LocalMcpSession>.Instance);
         session.InitializeAsync().GetAwaiter().GetResult();
         return session;

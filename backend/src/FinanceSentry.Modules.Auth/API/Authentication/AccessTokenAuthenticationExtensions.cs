@@ -1,19 +1,19 @@
 namespace FinanceSentry.Modules.Auth.API.Authentication;
 
-using System.Text;
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 /// <summary>
 /// The authentication every HTTP host shares: the stock JwtBearer handler as the default scheme, validating
-/// tokens signed with <c>Jwt:Secret</c> for one audience (<see cref="AuthAudiences"/>), plus a default-deny
+/// tokens signed with <see cref="JwtOptions.Secret"/> for one audience (<see cref="AuthAudiences"/>), plus a default-deny
 /// fallback policy: an endpoint with no authorization metadata is refused, so every endpoint must declare
 /// <see cref="AuthorizeAttribute"/> (optionally with a <see cref="AuthPolicies"/> policy) or
 /// <see cref="AllowAnonymousAttribute"/>. The request principal comes from the local account
@@ -54,24 +54,13 @@ public static class AccessTokenAuthenticationExtensions
                 };
             });
 
-        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Configure<IConfiguration>((options, config) =>
-            {
-                var secret = config["Jwt:Secret"]
-                    ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
+        // The secret is required here: a host that validates tokens refuses to start without it.
+        services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.SectionName).ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>());
 
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                    ValidateIssuer = false,
-                    ValidateAudience = true,
-                    ValidAudience = audience,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromSeconds(30),
-                };
-            });
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((options, jwt) =>
+                options.TokenValidationParameters = AccessTokenValidationParameters.Create(jwt.Value.Secret!, audience));
 
         if (configure is not null)
             services.Configure(JwtBearerDefaults.AuthenticationScheme, configure);

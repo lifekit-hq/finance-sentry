@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Auth;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure;
@@ -53,6 +54,7 @@ public static class AuthModule
                 .RequireClaim(Permissions.ClaimType, permission));
         }
 
+        services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.SectionName);
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IMcpAuthorizationCodeStore, PersistedMcpAuthorizationCodeStore>();
