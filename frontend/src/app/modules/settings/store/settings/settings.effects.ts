@@ -1,6 +1,6 @@
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
-import {ThemeService} from '@lifekit-hq/ui';
+import {ThemeService, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
@@ -13,12 +13,14 @@ interface EffectsStore {
   setLoadError: (errorCode: Nullable<string>) => void;
   setProfileSaving: (saving: boolean) => void;
   setProfileSaveError: (errorCode: Nullable<string>) => void;
+  profileSaveErrorMessage: () => string;
 }
 
 export function settingsEffects(store: EffectsStore) {
   const service = inject(SettingsService);
   const authStore = inject(AuthStore);
   const themeService = inject(ThemeService);
+  const toast = inject(ToastService);
 
   return {
     load: rxMethod<void>(
@@ -47,9 +49,11 @@ export function settingsEffects(store: EffectsStore) {
               authStore.setProfileName(profile.firstName, profile.lastName);
               themeService.setPreference(profile.theme);
               store.setProfileSaving(false);
+              toast.show('Profile saved successfully', 'success');
             }),
             catchError(err => {
               store.setProfileSaveError(extractErrorCode(err));
+              toast.show(store.profileSaveErrorMessage(), 'error');
               return EMPTY;
             })
           )
