@@ -15,7 +15,7 @@ public class CorrelationIdMiddleware(
     ILogger<CorrelationIdMiddleware> logger,
     CorrelationIdAccessor accessor)
 {
-    private const string CorrelationIdHeader = "X-Correlation-ID";
+    public const string CorrelationIdHeader = "X-Correlation-ID";
 
     private readonly RequestDelegate _next = next;
     private readonly ILogger<CorrelationIdMiddleware> _logger = logger;
