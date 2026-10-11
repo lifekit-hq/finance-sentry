@@ -969,11 +969,11 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ThesisIds")
+                    b.PrimitiveCollection<List<Guid>>("ThesisIds")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("Tickers")
+                    b.PrimitiveCollection<List<string>>("Tickers")
                         .IsRequired()
                         .HasColumnType("jsonb");
 

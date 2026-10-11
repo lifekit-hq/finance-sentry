@@ -425,18 +425,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         rdb.Property(x => x.Text).IsRequired();
         rdb.Property(x => x.CapturedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         rdb.Property(x => x.IndexStatus).IsRequired().HasConversion<string>().HasMaxLength(30);
-        rdb.Property(x => x.Tickers)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
-        rdb.Property(x => x.ThesisIds)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<Guid>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(GuidListComparer);
+        // Primitive collections stored as a jsonb array, so Contains/Any translate to SQL.
+        rdb.PrimitiveCollection(x => x.Tickers).HasColumnType("jsonb");
+        rdb.PrimitiveCollection(x => x.ThesisIds).HasColumnType("jsonb");
         // Postgres 14 treats NULLs as distinct in unique indexes, so this cannot dedupe two global
         // (null-user) rows by itself; the indexer upserts by this identity before inserting.
         rdb.HasIndex(x => new { x.SourceType, x.SourceId, x.UserId })
