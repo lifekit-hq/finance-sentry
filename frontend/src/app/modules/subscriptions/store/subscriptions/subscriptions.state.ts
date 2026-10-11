@@ -10,6 +10,8 @@ export interface SubscriptionsState {
   summary: Nullable<SubscriptionSummary>;
   hasInsufficientHistory: boolean;
   status: AsyncStatus;
+  /** Error code of the last failed list load; cleared when the next load starts. */
+  loadErrorCode: Nullable<string>;
   /** Error code from the last failed add; cleared when the next add starts. */
   addErrorCode: Nullable<string>;
   /** Server text of the last failed add, shown only for codes whose text names a row. */
@@ -22,6 +24,7 @@ export const initialSubscriptionsState: SubscriptionsState = {
   summary: null,
   hasInsufficientHistory: false,
   status: 'idle',
+  loadErrorCode: null,
   addErrorCode: null,
   addErrorDetail: null,
 };

@@ -9,6 +9,7 @@ interface EffectsStore {
   setSummaryItems: (items: BudgetSummaryItem[]) => void;
   setLoading: () => void;
   setError: () => void;
+  setRefreshFailed: () => void;
   setEditing: (id: Nullable<string>) => void;
   updateBudgetInList: (id: string, limit: number) => void;
   removeBudget: (id: string) => void;
@@ -20,11 +21,23 @@ interface EffectsStore {
 export function budgetsEffects(store: EffectsStore) {
   const service = inject(BudgetsService);
 
-  const refreshSummary = () =>
-    service.getBudgetSummary(store.selectedYear(), store.selectedMonth()).pipe(
-      tap(res => store.setSummaryItems(res.items)),
+  const fetchSummary = () =>
+    service
+      .getBudgetSummary(store.selectedYear(), store.selectedMonth())
+      .pipe(tap(res => store.setSummaryItems(res.items)));
+
+  const loadMonth = () =>
+    fetchSummary().pipe(
       catchError(() => {
         store.setError();
+        return EMPTY;
+      })
+    );
+
+  const refreshAfterChange = () =>
+    fetchSummary().pipe(
+      catchError(() => {
+        store.setRefreshFailed();
         return EMPTY;
       })
     );
@@ -33,7 +46,7 @@ export function budgetsEffects(store: EffectsStore) {
     loadSummary: rxMethod<void>(
       pipe(
         tap(() => store.setLoading()),
-        switchMap(() => refreshSummary())
+        switchMap(() => loadMonth())
       )
     ),
 
@@ -41,7 +54,7 @@ export function budgetsEffects(store: EffectsStore) {
       pipe(
         switchMap(req =>
           service.createBudget(req).pipe(
-            switchMap(() => refreshSummary()),
+            switchMap(() => refreshAfterChange()),
             catchError(() => EMPTY)
           )
         )
@@ -53,7 +66,7 @@ export function budgetsEffects(store: EffectsStore) {
         switchMap(({id, monthlyLimit}) =>
           service.updateBudget(id, {monthlyLimit}).pipe(
             tap(() => store.updateBudgetInList(id, monthlyLimit)),
-            switchMap(() => refreshSummary()),
+            switchMap(() => refreshAfterChange()),
             catchError(() => EMPTY)
           )
         )
@@ -65,7 +78,7 @@ export function budgetsEffects(store: EffectsStore) {
         switchMap(id =>
           service.deleteBudget(id).pipe(
             tap(() => store.removeBudget(id)),
-            switchMap(() => refreshSummary()),
+            switchMap(() => refreshAfterChange()),
             catchError(() => EMPTY)
           )
         )
@@ -74,8 +87,11 @@ export function budgetsEffects(store: EffectsStore) {
 
     navigateToPeriod: rxMethod<{year: number; month: number}>(
       pipe(
-        tap(({year, month}) => store.setSelectedPeriod(year, month)),
-        switchMap(() => refreshSummary())
+        tap(({year, month}) => {
+          store.setSelectedPeriod(year, month);
+          store.setLoading();
+        }),
+        switchMap(() => loadMonth())
       )
     ),
   };

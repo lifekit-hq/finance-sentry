@@ -10,15 +10,19 @@ import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
+  AsyncStateComponent,
   ButtonComponent,
   CmnPageActionsService,
   EmptyStateComponent,
   type LucideIconName,
   PageContainerComponent,
+  SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
 
 import {ALERTS_MARK_ALL_READ_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {
   type Alert,
   type AlertFilter,
@@ -31,6 +35,8 @@ import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
 import {ALERT_PAGE_SIZE_OPTIONS} from './alerts.constants';
+
+const SKELETON_ROWS = 5;
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -50,8 +56,10 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,
+    AsyncStateComponent,
     ButtonComponent,
     EmptyStateComponent,
+    SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -61,8 +69,22 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
 export class AlertsComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(AlertsStore);
+  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+
+  // The list is bound to the filter and page, so a stale page never stands in for the one being
+  // fetched: `hasData` stays false and a reload shows the skeleton instead of the previous rows.
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData: false,
+      errorMessage: this.store.errorMessage() ?? '',
+      offline: this.connectivity.offline(),
+      lastSyncedAt: null,
+    })
+  );
 
   public readonly alertsSubtitle = computed(() => {
     const count = this.store.unreadCount();

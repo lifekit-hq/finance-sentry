@@ -8,15 +8,27 @@
       (valueChange)="onMonthChange($event)"
     />
 
-    @if (store.summaryItems().length === 0) {
-      @if (store.status() !== 'loading') {
-        <cmn-empty-state
-          [message]="'No budgets for ' + store.monthName()"
-          subMessage="Set a monthly limit for a category to see how much you have left."
-          icon="PiggyBank"
-        />
-      }
-    } @else {
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [errorPlacement]="errorPlacement()"
+      [isEmpty]="store.summaryItems().length === 0"
+      [emptyMessage]="'No budgets for ' + store.monthName()"
+      (retry)="store.loadSummary()"
+      class="block space-y-cmn-5"
+      emptySubMessage="Set a monthly limit for a category to see how much you have left."
+      emptyIcon="PiggyBank"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-5" data-testid="budgets-skeleton">
+        <cmn-skeleton height="7rem" />
+        <div class="grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 lg:grid-cols-3">
+          @for (_ of skeletonCards; track $index) {
+            <cmn-skeleton height="8rem" />
+          }
+        </div>
+      </div>
+
       <!-- Over-budget warning -->
       @if (store.overBudgetCount() > 0) {
         <cmn-alert variant="warning" class="block">
@@ -155,6 +167,6 @@
           </cmn-card>
         }
       </div>
-    }
+    </cmn-async-state>
   </div>
 </cmn-page-container>

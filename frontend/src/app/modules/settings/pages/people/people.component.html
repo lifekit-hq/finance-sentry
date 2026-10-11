@@ -52,10 +52,17 @@
         <cmn-alert variant="error">{{ store.revokeErrorMessage() }}</cmn-alert>
       }
 
-      @if (store.loadErrorMessage()) {
-        <cmn-alert variant="error">{{ store.loadErrorMessage() }}</cmn-alert>
-      } @else if (store.isLoading()) {
-        <cmn-card padding="none">
+      <cmn-async-state
+        [status]="view().status"
+        [errorMessage]="view().errorMessage"
+        [isEmpty]="store.rows().length === 0"
+        (retry)="store.load()"
+        emptyMessage="No one here yet"
+        emptySubMessage="Invite someone to get started."
+        errorPlacement="above"
+        retryable
+      >
+        <cmn-card skeleton padding="none">
           @for (row of skeletonRows; track row) {
             <div class="p-cmn-4 space-y-cmn-2">
               <cmn-skeleton width="40%" height="14px" />
@@ -63,9 +70,7 @@
             </div>
           }
         </cmn-card>
-      } @else if (store.rows().length === 0) {
-        <cmn-empty-state message="No one here yet" subMessage="Invite someone to get started." />
-      } @else {
+
         <cmn-card padding="none">
           @for (person of store.rows(); track person.id) {
             <cmn-list-item-row
@@ -88,7 +93,7 @@
             </cmn-list-item-row>
           }
         </cmn-card>
-      }
+      </cmn-async-state>
     </section>
   </div>
 </cmn-page-container>

@@ -1,19 +1,27 @@
-import {ChangeDetectionStrategy, Component, inject, signal, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  ViewContainerRef,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
+  AsyncStateComponent,
   CardComponent,
   CmnDialogService,
   CmnPageActionsService,
-  EmptyStateComponent,
   IconComponent,
   InputComponent,
   MenuComponent,
   type MenuItem,
   MonthStepperComponent,
   PageContainerComponent,
+  SkeletonComponent,
   TagComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
@@ -22,14 +30,20 @@ import {BUDGETS_ADD_ACTION} from '../../../../shared/constants/page-actions/page
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
 import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
-import {BUDGET_NEAR_LIMIT_PCT} from '../../constants/budget/budget.constants';
+import {
+  BUDGET_NEAR_LIMIT_PCT,
+  BUDGETS_LOAD_ERROR_MESSAGE,
+} from '../../constants/budget/budget.constants';
 import {type CreateBudgetRequest} from '../../models/budget/budget.model';
 import {BudgetsStore} from '../../store/budgets/budgets.store';
 
 const PCT_MAX = 100;
+const SKELETON_CARDS = 3;
 
 const BUDGET_MENU_ITEMS: MenuItem[] = [
   {id: 'edit', label: 'Edit limit', icon: 'Pencil'},
@@ -43,14 +57,15 @@ const BUDGET_MENU_ITEMS: MenuItem[] = [
     PageContainerComponent,
     InputHintsDirective,
     AlertComponent,
+    AsyncStateComponent,
     CardComponent,
-    EmptyStateComponent,
     FormsModule,
     IconComponent,
     InputComponent,
     MenuComponent,
     MoneyPipe,
     MonthStepperComponent,
+    SkeletonComponent,
     TagComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,8 +76,27 @@ export class BudgetsComponent {
   private readonly router = inject(Router);
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(BudgetsStore);
+  public readonly skeletonCards = Array.from({length: SKELETON_CARDS});
+  // The cards belong to one month, so a failed or pending month never keeps the previous
+  // month's cards on screen (`hasData: false`): it shows the skeleton or the error instead.
+  // A failed refresh after an edit is the exception: the list is still valid, so it stays under
+  // the error banner.
+  public readonly view = computed(() => {
+    const hasData = this.store.refreshFailed();
+    return AsyncViewUtils.resolve({
+      isLoading: this.store.status() === 'loading',
+      hasData,
+      errorMessage: hasData || this.store.status() === 'error' ? BUDGETS_LOAD_ERROR_MESSAGE : '',
+      offline: this.connectivity.offline() && !hasData,
+      lastSyncedAt: null,
+    });
+  });
+  public readonly errorPlacement = computed(() =>
+    this.store.refreshFailed() ? 'above' : 'replace'
+  );
 
   public readonly editValue = signal('');
   public readonly budgetMenuItems = BUDGET_MENU_ITEMS;
