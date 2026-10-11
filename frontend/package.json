@@ -1,6 +1,6 @@
 {
   "name": "finance-sentry",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "scripts": {
     "ng": "ng",
     "whats-new": "node scripts/build-whats-new.mjs",
