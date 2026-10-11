@@ -69,6 +69,32 @@ public sealed class SecEdgarServiceTests
     }
 
     [Fact]
+    public async Task GetRecentFilingsAsync_ConcurrentCallersWithDifferentFlags_EachKeepsItsOwn()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var gate = new ManualResetEventSlim();
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json(TickerMapJson);
+            }
+
+            entered.Set();
+            gate.Wait();
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        });
+
+        var lenient = Task.Run(() => sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10, surfaceProviderFailure: false));
+        entered.Wait();
+        var strict = sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10, surfaceProviderFailure: true);
+        gate.Set();
+
+        (await lenient).Should().BeEmpty();
+        await strict.Awaiting(t => t).Should().ThrowAsync<EdgarProviderException>();
+    }
+
+    [Fact]
     public async Task GetRecentFilingsAsync_TickerNotAFiler_SurfaceProviderFailureTrue_StaysEmpty()
     {
         var sut = CreateSut(request =>
@@ -179,6 +205,6 @@ public sealed class SecEdgarServiceTests
     private sealed class DelegatingStub(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(respond(request));
+            => Task.Run(() => respond(request), cancellationToken);
     }
 }

@@ -66,7 +66,7 @@ public sealed class SecEdgarService(
     ];
 
     private readonly SemaphoreSlim tickerMapLock = new(1, 1);
-    private readonly TtlCache<IReadOnlyList<EdgarFiling>> filingsCache = new(clock, FilingsTtl, MaxCachedTickers);
+    private readonly TtlCache<FilingsRead> filingsCache = new(clock, FilingsTtl, MaxCachedTickers);
     private readonly TtlCache<FundamentalsSourceResult> fundamentalsCache = new(clock, ResultTtl, MaxCachedTickers);
 
     private IReadOnlyDictionary<string, string>? tickerToCik;
@@ -81,8 +81,13 @@ public sealed class SecEdgarService(
             ? formTypes.Select(f => f.Trim().ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : DefaultFormTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var all = await GetAllFilingsAsync(upper, surfaceProviderFailure, ct);
-        return all
+        var read = await GetAllFilingsAsync(upper, ct);
+        if (surfaceProviderFailure && read.ProviderFailure is not null)
+        {
+            throw new EdgarProviderException(read.ProviderFailure);
+        }
+
+        return read.Filings
             .Where(f => forms.Contains(f.Form))
             .Take(Math.Max(1, limit))
             .ToList();
@@ -128,7 +133,7 @@ public sealed class SecEdgarService(
         }
 
         var issuerType = IssuerTypeFromForms(fetch.Facts.Select(f => f.Form))
-            ?? IssuerTypeFromForms((await GetAllFilingsAsync(upper, surfaceProviderFailure: false, ct)).Select(f => f.Form));
+            ?? IssuerTypeFromForms((await GetAllFilingsAsync(upper, ct)).Filings.Select(f => f.Form));
 
         var result = fetch.Facts.Count > 0
             ? FundamentalsSourceResult.WithFacts(fetch.Facts, issuerType)
@@ -186,39 +191,26 @@ public sealed class SecEdgarService(
         return new TaxonomyFetch(fetched.SelectMany(f => f.Facts).ToList(), fetched.Sum(f => f.Failures));
     }
 
-    private Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(
-        string ticker, bool surfaceProviderFailure, CancellationToken ct)
-        => filingsCache.GetOrFetchAsync(
-            ticker, token => FetchAllFilingsAsync(ticker, surfaceProviderFailure, token), ct);
+    private Task<FilingsRead> GetAllFilingsAsync(string ticker, CancellationToken ct)
+        => filingsCache.GetOrFetchAsync(ticker, token => FetchAllFilingsAsync(ticker, token), ct);
 
-    private async Task<(IReadOnlyList<EdgarFiling> Value, bool Cacheable)> FetchAllFilingsAsync(
-        string ticker, bool surfaceProviderFailure, CancellationToken ct)
+    // The shared fetch never throws for a provider failure: it reports it in ProviderFailure (uncached)
+    // and each caller decides whether to surface it, so joiners of one flight keep their own flag.
+    private async Task<(FilingsRead Value, bool Cacheable)> FetchAllFilingsAsync(string ticker, CancellationToken ct)
     {
         var (cik, mapFetchFailed) = await ResolveCikAsync(ticker, ct);
         if (cik is null)
         {
             // mapFetchFailed distinguishes "EDGAR's map fetch never succeeded" (a provider
             // outage) from "the map is fine, this ticker just isn't a filer" (not a failure).
-            if (surfaceProviderFailure && mapFetchFailed)
-            {
-                throw new EdgarProviderException($"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}.");
-            }
-
-            return ([], false);
+            return (new FilingsRead(
+                [], mapFetchFailed ? $"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}." : null), false);
         }
 
         var filings = await FetchSubmissionsAsync(ticker, cik, ct);
-        if (filings is null)
-        {
-            if (surfaceProviderFailure)
-            {
-                throw new EdgarProviderException($"EDGAR submissions fetch failed for {ticker}.");
-            }
-
-            return ([], false);
-        }
-
-        return (filings, true);
+        return filings is null
+            ? (new FilingsRead([], $"EDGAR submissions fetch failed for {ticker}."), false)
+            : (new FilingsRead(filings, null), true);
     }
 
     // Null on a failed fetch, so the failure is not cached and the next call retries.
@@ -481,6 +473,8 @@ public sealed class SecEdgarService(
         fundamentalsCache.Dispose();
         tickerMapLock.Dispose();
     }
+
+    private sealed record FilingsRead(IReadOnlyList<EdgarFiling> Filings, string? ProviderFailure);
 
     private readonly record struct ConceptFetch(IReadOnlyList<FundamentalFact> Facts, int Failures);
 
