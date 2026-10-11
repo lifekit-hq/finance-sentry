@@ -291,7 +291,7 @@ public sealed class SecEdgarFundamentalsTests
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient(SecEdgarService.HttpClientName))
             .Returns(() => new HttpClient(new DelegatingStub(respond)));
-        return new SecEdgarService(factory.Object, NullLogger<SecEdgarService>.Instance);
+        return new SecEdgarService(factory.Object, TimeProvider.System, NullLogger<SecEdgarService>.Instance);
     }
 
     private static HttpResponseMessage Json(string body)

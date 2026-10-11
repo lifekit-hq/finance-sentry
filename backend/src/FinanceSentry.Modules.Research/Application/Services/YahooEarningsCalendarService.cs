@@ -1,9 +1,9 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
-using System.Collections.Concurrent;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
 // Live earnings/ex-dividend fetch from Yahoo Finance's quoteSummary "calendarEvents" module.
@@ -12,7 +12,8 @@ using Microsoft.Extensions.Logging;
 // dates change rarely. Registered as a singleton so the crumb and cache survive across requests.
 public sealed class YahooEarningsCalendarService(
     IHttpClientFactory httpFactory,
-    ILogger<YahooEarningsCalendarService> logger) : IEarningsCalendarService
+    TimeProvider clock,
+    ILogger<YahooEarningsCalendarService> logger) : IEarningsCalendarService, IDisposable
 {
     public const string HttpClientName = "yahoo-earnings";
 
@@ -20,12 +21,13 @@ public sealed class YahooEarningsCalendarService(
     private const string CrumbUrl = "https://query1.finance.yahoo.com/v1/test/getcrumb";
 
     private const int MaxConcurrentFetches = 4;
+    private const int MaxCachedTickers = 5_000;
 
     private static readonly TimeSpan CrumbTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
     private readonly SemaphoreSlim crumbLock = new(1, 1);
-    private readonly ConcurrentDictionary<string, CachedEvents> cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly TtlCache<TickerFetchResult> cache = new(clock, CacheTtl, MaxCachedTickers);
 
     private string? crumb;
     private DateTimeOffset crumbFetchedAt;
@@ -84,13 +86,19 @@ public sealed class YahooEarningsCalendarService(
             .ToList();
     }
 
-    private async Task<TickerFetchResult> FetchTickerAsync(string ticker, CancellationToken ct)
-    {
-        if (cache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < CacheTtl)
-        {
-            return new TickerFetchResult(hit.Events, false);
-        }
+    // Concurrent misses on one ticker share a single upstream fetch; a failed fetch is not cached.
+    private Task<TickerFetchResult> FetchTickerAsync(string ticker, CancellationToken ct)
+        => cache.GetOrFetchAsync(
+            ticker,
+            async token =>
+            {
+                var result = await QueryTickerAsync(ticker, token);
+                return (result, !result.Failed);
+            },
+            ct);
 
+    private async Task<TickerFetchResult> QueryTickerAsync(string ticker, CancellationToken ct)
+    {
         var client = httpFactory.CreateClient(HttpClientName);
 
         var crumbValue = await GetCrumbAsync(client, forceRefresh: false, ct);
@@ -112,18 +120,12 @@ public sealed class YahooEarningsCalendarService(
             (events, _, failed) = await QueryYahooAsync(client, ticker, crumbValue, ct);
         }
 
-        if (failed)
-        {
-            return new TickerFetchResult([], true);
-        }
-
-        cache[ticker] = new CachedEvents(DateTimeOffset.UtcNow, events);
-        return new TickerFetchResult(events, false);
+        return failed ? new TickerFetchResult([], true) : new TickerFetchResult(events, false);
     }
 
     private async Task<string?> GetCrumbAsync(HttpClient client, bool forceRefresh, CancellationToken ct)
     {
-        if (!forceRefresh && crumb is not null && DateTimeOffset.UtcNow - crumbFetchedAt < CrumbTtl)
+        if (!forceRefresh && crumb is not null && clock.GetUtcNow() - crumbFetchedAt < CrumbTtl)
         {
             return crumb;
         }
@@ -131,7 +133,7 @@ public sealed class YahooEarningsCalendarService(
         await crumbLock.WaitAsync(ct);
         try
         {
-            if (!forceRefresh && crumb is not null && DateTimeOffset.UtcNow - crumbFetchedAt < CrumbTtl)
+            if (!forceRefresh && crumb is not null && clock.GetUtcNow() - crumbFetchedAt < CrumbTtl)
             {
                 return crumb;
             }
@@ -162,7 +164,7 @@ public sealed class YahooEarningsCalendarService(
             }
 
             crumb = value;
-            crumbFetchedAt = DateTimeOffset.UtcNow;
+            crumbFetchedAt = clock.GetUtcNow();
             return crumb;
         }
         finally
@@ -275,7 +277,11 @@ public sealed class YahooEarningsCalendarService(
         return DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime);
     }
 
-    private readonly record struct CachedEvents(DateTimeOffset FetchedAt, IReadOnlyList<EarningsEvent> Events);
+    public void Dispose()
+    {
+        cache.Dispose();
+        crumbLock.Dispose();
+    }
 
     // Failed distinguishes "this ticker's fetch errored at the provider" from "fetched fine, no
     // events" — only the former can make a surfaceProviderFailure batch throw.

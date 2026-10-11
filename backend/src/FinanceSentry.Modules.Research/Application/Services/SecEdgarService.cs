@@ -1,12 +1,12 @@
 namespace FinanceSentry.Modules.Research.Application.Services;
 
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
 // Live SEC EDGAR access (data.sec.gov) — filings + XBRL fundamentals. Free and key-less, but SEC
@@ -16,7 +16,8 @@ using Microsoft.Extensions.Logging;
 // readers through the provider chain (SecEdgarFundamentalsSource, one per taxonomy), never directly.
 public sealed class SecEdgarService(
     IHttpClientFactory httpFactory,
-    ILogger<SecEdgarService> logger) : ISecEdgarService
+    TimeProvider clock,
+    ILogger<SecEdgarService> logger) : ISecEdgarService, IDisposable
 {
     public const string HttpClientName = "sec-edgar";
 
@@ -34,6 +35,7 @@ public sealed class SecEdgarService(
     private static readonly TimeSpan FilingsTtl = TimeSpan.FromMinutes(30);
 
     private const int MaxConcurrentConceptFetches = 4;
+    private const int MaxCachedTickers = 5_000;
 
     // Friendly name -> ordered us-gaap tags to try (first that returns data wins). Company taxonomies
     // differ (e.g. some report Revenues, others RevenueFromContractWithCustomer...), hence fallbacks.
@@ -64,8 +66,8 @@ public sealed class SecEdgarService(
     ];
 
     private readonly SemaphoreSlim tickerMapLock = new(1, 1);
-    private readonly ConcurrentDictionary<string, CachedFilings> filingsCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, CachedFundamentals> fundamentalsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly TtlCache<FilingsRead> filingsCache = new(clock, FilingsTtl, MaxCachedTickers);
+    private readonly TtlCache<FundamentalsSourceResult> fundamentalsCache = new(clock, ResultTtl, MaxCachedTickers);
 
     private IReadOnlyDictionary<string, string>? tickerToCik;
     private DateTimeOffset tickerMapFetchedAt;
@@ -79,8 +81,13 @@ public sealed class SecEdgarService(
             ? formTypes.Select(f => f.Trim().ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : DefaultFormTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var all = await GetAllFilingsAsync(upper, surfaceProviderFailure, ct);
-        return all
+        var read = await GetAllFilingsAsync(upper, ct);
+        if (surfaceProviderFailure && read.ProviderFailure is not null)
+        {
+            throw new EdgarProviderException(read.ProviderFailure);
+        }
+
+        return read.Filings
             .Where(f => forms.Contains(f.Form))
             .Take(Math.Max(1, limit))
             .ToList();
@@ -97,19 +104,22 @@ public sealed class SecEdgarService(
             _ => throw new ArgumentOutOfRangeException(nameof(taxonomy), taxonomy, "Unsupported XBRL taxonomy."),
         };
 
-        var cacheKey = $"{upper}|{taxonomy}";
-        if (fundamentalsCache.TryGetValue(cacheKey, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < ResultTtl)
-        {
-            return hit.Result;
-        }
+        // Concurrent misses on one ticker + taxonomy share a single fetch.
+        return await fundamentalsCache.GetOrFetchAsync(
+            $"{upper}|{taxonomy}", token => FetchFundamentalsAsync(upper, taxonomy, concepts, token), ct);
+    }
 
+    // The value is cached only on a fully successful read; a failure or partial read is not.
+    private async Task<(FundamentalsSourceResult Value, bool Cacheable)> FetchFundamentalsAsync(
+        string upper, string taxonomy, (string Concept, string[] Tags)[] concepts, CancellationToken ct)
+    {
         var (cik, mapFetchFailed) = await ResolveCikAsync(upper, ct);
         if (cik is null)
         {
-            return mapFetchFailed
+            return (mapFetchFailed
                 ? FundamentalsSourceResult.Failed("EDGAR ticker->CIK map unavailable")
                 : FundamentalsSourceResult.NoData(
-                    "not in the SEC ticker map", FundamentalsIssuerType.NotSecRegistrant);
+                    "not in the SEC ticker map", FundamentalsIssuerType.NotSecRegistrant), false);
         }
 
         var fetch = await FetchTaxonomyAsync(upper, cik, taxonomy, concepts, ct);
@@ -119,23 +129,18 @@ public sealed class SecEdgarService(
         // another taxonomy or provider on a bad night.
         if (fetch.Facts.Count == 0 && fetch.Failures > 0)
         {
-            return FundamentalsSourceResult.Failed($"EDGAR {taxonomy} concept fetches failed for {upper}");
+            return (FundamentalsSourceResult.Failed($"EDGAR {taxonomy} concept fetches failed for {upper}"), false);
         }
 
         var issuerType = IssuerTypeFromForms(fetch.Facts.Select(f => f.Form))
-            ?? IssuerTypeFromForms((await GetAllFilingsAsync(upper, surfaceProviderFailure: false, ct)).Select(f => f.Form));
+            ?? IssuerTypeFromForms((await GetAllFilingsAsync(upper, ct)).Filings.Select(f => f.Form));
 
         var result = fetch.Facts.Count > 0
             ? FundamentalsSourceResult.WithFacts(fetch.Facts, issuerType)
             : FundamentalsSourceResult.NoData($"no {taxonomy} facts filed", issuerType);
 
         // Partial failures (some tags errored) still return what was read, but are not cached.
-        if (fetch.Failures == 0)
-        {
-            fundamentalsCache[cacheKey] = new CachedFundamentals(DateTimeOffset.UtcNow, result);
-        }
-
-        return result;
+        return (result, fetch.Failures == 0);
     }
 
     // The issuer kind told by what it files, newest form first (the submissions feed is newest-first;
@@ -186,40 +191,26 @@ public sealed class SecEdgarService(
         return new TaxonomyFetch(fetched.SelectMany(f => f.Facts).ToList(), fetched.Sum(f => f.Failures));
     }
 
-    private async Task<IReadOnlyList<EdgarFiling>> GetAllFilingsAsync(
-        string ticker, bool surfaceProviderFailure, CancellationToken ct)
-    {
-        if (filingsCache.TryGetValue(ticker, out var hit) && DateTimeOffset.UtcNow - hit.FetchedAt < FilingsTtl)
-        {
-            return hit.Filings;
-        }
+    private Task<FilingsRead> GetAllFilingsAsync(string ticker, CancellationToken ct)
+        => filingsCache.GetOrFetchAsync(ticker, token => FetchAllFilingsAsync(ticker, token), ct);
 
+    // The shared fetch never throws for a provider failure: it reports it in ProviderFailure (uncached)
+    // and each caller decides whether to surface it, so joiners of one flight keep their own flag.
+    private async Task<(FilingsRead Value, bool Cacheable)> FetchAllFilingsAsync(string ticker, CancellationToken ct)
+    {
         var (cik, mapFetchFailed) = await ResolveCikAsync(ticker, ct);
         if (cik is null)
         {
             // mapFetchFailed distinguishes "EDGAR's map fetch never succeeded" (a provider
             // outage) from "the map is fine, this ticker just isn't a filer" (not a failure).
-            if (surfaceProviderFailure && mapFetchFailed)
-            {
-                throw new EdgarProviderException($"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}.");
-            }
-
-            return [];
+            return (new FilingsRead(
+                [], mapFetchFailed ? $"EDGAR ticker->CIK map unavailable; cannot resolve {ticker}." : null), false);
         }
 
         var filings = await FetchSubmissionsAsync(ticker, cik, ct);
-        if (filings is null)
-        {
-            if (surfaceProviderFailure)
-            {
-                throw new EdgarProviderException($"EDGAR submissions fetch failed for {ticker}.");
-            }
-
-            return [];
-        }
-
-        filingsCache[ticker] = new CachedFilings(DateTimeOffset.UtcNow, filings);
-        return filings;
+        return filings is null
+            ? (new FilingsRead([], $"EDGAR submissions fetch failed for {ticker}."), false)
+            : (new FilingsRead(filings, null), true);
     }
 
     // Null on a failed fetch, so the failure is not cached and the next call retries.
@@ -313,7 +304,7 @@ public sealed class SecEdgarService(
                 await using var stream = await response.Content.ReadAsStreamAsync(ct);
                 using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
 
-                merged.AddRange(ParseConcept(ticker, cik, taxonomy, concept, url, doc.RootElement, DateTimeOffset.UtcNow));
+                merged.AddRange(ParseConcept(ticker, cik, taxonomy, concept, url, doc.RootElement, clock.GetUtcNow()));
             }
             // An HttpClient timeout is a TaskCanceledException too: only the caller's own cancellation propagates.
             catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -420,7 +411,7 @@ public sealed class SecEdgarService(
 
     private async Task<IReadOnlyDictionary<string, string>?> GetTickerMapAsync(CancellationToken ct)
     {
-        if (tickerToCik is not null && DateTimeOffset.UtcNow - tickerMapFetchedAt < TickerMapTtl)
+        if (tickerToCik is not null && clock.GetUtcNow() - tickerMapFetchedAt < TickerMapTtl)
         {
             return tickerToCik;
         }
@@ -428,7 +419,7 @@ public sealed class SecEdgarService(
         await tickerMapLock.WaitAsync(ct);
         try
         {
-            if (tickerToCik is not null && DateTimeOffset.UtcNow - tickerMapFetchedAt < TickerMapTtl)
+            if (tickerToCik is not null && clock.GetUtcNow() - tickerMapFetchedAt < TickerMapTtl)
             {
                 return tickerToCik;
             }
@@ -457,7 +448,7 @@ public sealed class SecEdgarService(
             }
 
             tickerToCik = map;
-            tickerMapFetchedAt = DateTimeOffset.UtcNow;
+            tickerMapFetchedAt = clock.GetUtcNow();
             return tickerToCik;
         }
         catch (Exception ex)
@@ -476,9 +467,14 @@ public sealed class SecEdgarService(
 
     private static string Blank(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value;
 
-    private readonly record struct CachedFilings(DateTimeOffset FetchedAt, IReadOnlyList<EdgarFiling> Filings);
+    public void Dispose()
+    {
+        filingsCache.Dispose();
+        fundamentalsCache.Dispose();
+        tickerMapLock.Dispose();
+    }
 
-    private readonly record struct CachedFundamentals(DateTimeOffset FetchedAt, FundamentalsSourceResult Result);
+    private sealed record FilingsRead(IReadOnlyList<EdgarFiling> Filings, string? ProviderFailure);
 
     private readonly record struct ConceptFetch(IReadOnlyList<FundamentalFact> Facts, int Failures);
 

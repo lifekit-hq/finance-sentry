@@ -150,7 +150,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     {
         await using var alerts = AlertsContext();
         var calendar = new YahooEarningsCalendarService(
-            new FixtureHttpClientFactory(), NullLogger<YahooEarningsCalendarService>.Instance);
+            new FixtureHttpClientFactory(), TimeProvider.System, NullLogger<YahooEarningsCalendarService>.Instance);
         var job = new EarningsAheadJob(
             _banking.Object, Universe(), calendar, Generator(alerts), NullLogger<EarningsAheadJob>.Instance);
 
@@ -160,7 +160,7 @@ public sealed class LookaheadReplayTests : IAsyncLifetime
     private async Task RunFilingWatchAsync(DateTime nowUtc)
     {
         await using var alerts = AlertsContext();
-        var edgar = new SecEdgarService(new FixtureHttpClientFactory(), NullLogger<SecEdgarService>.Instance);
+        var edgar = new SecEdgarService(new FixtureHttpClientFactory(), TimeProvider.System, NullLogger<SecEdgarService>.Instance);
         var job = new FilingWatchJob(
             _banking.Object, Universe(), edgar, Generator(alerts), NullLogger<FilingWatchJob>.Instance);
 

@@ -1,10 +1,10 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Sources;
 
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 public sealed class YahooFundamentalsSource(
     IHttpClientFactory httpFactory,
     TimeProvider clock,
-    ILogger<YahooFundamentalsSource> logger) : IFundamentalsSource
+    ILogger<YahooFundamentalsSource> logger) : IFundamentalsSource, IDisposable
 {
     public const string HttpClientName = "yahoo-fundamentals";
 
@@ -32,6 +32,8 @@ public sealed class YahooFundamentalsSource(
     private const string AnnualPeriodType = "12M";
     private const string PerShareSuffix = "/shares";
     private const int HistoryYears = 6;
+
+    private const int MaxCachedTickers = 5_000;
 
     private static readonly TimeSpan ResultTtl = TimeSpan.FromHours(12);
 
@@ -50,19 +52,20 @@ public sealed class YahooFundamentalsSource(
     private static readonly string TypeQuery = string.Join(
         ',', Concepts.SelectMany(c => new[] { QuarterlyPrefix + c.YahooType, AnnualPrefix + c.YahooType }));
 
-    private readonly ConcurrentDictionary<string, Cached> cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly TtlCache<FundamentalsSourceResult> cache = new(clock, ResultTtl, MaxCachedTickers);
 
     public string Name => FundamentalsSourceNames.YahooFinance;
 
-    public async Task<FundamentalsSourceResult> FetchAsync(string ticker, CancellationToken ct)
+    public Task<FundamentalsSourceResult> FetchAsync(string ticker, CancellationToken ct)
     {
         var upper = ticker.Trim().ToUpperInvariant();
-        var now = clock.GetUtcNow();
-        if (cache.TryGetValue(upper, out var hit) && now - hit.FetchedAt < ResultTtl)
-        {
-            return hit.Result;
-        }
+        return cache.GetOrFetchAsync(upper, token => QueryAsync(upper, token), ct);
+    }
 
+    // Success and "no data" are cached; a failure is not, so the next call retries.
+    private async Task<(FundamentalsSourceResult Value, bool Cacheable)> QueryAsync(string upper, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
         var documentUrl = DocumentUrl(upper);
         var url = $"{documentUrl}&period1={now.AddYears(-HistoryYears).ToUnixTimeSeconds()}&period2={now.ToUnixTimeSeconds()}";
 
@@ -77,14 +80,13 @@ public sealed class YahooFundamentalsSource(
             var result = facts.Count > 0
                 ? FundamentalsSourceResult.WithFacts(facts)
                 : FundamentalsSourceResult.NoData("no fundamentals timeseries");
-            cache[upper] = new Cached(now, result);
-            return result;
+            return (result, true);
         }
         // An HttpClient timeout is a TaskCanceledException too: only the caller's own cancellation propagates.
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Yahoo fundamentals fetch failed for {Ticker}", upper);
-            return FundamentalsSourceResult.Failed($"Yahoo fundamentals fetch failed: {ex.Message}");
+            return (FundamentalsSourceResult.Failed($"Yahoo fundamentals fetch failed: {ex.Message}"), false);
         }
     }
 
@@ -194,5 +196,5 @@ public sealed class YahooFundamentalsSource(
             SourceProvenance: provenance);
     }
 
-    private readonly record struct Cached(DateTimeOffset FetchedAt, FundamentalsSourceResult Result);
+    public void Dispose() => cache.Dispose();
 }
