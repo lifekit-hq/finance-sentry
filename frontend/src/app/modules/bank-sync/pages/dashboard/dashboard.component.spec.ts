@@ -425,6 +425,16 @@ describe('DashboardComponent async states', () => {
       expect(el.textContent).toContain("Net worth history starts after tonight's snapshot.");
     });
 
+    it.each([
+      ['the page', {isLoading: signal(true)}],
+      ['the history', {isHistoryLoading: signal(true)}],
+    ])('keeps the chart mounted when %s reloads over existing history', (_, loading) => {
+      const {el} = render('3m', undefined, null, {historyHasHistory: signal(true), ...loading});
+
+      expect(el.querySelector(SKELETON)).toBeNull();
+      expect(el.querySelector(CHART)).not.toBeNull();
+    });
+
     it('mounts the chart once history has loaded', () => {
       const {el} = render();
 
