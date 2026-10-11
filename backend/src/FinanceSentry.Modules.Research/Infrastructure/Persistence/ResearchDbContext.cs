@@ -478,16 +478,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             .IsUnique().HasDatabaseName("idx_asset_ledger_reads_user_symbol");
     }
 
-    private static readonly ValueComparer<List<string>> StringListComparer = new(
-        (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
-        v => v.Aggregate(0, (hash, s) => HashCode.Combine(hash, s.GetHashCode())),
-        v => v.ToList());
-
-    private static readonly ValueComparer<List<Guid>> GuidListComparer = new(
-        (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
-        v => v.Aggregate(0, (hash, g) => HashCode.Combine(hash, g.GetHashCode())),
-        v => v.ToList());
-
     private static readonly ValueComparer<float[]> FloatArrayComparer = new(
         (a, b) => (a ?? Array.Empty<float>()).SequenceEqual(b ?? Array.Empty<float>()),
         v => v.Aggregate(0, (hash, f) => HashCode.Combine(hash, f.GetHashCode())),
