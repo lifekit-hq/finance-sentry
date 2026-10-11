@@ -178,16 +178,23 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         ib.Property(x => x.ReviewCadence).IsRequired().HasMaxLength(20);
         ib.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ib.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        ib.Property(x => x.Goals)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<InvestmentGoal>>(v, jsonOptions) ?? new());
-        ib.Property(x => x.AllocationTargets)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<AllocationTarget>>(v, jsonOptions) ?? new());
+        // JSON-mapped complex collections with the camelCase names the former string conversion wrote.
+        ib.ComplexCollection(x => x.Goals, c =>
+        {
+            c.ToJson("Goals");
+            c.Property(p => p.Label).HasJsonPropertyName("label");
+            c.Property(p => p.TargetAmountUsd).HasJsonPropertyName("targetAmountUsd");
+            c.Property(p => p.TargetDate).HasJsonPropertyName("targetDate");
+            c.Property(p => p.Priority).HasJsonPropertyName("priority");
+        });
+        ib.ComplexCollection(x => x.AllocationTargets, c =>
+        {
+            c.ToJson("AllocationTargets");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.TargetPct).HasJsonPropertyName("targetPct");
+            c.Property(p => p.MinPct).HasJsonPropertyName("minPct");
+            c.Property(p => p.MaxPct).HasJsonPropertyName("maxPct");
+        });
         ib.PrimitiveCollection(x => x.Exclusions).HasColumnType("jsonb");
         ib.Property(x => x.RebalancingRule)
             .HasColumnType("jsonb")
