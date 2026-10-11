@@ -16,6 +16,8 @@ using FinanceSentry.Infrastructure.Persistence;
 
 public static class WealthModule
 {
+    public const string MigrationsHistoryTable = "__ef_migrations_history_wealth";
+
     internal sealed class ModuleRegistrar : IModuleRegistrar
     {
         public void Register(IServiceCollection services, IConfiguration config)
@@ -57,7 +59,7 @@ public static class WealthModule
         services.AddUpdatedAtStamping();
         services.AddDbContext<WealthDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_wealth", "public")).UseUpdatedAtStamping(sp));
+                b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         // #673: published read port - the Integration adapter reaches the snapshots only through it.

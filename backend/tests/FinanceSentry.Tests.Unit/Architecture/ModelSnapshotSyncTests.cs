@@ -19,7 +19,7 @@ using Xunit;
 /// </summary>
 public class ModelSnapshotSyncTests
 {
-    private static IEnumerable<Type> ContextTypes()
+    internal static IEnumerable<Type> ContextTypes()
     {
         var files = Directory.GetFiles(AppContext.BaseDirectory, "FinanceSentry.*.dll")
             .Where(f => !Path.GetFileName(f).StartsWith("FinanceSentry.Tests.", StringComparison.Ordinal));
@@ -50,7 +50,7 @@ public class ModelSnapshotSyncTests
             {
                 if (type.IsClass && !type.IsAbstract && typeof(DbContext).IsAssignableFrom(type)
                     && type.GetConstructors().Any(c =>
-                        c.GetParameters() is [var p] && p.ParameterType.IsGenericType
+                        c.GetParameters() is [var p, ..] && p.ParameterType.IsGenericType
                         && p.ParameterType.GetGenericTypeDefinition() == typeof(DbContextOptions<>)))
                 {
                     yield return type;
