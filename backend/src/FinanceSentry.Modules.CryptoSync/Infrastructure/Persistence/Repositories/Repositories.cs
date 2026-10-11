@@ -67,24 +67,30 @@ public sealed class CryptoHoldingRepository(CryptoSyncDbContext context) : ICryp
 {
     private readonly CryptoSyncDbContext _context = context;
 
+    // One INSERT ... ON CONFLICT per holding on the unique (UserId, Provider, Asset) index: the write is atomic, so
+    // two overlapping syncs of one venue update the same row instead of the loser failing on the index, and no read
+    // precedes it. It runs at once rather than at SaveChanges, and a holding already tracked by this context is not
+    // refreshed. The DO UPDATE list mirrors CryptoHolding.Update (a reappearing asset reopens its row; cost basis,
+    // cursor and ledger columns are left alone).
     public async Task UpsertRangeAsync(IReadOnlyList<CryptoHolding> holdings, CancellationToken ct = default)
     {
-        foreach (var holding in holdings)
+        foreach (var h in holdings)
         {
-            var existing = await _context.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
-                .FirstOrDefaultAsync(h => h.UserId == holding.UserId
-                    && h.Provider == holding.Provider
-                    && h.Asset == holding.Asset, ct);
-
-            if (existing is not null)
-            {
-                existing.Update(holding.FreeQuantity, holding.LockedQuantity, holding.UsdValue, holding.IsFiat);
-                _context.CryptoHoldings.Update(existing);
-            }
-            else
-            {
-                await _context.CryptoHoldings.AddAsync(holding, ct);
-            }
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO crypto_sync."CryptoHoldings"
+                    ("Id", "UserId", "Provider", "Asset", "FreeQuantity", "LockedQuantity", "UsdValue", "IsFiat", "SyncedAt", "TradeCount")
+                VALUES
+                    ({h.Id}, {h.UserId}, {h.Provider}, {h.Asset}, {h.FreeQuantity}, {h.LockedQuantity}, {h.UsdValue}, {h.IsFiat}, {h.SyncedAt}, {h.TradeCount})
+                ON CONFLICT ("UserId", "Provider", "Asset") DO UPDATE SET
+                    "FreeQuantity" = EXCLUDED."FreeQuantity",
+                    "LockedQuantity" = EXCLUDED."LockedQuantity",
+                    "UsdValue" = EXCLUDED."UsdValue",
+                    "IsFiat" = EXCLUDED."IsFiat",
+                    "SyncedAt" = EXCLUDED."SyncedAt",
+                    "ClosedAt" = NULL
+                """,
+                ct);
         }
     }
 
