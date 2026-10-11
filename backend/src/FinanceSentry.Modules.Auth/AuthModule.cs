@@ -7,7 +7,6 @@ using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure;
 using FinanceSentry.Modules.Auth.Infrastructure.Authentication;
 using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
-using FinanceSentry.Modules.Auth.Infrastructure.Identity;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 using FinanceSentry.Modules.Auth.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
@@ -18,9 +17,6 @@ using FinanceSentry.Infrastructure.Persistence;
 
 public static class AuthModule
 {
-    /// <summary>How long an invite link (a password-reset token) stays valid.</summary>
-    public static readonly TimeSpan InviteLifespan = TimeSpan.FromDays(7);
-
     internal sealed class ModuleRegistrar : IModuleRegistrar
     {
         public void Register(IServiceCollection services, IConfiguration config)
@@ -39,23 +35,12 @@ public static class AuthModule
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
-                // Length plus a common-password check (CommonPasswordValidator), no composition rules.
-                options.Password.RequiredLength = 8;
-                options.Password.RequireDigit = false;
-                options.Password.RequireLowercase = false;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireNonAlphanumeric = false;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
                 options.Lockout.AllowedForNewUsers = true;
                 options.User.RequireUniqueEmail = true;
             })
-            .AddEntityFrameworkStores<AuthDbContext>()
-            .AddDefaultTokenProviders()
-            .AddPasswordValidator<CommonPasswordValidator>();
-
-        // Reset tokens are only issued as invites (there is no self-service reset), so their lifespan is the invite's.
-        services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = InviteLifespan);
+            .AddEntityFrameworkStores<AuthDbContext>();
 
         services.AddScoped<IAccessTokenPrincipalLoader, AccessTokenPrincipalLoader>();
 

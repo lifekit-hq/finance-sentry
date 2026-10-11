@@ -13,8 +13,6 @@ const PEOPLE: Person[] = [
 const INVITE: Invite = {
   userId: 'u-1',
   email: 'friend@test.com',
-  token: 'one-time',
-  expiresAt: '2099-01-01T00:00:00Z',
 };
 
 function buildStore() {

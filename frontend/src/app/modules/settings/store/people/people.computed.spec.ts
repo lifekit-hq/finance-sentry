@@ -1,4 +1,3 @@
-import {DOCUMENT} from '@angular/common';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
@@ -9,7 +8,6 @@ import {AuthStore} from '../../../auth/store/auth.store';
 import {type Invite, type Person} from '../../models/person/person.model';
 import {peopleComputed} from './people.computed';
 
-const ORIGIN = 'https://app.example.test';
 const CURRENT_USER_ID = 'owner-1';
 
 function build(
@@ -44,7 +42,6 @@ describe('peopleComputed', () => {
       providers: [
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
         {provide: AuthStore, useValue: {userId: signal(CURRENT_USER_ID)}},
-        {provide: DOCUMENT, useValue: {location: {origin: ORIGIN}}},
       ],
     });
   });
@@ -88,28 +85,6 @@ describe('peopleComputed', () => {
     it('offers revoke only for non-owner, non-self, not-yet-revoked people', () => {
       const rows = compute(build({people})).rows();
       expect(rows.filter(r => r.canRevoke).map(r => r.id)).toEqual(['member', 'invited']);
-    });
-  });
-
-  describe('inviteLink', () => {
-    it('is null without an invite', () => {
-      expect(compute(build()).inviteLink()).toBeNull();
-    });
-
-    it('builds the accept-invite link on this origin', () => {
-      const lastInvite: Invite = {
-        userId: 'u-1',
-        email: 'friend@test.com',
-        token: 'a+b/c=',
-        expiresAt: '2099-01-01T00:00:00Z',
-      };
-
-      const link = new URL(compute(build({lastInvite})).inviteLink() ?? '');
-
-      expect(link.origin).toBe(ORIGIN);
-      expect(link.pathname).toBe('/accept-invite');
-      expect(link.searchParams.get('user')).toBe('u-1');
-      expect(link.searchParams.get('token')).toBe('a+b/c=');
     });
   });
 

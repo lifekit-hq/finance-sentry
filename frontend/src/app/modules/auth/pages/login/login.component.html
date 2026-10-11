@@ -11,10 +11,6 @@
       <cmn-alert [variant]="flash.kind" class="block mb-cmn-4">{{ flash.text }}</cmn-alert>
     }
 
-    @if (errorMessage()) {
-      <cmn-alert variant="error" class="block mb-cmn-4">{{ errorMessage() }}</cmn-alert>
-    }
-
     @let methods = signInMethods();
 
     @if (methodsFailed()) {
@@ -37,63 +33,17 @@
         class="block w-full mb-cmn-6"
         >Sign in</cmn-button
       >
-      @if (oidcOnly() && !flashMessage()) {
+      @if (!flashMessage()) {
         <p class="text-center text-cmn-sm text-text-secondary mb-cmn-6">
           Taking you to the sign-in page…
         </p>
       }
     }
 
-    @if (methods?.passwordLogin) {
-      @if (methods?.oidc) {
-        <div class="flex items-center gap-cmn-3 mb-cmn-6">
-          <div class="flex-1 h-px bg-border-default"></div>
-          <span class="text-cmn-xs text-text-secondary uppercase tracking-wide">or</span>
-          <div class="flex-1 h-px bg-border-default"></div>
-        </div>
-      }
-
-      <form [formGroup]="form" (ngSubmit)="onSubmit()">
-        <cmn-form-field
-          [control]="form.get('email')"
-          label="Email address"
-          formControlName="email"
-          class="block mb-cmn-5"
-        >
-          <cmn-input
-            type="email"
-            autocomplete="username"
-            enterkeyhint="next"
-            placeholder="name@organization.com"
-          />
-        </cmn-form-field>
-
-        <div class="mb-cmn-6">
-          <cmn-form-field
-            [control]="form.get('password')"
-            label="Password"
-            formControlName="password"
-          >
-            <cmn-input
-              type="password"
-              autocomplete="current-password"
-              enterkeyhint="go"
-              placeholder="••••••••"
-            />
-          </cmn-form-field>
-        </div>
-
-        <cmn-button
-          [disabled]="loading() || form.invalid"
-          [loading]="loading()"
-          [variant]="methods?.oidc ? 'secondary' : 'primary'"
-          type="submit"
-          class="block w-full mb-cmn-6"
-          >{{
-            loading() ? 'Signing in…' : methods?.oidc ? 'Sign in with password' : 'Sign in'
-          }}</cmn-button
-        >
-      </form>
+    @if (noMethods()) {
+      <cmn-alert variant="warning" class="block mb-cmn-6" data-testid="no-methods"
+        >No sign-in method is configured. Ask the account owner.</cmn-alert
+      >
     }
 
     <p class="text-center text-cmn-sm text-text-secondary">

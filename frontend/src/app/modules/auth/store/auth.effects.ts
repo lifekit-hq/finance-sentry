@@ -1,32 +1,24 @@
 import {DOCUMENT} from '@angular/common';
 import {effect, inject, type Signal, signal, untracked} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
-import {ErrorMessageService, extractErrorCode} from '@lifekit-hq/core';
+import {ErrorMessageService} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rxjs';
 
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
-import {ErrorUtils} from '../../../shared/utils/error.utils';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
-import {
-  type AcceptInviteRequest,
-  type AuthRequest,
-  type AuthResponse,
-  type SignInMethods,
-} from '../models/auth/auth.model';
+import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {AuthUtils} from '../utils/auth.utils';
-import {type AuthFlow, type FlashMessage, type SignInMethodsStatus} from './auth.state';
+import {type FlashMessage, type SignInMethodsStatus} from './auth.state';
 
 interface EffectsStore {
   applyAuthResponse: (res: AuthResponse) => void;
   clearSession: () => void;
   setProfileName: (firstName: Nullable<string>, lastName: Nullable<string>) => void;
-  setLoading: (flow: AuthFlow) => void;
-  setError: (errorCode: Nullable<string>, flow: AuthFlow, errorDetail?: Nullable<string>) => void;
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   setSignInMethods: (signInMethods: SignInMethods) => void;
@@ -81,34 +73,6 @@ export function authEffects(store: EffectsStore) {
   };
 
   return {
-    login: rxMethod<AuthRequest>(
-      pipe(
-        tap(() => store.setLoading('login')),
-        switchMap(req =>
-          authService.login(req).pipe(
-            tap(res => store.applyAuthResponse(res)),
-            catchError((err: unknown) => {
-              store.setError(extractErrorCode(err), 'login', ErrorUtils.extractMessage(err));
-              return EMPTY;
-            })
-          )
-        )
-      )
-    ),
-    acceptInvite: rxMethod<AcceptInviteRequest>(
-      pipe(
-        tap(() => store.setLoading('acceptInvite')),
-        switchMap(req =>
-          authService.acceptInvite(req).pipe(
-            tap(res => store.applyAuthResponse(res)),
-            catchError((err: unknown) => {
-              store.setError(extractErrorCode(err), 'acceptInvite');
-              return EMPTY;
-            })
-          )
-        )
-      )
-    ),
     /** Hands the browser to the identity provider; the API redirects back signed in (or to /login with an error). */
     startOidcSignIn(): void {
       doc.location.assign(AuthUtils.oidcStartUrl(environment.apiBaseUrl, store.returnUrl()));
@@ -204,7 +168,7 @@ export function authHooks(store: HookStore): void {
   effect(() => {
     const methods = store.signInMethods();
     const onLogin = routePath() === loginRoute;
-    if (!onLogin || !methods?.oidc || methods.passwordLogin || store.flashMessage() !== null) {
+    if (!onLogin || !methods?.oidc || store.flashMessage() !== null) {
       return;
     }
     untracked(() => {
@@ -224,8 +188,7 @@ export function authHooks(store: HookStore): void {
       }
       const target = store.returnUrl() ?? AppRoute.Accounts;
       const currentPath = pathOf(router.url);
-      const acceptInvitePath: string = AppRoute.AcceptInvite;
-      if (currentPath === loginRoute || currentPath === acceptInvitePath) {
+      if (currentPath === loginRoute) {
         void router.navigateByUrl(target);
       }
     });

@@ -19,7 +19,6 @@ const VIEWPORT_UNITS_TALLER_BY_INSET = `
 
 const PAGES = [
   {name: 'login', url: '/login', card: 'fns-login'},
-  {name: 'accept-invite', url: '/accept-invite?user=u1&token=t1', card: 'fns-accept-invite'},
   {name: 'mcp-connect', url: '/mcp/connect', card: 'fns-mcp-connect'},
 ] as const;
 

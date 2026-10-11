@@ -6,15 +6,13 @@ import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
-import {type ChangePasswordRequest, SettingsService} from '../../services/settings.service';
+import {SettingsService} from '../../services/settings.service';
 
 interface EffectsStore {
   setProfile: (profile: UserProfile) => void;
   setLoadError: (errorCode: Nullable<string>) => void;
   setProfileSaving: (saving: boolean) => void;
   setProfileSaveError: (errorCode: Nullable<string>) => void;
-  setPasswordSaving: (saving: boolean) => void;
-  setPasswordSaveError: (errorCode: Nullable<string>) => void;
 }
 
 export function settingsEffects(store: EffectsStore) {
@@ -52,20 +50,6 @@ export function settingsEffects(store: EffectsStore) {
             }),
             catchError(err => {
               store.setProfileSaveError(extractErrorCode(err));
-              return EMPTY;
-            })
-          )
-        )
-      )
-    ),
-    changePassword: rxMethod<ChangePasswordRequest>(
-      pipe(
-        tap(() => store.setPasswordSaving(true)),
-        switchMap(request =>
-          service.changePassword(request).pipe(
-            tap(() => store.setPasswordSaving(false)),
-            catchError(err => {
-              store.setPasswordSaveError(extractErrorCode(err));
               return EMPTY;
             })
           )

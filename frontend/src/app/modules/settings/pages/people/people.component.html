@@ -9,7 +9,7 @@
       <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Invite someone</h2>
       <p class="mt-1 mb-cmn-4 text-cmn-xs text-text-secondary leading-relaxed">
         Creates a member account for that email. They sign in through single sign-on with that
-        address. Send them the link below yourself.
+        address.
       </p>
 
       @if (store.inviteErrorMessage()) {
@@ -37,20 +37,10 @@
       </form>
 
       @if (store.lastInvite(); as invite) {
-        @if (store.inviteLink(); as link) {
-          <cmn-alert variant="success" title="Invite created" class="block mt-cmn-5">
-            <p class="mb-cmn-3">
-              Send this link to {{ invite.email }}. It expires on
-              {{ invite.expiresAt | date: 'medium' }}. It is not shown again.
-            </p>
-            <div class="grid grid-cols-1 gap-cmn-2 sm:grid-cols-[1fr_auto]">
-              <cmn-input [ngModel]="link" [readonly]="true" aria-label="Invite link" />
-              <cmn-button (clicked)="copyInviteLink(link)" variant="secondary" icon="Copy"
-                >Copy link</cmn-button
-              >
-            </div>
-          </cmn-alert>
-        }
+        <cmn-alert variant="success" title="Invite created" class="block mt-cmn-5">
+          {{ invite.email }} can now sign in with that email. Tell them to open the app and choose
+          Sign in.
+        </cmn-alert>
       }
     </cmn-card>
 

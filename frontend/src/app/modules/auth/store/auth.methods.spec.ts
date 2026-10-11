@@ -22,9 +22,8 @@ const SAMPLE_RESPONSE: AuthResponse = {
 
 describe('authMethods', () => {
   describe('applyAuthResponse', () => {
-    it('patches state with userId/email/roles/permissions and resets status/error/flow/flashMessage', () => {
+    it('patches state with userId/email/roles/permissions and clears the flashMessage', () => {
       const {state, methods} = makeState();
-      methods.setLoading('login');
       methods.setFlashMessage({kind: 'info', text: 'stale'});
 
       methods.applyAuthResponse(SAMPLE_RESPONSE);
@@ -33,9 +32,6 @@ describe('authMethods', () => {
       expect(state.email()).toBe(SAMPLE_RESPONSE.user.email);
       expect(state.roles()).toEqual(['Member']);
       expect(state.permissions()).toEqual(['connections.manage']);
-      expect(state.status()).toBe('idle');
-      expect(state.errorCode()).toBeNull();
-      expect(state.flow()).toBeNull();
       expect(state.flashMessage()).toBeNull();
     });
   });
@@ -52,43 +48,7 @@ describe('authMethods', () => {
       expect(state.email()).toBeNull();
       expect(state.roles()).toEqual([]);
       expect(state.permissions()).toEqual([]);
-      expect(state.status()).toBe('idle');
-      expect(state.errorCode()).toBeNull();
-      expect(state.flow()).toBeNull();
       expect(state.flashMessage()).toEqual({kind: 'error', text: 'keep me'});
-    });
-  });
-
-  describe('setLoading', () => {
-    it('sets status to loading with the given flow and clears errorCode', () => {
-      const {state, methods} = makeState();
-      methods.setError('SOMETHING', 'login');
-
-      methods.setLoading('acceptInvite');
-
-      expect(state.status()).toBe('loading');
-      expect(state.flow()).toBe('acceptInvite');
-      expect(state.errorCode()).toBeNull();
-    });
-  });
-
-  describe('setError', () => {
-    it('sets status to error with code and flow', () => {
-      const {state, methods} = makeState();
-      methods.setError('INVALID_INVITE', 'acceptInvite');
-      expect(state.status()).toBe('error');
-      expect(state.errorCode()).toBe('INVALID_INVITE');
-      expect(state.flow()).toBe('acceptInvite');
-    });
-  });
-
-  describe('resetError', () => {
-    it('resets status to idle and clears errorCode', () => {
-      const {state, methods} = makeState();
-      methods.setError('X', 'login');
-      methods.resetError();
-      expect(state.status()).toBe('idle');
-      expect(state.errorCode()).toBeNull();
     });
   });
 

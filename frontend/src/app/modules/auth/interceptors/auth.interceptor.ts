@@ -52,7 +52,7 @@ export const authInterceptor: HttpInterceptorFn = (
       }
 
       // An anonymous visitor's session-restore probe is expected to 401; logging out would
-      // navigate to /login and clobber guest routes such as /accept-invite.
+      // navigate to /login and clobber guest routes such as /mcp/connect.
       if (isUnauthorized && skipRefresh && !req.context.get(SESSION_PROBE)) {
         injector.get(AuthStore).expireSession();
       }

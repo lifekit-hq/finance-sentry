@@ -6,20 +6,17 @@ using FinanceSentry.Modules.Auth.Domain.People;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.Auth.Application.Commands;
 
 /// <summary>
-/// Creates a Member account without a password and returns a password-reset token as the invite. Inviting an
-/// email whose invite is still pending issues a fresh token and voids the earlier one; an email that already
-/// has an active or revoked account is refused.
+/// Creates a Member account without a password. Inviting an email whose invite is still pending returns that
+/// invite unchanged; an email that already has an active or revoked account is refused.
 /// </summary>
 public class CreateInviteCommandHandler(
     UserManager<ApplicationUser> userManager,
     IUserAccessService userAccess,
-    IEventBus eventBus,
-    IOptions<DataProtectionTokenProviderOptions> tokenOptions) : ICommandHandler<CreateInviteCommand, InviteDto>
+    IEventBus eventBus) : ICommandHandler<CreateInviteCommand, InviteDto>
 {
     public async Task<InviteDto> Handle(CreateInviteCommand request, CancellationToken cancellationToken)
     {
@@ -42,15 +39,9 @@ public class CreateInviteCommandHandler(
             var hasExternalLogin = (await userManager.GetLoginsAsync(user)).Count > 0;
             if (PersonStatus.Of(user, hasExternalLogin) != PersonStatus.Invited)
                 throw new DuplicateEmailException();
-
-            // Reset tokens are bound to the security stamp, so rotating it voids the earlier link.
-            await userManager.UpdateSecurityStampAsync(user);
         }
 
-        var token = await userManager.GeneratePasswordResetTokenAsync(user);
-        var expiresAt = DateTime.UtcNow.Add(tokenOptions.Value.TokenLifespan);
-
-        return new InviteDto(user.Id, user.Email!, token, expiresAt);
+        return new InviteDto(user.Id, user.Email!);
     }
 
     /// <summary>

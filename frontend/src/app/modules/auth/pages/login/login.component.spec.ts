@@ -12,8 +12,6 @@ function setup(status: SignInMethodsStatus, methods: SignInMethods | null = null
   const store = {
     signInMethods: signal(methods),
     signInMethodsStatus: signal(status),
-    isLoading: signal(false),
-    errorMessage: signal(''),
     flashMessage: signal(null),
     loadSignInMethods: vi.fn(),
     startOidcSignIn: vi.fn(),
@@ -27,11 +25,10 @@ function setup(status: SignInMethodsStatus, methods: SignInMethods | null = null
 }
 
 describe('LoginComponent sign-in methods', () => {
-  it('shows a skeleton, not a password form, until the methods answer', () => {
+  it('shows a skeleton until the methods answer', () => {
     const {root} = setup('loading');
 
     expect(root.querySelector('cmn-skeleton')).not.toBeNull();
-    expect(root.querySelector('form')).toBeNull();
   });
 
   it('on a methods failure shows an error with Retry and keeps the OIDC path reachable', () => {
@@ -40,7 +37,6 @@ describe('LoginComponent sign-in methods', () => {
     expect(root.querySelector('[data-testid="methods-error"]')?.textContent).toContain(
       "Couldn't load the sign-in options."
     );
-    expect(root.querySelector('form')).toBeNull();
     const buttons = Array.from(root.querySelectorAll<HTMLElement>('cmn-button'));
     const signIn = buttons.find(b => b.textContent?.trim() === 'Sign in');
     expect(signIn).toBeDefined();
@@ -54,10 +50,22 @@ describe('LoginComponent sign-in methods', () => {
     expect(store.loadSignInMethods).toHaveBeenCalledOnce();
   });
 
-  it('renders the reported methods once loaded, without the failure banner', () => {
-    const {root} = setup('success', {oidc: false, passwordLogin: true});
+  it('offers the single sign-in button once OIDC is reported, without the failure banner', () => {
+    const {root} = setup('success', {oidc: true});
 
     expect(root.querySelector('[data-testid="methods-error"]')).toBeNull();
-    expect(root.querySelector('form')).not.toBeNull();
+    expect(root.querySelector('[data-testid="no-methods"]')).toBeNull();
+    expect(root.querySelector('form')).toBeNull();
+    expect(root.querySelector('input')).toBeNull();
+    expect(root.querySelector('cmn-button')?.textContent?.trim()).toBe('Sign in');
+  });
+
+  it('says so when the API offers no sign-in method', () => {
+    const {root} = setup('success', {oidc: false});
+
+    expect(root.querySelector('[data-testid="no-methods"]')?.textContent).toContain(
+      'No sign-in method is configured'
+    );
+    expect(root.querySelector('cmn-button')).toBeNull();
   });
 });

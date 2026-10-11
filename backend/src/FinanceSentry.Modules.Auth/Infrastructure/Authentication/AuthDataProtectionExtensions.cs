@@ -7,10 +7,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// The ASP.NET Core Data Protection key ring, persisted in the Auth database. It protects the invite tokens
-/// (Identity's token providers) and the OpenID Connect state and correlation cookies. The api container is
-/// read-only with no key volume, so the platform default is an in-memory ring that every restart throws away:
-/// each deploy voided outstanding invite links and any sign-in in flight (issue #930).
+/// The ASP.NET Core Data Protection key ring, persisted in the Auth database. It protects the OpenID
+/// Connect state and correlation cookies. The api container is read-only with no key volume, so the platform
+/// default is an in-memory ring that every restart throws away: each deploy voided any sign-in in flight
+/// (issue #930).
 /// </summary>
 public static class AuthDataProtectionExtensions
 {
