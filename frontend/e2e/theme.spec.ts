@@ -27,8 +27,8 @@ const PROFILE = {
   lowBalanceAlerts: false,
   lowBalanceThreshold: 100,
   syncFailureAlerts: false,
-  safeWithdrawalRate: 4,
-  realAnnualReturn: 5,
+  safeWithdrawalRate: 0.04,
+  realAnnualReturn: 0.05,
   twoFactor: false,
 };
 

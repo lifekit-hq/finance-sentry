@@ -131,7 +131,7 @@ export class SettingsComponent {
       form.markAllAsTouched();
       return;
     }
-    const assumptions = form.getRawValue();
+    const {safeWithdrawalRate, realAnnualReturn} = form.controls;
     this.store.saveProfile({
       firstName: p.firstName,
       lastName: p.lastName,
@@ -142,18 +142,20 @@ export class SettingsComponent {
       lowBalanceThreshold: p.lowBalanceThreshold,
       syncFailureAlerts: p.syncFailureAlerts,
       watchlistAnalystAlerts: p.watchlistAnalystAlerts,
-      safeWithdrawalRate:
-        PercentUtils.toFraction(
-          assumptions.safeWithdrawalRate,
-          SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
-          SAFE_WITHDRAWAL_RATE_MAX_PERCENT
-        ) ?? p.safeWithdrawalRate,
-      realAnnualReturn:
-        PercentUtils.toFraction(
-          assumptions.realAnnualReturn,
-          REAL_ANNUAL_RETURN_MIN_PERCENT,
-          REAL_ANNUAL_RETURN_MAX_PERCENT
-        ) ?? p.realAnnualReturn,
+      safeWithdrawalRate: safeWithdrawalRate.dirty
+        ? (PercentUtils.toFraction(
+            safeWithdrawalRate.value,
+            SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
+            SAFE_WITHDRAWAL_RATE_MAX_PERCENT
+          ) ?? p.safeWithdrawalRate)
+        : p.safeWithdrawalRate,
+      realAnnualReturn: realAnnualReturn.dirty
+        ? (PercentUtils.toFraction(
+            realAnnualReturn.value,
+            REAL_ANNUAL_RETURN_MIN_PERCENT,
+            REAL_ANNUAL_RETURN_MAX_PERCENT
+          ) ?? p.realAnnualReturn)
+        : p.realAnnualReturn,
     });
   }
 

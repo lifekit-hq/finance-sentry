@@ -77,10 +77,22 @@ describe('SettingsComponent financial independence assumptions', () => {
   it('sends both assumptions, converted to fractions, when the profile is saved', () => {
     const {store, component, form} = setup();
     form.controls.safeWithdrawalRate.setValue('3.5');
+    form.controls.safeWithdrawalRate.markAsDirty();
     form.controls.realAnnualReturn.setValue('6');
+    form.controls.realAnnualReturn.markAsDirty();
     component.saveProfile();
     expect(store.saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({safeWithdrawalRate: 0.035, realAnnualReturn: 0.06})
+    );
+  });
+
+  it('sends the stored fractions untouched when the assumptions were not edited', () => {
+    const {store, component} = create();
+    const stored = {...profile, safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456};
+    store.profile.set(stored as unknown as UserProfile);
+    component.saveProfile();
+    expect(store.saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456})
     );
   });
 
