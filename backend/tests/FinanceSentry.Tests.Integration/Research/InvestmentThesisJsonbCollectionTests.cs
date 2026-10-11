@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.Research;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.ThesisMonitor;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
@@ -53,6 +54,26 @@ public sealed class InvestmentThesisJsonbCollectionTests : IAsyncLifetime
         stored.Catalysts.Should().Equal(new ThesisCatalyst(new DateOnly(2026, 11, 20), "earnings"));
         stored.InvalidationTriggers.Should().Equal(
             new ThesisInvalidationTrigger("price_drawdown", "below", -20m, null, 2, ThesisPeriodType.Annual, "SPY", 90));
+    }
+
+    [DockerRequiredFact]
+    public async Task Trigger_without_consecutivePeriods_reads_back_as_one_and_stays_evaluable()
+    {
+        await using var db = CreateContext();
+        var thesis = new InvestmentThesis { UserId = Guid.NewGuid(), Ticker = "GRAB", ThesisText = "t" };
+        db.Theses.Add(thesis);
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync(
+            """UPDATE research.theses SET "InvalidationTriggers" = {0}::jsonb WHERE "Id" = {1}""",
+            """[{"metric":"gross_margin","direction":"lessThan","threshold":0.4},{"metric":"revenue_yoy","direction":"lessThan","threshold":0.1,"consecutivePeriods":0}]""",
+            thesis.Id);
+
+        await using var read = CreateContext();
+        var stored = await read.Theses.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().SingleAsync(t => t.Id == thesis.Id);
+
+        stored.InvalidationTriggers.Select(t => t.ConsecutivePeriods).Should().Equal(1, 0);
+        ThesisTriggerEvaluability.IsStructurallyEvaluable(stored.InvalidationTriggers[0], out var reason).Should().BeTrue();
+        reason.Should().BeNull();
     }
 
     [DockerRequiredFact]

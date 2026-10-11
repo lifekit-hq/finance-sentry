@@ -447,6 +447,10 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<decimal?>("EntryPrice")
                         .HasColumnType("numeric(18,6)");
 
+                    b.Property<string>("InvalidationTriggers")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("ThesisText")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -478,41 +482,6 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                             b1
                                 .ToJson("Catalysts")
-                                .HasColumnType("jsonb");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "InvalidationTriggers", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.InvalidationTriggers#ThesisInvalidationTrigger", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("BenchmarkTicker")
-                                .HasJsonPropertyName("benchmarkTicker");
-
-                            b1.Property<int>("ConsecutivePeriods")
-                                .HasJsonPropertyName("consecutivePeriods");
-
-                            b1.Property<string>("Direction")
-                                .IsRequired()
-                                .HasJsonPropertyName("direction");
-
-                            b1.Property<string>("Metric")
-                                .IsRequired()
-                                .HasJsonPropertyName("metric");
-
-                            b1.Property<int>("PeriodType")
-                                .HasJsonPropertyName("periodType");
-
-                            b1.Property<string>("ProxyTicker")
-                                .HasJsonPropertyName("proxyTicker");
-
-                            b1.Property<decimal>("Threshold")
-                                .HasJsonPropertyName("threshold");
-
-                            b1.Property<int?>("WindowDays")
-                                .HasJsonPropertyName("windowDays");
-
-                            b1
-                                .ToJson("InvalidationTriggers")
                                 .HasColumnType("jsonb");
                         });
 

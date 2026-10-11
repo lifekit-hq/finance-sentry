@@ -102,18 +102,14 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             c.Property(p => p.Date).HasJsonPropertyName("date");
             c.Property(p => p.Event).HasJsonPropertyName("event");
         });
-        tb.ComplexCollection(x => x.InvalidationTriggers, c =>
-        {
-            c.ToJson("InvalidationTriggers");
-            c.Property(p => p.Metric).HasJsonPropertyName("metric");
-            c.Property(p => p.Direction).HasJsonPropertyName("direction");
-            c.Property(p => p.Threshold).HasJsonPropertyName("threshold");
-            c.Property(p => p.ProxyTicker).HasJsonPropertyName("proxyTicker");
-            c.Property(p => p.ConsecutivePeriods).HasJsonPropertyName("consecutivePeriods");
-            c.Property(p => p.PeriodType).HasJsonPropertyName("periodType");
-            c.Property(p => p.BenchmarkTicker).HasJsonPropertyName("benchmarkTicker");
-            c.Property(p => p.WindowDays).HasJsonPropertyName("windowDays");
-        });
+        // Stays on the System.Text.Json conversion: a trigger stored before the monitor existed has no
+        // consecutivePeriods key and must read back as the record default (1); a JSON complex collection
+        // would materialise a missing key as 0.
+        tb.Property(x => x.InvalidationTriggers)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, jsonOptions),
+                v => JsonSerializer.Deserialize<List<ThesisInvalidationTrigger>>(v, jsonOptions) ?? new());
         tb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_thesis_user_ticker");
 
         var nb = modelBuilder.Entity<NewsArticle>();
