@@ -9,7 +9,9 @@ using Polly;
 /// handler (<c>Microsoft.Extensions.Http.Resilience</c>) with limits that are no looser than the bare client
 /// had. The registration's own <c>client.Timeout</c> stays the outer cap and is passed here as
 /// <c>timeout</c>, so the per-attempt budget and the worst-case call duration are what they were before; a
-/// retry only happens when an attempt fails fast (5xx, 408, 429, connection error) with budget to spare.
+/// retry only happens when an attempt fails fast (5xx, 408, 429, connection error) with budget to spare - a
+/// <c>Retry-After</c> longer than half the timeout is not waited for, so the 429 is returned to the caller as
+/// it was before instead of the call being cancelled by <see cref="HttpClient.Timeout"/> mid-wait.
 /// </summary>
 public static class ProviderHttpResilience
 {
@@ -56,12 +58,23 @@ public static class ProviderHttpResilience
                 return;
             }
 
+            var longestRetryAfter = timeout / 2;
+            options.Retry.ShouldHandle = args => ValueTask.FromResult(
+                HttpClientResiliencePredicates.IsTransient(args.Outcome)
+                && !AsksForLongerThan(args.Outcome.Result, longestRetryAfter));
             options.Retry.MaxRetryAttempts = maxRetries;
             if (retryDelay is { } delay)
                 options.Retry.Delay = delay;
         });
 
         return builder;
+    }
+
+    private static bool AsksForLongerThan(HttpResponseMessage? response, TimeSpan limit)
+    {
+        var retryAfter = response?.Headers.RetryAfter;
+        var requested = retryAfter?.Delta ?? (retryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+        return requested > limit;
     }
 
     private static TimeSpan Max(TimeSpan a, TimeSpan b) => a >= b ? a : b;

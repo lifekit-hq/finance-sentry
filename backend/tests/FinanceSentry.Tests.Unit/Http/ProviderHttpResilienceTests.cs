@@ -64,6 +64,23 @@ public class ProviderHttpResilienceTests
     }
 
     [Fact]
+    public async Task Get_ReturnsThe429WithoutWaitingWhenRetryAfterOutlastsTheBudget()
+    {
+        var (client, handler, time) = Build(_ =>
+        {
+            var response = Status(HttpStatusCode.TooManyRequests);
+            response.Headers.RetryAfter = new RetryConditionHeaderValue(Timeout);
+            return response;
+        });
+
+        using var response = await client.GetAsync("https://provider.test/x");
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        handler.Calls.Should().Be(1);
+        time.Waits.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Get_GivesUpAfterTheConfiguredRetries()
     {
         var (client, handler, time) = Build(_ => Status(HttpStatusCode.BadGateway));
