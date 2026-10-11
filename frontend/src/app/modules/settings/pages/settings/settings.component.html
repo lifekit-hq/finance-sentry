@@ -54,10 +54,7 @@
             />
           </cmn-form-field>
           <div class="flex justify-end pb-cmn-4">
-            <cmn-button
-              [disabled]="assumptionsInvalid()"
-              [loading]="store.profileSaving()"
-              (clicked)="saveProfile()"
+            <cmn-button [loading]="store.profileSaving()" (clicked)="saveProfile()"
               >Save Profile</cmn-button
             >
           </div>
@@ -282,34 +279,36 @@
           </p>
         </div>
         <div class="space-y-cmn-4">
-          <cmn-form-field
-            [errorMessage]="withdrawalRateError()"
-            [hint]="withdrawalRateHint"
-            label="Safe withdrawal rate (% a year)"
-            fieldId="s-swr"
-          >
-            <cmn-input
-              [ngModel]="withdrawalRateText(profile.safeWithdrawalRate)"
-              (ngModelChange)="setWithdrawalRate($event)"
-              id="s-swr"
-              type="text"
-              inputmode="decimal"
-            />
-          </cmn-form-field>
-          <cmn-form-field
-            [errorMessage]="realReturnError()"
-            [hint]="realReturnHint"
-            label="Real annual return (% a year)"
-            fieldId="s-real-return"
-          >
-            <cmn-input
-              [ngModel]="realReturnText(profile.realAnnualReturn)"
-              (ngModelChange)="setRealReturn($event)"
-              id="s-real-return"
-              type="text"
-              inputmode="decimal"
-            />
-          </cmn-form-field>
+          @if (assumptionsForm(); as form) {
+            <cmn-form-field
+              [control]="form.controls.safeWithdrawalRate"
+              [errorMessage]="form.controls.safeWithdrawalRate.invalid ? withdrawalRateError : ''"
+              [hint]="withdrawalRateHint"
+              label="Safe withdrawal rate (% a year)"
+              fieldId="s-swr"
+            >
+              <cmn-input
+                [formControl]="form.controls.safeWithdrawalRate"
+                id="s-swr"
+                type="text"
+                inputmode="decimal"
+              />
+            </cmn-form-field>
+            <cmn-form-field
+              [control]="form.controls.realAnnualReturn"
+              [errorMessage]="form.controls.realAnnualReturn.invalid ? realReturnError : ''"
+              [hint]="realReturnHint"
+              label="Real annual return (% a year)"
+              fieldId="s-real-return"
+            >
+              <cmn-input
+                [formControl]="form.controls.realAnnualReturn"
+                id="s-real-return"
+                type="text"
+                inputmode="decimal"
+              />
+            </cmn-form-field>
+          }
         </div>
       </div>
 
