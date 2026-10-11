@@ -50,7 +50,6 @@ public static class ProviderHttpResilience
             // The breaker rejects a sampling window shorter than twice the attempt timeout.
             options.CircuitBreaker.SamplingDuration = Max(options.CircuitBreaker.SamplingDuration, timeout * 2);
 
-            options.Retry.DisableForUnsafeHttpMethods();
             options.Retry.ShouldRetryAfterHeader = true;
             if (maxRetries == 0)
             {
@@ -62,6 +61,7 @@ public static class ProviderHttpResilience
             options.Retry.ShouldHandle = args => ValueTask.FromResult(
                 HttpClientResiliencePredicates.IsTransient(args.Outcome)
                 && !AsksForLongerThan(args.Outcome.Result, longestRetryAfter));
+            options.Retry.DisableForUnsafeHttpMethods();
             options.Retry.MaxRetryAttempts = maxRetries;
             if (retryDelay is { } delay)
                 options.Retry.Delay = delay;
