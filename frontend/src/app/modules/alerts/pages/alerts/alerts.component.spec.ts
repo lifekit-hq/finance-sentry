@@ -13,7 +13,12 @@ const TOTAL_COUNT = 45;
 
 type Segmented = HTMLElement & {options: {label: string; value: string}[]; value: string};
 
-function render(filter: AlertFilter = 'all', unreadCount = 0, alerts: Alert[] = []) {
+function render(
+  filter: AlertFilter = 'all',
+  unreadCount = 0,
+  alerts: Alert[] = [],
+  async: {isLoading?: boolean; errorMessage?: Nullable<string>} = {}
+) {
   const store = {
     alerts: signal(alerts),
     filter: signal(filter),
@@ -23,9 +28,16 @@ function render(filter: AlertFilter = 'all', unreadCount = 0, alerts: Alert[] = 
     currentPage: signal(1),
     hasPreviousPage: signal(false),
     hasNextPage: signal(true),
-    pageCount: signal(3),
+    totalPages: signal(3),
     setFilter: vi.fn(),
     setPageSize: vi.fn(),
+    isLoading: signal(async.isLoading ?? false),
+    errorMessage: signal<Nullable<string>>(async.errorMessage ?? null),
+    query: signal({filter, page: 1, pageSize: PAGE_SIZE}),
+    load: vi.fn(),
+    markRead: vi.fn(),
+    markAllRead: vi.fn(),
+    dismiss: vi.fn(),
   };
   TestBed.configureTestingModule({
     providers: [provideRouter([]), {provide: AlertsStore, useValue: store}],
@@ -87,5 +99,62 @@ describe('AlertsComponent single-choice controls', () => {
       {value: '50', label: '50 per page'},
       {value: '100', label: '100 per page'},
     ]);
+  });
+});
+
+describe('AlertsComponent async states', () => {
+  const ALERT = {
+    id: 'a1',
+    title: 'Budget exceeded',
+    message: 'You went over',
+    severity: 'Warning',
+    type: 'BudgetExceeded',
+    isRead: false,
+    isResolved: false,
+    createdAt: '2026-09-22T10:00:00Z',
+  } as unknown as Alert;
+
+  function retryButton(host: HTMLElement) {
+    return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry');
+  }
+
+  it('shows a skeleton, not the empty copy, while the page loads', () => {
+    const {el} = render('all', 0, [], {isLoading: true});
+
+    expect(el.querySelector('[data-testid="alerts-skeleton"]')).not.toBeNull();
+    expect(el.textContent).not.toContain('All your accounts are healthy.');
+  });
+
+  it('shows the load error and reloads the current query on Retry', () => {
+    const {el, store, fixture} = render('warning', 0, [], {errorMessage: 'Failed to load alerts.'});
+
+    expect(el.textContent).toContain('Failed to load alerts.');
+    expect(el.textContent).not.toContain('Try a different filter.');
+
+    retryButton(el)?.click();
+    fixture.detectChanges();
+
+    expect(store.load).toHaveBeenCalledWith({filter: 'warning', page: 1, pageSize: PAGE_SIZE});
+  });
+
+  it('shows the filter-aware empty state when no alert matches', () => {
+    const {el} = render('error');
+
+    expect(el.textContent).toContain('No error alerts');
+    expect(el.textContent).toContain('Try a different filter.');
+  });
+
+  it('shows the all-clear copy when there are no alerts at all', () => {
+    const {el} = render('all');
+
+    expect(el.textContent).toContain('No alerts');
+    expect(el.textContent).toContain('All your accounts are healthy.');
+  });
+
+  it('lists the alerts once loaded', () => {
+    const {el} = render('all', 1, [ALERT]);
+
+    expect(el.querySelectorAll('[data-testid="alert-row"]').length).toBe(1);
+    expect(el.querySelector('[data-testid="alerts-skeleton"]')).toBeNull();
   });
 });

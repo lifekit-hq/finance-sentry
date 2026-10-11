@@ -1,7 +1,10 @@
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {CmnDialogService} from '@lifekit-hq/ui';
 
 import {type Subscription} from '../../models/subscription/subscription.model';
+import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionsComponent} from './subscriptions.component';
 
 describe('SubscriptionsComponent', () => {
@@ -109,5 +112,106 @@ describe('SubscriptionsComponent', () => {
     component.onSortChange(new CustomEvent('lk-segmented-change', {detail: {value: 'amount'}}));
 
     expect(setSort).toHaveBeenCalledWith('amount');
+  });
+});
+
+describe('SubscriptionsComponent async states', () => {
+  const NETFLIX = {
+    id: 's1',
+    merchantName: 'Netflix',
+    cadence: 'monthly',
+    monthlyEquivalent: 10,
+    currency: 'EUR',
+    nextExpectedDate: '2026-09-01',
+    status: 'active',
+    kind: 'subscription',
+    isManual: false,
+    isTracked: true,
+  } as unknown as Subscription;
+
+  function render(
+    overrides: {
+      isLoading?: boolean;
+      loadErrorMessage?: string;
+      subscriptions?: Subscription[];
+      hasInsufficientHistory?: boolean;
+    } = {}
+  ) {
+    const subscriptions = overrides.subscriptions ?? [];
+    const store = {
+      isLoading: signal(overrides.isLoading ?? false),
+      loadErrorMessage: signal(overrides.loadErrorMessage ?? ''),
+      subscriptions: signal(subscriptions),
+      hasInsufficientHistory: signal(overrides.hasInsufficientHistory ?? false),
+      addErrorMessage: signal(''),
+      summary: signal(null),
+      sort: signal('date'),
+      activeSections: signal(
+        subscriptions.length > 0 ? [{id: 'upcoming', label: '', items: subscriptions}] : []
+      ),
+      activeSubscriptions: signal(subscriptions),
+      activeInstallments: signal<Subscription[]>([]),
+      sortedInstallments: signal<Subscription[]>([]),
+      completedInstallments: signal<Subscription[]>([]),
+      dismissedSubscriptions: signal<Subscription[]>([]),
+      sortedDismissed: signal<Subscription[]>([]),
+      load: vi.fn(),
+    };
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), {provide: CmnDialogService, useValue: {open: vi.fn()}}],
+    });
+    TestBed.overrideComponent(SubscriptionsComponent, {
+      set: {providers: [{provide: SubscriptionsStore, useValue: store}]},
+    });
+    const fixture = TestBed.createComponent(SubscriptionsComponent);
+    fixture.detectChanges();
+    return {fixture, store, host: fixture.nativeElement as HTMLElement};
+  }
+
+  function retryButton(host: HTMLElement) {
+    return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry');
+  }
+
+  it('shows a skeleton instead of the empty copy while the first load runs', () => {
+    const {host} = render({isLoading: true});
+
+    expect(host.querySelector('[data-testid="subscriptions-skeleton"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('No active subscriptions yet');
+  });
+
+  it('shows the load error, never the empty copy, and reloads on Retry', () => {
+    const {host, store, fixture} = render({loadErrorMessage: 'Failed to load subscriptions.'});
+
+    expect(host.textContent).toContain('Failed to load subscriptions.');
+    expect(host.textContent).not.toContain('No active subscriptions yet');
+
+    retryButton(host)?.click();
+    fixture.detectChanges();
+
+    expect(store.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the empty state when nothing is tracked', () => {
+    const {host} = render();
+
+    expect(host.textContent).toContain('No active subscriptions yet');
+    expect(host.textContent).toContain(
+      'Recurring charges show up here once they are detected, or add one yourself.'
+    );
+  });
+
+  it('explains the missing history instead of the empty state when there is too little', () => {
+    const {host} = render({hasInsufficientHistory: true});
+
+    expect(host.textContent).toContain('Not enough transaction history');
+    expect(host.textContent).not.toContain('Recurring charges show up here');
+  });
+
+  it('lists the subscriptions once loaded', () => {
+    const {host} = render({subscriptions: [NETFLIX]});
+
+    expect(host.textContent).toContain('Netflix');
+    expect(host.querySelector('[data-testid="subscriptions-skeleton"]')).toBeNull();
+    expect(host.textContent).not.toContain('No active subscriptions yet');
   });
 });

@@ -73,6 +73,35 @@ describe('subscriptionsMethods', () => {
     expect(state.status()).toBe('idle');
   });
 
+  it('setLoading marks the load in flight and clears a previous load error', () => {
+    const state = signalState({
+      ...initialSubscriptionsState,
+      status: 'error' as AsyncStatus,
+      loadErrorCode: 'BOOM',
+    });
+    const methods = subscriptionsMethods(state);
+
+    methods.setLoading();
+
+    expect(state.status()).toBe('loading');
+    expect(state.loadErrorCode()).toBeNull();
+  });
+
+  it('setLoadError stores the code and setData clears it', () => {
+    const state = signalState(initialSubscriptionsState);
+    const methods = subscriptionsMethods(state);
+
+    methods.setLoadError('BOOM');
+
+    expect(state.status()).toBe('error');
+    expect(state.loadErrorCode()).toBe('BOOM');
+
+    methods.setData([], false);
+
+    expect(state.status()).toBe('idle');
+    expect(state.loadErrorCode()).toBeNull();
+  });
+
   it('setAddError stores and clears the add error code', () => {
     const state = signalState(initialSubscriptionsState);
     const methods = subscriptionsMethods(state);

@@ -75,10 +75,27 @@ export class EventsComponent {
     return this.store.isUpcomingLoading() ? 'loading' : 'success';
   });
 
+  // Rows already on screen stay under the error banner; only a first page with nothing yet swaps
+  // for the skeleton. Appending a page shows its skeleton inside the list instead.
+  public readonly firedStatus = computed<AsyncStateStatus>(() => {
+    if (this.store.firedErrorMessage()) {
+      return 'error';
+    }
+    return this.store.isFiredLoading() && !this.store.hasFiredRows() ? 'loading' : 'success';
+  });
+
   public selectView(id: string): void {
     const option = EVENTS_VIEW_OPTIONS.find(opt => opt.id === id);
     if (option) {
       this.store.setView(option.id);
+    }
+  }
+
+  public retryFired(): void {
+    if (this.store.hasFiredRows()) {
+      this.store.loadMoreFired();
+    } else {
+      this.store.loadFired();
     }
   }
 

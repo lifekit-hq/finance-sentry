@@ -1,12 +1,18 @@
-import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  ViewContainerRef,
+} from '@angular/core';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   AlertComponent,
+  AsyncStateComponent,
   ButtonComponent,
   CardComponent,
   CmnDialogService,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FormFieldComponent,
   InputComponent,
   ListItemRowComponent,
@@ -16,6 +22,8 @@ import {
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {PERSON_STATUS_TAG_VARIANT} from '../../constants/person/person.constants';
 import {type PersonRow} from '../../models/person/person.model';
 import {PeopleStore} from '../../store/people/people.store';
@@ -28,9 +36,9 @@ const SKELETON_ROWS = 3;
     PageContainerComponent,
     ReactiveFormsModule,
     AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     CardComponent,
-    EmptyStateComponent,
     FormFieldComponent,
     InputComponent,
     ListItemRowComponent,
@@ -44,8 +52,18 @@ const SKELETON_ROWS = 3;
 export class PeopleComponent {
   private readonly dialog = inject(CmnDialogService);
   private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(PeopleStore);
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData: this.store.rows().length > 0,
+      errorMessage: this.store.loadErrorMessage(),
+      offline: this.connectivity.offline(),
+      lastSyncedAt: null,
+    })
+  );
   public readonly statusVariant = PERSON_STATUS_TAG_VARIANT;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
   public readonly inviteForm = inject(FormBuilder).group({

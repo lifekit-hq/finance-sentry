@@ -1,7 +1,8 @@
 import {DialogRef} from '@angular/cdk/dialog';
+import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
-import {type Observable, of, Subject} from 'rxjs';
+import {NEVER, type Observable, of, Subject, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
@@ -323,5 +324,64 @@ describe('AddCommitmentDialogComponent', () => {
       expect(component.form.controls.cadence.value).toBe('annual');
       expect(component.form.controls.cadence.dirty).toBe(true);
     });
+  });
+});
+
+describe('AddCommitmentDialogComponent candidate list states', () => {
+  const PAGE = {items: [CANDIDATE], totalCount: 1, offset: 0, limit: 30, hasMore: false};
+
+  function render(search: ReturnType<typeof vi.fn>) {
+    TestBed.configureTestingModule({
+      providers: [
+        {provide: DialogRef, useValue: {close: vi.fn()}},
+        {provide: CMN_DIALOG_DATA, useValue: undefined},
+        {provide: SubscriptionsService, useValue: {getCommitmentAnchor: vi.fn()}},
+        {provide: CommitmentCandidatesService, useValue: {search}},
+      ],
+    });
+    const fixture = TestBed.createComponent(AddCommitmentDialogComponent);
+    fixture.detectChanges();
+    return {fixture, host: fixture.nativeElement as HTMLElement};
+  }
+
+  function retryButton(host: HTMLElement) {
+    return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry');
+  }
+
+  it('lists the matching transactions', () => {
+    const {host} = render(vi.fn(() => of(PAGE)));
+
+    expect(host.textContent).toContain('Acme Hosting');
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+  });
+
+  it('shows a skeleton while the candidates load, not the empty copy', () => {
+    const {host} = render(vi.fn(() => NEVER));
+
+    expect(host.querySelector('[data-testid="candidates-skeleton"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+  });
+
+  it('shows the empty copy when nothing matches', () => {
+    const {host} = render(vi.fn(() => of({...PAGE, items: [], totalCount: 0})));
+
+    expect(host.textContent).toContain('No matching outgoing transactions');
+  });
+
+  it('shows the load error and searches again on Retry', () => {
+    const search = vi.fn(() => throwError(() => new HttpErrorResponse({status: 500})));
+    const {host, fixture} = render(search);
+
+    expect(host.textContent).toContain('Failed to load transactions.');
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+    expect(search).toHaveBeenCalledTimes(1);
+
+    search.mockReturnValue(of(PAGE) as never);
+    retryButton(host)?.click();
+    fixture.detectChanges();
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(host.textContent).toContain('Acme Hosting');
+    expect(host.textContent).not.toContain('Failed to load transactions.');
   });
 });
