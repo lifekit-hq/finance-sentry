@@ -10,7 +10,10 @@ using Testcontainers.PostgreSql;
 /// <para>
 /// A static singleton rather than an xUnit fixture: xUnit 2 has no assembly fixture, and a collection fixture
 /// would put every container-backed class into one collection and run them serially. The containers are
-/// removed by the Testcontainers resource reaper (Ryuk) when the test process exits.
+/// disposed (stopped, removed, with their anonymous volume) when the last test has finished, by
+/// <see cref="ContainerTeardownTestFramework"/>; the Testcontainers resource reaper (Ryuk) stays on as the
+/// backstop for a run that is killed before then. Ryuk alone is not enough: wherever it is disabled
+/// (<c>TESTCONTAINERS_RYUK_DISABLED=true</c>) nothing else removes the container.
 /// </para>
 /// <para>
 /// Isolation is by database, which Postgres enforces: schemas, tables, rows, sequences, function grants, EF
@@ -25,10 +28,14 @@ public sealed class PostgresServer
     // Each test brings its own connection pool; the default 100 would cap the parallel run.
     private const string MaxConnections = "max_connections=500";
 
-    private readonly Lazy<Task<Started>> _started;
+    private readonly string _image;
+    private Lazy<Task<Started>> _started;
 
-    private PostgresServer(string image) =>
-        _started = new Lazy<Task<Started>>(() => StartAsync(image));
+    private PostgresServer(string image)
+    {
+        _image = image;
+        _started = NewLazyStart();
+    }
 
     /// <summary>The production major version.</summary>
     public static PostgresServer Postgres14 { get; } = new("postgres:14-alpine");
@@ -58,6 +65,30 @@ public sealed class PostgresServer
             resetsClusterRoles ? started.BaselineRoles : null);
     }
 
+    /// <summary>
+    /// Disposes every container this process started, which also removes it and its anonymous volume. A server
+    /// that never started is left alone; one disposed here starts afresh if it is used again.
+    /// </summary>
+    internal static async Task DisposeAllAsync()
+    {
+        await Task.WhenAll(Postgres14.DisposeContainerAsync(), Postgres16.DisposeContainerAsync());
+    }
+
+    private Lazy<Task<Started>> NewLazyStart() => new(() => StartAsync(_image));
+
+    private async Task DisposeContainerAsync()
+    {
+        var started = _started;
+        if (!started.IsValueCreated)
+            return;
+
+        _started = NewLazyStart();
+        if (started.Value.IsFaulted)
+            return; // The start itself failed, so there is no container of ours to dispose.
+
+        await (await started.Value).Container.DisposeAsync();
+    }
+
     private static async Task<Started> StartAsync(string image)
     {
         var container = new PostgreSqlBuilder(image).WithCommand("-c", MaxConnections).Build();
@@ -74,8 +105,8 @@ public sealed class PostgresServer
                 roles.Add(reader.GetString(0));
         }
 
-        return new Started(admin, roles);
+        return new Started(container, admin, roles);
     }
 
-    private sealed record Started(string AdminConnectionString, IReadOnlySet<string> BaselineRoles);
+    private sealed record Started(PostgreSqlContainer Container, string AdminConnectionString, IReadOnlySet<string> BaselineRoles);
 }
