@@ -77,6 +77,37 @@ public sealed class InvestmentThesisJsonbCollectionTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Thesis_with_empty_lists_survives_a_read_modify_upsert_round_trip()
+    {
+        var userId = Guid.NewGuid();
+        await using (var seed = CreateContext())
+        {
+            seed.Theses.Add(new InvestmentThesis
+            {
+                UserId = userId, Ticker = "MU", ThesisText = "t",
+                InvalidationTriggers = [new ThesisInvalidationTrigger("gross_margin", "lessThan", 0.35m, null, 1)],
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = CreateContext();
+        var repository = new FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories.ThesisRepository(db);
+        var thesis = (await repository.ListUnscopedAsync(userId)).Single();
+        thesis.KeyDataPoints.Should().BeEmpty();
+        thesis.Catalysts.Should().BeEmpty();
+
+        thesis.BrokenAt = DateTimeOffset.UtcNow;
+        thesis.BrokenReason = "gross margin below 35%";
+        await repository.UpsertAsync(thesis);
+
+        await using var read = CreateContext();
+        var stored = (await new FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories.ThesisRepository(read).ListUnscopedAsync(userId)).Single();
+        stored.BrokenReason.Should().Be("gross margin below 35%");
+        stored.KeyDataPoints.Should().BeEmpty();
+        stored.Catalysts.Should().BeEmpty();
+    }
+
+    [DockerRequiredFact]
     public async Task Written_lists_keep_the_camelCase_json_shape()
     {
         await using var db = CreateContext();

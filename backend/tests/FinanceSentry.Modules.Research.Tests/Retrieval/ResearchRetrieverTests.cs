@@ -119,25 +119,6 @@ public class ResearchRetrieverTests
     }
 
     [Fact]
-    public async Task Search_FiltersByTicker()
-    {
-        using var db = RetrievalTestContext.CreateDb();
-        var mu = RetrievalTestContext.CreateDocument(
-            "MU coverage", "Memory pricing recovery continues.", tickers: ["MU"]);
-        var aapl = RetrievalTestContext.CreateDocument(
-            "AAPL coverage", "Memory pricing affects handset margins.", tickers: ["AAPL"]);
-        await SeedDocumentWithChunkAsync(db, mu);
-        await SeedDocumentWithChunkAsync(db, aapl);
-
-        var retriever = CreateRetriever(db, new FakeEmbeddingService { IsEnabled = false });
-
-        var result = await retriever.SearchAsync(Request(UserA, "memory pricing", tickers: ["mu"]));
-
-        result.Hits.Should().NotBeEmpty();
-        result.Hits.Should().OnlyContain(h => h.Document.Tickers.Contains("MU"));
-    }
-
-    [Fact]
     public async Task Search_IgnoresUnindexedDocuments()
     {
         using var db = RetrievalTestContext.CreateDb();

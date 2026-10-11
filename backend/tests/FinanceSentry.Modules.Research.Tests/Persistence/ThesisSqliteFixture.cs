@@ -92,8 +92,6 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
             thesis.Property(x => x.CreatedAt).HasDefaultValueSql(null);
             thesis.Property(x => x.UpdatedAt).HasDefaultValueSql(null);
             thesis.Property(x => x.EntryPrice).HasColumnType(null);
-            thesis.Property(x => x.KeyDataPoints).HasColumnType(null);
-            thesis.Property(x => x.Catalysts).HasColumnType(null);
             thesis.Property(x => x.InvalidationTriggers).HasColumnType(null);
 
             thesis.ToTable(t => t.HasCheckConstraint(

@@ -70,6 +70,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -116,7 +117,8 @@ public sealed class ToolParityTests
         services.AddDbContext<WealthDbContext>(o =>
             o.UseInMemoryDatabase($"wealth-{dbKey}"));
         services.AddDbContext<ResearchDbContext>(o =>
-            o.UseInMemoryDatabase($"research-{dbKey}"));
+            o.UseInMemoryDatabase($"research-{dbKey}")
+                .ReplaceService<IModelCustomizer, InMemoryResearchModelCustomizer>());
         services.AddDbContext<RadarDbContext>(o =>
             o.UseInMemoryDatabase($"radar-{dbKey}"));
         services.AddDbContext<RiskDbContext>(o =>
@@ -178,7 +180,7 @@ public sealed class ToolParityTests
         // context; embeddings stay disabled (default options) so ranking is lexical-only here.
         services.AddHttpClient();
         services.AddScoped<IResearchDocumentRepository, ResearchDocumentRepository>();
-        services.AddScoped<IResearchRetrievalRepository, ResearchRetrievalRepository>();
+        services.AddScoped<IResearchRetrievalRepository, InMemoryTickerRetrievalRepository>();
         services.AddSingleton<IResearchChunker, ResearchChunker>();
         services.AddSingleton<IEmbeddingService, ConfiguredEmbeddingService>();
         services.AddScoped<IResearchCorpusSourceReader, ResearchCorpusSourceReader>();
@@ -1925,6 +1927,51 @@ public sealed class ToolParityTests
         packet.Groups.Should().ContainSingle(g => g.Name == "recent_news");
         packet.Groups.SelectMany(g => g.Items)
             .Should().OnlyContain(i => i.DocumentId != Guid.Empty && i.ChunkId != Guid.Empty);
+    }
+
+    // The InMemory provider cannot persist the JSON complex collections ResearchDbContext maps for a thesis's
+    // data points and catalysts (they read back null), so this test host maps the same lists through a value
+    // converter instead. The real JSON mapping is covered on Postgres by InvestmentThesisJsonbCollectionTests.
+    private sealed class InMemoryResearchModelCustomizer(ModelCustomizerDependencies dependencies)
+        : ModelCustomizer(dependencies)
+    {
+        public override void Customize(ModelBuilder modelBuilder, DbContext context)
+        {
+            base.Customize(modelBuilder, context);
+
+            var thesis = modelBuilder.Entity<InvestmentThesis>();
+            foreach (var complex in thesis.Metadata.GetComplexProperties().ToList())
+            {
+                thesis.Metadata.RemoveComplexProperty(complex);
+            }
+
+            thesis.Property(t => t.KeyDataPoints).HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer.Deserialize<List<ThesisDataPoint>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new());
+            thesis.Property(t => t.Catalysts).HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer.Deserialize<List<ThesisCatalyst>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new());
+        }
+    }
+
+    // The InMemory provider cannot translate the jsonb element filter (Tickers.Any / Contains) the real
+    // repository runs in SQL, so this double drops the ticker predicate, delegates, and applies it in memory.
+    // The SQL translation itself is covered on Postgres by ResearchDocumentJsonbCollectionTests.
+    private sealed class InMemoryTickerRetrievalRepository(ResearchDbContext db, IOptions<ResearchRetrievalOptions> options)
+        : IResearchRetrievalRepository
+    {
+        public async Task<IReadOnlyList<ResearchChunkCandidate>> ListCandidatesAsync(
+            ResearchRetrievalFilter filter, CancellationToken ct = default)
+        {
+            var all = await new ResearchRetrievalRepository(db, options).ListCandidatesAsync(filter with { Tickers = [] }, ct);
+            if (filter.Tickers.Count == 0)
+            {
+                return all;
+            }
+
+            var upper = filter.Tickers.Select(t => t.ToUpperInvariant()).ToHashSet();
+            return all.Where(c => c.Document.Tickers.Any(upper.Contains)).ToList();
+        }
     }
 
     private sealed class InMemoryBenchmarkRecordRepository : IBenchmarkRelativeRecordRepository
