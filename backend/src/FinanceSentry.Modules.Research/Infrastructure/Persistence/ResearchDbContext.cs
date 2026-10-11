@@ -247,12 +247,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         ocb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ocb.Property(x => x.ExpiresAt).IsRequired();
         ocb.Property(x => x.RejectedReason).HasMaxLength(1000);
-        ocb.Property(x => x.NominationReasons)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
+        ocb.PrimitiveCollection(x => x.NominationReasons).HasColumnType("jsonb");
         ocb.HasIndex(x => new { x.UserId, x.Status }).HasDatabaseName("idx_opportunity_candidates_user_status");
         ocb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_opportunity_candidates_user_ticker");
 

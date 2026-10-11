@@ -669,7 +669,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("NominationReasons")
+                    b.PrimitiveCollection<List<string>>("NominationReasons")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
