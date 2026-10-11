@@ -1,5 +1,7 @@
 import {type UrlParamCodec} from '@lifekit-hq/core';
 
+import {type TransactionType} from '../../models/transaction/transaction.model';
+
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/;
 const MAX_MONTHS = 120;
@@ -27,4 +29,16 @@ export const MONTHS_PARAM_CODEC: UrlParamCodec<number> = {
       ? months
       : DEFAULT_MONTHS_PARAM;
   },
+};
+
+/** Free-form id params (`account`, `category`): an empty value reads as absent. */
+export const NULLABLE_STRING_PARAM_CODEC: UrlParamCodec<Nullable<string>> = {
+  encode: value => value ?? '',
+  decode: raw => (raw === '' ? null : raw),
+};
+
+/** The ledger `type` param: only `credit` and `debit` are filters, anything else reads as All. */
+export const TRANSACTION_TYPE_PARAM_CODEC: UrlParamCodec<Nullable<TransactionType>> = {
+  encode: value => value ?? '',
+  decode: raw => (raw === 'credit' || raw === 'debit' ? raw : null),
 };

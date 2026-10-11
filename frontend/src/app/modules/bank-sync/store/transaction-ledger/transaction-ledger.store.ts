@@ -1,5 +1,11 @@
+import {withUrlSync} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
+import {
+  ISO_DATE_PARAM_CODEC,
+  NULLABLE_STRING_PARAM_CODEC,
+  TRANSACTION_TYPE_PARAM_CODEC,
+} from '../../constants/url-params/url-params.constants';
 import {transactionLedgerComputed} from './transaction-ledger.computed';
 import {transactionLedgerEffects, transactionLedgerHooks} from './transaction-ledger.effects';
 import {transactionLedgerMethods} from './transaction-ledger.methods';
@@ -7,6 +13,26 @@ import {initialTransactionLedgerState} from './transaction-ledger.state';
 
 export const TransactionLedgerStore = signalStore(
   withState(initialTransactionLedgerState),
+  withUrlSync({
+    accountId: {
+      param: 'account',
+      default: initialTransactionLedgerState.accountId,
+      codec: NULLABLE_STRING_PARAM_CODEC,
+    },
+    transactionType: {
+      param: 'type',
+      default: initialTransactionLedgerState.transactionType,
+      codec: TRANSACTION_TYPE_PARAM_CODEC,
+    },
+    category: {
+      param: 'category',
+      default: initialTransactionLedgerState.category,
+      codec: NULLABLE_STRING_PARAM_CODEC,
+    },
+    from: {param: 'from', default: initialTransactionLedgerState.from, codec: ISO_DATE_PARAM_CODEC},
+    to: {param: 'to', default: initialTransactionLedgerState.to, codec: ISO_DATE_PARAM_CODEC},
+    search: {param: 'q', default: initialTransactionLedgerState.search},
+  }),
   withMethods(transactionLedgerMethods),
   withComputed(transactionLedgerComputed),
   withMethods(transactionLedgerEffects),
