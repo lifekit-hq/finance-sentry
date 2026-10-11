@@ -26,7 +26,7 @@ using Xunit;
 [Trait("Category", "Integration")]
 public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
 {
-    private const string Password = "quiet lantern orchard";
+    private const string Password = "Quiet-Lantern-1";
     private const string RedirectUri = "http://127.0.0.1:33418/callback";
 
     private static readonly TimeSpan Lifetime = TimeSpan.FromDays(1);
