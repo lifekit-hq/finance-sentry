@@ -123,18 +123,6 @@ describe('SettingsComponent financial independence assumptions', () => {
     expect(store.saveProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Save while an assumption is invalid and enables it once corrected', () => {
-    const {component, fixture, form} = setup();
-    fixture.detectChanges();
-    expect(component.assumptionsInvalid()).toBe(false);
-    form.controls.safeWithdrawalRate.setValue('12');
-    fixture.detectChanges();
-    expect(component.assumptionsInvalid()).toBe(true);
-    form.controls.safeWithdrawalRate.setValue('4');
-    fixture.detectChanges();
-    expect(component.assumptionsInvalid()).toBe(false);
-  });
-
   it('does not toast from the component on dispatch', () => {
     const {component, toast} = setup();
     component.saveProfile();
@@ -147,6 +135,105 @@ describe('SettingsComponent financial independence assumptions', () => {
     store.profile.set({...profile, firstName: 'Grace'} as unknown as UserProfile);
     expect(component.assumptionsForm()).toBe(form);
     expect(form.controls.safeWithdrawalRate.value).toBe('12');
+  });
+});
+
+describe('SettingsComponent Save Profile button', () => {
+  function render() {
+    const store = {
+      profile: signal<UserProfile | null>(profile),
+      avatarInitials: signal('AL'),
+      fullName: signal('Ada Lovelace'),
+      profileSaving: signal(false),
+      updateProfile: vi.fn(),
+      saveProfile: vi.fn(),
+    };
+    const push = {
+      pushEnabled: signal(false),
+      canToggle: signal(false),
+      serverNotice: signal(''),
+      browserNotice: signal(''),
+      loadErrorMessage: signal(''),
+      actionErrorMessage: signal(''),
+      rows: signal([]),
+      isBusy: signal(false),
+      removingId: signal<string | null>(null),
+      togglePush: vi.fn(),
+      remove: vi.fn(),
+    };
+    const appearance = {
+      seed: signal<string | null>(null),
+      intensity: signal(0.12),
+      choose: vi.fn(),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {provide: AuthStore, useValue: {canManageUsers: signal(false)}},
+        {provide: ToastService, useValue: {show: vi.fn()}},
+      ],
+    });
+    TestBed.overrideComponent(SettingsComponent, {
+      set: {
+        providers: [
+          {provide: SettingsStore, useValue: store},
+          {provide: PushStore, useValue: push},
+          {provide: AppearanceStore, useValue: appearance},
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const saveButton = (): HTMLButtonElement => {
+      const button = Array.from(el.querySelectorAll('button')).find(b =>
+        b.textContent?.includes('Save Profile')
+      );
+      if (!button) {
+        throw new Error('Save Profile button missing');
+      }
+      return button;
+    };
+    const type = (selector: string, text: string): void => {
+      const input = el.querySelector<HTMLInputElement>(selector);
+      if (!input) {
+        throw new Error(`${selector} missing`);
+      }
+      input.value = text;
+      input.dispatchEvent(new Event('input', {bubbles: true}));
+      fixture.detectChanges();
+    };
+    return {store, fixture, saveButton, type};
+  }
+
+  it('is enabled while the assumptions are valid', () => {
+    const {saveButton} = render();
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('is disabled once an invalid value is typed and enabled again when corrected', () => {
+    const {saveButton, type} = render();
+    type('#s-swr input', '12');
+    expect(saveButton().disabled).toBe(true);
+    type('#s-swr input', '4');
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('follows the second assumption as well', () => {
+    const {saveButton, type} = render();
+    type('#s-real-return input', 'abc');
+    expect(saveButton().disabled).toBe(true);
+    type('#s-real-return input', '6');
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('is enabled for a profile that loads after the first render', () => {
+    const {store, fixture, saveButton} = render();
+    store.profile.set(null);
+    fixture.detectChanges();
+    store.profile.set({...profile, safeWithdrawalRate: 0.05} as unknown as UserProfile);
+    fixture.detectChanges();
+    expect(saveButton().disabled).toBe(false);
   });
 });
 

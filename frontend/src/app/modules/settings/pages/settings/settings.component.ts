@@ -7,14 +7,7 @@ import {
   untracked,
   ViewContainerRef,
 } from '@angular/core';
-import {toObservable, toSignal} from '@angular/core/rxjs-interop';
-import {
-  FormControl,
-  type FormControlStatus,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   ButtonComponent,
@@ -29,7 +22,7 @@ import {
   ToastService,
   ToggleComponent,
 } from '@lifekit-hq/ui';
-import {map, of, startWith, switchMap, take} from 'rxjs';
+import {take} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -48,8 +41,6 @@ import {AppearanceStore} from '../../store/appearance/appearance.store';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {percentRange} from '../../validators/percent-range.validator';
-
-const isInvalid = (status: FormControlStatus): boolean => status === 'INVALID';
 
 const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
   {value: 'USD', label: 'USD — US Dollar'},
@@ -129,15 +120,6 @@ export class SettingsComponent {
       }),
     });
   });
-
-  public readonly assumptionsInvalid = toSignal(
-    toObservable(this.assumptionsForm).pipe(
-      switchMap(form =>
-        form ? form.statusChanges.pipe(startWith(form.status), map(isInvalid)) : of(false)
-      )
-    ),
-    {initialValue: false}
-  );
 
   public saveProfile(): void {
     const p = this.store.profile();

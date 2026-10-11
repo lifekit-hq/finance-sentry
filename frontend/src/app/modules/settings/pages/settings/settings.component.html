@@ -55,7 +55,7 @@
           </cmn-form-field>
           <div class="flex justify-end pb-cmn-4">
             <cmn-button
-              [disabled]="assumptionsInvalid()"
+              [disabled]="assumptionsForm()?.invalid ?? false"
               [loading]="store.profileSaving()"
               (clicked)="saveProfile()"
               >Save Profile</cmn-button
