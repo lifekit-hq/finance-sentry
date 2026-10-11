@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.Wealth.Domain;
 
-public sealed class NetWorthSnapshot
+using FinanceSentry.Core.Auth;
+
+public sealed class NetWorthSnapshot : IUserOwned
 {
     public Guid Id { get; init; }
     public Guid UserId { get; init; }
