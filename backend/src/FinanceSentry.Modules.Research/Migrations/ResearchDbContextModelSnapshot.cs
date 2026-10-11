@@ -609,7 +609,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Keywords")
+                    b.PrimitiveCollection<List<string>>("Keywords")
                         .IsRequired()
                         .HasColumnType("jsonb");
 

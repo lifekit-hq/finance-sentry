@@ -310,12 +310,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         nsb.Property(x => x.Name).IsRequired().HasMaxLength(80);
         nsb.Property(x => x.Kind).IsRequired().HasConversion<string>().HasMaxLength(10);
         nsb.Property(x => x.Url).IsRequired();
-        nsb.Property(x => x.Keywords)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
+        nsb.PrimitiveCollection(x => x.Keywords).HasColumnType("jsonb");
         nsb.Property(x => x.ThesisId);
         nsb.Property(x => x.Enabled).IsRequired();
         nsb.Property(x => x.ConsecutiveFailures).IsRequired();
