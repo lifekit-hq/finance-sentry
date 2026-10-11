@@ -63,6 +63,52 @@ public sealed class TtlCacheTests
     }
 
     [Fact]
+    public async Task ConcurrentMissesOnDifferentKeys_FetchInParallel()
+    {
+        using var sut = new TtlCache<int>(new ManualTimeProvider(Start), Ttl, maxEntries: 100);
+        var started = 0;
+        var release = new TaskCompletionSource();
+        const int keys = 40;
+
+        async Task<(int, bool)> Fetch(CancellationToken _)
+        {
+            Interlocked.Increment(ref started);
+            await release.Task;
+            return (1, true);
+        }
+
+        var pending = Enumerable.Range(0, keys)
+            .Select(i => sut.GetOrFetchAsync($"T{i}", Fetch, CancellationToken.None))
+            .ToArray();
+
+        started.Should().Be(keys);
+        release.SetResult();
+        await Task.WhenAll(pending);
+    }
+
+    [Fact]
+    public async Task CancelledWaiter_DoesNotCancelFetchOthersAreAwaiting()
+    {
+        using var sut = new TtlCache<int>(new ManualTimeProvider(Start), Ttl, maxEntries: 10);
+        var release = new TaskCompletionSource();
+        using var cts = new CancellationTokenSource();
+
+        async Task<(int, bool)> Fetch(CancellationToken ct)
+        {
+            await release.Task.WaitAsync(ct);
+            return (7, true);
+        }
+
+        var first = sut.GetOrFetchAsync("AAPL", Fetch, cts.Token);
+        var second = sut.GetOrFetchAsync("AAPL", Fetch, CancellationToken.None);
+        await cts.CancelAsync();
+        release.SetResult();
+
+        await first.Invoking(t => t).Should().ThrowAsync<OperationCanceledException>();
+        (await second).Should().Be(7);
+    }
+
+    [Fact]
     public void SizeLimit_EvictsInsteadOfGrowingPastMaxEntries()
     {
         using var sut = new TtlCache<int>(new ManualTimeProvider(Start), Ttl, maxEntries: 2);

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.Research.Infrastructure.Caching;
 
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 
 /// <summary>
@@ -7,17 +8,15 @@ using Microsoft.Extensions.Caching.Memory;
 /// <see cref="MemoryCache"/> (the shared <see cref="IMemoryCache"/> has no limit and its entries carry
 /// no size), so a long-running process cannot grow it past <c>maxEntries</c>. Freshness is judged on the
 /// injected <see cref="TimeProvider"/>, so tests move time instead of sleeping; the cache's own
-/// expiry only evicts. Concurrent misses on one key share a single fetch: the fetch runs under a
-/// striped lock and later callers read what the first stored.
+/// expiry only evicts. Concurrent misses on one key share a single in-flight fetch (other keys fetch
+/// in parallel); the fetch is not tied to any one caller's token, each caller only stops waiting on its own.
 /// </summary>
 public sealed class TtlCache<TValue> : IDisposable
 {
-    private const int LockStripes = 16;
-
     private readonly TimeProvider _clock;
     private readonly TimeSpan _ttl;
     private readonly MemoryCache _entries;
-    private readonly SemaphoreSlim[] _locks = Enumerable.Range(0, LockStripes).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+    private readonly ConcurrentDictionary<string, Lazy<Task<TValue>>> _inFlight = new();
 
     public TtlCache(TimeProvider clock, TimeSpan ttl, int maxEntries)
     {
@@ -36,27 +35,9 @@ public sealed class TtlCache<TValue> : IDisposable
             return hit;
         }
 
-        var gate = _locks[(uint)StringComparer.OrdinalIgnoreCase.GetHashCode(key) % LockStripes];
-        await gate.WaitAsync(ct);
-        try
-        {
-            if (TryGetFresh(key, out hit))
-            {
-                return hit;
-            }
-
-            var (value, cacheable) = await fetch(ct);
-            if (cacheable)
-            {
-                Set(key, value);
-            }
-
-            return value;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        var flight = _inFlight.GetOrAdd(
+            key.ToUpperInvariant(), normalized => new Lazy<Task<TValue>>(() => FetchAsync(normalized, key, fetch)));
+        return await flight.Value.WaitAsync(ct);
     }
 
     public bool TryGetFresh(string key, out TValue value)
@@ -81,12 +62,29 @@ public sealed class TtlCache<TValue> : IDisposable
         cacheEntry.AbsoluteExpirationRelativeToNow = _ttl;
     }
 
-    public void Dispose()
+    public void Dispose() => _entries.Dispose();
+
+    private async Task<TValue> FetchAsync(
+        string normalizedKey, string key, Func<CancellationToken, Task<(TValue Value, bool Cacheable)>> fetch)
     {
-        _entries.Dispose();
-        foreach (var gate in _locks)
+        try
         {
-            gate.Dispose();
+            if (TryGetFresh(key, out var hit))
+            {
+                return hit;
+            }
+
+            var (value, cacheable) = await fetch(CancellationToken.None);
+            if (cacheable)
+            {
+                Set(key, value);
+            }
+
+            return value;
+        }
+        finally
+        {
+            _inFlight.TryRemove(normalizedKey, out _);
         }
     }
 
