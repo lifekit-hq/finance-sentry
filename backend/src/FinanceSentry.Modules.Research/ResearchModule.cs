@@ -251,6 +251,7 @@ public static class ResearchModule
         var analystSources = config.GetSection(AnalystSourcesOptions.SectionName)
             .Get<AnalystSourcesOptions>() ?? new AnalystSourcesOptions();
         var finnhubTimeout = TimeSpan.FromSeconds(30);
+        var finnhubRetryDelay = TimeSpan.FromSeconds(5);
         services.AddHttpClient(FinnhubRecommendationTrendsService.HttpClientName, client =>
         {
             client.BaseAddress = new Uri(analystSources.Finnhub.BaseUrl.TrimEnd('/') + "/");
@@ -262,7 +263,7 @@ public static class ResearchModule
                 client.DefaultRequestHeaders.Add("X-Finnhub-Token", analystSources.Finnhub.ApiKey);
             }
         })
-            .AddProviderResilience(finnhubTimeout);
+            .AddProviderResilience(finnhubTimeout, maxRetries: 1, retryDelay: finnhubRetryDelay);
 
         var yahooMarketDataTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(YahooMarketDataService.HttpClientName, client =>

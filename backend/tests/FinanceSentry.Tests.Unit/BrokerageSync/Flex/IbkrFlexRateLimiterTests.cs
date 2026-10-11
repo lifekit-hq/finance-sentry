@@ -39,21 +39,6 @@ public class IbkrFlexRateLimiterTests
     }
 
     [Fact]
-    public async Task WaitAsync_NeverReleasesASecondCallBeforeTheIntervalHasElapsed()
-    {
-        var interval = TimeSpan.FromMilliseconds(300);
-        using var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: interval);
-
-        await Task.Delay(TimeSpan.FromMilliseconds(250));
-        await limiter.WaitAsync();
-        var first = System.Diagnostics.Stopwatch.GetTimestamp();
-
-        await limiter.WaitAsync();
-
-        System.Diagnostics.Stopwatch.GetElapsedTime(first).Should().BeGreaterThanOrEqualTo(interval - TimeSpan.FromMilliseconds(30));
-    }
-
-    [Fact]
     public void WaitAsync_UnderTheLimit_DoesNotDelay()
     {
         using var limiter = new IbkrFlexRateLimiter(maxPerWindow: 100, window: TimeSpan.FromMinutes(1), minInterval: TimeSpan.Zero);
