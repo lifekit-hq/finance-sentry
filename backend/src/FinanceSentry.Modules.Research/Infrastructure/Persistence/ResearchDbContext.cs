@@ -86,21 +86,34 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         tb.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         tb.Property(x => x.EntryPrice).HasColumnType("numeric(18,6)");
         tb.Property(x => x.BrokenReason).HasMaxLength(1000);
-        tb.Property(x => x.KeyDataPoints)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<ThesisDataPoint>>(v, jsonOptions) ?? new());
-        tb.Property(x => x.Catalysts)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<ThesisCatalyst>>(v, jsonOptions) ?? new());
-        tb.Property(x => x.InvalidationTriggers)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<ThesisInvalidationTrigger>>(v, jsonOptions) ?? new());
+        // JSON-mapped complex collections; the property names stay the camelCase the former string
+        // conversion wrote (System.Text.Json web defaults), so stored rows read back unchanged.
+        tb.ComplexCollection(x => x.KeyDataPoints, c =>
+        {
+            c.ToJson("KeyDataPoints");
+            c.Property(p => p.Metric).HasJsonPropertyName("metric");
+            c.Property(p => p.Direction).HasJsonPropertyName("direction");
+            c.Property(p => p.Threshold).HasJsonPropertyName("threshold");
+            c.Property(p => p.Source).HasJsonPropertyName("source");
+        });
+        tb.ComplexCollection(x => x.Catalysts, c =>
+        {
+            c.ToJson("Catalysts");
+            c.Property(p => p.Date).HasJsonPropertyName("date");
+            c.Property(p => p.Event).HasJsonPropertyName("event");
+        });
+        tb.ComplexCollection(x => x.InvalidationTriggers, c =>
+        {
+            c.ToJson("InvalidationTriggers");
+            c.Property(p => p.Metric).HasJsonPropertyName("metric");
+            c.Property(p => p.Direction).HasJsonPropertyName("direction");
+            c.Property(p => p.Threshold).HasJsonPropertyName("threshold");
+            c.Property(p => p.ProxyTicker).HasJsonPropertyName("proxyTicker");
+            c.Property(p => p.ConsecutivePeriods).HasJsonPropertyName("consecutivePeriods");
+            c.Property(p => p.PeriodType).HasJsonPropertyName("periodType");
+            c.Property(p => p.BenchmarkTicker).HasJsonPropertyName("benchmarkTicker");
+            c.Property(p => p.WindowDays).HasJsonPropertyName("windowDays");
+        });
         tb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_thesis_user_ticker");
 
         var nb = modelBuilder.Entity<NewsArticle>();

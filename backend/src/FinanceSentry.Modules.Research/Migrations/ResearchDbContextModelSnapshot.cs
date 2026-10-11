@@ -402,10 +402,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("Catalysts")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -413,14 +409,6 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.Property<decimal?>("EntryPrice")
                         .HasColumnType("numeric(18,6)");
-
-                    b.Property<string>("InvalidationTriggers")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("KeyDataPoints")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("ThesisText")
                         .IsRequired()
@@ -439,6 +427,81 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Catalysts", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.Catalysts#ThesisCatalyst", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<DateOnly>("Date")
+                                .HasJsonPropertyName("date");
+
+                            b1.Property<string>("Event")
+                                .IsRequired()
+                                .HasJsonPropertyName("event");
+
+                            b1
+                                .ToJson("Catalysts")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "InvalidationTriggers", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.InvalidationTriggers#ThesisInvalidationTrigger", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BenchmarkTicker")
+                                .HasJsonPropertyName("benchmarkTicker");
+
+                            b1.Property<int>("ConsecutivePeriods")
+                                .HasJsonPropertyName("consecutivePeriods");
+
+                            b1.Property<string>("Direction")
+                                .IsRequired()
+                                .HasJsonPropertyName("direction");
+
+                            b1.Property<string>("Metric")
+                                .IsRequired()
+                                .HasJsonPropertyName("metric");
+
+                            b1.Property<int>("PeriodType")
+                                .HasJsonPropertyName("periodType");
+
+                            b1.Property<string>("ProxyTicker")
+                                .HasJsonPropertyName("proxyTicker");
+
+                            b1.Property<decimal>("Threshold")
+                                .HasJsonPropertyName("threshold");
+
+                            b1.Property<int?>("WindowDays")
+                                .HasJsonPropertyName("windowDays");
+
+                            b1
+                                .ToJson("InvalidationTriggers")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "KeyDataPoints", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.KeyDataPoints#ThesisDataPoint", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Direction")
+                                .IsRequired()
+                                .HasJsonPropertyName("direction");
+
+                            b1.Property<string>("Metric")
+                                .IsRequired()
+                                .HasJsonPropertyName("metric");
+
+                            b1.Property<string>("Source")
+                                .IsRequired()
+                                .HasJsonPropertyName("source");
+
+                            b1.Property<decimal>("Threshold")
+                                .HasJsonPropertyName("threshold");
+
+                            b1
+                                .ToJson("KeyDataPoints")
+                                .HasColumnType("jsonb");
+                        });
 
                     b.HasKey("Id");
 
