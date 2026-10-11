@@ -16,17 +16,20 @@ using Microsoft.Extensions.DependencyInjection;
 /// still has retries left the applied state is <c>Scheduled</c>, so a <c>FailedState</c> here is terminal.
 /// Transient errors (throttling, network) don't count toward the streak; a later <c>Succeeded</c> resets
 /// it so the next failure can re-alert. Alert dispatch is fire-and-forget — a dispatch failure never
-/// breaks the job (US4-AS3).
+/// breaks the job (US4-AS3). The streak is also exported as <c>finance_job_consecutive_failures{job}</c>
+/// so an alert rule on the metrics stack can watch it.
 /// </summary>
 public sealed class ConsecutiveFailureAlertFilter(
     IServiceProvider serviceProvider,
     IJobFailureStreakStore store,
+    JobMetrics metrics,
     int threshold) : IApplyStateFilter
 {
     private const int MaxErrorLength = 200;
 
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly IJobFailureStreakStore _store = store;
+    private readonly JobMetrics _metrics = metrics;
     private readonly int _threshold = threshold < 1 ? 1 : threshold;
 
     public void OnStateApplied(ApplyStateContext context, IWriteOnlyTransaction transaction)
@@ -59,6 +62,7 @@ public sealed class ConsecutiveFailureAlertFilter(
                 TryResolveAlert(jobName);
             if (current.Count != 0 || current.Alerted)
                 _store.Set(jobName, JobFailureStreak.Empty);
+            _metrics.SetConsecutiveFailures(jobName, 0);
             return;
         }
 
@@ -74,6 +78,7 @@ public sealed class ConsecutiveFailureAlertFilter(
             alerted = TryRaiseAlert(jobName, count, error);
 
         _store.Set(jobName, new JobFailureStreak(count, alerted));
+        _metrics.SetConsecutiveFailures(jobName, count);
     }
 
     // Returns true when the alert was raised without error, so a failed dispatch retries on the next

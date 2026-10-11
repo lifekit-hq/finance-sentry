@@ -207,6 +207,7 @@ GlobalJobFilters.Filters.Add(
 GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertFilter(
     app.Services,
     new DashboardObservability.HangfireJobFailureStreakStore(),
+    app.Services.GetRequiredService<JobMetrics>(),
     app.Configuration.GetValue("Observability:JobFailureAlertThreshold", 3)));
 
 // Propagate trace context into job execution spans (spec 023 amendment, #616).
