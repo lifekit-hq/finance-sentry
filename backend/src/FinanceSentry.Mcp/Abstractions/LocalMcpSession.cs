@@ -1,8 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
-using Microsoft.Extensions.Configuration;
+using FinanceSentry.Modules.Auth.API.Authentication;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FinanceSentry.Mcp.Abstractions;
@@ -10,7 +10,7 @@ namespace FinanceSentry.Mcp.Abstractions;
 public sealed class LocalMcpSession(
     LocalMcpCredentialStore credentialStore,
     McpOAuthTokenClient tokenClient,
-    IConfiguration configuration,
+    IOptions<JwtOptions> jwtOptions,
     ILogger<LocalMcpSession> logger)
 {
     private const string ExpectedAudience = "mcp";
@@ -125,21 +125,13 @@ public sealed class LocalMcpSession(
 
     private ClaimsPrincipal? Validate(string token)
     {
-        var secret = configuration["Jwt:Secret"];
-        if (string.IsNullOrWhiteSpace(secret))
+        // Optional here: the host-run stdio server may run without the signing key, which makes the stored
+        // credentials unverifiable (no principal) rather than a startup failure.
+        if (!jwtOptions.Value.HasSecret)
             return null;
 
         var handler = new JwtSecurityTokenHandler();
-        var parameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-            ValidateIssuer = false,
-            ValidateAudience = true,
-            ValidAudience = ExpectedAudience,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
-        };
+        var parameters = AccessTokenValidationParameters.Create(jwtOptions.Value.Secret!, ExpectedAudience);
 
         try
         {
