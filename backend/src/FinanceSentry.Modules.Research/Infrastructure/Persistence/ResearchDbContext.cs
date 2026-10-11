@@ -220,16 +220,26 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         prb.Property(x => x.ReviewCadence).IsRequired().HasMaxLength(20);
         prb.Property(x => x.TotalValueUsd).HasColumnType("numeric(18,2)");
         prb.Property(x => x.Rationale).IsRequired();
-        prb.Property(x => x.Sleeves)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<PolicyReviewSleeve>>(v, jsonOptions) ?? new());
-        prb.Property(x => x.Adjustments)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<PolicyReviewAdjustment>>(v, jsonOptions) ?? new());
+        prb.ComplexCollection(x => x.Sleeves, c =>
+        {
+            c.ToJson("Sleeves");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.TargetPct).HasJsonPropertyName("targetPct");
+            c.Property(p => p.MinPct).HasJsonPropertyName("minPct");
+            c.Property(p => p.MaxPct).HasJsonPropertyName("maxPct");
+            c.Property(p => p.ActualPct).HasJsonPropertyName("actualPct");
+            c.Property(p => p.ActualValueUsd).HasJsonPropertyName("actualValueUsd");
+            c.Property(p => p.DriftPct).HasJsonPropertyName("driftPct");
+            c.Property(p => p.Status).HasJsonPropertyName("status");
+        });
+        prb.ComplexCollection(x => x.Adjustments, c =>
+        {
+            c.ToJson("Adjustments");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.Action).HasJsonPropertyName("action");
+            c.Property(p => p.ApproxAmountUsd).HasJsonPropertyName("approxAmountUsd");
+            c.Property(p => p.Rationale).HasJsonPropertyName("rationale");
+        });
         prb.HasIndex(x => new { x.UserId, x.CompletedAt }).HasDatabaseName("idx_policy_reviews_user_completed");
 
         var teb = modelBuilder.Entity<ThesisEvent>();

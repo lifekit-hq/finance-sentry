@@ -816,10 +816,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("Adjustments")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<DateTimeOffset>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -844,10 +840,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("Sleeves")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<decimal>("TotalValueUsd")
                         .HasColumnType("numeric(18,2)");
 
@@ -856,6 +848,65 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.Property<bool>("WasMissed")
                         .HasColumnType("boolean");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Adjustments", "FinanceSentry.Modules.Research.Domain.PolicyReviews.PolicyReview.Adjustments#PolicyReviewAdjustment", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Action")
+                                .IsRequired()
+                                .HasJsonPropertyName("action");
+
+                            b1.Property<decimal>("ApproxAmountUsd")
+                                .HasJsonPropertyName("approxAmountUsd");
+
+                            b1.Property<string>("AssetClass")
+                                .IsRequired()
+                                .HasJsonPropertyName("assetClass");
+
+                            b1.Property<string>("Rationale")
+                                .IsRequired()
+                                .HasJsonPropertyName("rationale");
+
+                            b1
+                                .ToJson("Adjustments")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Sleeves", "FinanceSentry.Modules.Research.Domain.PolicyReviews.PolicyReview.Sleeves#PolicyReviewSleeve", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("ActualPct")
+                                .HasJsonPropertyName("actualPct");
+
+                            b1.Property<decimal>("ActualValueUsd")
+                                .HasJsonPropertyName("actualValueUsd");
+
+                            b1.Property<string>("AssetClass")
+                                .IsRequired()
+                                .HasJsonPropertyName("assetClass");
+
+                            b1.Property<decimal>("DriftPct")
+                                .HasJsonPropertyName("driftPct");
+
+                            b1.Property<decimal>("MaxPct")
+                                .HasJsonPropertyName("maxPct");
+
+                            b1.Property<decimal>("MinPct")
+                                .HasJsonPropertyName("minPct");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasJsonPropertyName("status");
+
+                            b1.Property<decimal>("TargetPct")
+                                .HasJsonPropertyName("targetPct");
+
+                            b1
+                                .ToJson("Sleeves")
+                                .HasColumnType("jsonb");
+                        });
 
                     b.HasKey("Id");
 
