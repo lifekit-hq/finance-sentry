@@ -1,49 +1,44 @@
+import {DOCUMENT} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {
   ButtonComponent,
   ChatComponent,
   type CmnChatStreamFn,
-  IconComponent,
+  CmnDrawerService,
   type LucideIconName,
-  MenuComponent,
-  type MenuItem,
 } from '@lifekit-hq/ui';
 
-import {type ConversationSummary} from '../../models/conversation/conversation.model';
+import {SessionsListComponent} from '../../components/sessions-list/sessions-list.component';
 import {AgentChatStore} from '../../store/agent-chat.store';
 
-const CONVERSATION_MENU_ITEMS: MenuItem[] = [
-  {id: 'delete', label: 'Delete', icon: 'Trash2', destructive: true},
-];
+const SESSIONS_TITLE = 'Sessions';
 
 @Component({
   selector: 'fns-ledger-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {class: 'block h-full'},
   providers: [AgentChatStore],
-  imports: [ButtonComponent, ChatComponent, IconComponent, MenuComponent],
+  imports: [ButtonComponent, ChatComponent, SessionsListComponent],
   templateUrl: './ledger-chat.component.html',
 })
 export class LedgerChatComponent {
+  private readonly drawer = inject(CmnDrawerService);
+  private readonly document = inject(DOCUMENT);
+
   public readonly store = inject(AgentChatStore);
 
-  protected readonly newChatIcon: LucideIconName = 'Plus';
   protected readonly sessionsIcon: LucideIconName = 'History';
-  protected readonly conversationMenuItems = CONVERSATION_MENU_ITEMS;
 
   public readonly chatStream: CmnChatStreamFn = text => this.store.stream(text);
 
-  public onNewChat(): void {
-    this.store.resetThread();
-  }
-
-  public onSelect(conversation: ConversationSummary): void {
-    this.store.selectConversation(conversation.id);
-  }
-
-  public onConversationAction(actionId: string, conversation: ConversationSummary): void {
-    if (actionId === 'delete') {
-      this.store.deleteConversation(conversation.id);
-    }
+  /** Phone only: the drawer carries the store because it is created outside this page's injector. */
+  public openSessions(): void {
+    const trigger = this.document.activeElement;
+    const ref = this.drawer.open(SessionsListComponent, {title: SESSIONS_TITLE, data: this.store});
+    ref.afterClosed().subscribe(() => {
+      if (trigger instanceof HTMLElement) {
+        trigger.focus();
+      }
+    });
   }
 }

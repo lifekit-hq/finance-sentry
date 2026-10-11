@@ -71,11 +71,10 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       brand="Finance Sentry"
     >
       <router-outlet />
+      @if (canUseAi()) {
+        <fns-chat-widget cmnAppLayoutFab />
+      }
     </cmn-app-layout>
-
-    @if (canUseAi()) {
-      <fns-chat-widget />
-    }
   `,
 })
 export class AppShellComponent {
