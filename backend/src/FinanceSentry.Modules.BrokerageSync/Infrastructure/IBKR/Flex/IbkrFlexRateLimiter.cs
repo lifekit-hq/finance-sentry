@@ -1,55 +1,58 @@
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 
+using System.Threading.RateLimiting;
+
 /// <summary>
 /// Enforces IBKR's Flex Web Service rate limit — 1 request/second and max 10 requests/minute,
 /// per token. Registered as a singleton and shared across every Flex call (<c>SendRequest</c>,
 /// <c>GetStatement</c>, and each retry poll), because the limit is per-token, not per-endpoint.
+/// Two <see cref="SlidingWindowRateLimiter"/>s queue callers until both allow the request.
 /// </summary>
-public sealed class IbkrFlexRateLimiter(int maxPerWindow = 10, TimeSpan? window = null, TimeSpan? minInterval = null)
+public sealed class IbkrFlexRateLimiter : IDisposable
 {
-    private readonly int _maxPerWindow = maxPerWindow;
-    private readonly TimeSpan _window = window ?? TimeSpan.FromMinutes(1);
-    private readonly TimeSpan _minInterval = minInterval ?? TimeSpan.FromSeconds(1);
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly Queue<DateTimeOffset> _recent = new();
-    private DateTimeOffset _lastRequestAt = DateTimeOffset.MinValue;
+    // One-second segments across a minute: a permit returns at most a second after its window ends, never early.
+    private const int SegmentsPerWindow = 60;
+
+    private readonly SlidingWindowRateLimiter _perWindow;
+    private readonly SlidingWindowRateLimiter? _perInterval;
+
+    public IbkrFlexRateLimiter(int maxPerWindow = 10, TimeSpan? window = null, TimeSpan? minInterval = null)
+    {
+        _perWindow = Create(maxPerWindow, window ?? TimeSpan.FromMinutes(1), SegmentsPerWindow);
+
+        var interval = minInterval ?? TimeSpan.FromSeconds(1);
+        _perInterval = interval > TimeSpan.Zero ? Create(1, interval, 1) : null;
+    }
 
     public async Task WaitAsync(CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct);
-        try
-        {
-            while (true)
-            {
-                var now = DateTimeOffset.UtcNow;
-                while (_recent.Count > 0 && now - _recent.Peek() >= _window)
-                    _recent.Dequeue();
-
-                var delay = TimeSpan.Zero;
-                var sinceLast = now - _lastRequestAt;
-                if (sinceLast < _minInterval)
-                    delay = _minInterval - sinceLast;
-
-                if (_recent.Count >= _maxPerWindow)
-                {
-                    var untilOldestExpires = _window - (now - _recent.Peek());
-                    if (untilOldestExpires > delay)
-                        delay = untilOldestExpires;
-                }
-
-                if (delay <= TimeSpan.Zero)
-                {
-                    _lastRequestAt = now;
-                    _recent.Enqueue(now);
-                    return;
-                }
-
-                await Task.Delay(delay, ct);
-            }
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        // The leases are never released: a sliding window hands the permit back when its segment expires.
+        await AcquireAsync(_perWindow, ct);
+        if (_perInterval is not null)
+            await AcquireAsync(_perInterval, ct);
     }
+
+    public void Dispose()
+    {
+        _perWindow.Dispose();
+        _perInterval?.Dispose();
+    }
+
+    private static async Task AcquireAsync(RateLimiter limiter, CancellationToken ct)
+    {
+        using var lease = await limiter.AcquireAsync(1, ct);
+        if (!lease.IsAcquired)
+            throw new InvalidOperationException("The Flex rate limiter refused a queued request.");
+    }
+
+    private static SlidingWindowRateLimiter Create(int permitLimit, TimeSpan window, int segments) => new(
+        new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = window,
+            SegmentsPerWindow = segments,
+            QueueLimit = int.MaxValue,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            AutoReplenishment = true,
+        });
 }

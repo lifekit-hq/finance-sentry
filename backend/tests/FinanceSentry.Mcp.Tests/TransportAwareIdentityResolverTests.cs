@@ -5,6 +5,7 @@ using FinanceSentry.Mcp.Abstractions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
@@ -73,7 +74,8 @@ public sealed class TransportAwareIdentityResolverTests
 
         var session = new LocalMcpSession(
             store,
-            new McpOAuthTokenClient(NullLogger<McpOAuthTokenClient>.Instance),
+            new ServiceCollection().AddLogging().AddMcpOAuthTokenClient().BuildServiceProvider()
+                .GetRequiredService<McpOAuthTokenClient>(),
             config,
             NullLogger<LocalMcpSession>.Instance);
         session.InitializeAsync().GetAwaiter().GetResult();

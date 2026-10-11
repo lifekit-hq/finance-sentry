@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Http;
 
 public static class ResearchModule
 {
@@ -175,12 +176,14 @@ public static class ResearchModule
         services.Configure<FundamentalsOptions>(config.GetSection(FundamentalsOptions.SectionName));
 
         // Key-less, no crumb or cookie for the timeseries endpoint; the plain app UA is accepted.
+        var yahooFundamentalsTimeout = TimeSpan.FromSeconds(12);
         services.AddHttpClient(YahooFundamentalsSource.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(12);
+            client.Timeout = yahooFundamentalsTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
         })
+            .AddProviderResilience(yahooFundamentalsTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
@@ -247,43 +250,51 @@ public static class ResearchModule
         // trailing slash so relative "stock/recommendation" resolves under /api/v1.
         var analystSources = config.GetSection(AnalystSourcesOptions.SectionName)
             .Get<AnalystSourcesOptions>() ?? new AnalystSourcesOptions();
+        var finnhubTimeout = TimeSpan.FromSeconds(30);
         services.AddHttpClient(FinnhubRecommendationTrendsService.HttpClientName, client =>
         {
             client.BaseAddress = new Uri(analystSources.Finnhub.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = finnhubTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
             if (!string.IsNullOrWhiteSpace(analystSources.Finnhub.ApiKey))
             {
                 client.DefaultRequestHeaders.Add("X-Finnhub-Token", analystSources.Finnhub.ApiKey);
             }
-        });
+        })
+            .AddProviderResilience(finnhubTimeout);
 
+        var yahooMarketDataTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(YahooMarketDataService.HttpClientName, client =>
         {
             client.BaseAddress = new Uri("https://query1.finance.yahoo.com");
-            client.Timeout = TimeSpan.FromSeconds(10);
+            client.Timeout = yahooMarketDataTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
-        });
+        })
+            .AddProviderResilience(yahooMarketDataTimeout);
 
+        var rssTimeout = TimeSpan.FromSeconds(20);
         services.AddHttpClient(RssMarketNewsService.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = rssTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
-        });
+        })
+            .AddProviderResilience(rssTimeout);
 
         // Yahoo's quoteSummary/calendarEvents endpoint requires a cookie + crumb pair. Share one
         // CookieContainer across handler rotations so the seeded consent cookies persist as long as
         // the crumb the service caches. A browser-like UA is required or Yahoo rejects the request.
         var yahooEarningsCookies = new System.Net.CookieContainer();
+        var yahooEarningsTimeout = TimeSpan.FromSeconds(12);
         services.AddHttpClient(YahooEarningsCalendarService.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(12);
+            client.Timeout = yahooEarningsTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         })
+            .AddProviderResilience(yahooEarningsTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             CookieContainer = yahooEarningsCookies,
@@ -294,12 +305,14 @@ public static class ResearchModule
 
         // SEC EDGAR (filings + XBRL fundamentals). SEC policy REQUIRES a descriptive User-Agent
         // with contact info and permits gzip; a generic UA gets throttled/blocked.
+        var secTimeout = TimeSpan.FromSeconds(15);
         services.AddHttpClient(SecEdgarService.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = secTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("FinanceSentry/1.0 (contact: payar3282@gmail.com)");
             client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate");
         })
+            .AddProviderResilience(secTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
@@ -307,12 +320,14 @@ public static class ResearchModule
 
         // MarketBeat daily ratings page (analyst actions market-wide sweep). A browser-like UA is
         // required or the page returns a challenge instead of the table.
+        var marketBeatTimeout = TimeSpan.FromSeconds(20);
         services.AddHttpClient(MarketBeatAnalystActionsSource.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = marketBeatTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         })
+            .AddProviderResilience(marketBeatTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
@@ -321,12 +336,14 @@ public static class ResearchModule
         // Yahoo quoteSummary valuation modules (feature 030, US2) — same crumb + cookie dance with its
         // own isolated CookieContainer so its crumb/cookies don't collide with the analyst client.
         var yahooValuationCookies = new System.Net.CookieContainer();
+        var yahooValuationTimeout = TimeSpan.FromSeconds(12);
         services.AddHttpClient(YahooValuationDataService.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(12);
+            client.Timeout = yahooValuationTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         })
+            .AddProviderResilience(yahooValuationTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             CookieContainer = yahooValuationCookies,
@@ -382,12 +399,14 @@ public static class ResearchModule
         // TrendForce press-center page source (feature 030, US3). A browser-like UA is required or the
         // page returns a challenge instead of the article list. Registered under INewsPageSource so the
         // news job resolves page sources as an IEnumerable.
+        var trendForceTimeout = TimeSpan.FromSeconds(20);
         services.AddHttpClient(TrendForcePageSource.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = trendForceTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         })
+            .AddProviderResilience(trendForceTimeout)
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.All,
@@ -399,12 +418,14 @@ public static class ResearchModule
         // endpoint; when disabled (default), indexing still stores chunks for lexical-only search.
         var retrievalOptions = config.GetSection(ResearchRetrievalOptions.SectionName)
             .Get<ResearchRetrievalOptions>() ?? new ResearchRetrievalOptions();
+        var embeddingTimeout = TimeSpan.FromSeconds(Math.Max(1, retrievalOptions.Embedding.TimeoutSeconds));
         services.AddHttpClient(ConfiguredEmbeddingService.HttpClientName, client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(Math.Max(1, retrievalOptions.Embedding.TimeoutSeconds));
+            client.Timeout = embeddingTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
-        });
+        })
+            .AddProviderResilience(embeddingTimeout, maxRetries: 0);
         services.AddSingleton<IEmbeddingService, ConfiguredEmbeddingService>();
         services.AddSingleton<IResearchChunker, ResearchChunker>();
         services.AddScoped<IResearchCorpusSourceReader, ResearchCorpusSourceReader>();

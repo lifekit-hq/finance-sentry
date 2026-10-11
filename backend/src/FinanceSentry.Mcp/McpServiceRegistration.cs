@@ -63,7 +63,7 @@ public static class McpServiceRegistration
 
         services.AddHttpContextAccessor();
         services.AddSingleton<LocalMcpCredentialStore>();
-        services.AddSingleton<McpOAuthTokenClient>();
+        services.AddMcpOAuthTokenClient();
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
         services.AddScoped<ICurrentUser, IdentityResolverCurrentUser>();

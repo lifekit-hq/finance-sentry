@@ -13,7 +13,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="Polly" />
     <PackageReference Include="FluentResults" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />

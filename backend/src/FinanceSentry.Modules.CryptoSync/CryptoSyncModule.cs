@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.CryptoSync;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
@@ -49,11 +50,13 @@ public static class CryptoSyncModule
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
 
-        services.AddHttpClient<BinanceHttpClient>();
+        services.AddHttpClient<BinanceHttpClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddSingleton<BinanceHoldingsAggregator>();
         services.AddScoped<ICryptoExchangeAdapter, BinanceAdapter>();
 
-        services.AddHttpClient<RevolutXHttpClient>();
+        services.AddHttpClient<RevolutXHttpClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddSingleton<RevolutXHoldingsAggregator>();
         services.AddScoped<ICryptoExchangeAdapter, RevolutXAdapter>();
 

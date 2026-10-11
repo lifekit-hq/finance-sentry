@@ -1,10 +1,19 @@
 using System.Net.Http.Json;
+using FinanceSentry.Infrastructure.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Mcp.Abstractions;
 
-public sealed class McpOAuthTokenClient(ILogger<McpOAuthTokenClient> logger)
+/// <summary>
+/// Calls the API's MCP token endpoints. The singleton hosts (<see cref="LocalMcpSession"/>) hold it for the
+/// process lifetime, so it takes <see cref="IHttpClientFactory"/> and asks for a client per call - a typed
+/// <see cref="HttpClient"/> captured by a singleton would pin one handler and never see DNS changes.
+/// </summary>
+public sealed class McpOAuthTokenClient(IHttpClientFactory httpFactory, ILogger<McpOAuthTokenClient> logger)
 {
+    public const string HttpClientName = "mcp-oauth-token";
+
     public const string McpScope = "mcp.full_access";
 
     public async Task<StoredMcpCredentials> ExchangeAuthorizationCodeAsync(
@@ -14,8 +23,8 @@ public sealed class McpOAuthTokenClient(ILogger<McpOAuthTokenClient> logger)
         string redirectUri,
         CancellationToken cancellationToken = default)
     {
-        using var http = new HttpClient();
-        var response = await http.PostAsJsonAsync(
+        var http = httpFactory.CreateClient(HttpClientName);
+        using var response = await http.PostAsJsonAsync(
             $"{apiBaseUrl.TrimEnd('/')}/auth/mcp/token",
             new { grant_type = "authorization_code", code, redirect_uri = redirectUri },
             cancellationToken);
@@ -31,8 +40,8 @@ public sealed class McpOAuthTokenClient(ILogger<McpOAuthTokenClient> logger)
         StoredMcpCredentials current,
         CancellationToken cancellationToken = default)
     {
-        using var http = new HttpClient();
-        var response = await http.PostAsJsonAsync(
+        var http = httpFactory.CreateClient(HttpClientName);
+        using var response = await http.PostAsJsonAsync(
             $"{current.ApiBaseUrl.TrimEnd('/')}/auth/mcp/token",
             new { grant_type = "refresh_token", refresh_token = current.RefreshToken },
             cancellationToken);
@@ -48,8 +57,8 @@ public sealed class McpOAuthTokenClient(ILogger<McpOAuthTokenClient> logger)
     {
         try
         {
-            using var http = new HttpClient();
-            var response = await http.PostAsJsonAsync(
+            var http = httpFactory.CreateClient(HttpClientName);
+            using var response = await http.PostAsJsonAsync(
                 $"{current.ApiBaseUrl.TrimEnd('/')}/auth/mcp/revoke",
                 new { refresh_token = current.RefreshToken },
                 cancellationToken);
@@ -82,5 +91,21 @@ public sealed class McpOAuthTokenClient(ILogger<McpOAuthTokenClient> logger)
                 UserId,
                 Email,
                 Scope);
+    }
+}
+
+public static class McpOAuthTokenClientRegistration
+{
+    /// <summary>
+    /// Registers <see cref="McpOAuthTokenClient"/> over a named client with the platform resilience handler.
+    /// Both calls are POSTs - an authorization code and a rotating refresh token are single use - so nothing
+    /// is retried; the handler contributes the timeouts, circuit breaker and telemetry.
+    /// </summary>
+    public static IServiceCollection AddMcpOAuthTokenClient(this IServiceCollection services)
+    {
+        services.AddHttpClient(McpOAuthTokenClient.HttpClientName)
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
+        services.AddSingleton<McpOAuthTokenClient>();
+        return services;
     }
 }

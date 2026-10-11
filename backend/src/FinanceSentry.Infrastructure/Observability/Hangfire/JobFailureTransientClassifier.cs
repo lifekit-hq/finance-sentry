@@ -2,7 +2,7 @@ namespace FinanceSentry.Infrastructure.Observability.Hangfire;
 
 using System.Net.Http;
 using System.Net.Sockets;
-using FinanceSentry.Infrastructure.Retry;
+using FinanceSentry.Infrastructure.Http;
 
 /// <summary>
 /// Classifies a failed job's exception as transient/self-healing (US4) so throttling and network blips
@@ -31,7 +31,7 @@ public static class JobFailureTransientClassifier
 
         if (exception is HttpRequestException http
             && http.StatusCode is { } status
-            && RetryPolicies.IsTransientHttpError(status))
+            && TransientHttpStatus.IsTransient(status))
             return true;
 
         // A connect or DNS failure has no status code and, depending on the runtime path, no
