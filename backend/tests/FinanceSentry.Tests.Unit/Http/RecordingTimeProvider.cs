@@ -16,6 +16,9 @@ internal sealed class RecordingTimeProvider : FakeTimeProvider
     private readonly object _gate = new();
     private readonly List<TimeSpan> _created = [];
 
+    // Timers already scanned: a second RunAsync on the same clock must not re-fire the first one's waits.
+    private int _seen;
+
     /// <summary>The waits <see cref="RunAsync"/> fired, in order.</summary>
     public List<TimeSpan> Waits { get; } = [];
 
@@ -28,7 +31,6 @@ internal sealed class RecordingTimeProvider : FakeTimeProvider
 
     public async Task RunAsync(Task task, Func<TimeSpan, bool> isWait)
     {
-        var seen = 0;
         for (var spin = 0; !task.IsCompleted; spin++)
         {
             if (spin > MaxSpins)
@@ -37,9 +39,9 @@ internal sealed class RecordingTimeProvider : FakeTimeProvider
             TimeSpan? next = null;
             lock (_gate)
             {
-                while (next is null && seen < _created.Count)
+                while (next is null && _seen < _created.Count)
                 {
-                    var due = _created[seen++];
+                    var due = _created[_seen++];
                     if (due > TimeSpan.Zero && isWait(due))
                         next = due;
                 }
