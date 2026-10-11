@@ -1,6 +1,7 @@
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {DateUtils} from '../../../shared/utils/date.utils';
 import {EVENT_SOURCE_LABELS, THIS_WEEK_DAYS} from '../constants/event/event.constants';
 import {
   type CalendarWindow,
@@ -36,7 +37,7 @@ export function eventsComputed(store: StateSignals) {
   return {
     /** The window the calendar view asks for: today through today + horizon, local dates. */
     calendarWindow: computed((): CalendarWindow => {
-      const from = EventDayUtils.toIsoDate(new Date());
+      const from = DateUtils.isoDateLocal(new Date());
       return {from, to: EventDayUtils.addDays(from, store.horizonDays())};
     }),
     isUpcomingLoading: computed(() => store.upcomingStatus() === 'loading'),
@@ -48,7 +49,7 @@ export function eventsComputed(store: StateSignals) {
     }),
     /** Day groups split into "This week" and "Later"; a section with no days is left out. */
     upcomingSections: computed((): EventWeekSection[] => {
-      const today = EventDayUtils.toIsoDate(new Date());
+      const today = DateUtils.isoDateLocal(new Date());
       const groups = EventDayUtils.groupByDay(store.upcoming());
       const isThisWeek = (date: string) => EventDayUtils.daysUntil(date, today) < THIS_WEEK_DAYS;
       return (

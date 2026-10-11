@@ -21,20 +21,15 @@ import {
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {MonthKeyUtils} from '../../utils/month-key.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {type LedgerFilter} from './transaction-ledger.computed';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
-const MONTH_KEY_PAD = 2;
 export const SEARCH_DEBOUNCE_MS = 300;
 
-function currentUtcMonthKey(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(MONTH_KEY_PAD, '0')}`;
-}
-
 function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
-  const key = currentUtcMonthKey();
+  const key = MonthKeyUtils.currentUtc();
   return monthlyFlow.filter(r => r.month === key).reduce((sum, r) => sum + r.outflowUsd, 0);
 }
 

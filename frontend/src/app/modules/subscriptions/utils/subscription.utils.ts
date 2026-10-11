@@ -1,11 +1,11 @@
 import {NEUTRAL_STEP} from '@lifekit-hq/charts-core';
 
+import {MS_PER_DAY} from '../../../shared/constants/date/date.constants';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {MERCHANT_SERIES_STEPS} from '../constants/subscription/subscription.constants';
 import {type Subscription} from '../models/subscription/subscription.model';
 
 const HASH_SHIFT = 5;
-const MS_PER_DAY = 86_400_000;
 // Detection builds this label itself (`Mobile top-up 0057`); the statement line reads `*MOBI TOP-UP 0857860057`.
 const SYNTHESIZED_NAME = /^mobile top-up \d{4}$/i;
 

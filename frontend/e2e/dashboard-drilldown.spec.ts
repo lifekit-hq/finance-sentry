@@ -473,7 +473,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
 
     await page.mouse.move(box.x + 2, box.y + box.height / 2);
     await expect(value).toContainText('$40,000.00');
-    await expect(page.getByTestId('net-worth-change')).toContainText('Sep 1, 2026');
+    await expect(page.getByTestId('net-worth-change')).toContainText(/1 Sept? 2026/);
 
     await page.mouse.move(box.x - 50, box.y - 50);
     await expect(value).toContainText('$50,000.00');

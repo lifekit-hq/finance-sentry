@@ -17,12 +17,6 @@ function event(date: string, subject = 'MU'): UpcomingEvent {
   };
 }
 
-describe('EventDayUtils.toIsoDate', () => {
-  it('formats the local calendar date', () => {
-    expect(EventDayUtils.toIsoDate(new Date(2026, 8, 22, 23, 30))).toBe('2026-09-22');
-  });
-});
-
 describe('EventDayUtils.addDays', () => {
   it('adds whole days across a month boundary', () => {
     expect(EventDayUtils.addDays('2026-09-22', 30)).toBe('2026-10-22');

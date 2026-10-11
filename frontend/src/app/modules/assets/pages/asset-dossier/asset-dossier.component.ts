@@ -25,6 +25,7 @@ import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
+import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
@@ -43,7 +44,6 @@ const SEVERITY_DEFAULT = 5;
 const TREND_MIN_POINTS = 2;
 const TREND_SCALE_MAX = 30;
 const TREND_LABEL_FORMAT = 'mediumDate';
-const TREND_LOCALE = 'en-US';
 
 @Component({
   selector: 'fns-asset-dossier',
@@ -105,7 +105,7 @@ export class AssetDossierComponent {
     return [...signals]
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(s => ({
-        label: formatDate(s.timestamp, TREND_LABEL_FORMAT, TREND_LOCALE),
+        label: formatDate(s.timestamp, TREND_LABEL_FORMAT, APP_LOCALE),
         time: new Date(s.timestamp).getTime(),
         value: SEVERITY_VALUE[s.severity] ?? SEVERITY_DEFAULT,
       }));

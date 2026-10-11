@@ -10,6 +10,7 @@ import {
   FLOW_OUT_COLOUR,
   NEUTRAL_COLOUR,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
+import {APP_LOCALE, MS_PER_DAY} from '../../../../shared/constants/date/date.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
@@ -27,6 +28,7 @@ import {
   type NetWorthSplit,
 } from '../../models/dashboard/dashboard.model';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
+import {MonthKeyUtils} from '../../utils/month-key.utils';
 import {NetWorthSplitUtils} from '../../utils/net-worth-split.utils';
 
 interface StateSignals {
@@ -38,9 +40,9 @@ interface StateSignals {
   scrubIndex: Signal<number | null>;
 }
 
-const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short'});
-const DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {month: 'short', day: 'numeric'});
-const FULL_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+const MONTH_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {month: 'short'});
+const DAY_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {month: 'short', day: 'numeric'});
+const FULL_DATE_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
   month: 'short',
   day: 'numeric',
   year: 'numeric',
@@ -54,9 +56,8 @@ function formatMonthYear(date: Date): string {
 }
 
 // Below this span the snapshots are effectively daily, so month-year labels ("Jul '26")
-// collapse to a single repeated value — use day-level labels ("Jul 5") instead.
+// collapse to a single repeated value — use day-level labels ("5 Jul") instead.
 const SHORT_SPAN_DAYS = 92;
-const MS_PER_DAY = 86_400_000;
 
 // Sleeves keep the colour of the asset class they hold, and income / spending the money-in and
 // money-out colours: none of them follow the theme. Resolved when a chart is built, since a canvas
@@ -129,12 +130,6 @@ function formatPercent(percent: number | null | undefined): string {
     : `${percent > 0 ? '+' : ''}${percent.toFixed(CHANGE_PERCENT_DIGITS)}%`;
 }
 
-function currentMonthKey(): string {
-  const now = new Date();
-  const MONTH_KEY_PAD = 2;
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(MONTH_KEY_PAD, '0')}`;
-}
-
 function formatMonthKey(key: string): string {
   const [year, month] = key.split('-').map(Number);
   return formatMonthYear(new Date(Date.UTC(year, month - 1, 1)));
@@ -202,7 +197,9 @@ export function dashboardComputed(store: StateSignals) {
   // figure is exactly what the reader expects — the same split Binance and IBKR use, where
   // the current period is a tile and the bars are closed periods.
   const completeMonths = computed(() =>
-    groupMonthly(store.data()?.monthlyFlow ?? []).filter(([key]) => key !== currentMonthKey())
+    groupMonthly(store.data()?.monthlyFlow ?? []).filter(
+      ([key]) => key !== MonthKeyUtils.currentUtc()
+    )
   );
 
   // The tiles total every month in the selected window, in-progress month included: one

@@ -33,7 +33,7 @@ import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
-import {DateRangeUtils} from '../../../../shared/utils/date-range.utils';
+import {DateUtils} from '../../../../shared/utils/date.utils';
 import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
 import {
   BUDGET_NEAR_LIMIT_PCT,
@@ -188,8 +188,8 @@ export class BudgetsComponent {
   public viewTransactions(category: string): void {
     const year = this.store.selectedYear();
     const month = this.store.selectedMonth();
-    const from = DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month - 1, 1)));
-    const to = DateRangeUtils.toIsoDate(new Date(Date.UTC(year, month, 0)));
+    const from = DateUtils.isoDateUtc(new Date(Date.UTC(year, month - 1, 1)));
+    const to = DateUtils.isoDateUtc(new Date(Date.UTC(year, month, 0)));
     void this.router.navigate([AppRoute.Transactions], {
       queryParams: {category, type: 'debit', from, to},
     });

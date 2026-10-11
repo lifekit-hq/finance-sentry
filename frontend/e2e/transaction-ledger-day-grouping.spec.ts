@@ -71,20 +71,20 @@ test.describe('Transaction ledger — day grouping in the viewer timezone', () =
   test('Dublin-midnight rows share the Oct 2 group, not Oct 1', async ({page}) => {
     await page.goto('/transactions');
 
-    // "Fri, Oct 2" (2026-10-02 is a Friday); the year is appended once the date is outside "now".
-    const oct2 = page.getByRole('region', {name: /^Fri, Oct 2\b/});
+    // "Fri 2 Oct" (2026-10-02 is a Friday); the year is appended once the date is outside "now".
+    const oct2 = page.getByRole('region', {name: /^Fri 2 Oct\b/});
     await expect(oct2.getByRole('heading', {level: 2})).toBeVisible();
     await expect(oct2.getByTestId('ledger-row')).toHaveCount(2);
     await expect(oct2).toContainText('Synthetic booked card row');
     await expect(oct2).toContainText('Synthetic pending transfer row');
 
-    await expect(page.getByRole('region', {name: /Oct 1\b/})).toHaveCount(0);
+    await expect(page.getByRole('region', {name: /\b1 Oct\b/})).toHaveCount(0);
   });
 
   test('a bare date and an unparseable timestamp keep their own day', async ({page}) => {
     await page.goto('/transactions');
 
-    const bare = page.getByRole('region', {name: /^Tue, Sep 15\b/});
+    const bare = page.getByRole('region', {name: /^Tue 15 Sept?\b/});
     await expect(bare.getByTestId('ledger-row')).toHaveCount(1);
     await expect(bare).toContainText('Synthetic bare date row');
 
