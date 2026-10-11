@@ -4,7 +4,6 @@ import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.co
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
@@ -59,20 +58,9 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
     setMonthlyOutflowUsd(value: number | null, currency: string = DEFAULT_BASE_CURRENCY): void {
       patchState(store, {monthlyOutflowUsd: value, monthlyOutflowCurrency: currency});
     },
-    setAccountId(accountId: Nullable<string>): void {
-      patchState(store, {accountId, offset: 0});
-    },
-    setTransactionType(transactionType: Nullable<TransactionType>): void {
-      patchState(store, {transactionType, offset: 0});
-    },
-    setCategory(category: Nullable<string>): void {
-      patchState(store, {category, offset: 0});
-    },
-    setDateRange(from: Nullable<string>, to: Nullable<string>): void {
-      patchState(store, {from, to, offset: 0});
-    },
+    /** A blank box reads as no search, so it never reaches the `q` query param. */
     setSearch(search: string): void {
-      patchState(store, {search, offset: 0});
+      patchState(store, {search: search.trim() === '' ? '' : search, offset: 0});
     },
     setAccounts(accounts: TransactionAccountOption[]): void {
       patchState(store, {accounts});

@@ -1,7 +1,7 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {takeUntilDestroyed, toSignal} from '@angular/core/rxjs-interop';
+import {takeUntilDestroyed, toObservable} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
-import {ActivatedRoute, Router} from '@angular/router';
+import {Router} from '@angular/router';
 import {
   AlertComponent,
   AsyncStateComponent,
@@ -17,7 +17,6 @@ import {
   PageContainerComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
-import {debounceTime, distinctUntilChanged, map} from 'rxjs';
 
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
@@ -34,17 +33,11 @@ import {
 } from '../../models/transaction/transaction.model';
 import {TransactionAmountPipe} from '../../pipes/transaction-amount.pipe';
 import {TransactionAmountClassPipe} from '../../pipes/transaction-amount-class.pipe';
-import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-function isoDateOrNull(value: string | null): Nullable<string> {
-  return value !== null && ISO_DATE.test(value) ? value : null;
-}
 const DRAWER_WIDTH = '480px';
 
 @Component({
@@ -76,47 +69,13 @@ const DRAWER_WIDTH = '480px';
 })
 export class TransactionLedgerComponent {
   private readonly drawer = inject(CmnDrawerService);
-  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(TransactionLedgerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
 
-  /** The search text in the `q` query param: a shared link or back/forward restores the search. */
-  public readonly activeSearch = toSignal(
-    this.route.queryParamMap.pipe(map(p => p.get('q') ?? '')),
-    {initialValue: ''}
-  );
-
-  public readonly searchControl = new FormControl(this.activeSearch(), {nonNullable: true});
-
-  public readonly activeAccount = toSignal(
-    this.route.queryParamMap.pipe(map(p => p.get('account'))),
-    {initialValue: null}
-  );
-
-  public readonly activeCategory = toSignal(
-    this.route.queryParamMap.pipe(map(p => p.get('category'))),
-    {initialValue: null}
-  );
-
-  public readonly activeType = toSignal(
-    this.route.queryParamMap.pipe(
-      map((p): Nullable<TransactionType> => {
-        const type = p.get('type');
-        return type === 'credit' || type === 'debit' ? type : null;
-      })
-    ),
-    {initialValue: null}
-  );
-
-  public readonly activeDateRange = toSignal(
-    this.route.queryParamMap.pipe(
-      map(p => ({from: isoDateOrNull(p.get('from')), to: isoDateOrNull(p.get('to'))}))
-    ),
-    {initialValue: {from: null, to: null}}
-  );
+  public readonly searchControl = new FormControl(this.store.search(), {nonNullable: true});
 
   public readonly periods = LEDGER_PERIODS;
 
@@ -130,13 +89,13 @@ export class TransactionLedgerComponent {
       lastSyncedAt: this.store.lastSyncedAt(),
     })
   );
-  public readonly activePeriod = computed(() => {
-    const {from, to} = this.activeDateRange();
-    return LedgerPeriodUtils.match(from, to);
-  });
+  public readonly activePeriod = computed(() =>
+    LedgerPeriodUtils.match(this.store.from(), this.store.to())
+  );
 
   public readonly activeDateRangeLabel = computed(() => {
-    const {from, to} = this.activeDateRange();
+    const from = this.store.from();
+    const to = this.store.to();
     if (!from && !to) {
       return null;
     }
@@ -144,7 +103,7 @@ export class TransactionLedgerComponent {
   });
 
   public readonly activeCategoryLabel = computed(() => {
-    const cat = this.activeCategory();
+    const cat = this.store.category();
     return cat ? MerchantCategoryUtils.format(cat) : null;
   });
 
@@ -153,44 +112,18 @@ export class TransactionLedgerComponent {
   );
 
   constructor() {
-    this.store.applyAccount(this.activeAccount);
-    this.store.applyType(this.activeType);
-    this.store.applyCategory(this.activeCategory);
-    this.store.applyDateRange(this.activeDateRange);
-    this.store.applySearch(
-      toSignal(this.searchControl.valueChanges, {initialValue: this.searchControl.value})
-    );
-    this.followSearchParam();
-    this.syncSearchParam();
+    this.store.applySearch(this.searchControl.valueChanges);
+    this.followSearch();
   }
 
-  /** URL → box: back/forward (or a new deep link) rewrites the box when it differs. */
-  private followSearchParam(): void {
-    this.route.queryParamMap
-      .pipe(
-        map(p => p.get('q') ?? ''),
-        takeUntilDestroyed()
-      )
-      .subscribe(q => {
-        if (q !== this.searchControl.value) {
-          this.searchControl.setValue(q);
-        }
-      });
-  }
-
-  /** Box → URL: debounced, replacing the history entry, merged with the other filters. */
-  private syncSearchParam(): void {
-    this.searchControl.valueChanges
-      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), distinctUntilChanged(), takeUntilDestroyed())
+  /** State → box: back/forward (or a new deep link) rewrites the box when it differs. */
+  private followSearch(): void {
+    toObservable(this.store.search)
+      .pipe(takeUntilDestroyed())
       .subscribe(search => {
-        if (search.trim() === this.activeSearch().trim()) {
-          return;
+        if (search !== this.searchControl.value) {
+          this.searchControl.setValue(search);
         }
-        void this.router.navigate([], {
-          queryParams: {q: search.trim() === '' ? null : search},
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        });
       });
   }
 

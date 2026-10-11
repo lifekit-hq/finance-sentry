@@ -1,6 +1,16 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, debounceTime, filter, forkJoin, of, pipe, switchMap, tap} from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  filter,
+  forkJoin,
+  of,
+  pipe,
+  switchMap,
+  tap,
+} from 'rxjs';
 
 import {StoreErrorUtils} from '../../../../shared/utils/store-error.utils';
 import {type MonthlyFlow} from '../../models/dashboard/dashboard.model';
@@ -12,6 +22,7 @@ import {
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
+import {type LedgerFilter} from './transaction-ledger.computed';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
 const MONTH_KEY_PAD = 2;
@@ -36,10 +47,6 @@ interface EffectsStore {
   from: Signal<Nullable<string>>;
   to: Signal<Nullable<string>>;
   search: Signal<string>;
-  setAccountId: (accountId: Nullable<string>) => void;
-  setTransactionType: (transactionType: Nullable<TransactionType>) => void;
-  setCategory: (category: Nullable<string>) => void;
-  setDateRange: (from: Nullable<string>, to: Nullable<string>) => void;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
   setLoading: (keepRows?: boolean) => void;
@@ -56,6 +63,17 @@ interface EffectsStore {
   nextPage: () => void;
   setError: (errorCode: Nullable<string>) => void;
   setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
+}
+
+function sameFilter(a: LedgerFilter, b: LedgerFilter): boolean {
+  return (
+    a.accountId === b.accountId &&
+    a.transactionType === b.transactionType &&
+    a.category === b.category &&
+    a.from === b.from &&
+    a.to === b.to &&
+    a.search === b.search
+  );
 }
 
 function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
@@ -125,47 +143,21 @@ export function transactionLedgerEffects(store: EffectsStore) {
     loadMore: (): void => {
       fetchPage('next');
     },
-    /** Follows the `account` query param: a changed value re-queries from the first page. */
-    applyAccount: rxMethod<Nullable<string>>(
-      pipe(
-        filter(accountId => accountId !== store.accountId()),
-        tap(accountId => store.setAccountId(accountId)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the `type` query param (In / Out): a changed value re-queries from the first page. */
-    applyType: rxMethod<Nullable<TransactionType>>(
-      pipe(
-        filter(transactionType => transactionType !== store.transactionType()),
-        tap(transactionType => store.setTransactionType(transactionType)),
-        tap(() => load())
-      )
-    ),
-    /**
-     * Follows the `category` query param (dashboard Top spendings drill-down): filtered
-     * server-side so the whole dataset is searched, not only the loaded pages.
-     */
-    applyCategory: rxMethod<Nullable<string>>(
-      pipe(
-        filter(category => category !== store.category()),
-        tap(category => store.setCategory(category)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the `from`/`to` query params (ISO dates): a changed bound re-queries from the first page. */
-    applyDateRange: rxMethod<{from: Nullable<string>; to: Nullable<string>}>(
-      pipe(
-        filter(({from, to}) => from !== store.from() || to !== store.to()),
-        tap(({from, to}) => store.setDateRange(from, to)),
-        tap(() => load())
-      )
-    ),
-    /** Follows the search box: debounced, then re-queries from the first page. */
+    /** Follows the search box: debounced, then written to the `q` query param by `withUrlSync`. */
     applySearch: rxMethod<string>(
       pipe(
         debounceTime(SEARCH_DEBOUNCE_MS),
         filter(search => search.trim() !== store.search().trim()),
-        tap(search => store.setSearch(search)),
+        tap(search => store.setSearch(search))
+      )
+    ),
+    /**
+     * Loads the ledger for the filters (synced from the query params by `withUrlSync`), again on
+     * every change. The first emission is the page's first load.
+     */
+    watchFilter: rxMethod<LedgerFilter>(
+      pipe(
+        distinctUntilChanged(sameFilter),
         tap(() => load())
       )
     ),
@@ -173,11 +165,12 @@ export function transactionLedgerEffects(store: EffectsStore) {
 }
 
 interface HookStore {
-  load: () => void;
+  filter: Signal<LedgerFilter>;
+  watchFilter: (filter: Signal<LedgerFilter>) => void;
   loadSummary: () => void;
 }
 
 export function transactionLedgerHooks(store: HookStore): void {
-  store.load();
+  store.watchFilter(store.filter);
   store.loadSummary();
 }

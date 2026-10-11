@@ -2,11 +2,9 @@ import {provideHttpClient} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, convertToParamMap, provideRouter, Router} from '@angular/router';
+import {provideRouter, Router} from '@angular/router';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {BehaviorSubject} from 'rxjs';
 
-import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
 
@@ -26,7 +24,6 @@ const ROW = {
 };
 
 function setup(type: string | null, extra: Record<string, string> = {}) {
-  const params$ = new BehaviorSubject(convertToParamMap({...(type ? {type} : {}), ...extra}));
   const store = {
     accounts: signal([]),
     monthlyOutflow: signal(null),
@@ -41,11 +38,13 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
     hasActiveFilter: signal(false),
     hasMore: signal(false),
     transactions: signal([]),
-    applyAccount: () => undefined,
-    applyType: vi.fn(),
-    applyCategory: vi.fn(),
-    applyDateRange: vi.fn(),
-    applySearch: () => undefined,
+    accountId: signal<string | null>(extra['account'] ?? null),
+    transactionType: signal<string | null>(type),
+    category: signal<string | null>(extra['category'] ?? null),
+    from: signal<string | null>(extra['from'] ?? null),
+    to: signal<string | null>(extra['to'] ?? null),
+    search: signal(extra['q'] ?? ''),
+    applySearch: vi.fn(),
   };
   TestBed.overrideComponent(TransactionLedgerComponent, {
     set: {providers: [{provide: TransactionLedgerStore, useValue: store}]},
@@ -56,7 +55,6 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
       provideHttpClient(),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
-      {provide: ActivatedRoute, useValue: {queryParamMap: params$}},
     ],
   });
   const router = TestBed.inject(Router);
@@ -66,7 +64,7 @@ function setup(type: string | null, extra: Record<string, string> = {}) {
   const root = fixture.nativeElement as HTMLElement;
   const chip = (id: string) => root.querySelector(`[data-testid="${id}"]`) as HTMLElement;
   const selected = (id: string) => chip(id).querySelector('button')?.getAttribute('aria-pressed');
-  return {chip, selected, navigate, root, store, params$, fixture};
+  return {chip, selected, navigate, root, store, fixture};
 }
 
 describe('TransactionLedgerComponent type control', () => {
@@ -97,16 +95,8 @@ describe('TransactionLedgerComponent type control', () => {
     });
   });
 
-  it('drives the store type filter from the type query param', () => {
-    const {store} = setup('credit');
-    const followed = store.applyType.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBe('credit');
-  });
-
-  it('treats an unknown type query param as All', () => {
-    const {store, selected} = setup('bogus');
-    const followed = store.applyType.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBeNull();
+  it('selects All for a type the store does not filter by', () => {
+    const {selected} = setup(null);
     expect(selected('type-all')).toBe('true');
   });
 
@@ -124,11 +114,10 @@ describe('TransactionLedgerComponent type control', () => {
 });
 
 describe('TransactionLedgerComponent date range', () => {
-  it('shows a clearable chip and drives the store from from/to query params', () => {
-    const {root, store, navigate} = setup(null, {from: '2026-06-01', to: '2026-08-31'});
+  it('shows a clearable chip for the store date range and clears it through the URL', () => {
+    const {root, navigate} = setup(null, {from: '2026-06-01', to: '2026-08-31'});
     const chip = root.querySelector('[data-testid="date-range-chip"]') as HTMLElement;
     expect(chip.textContent).toContain('2026-06-01 – 2026-08-31');
-    expect(store.applyDateRange).toHaveBeenCalled();
     chip.querySelector('button')?.click();
     expect(navigate).toHaveBeenCalledWith([], {
       queryParams: {from: null, to: null},
@@ -136,19 +125,38 @@ describe('TransactionLedgerComponent date range', () => {
     });
   });
 
-  it('ignores malformed dates', () => {
-    const {root} = setup(null, {from: 'garbage', to: '2026-8-1'});
+  it('shows no chip while the store holds no date range', () => {
+    const {root} = setup(null);
     expect(root.querySelector('[data-testid="date-range-chip"]')).toBeNull();
   });
 });
 
+describe('TransactionLedgerComponent account filter', () => {
+  it('selects an account through the URL, pushing a history entry', () => {
+    const {navigate, store, fixture, root} = setup(null);
+    store.accounts.set([
+      {accountId: 'a1', label: 'Monzo'},
+      {accountId: 'a2', label: 'AIB'},
+    ] as never);
+    fixture.detectChanges();
+
+    const aib = Array.from(root.querySelectorAll<HTMLElement>('cmn-chip button')).find(b =>
+      b.textContent?.includes('AIB')
+    );
+    aib?.click();
+
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {account: 'a2'},
+      queryParamsHandling: 'merge',
+    });
+  });
+});
+
 describe('TransactionLedgerComponent category', () => {
-  it('shows a clearable chip and drives the server-side category from the query param', () => {
-    const {root, store, navigate} = setup(null, {category: 'FAMILY_SUPPORT'});
+  it('shows a clearable chip for the store category and clears it through the URL', () => {
+    const {root, navigate} = setup(null, {category: 'FAMILY_SUPPORT'});
     const chip = root.querySelector('[data-testid="category-chip"]') as HTMLElement;
     expect(chip.textContent).toContain('Category: Family Support');
-    const followed = store.applyCategory.mock.calls[0][0] as () => unknown;
-    expect(followed()).toBe('FAMILY_SUPPORT');
     chip.querySelector('button')?.click();
     expect(navigate).toHaveBeenCalledWith([], {
       queryParams: {category: null},
@@ -157,55 +165,43 @@ describe('TransactionLedgerComponent category', () => {
   });
 });
 
-describe('TransactionLedgerComponent search param', () => {
+describe('TransactionLedgerComponent search box', () => {
   const searchBox = (root: HTMLElement) =>
     root.querySelector('input[type="search"]') as HTMLInputElement;
 
-  afterEach(() => vi.useRealTimers());
-
-  it('reads the initial search from q and feeds the store', () => {
-    const {root, store} = setup(null, {q: 'netflix'});
+  it('starts from the search the store holds', () => {
+    const {root} = setup(null, {q: 'netflix'});
     expect(searchBox(root).value).toBe('netflix');
-    expect(store.applyDateRange).toHaveBeenCalled();
   });
 
-  it('writes typed search to q, debounced, replacing history and keeping the other params', () => {
-    vi.useFakeTimers();
-    const {root, navigate} = setup(null, {account: 'a1', category: 'FOOD'});
+  it('feeds typed text to the store', () => {
+    const {root, store} = setup(null);
+    const typed: string[] = [];
+    const feed = store.applySearch.mock.calls[0][0] as {
+      subscribe: (fn: (v: string) => void) => void;
+    };
+    feed.subscribe(value => typed.push(value));
+
+    const input = searchBox(root);
+    input.value = 'spotify';
+    input.dispatchEvent(new Event('input'));
+
+    expect(typed).toEqual(['spotify']);
+  });
+
+  it('never writes the URL itself', () => {
+    const {root, navigate} = setup(null);
     const input = searchBox(root);
     input.value = 'spotify';
     input.dispatchEvent(new Event('input'));
     expect(navigate).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {q: 'spotify'},
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
   });
 
-  it('drops q from the URL when the box is cleared', () => {
-    vi.useFakeTimers();
-    const {root, navigate} = setup(null, {q: 'spotify'});
-    const input = searchBox(root);
-    input.value = '';
-    input.dispatchEvent(new Event('input'));
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {q: null},
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  });
-
-  it('restores the box from q on back/forward without writing the URL again', () => {
-    vi.useFakeTimers();
-    const {root, navigate, params$, fixture} = setup(null, {q: 'netflix'});
-    params$.next(convertToParamMap({q: 'spotify', account: 'a1'}));
+  it('restores the box when the store search changes (back/forward)', () => {
+    const {root, store, fixture} = setup(null, {q: 'netflix'});
+    store.search.set('spotify');
     fixture.detectChanges();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
     expect(searchBox(root).value).toBe('spotify');
-    expect(navigate).not.toHaveBeenCalled();
   });
 });
 

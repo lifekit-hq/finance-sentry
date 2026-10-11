@@ -16,18 +16,22 @@
     </div>
     <div class="flex w-full flex-wrap items-center gap-cmn-2 md:w-auto">
       <div class="flex gap-cmn-2" role="group" aria-label="Type filter">
-        <cmn-chip [selected]="!activeType()" (clicked)="selectType(null)" data-testid="type-all">
+        <cmn-chip
+          [selected]="!store.transactionType()"
+          (clicked)="selectType(null)"
+          data-testid="type-all"
+        >
           All
         </cmn-chip>
         <cmn-chip
-          [selected]="activeType() === 'credit'"
+          [selected]="store.transactionType() === 'credit'"
           (clicked)="selectType('credit')"
           data-testid="type-in"
         >
           In
         </cmn-chip>
         <cmn-chip
-          [selected]="activeType() === 'debit'"
+          [selected]="store.transactionType() === 'debit'"
           (clicked)="selectType('debit')"
           data-testid="type-out"
         >
@@ -68,12 +72,12 @@
       role="group"
       aria-label="Account filter"
     >
-      <cmn-chip [selected]="!activeAccount()" (clicked)="selectAccount(null)" class="shrink-0">
+      <cmn-chip [selected]="!store.accountId()" (clicked)="selectAccount(null)" class="shrink-0">
         All accounts
       </cmn-chip>
       @for (account of store.accounts(); track account.accountId) {
         <cmn-chip
-          [selected]="activeAccount() === account.accountId"
+          [selected]="store.accountId() === account.accountId"
           (clicked)="selectAccount(account.accountId)"
           class="shrink-0"
         >
