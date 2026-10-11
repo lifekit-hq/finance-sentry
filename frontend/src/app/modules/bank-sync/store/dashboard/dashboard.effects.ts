@@ -1,6 +1,5 @@
 import {inject, type Signal, untracked} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
-import {ActivatedRoute, Router} from '@angular/router';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap, timer} from 'rxjs';
@@ -86,39 +85,18 @@ export function dashboardEffects(store: EffectsStore) {
 interface HookStore extends EffectsStore {
   load: (range: HistoryRange) => void;
   loadNetWorthHistory: (range: HistoryRange) => void;
-  setHistoryRange: (range: HistoryRange) => void;
-}
-
-const HISTORY_RANGE_VALUES: readonly HistoryRange[] = ['1w', 'mtd', '1m', '3m', 'ytd', '1y', 'all'];
-
-function isHistoryRange(value: string | null): value is HistoryRange {
-  return value !== null && (HISTORY_RANGE_VALUES as readonly string[]).includes(value);
 }
 
 export function dashboardHooks(store: HookStore): void {
   const bankSyncService = inject(BankSyncService);
-  const router = inject(Router);
-  const route = inject(ActivatedRoute);
 
-  // Restore the selected window from the URL so a refresh / deep-link keeps it.
-  const urlRange = route.snapshot.queryParamMap.get('range');
-  if (isHistoryRange(urlRange)) {
-    store.setHistoryRange(urlRange);
-  }
-
-  // Keep the URL in sync with the selected range (replaceUrl so range clicks don't
-  // pollute browser history), and reload BOTH the history chart and the range-scoped
-  // dashboard statistics whenever it changes. The initial emission doubles as the
-  // first load, so there is no separate load() call.
+  // The `range` query param is synced to `historyRange` by `withUrlSync` in the store (restored
+  // on a refresh / deep-link, written with replaceUrl so range clicks don't pollute browser
+  // history). Reload BOTH the history chart and the range-scoped dashboard statistics whenever
+  // it changes. The initial emission doubles as the first load, so there is no separate load().
   toObservable(store.historyRange)
     .pipe(
       tap(range => {
-        void router.navigate([], {
-          relativeTo: route,
-          queryParams: {range},
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        });
         untracked(() => {
           store.loadNetWorthHistory(range);
           store.load(range);

@@ -1,5 +1,25 @@
+import {type UrlParamCodec} from '@lifekit-hq/core';
+
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type HistoryRange} from '../../models/dashboard/dashboard.model';
+
+export const HISTORY_RANGES: readonly HistoryRange[] = [
+  '1w',
+  'mtd',
+  '1m',
+  '3m',
+  'ytd',
+  '1y',
+  'all',
+];
+
+export const DEFAULT_HISTORY_RANGE: HistoryRange = '3m';
+
+/** The `range` query param: an unknown value reads as the default range. */
+export const HISTORY_RANGE_CODEC: UrlParamCodec<HistoryRange> = {
+  encode: range => range,
+  decode: raw => HISTORY_RANGES.find(range => range === raw) ?? DEFAULT_HISTORY_RANGE,
+};
 
 /**
  * One selected range drives every dashboard widget — the net-worth chart via from/to

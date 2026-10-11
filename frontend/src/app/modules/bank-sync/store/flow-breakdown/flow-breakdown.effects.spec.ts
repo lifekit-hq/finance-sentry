@@ -12,6 +12,7 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
 const URL_PATH = '/dashboard/flow-breakdown';
 
 function setup(query: Record<string, string>) {
+  const params$ = new BehaviorSubject(convertToParamMap(query));
   TestBed.configureTestingModule({
     providers: [
       FlowBreakdownStore,
@@ -20,13 +21,14 @@ function setup(query: Record<string, string>) {
       provideApiBaseUrl('http://localhost/api/v1'),
       {
         provide: ActivatedRoute,
-        useValue: {queryParamMap: new BehaviorSubject(convertToParamMap(query))},
+        useValue: {queryParamMap: params$},
       },
     ],
   });
   const store = TestBed.inject(FlowBreakdownStore);
   const http = TestBed.inject(HttpTestingController);
-  return {store, http};
+  TestBed.tick();
+  return {store, http, params$};
 }
 
 describe('flowBreakdownHooks', () => {
@@ -46,13 +48,45 @@ describe('flowBreakdownHooks', () => {
     expect(req.request.params.get('month')).toBe('2026-08');
     expect(req.request.params.has('from')).toBe(false);
     expect(store.range()).toBeNull();
+    expect(store.month()).toBe('2026-08');
   });
 
   it('loads a month from the month param', () => {
-    const {http} = setup({month: '2026-05'});
+    const {store, http} = setup({month: '2026-05'});
 
     expect(http.expectOne(r => r.url.endsWith(URL_PATH)).request.params.get('month')).toBe(
       '2026-05'
+    );
+    expect(store.month()).toBe('2026-05');
+    expect(store.range()).toBeNull();
+  });
+
+  it('falls back to the current month for a malformed month param', () => {
+    const {store, http} = setup({month: 'last-month'});
+
+    expect(http.expectOne(r => r.url.endsWith(URL_PATH)).request.params.get('month')).toBe(
+      '2026-08'
+    );
+    expect(store.month()).toBe('2026-08');
+  });
+
+  it('reloads when the query params change, as on back/forward', () => {
+    const {store, http, params$} = setup({month: '2026-05'});
+    http.expectOne(r => r.url.endsWith(URL_PATH)).flush({month: '2026-05', items: []});
+
+    params$.next(convertToParamMap({month: '2026-04'}));
+    TestBed.tick();
+
+    expect(http.expectOne(r => r.url.endsWith(URL_PATH)).request.params.get('month')).toBe(
+      '2026-04'
+    );
+    expect(store.month()).toBe('2026-04');
+
+    params$.next(convertToParamMap({}));
+    TestBed.tick();
+
+    expect(http.expectOne(r => r.url.endsWith(URL_PATH)).request.params.get('month')).toBe(
+      '2026-08'
     );
   });
 
@@ -65,7 +99,6 @@ describe('flowBreakdownHooks', () => {
     expect(req.request.params.get('months')).toBe('1');
     expect(req.request.params.has('month')).toBe(false);
     expect(store.range()).toEqual({
-      kind: 'range',
       from: '2026-08-06',
       to: '2026-08-12',
       months: 1,
@@ -86,5 +119,14 @@ describe('flowBreakdownHooks', () => {
     const req = http.expectOne(r => r.url.endsWith(URL_PATH));
     expect(req.request.params.has('from')).toBe(false);
     expect(req.request.params.get('months')).toBe('1');
+  });
+
+  it('keeps the month mode when from and to are both malformed', () => {
+    const {store, http} = setup({from: 'yesterday', to: 'tomorrow'});
+
+    expect(http.expectOne(r => r.url.endsWith(URL_PATH)).request.params.get('month')).toBe(
+      '2026-08'
+    );
+    expect(store.range()).toBeNull();
   });
 });
