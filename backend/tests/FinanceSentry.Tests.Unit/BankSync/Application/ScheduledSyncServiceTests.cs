@@ -63,7 +63,7 @@ public class ScheduledSyncServiceTests
         var monobankCreds = new Mock<IMonobankCredentialRepository>();
         var truelayerConnections = new Mock<ITrueLayerConnectionRepository>();
         var truelayerClient = new Mock<ITrueLayerClient>();
-        var monobankBalanceCache = new FinanceSentry.Modules.BankSync.Infrastructure.Monobank.MonobankBalanceCache();
+        var monobankBalanceCache = new FinanceSentry.Modules.BankSync.Infrastructure.Monobank.MonobankBalanceCache(TimeProvider.System);
         alertGen ??= new Mock<FinanceSentry.Core.Interfaces.IAlertGeneratorService>();
         userPrefs ??= new Mock<FinanceSentry.Core.Interfaces.IUserAlertPreferencesReader>();
         var eventBus = new Mock<FinanceSentry.Core.Cqrs.IEventBus>();

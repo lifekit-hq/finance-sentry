@@ -93,11 +93,37 @@ public sealed class YahooFundamentalsSourceTests
         calls().Should().Be(1);
     }
 
+    [Fact]
+    public async Task Answer_ExpiresAfterTwelveHours()
+    {
+        var clock = new ManualTimeProvider(CaptureDate);
+        var (sut, calls) = CreateSut(_ => Json(Fixture("GRAB")), clock);
+
+        await sut.FetchAsync("GRAB", CancellationToken.None);
+        clock.Advance(TimeSpan.FromHours(12) - TimeSpan.FromSeconds(1));
+        await sut.FetchAsync("GRAB", CancellationToken.None);
+        calls().Should().Be(1);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await sut.FetchAsync("GRAB", CancellationToken.None);
+        calls().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ConcurrentMisses_OnOneTicker_FetchOnce()
+    {
+        var (sut, calls) = CreateSut(_ => Json(Fixture("GRAB")));
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => sut.FetchAsync("GRAB", CancellationToken.None)));
+
+        calls().Should().Be(1);
+    }
+
     private static string Fixture(string ticker)
         => File.ReadAllText(Path.Combine(FixtureDir, $"{ticker}-fundamentals-timeseries.json"));
 
     private static (YahooFundamentalsSource Sut, Func<int> Calls) CreateSut(
-        Func<HttpRequestMessage, HttpResponseMessage> respond)
+        Func<HttpRequestMessage, HttpResponseMessage> respond, TimeProvider? clock = null)
     {
         var calls = 0;
         var factory = new Mock<IHttpClientFactory>();
@@ -108,7 +134,7 @@ public sealed class YahooFundamentalsSourceTests
                 return respond(request);
             })));
         var sut = new YahooFundamentalsSource(
-            factory.Object, new FixedTimeProvider(CaptureDate), NullLogger<YahooFundamentalsSource>.Instance);
+            factory.Object, clock ?? new FixedTimeProvider(CaptureDate), NullLogger<YahooFundamentalsSource>.Instance);
         return (sut, () => calls);
     }
 

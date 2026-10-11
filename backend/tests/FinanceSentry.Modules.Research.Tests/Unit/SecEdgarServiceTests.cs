@@ -118,12 +118,59 @@ public sealed class SecEdgarServiceTests
         submissionsCalls.Should().Be(1);
     }
 
-    private static SecEdgarService CreateSut(Func<HttpRequestMessage, HttpResponseMessage> respond)
+    [Fact]
+    public async Task GetRecentFilingsAsync_CachedFilings_ExpireAfterThirtyMinutes()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 10, 11, 12, 0, 0, TimeSpan.Zero));
+        var submissionsCalls = 0;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json(TickerMapJson);
+            }
+
+            submissionsCalls++;
+            return Json(SubmissionsJson);
+        }, clock);
+
+        await sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10);
+        clock.Advance(TimeSpan.FromMinutes(29));
+        await sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10);
+        submissionsCalls.Should().Be(1);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        await sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10);
+        submissionsCalls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetRecentFilingsAsync_ConcurrentMisses_FetchSubmissionsOncePerTicker()
+    {
+        var submissionsCalls = 0;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.Host == "www.sec.gov")
+            {
+                return Json(TickerMapJson);
+            }
+
+            Interlocked.Increment(ref submissionsCalls);
+            return Json(SubmissionsJson);
+        });
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => sut.GetRecentFilingsAsync("AAPL", ["10-Q"], 10)));
+
+        submissionsCalls.Should().Be(1);
+    }
+
+    private static SecEdgarService CreateSut(
+        Func<HttpRequestMessage, HttpResponseMessage> respond, TimeProvider? clock = null)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient(SecEdgarService.HttpClientName))
             .Returns(() => new HttpClient(new DelegatingStub(respond)));
-        return new SecEdgarService(factory.Object, NullLogger<SecEdgarService>.Instance);
+        return new SecEdgarService(factory.Object, clock ?? TimeProvider.System, NullLogger<SecEdgarService>.Instance);
     }
 
     private static HttpResponseMessage Json(string body)

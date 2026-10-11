@@ -25,6 +25,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using FinanceSentry.Infrastructure.Persistence;
 
 public static class BankSyncModule
@@ -171,6 +172,7 @@ public static class BankSyncModule
         services.AddHttpClient<MonobankHttpClient>(client =>
                 client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"))
             .AddMonobankResilience();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<MonobankBalanceCache>();
         services.AddScoped<IMonobankAdapter, MonobankAdapter>();
         services.AddScoped<MonobankAdapter>();

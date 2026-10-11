@@ -169,7 +169,7 @@ public sealed class SyncClaimConcurrencyTests : IAsyncLifetime
             accounts, transactions.Object, syncJobs, encryption.Object, dedup.Object,
             Mock.Of<IBankSyncLogger>(), providerFactory.Object, monobankCredentials,
             Mock.Of<ITrueLayerConnectionRepository>(), Mock.Of<ITrueLayerClient>(),
-            new MonobankBalanceCache(), Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
+            new MonobankBalanceCache(TimeProvider.System), Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             Mock.Of<IEventBus>(), Mock.Of<ITrueLayerTokenRefreshService>(), Mock.Of<IConnectionHealthShadow>());
 
         var coordinator = new TransactionSyncCoordinator(

@@ -71,12 +71,68 @@ public sealed class YahooEarningsCalendarServiceTests
         await act.Should().ThrowAsync<EarningsCalendarProviderException>();
     }
 
-    private static YahooEarningsCalendarService CreateSut(Func<HttpRequestMessage, HttpResponseMessage> respond)
+    [Fact]
+    public async Task GetForTickersAsync_CachedTicker_ExpiresAfterSixHours()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 10, 11, 12, 0, 0, TimeSpan.Zero));
+        var quoteCalls = 0;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.AbsoluteUri.Contains("getcrumb"))
+            {
+                return Text(CrumbBody);
+            }
+
+            if (request.RequestUri!.AbsoluteUri.Contains("quoteSummary"))
+            {
+                quoteCalls++;
+            }
+
+            return Json("""{"quoteSummary":{"result":[{"calendarEvents":{}}]}}""");
+        }, clock);
+
+        await sut.GetForTickersAsync(["AAPL"], DateOnly.MinValue, DateOnly.MaxValue, null);
+        clock.Advance(TimeSpan.FromHours(6) - TimeSpan.FromSeconds(1));
+        await sut.GetForTickersAsync(["aapl"], DateOnly.MinValue, DateOnly.MaxValue, null);
+        quoteCalls.Should().Be(1);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await sut.GetForTickersAsync(["AAPL"], DateOnly.MinValue, DateOnly.MaxValue, null);
+        quoteCalls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetForTickersAsync_ConcurrentCallsForOneTicker_QueryYahooOnce()
+    {
+        var quoteCalls = 0;
+        var sut = CreateSut(request =>
+        {
+            if (request.RequestUri!.AbsoluteUri.Contains("getcrumb"))
+            {
+                return Text(CrumbBody);
+            }
+
+            if (request.RequestUri!.AbsoluteUri.Contains("quoteSummary"))
+            {
+                Interlocked.Increment(ref quoteCalls);
+            }
+
+            return Json("""{"quoteSummary":{"result":[{"calendarEvents":{}}]}}""");
+        });
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            sut.GetForTickersAsync(["AAPL"], DateOnly.MinValue, DateOnly.MaxValue, null)));
+
+        quoteCalls.Should().Be(1);
+    }
+
+    private static YahooEarningsCalendarService CreateSut(
+        Func<HttpRequestMessage, HttpResponseMessage> respond, TimeProvider? clock = null)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient(YahooEarningsCalendarService.HttpClientName))
             .Returns(() => new HttpClient(new DelegatingStub(respond)));
-        return new YahooEarningsCalendarService(factory.Object, NullLogger<YahooEarningsCalendarService>.Instance);
+        return new YahooEarningsCalendarService(factory.Object, clock ?? TimeProvider.System, NullLogger<YahooEarningsCalendarService>.Instance);
     }
 
     private static HttpResponseMessage Json(string body)
