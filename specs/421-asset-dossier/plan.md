@@ -149,7 +149,7 @@ Key design decisions:
 - **A stale read is rendered, not hidden**, flagged with an "out of date" tag plus a Regenerate
   button. Blanking the section on staleness would trade a slightly-old answer for no answer.
 - **No narrative → 503** `LEDGER_READ_UNAVAILABLE` (`ApiException` subclass, picked up by the
-  existing `ErrorHandlingMiddleware`), so an unconfigured or failing agent is a retryable
+  existing `ApiExceptionHandler`), so an unconfigured or failing agent is a retryable
   condition in the UI rather than a 500.
 - No new UI component was needed — the section composes existing `cmn-card` / `cmn-button` /
   `cmn-alert` / `cmn-tag`, so the library-first rule is satisfied without a lifekit-common PR.
