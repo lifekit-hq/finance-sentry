@@ -15,7 +15,6 @@
     [isEmpty]="store.alerts().length === 0"
     (retry)="store.load(store.query())"
     class="mt-cmn-3 flex min-h-0 flex-1 flex-col"
-    errorPlacement="above"
     retryable
   >
     <div skeleton class="space-y-cmn-2" data-testid="alerts-skeleton">

@@ -1,14 +1,17 @@
 import {DialogRef} from '@angular/cdk/dialog';
 import {HttpErrorResponse} from '@angular/common/http';
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
 import {NEVER, type Observable, of, Subject, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
 import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
 import {SubscriptionsService} from '../../services/subscriptions.service';
+import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
 import {AddCommitmentDialogComponent} from './add-commitment-dialog.component';
 
 const CANDIDATE: CommitmentCandidate = {
@@ -330,9 +333,10 @@ describe('AddCommitmentDialogComponent', () => {
 describe('AddCommitmentDialogComponent candidate list states', () => {
   const PAGE = {items: [CANDIDATE], totalCount: 1, offset: 0, limit: 30, hasMore: false};
 
-  function render(search: ReturnType<typeof vi.fn>) {
+  function render(search: ReturnType<typeof vi.fn>, offline = false) {
     TestBed.configureTestingModule({
       providers: [
+        {provide: ConnectivityService, useValue: {offline: signal(offline)}},
         {provide: DialogRef, useValue: {close: vi.fn()}},
         {provide: CMN_DIALOG_DATA, useValue: undefined},
         {provide: SubscriptionsService, useValue: {getCommitmentAnchor: vi.fn()}},
@@ -383,5 +387,18 @@ describe('AddCommitmentDialogComponent candidate list states', () => {
     expect(search).toHaveBeenCalledTimes(2);
     expect(host.textContent).toContain('Acme Hosting');
     expect(host.textContent).not.toContain('Failed to load transactions.');
+  });
+
+  it('keeps the candidates under the load error when a reload fails while offline', () => {
+    const search = vi.fn(() => of(PAGE));
+    const {fixture, host} = render(search, true);
+    expect(host.textContent).toContain('Acme Hosting');
+
+    search.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})) as never);
+    fixture.debugElement.injector.get(CommitmentPickerStore).load();
+    fixture.detectChanges();
+
+    expect(host.textContent).toContain('Failed to load transactions.');
+    expect(host.textContent).toContain('Acme Hosting');
   });
 });

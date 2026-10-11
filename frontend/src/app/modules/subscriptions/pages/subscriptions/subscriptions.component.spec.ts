@@ -3,9 +3,11 @@ import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {CmnDialogService} from '@lifekit-hq/ui';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type Subscription} from '../../models/subscription/subscription.model';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionsComponent} from './subscriptions.component';
+import {NO_ACTIVE_SUBSCRIPTIONS_COPY} from './subscriptions.constants';
 
 describe('SubscriptionsComponent', () => {
   it('routes the dismiss menu action through the confirmation dialog', () => {
@@ -134,7 +136,9 @@ describe('SubscriptionsComponent async states', () => {
       isLoading?: boolean;
       loadErrorMessage?: string;
       subscriptions?: Subscription[];
+      activeSubscriptions?: Subscription[];
       hasInsufficientHistory?: boolean;
+      offline?: boolean;
     } = {}
   ) {
     const subscriptions = overrides.subscriptions ?? [];
@@ -149,7 +153,7 @@ describe('SubscriptionsComponent async states', () => {
       activeSections: signal(
         subscriptions.length > 0 ? [{id: 'upcoming', label: '', items: subscriptions}] : []
       ),
-      activeSubscriptions: signal(subscriptions),
+      activeSubscriptions: signal(overrides.activeSubscriptions ?? subscriptions),
       activeInstallments: signal<Subscription[]>([]),
       sortedInstallments: signal<Subscription[]>([]),
       completedInstallments: signal<Subscription[]>([]),
@@ -158,7 +162,11 @@ describe('SubscriptionsComponent async states', () => {
       load: vi.fn(),
     };
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), {provide: CmnDialogService, useValue: {open: vi.fn()}}],
+      providers: [
+        provideRouter([]),
+        {provide: CmnDialogService, useValue: {open: vi.fn()}},
+        {provide: ConnectivityService, useValue: {offline: signal(overrides.offline ?? false)}},
+      ],
     });
     TestBed.overrideComponent(SubscriptionsComponent, {
       set: {providers: [{provide: SubscriptionsStore, useValue: store}]},
@@ -198,6 +206,24 @@ describe('SubscriptionsComponent async states', () => {
     expect(host.textContent).toContain(
       'Recurring charges show up here once they are detected, or add one yourself.'
     );
+  });
+
+  it('keeps the rows under the load error when a reload fails while offline', () => {
+    const {host} = render({
+      subscriptions: [NETFLIX],
+      loadErrorMessage: 'Failed to load subscriptions.',
+      offline: true,
+    });
+
+    expect(host.textContent).toContain('Failed to load subscriptions.');
+    expect(host.textContent).toContain('Netflix');
+  });
+
+  it('says there is nothing active when only installments or dismissed rows are tracked', () => {
+    const {host} = render({subscriptions: [NETFLIX], activeSubscriptions: []});
+
+    expect(host.textContent).toContain(NO_ACTIVE_SUBSCRIPTIONS_COPY.message);
+    expect(host.textContent).toContain(NO_ACTIVE_SUBSCRIPTIONS_COPY.subMessage);
   });
 
   it('explains the missing history instead of the empty state when there is too little', () => {

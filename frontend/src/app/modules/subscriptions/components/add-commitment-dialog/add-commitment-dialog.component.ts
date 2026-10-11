@@ -77,15 +77,18 @@ export class AddCommitmentDialogComponent {
 
   public readonly picker = inject(CommitmentPickerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
-  public readonly view = computed(() =>
-    AsyncViewUtils.resolve({
+  // Offline only reaches `resolve` while nothing is on screen: with candidates, a failed reload
+  // keeps its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.picker.candidates().length > 0;
+    return AsyncViewUtils.resolve({
       isLoading: this.picker.isLoading(),
-      hasData: this.picker.candidates().length > 0,
+      hasData,
       errorMessage: this.picker.errorMessage(),
-      offline: this.connectivity.offline(),
+      offline: this.connectivity.offline() && !hasData,
       lastSyncedAt: null,
-    })
-  );
+    });
+  });
   public readonly kindOptions = COMMITMENT_KIND_OPTIONS;
   public readonly cadenceOptions = COMMITMENT_CADENCE_OPTIONS;
   public readonly searchControl = new FormControl('', {nonNullable: true});

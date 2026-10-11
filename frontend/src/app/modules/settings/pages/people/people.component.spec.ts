@@ -1,13 +1,16 @@
 import {HttpErrorResponse, provideHttpClient, withXhr} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
+import {signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {API_BASE_URL} from '@lifekit-hq/core';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type Person} from '../../models/person/person.model';
 import {PeopleService} from '../../services/people.service';
+import {PeopleStore} from '../../store/people/people.store';
 import {PeopleComponent} from './people.component';
 
 const PEOPLE: Person[] = [
@@ -93,5 +96,20 @@ describe('PeopleComponent', () => {
     expect(service.list).toHaveBeenCalledTimes(2);
     expect(host.textContent).toContain('friend@test.com');
     expect(host.textContent).not.toContain('Failed to load people.');
+  });
+
+  it('keeps the rows under the load error when a reload fails while offline', () => {
+    TestBed.overrideProvider(ConnectivityService, {useValue: {offline: signal(true)}});
+    const host = render();
+    expect(host.textContent).toContain('friend@test.com');
+
+    service.list.mockReturnValue(
+      throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'BOOM'}}))
+    );
+    fixture.debugElement.injector.get(PeopleStore).load();
+    fixture.detectChanges();
+
+    expect(host.textContent).toContain('Failed to load people.');
+    expect(host.textContent).toContain('friend@test.com');
   });
 });

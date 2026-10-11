@@ -55,15 +55,18 @@ export class PeopleComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(PeopleStore);
-  public readonly view = computed(() =>
-    AsyncViewUtils.resolve({
+  // Offline only reaches `resolve` while nothing is on screen: with rows, a failed reload keeps
+  // its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.store.rows().length > 0;
+    return AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
-      hasData: this.store.rows().length > 0,
+      hasData,
       errorMessage: this.store.loadErrorMessage(),
-      offline: this.connectivity.offline(),
+      offline: this.connectivity.offline() && !hasData,
       lastSyncedAt: null,
-    })
-  );
+    });
+  });
   public readonly statusVariant = PERSON_STATUS_TAG_VARIANT;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
   public readonly inviteForm = inject(FormBuilder).group({

@@ -124,6 +124,7 @@ describe('BudgetsComponent hero copy', () => {
       overallPct: signal(0),
       selectedMonthDate: signal(new Date(2026, 8, 1)),
       status: signal<AsyncStatus>('idle'),
+      refreshFailed: signal(false),
       loadSummary: vi.fn(),
       summaryItems: signal([
         {
@@ -180,7 +181,7 @@ describe('BudgetsComponent hero copy', () => {
 });
 
 describe('BudgetsComponent async states', () => {
-  function render(status: AsyncStatus, withItems = false) {
+  function render(status: AsyncStatus, withItems = false, refreshFailed = false) {
     const store = {
       editingId: signal<string | null>(null),
       monthName: signal('September'),
@@ -190,6 +191,7 @@ describe('BudgetsComponent async states', () => {
       selectedYear: signal(2026),
       selectedMonth: signal(9),
       status: signal<AsyncStatus>(status),
+      refreshFailed: signal(refreshFailed),
       loadSummary: vi.fn(),
       summaryItems: signal(
         withItems
@@ -248,6 +250,21 @@ describe('BudgetsComponent async states', () => {
     fixture.detectChanges();
 
     expect(store.loadSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces the cards with the error when the month fails to load', () => {
+    const {host} = render('error', true);
+
+    expect(host.textContent).toContain('Failed to load budgets.');
+    expect(host.textContent).not.toContain('Groceries');
+  });
+
+  it('keeps the valid cards under the error when the refresh after an edit fails', () => {
+    const {host} = render('idle', true, true);
+
+    expect(host.textContent).toContain('Failed to load budgets.');
+    expect(host.textContent).toContain('Groceries');
+    expect(host.querySelector('[data-testid="budgets-skeleton"]')).toBeNull();
   });
 
   it('shows the empty state with its prompt when the month has no budgets', () => {

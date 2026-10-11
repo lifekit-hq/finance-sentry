@@ -11,6 +11,7 @@
     <cmn-async-state
       [status]="view().status"
       [errorMessage]="view().errorMessage"
+      [errorPlacement]="errorPlacement()"
       [isEmpty]="store.summaryItems().length === 0"
       [emptyMessage]="'No budgets for ' + store.monthName()"
       (retry)="store.loadSummary()"

@@ -137,6 +137,13 @@ describe('AlertsComponent async states', () => {
     expect(store.load).toHaveBeenCalledWith({filter: 'warning', page: 1, pageSize: PAGE_SIZE});
   });
 
+  it('replaces the previous query rows with the error when the new query fails', () => {
+    const {el} = render('error', 1, [ALERT], {errorMessage: 'Failed to load alerts.'});
+
+    expect(el.textContent).toContain('Failed to load alerts.');
+    expect(el.querySelector('[data-testid="alert-row"]')).toBeNull();
+  });
+
   it('shows the filter-aware empty state when no alert matches', () => {
     const {el} = render('error');
 

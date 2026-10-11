@@ -18,11 +18,11 @@
       [status]="view().status"
       [errorMessage]="view().errorMessage"
       [isEmpty]="isEmpty()"
+      [emptyMessage]="noActiveCopy.message"
+      [emptySubMessage]="noActiveCopy.subMessage"
+      [emptyIcon]="noActiveCopy.icon"
       (retry)="store.load()"
       class="block space-y-cmn-5"
-      emptyMessage="No active subscriptions yet"
-      emptySubMessage="Recurring charges show up here once they are detected, or add one yourself."
-      emptyIcon="Repeat"
       errorPlacement="above"
       retryable
     >
@@ -138,9 +138,9 @@
 
         @if (store.activeSubscriptions().length === 0 && !store.hasInsufficientHistory()) {
           <cmn-empty-state
-            message="No active subscriptions yet"
-            subMessage="Recurring charges show up here once they are detected, or add one yourself."
-            icon="Repeat"
+            [message]="noActiveCopy.message"
+            [subMessage]="noActiveCopy.subMessage"
+            [icon]="noActiveCopy.icon"
           />
         }
       </div>

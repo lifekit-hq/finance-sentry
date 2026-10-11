@@ -82,14 +82,20 @@ export class BudgetsComponent {
   public readonly skeletonCards = Array.from({length: SKELETON_CARDS});
   // The cards belong to one month, so a failed or pending month never keeps the previous
   // month's cards on screen (`hasData: false`): it shows the skeleton or the error instead.
-  public readonly view = computed(() =>
-    AsyncViewUtils.resolve({
+  // A failed refresh after an edit is the exception: the list is still valid, so it stays under
+  // the error banner.
+  public readonly view = computed(() => {
+    const hasData = this.store.refreshFailed();
+    return AsyncViewUtils.resolve({
       isLoading: this.store.status() === 'loading',
-      hasData: false,
-      errorMessage: this.store.status() === 'error' ? BUDGETS_LOAD_ERROR_MESSAGE : '',
-      offline: this.connectivity.offline(),
+      hasData,
+      errorMessage: hasData || this.store.status() === 'error' ? BUDGETS_LOAD_ERROR_MESSAGE : '',
+      offline: this.connectivity.offline() && !hasData,
       lastSyncedAt: null,
-    })
+    });
+  });
+  public readonly errorPlacement = computed(() =>
+    this.store.refreshFailed() ? 'above' : 'replace'
   );
 
   public readonly editValue = signal('');

@@ -47,6 +47,7 @@ import {InstallmentProgressPipe} from '../../pipes/installment-progress.pipe';
 import {MerchantColorPipe} from '../../pipes/merchant-color.pipe';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionUtils} from '../../utils/subscription.utils';
+import {NO_ACTIVE_SUBSCRIPTIONS_COPY} from './subscriptions.constants';
 
 const SKELETON_ROWS = 3;
 
@@ -114,15 +115,19 @@ export class SubscriptionsComponent {
   public readonly isEmpty = computed(
     () => this.store.subscriptions().length === 0 && !this.store.hasInsufficientHistory()
   );
-  public readonly view = computed(() =>
-    AsyncViewUtils.resolve({
+  // Offline only reaches `resolve` while nothing is on screen: with rows, a failed reload keeps
+  // its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.store.subscriptions().length > 0;
+    return AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
-      hasData: this.store.subscriptions().length > 0,
+      hasData,
       errorMessage: this.store.loadErrorMessage(),
-      offline: this.connectivity.offline(),
+      offline: this.connectivity.offline() && !hasData,
       lastSyncedAt: null,
-    })
-  );
+    });
+  });
+  public readonly noActiveCopy = NO_ACTIVE_SUBSCRIPTIONS_COPY;
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
 
