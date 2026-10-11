@@ -15,16 +15,11 @@ export function agentChatMethods(store: WritableStateSource<AgentChatState>) {
       patchState(store, {activeConversationId});
     },
 
-    setSessionsOpen(sessionsOpen: boolean): void {
-      patchState(store, {sessionsOpen});
-    },
-
     resetThread(): void {
       patchState(store, state => ({
         activeConversationId: null,
         history: [],
         threadNonce: state.threadNonce + 1,
-        sessionsOpen: false,
       }));
     },
 
@@ -33,7 +28,6 @@ export function agentChatMethods(store: WritableStateSource<AgentChatState>) {
         activeConversationId: id,
         history,
         threadNonce: state.threadNonce + 1,
-        sessionsOpen: false,
       }));
     },
 
