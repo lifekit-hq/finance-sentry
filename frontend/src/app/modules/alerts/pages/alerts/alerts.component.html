@@ -33,7 +33,7 @@
     <div class="md:min-h-0 md:flex-1 md:overflow-auto">
       @for (alert of store.alerts(); track alert.id) {
         <div
-          [class.opacity-60]="alert.isResolved"
+          [class]="alert.isResolved ? resolvedRowClass : ''"
           [attr.data-resolved]="alert.isResolved"
           class="relative rounded-cmn-md"
           data-testid="alert-row"

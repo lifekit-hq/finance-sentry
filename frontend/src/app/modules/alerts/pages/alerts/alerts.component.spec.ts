@@ -6,6 +6,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertsComponent} from './alerts.component';
+import {RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const UNREAD_COUNT = 3;
 const PAGE_SIZE = 20;
@@ -163,5 +164,16 @@ describe('AlertsComponent async states', () => {
 
     expect(el.querySelectorAll('[data-testid="alert-row"]').length).toBe(1);
     expect(el.querySelector('[data-testid="alerts-skeleton"]')).toBeNull();
+  });
+
+  it('mutes a resolved alert by recolour, fading only its icon, never the whole row', () => {
+    const resolved = {...ALERT, id: 'a2', isResolved: true} as unknown as Alert;
+    const {el} = render('all', 2, [ALERT, resolved]);
+    const [open, done] = Array.from(el.querySelectorAll('[data-testid="alert-row"]'));
+
+    expect(done.getAttribute('data-resolved')).toBe('true');
+    expect(done.className).toContain(RESOLVED_ALERT_ROW_CLASS);
+    expect(done.classList.contains('opacity-60')).toBe(false);
+    expect(open.className).not.toContain(RESOLVED_ALERT_ROW_CLASS);
   });
 });

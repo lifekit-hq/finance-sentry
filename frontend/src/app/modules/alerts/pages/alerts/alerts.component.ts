@@ -34,7 +34,7 @@ import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
-import {ALERT_PAGE_SIZE_OPTIONS} from './alerts.constants';
+import {ALERT_PAGE_SIZE_OPTIONS, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_ROWS = 5;
 
@@ -72,6 +72,7 @@ export class AlertsComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(AlertsStore);
+  public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
 
   // The list is bound to the filter and page, so a stale page never stands in for the one being
