@@ -1,7 +1,6 @@
 export enum AppRoute {
   Root = '/',
   Login = '/login',
-  AcceptInvite = '/accept-invite',
   McpConnect = '/mcp/connect',
   Accounts = '/accounts',
   AccountsList = '/accounts/list',
@@ -23,7 +22,3 @@ export enum AppRoute {
 }
 
 export const ASSET_DOSSIER_SYMBOL_PARAM = 'symbol';
-
-/** Query parameters of the one-time invite link (see `AppRoute.AcceptInvite`). */
-export const ACCEPT_INVITE_USER_PARAM = 'user';
-export const ACCEPT_INVITE_TOKEN_PARAM = 'token';

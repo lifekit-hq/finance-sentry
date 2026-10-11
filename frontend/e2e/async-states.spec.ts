@@ -144,7 +144,9 @@ test.describe('cmn-async-state surfaces', () => {
     await expect(notice).toHaveCount(0);
   });
 
-  test('login: a failed auth/methods call shows Retry and keeps OIDC reachable', async ({page}) => {
+  test('login: a failed auth/methods call shows Retry and keeps sign-in reachable', async ({
+    page,
+  }) => {
     const unauthorized = (route: {fulfill: (o: {status: number}) => Promise<void>}) =>
       route.fulfill({status: 401});
     await page.route(`${API}/auth/me`, unauthorized);
@@ -153,7 +155,7 @@ test.describe('cmn-async-state surfaces', () => {
     await page.route(`${API}/auth/methods`, route =>
       fail
         ? route.fulfill({status: 500, contentType: 'application/json', body: '{}'})
-        : route.fulfill(json({oidc: false, passwordLogin: true}))
+        : route.fulfill(json({oidc: false}))
     );
     await page.goto('/login');
 
@@ -165,6 +167,6 @@ test.describe('cmn-async-state surfaces', () => {
     await error.getByRole('button', {name: 'Retry'}).click();
 
     await expect(error).toHaveCount(0);
-    await expect(page.getByLabel('Email address')).toBeVisible();
+    await expect(page.getByTestId('no-methods')).toBeVisible();
   });
 });

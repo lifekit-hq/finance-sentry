@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure.Persistence;
+using FinanceSentry.Modules.Auth.Infrastructure.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
@@ -137,6 +138,27 @@ public class LoginContractTests : IClassFixture<AuthApiFactory>
         body!.ErrorCode.Should().Be("VALIDATION_ERROR");
     }
 
+    [Fact]
+    public async Task Login_WithBreakGlassOff_Returns404AndNoSession()
+    {
+        await _factory.EnsureUserExistsAsync("login-off@test.com", "TestPass123!");
+        using var off = _factory.WithWebHostBuilder(b => b.UseSetting("Auth:PasswordLogin:Enabled", "false"));
+        var client = off.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login",
+            new { email = "login-off@test.com", password = "TestPass123!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Headers.Contains("Set-Cookie").Should().BeFalse();
+    }
+
+    [Fact]
+    public void BreakGlassFlag_DefaultsToOff()
+    {
+        // No default-on path: a host that never mentions the flag must not serve the endpoint.
+        new AuthSignInOptions().PasswordLogin.Enabled.Should().BeFalse();
+    }
+
     private record UserShape(string Id, string Email);
     private record AuthResponseShape(UserShape User, DateTime ExpiresAt);
     private record ErrorResponseShape(string Error, string ErrorCode);
@@ -184,6 +206,8 @@ public class AuthApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:Secret",
             "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
         builder.UseSetting("Jwt:ExpiryMinutes", "60");
+        // Break-glass password sign-in is off by default; these tests exercise the sessions it mints.
+        builder.UseSetting("Auth:PasswordLogin:Enabled", "true");
     }
 
     public async Task EnsureUserExistsAsync(string email, string password)
@@ -203,10 +227,10 @@ public class AuthApiFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// A pending invite as the People page creates it: a Member account with no password, and the one-time
-    /// password-reset token that serves as the invite.
+    /// A pending invite as the People page creates it: a passwordless Member account that the invitee's first
+    /// sign-in with the same verified email links to their identity provider.
     /// </summary>
-    public async Task<(string UserId, string Token)> CreatePendingInviteAsync(string email)
+    public async Task<string> CreatePendingInviteAsync(string email)
     {
         using var scope = Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -222,7 +246,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>
             TestUsers.GrantRole(scope.ServiceProvider, user.Id, AuthRoles.Member);
         }
 
-        return (user.Id, await userManager.GeneratePasswordResetTokenAsync(user));
+        return user.Id;
     }
 
     /// <summary>Signs in with a password and returns the access-token cookie value.</summary>

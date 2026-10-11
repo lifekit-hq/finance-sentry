@@ -28,7 +28,6 @@ namespace FinanceSentry.Modules.Auth.API.Controllers;
 [Route("auth")]
 public class AuthController(
     ICommandHandler<LoginCommand, AuthResult> loginHandler,
-    ICommandHandler<AcceptInviteCommand, AuthResult> acceptInviteHandler,
     ICommandHandler<RefreshCommand, AuthResult> refreshHandler,
     ICommandHandler<ExternalLoginCommand, AuthResult> externalLoginHandler,
     ICommandHandler<LogoutCommand, Unit> logoutHandler,
@@ -39,7 +38,6 @@ public class AuthController(
     ICommandHandler<RevokeMcpServiceTokenCommand, Unit> revokeMcpServiceTokenHandler,
     IQueryHandler<GetMeQuery, GetMeResult> getMeHandler,
     IWebHostEnvironment env,
-    IOptions<AuthSignInOptions> signInOptions,
     IOptions<OidcLoginOptions> oidcOptions,
     ILogger<AuthController> logger) : ControllerBase
 {
@@ -73,8 +71,7 @@ public class AuthController(
     [AllowAnonymous]
     [HttpGet("methods")]
     public IActionResult Methods() => Ok(new SignInMethodsResponse(
-        Oidc: oidcOptions.Value.IsConfigured,
-        PasswordLogin: signInOptions.Value.PasswordLogin.Enabled));
+        Oidc: oidcOptions.Value.IsConfigured));
 
     // Sends the browser to the org identity provider. The provider returns to the OIDC handler's callback
     // (OidcLoginOptions.CallbackPath), which signs into Identity's external cookie and lands on OidcCallback.
@@ -139,24 +136,14 @@ public class AuthController(
     private static bool IsLocalPath(string? path) =>
         !string.IsNullOrEmpty(path) && path[0] == '/' && !path.StartsWith("//") && !path.StartsWith("/\\");
 
+    // Break-glass only: an operator signs in with an existing account's password while the identity provider is
+    // unavailable. Nothing in the SPA calls it, and with Auth:PasswordLogin:Enabled off (the default) it is a 404.
     [AllowAnonymous]
+    [PasswordLoginGate]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] AuthRequest request)
     {
         var result = await loginHandler.Handle(new LoginCommand(request.Email, request.Password), HttpContext.RequestAborted);
-        SetRefreshTokenCookie(result.RawRefreshToken);
-        SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
-        return Ok(result.Response);
-    }
-
-    // Sets an invited account's first password from the one-time invite token and signs it in.
-    [AllowAnonymous]
-    [HttpPost("invite/accept")]
-    public async Task<IActionResult> AcceptInvite([FromBody] AcceptInviteRequest request)
-    {
-        var result = await acceptInviteHandler.Handle(
-            new AcceptInviteCommand(request.UserId, request.Token, request.Password),
-            HttpContext.RequestAborted);
         SetRefreshTokenCookie(result.RawRefreshToken);
         SetAccessTokenCookie(result.RawAccessToken, result.Response.ExpiresAt);
         return Ok(result.Response);

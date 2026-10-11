@@ -30,9 +30,3 @@ export interface UpdateProfileRequest {
   safeWithdrawalRate: number;
   realAnnualReturn: number;
 }
-
-export interface PasswordForm {
-  current: string;
-  next: string;
-  confirm: string;
-}

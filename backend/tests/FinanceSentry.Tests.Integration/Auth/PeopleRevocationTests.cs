@@ -4,8 +4,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
+using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
@@ -72,15 +75,18 @@ public class PeopleRevocationTests(AuthApiFactory factory) : IClassFixture<AuthA
     }
 
     [Fact]
-    public async Task Revoke_OfAPendingInvite_VoidsTheInviteLink()
+    public async Task Revoke_OfAPendingInvite_RefusesTheInviteesProviderSignIn()
     {
         using var owner = await OwnerClientAsync("revoke-owner-pending@test.com");
-        var (userId, token) = await factory.CreatePendingInviteAsync("revoke-pending@test.com");
+        var userId = await factory.CreatePendingInviteAsync("revoke-pending@test.com");
 
         (await owner.PostAsync($"/api/v1/people/{userId}/revoke", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        await PeopleInviteContractTests.ShouldBeInvalidInviteAsync(await factory.CookieClient().PostAsJsonAsync(
-            "/api/v1/auth/invite/accept", new { userId, token, password = "quiet lantern orchard" }));
+        using var scope = factory.Services.CreateScope();
+        var signIn = async () => await scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<ExternalLoginCommand, AuthResult>>()
+            .Handle(new ExternalLoginCommand("TestIdp", "sub-revoke-pending", "revoke-pending@test.com", true), CancellationToken.None);
+        await signIn.Should().ThrowAsync<InvalidCredentialsException>();
     }
 
     [Fact]

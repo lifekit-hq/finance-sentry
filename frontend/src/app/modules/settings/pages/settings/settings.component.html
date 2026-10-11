@@ -320,7 +320,7 @@
         <div>
           <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Security</h2>
           <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Manage your password and two-factor authentication.
+            Manage two-factor authentication.
           </p>
         </div>
         <div class="space-y-cmn-5">
@@ -339,59 +339,6 @@
               label="Two-factor authentication"
             />
           </div>
-
-          <!-- Change password form -->
-          <form
-            (submit)="$event.preventDefault(); changePassword()"
-            class="space-y-cmn-3 border-t border-border-default pt-cmn-4"
-          >
-            <h3 class="font-label text-cmn-sm font-semibold text-text-primary">Change password</h3>
-            <input [value]="profile.email" type="text" autocomplete="username" class="hidden" />
-            <cmn-form-field label="Current Password" fieldId="s-cpw">
-              <cmn-input
-                [ngModel]="pwCurrent()"
-                (ngModelChange)="pwCurrent.set($event)"
-                id="s-cpw"
-                name="s-cpw"
-                type="password"
-                autocomplete="current-password"
-                placeholder="••••••••"
-              />
-            </cmn-form-field>
-            <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
-              <cmn-form-field label="New Password" fieldId="s-npw">
-                <cmn-input
-                  [ngModel]="pwNext()"
-                  (ngModelChange)="pwNext.set($event)"
-                  id="s-npw"
-                  name="s-npw"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="Min 8 chars"
-                />
-              </cmn-form-field>
-              <cmn-form-field label="Confirm Password" fieldId="s-rpw">
-                <cmn-input
-                  [ngModel]="pwConfirm()"
-                  (ngModelChange)="pwConfirm.set($event)"
-                  id="s-rpw"
-                  name="s-rpw"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="Repeat"
-                />
-              </cmn-form-field>
-            </div>
-            <div class="flex justify-end pb-cmn-4">
-              <cmn-button
-                [loading]="store.passwordSaving()"
-                (clicked)="changePassword()"
-                variant="secondary"
-                icon="KeyRound"
-                >Update Password</cmn-button
-              >
-            </div>
-          </form>
         </div>
       </div>
 

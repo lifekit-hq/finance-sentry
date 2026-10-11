@@ -22,12 +22,6 @@ export function settingsMethods(store: WritableStateSource<SettingsState>) {
     setProfileSaveError(errorCode: Nullable<string>): void {
       patchState(store, {profileSaving: false, profileErrorCode: errorCode});
     },
-    setPasswordSaving(saving: boolean): void {
-      patchState(store, {passwordSaving: saving, passwordErrorCode: null});
-    },
-    setPasswordSaveError(errorCode: Nullable<string>): void {
-      patchState(store, {passwordSaving: false, passwordErrorCode: errorCode});
-    },
     setShowDeleteConfirm(show: boolean): void {
       patchState(store, {showDeleteConfirm: show});
     },

@@ -55,8 +55,6 @@ const THEME_OPTIONS: {value: ThemePreference; label: string}[] = [
   {value: 'dark', label: 'Dark'},
 ];
 
-const MIN_PASSWORD_LENGTH = 8;
-
 @Component({
   selector: 'fns-settings',
   imports: [
@@ -110,10 +108,6 @@ export class SettingsComponent {
   public readonly assumptionsInvalid = computed(
     () => this.withdrawalRateError() !== '' || this.realReturnError() !== ''
   );
-
-  public readonly pwCurrent = signal('');
-  public readonly pwNext = signal('');
-  public readonly pwConfirm = signal('');
 
   public saveProfile(): void {
     const p = this.store.profile();
@@ -176,29 +170,6 @@ export class SettingsComponent {
       REAL_ANNUAL_RETURN_MIN_PERCENT,
       REAL_ANNUAL_RETURN_MAX_PERCENT
     );
-  }
-
-  public changePassword(): void {
-    if (!this.pwCurrent()) {
-      this.toast.show('Enter your current password', 'error');
-      return;
-    }
-    if (this.pwNext().length < MIN_PASSWORD_LENGTH) {
-      this.toast.show('New password must be at least 8 characters', 'error');
-      return;
-    }
-    if (this.pwNext() !== this.pwConfirm()) {
-      this.toast.show('Passwords do not match', 'error');
-      return;
-    }
-    this.store.changePassword({
-      currentPassword: this.pwCurrent(),
-      newPassword: this.pwNext(),
-    });
-    this.pwCurrent.set('');
-    this.pwNext.set('');
-    this.pwConfirm.set('');
-    this.toast.show('Password updated', 'success');
   }
 
   public onThemeChoice(event: Event): void {

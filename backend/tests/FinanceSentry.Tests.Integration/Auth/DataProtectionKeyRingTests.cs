@@ -1,7 +1,5 @@
 namespace FinanceSentry.Tests.Integration.Auth;
 
-using System.Net;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using FinanceSentry.Core.Auth;
@@ -18,8 +16,8 @@ using Xunit;
 
 /// <summary>
 /// The Data Protection key ring lives in the Auth database (issue #930), so every app instance built from the same
-/// database reads the same keys. Without it each process mints its own in-memory ring and an invite link issued
-/// before a deploy is rejected by the process that comes up after it.
+/// database reads the same keys. Without it each process mints its own in-memory ring and a payload protected
+/// before a deploy cannot be read by the process that comes up after it.
 /// </summary>
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class DataProtectionKeyRingCollection
@@ -48,17 +46,18 @@ public sealed class DataProtectionKeyRingTests : IDisposable
     }
 
     [Fact]
-    public async Task InviteToken_IssuedByOneInstance_ValidatesInASecondInstanceOverTheSameDatabase()
+    public void Payload_ProtectedByOneInstance_UnprotectsInASecondInstanceOverTheSameDatabase()
     {
         var sharedStore = new InMemoryDatabaseRoot();
-        await using var first = new SharedAuthStoreFactory(sharedStore);
-        await using var second = new SharedAuthStoreFactory(sharedStore);
-        var (userId, token) = await first.CreatePendingInviteAsync("friend-keyring@test.com");
+        using var first = new SharedAuthStoreFactory(sharedStore);
+        using var second = new SharedAuthStoreFactory(sharedStore);
+        var protectedPayload = first.Services.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("keyring-test").Protect("payload");
 
-        var accept = await second.CookieClient().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token, password = "quiet lantern orchard" });
+        var unprotected = second.Services.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("keyring-test").Unprotect(protectedPayload);
 
-        accept.StatusCode.Should().Be(HttpStatusCode.OK, "both instances must protect and unprotect with the persisted key ring");
+        unprotected.Should().Be("payload", "both instances must protect and unprotect with the persisted key ring");
     }
 
     [Fact]

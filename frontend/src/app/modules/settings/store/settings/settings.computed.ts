@@ -8,8 +8,6 @@ interface StateSignals {
   profile: Signal<Nullable<UserProfile>>;
   profileSaving: Signal<boolean>;
   profileErrorCode: Signal<Nullable<string>>;
-  passwordSaving: Signal<boolean>;
-  passwordErrorCode: Signal<Nullable<string>>;
   showDeleteConfirm: Signal<boolean>;
   errorCode: Signal<Nullable<string>>;
 }
@@ -31,9 +29,6 @@ export function settingsComputed(store: StateSignals) {
     ),
     profileSaveErrorMessage: computed(
       () => errorMessages.resolve(store.profileErrorCode()) ?? 'Failed to save profile.'
-    ),
-    passwordSaveErrorMessage: computed(
-      () => errorMessages.resolve(store.passwordErrorCode()) ?? 'Failed to change password.'
     ),
   };
 }

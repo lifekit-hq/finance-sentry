@@ -59,8 +59,7 @@ registered account, and only while nobody holds it — so once a second account 
 `auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
 (`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
-**Smoke account:** production has password sign-in (login and invite acceptance) fixed off
-(`Auth__PasswordLogin__Enabled: "false"` in `docker-compose.prod.yml`, no env override), so the post-deploy live smoke
+**Smoke account:** production has password sign-in off (`Auth__PasswordLogin__Enabled`, fed by `AUTH_PASSWORD_LOGIN_ENABLED`, default `false`; see §11), so the post-deploy live smoke
 (`frontend/e2e/live/smoke.spec.ts`) signs in through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
 `E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). It signs
 in once per run (a serial describe sharing one page: each sign-in spends several requests of the anonymous 10-per-minute
@@ -74,7 +73,7 @@ marked account that still carries a password has it removed at startup. Email un
 account it did not create, is never granted Owner, is not shared with anyone, and its `seeded` account is excluded from
 every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from
 any background job. A People-page revoke stays in effect; to retire it, revoke it there, disable the Logto user and delete
-the two secrets. If Logto is down, recovery is restoring Logto; there is no password fallback.
+the two secrets. If Logto is down, restore Logto; §11 is the break-glass fallback.
 
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).
@@ -146,6 +145,14 @@ GET /health/ready → 503
 - **Warnings `Problem report <id> not forwarded (attempt n)`**: ssh or the relay refused it; `LastError` on the row carries the exit code and stderr. Retried with backoff 1 min, 5 min, 15 min, 1 h, 4 h.
 - **Error `Problem report <id> failed after 6 attempts`**: status `Failed`, no further retries. Fix the cause, then `UPDATE companion.problem_reports SET "Status" = 'Pending', "Attempts" = 0, "NextAttemptAt" = NULL WHERE "Id" = <id>`.
 - The relay itself limits a sender to 30 notes per hour; past that the job pauses the batch without counting an attempt. Rows are purged after 90 days.
+
+## 11. Logto Unavailable (Break-glass Password Sign-in)
+
+Normal sign-in is Logto only. The one password path left is `POST /api/v1/auth/login` for an account that **already has a password hash**; no screen offers it, nothing creates passwords any more, and with the flag off (the default) the route answers `404` as if it did not exist. Use it only while Logto cannot be restored in time:
+
+1. Set `AUTH_PASSWORD_LOGIN_ENABLED=true` in `docker/.env.sops` (prod) or `docker/.env` (dev) and recreate the `api` container.
+2. From the app's origin, in the browser console: `fetch('/api/v1/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email: '<owner email>', password: '<password>'})})`. The response sets the session cookies; reload the app. Five failed attempts lock the account for five minutes.
+3. When Logto is back, set the flag back to `false` (or remove it) and recreate the `api` container. Passwords already stored stay as they are; accounts created by invite have none and cannot use this path.
 
 ## Contact
 

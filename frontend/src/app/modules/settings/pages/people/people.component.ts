@@ -1,7 +1,5 @@
-import {Clipboard} from '@angular/cdk/clipboard';
-import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
-import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   AlertComponent,
   ButtonComponent,
@@ -15,7 +13,6 @@ import {
   PageContainerComponent,
   SkeletonComponent,
   TagComponent,
-  ToastService,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
@@ -29,8 +26,6 @@ const SKELETON_ROWS = 3;
   selector: 'fns-people',
   imports: [
     PageContainerComponent,
-    DatePipe,
-    FormsModule,
     ReactiveFormsModule,
     AlertComponent,
     ButtonComponent,
@@ -47,9 +42,7 @@ const SKELETON_ROWS = 3;
   templateUrl: './people.component.html',
 })
 export class PeopleComponent {
-  private readonly clipboard = inject(Clipboard);
   private readonly dialog = inject(CmnDialogService);
-  private readonly toast = inject(ToastService);
   private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(PeopleStore);
@@ -67,20 +60,11 @@ export class PeopleComponent {
     this.inviteForm.reset();
   }
 
-  public copyInviteLink(link: string): void {
-    if (this.clipboard.copy(link)) {
-      this.toast.show('Invite link copied', 'success');
-    } else {
-      this.toast.show('Could not copy the link. Select it and copy it manually.', 'error');
-    }
-  }
-
   public requestRevoke(person: PersonRow): void {
     const ref = this.dialog.open<boolean>(ConfirmDialogComponent, {
       data: {
         title: `Revoke access for ${person.email}?`,
-        message:
-          'They are signed out on their next request and can no longer sign in. Any unused invite link stops working.',
+        message: 'They are signed out on their next request and can no longer sign in.',
         confirmLabel: 'Revoke access',
         cancelLabel: 'Cancel',
         confirmVariant: 'destructive',

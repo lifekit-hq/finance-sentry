@@ -23,13 +23,9 @@ export const APP_ROUTES: Routes = [
     ...RouteTitleUtils.of('Sign in'),
   },
   {
-    path: AppRoute.AcceptInvite.slice(1),
-    loadComponent: () =>
-      import('./modules/auth/pages/accept-invite/accept-invite.component').then(
-        m => m.AcceptInviteComponent
-      ),
-    canActivate: [guestGuard],
-    ...RouteTitleUtils.of('Accept invitation'),
+    // The retired invite link: the invited person signs in through the identity provider like everyone else.
+    path: 'accept-invite',
+    redirectTo: AppRoute.Login.slice(1),
   },
   {
     path: AppRoute.McpConnect.slice(1),

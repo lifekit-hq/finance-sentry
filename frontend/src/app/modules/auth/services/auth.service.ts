@@ -4,13 +4,7 @@ import {ApiService} from '@lifekit-hq/core';
 import {Observable} from 'rxjs';
 
 import {SESSION_PROBE, SKIP_AUTH_REFRESH} from '../constants/auth/auth-http-context.constants';
-import {
-  AcceptInviteRequest,
-  AuthRequest,
-  AuthResponse,
-  LogoutResponse,
-  SignInMethods,
-} from '../models/auth/auth.model';
+import {AuthResponse, LogoutResponse, SignInMethods} from '../models/auth/auth.model';
 
 const OWN_CALL = new HttpContext().set(SKIP_AUTH_REFRESH, true);
 const SESSION_PROBE_CALL = new HttpContext().set(SKIP_AUTH_REFRESH, true).set(SESSION_PROBE, true);
@@ -27,14 +21,6 @@ export class AuthService extends ApiService {
 
   public getSignInMethods(): Observable<SignInMethods> {
     return this.http.get<SignInMethods>(`${this.baseUrl}/methods`, {context: OWN_CALL});
-  }
-
-  public login(req: AuthRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/login`, req, {context: OWN_CALL});
-  }
-
-  public acceptInvite(req: AcceptInviteRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/invite/accept`, req, {context: OWN_CALL});
   }
 
   public refresh(): Observable<AuthResponse> {

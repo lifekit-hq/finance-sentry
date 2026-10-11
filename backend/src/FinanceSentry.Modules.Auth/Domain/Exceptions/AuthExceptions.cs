@@ -35,12 +35,6 @@ public sealed class DuplicateEmailException()
 public sealed class UserNotFoundException()
     : ApiException(404, "USER_NOT_FOUND", "User not found.");
 
-public sealed class InvalidCurrentPasswordException()
-    : ApiException(400, "INVALID_CURRENT_PASSWORD", "Current password is incorrect.");
-
-public sealed class InvalidInviteException()
-    : ApiException(400, "INVALID_INVITE", "This invite link is invalid or has expired. Ask the owner for a new one.");
-
 public sealed class AccountNotInvitedException()
     : ApiException(403, "ACCOUNT_NOT_INVITED", "No account exists for this email. Ask the owner for an invite.");
 

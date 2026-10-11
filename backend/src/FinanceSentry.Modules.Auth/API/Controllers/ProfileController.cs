@@ -11,8 +11,7 @@ namespace FinanceSentry.Modules.Auth.API.Controllers;
 [Route("profile")]
 public class ProfileController(
     IQueryHandler<GetProfileQuery, UserProfileDto> getProfileHandler,
-    ICommandHandler<UpdateProfileCommand, UserProfileDto> updateProfileHandler,
-    ICommandHandler<ChangePasswordCommand, Unit> changePasswordHandler) : ControllerBase
+    ICommandHandler<UpdateProfileCommand, UserProfileDto> updateProfileHandler) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetProfile(CancellationToken ct)
@@ -39,13 +38,5 @@ public class ProfileController(
             request.RealAnnualReturn);
         var profile = await updateProfileHandler.Handle(command, ct);
         return Ok(profile);
-    }
-
-    [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
-    {
-        await changePasswordHandler.Handle(
-            new ChangePasswordCommand(User.RequireUserId(), request.CurrentPassword, request.NewPassword), ct);
-        return NoContent();
     }
 }

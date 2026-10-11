@@ -17,7 +17,7 @@ const AUTH_RESPONSE = {
   expiresAt: '2027-01-01T00:00:00Z',
 };
 
-const SIGN_IN_METHODS = {oidc: false, passwordLogin: true};
+const SIGN_IN_METHODS = {oidc: false};
 
 const UNAUTHORIZED = 401;
 
@@ -89,7 +89,7 @@ test.describe('Security headers', () => {
     await page.goto('/login');
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', /^(light|dark)$/);
-    await expect(page.getByRole('button', {name: /sign in/i}).first()).toBeVisible();
+    await expect(page.getByTestId('no-methods')).toBeVisible();
     expect(await violations()).toEqual([]);
   });
 
