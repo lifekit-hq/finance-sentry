@@ -17,14 +17,18 @@ import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
 
 interface StoreMethods {
   setDossierLoading(): void;
+  setDossierSuccess(): void;
   setDossier(dossier: AssetDossierDto): void;
   setDossierError(errorCode: Nullable<string>): void;
   setLedgerReadLoading(): void;
+  setLedgerReadSuccess(): void;
   setLedgerRead(ledgerRead: AssetLedgerReadDto): void;
   setLedgerReadError(errorCode: Nullable<string>): void;
   setQuoteLoading(): void;
+  setQuoteSuccess(): void;
   setQuote(quote: Nullable<DossierQuoteDto>): void;
-  setQuoteError(): void;
+  setQuoteError(errorCode: Nullable<string>): void;
+  clearQuote(): void;
 }
 
 export function dossierEffects(store: StoreMethods) {
@@ -52,9 +56,13 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setQuoteLoading()),
       switchMap(symbol =>
         dossierService.getQuotes(symbol).pipe(
-          tap(quotes => store.setQuote(quotes[0] ?? null)),
+          tap(quotes => {
+            store.setQuote(quotes[0] ?? null);
+            store.setQuoteSuccess();
+          }),
           catchError(() => {
-            store.setQuoteError();
+            store.clearQuote();
+            store.setQuoteError(null);
             return EMPTY;
           })
         )
@@ -69,6 +77,7 @@ export function dossierEffects(store: StoreMethods) {
         dossierService.getDossier(symbol).pipe(
           tap(dossier => {
             store.setDossier(dossier);
+            store.setDossierSuccess();
             if (DossierQuoteUtils.isQuotable(dossier)) {
               loadQuote(dossier.symbol);
             }
@@ -88,7 +97,10 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setLedgerReadLoading()),
       switchMap(symbol =>
         dossierService.getLedgerRead(symbol).pipe(
-          tap(read => store.setLedgerRead(read)),
+          tap(read => {
+            store.setLedgerRead(read);
+            store.setLedgerReadSuccess();
+          }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setLedgerReadError(code),
           })
@@ -102,7 +114,10 @@ export function dossierEffects(store: StoreMethods) {
       tap(() => store.setLedgerReadLoading()),
       switchMap(({symbol, force}) =>
         dossierService.generateLedgerRead(symbol, force).pipe(
-          tap(read => store.setLedgerRead(read)),
+          tap(read => {
+            store.setLedgerRead(read);
+            store.setLedgerReadSuccess();
+          }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => store.setLedgerReadError(code),
           })
