@@ -56,8 +56,9 @@ live path that keeps the role predicate from being a tautology over today's role
 - `API/Controllers/CommittedMerchantsController.cs`, `API/Responses/CommittedMerchantPinDto.cs`
 - `FinanceSentry.Mcp/Tools/CommittedMerchantsTool.cs` + `Responses/CommittedMerchantsToolResult.cs`,
   registered in `ToolNameContractTests`' canonical list (60 tools) and `docs/mcp.md`
-- Tests: `CommittedMerchantPinsTests` (handlers over the real repository on an in-memory
-  context), rule (d) cases in `CommittedOutflowPolicyTests`, a pinned-merchant split fixture in
+- Tests: `CommittedMerchantPinsTests` (handlers over the in-memory context, pins seeded directly),
+  `CommittedMerchantPinUpsertTests` + `CommittedMerchantsPostgresContractTests` (the pin insert on real
+  Postgres), rule (d) cases in `CommittedOutflowPolicyTests`, a pinned-merchant split fixture in
   `MoneyFlowStatisticsTests`, `CommittedMerchantsAPIContractTests`, `CommittedMerchantsToolTests`
 
 | US2 decision | Choice | Why |
@@ -89,9 +90,9 @@ description alone it normalizes to the whole description, which no pin equals.
 - `Application/Services/CommittedOutflowPolicy.cs` — `CommittedOutflowRules` construction.
 - `Domain/Repositories/ICommittedMerchantPinRepository.cs` — **new**; moved out of
   `IRepositories.cs`, gains `AddIfAbsentAsync` and loses `FindAsync`.
-- `Infrastructure/Persistence/Repositories/CommittedMerchantPinRepository.cs` — the race catch.
-- Tests: `MerchantNameNormalizerTests` (the idempotence property), `CommittedMerchantPinsTests`
-  (the two race paths), `CommittedOutflowPolicyTests` + `MoneyFlowStatisticsTests` (construction).
+- `Infrastructure/Persistence/Repositories/CommittedMerchantPinRepository.cs` — the race-safe insert.
+- Tests: `MerchantNameNormalizerTests` (the idempotence property), `CommittedMerchantPinUpsertTests`
+  (the race path, on Postgres), `CommittedOutflowPolicyTests` + `MoneyFlowStatisticsTests` (construction).
 - `docs/money-semantics.md` §5a — unpin takes one key form, not two.
 
 | US3 decision | Choice | Why |
@@ -99,8 +100,8 @@ description alone it normalizes to the whole description, which no pin equals.
 | Fixed point, not a second path | `NormalizeDetectionKey` recognises the `mobile top-up NNNN` key it emits and returns it unchanged | The mobi branch was the only clause whose output re-normalized to something else. Fixing the function removes the reason unpin had two lookups, rather than leaving one seam declared canonical and a second one live beside it |
 | Suffix stripping repeats | `Normalize` strips `.com`/`.io`/… in a loop instead of once | `"x.com.com"` was the other input whose key was not stable under a second pass. Cheap, and the property test now covers all inputs rather than all-but-two |
 | Two same-typed sets | `CommittedOutflowRules` takes `required` init properties, not positional args | Swapping the two `IReadOnlySet<string>` arguments compiled and silently inverted rules (a) and (d). Precedent for `required init`: `IbkrOAuthCredentials` |
-| Where the pin race is handled | Repository `AddIfAbsentAsync`, catching `DbUpdateException` and re-reading | Precedent: `CompanionEventRepository.InsertIfNewAsync`. The unique index is an Infrastructure fact; the handler should not learn EF exception types to honour a documented idempotent result |
-| Only a real duplicate is swallowed | The catch re-reads and rethrows when no winning row exists | Otherwise a genuine write failure would report a pin the user does not hold |
+| Where the pin race is handled | Repository `AddIfAbsentAsync`: one `INSERT ... ON CONFLICT ("UserId", "MerchantKey") DO NOTHING`, then a read-back when no row was inserted | The unique index is an Infrastructure fact; the handler should not learn EF exception types to honour a documented idempotent result. The atomic insert (issue #936) replaced an earlier find-then-add that swallowed `DbUpdateException` |
+| Only a real duplicate is reported as pinned | A conflict is reported `AlreadyPinned` only when the read-back finds the row; a pin unpinned in between retries the insert once, then throws | Otherwise a genuine write failure would report a pin the user does not hold |
 | `FindAsync` leaves the port | Folded into `AddIfAbsentAsync`; the impl keeps it private | Its only caller was the racy find-then-add; leaving it on the port invites the same shape back |
 | Persisted keys are rekeyed, not left to drift | Data-only migrations `M006` (subscriptions) and `M018` (pins) strip the now-stripped domain suffix | Making the normalizer idempotent changes the key for one class of input: a suffix hidden behind trailing digits ("NETFLIX.COM 866-5797172" was `netflix.com`, is `netflix`). Rows minted under the old derivation would stop matching rule (a) AND get a duplicate on the next detection run. Precedent: M004's plan rekey |
 | The rekey deletes only detected rows | Collision losers go when `IsManual = false`; hand-entered rows stay | A detected row is regenerable; a row the user typed is theirs, and silently deleting it to tidy a key is not a repair |
@@ -109,7 +110,6 @@ description alone it normalizes to the whole description, which no pin equals.
 | The subscriptions rekey never deletes | A row that collides keeps its old key | The loser can carry state detection would not restore (a dismissal, a term count, an end date), so "the detected row is regenerable" is not true enough to delete on. Pins are different: a pin has no state beyond its key, and an unrekeyed duplicate would be a listing entry the user cannot remove |
 | One winner per collapsed key | `DISTINCT ON (UserId, target)` in the UPDATE, the rest deleted | `NOT EXISTS` alone is evaluated against the pre-statement snapshot: two old keys collapsing to one would both pass it and the second write would break the unique index, leaving the whole rekey unapplied on every boot |
 
-Constraint discovered while building: the in-memory provider does not enforce unique indexes, so
-the race path is covered with a `BankSyncDbContext` subclass that fails the first
-`SaveChangesAsync` after a competing context commits the winning row — a Sqlite/Postgres-backed
-test would need a package this test project deliberately does not carry.
+Constraint discovered while building: the in-memory provider enforces neither unique indexes nor raw
+SQL, so the pin insert and its race are covered by `[DockerRequiredFact]` tests on real Postgres
+(`CommittedMerchantPinUpsertTests`); the in-memory suites seed pins directly through the context.
