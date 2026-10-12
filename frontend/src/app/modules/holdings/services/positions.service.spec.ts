@@ -219,4 +219,50 @@ describe('PositionsService', () => {
       ['OLD', 'equity'],
     ]);
   });
+  it('keeps a non-USD broker row in its own currency next to the USD value', () => {
+    const brokerage: BrokerageHoldingsDto = {
+      provider: 'mixed',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 130,
+      positions: [
+        {
+          symbol: 'UAH Cash',
+          instrumentType: 'CASH',
+          quantity: 5_000,
+          usdValue: 120,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'inzhur',
+          assetClass: 'Cash',
+          currency: 'UAH',
+          nativeValue: 5_000,
+        },
+        {
+          symbol: 'AAPL',
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 10,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+          assetClass: 'Equities',
+          currency: 'USD',
+          nativeValue: null,
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(null);
+
+    expect(positions.map(p => [p.symbol, p.currentValue, p.nativeCurrency, p.nativeValue])).toEqual(
+      [
+        ['UAH Cash', 120, 'UAH', 5_000],
+        ['AAPL', 10, undefined, undefined],
+      ]
+    );
+  });
 });

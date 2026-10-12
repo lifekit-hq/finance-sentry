@@ -127,7 +127,14 @@
               <ng-template let-row cmnCell>
                 <span class="tabular-nums">{{ row.quantity | number: '1.0-8' }}</span>
                 @if (row.currentPrice !== null) {
-                  <span class="tabular-nums md:hidden"> × {{ row.currentPrice | money }}</span>
+                  <span class="tabular-nums md:hidden">
+                    ×
+                    {{
+                      row.nativeCurrency && row.nativePrice !== null
+                        ? (row.nativePrice | money: row.nativeCurrency)
+                        : (row.currentPrice | money)
+                    }}</span
+                  >
                 }
                 <span class="md:hidden" data-testid="holding-day-change-phone">
                   <ng-container *ngTemplateOutlet="dayChange; context: {$implicit: row}" />
@@ -138,6 +145,10 @@
               <ng-template let-row cmnCell>
                 @if (row.currentPrice === null) {
                   <span class="tabular-nums text-text-secondary">—</span>
+                } @else if (row.nativeCurrency && row.nativePrice !== null) {
+                  <span class="tabular-nums" data-testid="holding-native-price">{{
+                    row.nativePrice | money: row.nativeCurrency
+                  }}</span>
                 } @else {
                   <span class="tabular-nums">{{ row.currentPrice | money }}</span>
                 }
@@ -150,7 +161,18 @@
             </cmn-column>
             <cmn-column key="value" listSlot="trailing" header="Value" align="right">
               <ng-template let-row cmnCell>
-                <span class="tabular-nums font-semibold">{{ row.currentValue | money }}</span>
+                @if (row.nativeCurrency && row.nativeValue !== null) {
+                  <span class="flex flex-col items-end leading-tight">
+                    <span class="tabular-nums font-semibold" data-testid="holding-native-value">{{
+                      row.nativeValue | money: row.nativeCurrency
+                    }}</span>
+                    <span class="tabular-nums text-cmn-xs text-text-secondary"
+                      >~ {{ row.currentValue | money }}</span
+                    >
+                  </span>
+                } @else {
+                  <span class="tabular-nums font-semibold">{{ row.currentValue | money }}</span>
+                }
               </ng-template>
             </cmn-column>
             <cmn-column key="pnl" listSlot="trailing-secondary" header="P&L" align="right">

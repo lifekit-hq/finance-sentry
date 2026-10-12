@@ -110,6 +110,13 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                         .HasPrecision(20, 4)
                         .HasColumnType("numeric(20,4)");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("USD");
+
                     b.Property<DateOnly?>("FlexAsOfDate")
                         .HasColumnType("date");
 
@@ -120,6 +127,10 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("NativeValue")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
 
                     b.Property<string>("Provider")
                         .IsRequired()

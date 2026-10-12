@@ -13,7 +13,9 @@ public sealed record GetBrokerageHoldingsQuery(Guid UserId) : IQuery<BrokerageHo
 /// <see cref="BasisState"/> is "Verified", "Unverified" or "Unknown" (fs-688) — see
 /// <c>BrokerageCostBasisReconciler</c>. <see cref="CostBasisUsd"/> and <see cref="AverageCostUsd"/> are
 /// null whenever it is not "Verified". <see cref="AssetClass"/> is the <c>AssetClassNormalizer</c> bucket of
-/// <see cref="InstrumentType"/> (<c>Cash</c> for the broker's currency rows).
+/// <see cref="InstrumentType"/> (<c>Cash</c> for the broker's currency rows). <see cref="Currency"/> is the
+/// position's own denomination and <see cref="NativeValue"/> its value in it as the broker reported it (null for
+/// USD-only rows); <see cref="UsdValue"/> stays the one figure totals and weights sum.
 /// </summary>
 public sealed record BrokeragePositionDto(
     string Symbol,
@@ -24,7 +26,9 @@ public sealed record BrokeragePositionDto(
     decimal? AverageCostUsd,
     string BasisState,
     string Provider = "ibkr",
-    string AssetClass = "Other");
+    string AssetClass = "Other",
+    string Currency = "USD",
+    decimal? NativeValue = null);
 
 /// <summary><see cref="Provider"/> is the one provider all positions come from, or <c>mixed</c>.</summary>
 public sealed record BrokerageHoldingsResponse(
@@ -96,7 +100,9 @@ public sealed class GetBrokerageHoldingsQueryHandler(
                     verified ? h.AverageCostUsd : null,
                     reconciliation.State.ToString(),
                     h.Provider,
-                    AssetClassNormalizer.Normalize(h.InstrumentType));
+                    AssetClassNormalizer.Normalize(h.InstrumentType),
+                    h.Currency,
+                    h.NativeValue);
             })
             .ToList();
 

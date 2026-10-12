@@ -200,4 +200,28 @@ describe('holdingsComputed', () => {
     expect(bySymbol('EUR')?.dayChangePct).toBeNull();
     expect(bySymbol('USD Cash')?.dayChangePct).toBeNull();
   });
+  it('derives a native unit price only for a row that carries its own currency', () => {
+    const computed = build([
+      position({
+        symbol: 'Fund A',
+        provider: 'inzhur',
+        quantity: 10,
+        currentValue: 30,
+        nativeCurrency: 'UAH',
+        nativeValue: 1_200,
+        assetClass: 'realEstate',
+      }),
+      position({symbol: 'AAPL', provider: 'ibkr', currentValue: 10, assetClass: 'equity'}),
+    ]);
+
+    const rows = computed.positionsByAssetClass().flatMap(g => g.rows);
+    const bySymbol = (s: string) => rows.find(r => r.symbol === s);
+
+    expect(bySymbol('Fund A')).toEqual(
+      expect.objectContaining({nativeCurrency: 'UAH', nativeValue: 1_200, nativePrice: 120})
+    );
+    expect(bySymbol('AAPL')).toEqual(
+      expect.objectContaining({nativeCurrency: null, nativeValue: null, nativePrice: null})
+    );
+  });
 });
