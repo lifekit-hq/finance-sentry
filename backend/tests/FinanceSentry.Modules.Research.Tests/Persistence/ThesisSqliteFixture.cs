@@ -64,9 +64,9 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
     public sealed class ThesisOnlySqliteContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser)
         : ResearchDbContext(options, currentUser)
     {
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        protected override void ConfigureModel(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            base.ConfigureModel(modelBuilder);
 
             var unwanted = modelBuilder.Model.GetEntityTypes()
                 .Select(e => e.ClrType)

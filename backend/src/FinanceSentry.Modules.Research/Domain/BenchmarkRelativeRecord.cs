@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One materialized benchmark-relative track-record figure (fs-699): the return of a scope (book,
 /// sleeve or thesis) against the benchmark over one window, computed by the weekly track-record job
@@ -9,7 +11,7 @@ namespace FinanceSentry.Modules.Research.Domain;
 /// Returns are percentages (5.0 = 5%). Uncovered windows keep the row with null returns so the gap
 /// is visible rather than silently missing.
 /// </summary>
-public class BenchmarkRelativeRecord
+public class BenchmarkRelativeRecord : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }
