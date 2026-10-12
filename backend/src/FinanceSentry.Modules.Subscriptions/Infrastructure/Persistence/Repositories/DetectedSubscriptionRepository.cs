@@ -39,16 +39,18 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
     // key (a legacy row re-keyed when it is linked to a transaction). A new row is one INSERT ... ON CONFLICT on the
     // unique (UserId, MerchantNameNormalized) index: one already stored under that key (the detection job re-finds it
     // in a race) is updated in place with the caller's state, keeping its Id and DetectedAt, so two writers of one key
-    // leave one row instead of the loser failing on the index, and no read precedes it.
-    public async Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
+    // leave one row instead of the loser failing on the index, and no read precedes it. A writer that is not manual
+    // (the detection job) never replaces a manual or dismissed row, the same rule SubscriptionDetectionResultService
+    // applies to a row it has read; in that case the stored row is left as it was. The Id returned is the stored row's.
+    public async Task<Guid> UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
     {
         if (_db.Entry(subscription).State != EntityState.Detached)
         {
             await _db.SaveChangesAsync(ct);
-            return;
+            return subscription.Id;
         }
 
-        await _db.Database.ExecuteSqlInterpolatedAsync(
+        var ids = await _db.Database.SqlQuery<Guid>(
             $"""
             INSERT INTO public.detected_subscriptions
                 ("Id", "UserId", "MerchantNameNormalized", "MerchantNameDisplay", "Cadence", "AverageAmount",
@@ -84,8 +86,17 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
                 "IsManual" = EXCLUDED."IsManual",
                 "UpdatedAt" = now(),
                 "DismissedAt" = EXCLUDED."DismissedAt"
-            """,
-            ct);
+            WHERE EXCLUDED."IsManual"
+                OR (NOT detected_subscriptions."IsManual" AND detected_subscriptions."Status" <> {SubscriptionStatus.Dismissed})
+            RETURNING "Id" AS "Value"
+            """).ToListAsync(ct);
+        if (ids.Count > 0)
+            return ids[0];
+
+        return await AllUsers.AsNoTracking()
+            .Where(s => s.UserId == subscription.UserId && s.MerchantNameNormalized == subscription.MerchantNameNormalized)
+            .Select(s => s.Id)
+            .SingleAsync(ct);
     }
 
     public async Task DeleteAsync(DetectedSubscription subscription, CancellationToken ct = default)

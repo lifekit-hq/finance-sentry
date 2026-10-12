@@ -140,6 +140,66 @@ public sealed class DetectedSubscriptionUpsertTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task A_detected_upsert_does_not_replace_a_manual_row_and_returns_its_id()
+    {
+        var manual = DetectedSubscription.CreateFromTransaction(
+            _user, Merchant, "My Netflix", 9m, "USD", new DateOnly(2026, 9, 1), chargeCount: 1,
+            termCount: null, SubscriptionKinds.Subscription);
+        await using (var ctx = CreateContext())
+            await new DetectedSubscriptionRepository(ctx).UpsertAsync(manual);
+
+        Guid returned;
+        await using (var ctx = CreateContext())
+            returned = await new DetectedSubscriptionRepository(ctx).UpsertAsync(NewSubscription(15.99m, "streaming"));
+
+        returned.Should().Be(manual.Id);
+        var row = (await RowsAsync()).Should().ContainSingle().Subject;
+        row.IsManual.Should().BeTrue();
+        row.MerchantNameDisplay.Should().Be("My Netflix");
+        row.LastKnownAmount.Should().Be(9m);
+        row.Category.Should().BeNull();
+    }
+
+    [DockerRequiredFact]
+    public async Task A_detected_upsert_does_not_revive_a_dismissed_row_and_returns_its_id()
+    {
+        var detected = NewSubscription(15.99m);
+        detected.MarkDismissed();
+        await using (var ctx = CreateContext())
+            await new DetectedSubscriptionRepository(ctx).UpsertAsync(detected);
+
+        Guid returned;
+        await using (var ctx = CreateContext())
+            returned = await new DetectedSubscriptionRepository(ctx).UpsertAsync(NewSubscription(17.99m));
+
+        returned.Should().Be(detected.Id);
+        var row = (await RowsAsync()).Should().ContainSingle().Subject;
+        row.Status.Should().Be(SubscriptionStatus.Dismissed);
+        row.LastKnownAmount.Should().Be(15.99m);
+    }
+
+    [DockerRequiredFact]
+    public async Task A_commitment_added_over_a_detected_row_updates_it_and_returns_the_stored_id()
+    {
+        var detected = NewSubscription(15.99m);
+        await using (var ctx = CreateContext())
+            await new DetectedSubscriptionRepository(ctx).UpsertAsync(detected);
+
+        var added = DetectedSubscription.CreateFromTransaction(
+            _user, Merchant, "My Netflix", 9m, "USD", new DateOnly(2026, 9, 1), chargeCount: 1,
+            termCount: null, SubscriptionKinds.Subscription);
+        Guid returned;
+        await using (var ctx = CreateContext())
+            returned = await new DetectedSubscriptionRepository(ctx).UpsertAsync(added);
+
+        returned.Should().Be(detected.Id).And.NotBe(added.Id);
+        var row = (await RowsAsync()).Should().ContainSingle().Subject;
+        row.Id.Should().Be(detected.Id);
+        row.IsManual.Should().BeTrue();
+        row.MerchantNameDisplay.Should().Be("My Netflix");
+    }
+
+    [DockerRequiredFact]
     public async Task Repeating_the_detection_result_keeps_one_row()
     {
         var detected = new DetectedSubscriptionData(

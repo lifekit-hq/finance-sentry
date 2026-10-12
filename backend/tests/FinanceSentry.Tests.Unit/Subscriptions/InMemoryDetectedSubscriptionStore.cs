@@ -26,12 +26,13 @@ internal sealed class InMemoryDetectedSubscriptionStore(SubscriptionsDbContext d
         string userId, string merchantNameNormalized, CancellationToken ct = default)
         => _repository.FindByUserAndMerchantUnscopedAsync(userId, merchantNameNormalized, ct);
 
-    public async Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
+    public async Task<Guid> UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
     {
         if (db.Entry(subscription).State == EntityState.Detached)
             db.DetectedSubscriptions.Add(subscription);
 
         await db.SaveChangesAsync(ct);
+        return subscription.Id;
     }
 
     public Task DeleteAsync(DetectedSubscription subscription, CancellationToken ct = default)
