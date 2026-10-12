@@ -27,7 +27,7 @@ The convention, enforced structurally:
 
 ## Owner Query Filter - per-user DbContexts
 
-A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and carries the named filter on every per-user entity: declared by hand as `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`, or - in a context derived from `OwnerScopedDbContext` (`WealthDbContext` so far) - applied by the base to every entity that implements `IUserOwned`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
+A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and carries the named filter on every per-user entity: declared by hand as `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`, or - in a context derived from `OwnerScopedDbContext` (`WealthDbContext`, `BudgetsDbContext`, `EventsDbContext`, `RiskDbContext` so far) - applied by the base to every entity that implements `IUserOwned`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
 
 - Every job or sweep that legitimately reads across users opts out explicitly with `IgnoreQueryFilters([OwnerQueryFilter.Name])` and keeps its own `UserId` predicate. Inserts and `SaveChanges` are not filtered; `ExecuteUpdate`/`ExecuteDelete` are.
 - Each converted context ships a two-user isolation test and a no-principal test per cross-user job (see `AlertsOwnerQueryFilterTests`).
