@@ -143,11 +143,11 @@ describe('SubscriptionsComponent async states', () => {
   ) {
     const subscriptions = overrides.subscriptions ?? [];
     const store = {
-      isLoading: signal(overrides.isLoading ?? false),
+      isLoadLoading: signal(overrides.isLoading ?? false),
       loadErrorMessage: signal(overrides.loadErrorMessage ?? ''),
       subscriptions: signal(subscriptions),
       hasInsufficientHistory: signal(overrides.hasInsufficientHistory ?? false),
-      addErrorMessage: signal(''),
+      addAlertMessage: signal(''),
       summary: signal(null),
       sort: signal('date'),
       activeSections: signal(

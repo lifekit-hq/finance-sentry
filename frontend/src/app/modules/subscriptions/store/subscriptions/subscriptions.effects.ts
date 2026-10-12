@@ -15,11 +15,15 @@ import {SubscriptionsService} from '../../services/subscriptions.service';
 interface EffectsStore {
   setData: (subscriptions: Subscription[], hasInsufficientHistory: boolean) => void;
   setSummary: (summary: SubscriptionSummary) => void;
-  setLoading: () => void;
+  setLoadLoading: () => void;
+  setLoadSuccess: () => void;
   setLoadError: (errorCode: Nullable<string>) => void;
   dismissSubscription: (id: string) => void;
   restoreSubscription: (id: string) => void;
-  setAddError: (errorCode: Nullable<string>, errorDetail?: Nullable<string>) => void;
+  setAddLoading: () => void;
+  setAddSuccess: () => void;
+  setAddError: (errorCode: Nullable<string>) => void;
+  setAddErrorDetail: (errorDetail: Nullable<string>) => void;
 }
 
 export function subscriptionsEffects(store: EffectsStore) {
@@ -33,11 +37,18 @@ export function subscriptionsEffects(store: EffectsStore) {
       tap(({list$, summary$}) => {
         store.setData(list$.items, list$.hasInsufficientHistory);
         store.setSummary(summary$);
+        store.setLoadSuccess();
       })
     );
 
+  const startAdd = (): void => {
+    store.setAddLoading();
+    store.setAddErrorDetail(null);
+  };
+
   const reportAddError = (err: unknown): Observable<never> => {
-    store.setAddError(extractErrorCode(err), ErrorUtils.extractMessage(err));
+    store.setAddError(extractErrorCode(err));
+    store.setAddErrorDetail(ErrorUtils.extractMessage(err));
     return EMPTY;
   };
 
@@ -47,7 +58,7 @@ export function subscriptionsEffects(store: EffectsStore) {
   return {
     load: rxMethod<void>(
       pipe(
-        tap(() => store.setLoading()),
+        tap(() => store.setLoadLoading()),
         switchMap(() =>
           refresh().pipe(
             catchError((err: unknown) => {
@@ -93,10 +104,11 @@ export function subscriptionsEffects(store: EffectsStore) {
     ),
     addCommitment: rxMethod<AddCommitmentRequest>(
       pipe(
-        tap(() => store.setAddError(null)),
+        tap(() => startAdd()),
         switchMap(payload =>
           service.add(payload).pipe(
             switchMap(() => refresh()),
+            tap(() => store.setAddSuccess()),
             catchError(reportAddError)
           )
         )
@@ -104,10 +116,11 @@ export function subscriptionsEffects(store: EffectsStore) {
     ),
     linkCommitment: rxMethod<{id: string; request: LinkCommitmentRequest}>(
       pipe(
-        tap(() => store.setAddError(null)),
+        tap(() => startAdd()),
         switchMap(({id, request}) =>
           service.link(id, request).pipe(
             switchMap(() => refresh()),
+            tap(() => store.setAddSuccess()),
             catchError(reportAddError)
           )
         )

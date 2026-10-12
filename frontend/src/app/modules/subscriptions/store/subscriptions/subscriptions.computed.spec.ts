@@ -1,9 +1,6 @@
 import {signal} from '@angular/core';
-import {TestBed} from '@angular/core/testing';
-import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {
   type Subscription,
   type SubscriptionSort,
@@ -37,17 +34,14 @@ function sub(id: string, nextExpectedDate: string, overrides: Partial<Subscripti
 }
 
 function build(subscriptions: Subscription[], sort: SubscriptionSort = 'date') {
-  return TestBed.runInInjectionContext(() =>
-    subscriptionsComputed({
-      subscriptions: signal(subscriptions),
-      sort: signal(sort),
-      summary: signal(null),
-      status: signal<AsyncStatus>('idle'),
-      loadErrorCode: signal(null),
-      addErrorCode: signal(null),
-      addErrorDetail: signal(null),
-    })
-  );
+  return subscriptionsComputed({
+    subscriptions: signal(subscriptions),
+    sort: signal(sort),
+    summary: signal(null),
+    addErrorCode: signal(null),
+    addErrorMessage: signal(''),
+    addErrorDetail: signal(null),
+  });
 }
 
 describe('subscriptionsComputed activeSections', () => {
@@ -135,36 +129,25 @@ describe('subscriptionsComputed activeSections', () => {
   });
 });
 
-describe('subscriptionsComputed addErrorMessage', () => {
-  beforeEach(() => {
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY}],
-    });
-  });
-
+describe('subscriptionsComputed addAlertMessage', () => {
   function withError(addErrorCode: Nullable<string>, addErrorDetail: Nullable<string> = null) {
-    return TestBed.runInInjectionContext(() =>
-      subscriptionsComputed({
-        subscriptions: signal([]),
-        sort: signal('date'),
-        summary: signal(null),
-        status: signal<AsyncStatus>('idle'),
-        loadErrorCode: signal(null),
-        addErrorCode: signal(addErrorCode),
-        addErrorDetail: signal(addErrorDetail),
-      })
-    ).addErrorMessage();
+    return subscriptionsComputed({
+      subscriptions: signal([]),
+      sort: signal('date'),
+      summary: signal(null),
+      addErrorCode: signal(addErrorCode),
+      // What the add slice resolves for the code (registry text, or its default).
+      addErrorMessage: signal(addErrorCode === null ? '' : `resolved:${addErrorCode}`),
+      addErrorDetail: signal(addErrorDetail),
+    }).addAlertMessage();
   }
 
   it('is empty without an error', () => {
     expect(withError(null)).toBe('');
   });
 
-  it('resolves a registered code', () => {
-    expect(withError('COMMITMENT_ALREADY_TRACKED')).toBe(
-      ERROR_MESSAGES_REGISTRY['COMMITMENT_ALREADY_TRACKED']
-    );
+  it('uses the slice message for a code', () => {
+    expect(withError('COMMITMENT_ALREADY_TRACKED')).toBe('resolved:COMMITMENT_ALREADY_TRACKED');
   });
 
   it('names the row that already holds the charges using the server text', () => {
@@ -175,51 +158,7 @@ describe('subscriptionsComputed addErrorMessage', () => {
 
   it('ignores the server text for any other code', () => {
     expect(withError('COMMITMENT_ALREADY_LINKED', 'Something else')).toBe(
-      ERROR_MESSAGES_REGISTRY['COMMITMENT_ALREADY_LINKED']
+      'resolved:COMMITMENT_ALREADY_LINKED'
     );
-  });
-
-  it('falls back to a generic message for an unregistered code', () => {
-    expect(withError('SOMETHING_ELSE')).toBe('Failed to add.');
-  });
-});
-
-describe('subscriptionsComputed load state', () => {
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [{provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY}],
-    });
-  });
-
-  function withLoad(status: AsyncStatus, loadErrorCode: Nullable<string> = null) {
-    return TestBed.runInInjectionContext(() =>
-      subscriptionsComputed({
-        subscriptions: signal([]),
-        sort: signal('date'),
-        summary: signal(null),
-        status: signal(status),
-        loadErrorCode: signal(loadErrorCode),
-        addErrorCode: signal(null),
-        addErrorDetail: signal(null),
-      })
-    );
-  }
-
-  it('is loading only while the status says so', () => {
-    expect(withLoad('loading').isLoading()).toBe(true);
-    expect(withLoad('idle').isLoading()).toBe(false);
-    expect(withLoad('error').isLoading()).toBe(false);
-  });
-
-  it('has no load error unless the load failed', () => {
-    expect(withLoad('idle', 'BOOM').loadErrorMessage()).toBe('');
-    expect(withLoad('loading').loadErrorMessage()).toBe('');
-  });
-
-  it('falls back to the generic load message for an unregistered code', () => {
-    expect(withLoad('error', 'SOMETHING_ELSE').loadErrorMessage()).toBe(
-      'Failed to load subscriptions.'
-    );
-    expect(withLoad('error').loadErrorMessage()).toBe('Failed to load subscriptions.');
   });
 });
