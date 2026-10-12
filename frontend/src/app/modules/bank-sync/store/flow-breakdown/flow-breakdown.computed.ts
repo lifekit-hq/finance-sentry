@@ -1,5 +1,5 @@
-import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {computed, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 
 import {DateUtils} from '../../../../shared/utils/date.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
@@ -20,7 +20,6 @@ interface StateSignals {
   months: Signal<number>;
   accountFilter: Signal<Nullable<string>>;
   status: Signal<AsyncStatus>;
-  errorCode: Signal<Nullable<string>>;
 }
 
 /** One rendered section of the audit view: a bucket, its rows, and their USD sum. */
@@ -42,7 +41,6 @@ export interface AccountChip {
 }
 
 const PCT_MAX = 100;
-const DEFAULT_ERROR = 'Failed to load the month breakdown. Please try again.';
 
 // Render order + copy for each bucket. `counted` marks buckets that enter the savings
 // math; the excluded ones are shown so the reader can audit what the math ignored.
@@ -90,8 +88,6 @@ function wholeUsd(value: number): string {
 }
 
 export function flowBreakdownComputed(store: StateSignals) {
-  const errorMessages = inject(ErrorMessageService);
-
   // A `from` and/or `to` date is a dashboard window's day range (with `months` as the history the
   // dashboard loaded around it); otherwise the page shows one month, where an absent or invalid
   // `month` means "now".
@@ -135,14 +131,7 @@ export function flowBreakdownComputed(store: StateSignals) {
     range,
     month,
     request,
-    isLoading: computed(() => store.status() === 'loading'),
-    isEmpty: computed(() => store.status() === 'idle' && filteredItems().length === 0),
-    errorMessage: computed(() => {
-      if (store.status() !== 'error') {
-        return '';
-      }
-      return errorMessages.resolve(store.errorCode()) ?? DEFAULT_ERROR;
-    }),
+    isEmpty: computed(() => store.status() === 'success' && filteredItems().length === 0),
     groups: computed((): BucketGroup[] =>
       BUCKET_META.map(meta => {
         const items = itemsOf(meta.bucket);

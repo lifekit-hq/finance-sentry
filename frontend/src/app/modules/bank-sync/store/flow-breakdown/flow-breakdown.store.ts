@@ -1,4 +1,4 @@
-import {withUrlSync} from '@lifekit-hq/core';
+import {withAsyncStatus, withUrlSync} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
 import {
@@ -27,6 +27,7 @@ export const FlowBreakdownStore = signalStore(
       codec: MONTHS_PARAM_CODEC,
     },
   }),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load the month breakdown. Please try again.'}),
   withMethods(flowBreakdownMethods),
   withComputed(flowBreakdownComputed),
   withMethods(flowBreakdownEffects),

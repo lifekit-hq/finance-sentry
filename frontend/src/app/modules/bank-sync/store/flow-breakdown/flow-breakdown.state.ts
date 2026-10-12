@@ -11,8 +11,6 @@ export interface FlowBreakdownState {
   /** The `months` query param: the history the dashboard loaded around the window. */
   months: number;
   accountFilter: Nullable<string>;
-  status: AsyncStatus;
-  errorCode: Nullable<string>;
 }
 
 export const initialFlowBreakdownState: FlowBreakdownState = {
@@ -22,6 +20,4 @@ export const initialFlowBreakdownState: FlowBreakdownState = {
   to: null,
   months: DEFAULT_MONTHS_PARAM,
   accountFilter: null,
-  status: 'idle',
-  errorCode: null,
 };
