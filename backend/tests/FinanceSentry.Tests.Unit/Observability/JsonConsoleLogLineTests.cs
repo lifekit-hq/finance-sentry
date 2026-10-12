@@ -2,7 +2,7 @@ namespace FinanceSentry.Tests.Unit.Observability;
 
 using System.Diagnostics;
 using System.Text.Json;
-using FinanceSentry.Core.Observability;
+using FinanceSentry.Infrastructure.Observability;
 using FluentAssertions;
 using Serilog;
 using Serilog.Core;
@@ -13,10 +13,10 @@ using Xunit;
 
 /// <summary>
 /// The console line shape the platform contract checks (guardrail 1, spec 048): one JSON object per
-/// line, with the rendered message and — inside a traced request — a <c>TraceId</c> key. Exercises
-/// the formatter + enricher pair <see cref="FinanceSentry.Infrastructure.Observability.SerilogConfiguration"/>
-/// writes to the console, through a <see cref="TextWriter"/> so the test never touches the process
-/// stdout.
+/// line, with the rendered message and — inside a traced request — the W3C trace id (<c>@tr</c>) Serilog
+/// 4 captures from <see cref="Activity.Current"/> with no enricher. Exercises the formatter
+/// <see cref="SerilogConfiguration"/> writes to the console, through a <see cref="TextWriter"/> so the test
+/// never touches the process stdout. Also pins the Loki body's <c>TraceId</c>/<c>SpanId</c> fields.
 /// </summary>
 public class JsonConsoleLogLineTests
 {
@@ -37,6 +37,22 @@ public class JsonConsoleLogLineTests
         root.GetProperty("@t").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("@m").GetString().Should().Be("hello \"contract\"");
         root.GetProperty("Who").GetString().Should().Be("contract");
+        root.GetProperty("@tr").GetString().Should().Be(activity!.TraceId.ToHexString());
+        root.GetProperty("@sp").GetString().Should().Be(activity.SpanId.ToHexString());
+    }
+
+    [Fact]
+    public void UnderActivity_LokiBodyCarriesTheIdsAsTraceIdAndSpanIdFields()
+    {
+        using var listener = StartListener();
+        using var activity = ActivitySource.StartActivity("request");
+        activity.Should().NotBeNull();
+
+        var line = WriteOneLine("hello {Who}", "contract", SerilogConfiguration.CreateLokiFormatter());
+
+        using var doc = JsonDocument.Parse(line);
+        var root = doc.RootElement;
+        root.GetProperty("Message").GetString().Should().Be("hello \"contract\"");
         root.GetProperty("TraceId").GetString().Should().Be(activity!.TraceId.ToHexString());
         root.GetProperty("SpanId").GetString().Should().Be(activity.SpanId.ToHexString());
     }
@@ -49,16 +65,15 @@ public class JsonConsoleLogLineTests
         var line = WriteOneLine("plain", null);
 
         using var doc = JsonDocument.Parse(line);
-        doc.RootElement.TryGetProperty("TraceId", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("@tr", out _).Should().BeFalse();
         doc.RootElement.GetProperty("@m").GetString().Should().Be("plain");
     }
 
-    private static string WriteOneLine(string template, string? argument)
+    private static string WriteOneLine(string template, string? argument, ITextFormatter? formatter = null)
     {
         var output = new StringWriter();
         var logger = new LoggerConfiguration()
-            .Enrich.With<TraceEnricher>()
-            .WriteTo.Sink(new FormattingSink(new RenderedCompactJsonFormatter(), output))
+            .WriteTo.Sink(new FormattingSink(formatter ?? new RenderedCompactJsonFormatter(), output))
             .CreateLogger();
 
         if (argument is null)

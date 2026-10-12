@@ -17,9 +17,4 @@
     <PackageReference Include="Serilog.Formatting.Compact" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Only for the shared TraceEnricher (spec 048): the gateway stays a lean host otherwise. -->
-    <ProjectReference Include="..\FinanceSentry.Core\FinanceSentry.Core.csproj" />
-  </ItemGroup>
-
 </Project>

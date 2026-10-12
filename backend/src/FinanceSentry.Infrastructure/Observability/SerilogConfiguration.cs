@@ -1,17 +1,18 @@
 namespace FinanceSentry.Infrastructure.Observability;
 
-using FinanceSentry.Core.Observability;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting;
 using Serilog.Formatting.Compact;
 using Serilog.Sinks.Grafana.Loki;
 
 /// <summary>
 /// Central Serilog setup (FR-003/011). Console output is one compact JSON object per line — the
 /// platform contract's "JSON logs with a trace id on stdout" (guardrail 1, spec 048): the box log
-/// agent reads stdout, so the rendered message (<c>@m</c>) plus <c>TraceId</c>/<c>SpanId</c> from
-/// <see cref="TraceEnricher"/> is what every downstream reader sees. Keeps the api's rolling-file sink,
+/// agent reads stdout, so the rendered message (<c>@m</c>) plus the W3C trace and span ids Serilog 4
+/// captures from <see cref="System.Diagnostics.Activity.Current"/> (<c>@tr</c>/<c>@sp</c>) is what every
+/// downstream reader sees. Keeps the api's rolling-file sink,
 /// suppresses the EF Core <c>Database.Command</c> SQL flood that made grep-based triage slow (FR-011,
 /// override-able via config), enriches every event with a bounded <c>module</c> + <c>app</c>, and —
 /// when a Loki URL is configured — ships structured logs to Loki via the batched sink (fire-and-forget:
@@ -39,6 +40,15 @@ public static class SerilogConfiguration
     public static Action<HostBuilderContext, LoggerConfiguration> For(string appName)
         => (context, loggerConfiguration) => Configure(context, loggerConfiguration, appName, writeToFile: false);
 
+    /// <summary>
+    /// The Loki body: one JSON object per event, with the event's W3C trace and span ids as <c>TraceId</c>
+    /// and <c>SpanId</c> body fields (the sink's own fields; off by default) — what the box Loki
+    /// datasource's derived field matches (<c>"TraceId":"…"</c>) to jump to the trace in Tempo. Body
+    /// fields only, never Loki labels: both are per-request and would explode label cardinality.
+    /// </summary>
+    public static ITextFormatter CreateLokiFormatter()
+        => new LokiJsonTextFormatter(new LokiExceptionFormatter(), enrichTraceId: true, enrichSpanId: true);
+
     private static void Configure(
         HostBuilderContext context,
         LoggerConfiguration loggerConfiguration,
@@ -55,7 +65,6 @@ public static class SerilogConfiguration
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .Enrich.With<ModuleEnricher>()
-            .Enrich.With<TraceEnricher>()
             .Enrich.WithProperty("app", appName)
             .WriteTo.Console(new RenderedCompactJsonFormatter());
 
@@ -72,12 +81,11 @@ public static class SerilogConfiguration
         var lokiUrl = configuration[LokiUrlConfigKey];
         if (!string.IsNullOrWhiteSpace(lokiUrl))
         {
-            // JSON payload so structured properties (CorrelationId, SourceContext, …) are searchable in
-            // Loki via `| json` (SC-002 correlation-id grouping); only app/module/level become labels so
-            // cardinality stays bounded (FR-007).
+            // JSON payload so structured properties (SourceContext, …) are searchable in Loki via
+            // `| json`; only app/module/level become labels so cardinality stays bounded (FR-007).
             loggerConfiguration.WriteTo.GrafanaLoki(
                 lokiUrl,
-                textFormatter: new LokiJsonTextFormatter(),
+                textFormatter: CreateLokiFormatter(),
                 labels: [new LokiLabel { Key = "app", Value = appName }],
                 propertiesAsLabels: ["module", "level"]);
         }

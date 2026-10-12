@@ -5,7 +5,6 @@ using System.Text.Json;
 using FinanceSentry.API.Errors;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.API.Controllers;
 using FinanceSentry.Modules.BankSync.Application.Commands;
@@ -162,7 +161,7 @@ public class ConnectMonobankContractTests
     private static async Task<(int Status, string? ErrorCode)> RunThroughExceptionHandlerAsync(
         Func<Task> action)
     {
-        var handler = new ApiExceptionHandler(NullLogger<ApiExceptionHandler>.Instance, new CorrelationIdAccessor());
+        var handler = new ApiExceptionHandler(NullLogger<ApiExceptionHandler>.Instance);
 
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();

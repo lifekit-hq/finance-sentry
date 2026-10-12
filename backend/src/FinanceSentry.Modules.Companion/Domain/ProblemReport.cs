@@ -60,6 +60,7 @@ public sealed class ProblemReport : IUserOwned
     /// <summary>Operating system and browser family, for example <c>iOS Safari</c>.</summary>
     public string Client { get; set; } = string.Empty;
 
+    /// <summary>W3C trace id of the request that submitted the report; the <c>TraceId</c> its log lines carry.</summary>
     public string CorrelationId { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

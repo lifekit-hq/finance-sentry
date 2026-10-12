@@ -6,7 +6,6 @@ using System.Net.Http.Json;
 using FinanceSentry.API.Errors;
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Exceptions;
-using FinanceSentry.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -24,13 +23,11 @@ using Xunit;
 
 /// <summary>
 /// The API's one error format: <see cref="ApiExceptionHandler"/> behind <c>UseExceptionHandler()</c> and the
-/// model-binding 400 both answer with <see cref="ApiErrorBody"/>, and the error logs carry the correlation scope.
+/// model-binding 400 both answer with <see cref="ApiErrorBody"/>, and the error is logged.
 /// Requests go through the real pipeline in <c>Program.cs</c> to anonymous probe endpoints that throw.
 /// </summary>
 public class ApiErrorHandlingTests(ErrorHandlingApiFactory factory) : IClassFixture<ErrorHandlingApiFactory>
 {
-    private const string CorrelationHeader = "X-Correlation-ID";
-
     [Fact]
     public async Task MappedDomainException_ReturnsItsStatusCodeAndBody_AndRetryAfter()
     {
@@ -112,19 +109,16 @@ public class ApiErrorHandlingTests(ErrorHandlingApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task ErrorLog_CarriesTheRequestsCorrelationScope_AndTheResponseEchoesTheId()
+    public async Task UnhandledException_IsLoggedAsAnError_AndTheResponseCarriesNoCorrelationHeader()
     {
-        var correlationId = Guid.NewGuid().ToString("N");
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/error-probe/unhandled");
-        request.Headers.Add(CorrelationHeader, correlationId);
+        var logsBefore = factory.Logs.Count;
 
-        var response = await factory.CreateClient().SendAsync(request);
+        var response = await factory.CreateClient().GetAsync("/api/v1/error-probe/unhandled");
 
-        response.Headers.GetValues(CorrelationHeader).Should().ContainSingle().Which.Should().Be(correlationId);
-        var entry = factory.Logs.Snapshot().Single(e =>
-            e.Category == typeof(ApiExceptionHandler).FullName
-            && e.Level == LogLevel.Error
-            && e.CorrelationId == correlationId);
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.Headers.Contains("X-Correlation-ID").Should().BeFalse();
+        var entry = factory.Logs.Snapshot().Skip(logsBefore).Single(e =>
+            e.Category == typeof(ApiExceptionHandler).FullName && e.Level == LogLevel.Error);
         entry.Exception.Should().BeOfType<InvalidOperationException>();
     }
 
@@ -172,7 +166,7 @@ public class ApiErrorHandlingTests(ErrorHandlingApiFactory factory) : IClassFixt
         context.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
         context.Response.Body = new MemoryStream();
 
-        var handled = await new ApiExceptionHandler(logger, new CorrelationIdAccessor())
+        var handled = await new ApiExceptionHandler(logger)
             .TryHandleAsync(context, new InvalidOperationException("boom"), default);
 
         handled.Should().BeTrue();
@@ -211,8 +205,7 @@ public class ErrorHandlingApiFactory : WebApplicationFactory<Program>
         {
             services.AddControllers().AddApplicationPart(typeof(ErrorProbeController).Assembly);
 
-            // The host logs through Serilog; swap in a factory whose provider records entries together
-            // with the scopes (CorrelationId) active when they were written.
+            // The host logs through Serilog; swap in a factory whose provider records the entries.
             services.RemoveAll<ILoggerFactory>();
             services.AddSingleton<ILoggerFactory>(_ => LoggerFactory.Create(b =>
                 b.SetMinimumLevel(LogLevel.Debug).AddProvider(Logs)));
@@ -233,8 +226,7 @@ public class ErrorHandlingApiFactory : WebApplicationFactory<Program>
     }
 }
 
-public sealed record CapturedLog(
-    string Category, LogLevel Level, string Message, Exception? Exception, string? CorrelationId);
+public sealed record CapturedLog(string Category, LogLevel Level, string Message, Exception? Exception);
 
 public sealed class CapturingLoggerProvider : ILoggerProvider, ISupportExternalScope
 {
@@ -270,22 +262,9 @@ public sealed class CapturingLoggerProvider : ILoggerProvider, ISupportExternalS
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            string? correlationId = null;
-            owner._scopes.ForEachScope((scope, _) =>
-            {
-                if (scope is IEnumerable<KeyValuePair<string, object>> pairs)
-                {
-                    foreach (var (key, value) in pairs)
-                    {
-                        if (key == "CorrelationId")
-                            correlationId = value.ToString();
-                    }
-                }
-            }, state);
-
             lock (owner._entries)
             {
-                owner._entries.Add(new CapturedLog(category, logLevel, formatter(state, exception), exception, correlationId));
+                owner._entries.Add(new CapturedLog(category, logLevel, formatter(state, exception), exception));
             }
         }
     }

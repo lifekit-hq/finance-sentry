@@ -11,7 +11,6 @@ using FinanceSentry.API.Migrations;
 using FinanceSentry.API.Modules;
 using FinanceSentry.Infrastructure.Auth;
 using FinanceSentry.Infrastructure.Fx;
-using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Infrastructure.Observability.HealthChecks;
 using FinanceSentry.Core.Auth;
@@ -156,9 +155,7 @@ if (args.Length > 0 && RetentionCommand.Handles(args[0]))
 // Must run before request logging so logs capture the real client IP (025, FR-006).
 app.UseForwardedHeaders();
 app.UseSerilogRequestLogging();
-app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseCors("Frontend");
-// After CorrelationIdMiddleware so the error logs written by ApiExceptionHandler carry the correlation scope.
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseRateLimiter();

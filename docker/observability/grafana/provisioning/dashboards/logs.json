@@ -40,8 +40,8 @@
         "current": { "text": "", "value": "" }
       },
       {
-        "name": "correlationId",
-        "label": "Correlation id",
+        "name": "traceId",
+        "label": "Trace id",
         "type": "textbox",
         "query": "",
         "current": { "text": "", "value": "" }
@@ -65,12 +65,12 @@
     {
       "id": 2,
       "type": "logs",
-      "title": "Logs — filter by module / level, free text, correlation id",
-      "description": "Structured app logs from Loki (US2). EF Core SQL is suppressed at the default level (FR-011); paste a correlation id to group one request's entries (SC-002).",
+      "title": "Logs — filter by module / level, free text, trace id",
+      "description": "Structured app logs from Loki (US2). EF Core SQL is suppressed at the default level (FR-011); paste a W3C trace id to group one request's entries (SC-002).",
       "gridPos": { "h": 20, "w": 24, "x": 0, "y": 7 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
-        { "refId": "A", "expr": "{app=\"finance-sentry\", module=~\"$module\", level=~\"$level\"} |~ \"(?i)$search\" |~ \"$correlationId\"" }
+        { "refId": "A", "expr": "{app=\"finance-sentry\", module=~\"$module\", level=~\"$level\"} |~ \"(?i)$search\" |~ \"$traceId\"" }
       ],
       "options": {
         "showTime": true,

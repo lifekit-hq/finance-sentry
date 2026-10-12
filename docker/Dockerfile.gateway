@@ -12,9 +12,8 @@ WORKDIR /src
 ENV NUGET_PACKAGES=/src/.nuget/packages
 
 # Project files first so the restore layer only rebuilds when a dependency changes. The gateway's
-# project graph is just itself plus Core (the shared TraceEnricher).
+# project graph is just itself.
 COPY backend/Directory.*.props backend/
-COPY backend/src/FinanceSentry.Core/FinanceSentry.Core.csproj backend/src/FinanceSentry.Core/
 COPY backend/src/FinanceSentry.Gateway/FinanceSentry.Gateway.csproj backend/src/FinanceSentry.Gateway/
 
 WORKDIR /src/backend
