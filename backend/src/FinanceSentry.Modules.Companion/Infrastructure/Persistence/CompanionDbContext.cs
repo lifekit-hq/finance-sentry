@@ -1,15 +1,14 @@
 namespace FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Domain;
 using Microsoft.EntityFrameworkCore;
 
-public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, ICurrentUser currentUser) : DbContext(options)
+public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, ICurrentUser currentUser)
+    : OwnerScopedDbContext(options, currentUser)
 {
     public const string Schema = "companion";
-
-    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no row.
-    private Guid? CurrentUserId => currentUser.UserId;
 
     public DbSet<CompanionNotificationSetting> NotificationSettings => Set<CompanionNotificationSetting>();
 
@@ -23,7 +22,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
 
     public DbSet<ProblemReport> ProblemReports => Set<ProblemReport>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
 
@@ -32,8 +31,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.ToTable("companion_notification_settings");
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.UserId).IsUnique();
-            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Mode).HasMaxLength(16);
             e.Property(x => x.TimeZoneId).HasMaxLength(64);
         });
 
@@ -44,9 +42,8 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.HasIndex(x => x.DedupKey).IsUnique();
             e.HasIndex(x => new { x.UserId, x.Disposition, x.OccurredAt });
             e.HasIndex(x => new { x.UserId, x.CapturedAt });
-            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(24);
-            e.Property(x => x.Disposition).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Kind).HasMaxLength(24);
+            e.Property(x => x.Disposition).HasMaxLength(24);
             e.Property(x => x.Subject).HasMaxLength(128);
             e.Property(x => x.Severity).HasMaxLength(16);
             e.Property(x => x.Summary).HasMaxLength(500);
@@ -62,7 +59,6 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.Endpoint).IsUnique();
             e.HasIndex(x => x.UserId);
-            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
             e.Property(x => x.Endpoint).HasMaxLength(PushSubscriptionLimits.EndpointMaxLength);
             e.Property(x => x.P256dh).HasMaxLength(PushSubscriptionLimits.P256dhMaxLength);
             e.Property(x => x.Auth).HasMaxLength(PushSubscriptionLimits.AuthMaxLength);
@@ -78,8 +74,7 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.HasIndex(x => new { x.Status, x.NextAttemptAt });
             e.HasOne<CompanionEvent>().WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<PushSubscription>().WithMany().HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Status).HasMaxLength(16);
         });
 
         modelBuilder.Entity<ProblemReport>(e =>
@@ -89,11 +84,10 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.Property(x => x.Id).ValueGeneratedOnAdd();
             e.HasIndex(x => new { x.UserId, x.CreatedAt });
             e.HasIndex(x => new { x.Status, x.NextAttemptAt });
-            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
             e.Property(x => x.Role).HasMaxLength(16);
-            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.Device).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Device).HasMaxLength(16);
+            e.Property(x => x.Status).HasMaxLength(16);
             e.Property(x => x.Text).HasMaxLength(ProblemReportLimits.TextMaxLength);
             e.Property(x => x.RoutePattern).HasMaxLength(ProblemReportLimits.RouteMaxLength);
             e.Property(x => x.AppVersion).HasMaxLength(ProblemReportLimits.VersionMaxLength);

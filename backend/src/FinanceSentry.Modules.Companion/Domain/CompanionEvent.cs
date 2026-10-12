@@ -1,10 +1,12 @@
 namespace FinanceSentry.Modules.Companion.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One captured material event and its lifecycle — the outbound outbox row (feature 031). Deduped by
 /// <see cref="DedupKey"/> (unique). Recorded regardless of mode so nothing is lost (FR-007).
 /// </summary>
-public sealed class CompanionEvent
+public sealed class CompanionEvent : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

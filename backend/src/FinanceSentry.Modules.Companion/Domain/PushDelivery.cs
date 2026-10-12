@@ -1,10 +1,12 @@
 namespace FinanceSentry.Modules.Companion.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// The push ledger: one row per (event, subscription), unique, so overlapping sender runs never deliver twice
 /// (spec 859 FR-007). Kept apart from <see cref="CompanionEvent.Disposition"/>, which push never touches (FR-001).
 /// </summary>
-public sealed class PushDelivery
+public sealed class PushDelivery : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

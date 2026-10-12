@@ -1,12 +1,13 @@
 namespace FinanceSentry.Modules.Companion.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
 /// A user's proactivity dial + guardrails (feature 031). One row per user; created lazily on first
 /// set/read. Governs proactive outreach only.
 /// </summary>
-public sealed class CompanionNotificationSetting : IHasUpdatedAt
+public sealed class CompanionNotificationSetting : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
