@@ -40,6 +40,17 @@ public class InzhurLedgerMapperTests
         ledger.Trades.Should().BeEmpty();
     }
 
+    [Fact]
+    public void Ledger_amounts_on_the_wire_are_kopecks()
+    {
+        var ledger = InzhurLedgerMapper.Map(Rows(
+            new { id = "p", type = "Purchase", amount = 98_765m, externalCreatedAt = "2026-01-02T00:00:00Z", asset = new { type = "fund", name = "Fund A" }, contract = new { quantity = 5m } },
+            new { id = "t", type = "Sale tax", amount = 7m, externalCreatedAt = "2026-01-03T00:00:00Z" }));
+
+        ledger.Trades.Should().ContainSingle().Which.Should().Match<InzhurLedgerTrade>(t => t.Proceeds == -987.65m && t.Price == 197.53m);
+        ledger.Cash.Should().ContainSingle().Which.Amount.Should().Be(-0.07m);
+    }
+
     [Theory]
     [InlineData("DIVIDEND")]
     [InlineData("COUPON")]

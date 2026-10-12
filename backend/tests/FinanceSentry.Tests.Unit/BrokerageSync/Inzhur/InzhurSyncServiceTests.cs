@@ -1,4 +1,5 @@
 using System.Net;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
@@ -114,6 +115,49 @@ public class InzhurSyncServiceTests
         var stored = InzhurSession.Deserialize(_encryption.Decrypt(credential.EncryptedSession, [], [], 1));
         stored.AccessToken.Should().Be("fresh-token");
         stored.Cookies.Should().ContainSingle(c => c.Name == InzhurFakes.RefreshCookieName).Which.Value.Should().Be("fake-refresh-2");
+    }
+
+    // The production reproduction, anonymised (diagnosis: fs-inzhur-history). The cabinet sends money in kopecks and
+    // prices in hryvnia; the pre-fix sync stored every Inzhur amount 100x too large (stored value / (quantity x sell)
+    // was 99.8-99.9 on both funds). Literal wire values, no helper scaling, so the unit is pinned here and nowhere else.
+    [Fact]
+    public async Task Regression_cabinet_kopecks_are_stored_as_hryvnia_not_a_hundred_times_over()
+    {
+        ActiveCredential();
+        var cheapFund = new
+        {
+            id = 11, type = "fund", status = "active",
+            prices = new { sellUAH = 12.3456m },
+            details = new { certificatesOwnedQuantity = 37m, totalAmountUAH = 45_679m, investedUAH = 44_400m },
+        };
+        var dearFund = new
+        {
+            id = 12, type = "fund", status = "active",
+            prices = new { sellUAH = 987.6543m },
+            details = new { certificatesOwnedQuantity = 3m, totalAmountUAH = 296_296m, investedUAH = 300_000m },
+        };
+        CabinetAnswersWith(
+            new { assets = new object[] { cheapFund, dearFund } },
+            new { availableBalanceUAH = 250m, blockedBalanceUAH = 0m, totalBalanceUAH = 342_225m },
+            [new { id = "r1", type = "Deposit", amount = 12_345m, externalCreatedAt = "2026-01-01T00:00:00Z" }],
+            InzhurFakes.Catalog(InzhurFakes.CatalogEntry(11, "Cheap Fund"), InzhurFakes.CatalogEntry(12, "Dear Fund")));
+
+        (await Service().SyncAsync(_userId)).Should().Be(InzhurSyncOutcome.Synced);
+
+        var bySymbol = _upserted.ToDictionary(h => h.Symbol);
+        bySymbol["Cheap Fund"].NativeValue.Should().Be(456.79m);
+        bySymbol["Dear Fund"].NativeValue.Should().Be(2_962.96m);
+        bySymbol["UAH Cash"].Quantity.Should().Be(2.50m);
+        _upserted.Should().OnlyContain(h => h.Currency == "UAH");
+        // The cabinet's headline total, read the same way, is exactly what the holdings add up to.
+        _upserted.Sum(h => h.NativeValue).Should().Be(3_422.25m);
+        _upserted.Sum(h => h.UsdValue).Should().Be(CurrencyConverter.ToUsd(3_422.25m, "UAH"));
+        // Value agrees with the independent price path to the kopeck, the check the ×100 failed by two orders of magnitude.
+        bySymbol["Cheap Fund"].NativeValue.Should().BeApproximately(37m * 12.3456m, 0.01m);
+        bySymbol["Dear Fund"].NativeValue.Should().BeApproximately(3m * 987.6543m, 0.01m);
+        bySymbol["Cheap Fund"].AverageCostUsd.Should().Be(CurrencyConverter.ToUsd(444m, "UAH") / 37m);
+        bySymbol["Dear Fund"].AverageCostUsd.Should().Be(CurrencyConverter.ToUsd(3_000m, "UAH") / 3m);
+        _storedCash.Should().ContainSingle().Which.Amount.Should().Be(123.45m);
     }
 
     [Fact]

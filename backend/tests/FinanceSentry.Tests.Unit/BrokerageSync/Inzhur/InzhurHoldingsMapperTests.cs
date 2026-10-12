@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -16,6 +17,17 @@ public class InzhurHoldingsMapperTests
             JsonSerializer.Deserialize<InzhurUserAssetsResponse>(JsonSerializer.Serialize(assets), Web)!.Assets ?? [],
             account is null ? null : JsonSerializer.Deserialize<InzhurBrokerAccount>(JsonSerializer.Serialize(account), Web),
             catalog is null ? null : JsonSerializer.Deserialize<InzhurCatalogResponse>(JsonSerializer.Serialize(catalog), Web)!.Items);
+
+    [Theory]
+    [InlineData(null, "0")]
+    [InlineData("0", "0")]
+    [InlineData("1", "0.01")]
+    [InlineData("100", "1")]
+    [InlineData("12345", "123.45")]
+    [InlineData("99999999", "999999.99")]
+    public void Cabinet_amounts_convert_from_kopecks_to_hryvnia(string? kopecks, string hryvnia)
+        => InzhurHoldingsMapper.FromMinorUnits(kopecks is null ? null : decimal.Parse(kopecks, CultureInfo.InvariantCulture))
+            .Should().Be(decimal.Parse(hryvnia, CultureInfo.InvariantCulture));
 
     // The cabinet's own shape, as its web client reads it: no name on the user-asset row (the catalog has it), money in
     // kopecks, prices in hryvnia. 3 certificates at a 1,000.50 UAH sell price are worth 3,001.50 UAH, sent as 300,150.
