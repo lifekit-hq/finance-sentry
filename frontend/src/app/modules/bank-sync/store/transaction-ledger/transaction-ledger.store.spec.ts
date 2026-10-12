@@ -1,15 +1,17 @@
 import {provideHttpClient} from '@angular/common/http';
+import {HttpErrorResponse} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
 import {RouterTestingHarness} from '@angular/router/testing';
-import {provideApiBaseUrl} from '@lifekit-hq/core';
+import {ERROR_MESSAGES, provideApiBaseUrl} from '@lifekit-hq/core';
 import {patchState} from '@ngrx/signals';
 import {unprotected} from '@ngrx/signals/testing';
-import {NEVER} from 'rxjs';
+import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {BankSyncService} from '../../services/bank-sync.service';
 import {type TransactionLedgerState} from './transaction-ledger.state';
 import {TransactionLedgerStore} from './transaction-ledger.store';
@@ -38,6 +40,7 @@ async function open(url: string) {
       provideApiBaseUrl('http://localhost/api/v1'),
       provideRouter([{path: 'transactions', component: HostComponent}]),
       {provide: BankSyncService, useValue: service},
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -187,5 +190,58 @@ describe('TransactionLedgerStore state → URL', () => {
 
     expect(store.search()).toBe('');
     expect(router.url).toBe('/transactions');
+  });
+});
+
+describe('TransactionLedgerStore async status', () => {
+  const ITEM = {transactionId: 'tx-1'};
+  const page = {items: [ITEM], totalCount: 1, offset: 0, limit: 50, hasMore: false};
+
+  it('is loading, then success; an empty page reads as empty', async () => {
+    const {store} = await open('/transactions');
+    expect(store.status()).toBe('loading');
+    expect(store.isLoading()).toBe(true);
+    expect(store.isEmpty()).toBe(false);
+
+    service.getAllTransactions.mockReturnValueOnce(
+      of({...page, items: [], totalCount: 0}) as never
+    );
+    store.load();
+
+    expect(store.status()).toBe('success');
+    expect(store.isLoading()).toBe(false);
+    expect(store.isEmpty()).toBe(true);
+    expect(store.errorMessage()).toBe('');
+  });
+
+  it('shows the default message on a failed load and never reads as empty', async () => {
+    const {store} = await open('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'UNKNOWN'}})) as never
+    );
+    store.load();
+
+    expect(store.status()).toBe('error');
+    expect(store.errorMessage()).toBe('Failed to load transactions. Please try again.');
+    expect(store.isEmpty()).toBe(false);
+  });
+
+  it('keeps the rows on a failed retry', async () => {
+    const {store} = await open('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(of(page) as never);
+    store.load();
+    service.getAllTransactions.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({status: 500})) as never
+    );
+    store.loadMore();
+
+    expect(store.status()).toBe('error');
+    expect(store.transactions()).toHaveLength(1);
+
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    store.retry();
+
+    expect(store.status()).toBe('loading');
+    expect(store.transactions()).toHaveLength(1);
   });
 });

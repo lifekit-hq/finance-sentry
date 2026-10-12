@@ -130,7 +130,9 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
     from: signal<string | null>(null),
     to: signal<string | null>(null),
     search: signal(''),
+    clearRows: vi.fn(),
     setLoading: vi.fn(),
+    setSuccess: vi.fn(),
     setTransactions: vi.fn(),
     appendTransactions: vi.fn(),
     nextPage: vi.fn(),
@@ -169,9 +171,11 @@ describe('transactionLedgerEffects', () => {
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
 
+      expect(store.clearRows).toHaveBeenCalled();
       expect(store.setLoading).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({offset: 0, limit: PAGE_SIZE});
       expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setSuccess).toHaveBeenCalled();
     });
 
     it('sends the active account and a trimmed search to the server', () => {
@@ -234,6 +238,7 @@ describe('transactionLedgerEffects', () => {
 
       expect(store.setError).toHaveBeenCalled();
       expect(store.setTransactions).not.toHaveBeenCalled();
+      expect(store.setSuccess).not.toHaveBeenCalled();
     });
   });
 

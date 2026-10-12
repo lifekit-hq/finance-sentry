@@ -44,7 +44,9 @@ interface EffectsStore {
   search: Signal<string>;
   setSearch: (search: string) => void;
   setAccounts: (accounts: TransactionAccountOption[]) => void;
-  setLoading: (keepRows?: boolean) => void;
+  clearRows: () => void;
+  setLoading: () => void;
+  setSuccess: () => void;
   setTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
@@ -89,7 +91,12 @@ export function transactionLedgerEffects(store: EffectsStore) {
 
   const fetchPage = rxMethod<'first' | 'next'>(
     pipe(
-      tap(page => store.setLoading(page === 'next')),
+      tap(page => {
+        if (page === 'first') {
+          store.clearRows();
+        }
+        store.setLoading();
+      }),
       switchMap(page => {
         const offset = page === 'first' ? 0 : store.offset() + PAGE_SIZE;
         return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
@@ -100,8 +107,11 @@ export function transactionLedgerEffects(store: EffectsStore) {
             } else {
               store.setTransactions(res.items, res.totalCount, res.hasMore);
             }
+            store.setSuccess();
           }),
-          StoreErrorUtils.catchAndSetError(store)
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setError(code),
+          })
         );
       })
     )
