@@ -1,8 +1,9 @@
 namespace FinanceSentry.Modules.Budgets.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
-public class Budget : IHasUpdatedAt
+public class Budget : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

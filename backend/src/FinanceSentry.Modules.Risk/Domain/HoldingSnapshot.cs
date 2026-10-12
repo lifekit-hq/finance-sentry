@@ -1,11 +1,13 @@
 namespace FinanceSentry.Modules.Risk.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// Point-in-time (symbol, quantity, usdValue) capture written once per position per
 /// <see cref="Infrastructure.Jobs.RiskCheckJob"/> run. Own history — no other module persists
 /// holdings-quantity history, and turnover/add-to-broken-thesis detection needs it.
 /// </summary>
-public class HoldingSnapshot
+public class HoldingSnapshot : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

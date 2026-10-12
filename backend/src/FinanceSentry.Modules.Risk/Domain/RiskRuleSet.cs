@@ -1,7 +1,9 @@
 namespace FinanceSentry.Modules.Risk.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>Versioned per-user risk rule set (FR-001). A new save appends a row and flips IsCurrent.</summary>
-public class RiskRuleSet
+public class RiskRuleSet : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

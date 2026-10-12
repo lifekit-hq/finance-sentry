@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Events.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// The reader's recorded judgement on one fired event, keyed by the companion event id the reader
 /// holds (wake payload / pending-events pull). One row per (user, event) - the unique index on
@@ -11,7 +13,7 @@ namespace FinanceSentry.Modules.Events.Domain;
 /// verdict. <see cref="Notified"/> says whether the reader told the user or judged the event
 /// immaterial - both are verdicts; an acknowledged event with no row at all is silence.
 /// </summary>
-public sealed class EventVerdict
+public sealed class EventVerdict : IUserOwned
 {
     public const int MaxVerdictLength = 2000;
 

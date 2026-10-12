@@ -1,7 +1,9 @@
 namespace FinanceSentry.Modules.Risk.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>Acknowledged pre-existing violation with a remediation note (FR-003).</summary>
-public class PolicyViolationAck
+public class PolicyViolationAck : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
