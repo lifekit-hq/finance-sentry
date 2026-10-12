@@ -10,23 +10,22 @@ function setup() {
 }
 
 describe('budgetsMethods refresh failure', () => {
-  it('flags a failed refresh without touching the status or the list', () => {
+  it('flags a failed refresh without touching the list', () => {
     const {state, methods} = setup();
 
     methods.setRefreshFailed();
 
     expect(state.refreshFailed()).toBe(true);
-    expect(state.status()).toBe('idle');
+    expect(state.summaryItems()).toEqual([]);
   });
 
   it('clears the flag when a month load starts', () => {
     const {state, methods} = setup();
     methods.setRefreshFailed();
 
-    methods.setLoading();
+    methods.clearRefreshFailed();
 
     expect(state.refreshFailed()).toBe(false);
-    expect(state.status()).toBe('loading');
   });
 
   it('clears the flag when a summary arrives', () => {

@@ -6,16 +6,13 @@ import {type BudgetsState} from './budgets.state';
 export function budgetsMethods(store: WritableStateSource<BudgetsState>) {
   return {
     setSummaryItems(summaryItems: BudgetSummaryItem[]): void {
-      patchState(store, {summaryItems, status: 'idle', refreshFailed: false});
+      patchState(store, {summaryItems, refreshFailed: false});
     },
     setEditing(id: Nullable<string>): void {
       patchState(store, {editingId: id});
     },
-    setLoading(): void {
-      patchState(store, {status: 'loading', refreshFailed: false});
-    },
-    setError(): void {
-      patchState(store, {status: 'error'});
+    clearRefreshFailed(): void {
+      patchState(store, {refreshFailed: false});
     },
     setRefreshFailed(): void {
       patchState(store, {refreshFailed: true});
