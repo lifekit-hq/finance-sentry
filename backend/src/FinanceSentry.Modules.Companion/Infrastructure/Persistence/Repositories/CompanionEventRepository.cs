@@ -12,26 +12,27 @@ public class CompanionEventRepository(CompanionDbContext db) : ICompanionEventRe
 {
     private const int MaxLimit = 200;
 
+    // One INSERT ... ON CONFLICT DO NOTHING on the unique DedupKey index: the write is atomic, so two captures of
+    // one event insert it once and the loser reports false instead of failing on the index, and no read precedes
+    // it. It runs at once and the event is not tracked by this context. Kind and Disposition are stored as strings.
     public async Task<bool> InsertIfNewAsync(CompanionEvent evt, CancellationToken ct = default)
     {
-        var exists = await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().AnyAsync(e => e.DedupKey == evt.DedupKey, ct);
-        if (exists)
-        {
-            return false;
-        }
-
-        db.Events.Add(evt);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            return true;
-        }
-        catch (DbUpdateException)
-        {
-            // Lost a race on the unique DedupKey — treat as already-captured.
-            db.Entry(evt).State = EntityState.Detached;
-            return false;
-        }
+        var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO companion.companion_events
+                ("Id", "UserId", "Kind", "Subject", "Severity", "Summary", "DedupKey", "ReferenceId", "AppPath",
+                 "SourceModule", "Disposition", "OccurredAt", "CapturedAt", "DispatchedAt", "DeliveredAt", "Attempts",
+                 "LastError")
+            VALUES
+                ({evt.Id}, {evt.UserId}, {evt.Kind.ToString()}, {evt.Subject}, {evt.Severity}, {evt.Summary},
+                 {evt.DedupKey}, {evt.ReferenceId}, {evt.AppPath}, {evt.SourceModule}, {evt.Disposition.ToString()},
+                 {evt.OccurredAt.ToUniversalTime()}, {evt.CapturedAt.ToUniversalTime()},
+                 {evt.DispatchedAt?.ToUniversalTime()}, {evt.DeliveredAt?.ToUniversalTime()}, {evt.Attempts},
+                 {evt.LastError})
+            ON CONFLICT ("DedupKey") DO NOTHING
+            """,
+            ct);
+        return inserted > 0;
     }
 
     public async Task<IReadOnlyList<CompanionEvent>> ListByDispositionAsync(

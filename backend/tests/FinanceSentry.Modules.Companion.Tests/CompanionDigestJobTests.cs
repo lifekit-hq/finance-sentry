@@ -5,10 +5,7 @@ using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -51,14 +48,8 @@ public sealed class CompanionDigestJobTests
         }
     }
 
-    private static CompanionEventRepository NewEventRepository()
-    {
-        var db = new CompanionDbContext(
-            new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"digest-job-{Guid.NewGuid():N}").Options,
-            NoCurrentUser.Instance);
-        return new CompanionEventRepository(db);
-    }
+    private static InMemoryCompanionStore NewEventRepository()
+        => new($"digest-job-{Guid.NewGuid():N}", NoCurrentUser.Instance);
 
     private static CompanionEvent HeldEvent() => new()
     {

@@ -5,10 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -96,10 +93,7 @@ public sealed class SyncFailureCaptureTests
 
     private static async Task<CompanionEvent> CaptureAsync(MaterialAlertRecord alert, IBankingAccountsReader accounts)
     {
-        await using var db = new CompanionDbContext(
-            new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"sync-failure-{Guid.NewGuid():N}").Options,
-            NoCurrentUser.Instance);
+        await using var store = new InMemoryCompanionStore($"sync-failure-{Guid.NewGuid():N}", NoCurrentUser.Instance);
         var capture = new CompanionEventCapture(
             new OneAlert(alert),
             new NoAnalystActions(),
@@ -107,14 +101,14 @@ public sealed class SyncFailureCaptureTests
             new NoBankingTotals(),
             accounts,
             new RealtimeSettings(),
-            new CompanionEventRepository(db),
-            new CompanionCaptureStateRepository(db),
+            store,
+            store,
             new MaterialityPolicy(),
             Options.Create(new CompanionOptions()),
             NullLogger<CompanionEventCapture>.Instance);
 
         (await capture.CaptureAsync()).Should().Be(1);
-        return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
+        return (await store.AllEventsAsync()).Single();
     }
 
     [Fact]
