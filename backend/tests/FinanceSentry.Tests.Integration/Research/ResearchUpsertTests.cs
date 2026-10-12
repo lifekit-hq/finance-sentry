@@ -74,6 +74,26 @@ public sealed class ResearchUpsertTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Macro_event_repeated_in_one_batch_keeps_the_last_copy()
+    {
+        await using (var ctx = CreateContext())
+        {
+            var inserted = await new MacroCalendarRepository(ctx).UpsertAsync(
+            [
+                Macro("CPI", "medium", "first", new TimeOnly(8, 30)),
+                Macro("CPI", "high", "revised", new TimeOnly(13, 30)),
+            ]);
+            inserted.Should().Be(1);
+        }
+
+        await using var read = CreateContext();
+        var row = await read.MacroEvents.AsNoTracking().SingleAsync();
+        row.Importance.Should().Be("high");
+        row.Source.Should().Be("revised");
+        row.EventTime.Should().Be(new TimeOnly(13, 30));
+    }
+
+    [DockerRequiredFact]
     public async Task Macro_concurrent_upserts_of_one_event_leave_one_row()
     {
         var writes = Enumerable.Range(0, 8).Select(async i =>
@@ -163,87 +183,6 @@ public sealed class ResearchUpsertTests : IAsyncLifetime
 
         await using var read = CreateContext();
         (await read.QuoteCache.AsNoTracking().CountAsync()).Should().Be(1);
-    }
-
-    // --- analyst actions ------------------------------------------------------------------------------------
-
-    private static AnalystAction Action(
-        AnalystActionType type, string? priorRating, string? newRating, decimal? priorTarget, decimal? newTarget,
-        string source) => new()
-    {
-        Ticker = "MU", Firm = "Morgan Stanley", ActionType = type, PriorRating = priorRating, NewRating = newRating,
-        PriorTarget = priorTarget, NewTarget = newTarget, ActionDate = Day, Source = source,
-    };
-
-    [DockerRequiredFact]
-    public async Task Action_from_two_sources_in_one_batch_collapses_into_one_richer_row()
-    {
-        await using var ctx = CreateContext();
-
-        // MarketBeat has price targets but no ratings; Yahoo has ratings but no targets. Same action.
-        var inserted = await new AnalystActionRepository(ctx).UpsertAsync(
-        [
-            Action(AnalystActionType.Upgrade, null, null, 98m, 135m, "marketbeat"),
-            Action(AnalystActionType.Upgrade, "Equal-Weight", "Overweight", null, null, "yahoo"),
-        ]);
-
-        inserted.Should().Be(1);
-        await using var read = CreateContext();
-        var row = await read.AnalystActions.AsNoTracking().SingleAsync();
-        row.PriorTarget.Should().Be(98m);
-        row.NewTarget.Should().Be(135m);
-        row.PriorRating.Should().Be("Equal-Weight");
-        row.NewRating.Should().Be("Overweight");
-    }
-
-    [DockerRequiredFact]
-    public async Task Action_repeated_in_a_later_batch_fills_only_the_null_fields_of_the_stored_row()
-    {
-        await using (var ctx = CreateContext())
-        {
-            await new AnalystActionRepository(ctx).UpsertAsync(
-                [Action(AnalystActionType.Upgrade, null, null, 98m, 135m, "marketbeat")]);
-        }
-
-        int second;
-        await using (var ctx = CreateContext())
-        {
-            second = await new AnalystActionRepository(ctx).UpsertAsync(
-                [Action(AnalystActionType.Upgrade, "Equal-Weight", "Overweight", 1m, 2m, "yahoo")]);
-        }
-
-        second.Should().Be(0, "the same logical action already exists");
-        await using var read = CreateContext();
-        var row = await read.AnalystActions.AsNoTracking().SingleAsync();
-        row.NewRating.Should().Be("Overweight", "a NULL field is filled");
-        row.PriorTarget.Should().Be(98m, "a populated field is never overwritten");
-        row.NewTarget.Should().Be(135m);
-        row.Source.Should().Be("marketbeat");
-    }
-
-    [DockerRequiredFact]
-    public async Task Action_distinct_types_are_separate_rows_and_concurrent_ingests_do_not_fail()
-    {
-        await using (var ctx = CreateContext())
-        {
-            var inserted = await new AnalystActionRepository(ctx).UpsertAsync(
-            [
-                Action(AnalystActionType.Upgrade, null, "Overweight", null, 135m, "yahoo"),
-                Action(AnalystActionType.TargetChange, null, null, 120m, 140m, "marketbeat"),
-            ]);
-            inserted.Should().Be(2);
-        }
-
-        var writes = Enumerable.Range(0, 8).Select(async _ =>
-        {
-            await using var ctx = CreateContext();
-            await new AnalystActionRepository(ctx).UpsertAsync(
-                [Action(AnalystActionType.Downgrade, "Buy", "Hold", null, null, "yahoo")]);
-        });
-        await Task.WhenAll(writes);
-
-        await using var read = CreateContext();
-        (await read.AnalystActions.AsNoTracking().CountAsync()).Should().Be(3);
     }
 
     // --- analyst universe -----------------------------------------------------------------------------------

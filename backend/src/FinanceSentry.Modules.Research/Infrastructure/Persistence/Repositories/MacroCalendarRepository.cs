@@ -45,10 +45,10 @@ public class MacroCalendarRepository(ResearchDbContext db) : IMacroCalendarRepos
             return 0;
         }
 
-        // ON CONFLICT cannot touch one row twice in a statement, so a repeated key keeps its first event.
+        // ON CONFLICT cannot touch one row twice in a statement, so a repeated key keeps its last event.
         var incoming = events
             .GroupBy(e => (e.EventDate, e.Region, e.Event))
-            .Select(g => g.First())
+            .Select(g => g.Last())
             .ToList();
 
         var ids = incoming.Select(e => e.Id).ToArray();
