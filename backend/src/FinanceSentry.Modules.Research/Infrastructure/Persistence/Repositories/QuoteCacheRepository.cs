@@ -3,7 +3,6 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public class QuoteCacheRepository(ResearchDbContext db) : IQuoteCacheRepository
 {
@@ -26,17 +25,17 @@ public class QuoteCacheRepository(ResearchDbContext db) : IQuoteCacheRepository
     }
 
     /// <summary>
-    /// Refreshes the cached quotes. On failure the shared <see cref="ResearchDbContext"/> is left
-    /// exactly as it was found: the rows this call staged are rolled back out of the change tracker
-    /// before the exception leaves.
+    /// Refreshes the cached quotes with one <c>INSERT ... ON CONFLICT</c> over the <c>Ticker</c> primary key: the
+    /// write is atomic, so two overlapping refreshes update the same rows instead of the loser failing on the key,
+    /// and no read precedes it. A repeated ticker in the batch keeps its last entry.
     ///
-    /// Why that matters (issue #626): this context is scoped, so it is the *caller's* unit of work —
-    /// and every caller treats a quote refresh as best-effort and swallows the failure
-    /// (<c>ThesisEventRecorder.TryGetPricesAsync</c>, the monitor, the snapshot jobs). Staged rows
-    /// left behind survive the swallow, and the next unrelated <c>SaveChangesAsync</c> on the same
-    /// context re-attempts them and throws — which is how a quote-cache write failure surfaced as
-    /// <c>save_thesis</c> failing on every call while reads were fine. A cache is best-effort; its
-    /// failure must not be contagious.
+    /// The statement runs at once and stages nothing in the shared <see cref="ResearchDbContext"/>, which is what
+    /// issue #626 needs: this context is scoped, so it is the *caller's* unit of work, and every caller treats a
+    /// quote refresh as best-effort and swallows the failure (<c>ThesisEventRecorder.TryGetPricesAsync</c>, the
+    /// monitor, the snapshot jobs). Rows left staged by a failed write would survive the swallow and make the next
+    /// unrelated <c>SaveChangesAsync</c> throw — how a quote-cache fault surfaced as <c>save_thesis</c> failing on
+    /// every call while reads were fine. A cache is best-effort; its failure must not be contagious. A quote
+    /// already tracked by this context is not refreshed.
     /// </summary>
     public async Task UpsertManyAsync(IReadOnlyCollection<QuoteCacheEntry> entries, CancellationToken ct = default)
     {
@@ -45,63 +44,44 @@ public class QuoteCacheRepository(ResearchDbContext db) : IQuoteCacheRepository
             return;
         }
 
-        var tickers = entries.Select(e => e.Ticker).ToArray();
-        var existing = await db.QuoteCache
-            .Where(q => tickers.Contains(q.Ticker))
-            .ToDictionaryAsync(q => q.Ticker, ct);
+        var incoming = entries
+            .GroupBy(e => e.Ticker)
+            .Select(g => g.Last())
+            .ToList();
 
-        var staged = new List<EntityEntry<QuoteCacheEntry>>(entries.Count);
+        var tickers = incoming.Select(e => e.Ticker).ToArray();
+        var resolvedTickers = incoming.Select(e => e.ResolvedTicker).ToArray();
+        var prices = incoming.Select(e => e.Price).ToArray();
+        var previousCloses = incoming.Select(e => e.PreviousClose).ToArray();
+        var currencies = incoming.Select(e => e.Currency).ToArray();
+        var fetchedAts = incoming.Select(e => e.FetchedAt).ToArray();
+        var marketStates = incoming.Select(e => e.MarketState).ToArray();
+        var sessions = incoming.Select(e => e.Session).ToArray();
+        var isStales = incoming.Select(e => e.IsStale).ToArray();
+        var sourcePriceTimes = incoming.Select(e => e.SourcePriceTime).ToArray();
+        var regularMarketTimes = incoming.Select(e => e.RegularMarketTime).ToArray();
 
-        foreach (var entry in entries)
-        {
-            if (existing.TryGetValue(entry.Ticker, out var row))
-            {
-                row.ResolvedTicker = entry.ResolvedTicker;
-                row.Price = entry.Price;
-                row.PreviousClose = entry.PreviousClose;
-                row.Currency = entry.Currency;
-                row.FetchedAt = entry.FetchedAt;
-                row.MarketState = entry.MarketState;
-                row.Session = entry.Session;
-                row.IsStale = entry.IsStale;
-                row.SourcePriceTime = entry.SourcePriceTime;
-                row.RegularMarketTime = entry.RegularMarketTime;
-                staged.Add(db.Entry(row));
-            }
-            else
-            {
-                staged.Add(db.QuoteCache.Add(entry));
-            }
-        }
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch
-        {
-            Rollback(staged);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Undoes staged work: an inserted row is detached outright, an updated row has its mutated
-    /// values restored from the snapshot EF took when it was loaded and is marked unchanged.
-    /// </summary>
-    private static void Rollback(List<EntityEntry<QuoteCacheEntry>> staged)
-    {
-        foreach (var entry in staged)
-        {
-            if (entry.State == EntityState.Added)
-            {
-                entry.State = EntityState.Detached;
-            }
-            else
-            {
-                entry.CurrentValues.SetValues(entry.OriginalValues);
-                entry.State = EntityState.Unchanged;
-            }
-        }
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO research.quote_cache
+                ("Ticker", "ResolvedTicker", "Price", "PreviousClose", "Currency", "FetchedAt", "MarketState",
+                 "Session", "IsStale", "SourcePriceTime", "RegularMarketTime")
+            SELECT * FROM unnest(
+                {tickers}::varchar[], {resolvedTickers}::varchar[], {prices}::numeric[], {previousCloses}::numeric[],
+                {currencies}::varchar[], {fetchedAts}::timestamptz[], {marketStates}::varchar[], {sessions}::varchar[],
+                {isStales}::boolean[], {sourcePriceTimes}::timestamptz[], {regularMarketTimes}::timestamptz[])
+            ON CONFLICT ("Ticker") DO UPDATE SET
+                "ResolvedTicker" = EXCLUDED."ResolvedTicker",
+                "Price" = EXCLUDED."Price",
+                "PreviousClose" = EXCLUDED."PreviousClose",
+                "Currency" = EXCLUDED."Currency",
+                "FetchedAt" = EXCLUDED."FetchedAt",
+                "MarketState" = EXCLUDED."MarketState",
+                "Session" = EXCLUDED."Session",
+                "IsStale" = EXCLUDED."IsStale",
+                "SourcePriceTime" = EXCLUDED."SourcePriceTime",
+                "RegularMarketTime" = EXCLUDED."RegularMarketTime"
+            """,
+            ct);
     }
 }
