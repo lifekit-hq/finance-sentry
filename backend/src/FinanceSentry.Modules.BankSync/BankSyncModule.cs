@@ -6,7 +6,6 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
-using FinanceSentry.Modules.BankSync.Infrastructure.AuditLog;
 using FinanceSentry.Modules.BankSync.Infrastructure.Categorization;
 using FinanceSentry.Modules.BankSync.Infrastructure.FeatureFlags;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -17,7 +16,6 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Core.Interfaces;
-using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
@@ -191,8 +189,6 @@ public static class BankSyncModule
 
         services.AddScoped<IBankProviderFactory, BankProviderFactory>();
 
-        services.AddSingleton<CorrelationIdAccessor>();
-        services.AddScoped<ICorrelationIdAccessor>(sp => sp.GetRequiredService<CorrelationIdAccessor>());
         services.AddScoped<IBankSyncLogger, BankSyncLogger>();
         services.AddScoped<IScheduledSyncService, ScheduledSyncService>();
         services.AddScoped<ITransactionSyncCoordinator, TransactionSyncCoordinator>();
@@ -232,7 +228,6 @@ public static class BankSyncModule
         services.AddScoped<FamilyClearingStatementJob>();
 
         services.AddSingleton<IFeatureFlagService, FeatureFlagService>();
-        services.AddSingleton<IAuditLogService, AuditLogService>();
         services.AddScoped<EFQueryLoggerInterceptor>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();

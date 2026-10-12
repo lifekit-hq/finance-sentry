@@ -3,8 +3,6 @@ namespace FinanceSentry.API.Errors;
 using System.Globalization;
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Exceptions;
-using FinanceSentry.Infrastructure;
-using FinanceSentry.Infrastructure.Logging;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +10,10 @@ using Npgsql;
 
 /// <summary>
 /// Converts any exception that escapes the pipeline into the API's <see cref="ApiErrorBody"/> JSON shape.
-/// Never exposes stack traces or technical details. Runs inside <c>UseExceptionHandler()</c>, which is
-/// registered after the correlation-id middleware so the logs written here carry the correlation scope.
+/// Never exposes stack traces or technical details. The logs written here carry the request's W3C trace
+/// id natively (Serilog reads it from <c>Activity.Current</c>).
 /// </summary>
-public sealed class ApiExceptionHandler(
-    ILogger<ApiExceptionHandler> logger,
-    CorrelationIdAccessor correlationIdAccessor) : IExceptionHandler
+public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
@@ -34,10 +30,6 @@ public sealed class ApiExceptionHandler(
         if (httpContext.Response.HasStarted)
             return true;
 
-        // UseExceptionHandler resets the response's headers before it calls the handlers, which drops the id
-        // CorrelationIdMiddleware echoed; put it back so the client can still quote it.
-        httpContext.Response.Headers[CorrelationIdMiddleware.CorrelationIdHeader] =
-            correlationIdAccessor.GetCorrelationId();
         httpContext.Response.StatusCode = statusCode;
         if (exception is ApiException { RetryAfterSeconds: { } retryAfter })
             httpContext.Response.Headers.RetryAfter = retryAfter.ToString(CultureInfo.InvariantCulture);

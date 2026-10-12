@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
-using FinanceSentry.Core.Observability;
 using FinanceSentry.Gateway;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenTelemetry.Exporter;
@@ -20,15 +19,15 @@ const string DefaultOtlpEndpoint = "http://otel-collector:4318";
 const string OtlpTracesPath = "/v1/traces";
 const string MetricsPath = "/metrics";
 
-// Platform contract (guardrail 1, spec 048): one compact JSON object per stdout line, with
-// TraceId/SpanId from the current Activity — the same shape the api and the MCP write, so the box log
-// agent reads every finance-sentry container the same way. No file or Loki sink: the gateway keeps no
-// disk state worth a second copy. `Serilog:` config sections still apply through ReadFrom.Configuration.
+// Platform contract (guardrail 1, spec 048): one compact JSON object per stdout line, with the W3C
+// trace and span ids Serilog captures from the current Activity (@tr/@sp) — the same shape the api and
+// the MCP write, so the box log agent reads every finance-sentry container the same way. No file or
+// Loki sink: the gateway keeps no disk state worth a second copy. `Serilog:` config sections still
+// apply through ReadFrom.Configuration.
 builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
     .ReadFrom.Configuration(context.Configuration)
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .Enrich.With<TraceEnricher>()
     .Enrich.WithProperty("app", GatewayServiceName)
     .WriteTo.Console(new RenderedCompactJsonFormatter()));
 

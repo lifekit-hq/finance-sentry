@@ -12,7 +12,7 @@
 ## Log entry → Loki (external)
 
 - **Owner**: Loki; app only emits via the Serilog Loki sink (fire-and-forget, FR-003).
-- **Shape**: timestamp, level, source module (`SourceContext`), message template + properties, correlation id, exception. Labels: `app`, `module`, `level`. EF `Database.Command` SQL absent at default level (FR-011).
+- **Shape**: timestamp, level, source module (`SourceContext`), message template + properties, W3C trace id (`TraceId`/`SpanId` body fields), exception. Labels: `app`, `module`, `level`. EF `Database.Command` SQL absent at default level (FR-011).
 - **Retention**: ≥14d, capped (FR-005).
 
 ## Background job record → Hangfire (PostgreSQL, `hangfire` schema)
