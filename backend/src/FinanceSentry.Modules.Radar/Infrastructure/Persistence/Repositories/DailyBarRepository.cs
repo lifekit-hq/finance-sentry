@@ -6,6 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 public sealed class DailyBarRepository(RadarDbContext db) : IDailyBarRepository
 {
+    // One INSERT ... ON CONFLICT over the unique (Ticker, Date) index: Yahoo retroactively rescales AdjClose after
+    // splits/dividends, so an existing row is overwritten in place (insert-only storage leaves a scale discontinuity
+    // that corrupts returns and z-scores). The write is atomic, so two overlapping ingests update the same rows
+    // instead of the loser failing on the index, and no read precedes it. It runs at once rather than at
+    // SaveChanges, and a bar already tracked by this context is not refreshed. RETURNING (xmax = 0) is true only for
+    // a freshly inserted row, which is what the added count reports.
     public async Task<int> UpsertRangeAsync(IReadOnlyCollection<DailyBar> bars, CancellationToken ct = default)
     {
         if (bars.Count == 0)
@@ -13,42 +19,39 @@ public sealed class DailyBarRepository(RadarDbContext db) : IDailyBarRepository
             return 0;
         }
 
-        var tickers = bars.Select(b => b.Ticker).Distinct().ToArray();
-        var minDate = bars.Min(b => b.Date);
-
-        // Tracked read: Yahoo retroactively rescales AdjClose after splits/dividends, so
-        // existing rows must be updated in place — insert-only storage leaves a scale
-        // discontinuity that corrupts returns and z-scores.
-        var existing = await db.DailyBars
-            .Where(b => tickers.Contains(b.Ticker) && b.Date >= minDate)
-            .ToDictionaryAsync(b => (b.Ticker, b.Date), ct);
-
+        // ON CONFLICT cannot touch one row twice in a statement, so a repeated (Ticker, Date) keeps its first bar.
         var incoming = bars
             .GroupBy(b => (b.Ticker, b.Date))
             .Select(g => g.First())
             .ToList();
 
-        var added = 0;
-        foreach (var bar in incoming)
-        {
-            if (existing.TryGetValue((bar.Ticker, bar.Date), out var row))
-            {
-                row.Open = bar.Open;
-                row.High = bar.High;
-                row.Low = bar.Low;
-                row.Close = bar.Close;
-                row.AdjClose = bar.AdjClose;
-                row.Volume = bar.Volume;
-            }
-            else
-            {
-                db.DailyBars.Add(bar);
-                added++;
-            }
-        }
+        var tickers = incoming.Select(b => b.Ticker).ToArray();
+        var dates = incoming.Select(b => b.Date).ToArray();
+        var opens = incoming.Select(b => b.Open).ToArray();
+        var highs = incoming.Select(b => b.High).ToArray();
+        var lows = incoming.Select(b => b.Low).ToArray();
+        var closes = incoming.Select(b => b.Close).ToArray();
+        var adjCloses = incoming.Select(b => b.AdjClose).ToArray();
+        var volumes = incoming.Select(b => b.Volume).ToArray();
 
-        await db.SaveChangesAsync(ct);
-        return added;
+        var inserted = await db.Database.SqlQuery<bool>(
+            $"""
+            INSERT INTO radar.daily_bars AS t
+                ("Ticker", "Date", "Open", "High", "Low", "Close", "AdjClose", "Volume")
+            SELECT * FROM unnest(
+                {tickers}::varchar[], {dates}::date[], {opens}::numeric[], {highs}::numeric[], {lows}::numeric[],
+                {closes}::numeric[], {adjCloses}::numeric[], {volumes}::bigint[])
+            ON CONFLICT ("Ticker", "Date") DO UPDATE SET
+                "Open" = EXCLUDED."Open",
+                "High" = EXCLUDED."High",
+                "Low" = EXCLUDED."Low",
+                "Close" = EXCLUDED."Close",
+                "AdjClose" = EXCLUDED."AdjClose",
+                "Volume" = EXCLUDED."Volume"
+            RETURNING (xmax = 0) AS "Value"
+            """).ToListAsync(ct);
+
+        return inserted.Count(isNew => isNew);
     }
 
     public async Task<IReadOnlyList<DailyBar>> GetSinceAsync(

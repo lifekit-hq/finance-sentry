@@ -76,8 +76,8 @@ public sealed class ShortlistStructureCostTests
             FreshnessMaxTradingDays = int.MaxValue,
         });
 
-        var barRepo = new CountingDailyBarRepository(new DailyBarRepository(db));
-        var universeRepo = new RadarUniverseRepository(db);
+        var barRepo = new CountingDailyBarRepository(new InMemoryDailyBarRepository(db));
+        var universeRepo = new InMemoryRadarUniverseRepository(db);
 
         var banking = new Mock<IBankingTotalsReader>();
         banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([BookOwner]);

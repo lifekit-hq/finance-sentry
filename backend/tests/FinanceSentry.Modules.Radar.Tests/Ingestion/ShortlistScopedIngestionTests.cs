@@ -5,7 +5,6 @@ using FinanceSentry.Modules.Radar.Application.Commands;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain.MarketStructure;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence;
-using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -114,12 +113,12 @@ public sealed class ShortlistScopedIngestionTests
             var source = new FakeShortlistSource { Tickers = shortlist };
 
             var universeService = new RadarUniverseService(
-                new RadarUniverseRepository(db), brokerage.Object, watchlist.Object, banking.Object, options, source);
+                new InMemoryRadarUniverseRepository(db), brokerage.Object, watchlist.Object, banking.Object, options, source);
 
             var handler = new IngestDailyBarsCommandHandler(
                 universeService,
                 history,
-                new DailyBarRepository(db),
+                new InMemoryDailyBarRepository(db),
                 options,
                 NullLogger<IngestDailyBarsCommandHandler>.Instance);
 

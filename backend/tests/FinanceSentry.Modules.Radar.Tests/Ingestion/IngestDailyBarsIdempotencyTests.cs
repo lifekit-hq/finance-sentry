@@ -1,7 +1,6 @@
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Radar.Application.Commands;
 using FinanceSentry.Modules.Radar.Domain;
-using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -38,7 +37,7 @@ public sealed class IngestDailyBarsIdempotencyTests
         };
 
         await using var db = TestSupport.NewContext();
-        var repo = new DailyBarRepository(db);
+        var repo = new InMemoryDailyBarRepository(db);
         var handler = new IngestDailyBarsCommandHandler(
             new FakeUniverseService([Member("AAA")]),
             new FakeHistorySource(barsByTicker),
@@ -60,7 +59,7 @@ public sealed class IngestDailyBarsIdempotencyTests
         var day1 = new Dictionary<string, IReadOnlyList<DailyBarData>> { ["AAA"] = Series(start, 200) };
 
         await using var db = TestSupport.NewContext();
-        var repo = new DailyBarRepository(db);
+        var repo = new InMemoryDailyBarRepository(db);
 
         var handler1 = new IngestDailyBarsCommandHandler(
             new FakeUniverseService([Member("AAA")]),
@@ -92,7 +91,7 @@ public sealed class IngestDailyBarsIdempotencyTests
         };
 
         await using var db = TestSupport.NewContext();
-        var repo = new DailyBarRepository(db);
+        var repo = new InMemoryDailyBarRepository(db);
         var handler = new IngestDailyBarsCommandHandler(
             new FakeUniverseService([Member("AAA"), Member("BBB"), Member("CCC")]),
             new FakeHistorySource(barsByTicker, throwForTicker: "BBB"),

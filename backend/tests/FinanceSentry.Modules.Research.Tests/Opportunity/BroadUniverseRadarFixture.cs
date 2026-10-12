@@ -6,6 +6,7 @@ using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 using FinanceSentry.Modules.Radar.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Radar.Tests;
 using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
@@ -117,8 +118,8 @@ internal sealed class BroadUniverseRadarFixture : IAsyncDisposable
             BroadUniverseEnabled = true,
         });
 
-        var universeRepo = new RadarUniverseRepository(db);
-        var barRepo = new DailyBarRepository(db);
+        var universeRepo = new InMemoryRadarUniverseRepository(db);
+        var barRepo = new InMemoryDailyBarRepository(db);
 
         var banking = new Mock<IBankingTotalsReader>();
         banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>()))
