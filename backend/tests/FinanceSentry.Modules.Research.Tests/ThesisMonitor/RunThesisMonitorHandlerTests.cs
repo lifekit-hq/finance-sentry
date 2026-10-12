@@ -444,10 +444,6 @@ public class RunThesisMonitorHandlerTests
             Guid userId, Guid referenceId, string providerName, DateTime expiresAt, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task GenerateJobFailureAlertAsync(
-            Guid userId, Guid referenceId, string jobName, int consecutiveCount, string? lastError, CancellationToken ct = default)
-            => Task.CompletedTask;
-
         public Task GenerateThesisBreakAlertAsync(
             Guid userId, Guid thesisId, string ticker, string reason, CancellationToken ct = default)
         {
@@ -581,9 +577,6 @@ public class RunThesisMonitorHandlerTests
             => Task.CompletedTask;
 
         public Task ResolveConsentExpiringAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public Task ResolveJobFailureAlertAsync(Guid userId, Guid referenceId, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public Task GenerateDetectorSilentAlertAsync(

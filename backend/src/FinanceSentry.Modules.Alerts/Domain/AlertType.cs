@@ -14,6 +14,11 @@ public static class AlertType
     public const string PolicyViolation = "PolicyViolation";
     public const string Opportunity = "Opportunity";
     public const string ConsentExpiring = "ConsentExpiring";
+    /// <summary>
+    /// The operational-alert type. Failing jobs no longer raise it (the Grafana rule on
+    /// <c>finance_job_consecutive_failures</c> replaced that, #935); the silent-detector alert still does, and
+    /// rows already stored under it keep resolving to a known type.
+    /// </summary>
     public const string JobFailure = "JobFailure";
     public const string PerformanceBrief = "PerformanceBrief";
     public const string CashShortfall = "CashShortfall";

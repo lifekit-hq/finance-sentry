@@ -30,9 +30,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         // Reminders repeat only every 3 days while inside the pre-expiry window, so the detector can
         // run daily without spamming the same connection.
         [AlertType.ConsentExpiring] = TimeSpan.FromDays(3),
-        // Backstop only — the failure filter already guarantees one call per streak. Short enough
-        // that a genuine success-then-new-streak re-alerts, long enough to absorb a double-call.
-        [AlertType.JobFailure] = TimeSpan.FromMinutes(15),
         // 6 days: weekly cron fires each Monday; prevents a re-run or drift from double-alerting.
         [AlertType.PerformanceBrief] = TimeSpan.FromDays(6),
         // Active-alert dedup is the primary guard; 24h prevents re-alert the same day after a
@@ -212,31 +209,6 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveConsentExpiringAlertAsync(
         Guid userId, Guid referenceId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.ConsentExpiring, referenceId, ct);
-
-    public Task GenerateJobFailureAlertAsync(
-        Guid userId, Guid referenceId, string jobName, int consecutiveCount, string? lastError,
-        CancellationToken ct = default)
-    {
-        var detail = string.IsNullOrWhiteSpace(lastError) ? string.Empty : $" Last error: {lastError}";
-
-        return EmitAsync(userId, new AlertDraft(
-            AlertType.JobFailure, AlertSeverity.Error, referenceId, jobName,
-            $"Job failing: {jobName}",
-            $"Scheduled job '{jobName}' has failed {consecutiveCount} times in a row.{detail}")
-        {
-            // Each streak should produce a fresh alert row (a fresh Telegram message); the failure
-            // filter guarantees one call per streak, so an open alert must not suppress the next.
-            // A newer streak supersedes the still-open earlier alert for the same job rather than
-            // colliding with it on idx_alert_dedup — the newest streak is the current truth.
-            Dedup = AlertDedup.SilenceOnly,
-            SupersedeOpen = true,
-        },
-            ct);
-    }
-
-    public Task ResolveJobFailureAlertAsync(
-        Guid userId, Guid referenceId, CancellationToken ct = default)
-        => ResolveAsync(userId, AlertType.JobFailure, referenceId, ct);
 
     public Task GenerateDetectorSilentAlertAsync(
         Guid userId, string detectorName, int silentDays, int inputCount, CancellationToken ct = default)

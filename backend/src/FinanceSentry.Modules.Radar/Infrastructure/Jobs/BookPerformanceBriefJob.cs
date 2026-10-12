@@ -53,8 +53,8 @@ public sealed class BookPerformanceBriefJob(
         }
 
         // One user's brief failing must not cost the others theirs, but a run where every user failed
-        // produced nothing at all — surface it as a job failure so ConsecutiveFailureAlertFilter can
-        // see the streak and alert (US2). Swallowing here made total outage indistinguishable from a
+        // produced nothing at all — surface it as a job failure so ConsecutiveFailureGaugeFilter can
+        // see the streak (US2). Swallowing here made total outage indistinguishable from a
         // quiet week, which is the exact gap the filter exists to close.
         if (failures.Count > 0 && failures.Count == userIds.Count)
         {

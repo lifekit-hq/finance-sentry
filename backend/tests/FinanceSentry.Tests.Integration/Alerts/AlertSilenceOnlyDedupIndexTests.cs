@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 /// <summary>
-/// A SilenceOnly alert (the intraday-move sentinel's mode, and job-failure alerting) re-fires once
+/// A SilenceOnly alert (the intraday-move sentinel's mode) re-fires once
 /// its silence window has passed even while the earlier alert on the same reference is still open,
 /// superseding it instead of colliding with the unique index. Real Postgres
 /// is required: the <c>idx_alert_dedup</c> partial unique index on (UserId, Type, ReferenceId) over
@@ -81,48 +81,6 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
 
         alerts.Should().HaveCount(2);
         alerts.Single(a => a.Id == old.Id).IsResolved.Should().BeTrue("the new occurrence supersedes it");
-        alerts.Single(a => a.Id != old.Id).Should().Match<Alert>(a => !a.IsResolved && !a.IsDismissed);
-    }
-
-    [DockerRequiredFact]
-    public async Task SilenceOnly_JobFailurePastWindowWithEarlierAlertStillOpen_SupersedesItInsteadOfViolatingIndex()
-    {
-        await using (var setup = CreateContext())
-        {
-            await setup.Database.EnsureCreatedAsync();
-        }
-
-        var userId = Guid.NewGuid();
-        var referenceId = Guid.NewGuid();
-        var old = new Alert
-        {
-            UserId = userId,
-            Type = AlertType.JobFailure,
-            Title = "Job failing: sync",
-            Message = "earlier streak",
-            ReferenceId = referenceId,
-            ReferenceLabel = "sync",
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
-        };
-        await using (var seed = CreateContext())
-        {
-            seed.Alerts.Add(old);
-            await seed.SaveChangesAsync();
-        }
-
-        await using (var ctx = CreateContext())
-        {
-            var generator = new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object);
-            await generator.GenerateJobFailureAlertAsync(userId, referenceId, "sync", 3, "boom");
-        }
-
-        await using var read = CreateContext(userId);
-        var alerts = await read.Alerts.AsNoTracking()
-            .Where(a => a.UserId == userId && a.ReferenceId == referenceId)
-            .ToListAsync();
-
-        alerts.Should().HaveCount(2);
-        alerts.Single(a => a.Id == old.Id).IsResolved.Should().BeTrue("the newer failure streak supersedes it");
         alerts.Single(a => a.Id != old.Id).Should().Match<Alert>(a => !a.IsResolved && !a.IsDismissed);
     }
 

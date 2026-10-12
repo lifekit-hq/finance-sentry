@@ -93,7 +93,7 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   position to zero clears the unknown lots. `RealizedPnlUsd` is the P&L of sells made while
   every held lot was priced. A failed walk leaves that holding's ledger and cursor untouched
   and fails the sync after the other holdings are walked (`CryptoTradeHistoryException`), so it
-  reaches the job-failure Telegram alert (#023) instead of freezing cost basis silently.
+  reaches the consecutive-failure gauge (`finance_job_consecutive_failures`, #935) instead of freezing cost basis silently.
 
 ### Brokerage holdings (`FinanceSentry.Modules.BrokerageSync`)
 

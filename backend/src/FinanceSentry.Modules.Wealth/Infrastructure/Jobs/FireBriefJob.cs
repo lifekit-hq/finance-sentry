@@ -42,7 +42,7 @@ public sealed class FireBriefJob(
         }
 
         // One user's brief failing must not cost the others theirs, but a run where every user failed
-        // produced nothing at all — surface it so ConsecutiveFailureAlertFilter sees the streak.
+        // produced nothing at all — surface it so ConsecutiveFailureGaugeFilter sees the streak.
         if (failures.Count > 0 && failures.Count == userIds.Count)
         {
             throw new AggregateException(
