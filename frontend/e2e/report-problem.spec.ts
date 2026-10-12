@@ -6,7 +6,6 @@ const PHONE = {width: 390, height: 844};
 const DESKTOP = {width: 1440, height: 900};
 const SEEN_KEY = 'fns.whatsNew.lastSeen';
 const REFERENCE = 'FS-R-42';
-const SHOTS = process.env['REPORT_SHOTS_DIR'];
 
 const WHATS_NEW = {
   versions: [
@@ -41,21 +40,6 @@ async function open(page: Page, path: string): Promise<{requests: Request[]}> {
   return {requests};
 }
 
-async function shot(page: Page, name: string): Promise<void> {
-  if (SHOTS) {
-    // The drawer slides in: wait for the finite transitions so the capture is the settled sheet, not mid-slide.
-    await page.evaluate(() =>
-      Promise.all(
-        document
-          .getAnimations()
-          .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
-          .map(a => a.finished)
-      )
-    );
-    await page.screenshot({path: `${SHOTS}/${name}.png`});
-  }
-}
-
 async function fillAndSend(page: Page): Promise<void> {
   await page.getByTestId('report-kind-LooksWrong').click();
   await page.getByTestId('report-text').locator('textarea').fill('The chart is cut off');
@@ -68,14 +52,12 @@ test.describe('report a problem (phone)', () => {
   test('More opens the sheet and the report carries only the route pattern', async ({page}) => {
     const {requests} = await open(page, '/more');
     await expect(page.getByTestId('more-report-problem')).toBeVisible();
-    await shot(page, 'phone-more');
 
     await page.getByTestId('more-report-problem').click();
     await expect(page.getByTestId('report-send')).toBeVisible();
     await expect(
       page.getByText("Don't include account numbers, amounts or passwords")
     ).toBeVisible();
-    await shot(page, 'phone-sheet-empty');
 
     await fillAndSend(page);
     await expect.poll(() => requests.length).toBe(1);
@@ -104,7 +86,6 @@ test.describe('report a problem (phone)', () => {
     await expect(page.getByTestId('report-text').locator('textarea')).toHaveValue(
       'The chart is cut off'
     );
-    await shot(page, 'phone-sheet-rate-limited');
   });
 });
 
@@ -117,7 +98,6 @@ test.describe('report a problem (desktop)', () => {
 
     await expect(footer).toContainText(/v\d+\.\d+\.\d+/);
     await expect(footer.locator('.cmn-badge-indicator')).toBeVisible();
-    await shot(page, 'desktop-footer-dot');
 
     await footer.click();
     await expect(page.getByTestId('whats-new-list')).toContainText('only money in');
@@ -131,7 +111,6 @@ test.describe('report a problem (desktop)', () => {
     await page.getByRole('button', {name: 'Account menu'}).click();
     await page.getByRole('menuitem', {name: 'Report a problem'}).click();
     await expect(page.getByTestId('report-send')).toBeVisible();
-    await shot(page, 'desktop-sheet');
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('report-send')).toHaveCount(0);
 
