@@ -19,4 +19,4 @@ export interface ProblemReportAccepted {
   reference: string;
 }
 
-export type ReportProblemStatus = 'idle' | 'submitting' | 'error' | 'rate-limited';
+export type ReportProblemStatus = 'idle' | 'submitting' | 'error';

@@ -2,15 +2,14 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {CmnDrawerRef, CmnShellService, ToastService} from '@lifekit-hq/ui';
 import {Subject} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {APP_VERSION} from '../../../../shared/constants/version/version.constants';
-import {
-  REPORT_PROBLEM_FAILED_MESSAGE,
-  REPORT_PROBLEM_RATE_LIMITED_MESSAGE,
-} from '../../constants/report-problem.constants';
+import {ERROR_MESSAGES_REGISTRY} from '../../../errors/error-messages.registry';
+import {REPORT_PROBLEM_FAILED_MESSAGE} from '../../constants/report-problem.constants';
 import {
   type ProblemReportAccepted,
   type ProblemReportRequest,
@@ -28,6 +27,7 @@ describe('ReportProblemSheetComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([{path: 'accounts', children: [{path: ':id', children: []}]}]),
+        {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
         {provide: ReportProblemService, useValue: {submit}},
         {provide: CmnDrawerRef, useValue: {close}},
         {provide: ToastService, useValue: {success}},
@@ -119,7 +119,24 @@ describe('ReportProblemSheetComponent', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it('says to try later on 429 and keeps the text', async () => {
+  it.each([
+    ['REPORT_RATE_LIMITED', 429],
+    ['REPORT_NOT_ALLOWED', 403],
+  ])('shows the registry message for %s and keeps the text', async (errorCode, status) => {
+    const {host, type, fixture} = await render();
+    type('broken');
+    host.querySelector('form')?.dispatchEvent(new Event('submit'));
+    response.error(new HttpErrorResponse({status, error: {errorCode}}));
+    fixture.detectChanges();
+
+    expect(host.querySelector('[data-testid="report-error"]')?.textContent).toContain(
+      ERROR_MESSAGES_REGISTRY[errorCode]
+    );
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('broken');
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the generic message when the error has no known code', async () => {
     const {host, type, fixture} = await render();
     type('broken');
     host.querySelector('form')?.dispatchEvent(new Event('submit'));
@@ -127,7 +144,7 @@ describe('ReportProblemSheetComponent', () => {
     fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="report-error"]')?.textContent).toContain(
-      REPORT_PROBLEM_RATE_LIMITED_MESSAGE
+      REPORT_PROBLEM_FAILED_MESSAGE
     );
     expect(host.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('broken');
     expect(close).not.toHaveBeenCalled();

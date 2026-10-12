@@ -10,7 +10,10 @@ export function reportProblemMethods(store: WritableStateSource<ReportProblemSta
       patchState(store, state => ({kind: state.kind === kind ? null : kind}));
     },
     setStatus(status: ReportProblemStatus): void {
-      patchState(store, {status});
+      patchState(store, {status, errorCode: null});
+    },
+    setError(errorCode: Nullable<string>): void {
+      patchState(store, {status: 'error', errorCode});
     },
   };
 }

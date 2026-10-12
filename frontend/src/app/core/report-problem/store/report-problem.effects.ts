@@ -1,12 +1,11 @@
-import {HttpErrorResponse} from '@angular/common/http';
 import {inject, type Signal} from '@angular/core';
 import {Router} from '@angular/router';
+import {extractErrorCode} from '@lifekit-hq/core';
 import {CmnDrawerRef, CmnShellService, ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, tap} from 'rxjs';
 
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
-import {REPORT_PROBLEM_TOO_MANY_REQUESTS_STATUS} from '../constants/report-problem.constants';
 import {type ReportProblemStatus} from '../models/report-problem.model';
 import {ReportProblemService} from '../services/report-problem.service';
 import {ClientInfoUtils} from '../utils/client-info.utils';
@@ -16,6 +15,7 @@ import {type ReportProblemState} from './report-problem.state';
 interface EffectsStore {
   kind: Signal<ReportProblemState['kind']>;
   setStatus(status: ReportProblemStatus): void;
+  setError(errorCode: Nullable<string>): void;
 }
 
 export function reportProblemEffects(store: EffectsStore) {
@@ -47,10 +47,7 @@ export function reportProblemEffects(store: EffectsStore) {
               drawerRef.close();
             }),
             catchError((err: unknown) => {
-              const limited =
-                err instanceof HttpErrorResponse &&
-                err.status === REPORT_PROBLEM_TOO_MANY_REQUESTS_STATUS;
-              store.setStatus(limited ? 'rate-limited' : 'error');
+              store.setError(extractErrorCode(err));
               return EMPTY;
             })
           )

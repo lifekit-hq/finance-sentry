@@ -12,13 +12,8 @@ export const REPORT_PROBLEM_TEXT_ROWS = 6;
 
 export const REPORT_PROBLEM_HELPER = "Don't include account numbers, amounts or passwords";
 
-export const REPORT_PROBLEM_RATE_LIMITED_MESSAGE =
-  'Too many reports for now. Please try again later.';
-
 export const REPORT_PROBLEM_FAILED_MESSAGE =
   "Couldn't send your report. Your text is kept; try again.";
-
-export const REPORT_PROBLEM_TOO_MANY_REQUESTS_STATUS = 429;
 
 /** The optional kind chips, in the order the sheet shows them; `value` is what the API accepts. */
 export const REPORT_PROBLEM_KINDS = [

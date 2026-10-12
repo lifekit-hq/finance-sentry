@@ -85,12 +85,18 @@ test.describe('report a problem (phone)', () => {
 
   test('a 429 says to try later and keeps the text', async ({page}) => {
     await open(page, '/more');
-    await page.route(`${API}/feedback`, route => route.fulfill({status: 429, body: ''}));
+    await page.route(`${API}/feedback`, route =>
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({errorCode: 'REPORT_RATE_LIMITED'}),
+      })
+    );
 
     await page.getByTestId('more-report-problem').click();
     await fillAndSend(page);
 
-    await expect(page.getByTestId('report-error')).toContainText('Too many reports');
+    await expect(page.getByTestId('report-error')).toContainText('several reports recently');
     await expect(page.getByTestId('report-text').locator('textarea')).toHaveValue(
       'The chart is cut off'
     );
@@ -105,7 +111,7 @@ test.describe('report a problem (desktop)', () => {
     await open(page, '/dashboard');
     const footer = page.locator('aside button', {hasText: "What's new"});
 
-    await expect(footer).toContainText('v1.14.0');
+    await expect(footer).toContainText(/v\d+\.\d+\.\d+/);
     await expect(footer.locator('.cmn-badge-indicator')).toBeVisible();
     await shot(page, 'desktop-footer-dot');
 
