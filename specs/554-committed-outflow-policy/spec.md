@@ -108,8 +108,8 @@ paid off here rather than carried.
 3. `CommittedOutflowRules` cannot be constructed with its two same-typed key sets swapped:
    both are named at every call site.
 4. Two concurrent pins of the same merchant both return the documented idempotent result
-   rather than a `DbUpdateException`; the losing write finds the winner's row. A
-   `DbUpdateException` that is *not* a lost race still surfaces.
+   rather than a unique-index failure: the insert is `ON CONFLICT DO NOTHING` and the losing write
+   finds the winner's row. A write failure that is *not* a lost race still surfaces.
 5. `ICommittedMerchantPinRepository` lives in its own file, not appended to the module's
    catch-all repository-port file.
 6. The keys the idempotence fix moves are rekeyed in the database, so no commitment or pin
