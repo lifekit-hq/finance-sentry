@@ -159,7 +159,7 @@ public sealed class InzhurConnector(
 
         if (value.Length == 0)
             throw Error(StatusCodes.Status400BadRequest, InzhurErrorCodes.SessionRequired, "Paste the value of the refreshToken cookie.");
-        if (value.Length > MaxRefreshCookieLength || value.Any(c => c is ';' or ',' or '"' or '\\' || char.IsWhiteSpace(c) || char.IsControl(c)))
+        if (value.Length > MaxRefreshCookieLength || value.Any(c => c is < '!' or > '~' or ';' or ',' or '"' or '\\'))
             throw Error(StatusCodes.Status400BadRequest, InzhurErrorCodes.SessionInvalid, "That is not a refreshToken cookie value. Copy only the Value column.");
         return value;
     }

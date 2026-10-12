@@ -107,6 +107,9 @@ public class InzhurConnectorTests
     [InlineData("refreshToken=fake; Path=/")]
     [InlineData("fake value")]
     [InlineData("fake,value")]
+    [InlineData("fake\u2026value")]
+    [InlineData("fake\u00e9value")]
+    [InlineData("fake\u007fvalue")]
     public async Task A_paste_that_is_not_a_bare_cookie_value_is_refused_before_Inzhur_is_called(string pasted)
     {
         var act = () => Connector().ConnectSessionAsync(_userId, pasted, default);
