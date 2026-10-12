@@ -146,13 +146,4 @@ describe('pushComputed', () => {
     state.actionErrorCode.set('UNKNOWN');
     expect(c.actionErrorMessage()).toBe('Could not update push notifications.');
   });
-
-  it('reports loading only while there is nothing to show yet', () => {
-    state.status.set('loading');
-    const c = computed();
-    expect(c.isInitialLoading()).toBe(true);
-
-    state.devices.set([device]);
-    expect(c.isInitialLoading()).toBe(false);
-  });
 });

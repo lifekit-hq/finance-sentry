@@ -13,12 +13,6 @@ export function settingsMethods(store: WritableStateSource<SettingsState>) {
         profile: s.profile ? {...s.profile, ...partial} : s.profile,
       }));
     },
-    setProfileSaving(saving: boolean): void {
-      patchState(store, {profileSaving: saving, profileErrorCode: null});
-    },
-    setProfileSaveError(errorCode: Nullable<string>): void {
-      patchState(store, {profileSaving: false, profileErrorCode: errorCode});
-    },
     setShowDeleteConfirm(show: boolean): void {
       patchState(store, {showDeleteConfirm: show});
     },

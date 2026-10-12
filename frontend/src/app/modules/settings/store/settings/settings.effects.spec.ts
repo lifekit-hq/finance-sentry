@@ -27,7 +27,8 @@ function buildStore() {
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
     setError: vi.fn(),
-    setProfileSaving: vi.fn(),
+    setProfileSaveLoading: vi.fn(),
+    setProfileSaveSuccess: vi.fn(),
     setProfileSaveError: vi.fn(() => errorMessage.set(SAVE_FAILED)),
     profileSaveErrorMessage: () => errorMessage(),
   };

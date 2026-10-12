@@ -22,7 +22,6 @@ export function pushComputed(store: StateSignals) {
   const thisDeviceRegistered = computed(() => store.thisDeviceId() !== null);
 
   return {
-    isInitialLoading: computed(() => store.status() === 'loading' && store.devices().length === 0),
     isBusy: computed(() => store.action() !== 'idle'),
     thisDeviceRegistered,
     rows: computed<PushDeviceRow[]>(() =>

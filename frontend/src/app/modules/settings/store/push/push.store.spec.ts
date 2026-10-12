@@ -50,14 +50,13 @@ describe('PushStore', () => {
     };
   });
 
-  it('is loading, with nothing to show yet, until the answers arrive', () => {
+  it('is loading until the answers arrive', () => {
     service.listDevices.mockReturnValue(NEVER);
 
     const store = inject();
 
     expect(store.status()).toBe('loading');
     expect(store.isLoading()).toBe(true);
-    expect(store.isInitialLoading()).toBe(true);
   });
 
   it('settles on success with the loaded devices and no error', () => {
@@ -65,7 +64,6 @@ describe('PushStore', () => {
 
     expect(store.status()).toBe('success');
     expect(store.devices()).toEqual([DEVICE]);
-    expect(store.isInitialLoading()).toBe(false);
     expect(store.errorMessage()).toBe('');
     expect(store.serverNotice()).toBe('');
   });

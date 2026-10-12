@@ -156,7 +156,7 @@ describe('SettingsComponent Save Profile button', () => {
       profile: signal<UserProfile | null>(profile),
       avatarInitials: signal('AL'),
       fullName: signal('Ada Lovelace'),
-      profileSaving: signal(false),
+      isProfileSaveLoading: signal(false),
       updateProfile: vi.fn(),
       saveProfile: vi.fn(),
     };
