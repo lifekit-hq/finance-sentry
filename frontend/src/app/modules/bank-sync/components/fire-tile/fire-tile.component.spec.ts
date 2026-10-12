@@ -26,7 +26,7 @@ function fire(overrides: Partial<FireProjection> = {}): FireProjection {
 }
 
 function render(projection: Nullable<FireProjection>) {
-  const computeds = fireComputed({projection: signal(projection), status: signal('idle')});
+  const computeds = fireComputed({projection: signal(projection)});
   TestBed.configureTestingModule({providers: [provideRouter([])]});
   TestBed.overrideComponent(FireTileComponent, {
     set: {providers: [{provide: FireStore, useValue: {...computeds}}]},

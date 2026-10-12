@@ -4,8 +4,8 @@ import {describe, expect, it} from 'vitest';
 import {type FireProjection} from '../../models/fire/fire.model';
 import {fireComputed} from './fire.computed';
 
-function build(projection: Nullable<FireProjection>, status: AsyncStatus = 'idle') {
-  return fireComputed({projection: signal(projection), status: signal(status)});
+function build(projection: Nullable<FireProjection>) {
+  return fireComputed({projection: signal(projection)});
 }
 
 function fire(overrides: Partial<FireProjection> = {}): FireProjection {
@@ -36,10 +36,6 @@ describe('fireComputed', () => {
 
   it.each(['Projected', 'AlreadyReached', 'NotSaving'] as const)('is shown for %s', status => {
     expect(build(fire({status})).visible()).toBe(true);
-  });
-
-  it('reports loading while the request is in flight', () => {
-    expect(build(null, 'loading').isLoading()).toBe(true);
   });
 
   it('derives the progress share from net worth and target', () => {

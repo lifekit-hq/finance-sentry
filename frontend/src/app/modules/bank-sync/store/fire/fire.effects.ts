@@ -8,6 +8,7 @@ import {WealthService} from '../../services/wealth.service';
 
 interface EffectsStore {
   setLoading: () => void;
+  setSuccess: () => void;
   setProjection: (projection: FireProjection) => void;
   setError: (errorCode: Nullable<string>) => void;
 }
@@ -21,7 +22,10 @@ export function fireEffects(store: EffectsStore) {
         tap(() => store.setLoading()),
         switchMap(() =>
           wealthService.getFireProjection().pipe(
-            tap(projection => store.setProjection(projection)),
+            tap(projection => {
+              store.setProjection(projection);
+              store.setSuccess();
+            }),
             catchError((err: unknown) => {
               store.setError(extractErrorCode(err));
               return EMPTY;

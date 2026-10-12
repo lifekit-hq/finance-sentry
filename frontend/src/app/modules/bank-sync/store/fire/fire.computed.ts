@@ -5,7 +5,6 @@ import {FireTileUtils} from '../../utils/fire-tile.utils';
 
 interface StateSignals {
   projection: Signal<Nullable<FireProjection>>;
-  status: Signal<AsyncStatus>;
 }
 
 export function fireComputed(store: StateSignals) {
@@ -18,7 +17,6 @@ export function fireComputed(store: StateSignals) {
   });
 
   return {
-    isLoading: computed(() => store.status() === 'loading'),
     visible,
     headline: computed(() => {
       const projection = store.projection();
