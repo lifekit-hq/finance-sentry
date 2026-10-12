@@ -5,14 +5,8 @@ import {type FlowBreakdownState} from './flow-breakdown.state';
 
 export function flowBreakdownMethods(store: WritableStateSource<FlowBreakdownState>) {
   return {
-    setLoading(): void {
-      patchState(store, {status: 'loading', errorCode: null});
-    },
     setBreakdown(breakdown: FlowBreakdown): void {
-      patchState(store, {breakdown, status: 'idle', errorCode: null});
-    },
-    setError(errorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', errorCode});
+      patchState(store, {breakdown});
     },
     setAccountFilter(accountId: Nullable<string>): void {
       patchState(store, state => ({

@@ -11,6 +11,7 @@ import {BankSyncService} from '../../services/bank-sync.service';
 
 interface EffectsStore {
   setLoading: () => void;
+  setSuccess: () => void;
   setBreakdown: (breakdown: FlowBreakdown) => void;
   setError: (errorCode: Nullable<string>) => void;
 }
@@ -27,8 +28,13 @@ export function flowBreakdownEffects(store: EffectsStore) {
             ? bankSyncService.getFlowBreakdown(request.month)
             : bankSyncService.getFlowBreakdownRange(request.from, request.to, request.months)
           ).pipe(
-            tap(breakdown => store.setBreakdown(breakdown)),
-            StoreErrorUtils.catchAndSetError(store)
+            tap(breakdown => {
+              store.setBreakdown(breakdown);
+              store.setSuccess();
+            }),
+            StoreErrorUtils.catchAndSetError({
+              setError: (code: Nullable<string>) => store.setError(code),
+            })
           )
         )
       )

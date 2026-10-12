@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ERROR_MESSAGES} from '@lifekit-hq/core';
+import {type AsyncStatus, ERROR_MESSAGES} from '@lifekit-hq/core';
 import {beforeEach, describe, expect, it} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
@@ -44,8 +44,7 @@ function groupsFor(items: FlowBreakdownItem[], accountFilter: Nullable<string> =
     to: signal<Nullable<string>>(null),
     months: signal(1),
     accountFilter: signal(accountFilter),
-    status: signal<AsyncStatus>('idle'),
-    errorCode: signal<Nullable<string>>(null),
+    status: signal<AsyncStatus>('success'),
   };
   return TestBed.runInInjectionContext(() => flowBreakdownComputed(store).groups());
 }

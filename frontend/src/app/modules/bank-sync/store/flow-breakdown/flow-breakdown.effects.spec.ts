@@ -2,10 +2,11 @@ import {provideHttpClient, withXhr} from '@angular/common/http';
 import {HttpTestingController, provideHttpClientTesting} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
 import {ActivatedRoute, convertToParamMap} from '@angular/router';
-import {provideApiBaseUrl} from '@lifekit-hq/core';
+import {ERROR_MESSAGES, provideApiBaseUrl} from '@lifekit-hq/core';
 import {BehaviorSubject} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {FlowBreakdownStore} from './flow-breakdown.store';
 
 const NOW = new Date('2026-08-12T10:00:00.000Z');
@@ -19,6 +20,7 @@ function setup(query: Record<string, string>) {
       provideHttpClient(withXhr()),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       {
         provide: ActivatedRoute,
         useValue: {queryParamMap: params$},
@@ -128,5 +130,35 @@ describe('flowBreakdownHooks', () => {
       '2026-08'
     );
     expect(store.range()).toBeNull();
+  });
+
+  it('is loading, then success and empty once an empty breakdown arrives', () => {
+    const {store, http} = setup({});
+    expect(store.status()).toBe('loading');
+    expect(store.isLoading()).toBe(true);
+    expect(store.isEmpty()).toBe(false);
+
+    http.expectOne(r => r.url.endsWith(URL_PATH)).flush({month: '2026-08', items: []});
+
+    expect(store.status()).toBe('success');
+    expect(store.isLoading()).toBe(false);
+    expect(store.isEmpty()).toBe(true);
+    expect(store.errorMessage()).toBe('');
+  });
+
+  it('shows the default message on a failed load and keeps the stale breakdown', () => {
+    const {store, http, params$} = setup({month: '2026-05'});
+    const loaded = {month: '2026-05', items: []};
+    http.expectOne(r => r.url.endsWith(URL_PATH)).flush(loaded);
+
+    params$.next(convertToParamMap({month: '2026-04'}));
+    TestBed.tick();
+    http
+      .expectOne(r => r.url.endsWith(URL_PATH))
+      .flush({errorCode: 'UNKNOWN'}, {status: 500, statusText: 'Server Error'});
+
+    expect(store.status()).toBe('error');
+    expect(store.errorMessage()).toBe('Failed to load the month breakdown. Please try again.');
+    expect(store.breakdown()).toEqual(loaded);
   });
 });
