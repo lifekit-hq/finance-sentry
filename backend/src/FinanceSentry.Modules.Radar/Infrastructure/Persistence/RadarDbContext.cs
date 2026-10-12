@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Radar.Infrastructure.Persistence;
 
 using System.Text.Json;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Regime;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,16 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUs
 
     public DbSet<RegimeReading> RegimeReadings { get; set; } = null!;
 
+    // Not an OwnerScopedDbContext: the only per-user entity, RadarSignal, has a nullable UserId (a null one is a
+    // global signal every person reads), so it cannot implement IUserOwned and keeps its own filter below. The
+    // column conventions still apply.
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        PersistenceConventions.Apply(configurationBuilder);
+        configurationBuilder.HaveGeneratedGuidKeyDefault();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("radar");
@@ -30,7 +41,6 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUs
         var bar = modelBuilder.Entity<DailyBar>();
         bar.ToTable("daily_bars");
         bar.HasKey(x => x.Id);
-        bar.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         bar.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
         bar.Property(x => x.Date).IsRequired();
         bar.Property(x => x.Open).HasColumnType("numeric(18,6)");
@@ -47,11 +57,10 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUs
         // A null UserId is a global signal (breadth, rotation), readable by every person; a holder-scoped signal
         // only by its holder. Bars, universe members and regime readings are market data with no owner.
         sig.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == null || x.UserId == CurrentUserId);
-        sig.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         sig.Property(x => x.Timestamp).IsRequired();
         sig.Property(x => x.Scanner).IsRequired().HasMaxLength(50);
         sig.Property(x => x.SignalType).IsRequired().HasMaxLength(50);
-        sig.Property(x => x.Severity).IsRequired().HasConversion<string>().HasMaxLength(20);
+        sig.Property(x => x.Severity).IsRequired().HasMaxLength(20);
         sig.Property(x => x.SubjectType).IsRequired().HasMaxLength(20);
         sig.Property(x => x.Subject).IsRequired().HasMaxLength(40);
         sig.Property(x => x.UserId);
@@ -73,25 +82,23 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUs
         var mem = modelBuilder.Entity<RadarUniverseMember>();
         mem.ToTable("radar_universe_members");
         mem.HasKey(x => x.Id);
-        mem.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         mem.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
-        mem.Property(x => x.Kind).IsRequired().HasConversion<string>().HasMaxLength(20);
-        mem.Property(x => x.Source).IsRequired().HasConversion<string>().HasMaxLength(10);
+        mem.Property(x => x.Kind).IsRequired().HasMaxLength(20);
+        mem.Property(x => x.Source).IsRequired().HasMaxLength(10);
         mem.Property(x => x.Active).IsRequired();
         mem.HasIndex(x => x.Ticker).IsUnique().HasDatabaseName("idx_radar_universe_ticker");
 
         var reg = modelBuilder.Entity<RegimeReading>();
         reg.ToTable("regime_readings");
         reg.HasKey(x => x.Id);
-        reg.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         reg.Property(x => x.ComputedAt).IsRequired();
         reg.Property(x => x.VolatilityAvailable).IsRequired();
-        reg.Property(x => x.VolatilityRegime).HasConversion<string>().HasMaxLength(20);
+        reg.Property(x => x.VolatilityRegime).HasMaxLength(20);
         reg.Property(x => x.VixLevel).HasColumnType("numeric(10,4)");
         reg.Property(x => x.VixSma).HasColumnType("numeric(10,4)");
-        reg.Property(x => x.VixTrend).HasConversion<string>().HasMaxLength(20);
+        reg.Property(x => x.VixTrend).HasMaxLength(20);
         reg.Property(x => x.RatesAvailable).IsRequired();
-        reg.Property(x => x.RatesRegime).HasConversion<string>().HasMaxLength(20);
+        reg.Property(x => x.RatesRegime).HasMaxLength(20);
         reg.Property(x => x.Dgs10).HasColumnType("numeric(10,4)");
         reg.Property(x => x.Dgs2).HasColumnType("numeric(10,4)");
         reg.Property(x => x.Spread).HasColumnType("numeric(10,4)");

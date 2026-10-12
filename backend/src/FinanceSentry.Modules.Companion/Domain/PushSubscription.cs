@@ -1,10 +1,12 @@
 namespace FinanceSentry.Modules.Companion.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One browser/device Web Push subscription (spec 859). The <see cref="Endpoint"/> is unique across users: a device
 /// that changes signed-in user re-registers and the row moves to the newer owner.
 /// </summary>
-public sealed class PushSubscription
+public sealed class PushSubscription : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

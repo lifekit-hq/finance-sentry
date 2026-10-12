@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// The user's Investment Policy Statement — the written, versioned strategy that
 /// every proactive alert and rebalancing prompt is measured against. Structure follows
@@ -8,7 +10,7 @@ namespace FinanceSentry.Modules.Research.Domain;
 /// Amended over time: saving a new version supersedes the prior one (IsCurrent flips),
 /// keeping history rather than overwriting.
 /// </summary>
-public class InvestmentPolicyStatement
+public class InvestmentPolicyStatement : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }

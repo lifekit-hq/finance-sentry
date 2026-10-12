@@ -56,13 +56,18 @@ public sealed class OwnerScopedDbContextTests
     {
         using var context = ModelSnapshotSyncTests.CreateOffline(contextType);
 
+        // A nullable UserId marks a shared corpus (null rows are visible to everyone): IUserOwned's Guid cannot hold
+        // it, so such an entity declares the Owner filter by hand instead.
         var unmarked = context.Model.GetEntityTypes()
             .Where(e => e.FindProperty("UserId") is { ClrType: var t } && (t == typeof(Guid) || t == typeof(Guid?))
-                && !typeof(IUserOwned).IsAssignableFrom(e.ClrType))
+                && !typeof(IUserOwned).IsAssignableFrom(e.ClrType)
+                && !(e.FindProperty("UserId")!.ClrType == typeof(Guid?)
+                    && e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name)))
             .Select(e => e.ClrType.Name);
 
         unmarked.Should().BeEmpty(
-            "an entity keyed to a person must implement IUserOwned or the context cannot scope it to that person");
+            "an entity keyed to a person must implement IUserOwned (or, for a shared corpus with a nullable UserId, " +
+            "declare the Owner filter itself) or the context cannot scope it to that person");
     }
 
     [Fact]

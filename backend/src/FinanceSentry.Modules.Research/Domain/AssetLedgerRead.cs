@@ -1,10 +1,12 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// A cached "Ledger's read" — the agent-generated narrative for one user's view of one ticker
 /// (feature 421, US3). One row per (user, symbol); regenerating overwrites in place.
 /// </summary>
-public class AssetLedgerRead
+public class AssetLedgerRead : IUserOwned
 {
     public Guid Id { get; set; }
 

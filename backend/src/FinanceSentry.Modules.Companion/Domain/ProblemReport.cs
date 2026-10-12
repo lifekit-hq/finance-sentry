@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Domain;
 
 using System.Text.Json.Serialization;
+using FinanceSentry.Core.Auth;
 
 /// <summary>What the reporter says went wrong; optional in the request.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -36,7 +37,7 @@ public enum ProblemReportStatus
 /// (<c>ProblemReportCleaner</c>): the text carries no control characters, long digit runs or amounts, and the
 /// page is a route pattern, never a URL. The owner is read from the token, never from the request.
 /// </summary>
-public sealed class ProblemReport
+public sealed class ProblemReport : IUserOwned
 {
     /// <summary>Also the reference the reporter sees (<c>FS-R-42</c>) and the relay request id (<c>fs-report-42</c>).</summary>
     public long Id { get; set; }

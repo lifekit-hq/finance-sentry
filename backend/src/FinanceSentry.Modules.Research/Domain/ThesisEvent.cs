@@ -1,12 +1,14 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// Append-only price-stamped lifecycle event for a thesis or candidate (FR-001/FR-009). No row is
 /// ever updated after insert except <see cref="SubjectPrice"/>/<see cref="BenchmarkPrice"/>/
 /// <see cref="PricesPending"/>, and only by <c>ThesisTrackRecordSnapshotJob</c> backfilling a
 /// previously-unknown price — never a correction of a recorded fact.
 /// </summary>
-public class ThesisEvent
+public class ThesisEvent : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

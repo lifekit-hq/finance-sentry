@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
-public class WatchlistItem
+using FinanceSentry.Core.Auth;
+
+public class WatchlistItem : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }

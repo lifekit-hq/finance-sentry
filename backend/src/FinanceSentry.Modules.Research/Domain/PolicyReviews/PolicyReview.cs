@@ -2,13 +2,14 @@ namespace FinanceSentry.Modules.Research.Domain.PolicyReviews;
 
 using System.Security.Cryptography;
 using System.Text;
+using FinanceSentry.Core.Auth;
 
 /// <summary>
 /// One completed scheduled review of the investment policy statement (#696): current positioning
 /// measured against the statement's bands, the adjustments it suggests and why. Recommend-only —
 /// a review records a proposal for the operator and never places, stages or routes an order.
 /// </summary>
-public class PolicyReview
+public class PolicyReview : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

@@ -148,9 +148,9 @@ public sealed class PolicyReviewRepositoryTests : IAsyncLifetime
     private sealed class PolicyReviewSqliteContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser)
         : ResearchDbContext(options, currentUser)
     {
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        protected override void ConfigureModel(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            base.ConfigureModel(modelBuilder);
 
             var kept = new HashSet<Type> { typeof(InvestmentPolicyStatement), typeof(PolicyReview) };
             foreach (var clrType in modelBuilder.Model.GetEntityTypes().Select(e => e.ClrType).Where(t => !kept.Contains(t)).ToList())

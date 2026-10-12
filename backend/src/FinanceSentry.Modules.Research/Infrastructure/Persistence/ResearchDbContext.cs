@@ -2,18 +2,17 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Persistence;
 
 using System.Text.Json;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser) : DbContext(options)
+public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICurrentUser currentUser)
+    : OwnerScopedDbContext(options, currentUser)
 {
-    // Read by the Owner query filter on every query this context runs; null (no person in scope) matches no
-    // per-user row.
-    private Guid? CurrentUserId => currentUser.UserId;
-
     public DbSet<WatchlistItem> WatchlistItems { get; set; } = null!;
 
     public DbSet<InvestmentThesis> Theses { get; set; } = null!;
@@ -55,18 +54,21 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
     public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
     public DbSet<BenchmarkRelativeRecord> BenchmarkRelativeRecords { get; set; } = null!;
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.HaveGeneratedGuidKeyDefault();
+    }
+
+    protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("research");
-        base.OnModelCreating(modelBuilder);
 
         var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
         var wb = modelBuilder.Entity<WatchlistItem>();
         wb.ToTable("watchlist_items");
         wb.HasKey(x => x.Id);
-        wb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        wb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         wb.Property(x => x.UserId).IsRequired();
         wb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
         wb.Property(x => x.Exchange).HasMaxLength(20);
@@ -77,8 +79,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var tb = modelBuilder.Entity<InvestmentThesis>();
         tb.ToTable("theses");
         tb.HasKey(x => x.Id);
-        tb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        tb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         tb.Property(x => x.UserId).IsRequired();
         tb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
         tb.Property(x => x.ThesisText).IsRequired().HasMaxLength(4000);
@@ -115,7 +115,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var nb = modelBuilder.Entity<NewsArticle>();
         nb.ToTable("news_articles");
         nb.HasKey(x => x.Id);
-        nb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         nb.Property(x => x.Source).IsRequired().HasMaxLength(50);
         nb.Property(x => x.Title).IsRequired().HasMaxLength(500);
         nb.Property(x => x.Url).IsRequired().HasMaxLength(2000);
@@ -132,7 +131,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var mb = modelBuilder.Entity<MacroEvent>();
         mb.ToTable("macro_events");
         mb.HasKey(x => x.Id);
-        mb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         mb.Property(x => x.EventDate).IsRequired();
         mb.Property(x => x.Event).IsRequired().HasMaxLength(200);
         mb.Property(x => x.Region).IsRequired().HasMaxLength(10);
@@ -160,8 +158,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var ib = modelBuilder.Entity<InvestmentPolicyStatement>();
         ib.ToTable("investment_policy_statements");
         ib.HasKey(x => x.Id);
-        ib.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        ib.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ib.Property(x => x.UserId).IsRequired();
         ib.Property(x => x.Version).IsRequired();
         ib.Property(x => x.IsCurrent).IsRequired();
@@ -212,8 +208,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var prb = modelBuilder.Entity<PolicyReview>();
         prb.ToTable("policy_reviews");
         prb.HasKey(x => x.Id);
-        prb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        prb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         prb.Property(x => x.UserId).IsRequired();
         prb.Property(x => x.PolicyStatementId).IsRequired();
         prb.Property(x => x.PolicyStatementVersion).IsRequired();
@@ -245,13 +239,11 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var teb = modelBuilder.Entity<ThesisEvent>();
         teb.ToTable("thesis_events");
         teb.HasKey(x => x.Id);
-        teb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        teb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         teb.Property(x => x.UserId).IsRequired();
-        teb.Property(x => x.SubjectType).IsRequired().HasConversion<string>().HasMaxLength(20);
+        teb.Property(x => x.SubjectType).IsRequired().HasMaxLength(20);
         teb.Property(x => x.SubjectId).IsRequired();
         teb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
-        teb.Property(x => x.EventType).IsRequired().HasConversion<string>().HasMaxLength(20);
+        teb.Property(x => x.EventType).IsRequired().HasMaxLength(20);
         teb.Property(x => x.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
         teb.Property(x => x.SubjectPrice).HasColumnType("numeric(18,6)");
         teb.Property(x => x.BenchmarkPrice).HasColumnType("numeric(18,6)");
@@ -268,12 +260,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var ocb = modelBuilder.Entity<OpportunityCandidate>();
         ocb.ToTable("opportunity_candidates");
         ocb.HasKey(x => x.Id);
-        ocb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        ocb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         ocb.Property(x => x.UserId).IsRequired();
         ocb.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
-        ocb.Property(x => x.Source).IsRequired().HasConversion<string>().HasMaxLength(20);
-        ocb.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(20);
+        ocb.Property(x => x.Source).IsRequired().HasMaxLength(20);
+        ocb.Property(x => x.Status).IsRequired().HasMaxLength(20);
         ocb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ocb.Property(x => x.ExpiresAt).IsRequired();
         ocb.Property(x => x.RejectedReason).HasMaxLength(1000);
@@ -284,10 +274,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var csb = modelBuilder.Entity<CandidateScore>();
         csb.ToTable("candidate_scores");
         csb.HasKey(x => x.Id);
-        csb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         csb.Property(x => x.CandidateId).IsRequired();
         csb.Property(x => x.ScoredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        csb.Property(x => x.CrowdingClass).IsRequired().HasConversion<string>().HasMaxLength(20);
+        csb.Property(x => x.CrowdingClass).IsRequired().HasMaxLength(20);
         csb.Property(x => x.FormulaVersion).IsRequired();
         // IpsFit and Evidence stay on the string conversion. IpsFit: a JSON complex property cannot be queried on the
         // InMemory provider the test fixtures use (see InvestmentPolicyStatement above). Evidence: ScoreEvidence holds
@@ -310,10 +299,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var aab = modelBuilder.Entity<AnalystAction>();
         aab.ToTable("analyst_actions");
         aab.HasKey(x => x.Id);
-        aab.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         aab.Property(x => x.Ticker).IsRequired().HasMaxLength(12);
         aab.Property(x => x.Firm).IsRequired().HasMaxLength(120);
-        aab.Property(x => x.ActionType).IsRequired().HasConversion<string>().HasMaxLength(20);
+        aab.Property(x => x.ActionType).IsRequired().HasMaxLength(20);
         aab.Property(x => x.PriorRating).HasMaxLength(40);
         aab.Property(x => x.NewRating).HasMaxLength(40);
         aab.Property(x => x.PriorTarget).HasColumnType("numeric(18,4)");
@@ -330,9 +318,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var aumb = modelBuilder.Entity<AnalystUniverseMember>();
         aumb.ToTable("analyst_universe_members");
         aumb.HasKey(x => x.Id);
-        aumb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         aumb.Property(x => x.Ticker).IsRequired().HasMaxLength(12);
-        aumb.Property(x => x.Reason).IsRequired().HasConversion<string>().HasMaxLength(20);
+        aumb.Property(x => x.Reason).IsRequired().HasMaxLength(20);
         aumb.Property(x => x.Active).IsRequired();
         aumb.Property(x => x.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         aumb.HasIndex(x => x.Ticker).IsUnique().HasDatabaseName("idx_analyst_universe_ticker");
@@ -340,9 +327,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var nsb = modelBuilder.Entity<NewsSource>();
         nsb.ToTable("news_sources");
         nsb.HasKey(x => x.Id);
-        nsb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         nsb.Property(x => x.Name).IsRequired().HasMaxLength(80);
-        nsb.Property(x => x.Kind).IsRequired().HasConversion<string>().HasMaxLength(10);
+        nsb.Property(x => x.Kind).IsRequired().HasMaxLength(10);
         nsb.Property(x => x.Url).IsRequired();
         nsb.PrimitiveCollection(x => x.Keywords).HasColumnType("jsonb");
         nsb.Property(x => x.ThesisId);
@@ -361,13 +347,11 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var brb = modelBuilder.Entity<BenchmarkRelativeRecord>();
         brb.ToTable("benchmark_relative_records");
         brb.HasKey(x => x.Id);
-        brb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        brb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         brb.Property(x => x.UserId).IsRequired();
-        brb.Property(x => x.Scope).IsRequired().HasConversion<string>().HasMaxLength(20);
+        brb.Property(x => x.Scope).IsRequired().HasMaxLength(20);
         brb.Property(x => x.ScopeKey).IsRequired().HasMaxLength(64);
         brb.Property(x => x.Label).IsRequired().HasMaxLength(40);
-        brb.Property(x => x.Window).IsRequired().HasConversion<string>().HasMaxLength(20);
+        brb.Property(x => x.Window).IsRequired().HasMaxLength(20);
         brb.Property(x => x.BenchmarkTicker).IsRequired().HasMaxLength(20);
         brb.Property(x => x.SubjectReturnPct).HasColumnType("numeric(12,4)");
         brb.Property(x => x.BenchmarkReturnPct).HasColumnType("numeric(12,4)");
@@ -381,7 +365,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var mtb = modelBuilder.Entity<MaterialityTerm>();
         mtb.ToTable("materiality_terms");
         mtb.HasKey(x => x.Id);
-        mtb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         mtb.Property(x => x.Term).IsRequired().HasMaxLength(40);
         mtb.Property(x => x.Enabled).IsRequired();
         mtb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -390,7 +373,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var vsb = modelBuilder.Entity<ValuationSnapshot>();
         vsb.ToTable("valuation_snapshots");
         vsb.HasKey(x => x.Id);
-        vsb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         vsb.Property(x => x.Ticker).IsRequired().HasMaxLength(12);
         vsb.Property(x => x.CapturedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         vsb.Property(x => x.Price).HasColumnType("numeric(18,4)");
@@ -405,7 +387,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var rtb = modelBuilder.Entity<RecommendationTrend>();
         rtb.ToTable("recommendation_trends");
         rtb.HasKey(x => x.Id);
-        rtb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         rtb.Property(x => x.Ticker).IsRequired().HasMaxLength(12);
         rtb.Property(x => x.Period).IsRequired();
         rtb.Property(x => x.StrongBuy).IsRequired();
@@ -421,17 +402,17 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var rdb = modelBuilder.Entity<ResearchDocument>();
         rdb.ToTable("research_documents");
         rdb.HasKey(x => x.Id);
-        // A null UserId is the shared corpus (news), readable by every person; an owned document only by its owner.
+        // Not IUserOwned (UserId is nullable), so the base adds no filter: a null UserId is the shared corpus (news),
+        // readable by every person; an owned document only by its owner.
         rdb.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == null || x.UserId == CurrentUserId);
-        rdb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
-        rdb.Property(x => x.SourceType).IsRequired().HasConversion<string>().HasMaxLength(40);
+        rdb.Property(x => x.SourceType).IsRequired().HasMaxLength(40);
         rdb.Property(x => x.SourceId).IsRequired().HasMaxLength(80);
         rdb.Property(x => x.Title).IsRequired().HasMaxLength(500);
         rdb.Property(x => x.SourceName).HasMaxLength(160);
         rdb.Property(x => x.ContentHash).IsRequired().HasMaxLength(128);
         rdb.Property(x => x.Text).IsRequired();
         rdb.Property(x => x.CapturedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        rdb.Property(x => x.IndexStatus).IsRequired().HasConversion<string>().HasMaxLength(30);
+        rdb.Property(x => x.IndexStatus).IsRequired().HasMaxLength(30);
         // Primitive collections stored as a jsonb array, so Contains/Any translate to SQL.
         rdb.PrimitiveCollection(x => x.Tickers).HasColumnType("jsonb");
         rdb.PrimitiveCollection(x => x.ThesisIds).HasColumnType("jsonb");
@@ -445,7 +426,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var rcb = modelBuilder.Entity<ResearchChunk>();
         rcb.ToTable("research_chunks");
         rcb.HasKey(x => x.Id);
-        rcb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         rcb.Property(x => x.Text).IsRequired();
         rcb.Property(x => x.ContentHash).IsRequired().HasMaxLength(128);
         rcb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -457,7 +437,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var reb = modelBuilder.Entity<ResearchEmbedding>();
         reb.ToTable("research_embeddings");
         reb.HasKey(x => x.Id);
-        reb.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         reb.Property(x => x.Provider).IsRequired().HasMaxLength(60);
         reb.Property(x => x.Model).IsRequired().HasMaxLength(120);
         reb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -471,8 +450,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         var alr = modelBuilder.Entity<AssetLedgerRead>();
         alr.ToTable("asset_ledger_reads");
         alr.HasKey(x => x.Id);
-        alr.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
-        alr.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         alr.Property(x => x.UserId).IsRequired();
         alr.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
         alr.Property(x => x.Narrative).IsRequired();
