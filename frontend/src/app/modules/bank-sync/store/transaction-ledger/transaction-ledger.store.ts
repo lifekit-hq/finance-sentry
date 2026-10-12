@@ -24,10 +24,10 @@ export const TransactionLedgerStore = signalStore(
       default: initialTransactionLedgerState.transactionType,
       codec: TRANSACTION_TYPE_PARAM_CODEC,
     },
-    category: {
+    categories: {
       param: 'category',
-      default: initialTransactionLedgerState.category,
-      codec: NULLABLE_STRING_PARAM_CODEC,
+      default: initialTransactionLedgerState.categories,
+      codec: 'csv',
     },
     from: {param: 'from', default: initialTransactionLedgerState.from, codec: ISO_DATE_PARAM_CODEC},
     to: {param: 'to', default: initialTransactionLedgerState.to, codec: ISO_DATE_PARAM_CODEC},

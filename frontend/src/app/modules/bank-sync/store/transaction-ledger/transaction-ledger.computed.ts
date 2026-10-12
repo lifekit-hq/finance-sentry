@@ -19,7 +19,7 @@ interface StateSignals {
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
   search: Signal<string>;
-  category: Signal<Nullable<string>>;
+  categories: Signal<string[]>;
   from: Signal<Nullable<string>>;
   to: Signal<Nullable<string>>;
   accounts: Signal<TransactionAccountOption[]>;
@@ -29,7 +29,7 @@ interface StateSignals {
 export interface LedgerFilter {
   accountId: Nullable<string>;
   transactionType: Nullable<TransactionType>;
-  category: Nullable<string>;
+  categories: string[];
   from: Nullable<string>;
   to: Nullable<string>;
   search: string;
@@ -44,7 +44,7 @@ export function transactionLedgerComputed(store: StateSignals) {
     filter: computed<LedgerFilter>(() => ({
       accountId: store.accountId(),
       transactionType: store.transactionType(),
-      category: store.category(),
+      categories: store.categories(),
       from: store.from(),
       to: store.to(),
       search: store.search().trim(),

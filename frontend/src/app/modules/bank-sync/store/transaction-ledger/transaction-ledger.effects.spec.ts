@@ -29,7 +29,7 @@ function prevUtcMonthKey(): string {
 const NO_FILTER: LedgerFilter = {
   accountId: null,
   transactionType: null,
-  category: null,
+  categories: [],
   from: null,
   to: null,
   search: '',
@@ -126,7 +126,7 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
-    category: signal<string | null>(null),
+    categories: signal<string[]>([]),
     from: signal<string | null>(null),
     to: signal<string | null>(null),
     search: signal(''),
@@ -210,7 +210,7 @@ describe('transactionLedgerEffects', () => {
 
     it('sends the active category to the server', () => {
       const store = buildStore();
-      store.category.set('FAMILY_SUPPORT');
+      store.categories.set(['FAMILY_SUPPORT']);
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
@@ -220,7 +220,7 @@ describe('transactionLedgerEffects', () => {
       expect(service.getAllTransactions).toHaveBeenCalledWith({
         offset: 0,
         limit: PAGE_SIZE,
-        category: 'FAMILY_SUPPORT',
+        category: ['FAMILY_SUPPORT'],
       });
     });
 
@@ -456,7 +456,7 @@ describe('transactionLedgerEffects', () => {
     it.each<[string, Partial<LedgerFilter>]>([
       ['account', {accountId: 'acc-1'}],
       ['type', {transactionType: 'debit'}],
-      ['category', {category: 'FOOD_AND_DRINK'}],
+      ['category', {categories: ['FOOD_AND_DRINK']}],
       ['from bound', {from: '2026-06-01'}],
       ['to bound', {to: '2026-08-31'}],
       ['search', {search: 'coffee'}],

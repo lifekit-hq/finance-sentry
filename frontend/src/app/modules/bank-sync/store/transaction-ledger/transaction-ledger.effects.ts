@@ -38,7 +38,7 @@ interface EffectsStore {
   offset: Signal<number>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
-  category: Signal<Nullable<string>>;
+  categories: Signal<string[]>;
   from: Signal<Nullable<string>>;
   to: Signal<Nullable<string>>;
   search: Signal<string>;
@@ -64,7 +64,7 @@ function sameFilter(a: LedgerFilter, b: LedgerFilter): boolean {
   return (
     a.accountId === b.accountId &&
     a.transactionType === b.transactionType &&
-    a.category === b.category &&
+    a.categories.join() === b.categories.join() &&
     a.from === b.from &&
     a.to === b.to &&
     a.search === b.search
@@ -77,7 +77,7 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
     limit: PAGE_SIZE,
     accountId: store.accountId() ?? undefined,
     transactionType: store.transactionType() ?? undefined,
-    category: store.category() ?? undefined,
+    category: store.categories().length > 0 ? store.categories() : undefined,
     from: store.from() ?? undefined,
     to: store.to() ?? undefined,
     search: store.search().trim() || undefined,

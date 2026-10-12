@@ -67,7 +67,7 @@ describe('TransactionLedgerStore URL → state', () => {
 
     expect(store.accountId()).toBe('acc-1');
     expect(store.transactionType()).toBe('credit');
-    expect(store.category()).toBe('FOOD');
+    expect(store.categories()).toEqual(['FOOD']);
     expect(store.from()).toBe(DATE_FROM);
     expect(store.to()).toBe(DATE_TO);
     expect(store.search()).toBe('netflix');
@@ -77,7 +77,7 @@ describe('TransactionLedgerStore URL → state', () => {
       limit: 50,
       accountId: 'acc-1',
       transactionType: 'credit',
-      category: 'FOOD',
+      category: ['FOOD'],
       from: DATE_FROM,
       to: DATE_TO,
       search: 'netflix',
@@ -89,7 +89,7 @@ describe('TransactionLedgerStore URL → state', () => {
 
     expect(store.accountId()).toBeNull();
     expect(store.transactionType()).toBeNull();
-    expect(store.category()).toBeNull();
+    expect(store.categories()).toEqual([]);
     expect(store.from()).toBeNull();
     expect(store.to()).toBeNull();
     expect(store.search()).toBe('');
@@ -117,7 +117,7 @@ describe('TransactionLedgerStore URL → state', () => {
     const {store} = await open('/transactions?account=&category=');
 
     expect(store.accountId()).toBeNull();
-    expect(store.category()).toBeNull();
+    expect(store.categories()).toEqual([]);
   });
 
   it('follows the URL when it changes after load and reloads once', async () => {
@@ -136,13 +136,13 @@ describe('TransactionLedgerStore URL → state', () => {
 
 describe('TransactionLedgerStore state → URL', () => {
   type Change = Partial<
-    Pick<TransactionLedgerState, 'accountId' | 'transactionType' | 'category' | 'from' | 'to'>
+    Pick<TransactionLedgerState, 'accountId' | 'transactionType' | 'categories' | 'from' | 'to'>
   >;
 
   it.each<[string, Change, string]>([
     ['account', {accountId: 'acc-1'}, '/transactions?account=acc-1'],
     ['type', {transactionType: 'debit'}, '/transactions?type=debit'],
-    ['category', {category: 'FOOD'}, '/transactions?category=FOOD'],
+    ['category', {categories: ['FOOD']}, '/transactions?category=FOOD'],
     ['from', {from: DATE_FROM}, `/transactions?from=${DATE_FROM}`],
     ['to', {to: DATE_TO}, `/transactions?to=${DATE_TO}`],
   ])('writes a changed %s without adding a history entry', async (_, change, expected) => {
