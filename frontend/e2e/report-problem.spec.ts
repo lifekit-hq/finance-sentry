@@ -85,13 +85,7 @@ test.describe('report a problem (phone)', () => {
 
   test('a 429 says to try later and keeps the text', async ({page}) => {
     await open(page, '/more');
-    await page.route(`${API}/feedback`, route =>
-      route.fulfill({
-        status: 429,
-        contentType: 'application/json',
-        body: JSON.stringify({errorCode: 'REPORT_RATE_LIMITED'}),
-      })
-    );
+    await page.route(`${API}/feedback`, route => route.fulfill({status: 429, body: ''}));
 
     await page.getByTestId('more-report-problem').click();
     await fillAndSend(page);

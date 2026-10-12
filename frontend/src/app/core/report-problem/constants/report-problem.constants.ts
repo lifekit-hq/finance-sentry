@@ -12,6 +12,9 @@ export const REPORT_PROBLEM_TEXT_ROWS = 6;
 
 export const REPORT_PROBLEM_HELPER = "Don't include account numbers, amounts or passwords";
 
+/** The code the API's own limiter reports; the middleware's bare 429 carries none, so the sheet supplies it. */
+export const REPORT_PROBLEM_RATE_LIMITED_CODE = 'REPORT_RATE_LIMITED';
+
 export const REPORT_PROBLEM_FAILED_MESSAGE =
   "Couldn't send your report. Your text is kept; try again.";
 

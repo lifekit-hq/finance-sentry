@@ -136,7 +136,7 @@ describe('ReportProblemSheetComponent', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it('falls back to the generic message when the error has no known code', async () => {
+  it('says to try later on a bare 429 from the rate limiter and keeps the text', async () => {
     const {host, type, fixture} = await render();
     type('broken');
     host.querySelector('form')?.dispatchEvent(new Event('submit'));
@@ -144,7 +144,7 @@ describe('ReportProblemSheetComponent', () => {
     fixture.detectChanges();
 
     expect(host.querySelector('[data-testid="report-error"]')?.textContent).toContain(
-      REPORT_PROBLEM_FAILED_MESSAGE
+      ERROR_MESSAGES_REGISTRY['REPORT_RATE_LIMITED']
     );
     expect(host.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('broken');
     expect(close).not.toHaveBeenCalled();

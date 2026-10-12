@@ -1,3 +1,4 @@
+import {HttpErrorResponse, HttpStatusCode} from '@angular/common/http';
 import {inject, type Signal} from '@angular/core';
 import {Router} from '@angular/router';
 import {extractErrorCode} from '@lifekit-hq/core';
@@ -6,6 +7,7 @@ import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, exhaustMap, pipe, tap} from 'rxjs';
 
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
+import {REPORT_PROBLEM_RATE_LIMITED_CODE} from '../constants/report-problem.constants';
 import {type ReportProblemStatus} from '../models/report-problem.model';
 import {ReportProblemService} from '../services/report-problem.service';
 import {ClientInfoUtils} from '../utils/client-info.utils';
@@ -47,7 +49,11 @@ export function reportProblemEffects(store: EffectsStore) {
               drawerRef.close();
             }),
             catchError((err: unknown) => {
-              store.setError(extractErrorCode(err));
+              const bareRateLimit =
+                err instanceof HttpErrorResponse && err.status === HttpStatusCode.TooManyRequests;
+              store.setError(
+                extractErrorCode(err) ?? (bareRateLimit ? REPORT_PROBLEM_RATE_LIMITED_CODE : null)
+              );
               return EMPTY;
             })
           )
