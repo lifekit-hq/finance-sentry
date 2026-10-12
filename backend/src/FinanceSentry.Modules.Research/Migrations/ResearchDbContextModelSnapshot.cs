@@ -775,6 +775,11 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.HasIndex("UserId", "Ticker")
                         .HasDatabaseName("idx_opportunity_candidates_user_ticker");
 
+                    b.HasIndex("UserId", "Ticker")
+                        .IsUnique()
+                        .HasDatabaseName("ux_opportunity_candidates_user_ticker_active")
+                        .HasFilter("\"Status\" = 'Active'");
+
                     b.ToTable("opportunity_candidates", "research");
                 });
 

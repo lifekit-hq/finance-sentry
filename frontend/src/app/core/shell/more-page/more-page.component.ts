@@ -10,6 +10,8 @@ import {
 
 import {AuthStore} from '../../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
+import {REPORT_PROBLEM_LABEL} from '../../report-problem/constants/report-problem.constants';
+import {ReportProblemPanelService} from '../../report-problem/services/report-problem-panel.service';
 import {WHATS_NEW_LABEL} from '../../whats-new/constants/whats-new.constants';
 import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
 import {WhatsNewStore} from '../../whats-new/store/whats-new.store';
@@ -33,10 +35,12 @@ import {NavUtils} from '../utils/nav.utils';
 export class MorePageComponent {
   private readonly authStore = inject(AuthStore);
   private readonly whatsNewPanel = inject(WhatsNewPanelService);
+  private readonly reportProblemPanel = inject(ReportProblemPanelService);
 
   public readonly email = this.authStore.email;
   public readonly hasUnread = inject(WhatsNewStore).hasUnread;
   public readonly whatsNewLabel = WHATS_NEW_LABEL;
+  public readonly reportProblemLabel = REPORT_PROBLEM_LABEL;
   public readonly versionLabel = `Version ${APP_VERSION}`;
 
   public readonly items = computed(() =>
@@ -47,6 +51,10 @@ export class MorePageComponent {
 
   public openWhatsNew(): void {
     this.whatsNewPanel.open();
+  }
+
+  public openReportProblem(): void {
+    this.reportProblemPanel.open();
   }
 
   public logout(): void {

@@ -18,7 +18,8 @@ public enum InzhurSyncOutcome
 public interface IInzhurSyncService
 {
     /// <summary>
-    /// One read of the user's cabinet: refresh the session, read holdings and cash, store them. Throws
+    /// One read of the user's cabinet: refresh the session, read holdings, cash and the whole ledger, store them (the
+    /// first sync is the full history backfill; later ones re-read it and change nothing they already hold). Throws
     /// <see cref="InzhurApiException"/> when Inzhur fails; a dead session also flips the connection to
     /// <see cref="InzhurConnectionStatus.ReauthRequired"/> first. Never signs in, so never sends an SMS.
     /// </summary>
@@ -28,6 +29,8 @@ public interface IInzhurSyncService
 public sealed class InzhurSyncService(
     IInzhurCredentialRepository credentialRepository,
     IBrokerageHoldingRepository holdingRepository,
+    IBrokerageTradeRepository tradeRepository,
+    IBrokerageCashTransactionRepository cashTransactionRepository,
     IInzhurApiClient api,
     IInzhurSessionGate gate,
     ICredentialEncryptionService encryption,
@@ -54,19 +57,27 @@ public sealed class InzhurSyncService(
             credential.RefreshSession(Encrypt(refreshed.Serialize()), Now);
             await credentialRepository.SaveChangesAsync(ct);
 
+            // Every read comes before any write: a failed read keeps what is stored instead of half of a new day.
             var portfolio = await api.GetPortfolioAsync(refreshed, ct);
+            var transactions = await api.GetTransactionsAsync(refreshed, ct);
             LogUnmodelledAssetFields(portfolio);
 
             var positions = InzhurHoldingsMapper.Map(portfolio);
             RefuseWhenFundedAssetsAllDropped(portfolio, positions);
+            var ledger = InzhurLedgerMapper.Map(transactions);
+            if (ledger.SkippedTypes.Count > 0)
+                logger.LogWarning(
+                    "Inzhur ledger rows of unmodelled types were not stored: {TransactionTypes}", string.Join(", ", ledger.SkippedTypes));
+
             await StoreHoldingsAsync(userId, positions, ct);
+            var (tradesAdded, cashAdded) = await StoreLedgerAsync(userId, ledger, ct);
 
             credential.RecordSyncSuccess(Now);
             await credentialRepository.SaveChangesAsync(ct);
 
             logger.LogInformation(
-                "Inzhur sync stored {PositionCount} positions for user {UserId}; session started {SessionStartedAt:o}",
-                positions.Count, userId, credential.SessionStartedAt);
+                "Inzhur sync stored {PositionCount} positions and read {LedgerRowCount} ledger rows ({TradesAdded} new trades, {CashAdded} new cash rows) for user {UserId}; session started {SessionStartedAt:o}",
+                positions.Count, transactions.Count, tradesAdded, cashAdded, userId, credential.SessionStartedAt);
             return InzhurSyncOutcome.Synced;
         }
         catch (InzhurApiException ex) when (ex.Kind == InzhurFailureKind.ReauthRequired)
@@ -93,12 +104,16 @@ public sealed class InzhurSyncService(
     {
         var funded = portfolio.Assets
             .Where(a => a.Details is { TotalAmountUah: not (null or 0m) } or { InvestedUah: not (null or 0m) })
-            .Select(InzhurHoldingsMapper.SymbolFor)
-            .ToHashSet(StringComparer.Ordinal);
-        if (funded.Count > 0 && !positions.Any(p => funded.Contains(p.Symbol)))
+            .ToList();
+        // Funded assets but not one holding besides cash: the quantity field moved, the owner did not sell out.
+        if (funded.Count > 0 && positions.All(p => p.InstrumentType == InzhurHoldingsMapper.CashInstrumentType))
             throw new InzhurApiException(
                 InzhurFailureKind.Unexpected, "Inzhur user-assets listed assets with amounts but none could be read as a position.");
     }
+
+    private const string OpenIndicator = "O";
+    private const string CloseIndicator = "C";
+    private const int TradeIdMaxLength = 30;
 
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
 
@@ -142,6 +157,58 @@ public sealed class InzhurSyncService(
 
         await holdingRepository.SaveChangesAsync(ct);
     }
+
+    // Idempotent on Inzhur's own row id: a trade seen again is refreshed in place (the cabinet may correct it), a cash
+    // row seen again is left alone, as IbkrFlexTradeSyncService does for Flex rows.
+    private async Task<(int TradesAdded, int CashAdded)> StoreLedgerAsync(Guid userId, InzhurLedger ledger, CancellationToken ct)
+    {
+        const string provider = InzhurHoldingsMapper.Provider;
+        const string currency = InzhurHoldingsMapper.DefaultCurrency;
+        var tradesAdded = 0;
+        foreach (var t in ledger.Trades)
+        {
+            var openClose = t.Quantity > 0m ? OpenIndicator : CloseIndicator;
+            var existing = await tradeRepository.GetByExecutionIdUnscopedAsync(userId, provider, t.Id, ct);
+            if (existing is null)
+            {
+                await tradeRepository.AddAsync(new BrokerageTrade(
+                    userId, provider, t.Id, TradeIdFor(t.Id), conid: null, t.Isin, t.Symbol, openClose, openDateTime: null,
+                    t.TradeDateTime, t.Quantity, t.Price, t.Proceeds, costBasis: null, realizedPnl: null, commission: null,
+                    commissionCurrency: null, taxes: null, currency, fxRateToBase: null), ct);
+                tradesAdded++;
+            }
+            else
+            {
+                existing.Refresh(
+                    conid: null, t.Isin, t.Symbol, openClose, openDateTime: null, t.TradeDateTime, t.Quantity, t.Price,
+                    t.Proceeds, costBasis: null, realizedPnl: null, commission: null, commissionCurrency: null, taxes: null,
+                    currency, fxRateToBase: null, instrumentId: null);
+                tradeRepository.Update(existing);
+            }
+        }
+
+        if (ledger.Trades.Count > 0)
+            await tradeRepository.SaveChangesAsync(ct);
+
+        var cashAdded = 0;
+        foreach (var c in ledger.Cash)
+        {
+            if (await cashTransactionRepository.GetByIdempotencyKeyUnscopedAsync(userId, provider, c.Id, ct) is not null)
+                continue;
+            await cashTransactionRepository.AddAsync(new BrokerageCashTransaction(
+                userId, provider, c.Id, conid: null, c.Isin, c.Symbol, c.DateTime, c.Amount, c.Type, c.Code,
+                withholdingTax: null, currency, fxRateToBase: null), ct);
+            cashAdded++;
+        }
+
+        if (cashAdded > 0)
+            await cashTransactionRepository.SaveChangesAsync(ct);
+
+        return (tradesAdded, cashAdded);
+    }
+
+    // The trade-id column is IBKR's (30 characters, informational, never a key); the full Inzhur id is the execution id.
+    private static string TradeIdFor(string id) => id.Length <= TradeIdMaxLength ? id : id[..TradeIdMaxLength];
 
     // The asset row's name field is not settled by the design read (the cabinet takes names from its CMS); the
     // field names - never values - show where it lives so the symbol can follow it.

@@ -1,4 +1,4 @@
-import {expect, type Page, test} from '@playwright/test';
+import {expect, type Locator, type Page, test} from '@playwright/test';
 
 import {API, AUTH_RESPONSE} from './dossier-mocks';
 
@@ -119,13 +119,20 @@ async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
   await page.clock.runFor(CHART_SETTLE_MS);
 }
 
+/**
+ * The release version shows up twice and changes on every release, so every baseline masks both:
+ * the sidebar footer prints it next to "What's new" (its text may be padded with whitespace, which a
+ * regex, unlike a string, is matched against verbatim) and the More page lists it as a row of its own.
+ */
+export function versionMasks(page: Page): Locator[] {
+  return [
+    page.getByText(/^\s*v\d+\.\d+\.\d+ · What's new\s*$/),
+    page.getByTestId('more-version'),
+  ];
+}
+
 async function expectBaseline(page: Page, name: string): Promise<void> {
-  // The sidebar footer prints the app version, which changes on every release. The element's text is
-  // padded with whitespace, which a regex (unlike a string) is matched against verbatim.
-  const version = page.getByText(/^\s*v\d+\.\d+\.\d+\s*$/);
-  // The More page prints it as a list row of its own.
-  const moreVersion = page.getByTestId('more-version');
-  await expect(page).toHaveScreenshot(name, {...SCREENSHOT_OPTIONS, mask: [version, moreVersion]});
+  await expect(page).toHaveScreenshot(name, {...SCREENSHOT_OPTIONS, mask: versionMasks(page)});
 }
 
 export function describeVisualBaseline(screen: VisualScreen): void {

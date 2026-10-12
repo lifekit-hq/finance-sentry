@@ -270,6 +270,12 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         ocb.PrimitiveCollection(x => x.NominationReasons).HasColumnType("jsonb");
         ocb.HasIndex(x => new { x.UserId, x.Status }).HasDatabaseName("idx_opportunity_candidates_user_status");
         ocb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_opportunity_candidates_user_ticker");
+        // One Active candidate per (UserId, Ticker): the guard behind CandidateRepository.UpsertActiveAsync. Partial, so a
+        // ticker re-activated after Expire/Promote/Reject still inserts.
+        ocb.HasIndex(x => new { x.UserId, x.Ticker })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Active'")
+            .HasDatabaseName("ux_opportunity_candidates_user_ticker_active");
 
         var csb = modelBuilder.Entity<CandidateScore>();
         csb.ToTable("candidate_scores");

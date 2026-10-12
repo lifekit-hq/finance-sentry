@@ -14,7 +14,8 @@ public sealed record InzhurPosition(
 /// <summary>
 /// Maps a day's cabinet read onto brokerage holdings (money-semantics §1, "Inzhur"). Funds land as <c>REIT</c> (real
 /// estate, never the equity universes that research/earnings/events build from <c>STK</c>), war bonds as <c>BOND</c>,
-/// and the broker account's free + order-blocked UAH as one <c>CASH</c> row, the way IBKR's cash ledger lands.
+/// and the broker account's free + order-blocked UAH as one <c>CASH</c> row, the way IBKR's cash ledger lands. The
+/// cabinet's money amounts are kopecks and are converted to hryvnia once, by <see cref="FromMinorUnits"/>.
 /// </summary>
 public static class InzhurHoldingsMapper
 {
@@ -27,14 +28,21 @@ public static class InzhurHoldingsMapper
     /// <summary>What every Inzhur amount is denominated in unless the cabinet reports a currency itself.</summary>
     public const string DefaultCurrency = "UAH";
 
+    /// <summary>The cabinet reports money in minor units (kopecks); its UI divides by this before showing any amount.</summary>
+    public const decimal MinorUnitsPerMajor = 100m;
+
     private const string BondType = "bond";
     private const string FallbackSymbolPrefix = "INZHUR-";
     private const int SymbolMaxLength = 50;
 
     public static IReadOnlyList<InzhurPosition> Map(InzhurPortfolio portfolio)
     {
+        var catalog = (portfolio.Catalog ?? [])
+            .Where(c => c.AssetIdText.Length > 0)
+            .GroupBy(c => c.AssetIdText, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var positions = portfolio.Assets
-            .Select(MapAsset)
+            .Select(a => MapAsset(a, catalog.GetValueOrDefault(a.IdText)))
             .OfType<InzhurPosition>()
             // The holding row is unique per (user, symbol, provider): two lots of one asset become one row.
             .GroupBy(p => p.Symbol, StringComparer.Ordinal)
@@ -42,7 +50,7 @@ public static class InzhurHoldingsMapper
             .ToList();
 
         var account = portfolio.BrokerAccount;
-        var cashUah = (account?.AvailableBalanceUah ?? 0m) + (account?.BlockedBalanceUah ?? 0m);
+        var cashUah = FromMinorUnits(account?.AvailableBalanceUah) + FromMinorUnits(account?.BlockedBalanceUah);
         if (cashUah != 0m)
         {
             var currency = CurrencyFor(account?.Currency);
@@ -60,29 +68,47 @@ public static class InzhurHoldingsMapper
         return CurrencyConverter.IsKnown(code) ? code! : DefaultCurrency;
     }
 
-    public static string SymbolFor(InzhurAsset asset)
+    /// <summary>A cabinet money amount (kopecks) in major units (hryvnia); a missing amount is zero.</summary>
+    public static decimal FromMinorUnits(decimal? minorUnits) => (minorUnits ?? 0m) / MinorUnitsPerMajor;
+
+    public static string SymbolFor(InzhurAsset asset, InzhurCatalogAsset? catalog = null)
+        => SymbolFor(
+            asset.Type ?? catalog?.Type,
+            FirstNonBlank(asset.Name, asset.Title, catalog?.Name),
+            FirstNonBlank(asset.Isin, catalog?.Isin),
+            asset.IdText);
+
+    /// <summary>
+    /// The one naming rule for an Inzhur instrument, shared by holdings and ledger rows so the cost-basis reconciler can
+    /// match them by symbol: a war bond is its ISIN (the cabinet shows it as "ОВДП &lt;isin&gt;"), a fund its name; then
+    /// whichever of the two exists, then <c>INZHUR-&lt;id&gt;</c>.
+    /// </summary>
+    public static string SymbolFor(string? type, string? name, string? isin, string? id)
     {
-        var name = FirstNonBlank(asset.Name, asset.Title, asset.Isin) ?? FallbackSymbolPrefix + asset.IdText;
-        return name.Length <= SymbolMaxLength ? name : name[..SymbolMaxLength];
+        var symbol = (IsBond(type) ? FirstNonBlank(isin, name) : FirstNonBlank(name, isin))
+            ?? FallbackSymbolPrefix + id;
+        return symbol.Length <= SymbolMaxLength ? symbol : symbol[..SymbolMaxLength];
     }
 
-    private static InzhurPosition? MapAsset(InzhurAsset asset)
+    public static bool IsBond(string? type) => string.Equals(type, BondType, StringComparison.OrdinalIgnoreCase);
+
+    private static InzhurPosition? MapAsset(InzhurAsset asset, InzhurCatalogAsset? catalog)
     {
         var quantity = asset.Details?.CertificatesOwnedQuantity ?? asset.SecurityProperties?.AvailableQuantity ?? 0m;
         if (quantity <= 0m)
             return null;
 
         var price = asset.Prices?.SellUah ?? asset.Prices?.NavUah ?? 0m;
-        var valueUah = asset.Details?.TotalAmountUah ?? quantity * price;
-        var investedUah = asset.Details?.InvestedUah;
+        var valueUah = asset.Details?.TotalAmountUah is { } total ? FromMinorUnits(total) : quantity * price;
+        var investedUah = FromMinorUnits(asset.Details?.InvestedUah);
         var currency = CurrencyFor(asset.Currency);
 
         return new InzhurPosition(
-            SymbolFor(asset),
-            string.Equals(asset.Type, BondType, StringComparison.OrdinalIgnoreCase) ? BondInstrumentType : FundInstrumentType,
+            SymbolFor(asset, catalog),
+            IsBond(asset.Type ?? catalog?.Type) ? BondInstrumentType : FundInstrumentType,
             quantity,
             CurrencyConverter.ToUsd(valueUah, currency),
-            investedUah is > 0m ? CurrencyConverter.ToUsd(investedUah.Value, currency) / quantity : null,
+            investedUah > 0m ? CurrencyConverter.ToUsd(investedUah, currency) / quantity : null,
             currency,
             valueUah);
     }
@@ -106,6 +132,6 @@ public static class InzhurHoldingsMapper
         };
     }
 
-    private static string? FirstNonBlank(params string?[] values)
+    internal static string? FirstNonBlank(params string?[] values)
         => values.Select(v => v?.Trim()).FirstOrDefault(v => !string.IsNullOrEmpty(v));
 }

@@ -137,7 +137,9 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: playwright-report
-        path: frontend/playwright-report/
+        path: |
+          frontend/playwright-report/
+          frontend/test-results/
 
     # - name: Upload coverage
     #   if: always()
