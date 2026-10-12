@@ -11,13 +11,10 @@ function unreadWeight(alert: Alert | undefined): number {
 export function alertsMethods(store: WritableStateSource<AlertsState>) {
   return {
     setData(alerts: Alert[], totalCount: number, unreadCount: number): void {
-      patchState(store, {alerts, totalCount, unreadCount, status: 'idle'});
+      patchState(store, {alerts, totalCount, unreadCount});
     },
     setUnreadCount(unreadCount: number): void {
       patchState(store, {unreadCount});
-    },
-    setStatus(status: AsyncStatus): void {
-      patchState(store, {status});
     },
     setFilter(filter: AlertFilter): void {
       patchState(store, {filter, currentPage: 1});
