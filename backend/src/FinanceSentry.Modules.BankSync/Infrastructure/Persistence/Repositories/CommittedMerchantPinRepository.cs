@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 /// </summary>
 public class CommittedMerchantPinRepository(BankSyncDbContext context) : ICommittedMerchantPinRepository
 {
+    private const int MaxAddAttempts = 2;
+
     private readonly BankSyncDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
     /// <inheritdoc />
@@ -34,36 +36,36 @@ public class CommittedMerchantPinRepository(BankSyncDbContext context) : ICommit
         return keys.ToHashSet(StringComparer.Ordinal);
     }
 
+    // One INSERT ... ON CONFLICT DO NOTHING on the unique (UserId, MerchantKey) index: the write is atomic, so two
+    // tabs (or a double-clicked button) pinning one merchant cannot fail on the index, and no read precedes it. The
+    // affected-row count says which happened. It runs at once rather than at SaveChanges, and the pin is not
+    // tracked by this context. A pin removed between the conflict and the read-back (a concurrent unpin) leaves
+    // nothing to report, so the insert is tried once more.
     /// <inheritdoc />
     public async Task<AddCommittedMerchantPinResult> AddIfAbsentAsync(
         CommittedMerchantPin pin, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pin);
 
-        var existing = await FindAsync(pin.UserId, pin.MerchantKey, cancellationToken);
-        if (existing is not null)
-            return new AddCommittedMerchantPinResult(existing, AlreadyPinned: true);
-
-        _context.CommittedMerchantPins.Add(pin);
-        try
+        for (var attempt = 0; attempt < MaxAddAttempts; attempt++)
         {
-            await _context.SaveChangesAsync(cancellationToken);
-            return new AddCommittedMerchantPinResult(pin, AlreadyPinned: false);
-        }
-        catch (DbUpdateException)
-        {
-            // Same shape as CompanionEventRepository.InsertIfNewAsync: the read above cannot be
-            // atomic with the write, so a concurrent pin of the same merchant (two tabs, a
-            // double-clicked button) loses the unique (UserId, MerchantKey) index here. That is
-            // the state the caller asked for, so report it as already pinned rather than a 5xx.
-            _context.Entry(pin).State = EntityState.Detached;
+            var inserted = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO bank_sync.committed_merchant_pins ("Id", "UserId", "MerchantKey", "DisplayName", "CreatedAt")
+                VALUES ({pin.Id}, {pin.UserId}, {pin.MerchantKey}, {pin.DisplayName}, {pin.CreatedAt})
+                ON CONFLICT ("UserId", "MerchantKey") DO NOTHING
+                """,
+                cancellationToken);
+            if (inserted > 0)
+                return new AddCommittedMerchantPinResult(pin, AlreadyPinned: false);
 
-            var winner = await FindAsync(pin.UserId, pin.MerchantKey, cancellationToken);
-            if (winner is null)
-                throw; // Not a lost race — a real write failure the caller must hear about.
-
-            return new AddCommittedMerchantPinResult(winner, AlreadyPinned: true);
+            var existing = await FindAsync(pin.UserId, pin.MerchantKey, cancellationToken);
+            if (existing is not null)
+                return new AddCommittedMerchantPinResult(existing, AlreadyPinned: true);
         }
+
+        throw new InvalidOperationException(
+            $"Pin for merchant '{pin.MerchantKey}' was neither inserted nor found after {MaxAddAttempts} attempts.");
     }
 
     private Task<CommittedMerchantPin?> FindAsync(
