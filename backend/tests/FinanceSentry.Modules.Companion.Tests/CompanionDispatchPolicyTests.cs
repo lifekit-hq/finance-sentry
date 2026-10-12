@@ -5,10 +5,7 @@ using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -61,16 +58,10 @@ public sealed class CompanionDispatchPolicyTests
         OccurredAt = occurredAt,
     };
 
-    private static CompanionEventRepository NewEventRepository()
-    {
-        var db = new CompanionDbContext(
-            new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"dispatch-policy-{Guid.NewGuid():N}").Options,
-            // The in-memory provider applies the Owner query filter too; the assertions read User's events
-            // through GetAsync, while the job's own reads are the unscoped ones.
-            new FixedCurrentUser(User));
-        return new CompanionEventRepository(db);
-    }
+    // The Owner query filter applies in memory too; the assertions read User's events through GetAsync, while the
+    // job's own reads are the unscoped ones.
+    private static InMemoryCompanionStore NewEventRepository()
+        => new($"dispatch-policy-{Guid.NewGuid():N}", new FixedCurrentUser(User));
 
     [Fact]
     public async Task Realtime_event_is_deferred_during_quiet_hours()

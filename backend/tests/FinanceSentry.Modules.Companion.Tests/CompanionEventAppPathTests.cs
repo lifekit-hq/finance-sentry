@@ -5,10 +5,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -79,17 +76,14 @@ public sealed class CompanionEventAppPathTests
 
     private static async Task<List<CompanionEvent>> CaptureAsync(IMaterialAlertReader alerts, IAnalystActionFeedReader actions, string held)
     {
-        await using var db = new CompanionDbContext(
-            new DbContextOptionsBuilder<CompanionDbContext>()
-                .UseInMemoryDatabase($"app-path-{Guid.NewGuid():N}").Options,
-            NoCurrentUser.Instance);
+        await using var store = new InMemoryCompanionStore($"app-path-{Guid.NewGuid():N}", NoCurrentUser.Instance);
         var capture = new CompanionEventCapture(
             alerts, actions, new Holds(held), new Banking(), new NoAccounts(), new RealtimeSettings(),
-            new CompanionEventRepository(db), new CompanionCaptureStateRepository(db), new MaterialityPolicy(),
+            store, store, new MaterialityPolicy(),
             Options.Create(new CompanionOptions()), NullLogger<CompanionEventCapture>.Instance);
 
         await capture.CaptureAsync();
-        return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).ToListAsync();
+        return await store.AllEventsAsync();
     }
 
     [Fact]

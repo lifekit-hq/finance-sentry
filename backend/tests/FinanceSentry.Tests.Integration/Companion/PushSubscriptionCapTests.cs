@@ -8,13 +8,32 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-public class PushSubscriptionCapTests
+/// <summary>
+/// The per-user device cap. The upsert is raw SQL (<c>INSERT ... ON CONFLICT</c>), which the in-memory provider
+/// cannot run, so this needs real Postgres.
+/// </summary>
+[Trait("Category", "Integration")]
+public sealed class PushSubscriptionCapTests : IAsyncLifetime
 {
-    private readonly string _dbName = $"PushCap_{Guid.NewGuid()}";
     private readonly Guid _user = Guid.NewGuid();
+    private TestDatabase? _database;
+
+    public async Task InitializeAsync()
+    {
+        _database = await PostgresServer.Postgres16.CreateDatabaseAsync();
+
+        await using var setup = CreateContext(null);
+        await setup.Database.EnsureCreatedAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_database is not null)
+            await _database.DisposeAsync();
+    }
 
     private CompanionDbContext CreateContext(Guid? actingUser) =>
-        new(new DbContextOptionsBuilder<CompanionDbContext>().UseInMemoryDatabase(_dbName).Options,
+        new(new DbContextOptionsBuilder<CompanionDbContext>().UseNpgsql(_database!.ConnectionString).Options,
             new FixedCurrentUser(actingUser));
 
     private static PushSubscription NewSubscription(Guid userId, string endpoint, DateTimeOffset createdAt) => new()
@@ -44,7 +63,7 @@ public class PushSubscriptionCapTests
         return await ctx.PushSubscriptions.OrderBy(s => s.CreatedAt).Select(s => s.Endpoint).ToListAsync();
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public async Task An_eleventh_device_replaces_the_users_oldest()
     {
         var seeded = await SeedAsync(_user, PushSubscriptionLimits.MaxPerUser);
@@ -62,7 +81,7 @@ public class PushSubscriptionCapTests
         (await EndpointsAsync(others[0].UserId)).Should().HaveCount(1, "another person's devices are never evicted");
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public async Task Re_registering_an_existing_endpoint_at_the_cap_evicts_nothing()
     {
         var seeded = await SeedAsync(_user, PushSubscriptionLimits.MaxPerUser);
@@ -74,7 +93,7 @@ public class PushSubscriptionCapTests
         (await EndpointsAsync(_user)).Should().BeEquivalentTo(seeded.Select(s => s.Endpoint));
     }
 
-    [Fact]
+    [DockerRequiredFact]
     public async Task Under_the_cap_nothing_is_evicted()
     {
         var seeded = await SeedAsync(_user, PushSubscriptionLimits.MaxPerUser - 1);

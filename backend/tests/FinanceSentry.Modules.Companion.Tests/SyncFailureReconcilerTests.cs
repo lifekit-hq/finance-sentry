@@ -6,8 +6,6 @@ using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
-using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -69,17 +67,12 @@ public sealed class SyncFailureReconcilerTests
 
     private sealed class Outbox
     {
-        private readonly CompanionDbContext _db = new(
-            new DbContextOptionsBuilder<CompanionDbContext>().UseInMemoryDatabase($"reconciler-{Guid.NewGuid():N}").Options,
-            NoCurrentUser.Instance);
+        private readonly InMemoryCompanionStore _store = new($"reconciler-{Guid.NewGuid():N}", NoCurrentUser.Instance);
 
-        public Outbox() => Repository = new CompanionEventRepository(_db);
+        public ICompanionEventRepository Repository => _store;
 
-        public CompanionEventRepository Repository { get; }
-
-        // A no-principal read matches nothing under the Owner filter, so the assertions opt out like the jobs do.
         public async Task<EventDisposition> DispositionOfAsync(Guid id)
-            => (await _db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking().SingleAsync(e => e.Id == id)).Disposition;
+            => (await _store.AllEventsAsync()).Single(e => e.Id == id).Disposition;
     }
 
     private static CompanionEvent SyncFailure(Guid alertId, TimeSpan age, EventDisposition disposition) => new()
@@ -97,7 +90,7 @@ public sealed class SyncFailureReconcilerTests
     };
 
     private static SyncFailureReconciler NewReconciler(
-        CompanionEventRepository events, NotificationMode mode, params Guid[] notOpen)
+        ICompanionEventRepository events, NotificationMode mode, params Guid[] notOpen)
         => new(new Alerts(notOpen), new Settings(mode), events, Policy);
 
     [Fact]
