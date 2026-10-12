@@ -7,7 +7,6 @@ interface StateSignals {
   alerts: Signal<Alert[]>;
   filter: Signal<AlertFilter>;
   unreadCount: Signal<number>;
-  status: Signal<AsyncStatus>;
   totalCount: Signal<number>;
   currentPage: Signal<number>;
   pageSize: Signal<number>;
@@ -16,8 +15,6 @@ interface StateSignals {
 export function alertsComputed(store: StateSignals) {
   const totalPages = computed(() => Math.max(1, Math.ceil(store.totalCount() / store.pageSize())));
   return {
-    isLoading: computed(() => store.status() === 'loading'),
-    errorMessage: computed(() => (store.status() === 'error' ? 'Failed to load alerts.' : null)),
     totalPages,
     hasPreviousPage: computed(() => store.currentPage() > 1),
     hasNextPage: computed(() => store.currentPage() < totalPages()),

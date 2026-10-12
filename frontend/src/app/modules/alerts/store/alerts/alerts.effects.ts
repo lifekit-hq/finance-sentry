@@ -9,7 +9,9 @@ import {AlertsService} from '../../services/alerts.service';
 interface EffectsStore {
   setData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
   setUnreadCount: (n: number) => void;
-  setStatus: (status: AsyncStatus) => void;
+  setLoading: () => void;
+  setSuccess: () => void;
+  setError: (errorCode: Nullable<string>) => void;
   markReadLocal: (id: string) => void;
   markAllReadLocal: () => void;
   dismissLocal: (id: string) => void;
@@ -21,12 +23,15 @@ export function alertsEffects(store: EffectsStore) {
   return {
     load: rxMethod<AlertsQuery>(
       pipe(
-        tap(() => store.setStatus('loading')),
+        tap(() => store.setLoading()),
         switchMap(({filter, page, pageSize}) =>
           api.getAlerts(filter, page, pageSize).pipe(
-            tap(res => store.setData(res.items, res.totalCount, res.unreadCount)),
+            tap(res => {
+              store.setData(res.items, res.totalCount, res.unreadCount);
+              store.setSuccess();
+            }),
             catchError(() => {
-              store.setStatus('error');
+              store.setError(null);
               return EMPTY;
             })
           )

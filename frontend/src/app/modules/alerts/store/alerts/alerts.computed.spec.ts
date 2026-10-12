@@ -8,7 +8,6 @@ function build(totalCount: number, currentPage: number, pageSize = 20) {
     alerts: signal([]),
     filter: signal('unread' as const),
     unreadCount: signal(0),
-    status: signal('idle' as const),
     totalCount: signal(totalCount),
     currentPage: signal(currentPage),
     pageSize: signal(pageSize),

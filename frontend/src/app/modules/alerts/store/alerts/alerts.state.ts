@@ -5,7 +5,6 @@ const DEFAULT_PAGE_SIZE = 20;
 export interface AlertsState {
   alerts: Alert[];
   filter: AlertFilter;
-  status: AsyncStatus;
   totalCount: number;
   unreadCount: number;
   currentPage: number;
@@ -15,7 +14,6 @@ export interface AlertsState {
 export const initialAlertsState: AlertsState = {
   alerts: [],
   filter: 'all',
-  status: 'idle',
   totalCount: 0,
   unreadCount: 0,
   currentPage: 1,

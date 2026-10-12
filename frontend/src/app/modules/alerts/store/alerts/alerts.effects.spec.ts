@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {of} from 'rxjs';
+import {of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
@@ -13,7 +13,9 @@ function build() {
   return {
     setData: vi.fn(),
     setUnreadCount: vi.fn(),
-    setStatus: vi.fn(),
+    setLoading: vi.fn(),
+    setSuccess: vi.fn(),
+    setError: vi.fn(),
     markReadLocal: vi.fn(),
     markAllReadLocal: vi.fn(),
     dismissLocal: vi.fn(),
@@ -39,7 +41,22 @@ describe('alertsEffects', () => {
     });
 
     expect(api.getAlerts).toHaveBeenCalledWith('error', 2, 50);
+    expect(store.setLoading).toHaveBeenCalledOnce();
     expect(store.setData).toHaveBeenCalledWith([], 45, 7);
+    expect(store.setSuccess).toHaveBeenCalledOnce();
+    expect(store.setError).not.toHaveBeenCalled();
+  });
+
+  it('load records an error and no data when the request fails', () => {
+    api.getAlerts.mockReturnValue(throwError(() => new Error('boom')));
+    const store = build();
+    TestBed.runInInjectionContext(() => {
+      alertsEffects(store).load({filter: 'all', page: 1, pageSize: 20});
+    });
+
+    expect(store.setError).toHaveBeenCalledWith(null);
+    expect(store.setData).not.toHaveBeenCalled();
+    expect(store.setSuccess).not.toHaveBeenCalled();
   });
 
   it('the hook refetches whenever the query signal changes', () => {
