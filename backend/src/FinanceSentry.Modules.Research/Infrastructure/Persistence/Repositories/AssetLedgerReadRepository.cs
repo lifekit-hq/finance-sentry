@@ -13,24 +13,28 @@ public class AssetLedgerReadRepository(ResearchDbContext db) : IAssetLedgerReadR
             .FirstOrDefaultAsync(r => r.UserId == userId && r.Symbol == upper, ct);
     }
 
+    // One INSERT ... ON CONFLICT over the unique (UserId, Symbol) index: the write is atomic, so two regenerations
+    // of one read update the same row instead of the loser failing on the index, and no read precedes it. It runs
+    // at once rather than at SaveChanges. The stored row keeps its Id and takes the new narrative, fingerprint and
+    // generation time.
     public async Task UpsertAsync(AssetLedgerRead read, CancellationToken ct = default)
     {
         read.Symbol = read.Symbol.Trim().ToUpperInvariant();
-
-        var existing = await db.AssetLedgerReads
-            .FirstOrDefaultAsync(r => r.UserId == read.UserId && r.Symbol == read.Symbol, ct);
-
-        if (existing is null)
+        if (read.Id == Guid.Empty)
         {
-            db.AssetLedgerReads.Add(read);
-        }
-        else
-        {
-            existing.Narrative = read.Narrative;
-            existing.SourceFingerprint = read.SourceFingerprint;
-            existing.GeneratedAt = read.GeneratedAt;
+            read.Id = Guid.NewGuid();
         }
 
-        await db.SaveChangesAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO research.asset_ledger_reads
+                ("Id", "UserId", "Symbol", "Narrative", "SourceFingerprint", "GeneratedAt")
+            VALUES ({read.Id}, {read.UserId}, {read.Symbol}, {read.Narrative}, {read.SourceFingerprint}, {read.GeneratedAt})
+            ON CONFLICT ("UserId", "Symbol") DO UPDATE SET
+                "Narrative" = EXCLUDED."Narrative",
+                "SourceFingerprint" = EXCLUDED."SourceFingerprint",
+                "GeneratedAt" = EXCLUDED."GeneratedAt"
+            """,
+            ct);
     }
 }
