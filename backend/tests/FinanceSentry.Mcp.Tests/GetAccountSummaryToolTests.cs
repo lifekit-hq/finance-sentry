@@ -205,4 +205,25 @@ public sealed class GetAccountSummaryToolTests
         credit.Balance.Should().Be(300m);
         result.Single(e => e.Name == "Chase").IsCash.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ReportsABrokerageRowInItsOwnCurrency_WhenTheProviderReportedOne()
+    {
+        _bankingReader.Setup(r => r.GetAccountSummariesAsync(UserId, default)).ReturnsAsync([]);
+        _cryptoReader.Setup(r => r.GetHoldingsAsync(UserId, default)).ReturnsAsync([]);
+        _brokerageReader.Setup(r => r.GetHoldingsAsync(UserId, default))
+            .ReturnsAsync([
+                new BrokerageHoldingSummary("Fund A", "REIT", 10m, 29m, DateTime.UtcNow, "inzhur", Currency: "UAH", NativeValue: 1200m),
+                new BrokerageHoldingSummary("AAPL", "STK", 10m, 1800m, DateTime.UtcNow, "ibkr")
+            ]);
+
+        var result = await CreateSut().ExecuteAsync();
+
+        var fund = result.Single(e => e.Provider == "inzhur");
+        fund.Currency.Should().Be("UAH");
+        fund.Balance.Should().Be(1200m);
+        var stock = result.Single(e => e.Provider == "ibkr");
+        stock.Currency.Should().Be("USD");
+        stock.Balance.Should().Be(1800m);
+    }
 }

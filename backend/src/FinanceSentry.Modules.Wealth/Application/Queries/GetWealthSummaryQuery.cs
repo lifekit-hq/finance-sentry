@@ -7,7 +7,9 @@ public record AppliedFiltersDto(string? Category, string? Provider);
 
 /// <summary>
 /// A single sub-account under an institution: a Monobank card, a Revolut
-/// currency pocket, a Binance asset, an IBKR position.
+/// currency pocket, a Binance asset, an IBKR position. <see cref="NativeValue"/> in
+/// <see cref="NativeCurrency"/> is a position's value as its provider reported it (an Inzhur fund in
+/// UAH); null for rows whose <see cref="CurrentBalance"/> is already their native amount.
 /// </summary>
 public record AccountBalanceDto(
     Guid AccountId,
@@ -21,7 +23,9 @@ public record AccountBalanceDto(
     decimal? BalanceInBaseCurrency,
     string SyncStatus,
     DateTime? LastSyncTimestamp,
-    string? ProductType = null);
+    string? ProductType = null,
+    string? NativeCurrency = null,
+    decimal? NativeValue = null);
 
 /// <summary>
 /// A physical card within an institution, grouping its per-currency sub-accounts. Populated

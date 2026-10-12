@@ -16,15 +16,25 @@ const LIABILITY_ACCOUNT_TYPE = 'credit';
 @Pipe({name: 'accountBalance'})
 export class AccountBalancePipe implements PipeTransform {
   public transform(
-    {accountType, currentBalance, currency, balanceInBaseCurrency}: AccountBalanceItem,
+    {
+      accountType,
+      currentBalance,
+      currency,
+      balanceInBaseCurrency,
+      nativeCurrency,
+      nativeValue,
+    }: AccountBalanceItem,
     baseCurrency: string
   ): FormattedBalance {
-    const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && currentBalance > 0;
+    const hasNative = nativeValue !== null && nativeValue !== undefined;
+    const amount = hasNative ? nativeValue : currentBalance;
+    const shownCurrency = hasNative ? nativeCurrency : currency;
+    const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && amount > 0;
     const native = owed
-      ? MoneyUtils.formatOwed(currentBalance, currency)
-      : MoneyUtils.format(currentBalance, currency);
+      ? MoneyUtils.formatOwed(amount, shownCurrency)
+      : MoneyUtils.format(amount, shownCurrency);
 
-    if (currency === baseCurrency || balanceInBaseCurrency === null) {
+    if (shownCurrency === baseCurrency || balanceInBaseCurrency === null) {
       return {native, equivalent: null, owed};
     }
 

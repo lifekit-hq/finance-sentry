@@ -114,7 +114,8 @@ public class WealthAggregationService(
                     AssetClassNormalizer.Normalize(h.InstrumentType) == AssetClassNormalizer.Cash ? "cash" : "brokerage",
                     h.Symbol.Length >= 4 ? h.Symbol[..4] : h.Symbol,
                     h.Provider.ToLowerInvariant(), "brokerage", h.Symbol, h.Quantity, h.UsdValue,
-                    BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt))
+                    BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt,
+                    NativeCurrency: h.NativeValue is null ? null : h.Currency, NativeValue: h.NativeValue))
                     .ToList<AccountBalanceDto>();
 
                 var institutionsByProvider = holdings

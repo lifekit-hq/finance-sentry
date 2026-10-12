@@ -67,7 +67,8 @@ public sealed class GetAccountSummaryTool(
             _logger.LogWarning(ex, "CryptoSync provider unavailable for user {UserId}; contributing empty list.", userIdVal);
         }
 
-        // Brokerage positions — each position is one entry denominated in USD.
+        // Brokerage positions — each position is one entry: its provider-reported value in its own currency when it
+        // has one (an Inzhur fund in UAH), otherwise its USD value.
         try
         {
             var positions = await _brokerageReader.GetHoldingsAsync(userIdVal, cancellationToken);
@@ -75,8 +76,8 @@ public sealed class GetAccountSummaryTool(
                 h.Symbol,
                 h.Symbol,
                 h.Provider,
-                "USD",
-                h.UsdValue,
+                h.NativeValue is null ? "USD" : h.Currency,
+                h.NativeValue ?? h.UsdValue,
                 IsCash: AssetClassNormalizer.Normalize(h.InstrumentType) == AssetClassNormalizer.Cash)));
         }
         catch (Exception ex)

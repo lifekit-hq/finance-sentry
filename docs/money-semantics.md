@@ -127,8 +127,10 @@ broker account (then that code wins; an unrecognised value falls back to UAH). E
 currency and its amount as reported (`BrokerageHolding.Currency` / `NativeValue`, never converted) next
 to `UsdValue`, which is converted once, at ingest (§3). `GET /brokerage/holdings` returns both as
 `currency` / `nativeValue` (null `nativeValue` = USD-only row, e.g. IBKR); the Holdings page shows such a
-row's price and value in its own currency with the USD figure muted beneath. Totals, weights and the
-donut still sum `UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next
+row's price and value in its own currency with the USD figure muted beneath. The wealth summary's brokerage
+account rows carry the same pair as `nativeCurrency` / `nativeValue` (the accounts list shows them in that
+currency with the base equivalent muted) and MCP `get_account_summary` reports such a row in its own
+currency. Totals, weights and the donut still sum `UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next
 daily sync rewrites them.
 
 - **Funds and bonds** — one row per asset from `user-assets`, instrument type `REIT` for a fund
