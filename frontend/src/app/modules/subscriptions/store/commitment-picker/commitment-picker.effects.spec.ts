@@ -31,6 +31,7 @@ function buildStore() {
     search,
     setSearch: vi.fn((value: string) => search.set(value)),
     setLoading: vi.fn(),
+    setSuccess: vi.fn(),
     setCandidates: vi.fn(),
     setError: vi.fn(),
     setAnchor: vi.fn(),
@@ -74,6 +75,7 @@ describe('commitmentPickerEffects', () => {
     expect(store.setLoading).toHaveBeenCalled();
     expect(service.search).toHaveBeenCalledWith('');
     expect(store.setCandidates).toHaveBeenCalledWith([CANDIDATE]);
+    expect(store.setSuccess).toHaveBeenCalledOnce();
   });
 
   it('load: keeps the error code when the fetch fails', () => {

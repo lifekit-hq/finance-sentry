@@ -16,6 +16,7 @@ interface EffectsStore {
   search: Signal<string>;
   setSearch: (search: string) => void;
   setLoading: () => void;
+  setSuccess: () => void;
   setCandidates: (candidates: CommitmentCandidate[]) => void;
   setError: (errorCode: Nullable<string>) => void;
   setAnchor: (anchor: CommitmentAnchor) => void;
@@ -30,7 +31,10 @@ export function commitmentPickerEffects(store: EffectsStore) {
       tap(() => store.setLoading()),
       switchMap(() =>
         service.search(store.search()).pipe(
-          tap(page => store.setCandidates(page.items)),
+          tap(page => {
+            store.setCandidates(page.items);
+            store.setSuccess();
+          }),
           catchError((err: unknown) => {
             store.setError(extractErrorCode(err));
             return EMPTY;

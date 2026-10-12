@@ -11,14 +11,8 @@ export function commitmentPickerMethods(store: WritableStateSource<CommitmentPic
     setSearch(search: string): void {
       patchState(store, {search});
     },
-    setLoading(): void {
-      patchState(store, {status: 'loading', errorCode: null});
-    },
     setCandidates(candidates: CommitmentCandidate[]): void {
-      patchState(store, {candidates, status: 'idle'});
-    },
-    setError(errorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', errorCode});
+      patchState(store, {candidates});
     },
     select(candidate: CommitmentCandidate): void {
       patchState(store, {selected: candidate, anchor: null});
