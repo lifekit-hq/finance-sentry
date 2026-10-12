@@ -30,30 +30,44 @@ public class AnalystActionRepository(ResearchDbContext db) : IAnalystActionRepos
             }
         }
 
-        // Pull any already-stored rows that collide with this batch (by the four identity fields).
-        var tickers = incoming.Values.Select(a => a.Ticker).Distinct().ToArray();
-        var dates = incoming.Values.Select(a => a.ActionDate).Distinct().ToArray();
-        var stored = await db.AnalystActions
-            .Where(a => tickers.Contains(a.Ticker) && dates.Contains(a.ActionDate))
-            .ToListAsync(ct);
-        var storedByKey = stored.ToDictionary(ActionKey.From);
+        // One INSERT ... ON CONFLICT over the unique (Ticker, Firm, ActionDate, ActionType) index: the write is
+        // atomic, so two overlapping ingests merge into the same rows instead of the loser failing on the index,
+        // and no read precedes it. It runs at once rather than at SaveChanges. A stored row only has its NULL
+        // rating/target/url fields filled, never overwritten (keep the richer record - FR-003); RETURNING
+        // (xmax = 0) is true only for a freshly inserted row, which is what the inserted count reports.
+        var rows = incoming.Values.ToList();
+        var ids = rows.Select(a => a.Id).ToArray();
+        var tickers = rows.Select(a => a.Ticker).ToArray();
+        var firms = rows.Select(a => a.Firm).ToArray();
+        var actionTypes = rows.Select(a => a.ActionType.ToString()).ToArray();
+        var priorRatings = rows.Select(a => a.PriorRating).ToArray();
+        var newRatings = rows.Select(a => a.NewRating).ToArray();
+        var priorTargets = rows.Select(a => a.PriorTarget).ToArray();
+        var newTargets = rows.Select(a => a.NewTarget).ToArray();
+        var actionDates = rows.Select(a => a.ActionDate).ToArray();
+        var sources = rows.Select(a => a.Source).ToArray();
+        var sourceUrls = rows.Select(a => a.SourceUrl).ToArray();
+        var ingestedAts = rows.Select(a => a.IngestedAt).ToArray();
 
-        var inserted = 0;
-        foreach (var (key, candidate) in incoming)
-        {
-            if (storedByKey.TryGetValue(key, out var row))
-            {
-                Merge(row, candidate);
-            }
-            else
-            {
-                db.AnalystActions.Add(candidate);
-                inserted++;
-            }
-        }
+        var inserted = await db.Database.SqlQuery<bool>(
+            $"""
+            INSERT INTO research.analyst_actions AS t
+                ("Id", "Ticker", "Firm", "ActionType", "PriorRating", "NewRating", "PriorTarget", "NewTarget",
+                 "ActionDate", "Source", "SourceUrl", "IngestedAt")
+            SELECT * FROM unnest(
+                {ids}::uuid[], {tickers}::varchar[], {firms}::varchar[], {actionTypes}::varchar[],
+                {priorRatings}::varchar[], {newRatings}::varchar[], {priorTargets}::numeric[], {newTargets}::numeric[],
+                {actionDates}::date[], {sources}::varchar[], {sourceUrls}::varchar[], {ingestedAts}::timestamptz[])
+            ON CONFLICT ("Ticker", "Firm", "ActionDate", "ActionType") DO UPDATE SET
+                "PriorRating" = COALESCE(t."PriorRating", EXCLUDED."PriorRating"),
+                "NewRating" = COALESCE(t."NewRating", EXCLUDED."NewRating"),
+                "PriorTarget" = COALESCE(t."PriorTarget", EXCLUDED."PriorTarget"),
+                "NewTarget" = COALESCE(t."NewTarget", EXCLUDED."NewTarget"),
+                "SourceUrl" = COALESCE(t."SourceUrl", EXCLUDED."SourceUrl")
+            RETURNING (xmax = 0) AS "Value"
+            """).ToListAsync(ct);
 
-        await db.SaveChangesAsync(ct);
-        return inserted;
+        return inserted.Count(isNew => isNew);
     }
 
     public async Task<IReadOnlyList<AnalystAction>> QueryAsync(
