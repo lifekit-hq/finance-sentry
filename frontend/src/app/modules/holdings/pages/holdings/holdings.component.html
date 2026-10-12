@@ -1,7 +1,7 @@
 <div class="space-y-cmn-5">
   <cmn-async-state
     [status]="positionsStatus()"
-    [errorMessage]="store.positionsErrorMessage()"
+    [errorMessage]="store.errorMessage()"
     [isEmpty]="store.positionsByAssetClass().length === 0"
   >
     <cmn-card skeleton padding="none">

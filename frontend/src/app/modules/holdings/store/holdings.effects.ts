@@ -9,9 +9,10 @@ import {QuotesService} from '../services/quotes.service';
 import {DayChangeUtils} from '../utils/day-change.utils';
 
 interface StoreMethods {
-  setPositionsLoading(): void;
+  setLoading(): void;
+  setSuccess(): void;
+  setError(errorCode: Nullable<string>): void;
   setPositions(positions: Position[]): void;
-  setPositionsError(errorCode: Nullable<string>): void;
   setDayChangePct(dayChangePctByTicker: Record<string, number>): void;
 }
 
@@ -36,15 +37,16 @@ export function holdingsEffects(store: StoreMethods) {
 
   const loadPositions = rxMethod<void>(
     pipe(
-      tap(() => store.setPositionsLoading()),
+      tap(() => store.setLoading()),
       switchMap(() =>
         positionsService.getPositions().pipe(
           tap(positions => {
             store.setPositions(positions);
+            store.setSuccess();
             loadQuotes(DayChangeUtils.quotableTickers(positions));
           }),
           StoreErrorUtils.catchAndSetError({
-            setError: (code: Nullable<string>) => store.setPositionsError(code),
+            setError: (code: Nullable<string>) => store.setError(code),
           })
         )
       )

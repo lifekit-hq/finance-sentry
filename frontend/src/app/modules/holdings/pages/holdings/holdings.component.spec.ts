@@ -56,8 +56,8 @@ const CRYPTO_GROUP: PositionAssetGroup = {
 
 describe('InvestmentsComponent — positions view', () => {
   let mockStore: {
-    isPositionsLoading: ReturnType<typeof signal<boolean>>;
-    positionsErrorMessage: ReturnType<typeof signal<string>>;
+    isLoading: ReturnType<typeof signal<boolean>>;
+    errorMessage: ReturnType<typeof signal<string>>;
     positions: ReturnType<typeof signal<Position[]>>;
     positionsByAssetClass: ReturnType<typeof signal<PositionAssetGroup[]>>;
     totalPositionsValue: ReturnType<typeof signal<number>>;
@@ -70,8 +70,8 @@ describe('InvestmentsComponent — positions view', () => {
   beforeEach(async () => {
     mockConnectStore = {importPending: signal(false)};
     mockStore = {
-      isPositionsLoading: signal(false),
-      positionsErrorMessage: signal(''),
+      isLoading: signal(false),
+      errorMessage: signal(''),
       positions: signal<Position[]>([
         {
           symbol: 'DRAM',
@@ -186,7 +186,7 @@ describe('InvestmentsComponent — positions view', () => {
   });
 
   it('renders skeleton rows while positions load', () => {
-    mockStore.isPositionsLoading.set(true);
+    mockStore.isLoading.set(true);
 
     const fixture = TestBed.createComponent(InvestmentsComponent);
     fixture.detectChanges();
@@ -197,7 +197,7 @@ describe('InvestmentsComponent — positions view', () => {
   });
 
   it('replaces the content with the error alert when positions fail to load', () => {
-    mockStore.positionsErrorMessage.set('Failed to load positions.');
+    mockStore.errorMessage.set('Failed to load positions.');
 
     const fixture = TestBed.createComponent(InvestmentsComponent);
     fixture.detectChanges();

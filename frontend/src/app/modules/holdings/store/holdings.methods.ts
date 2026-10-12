@@ -5,17 +5,11 @@ import {type HoldingsState} from './holdings.state';
 
 export function holdingsMethods(store: WritableStateSource<HoldingsState>) {
   return {
-    setPositionsLoading(): void {
-      patchState(store, {positionsStatus: 'loading', positionsErrorCode: null});
-    },
     setPositions(positions: Position[]): void {
-      patchState(store, {positions, positionsStatus: 'idle', positionsErrorCode: null});
+      patchState(store, {positions});
     },
     setDayChangePct(dayChangePctByTicker: Record<string, number>): void {
       patchState(store, {dayChangePctByTicker});
-    },
-    setPositionsError(errorCode: Nullable<string>): void {
-      patchState(store, {positionsStatus: 'error', positionsErrorCode: errorCode});
     },
   };
 }

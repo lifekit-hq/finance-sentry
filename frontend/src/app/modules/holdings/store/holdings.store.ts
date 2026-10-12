@@ -1,3 +1,4 @@
+import {withAsyncStatus} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
 import {holdingsComputed} from './holdings.computed';
@@ -7,6 +8,7 @@ import {initialHoldingsState} from './holdings.state';
 
 export const HoldingsStore = signalStore(
   withState(initialHoldingsState),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load positions.'}),
   withMethods(holdingsMethods),
   withComputed(holdingsComputed),
   withMethods(holdingsEffects),
