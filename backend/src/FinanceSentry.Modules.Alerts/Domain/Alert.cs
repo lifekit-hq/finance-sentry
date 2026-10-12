@@ -1,8 +1,9 @@
 namespace FinanceSentry.Modules.Alerts.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
-public class Alert : IHasUpdatedAt
+public class Alert : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }
