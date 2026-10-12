@@ -46,7 +46,6 @@ public static class RetentionPolicyRegistry
     public static readonly IReadOnlyList<RetentionPolicy> All =
     [
         // ── Generic purge: derived/observational rows the engine deletes on a schedule ───────────
-        Purge(BankSync, "audit_logs", "PerformedAt", 365, "Data-access audit trail; observational."),
         Purge(BankSync, "SyncJobs", "CreatedAt", 90, "Per-sync run history; grows fast, low long-term value."),
         Purge(Analytics, "query_audit", "CreatedAt", 180, "Analytics query audit (feature 033)."),
         Purge(Companion, "companion_events", "CapturedAt", 90, "Dispatched outbox rows; watermark in companion_capture_state survives."),

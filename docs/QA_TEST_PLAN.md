@@ -51,7 +51,6 @@
 - [ ] No new compiler warnings
 - [ ] Swagger UI renders all endpoints at `/swagger`
 - [ ] Health check responds at `/health/ready`
-- [ ] Audit logs written for every data access (spot-check `audit_logs` table)
 
 ## Browser / Device Compatibility
 

@@ -54,7 +54,7 @@ Run a full restore drill monthly:
 
 1. Restore latest backup to a staging environment.
 2. Run `dotnet test` against the restored DB.
-3. Verify `audit_logs` are intact and `encrypted_credentials` decrypt without errors.
+3. Verify `encrypted_credentials` decrypt without errors.
 4. Document the drill result in the ops runbook.
 
 ## GDPR — User Data Deletion
@@ -65,9 +65,6 @@ To delete all data for a user (right-to-erasure request):
 -- Soft-delete all accounts (cascades to transactions via EF OnDelete)
 UPDATE bank_accounts SET is_active = false, deleted_at = now()
 WHERE user_id = '<user-uuid>';
-
--- Delete audit log entries for the user
-DELETE FROM audit_logs WHERE user_id = '<user-uuid>';
 
 -- Remove encrypted credentials
 DELETE FROM encrypted_credentials

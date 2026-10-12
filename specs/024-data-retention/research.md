@@ -27,7 +27,7 @@ exactly once as a `RetentionPolicy` record: `{ Schema, Table, TimestampColumn, A
 ## D2. Enforcement: generic engine + existing bespoke jobs (no rip-and-replace)
 
 **Decision**: The registry is the single source of truth for *decisions*. Enforcement is split, recorded per-policy via `EnforcedBy`:
-- **Generic `RetentionPurgeJob`** enforces every `Action=Purge` policy where `EnforcedBy=Generic` — currently-unmanaged growing tables: `bank_sync.audit_logs`, `bank_sync.sync_jobs`, `research.candidate_scores`, `research.valuation_snapshots`, `research.analyst_actions` (observational rows only), `risk.holding_snapshots`, `companion.companion_events`, `analytics.query_audit`, `research.macro_events` (past events), `research.recommendation_trends` (superseded periods).
+- **Generic `RetentionPurgeJob`** enforces every `Action=Purge` policy where `EnforcedBy=Generic` — currently-unmanaged growing tables: `bank_sync.sync_jobs`, `research.candidate_scores`, `research.valuation_snapshots`, `research.analyst_actions` (observational rows only), `risk.holding_snapshots`, `companion.companion_events`, `analytics.query_audit`, `research.macro_events` (past events), `research.recommendation_trends` (superseded periods).
 - **Existing bespoke jobs stay** and their tables are listed with `EnforcedBy=<job name>` (documentation + coverage only, generic engine skips them): `bank_sync.transactions` (soft-archive `DataRetentionJob`), `alerts.alerts` (`AlertPurgeJob`), `radar.radar_signals` (`RadarComputeJob` prune), `research.opportunity_candidates` (`CandidateExpiryJob`).
 
 **Rationale**: Ship-first — do not destabilize four working, tested purge paths. The registry + coverage test still deliver FR-001's "every table has an explicit decision." Consolidating the bespoke jobs into the engine is a later refactor, not a launch blocker.
@@ -139,7 +139,6 @@ Add a Grafana dashboard `docker/observability/grafana/dashboards/retention-backu
 
 | Table | Action | Window | Enforced by |
 |---|---|---|---|
-| `bank_sync.audit_logs` | Purge | 365d | Generic |
 | `bank_sync.sync_jobs` | Purge | 90d | Generic |
 | `analytics.query_audit` | Purge | 180d | Generic |
 | `companion.companion_events` | Purge | 90d | Generic |

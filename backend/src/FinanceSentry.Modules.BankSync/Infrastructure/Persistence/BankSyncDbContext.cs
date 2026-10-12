@@ -22,7 +22,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     public DbSet<BankAccount> BankAccounts { get; set; } = null!;
     public DbSet<Transaction> Transactions { get; set; } = null!;
     public DbSet<SyncJob> SyncJobs { get; set; } = null!;
-    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
     public DbSet<MonobankCredential> MonobankCredentials { get; set; } = null!;
     public DbSet<TrueLayerConnection> TrueLayerConnections { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
@@ -183,16 +182,5 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         sjb.Property(sj => sj.RetryCount).HasDefaultValue(0);
         sjb.HasIndex(sj => new { sj.AccountId, sj.Status }).HasDatabaseName("idx_sync_job_account_status");
         sjb.Property(sj => sj.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-        var alb = modelBuilder.Entity<AuditLog>();
-        alb.ToTable("audit_logs");
-        alb.HasKey(al => al.AuditId);
-        alb.HasIndex(al => new { al.UserId, al.PerformedAt }).HasDatabaseName("idx_audit_log_user_performed_at");
-        alb.HasIndex(al => new { al.ResourceType, al.ResourceId }).HasDatabaseName("idx_audit_log_resource");
-        alb.Property(al => al.Action).IsRequired().HasMaxLength(50);
-        alb.Property(al => al.ResourceType).IsRequired().HasMaxLength(50);
-        alb.Property(al => al.IpAddress).HasMaxLength(45).IsRequired(false);
-        alb.Property(al => al.CorrelationId).HasMaxLength(64).IsRequired(false);
-        alb.Property(al => al.PerformedAt).IsRequired();
     }
 }

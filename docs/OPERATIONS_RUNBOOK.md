@@ -82,16 +82,9 @@ the two secrets. If Logto is down, restore Logto; §11 is the break-glass fallba
 4. Re-register recurring jobs: restart the API (scheduler runs on startup).
 5. Recurring jobs register in the background once the API is listening, so a held Hangfire lock no longer delays or crashes startup. A process killed while holding `hangfire:lock:recurring-job:<id>` leaves the lock row until Hangfire.PostgreSql's `DistributedLockTimeout` (10 min default) passes; registration retries through that window. `Recurring job registration hit a Hangfire lock timeout (attempt n)` warnings and a `job-registration` readiness check still `Healthy` ("in progress") need no action. If the log shows `Recurring job registration gave up` and `/api/v1/health/ready` reports `job-registration` Unhealthy, the retry budget (storage lock timeout + 2 min) was spent: the API stays up with the jobs already in storage but this build's schedule changes are not applied — restart the API once the other lock holder is gone. Any other exception during registration stops the host, as it did when registration ran inline at startup.
 
-## 5. Audit Log Table Growing Too Large
+## 5. (Retired)
 
-**Symptoms:** `audit_logs` table > 10GB
-
-**Steps:**
-1. Archive old rows (> 1 year) to cold storage:
-   ```sql
-   DELETE FROM audit_logs WHERE performed_at < NOW() - INTERVAL '1 year';
-   ```
-2. Add a partition by month if volume is sustained (consult DBA).
+The `bank_sync.audit_logs` table no longer exists (dropped by BankSync migration `M023_DropAuditLogs`); there is nothing to prune. The number is kept so the §7 and §8 references stay valid.
 
 ## 6. Data Retention Job Failing
 
