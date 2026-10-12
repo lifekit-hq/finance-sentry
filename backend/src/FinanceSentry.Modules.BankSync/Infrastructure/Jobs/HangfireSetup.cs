@@ -51,7 +51,7 @@ public static class HangfireSetup
 
             // Durable job storage on the existing PostgreSQL so job history + recurring-job state
             // survive restarts (FR-010) — the prerequisite for job-health trends (US3) and
-            // consecutive-failure tracking (US4). Replaces the in-memory storage that lost everything.
+            // consecutive-failure tracking. Replaces the in-memory storage that lost everything.
             var connectionString = config.GetConnectionString("Default")
                 ?? throw new InvalidOperationException("Connection string 'Default' is required for Hangfire storage.");
 

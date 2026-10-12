@@ -104,7 +104,7 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         // #673: published read port - the Integration adapter reaches tax lots only through it.
         services.AddScoped<ITaxLotReader, TaxLotReader>();
-        // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
+        // Shared with the Hangfire ConsecutiveFailureGaugeFilter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
         // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in from the connect modal

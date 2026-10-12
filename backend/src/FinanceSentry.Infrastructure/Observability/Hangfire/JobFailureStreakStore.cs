@@ -2,7 +2,7 @@ namespace FinanceSentry.Infrastructure.Observability.Hangfire;
 
 using global::Hangfire;
 
-/// <summary>Per-job consecutive-failure streak state (US4).</summary>
+/// <summary>Per-job consecutive-failure streak state.</summary>
 public readonly record struct JobFailureStreak(int Count, bool Alerted)
 {
     public static readonly JobFailureStreak Empty = new(0, false);

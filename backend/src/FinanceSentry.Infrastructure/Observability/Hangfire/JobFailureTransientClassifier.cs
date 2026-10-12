@@ -7,7 +7,7 @@ using Polly.CircuitBreaker;
 using Polly.Timeout;
 
 /// <summary>
-/// Classifies a failed job's exception as transient/self-healing (US4) so throttling and network blips
+/// Classifies a failed job's exception as transient/self-healing so throttling and network blips
 /// don't count toward a consecutive-failure streak — mirroring the sync layer's transient set
 /// (timeout / rate-limit / 5xx / network) so only genuine, sticky failures alert.
 /// </summary>
