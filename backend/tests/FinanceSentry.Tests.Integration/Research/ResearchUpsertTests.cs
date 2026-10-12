@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Integration.Research;
 
 using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
@@ -314,5 +315,67 @@ public sealed class ResearchUpsertTests : IAsyncLifetime
 
         await using var read = CreateContext();
         (await read.RecommendationTrends.AsNoTracking().CountAsync()).Should().Be(1);
+    }
+
+    // --- opportunity candidates -----------------------------------------------------------------------------
+
+    [DockerRequiredFact]
+    public async Task Candidate_concurrent_upserts_of_one_ticker_leave_one_active_row_and_one_new()
+    {
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
+        {
+            await using var ctx = CreateContext();
+            return await new CandidateRepository(ctx)
+                .UpsertActiveAsync(_user, "NVDA", CandidateSource.Scan, TimeSpan.FromDays(30));
+        }));
+
+        results.Count(r => r.IsNew).Should().Be(1);
+        results.Select(r => r.Candidate.Id).Distinct().Should().ContainSingle();
+
+        await using var read = CreateContext();
+        (await read.OpportunityCandidates.AsNoTracking().CountAsync(c => c.Status == CandidateStatus.Active))
+            .Should().Be(1);
+    }
+
+    [DockerRequiredFact]
+    public async Task Candidate_reactivated_after_leaving_active_inserts_a_new_row()
+    {
+        Guid firstId;
+        await using (var ctx = CreateContext())
+        {
+            var repo = new CandidateRepository(ctx);
+            var (first, isNew) = await repo.UpsertActiveAsync(_user, "NVDA", CandidateSource.Scan, TimeSpan.FromDays(30));
+            isNew.Should().BeTrue();
+            firstId = first.Id;
+            first.Status = CandidateStatus.Expired;
+            await repo.UpdateAsync(first);
+        }
+
+        await using (var ctx = CreateContext())
+        {
+            var (second, isNew) = await new CandidateRepository(ctx)
+                .UpsertActiveAsync(_user, "NVDA", CandidateSource.Scan, TimeSpan.FromDays(30));
+            isNew.Should().BeTrue("the partial index only covers Active rows");
+            second.Id.Should().NotBe(firstId);
+        }
+
+        await using var read = CreateContext();
+        var rows = await read.OpportunityCandidates.AsNoTracking().ToListAsync();
+        rows.Should().HaveCount(2);
+        rows.Count(c => c.Status == CandidateStatus.Active).Should().Be(1);
+    }
+
+    [DockerRequiredFact]
+    public async Task Candidate_active_row_of_one_user_does_not_block_another_users_same_ticker()
+    {
+        await using var ctxA = CreateContext();
+        await using var ctxB = CreateContext(Guid.NewGuid());
+        var other = Guid.NewGuid();
+
+        var a = await new CandidateRepository(ctxA).UpsertActiveAsync(_user, "NVDA", CandidateSource.Scan, TimeSpan.FromDays(30));
+        var b = await new CandidateRepository(ctxB).UpsertActiveAsync(other, "NVDA", CandidateSource.Scan, TimeSpan.FromDays(30));
+
+        a.IsNew.Should().BeTrue();
+        b.IsNew.Should().BeTrue();
     }
 }
