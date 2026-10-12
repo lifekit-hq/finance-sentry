@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
@@ -11,7 +12,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// One secret lives here, AES-256-GCM encrypted at rest (the IBKR path): the session jar (the cabinet's refresh cookie
 /// and short-lived access token, replaced after every refresh in case it rotated). It is never logged.
 /// </summary>
-public sealed class InzhurCredential
+public sealed class InzhurCredential : IUserOwned
 {
     /// <summary>Column width of <see cref="LastSyncError"/>.</summary>
     public const int LastErrorMaxLength = 1000;

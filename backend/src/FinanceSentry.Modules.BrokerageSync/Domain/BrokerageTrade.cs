@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
@@ -13,7 +14,7 @@ using FinanceSentry.Core.Domain;
 /// at the reader boundary via <c>CurrencyConverter.ToUsd</c> using <see cref="Currency"/>
 /// / <see cref="FxRateToBase"/> — never sum the native amounts directly.
 /// </summary>
-public sealed class BrokerageTrade : IHasUpdatedAt
+public sealed class BrokerageTrade : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

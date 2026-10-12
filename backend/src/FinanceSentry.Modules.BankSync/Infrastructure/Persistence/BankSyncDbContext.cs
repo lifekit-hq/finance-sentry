@@ -2,10 +2,13 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Persistence.Conventions;
 using Microsoft.EntityFrameworkCore;
 using FinanceSentry.Modules.BankSync.Domain;
 
-public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICurrentUser currentUser) : DbContext(options)
+public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICurrentUser currentUser)
+    : OwnerScopedDbContext(options, currentUser)
 {
     /// <summary>Name of the soft-delete filter on <see cref="Transaction"/>; paths that need archived rows opt out by name.</summary>
     public const string ActiveFilterName = "Active";
@@ -13,8 +16,8 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     /// <summary>Name of the soft-delete filter on <see cref="BankAccount"/>; paths that must see removed accounts opt out by name.</summary>
     public const string AccountActiveFilterName = "IsActive";
 
-    // Read by the Owner query filters on every query this context runs; null (no person in scope) matches no row.
-    private Guid? CurrentUserId => currentUser.UserId;
+    private const int MoneyPrecision = 15;
+    private const int MoneyScale = 2;
 
     public DbSet<BankAccount> BankAccounts { get; set; } = null!;
     public DbSet<Transaction> Transactions { get; set; } = null!;
@@ -29,13 +32,17 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
     public DbSet<CounterpartyRule> CounterpartyRules { get; set; } = null!;
     public DbSet<CommittedMerchantPin> CommittedMerchantPins { get; set; } = null!;
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.HaveDecimalPrecision(MoneyPrecision, MoneyScale);
+    }
+
+    protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("bank_sync");
-        base.OnModelCreating(modelBuilder);
 
         var bab = modelBuilder.Entity<BankAccount>();
-        bab.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         bab.HasQueryFilter(AccountActiveFilterName, ba => ba.IsActive);
         bab.HasKey(ba => ba.Id);
         bab.HasIndex(ba => ba.UserId).HasDatabaseName("idx_bank_account_user_id");
@@ -48,8 +55,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         bab.Property(ba => ba.AccountNumberLast4).IsRequired().HasMaxLength(4);
         bab.Property(ba => ba.OwnerName).IsRequired().HasMaxLength(255);
         bab.Property(ba => ba.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("EUR");
-        bab.Property(ba => ba.CurrentBalance).HasPrecision(15, 2);
-        bab.Property(ba => ba.CreditLimit).HasPrecision(15, 2);
         bab.Property(ba => ba.SyncStatus).IsRequired().HasMaxLength(50).HasDefaultValue("pending");
         bab.Property(ba => ba.IsActive).HasDefaultValue(true);
         bab.Property(ba => ba.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -60,7 +65,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         bab.HasConnectionHealth(ba => ba.Health);
 
         var mcb = modelBuilder.Entity<MonobankCredential>();
-        mcb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         mcb.HasKey(mc => mc.Id);
         mcb.HasIndex(mc => mc.UserId).HasDatabaseName("idx_monobank_credential_user_id");
         mcb.HasIndex(mc => mc.UserId).IsUnique().HasDatabaseName("idx_monobank_credential_user_unique");
@@ -72,7 +76,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         mcb.HasConnectionHealth(mc => mc.Health);
 
         var tlb = modelBuilder.Entity<TrueLayerConnection>();
-        tlb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         tlb.HasKey(tc => tc.Id);
         tlb.HasIndex(tc => tc.UserId).HasDatabaseName("idx_truelayer_connection_user_id");
         tlb.HasIndex(tc => new { tc.UserId, tc.ProviderId }).IsUnique().HasDatabaseName("idx_truelayer_connection_user_provider_unique");
@@ -89,13 +92,12 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         tlb.HasConnectionHealth(tc => tc.Health);
 
         var tb = modelBuilder.Entity<Transaction>();
-        tb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         tb.HasKey(t => t.Id);
         tb.HasIndex(t => t.AccountId).HasDatabaseName("idx_transaction_account_id");
         tb.HasIndex(t => t.PostedDate).HasDatabaseName("idx_transaction_posted_date");
         tb.HasIndex(t => t.CreatedAt).HasDatabaseName("idx_transaction_created_at");
         tb.HasIndex(t => new { t.AccountId, t.UniqueHash }).IsUnique().HasDatabaseName("idx_transaction_account_unique_hash_unique");
-        tb.Property(t => t.Amount).IsRequired().HasPrecision(15, 2);
+        tb.Property(t => t.Amount).IsRequired();
         tb.Property(t => t.Description).IsRequired();
         tb.Property(t => t.UniqueHash).IsRequired().HasMaxLength(64);
         tb.Property(t => t.TransactionType).HasMaxLength(50);
@@ -137,13 +139,11 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         mkb.HasOne<Category>().WithMany().HasForeignKey(mk => mk.CategoryKey).OnDelete(DeleteBehavior.Restrict);
 
         var cpb = modelBuilder.Entity<Counterparty>();
-        cpb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         cpb.ToTable("counterparties");
         cpb.HasKey(cp => cp.Id);
         cpb.Property(cp => cp.Name).IsRequired().HasMaxLength(255);
         cpb.Property(cp => cp.FlowRole).IsRequired().HasMaxLength(50);
         cpb.Property(cp => cp.UserId).IsRequired();
-        cpb.Property(cp => cp.ExpectedMonthlyInflowAmount).HasPrecision(15, 2);
         cpb.Property(cp => cp.ExpectedMonthlyInflowCurrency).HasMaxLength(3);
         cpb.HasIndex(cp => cp.UserId).HasDatabaseName("idx_counterparty_user_id");
         cpb.HasMany(cp => cp.Rules).WithOne(r => r.Counterparty).HasForeignKey(r => r.CounterpartyId).OnDelete(DeleteBehavior.Cascade);
@@ -158,7 +158,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         crb.HasIndex(r => r.CounterpartyId).HasDatabaseName("idx_counterparty_rule_counterparty_id");
 
         var cmp = modelBuilder.Entity<CommittedMerchantPin>();
-        cmp.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         cmp.ToTable("committed_merchant_pins");
         cmp.HasKey(p => p.Id);
         cmp.Property(p => p.UserId).IsRequired();
@@ -170,7 +169,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
            .HasDatabaseName("idx_committed_merchant_pin_user_merchant_unique");
 
         var sjb = modelBuilder.Entity<SyncJob>();
-        sjb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         sjb.HasKey(sj => sj.Id);
         sjb.HasIndex(sj => sj.AccountId).HasDatabaseName("idx_sync_job_account_id");
         sjb.HasIndex(sj => sj.Status).HasDatabaseName("idx_sync_job_status");
@@ -187,7 +185,6 @@ public class BankSyncDbContext(DbContextOptions<BankSyncDbContext> options, ICur
         sjb.Property(sj => sj.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         var alb = modelBuilder.Entity<AuditLog>();
-        alb.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
         alb.ToTable("audit_logs");
         alb.HasKey(al => al.AuditId);
         alb.HasIndex(al => new { al.UserId, al.PerformedAt }).HasDatabaseName("idx_audit_log_user_performed_at");

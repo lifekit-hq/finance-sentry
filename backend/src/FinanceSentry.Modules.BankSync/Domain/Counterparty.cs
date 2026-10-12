@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
@@ -7,7 +8,7 @@ using FinanceSentry.Core.Domain;
 /// (e.g. family members whose rent credits are income and support debits are expense).
 /// UserId = Guid.Empty marks a system-default counterparty that applies to all users.
 /// </summary>
-public class Counterparty : Entity
+public class Counterparty : Entity, IUserOwned
 {
     /// <summary>
     /// Owning user. Guid.Empty = applies to every user (system default).

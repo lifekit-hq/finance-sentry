@@ -1,12 +1,13 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
 /// Domain entity representing an individual transaction.
 /// Immutable after creation. Includes deduplication via unique_hash.
 /// </summary>
-public class Transaction : Entity
+public class Transaction : Entity, IUserOwned
 {
     /// <summary>
     /// Foreign key to BankAccount.

@@ -1,12 +1,13 @@
 namespace FinanceSentry.Modules.Agent.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
 /// A chat thread between a single user and Ledger (feature 040). Owner-scoped: every read and write
 /// filters by <see cref="UserId"/>; there is no cross-user query path (FR-008).
 /// </summary>
-public sealed class Conversation : IHasUpdatedAt
+public sealed class Conversation : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; set; }
 
