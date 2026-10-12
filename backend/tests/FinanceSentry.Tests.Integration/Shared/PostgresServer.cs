@@ -92,20 +92,28 @@ public sealed class PostgresServer
     private static async Task<Started> StartAsync(string image)
     {
         var container = new PostgreSqlBuilder(image).WithCommand("-c", MaxConnections).Build();
-        await container.StartAsync();
-
-        var admin = container.GetConnectionString();
-        await using var connection = new NpgsqlConnection(admin);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT rolname FROM pg_roles", connection);
-        var roles = new HashSet<string>(StringComparer.Ordinal);
-        await using (var reader = await command.ExecuteReaderAsync())
+        try
         {
-            while (await reader.ReadAsync())
-                roles.Add(reader.GetString(0));
-        }
+            await container.StartAsync();
 
-        return new Started(container, admin, roles);
+            var admin = container.GetConnectionString();
+            await using var connection = new NpgsqlConnection(admin);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand("SELECT rolname FROM pg_roles", connection);
+            var roles = new HashSet<string>(StringComparer.Ordinal);
+            await using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                    roles.Add(reader.GetString(0));
+            }
+
+            return new Started(container, admin, roles);
+        }
+        catch
+        {
+            await container.DisposeAsync();
+            throw;
+        }
     }
 
     private sealed record Started(PostgreSqlContainer Container, string AdminConnectionString, IReadOnlySet<string> BaselineRoles);
