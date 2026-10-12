@@ -111,8 +111,8 @@ public static class BrokerageSyncModule
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
         // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in on inzhur.reit in his own
         // browser and pastes the session's refresh cookie (the sign-in's reCAPTCHA rejects this server's IP,
-        // data/fs-inzhur-recaptcha); the daily job only refreshes that session and reads the portfolio. Read-only: no
-        // trade or other write call to Inzhur exists.
+        // data/fs-inzhur-recaptcha); the keep-alive job only refreshes that session and the daily job refreshes it and
+        // reads the portfolio. Read-only: no trade or other write call to Inzhur exists.
         services.Configure<InzhurOptions>(config.GetSection(InzhurOptions.SectionName));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IInzhurCredentialRepository, InzhurCredentialRepository>();

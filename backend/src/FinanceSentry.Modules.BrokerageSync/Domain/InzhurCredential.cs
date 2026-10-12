@@ -6,8 +6,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// <summary>
 /// A user's own Inzhur cabinet connection. Inzhur has no API and its sign-in is guarded by a reCAPTCHA v3 that rejects
 /// a server's datacenter IP, so the owner signs in on inzhur.reit in his own browser and pastes the session's refresh
-/// cookie into finance-sentry. The daily sync then keeps that one session alive: it refreshes it and reads the
-/// portfolio, read-only. finance-sentry never signs in, so it never holds the phone number or password.
+/// cookie into finance-sentry. The hourly keep-alive then keeps that one session alive by refreshing it, and the daily
+/// sync refreshes it once more and reads the portfolio, read-only. finance-sentry never signs in, so it never holds
+/// the phone number or password.
 ///
 /// One secret lives here, AES-256-GCM encrypted at rest (the IBKR path): the session jar (the cabinet's refresh cookie
 /// and short-lived access token, replaced after every refresh in case it rotated). It is never logged.

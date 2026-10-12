@@ -40,8 +40,8 @@ public interface IInzhurConnector
 /// <summary>
 /// The owner-initiated half of the Inzhur sync. finance-sentry never signs in to Inzhur: its sign-in sits behind a
 /// reCAPTCHA v3 that rejects this server's datacenter IP (data/fs-inzhur-recaptcha), so the owner signs in in his own
-/// browser and hands over the session's refresh cookie. The refresh endpoint has no bot check; the daily job keeps the
-/// session alive from there.
+/// browser and hands over the session's refresh cookie. The refresh endpoint has no bot check; the keep-alive job keeps
+/// the session alive from there.
 /// </summary>
 public sealed class InzhurConnector(
     IInzhurCredentialRepository credentialRepository,

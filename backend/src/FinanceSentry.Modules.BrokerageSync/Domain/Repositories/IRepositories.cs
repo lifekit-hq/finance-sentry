@@ -72,7 +72,7 @@ public interface IInzhurCredentialRepository
     /// </summary>
     Task<InzhurCredential?> GetFreshByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
 
-    /// <summary>Every user's credential holding a live session, for the daily sweep. Opts out of the Owner query filter.</summary>
+    /// <summary>Every user's credential holding a live session, for the daily sweep and the keep-alive. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<InzhurCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default);
 
     /// <summary>

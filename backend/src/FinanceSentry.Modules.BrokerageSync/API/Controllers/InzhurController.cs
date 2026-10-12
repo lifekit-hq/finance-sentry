@@ -13,7 +13,7 @@ public sealed record ConnectInzhurSessionRequest(string? RefreshToken)
 
 /// <summary>
 /// The owner's Inzhur cabinet connection. finance-sentry never signs in to Inzhur: the owner signs in on inzhur.reit
-/// and hands over the session here; the daily sync only refreshes it.
+/// and hands over the session here; the keep-alive and the daily sync only refresh it.
 /// </summary>
 [ApiController]
 [Authorize]
