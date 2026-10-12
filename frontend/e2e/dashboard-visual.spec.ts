@@ -1,6 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
 import {API, AUTH_RESPONSE} from './support/dossier-mocks';
+import {versionMasks} from './support/visual-baseline';
 
 // Pixel baseline for the dashboard, same pattern as the asset dossier spec: route-mocked fixtures,
 // a clock that starts at a pinned time so month keys and relative timestamps are stable, CSS
@@ -103,9 +104,7 @@ async function openDashboard(page: Page): Promise<void> {
 }
 
 async function expectBaseline(page: Page, name: string): Promise<void> {
-  // The sidebar footer prints the app version, which changes on every release.
-  const version = page.getByText(/^v\d+\.\d+\.\d+$/);
-  await expect(page).toHaveScreenshot(name, {...SCREENSHOT_OPTIONS, mask: [version]});
+  await expect(page).toHaveScreenshot(name, {...SCREENSHOT_OPTIONS, mask: versionMasks(page)});
 }
 
 test.describe('Dashboard visual baseline', () => {

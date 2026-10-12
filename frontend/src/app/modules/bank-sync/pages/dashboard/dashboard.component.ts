@@ -140,7 +140,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 </a>
               </div>
               @if (store.isLoading()) {
-                <cmn-skeleton height="1.875rem" width="50%" />
+                <cmn-skeleton class="block" height="1.875rem" width="50%" />
               } @else {
                 <p
                   class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
