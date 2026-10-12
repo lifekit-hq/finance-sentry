@@ -111,7 +111,8 @@ public sealed class BrokerageCostBasisReconciler
 
     private static bool Matches(BrokerageHolding holding, BrokerageTrade trade)
     {
-        if (trade.UserId != holding.UserId)
+        // Fills only explain a holding of the broker that reported them (IBKR and Inzhur both match by symbol).
+        if (trade.UserId != holding.UserId || !string.Equals(trade.Provider, holding.Provider, StringComparison.Ordinal))
             return false;
 
         if (holding.InstrumentId is Guid instrumentId && trade.InstrumentId is Guid tradeInstrumentId)

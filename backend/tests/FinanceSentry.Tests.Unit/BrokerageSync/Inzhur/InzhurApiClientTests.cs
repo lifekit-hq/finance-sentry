@@ -56,18 +56,69 @@ public class InzhurApiClientTests
     }
 
     [Fact]
-    public async Task Portfolio_is_two_GETs_with_the_bearer_token()
+    public async Task Portfolio_is_three_GETs_with_the_bearer_token_and_names_come_from_the_catalog()
     {
         _handler
-            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.UserAssets(InzhurFakes.Fund("Fund A", 1m, 100m, 90m))))
-            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.BrokerAccount(10m, 0m)));
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.UserAssets(
+                InzhurFakes.Fund("Fund A", 1m, 100m, 90m, id: 3), InzhurFakes.Fund("Fund B", 1m, 100m, 90m, id: 4))))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.BrokerAccount(10m, 0m)))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.Catalog(InzhurFakes.CatalogEntry(3, "Fund A"), InzhurFakes.CatalogEntry(4, "Fund B"))));
 
         var portfolio = await Client().GetPortfolioAsync(InzhurFakes.Session());
 
         _handler.Requests.Should().OnlyContain(r => r.Method == HttpMethod.Get && r.Authorization == $"Bearer {InzhurFakes.AccessToken}");
-        _handler.Requests.Select(r => r.Uri.AbsolutePath).Should().Equal("/core/api/v1/user-assets", "/core/api/v1/users/broker-account");
-        portfolio.Assets.Should().ContainSingle(a => a.Name == "Fund A");
-        portfolio.BrokerAccount!.AvailableBalanceUah.Should().Be(10m);
+        _handler.Requests.Select(r => r.Uri.AbsolutePath).Should().Equal(
+            "/core/api/v1/user-assets", "/core/api/v1/users/broker-account", "/core/api/v1/assets/details");
+        Uri.UnescapeDataString(_handler.Requests[2].Uri.Query).Should().Be("?assetIds=3,4");
+        portfolio.Assets.Should().HaveCount(2);
+        portfolio.Catalog.Should().HaveCount(2).And.Contain(c => c.AssetIdText == "3" && c.Name == "Fund A");
+        portfolio.BrokerAccount!.AvailableBalanceUah.Should().Be(10m * InzhurFakes.Kopecks);
+    }
+
+    [Fact]
+    public async Task Ledger_pages_back_by_the_last_rows_date_until_a_page_brings_nothing_new()
+    {
+        // The cursor may be inclusive: the second page repeats the first page's last row, which is read once.
+        _handler
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new[]
+            {
+                InzhurFakes.Transaction("a", "Deposit", 1m, "2026-03-03T00:00:00Z"),
+                InzhurFakes.Transaction("b", "Deposit", 1m, "2026-03-02T00:00:00Z"),
+            }))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new[]
+            {
+                InzhurFakes.Transaction("b", "Deposit", 1m, "2026-03-02T00:00:00Z"),
+                InzhurFakes.Transaction("c", "Deposit", 1m, "2026-03-01T00:00:00Z"),
+            }))
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new[] { InzhurFakes.Transaction("c", "Deposit", 1m, "2026-03-01T00:00:00Z") }));
+
+        var rows = await Client().GetTransactionsAsync(InzhurFakes.Session());
+
+        rows.Select(r => r.IdText).Should().Equal("a", "b", "c");
+        rows[0].Amount.Should().Be(InzhurFakes.Kopecks);
+        _handler.Requests.Should().HaveCount(3).And.OnlyContain(r => r.Uri.AbsolutePath == "/core/api/v1/users/transactions");
+        Uri.UnescapeDataString(_handler.Requests[0].Uri.Query).Should().Be($"?pageSize={InzhurApiClient.TransactionsPageSize}");
+        Uri.UnescapeDataString(_handler.Requests[1].Uri.Query).Should().EndWith("&lastExternalCreatedAt=2026-03-02T00:00:00Z");
+        Uri.UnescapeDataString(_handler.Requests[2].Uri.Query).Should().EndWith("&lastExternalCreatedAt=2026-03-01T00:00:00Z");
+    }
+
+    [Fact]
+    public async Task An_empty_ledger_is_one_GET()
+    {
+        _handler.Then(InzhurFakes.Json(HttpStatusCode.OK, Array.Empty<object>()));
+
+        (await Client().GetTransactionsAsync(InzhurFakes.Session())).Should().BeEmpty();
+        _handler.Requests.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task A_ledger_page_that_is_not_a_list_is_unexpected()
+    {
+        _handler.Then(Raw("{\"items\":[]}"));
+
+        var act = () => Client().GetTransactionsAsync(InzhurFakes.Session());
+
+        (await act.Should().ThrowAsync<InzhurApiException>()).Which.Kind.Should().Be(InzhurFailureKind.Unexpected);
     }
 
     [Theory]
