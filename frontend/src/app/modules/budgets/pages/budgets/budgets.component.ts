@@ -32,6 +32,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {CategoryColourUtils} from '../../../../shared/utils/category-colour.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {DateUtils} from '../../../../shared/utils/date.utils';
 import {AddBudgetDialogComponent} from '../../components/add-budget-dialog/add-budget-dialog.component';
@@ -110,10 +111,8 @@ export class BudgetsComponent {
       .subscribe(() => this.openAddBudget());
   }
 
-  // By position in the grid, not by category: the colours repeat only every eight cards, so
-  // cards that sit side by side never share one.
-  public categoryColor(index: number): string {
-    return ChartColorUtils.categorical(index);
+  public categoryColor(category: string): string {
+    return ChartColorUtils.css(CategoryColourUtils.of(category));
   }
 
   public barPct(spent: number, limit: number): number {
@@ -124,7 +123,7 @@ export class BudgetsComponent {
     return Math.round(paceRatio * PCT_MAX);
   }
 
-  public barColor(spent: number, limit: number, index: number): string {
+  public barColor(spent: number, limit: number, category: string): string {
     const pct = (spent / limit) * PCT_MAX;
     if (spent > limit) {
       return 'var(--color-status-error)';
@@ -132,7 +131,7 @@ export class BudgetsComponent {
     if (pct >= BUDGET_NEAR_LIMIT_PCT) {
       return 'var(--color-status-warning)';
     }
-    return this.categoryColor(index);
+    return this.categoryColor(category);
   }
 
   public onBudgetAction(

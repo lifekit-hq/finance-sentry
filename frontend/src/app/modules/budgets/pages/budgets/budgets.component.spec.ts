@@ -109,9 +109,9 @@ describe('BudgetsComponent actions', () => {
 
   it('colours the bar red over limit, amber near it, category colour otherwise', () => {
     const {component} = setup();
-    expect(component.barColor(120, 100, 0)).toContain('error');
-    expect(component.barColor(85, 100, 0)).toContain('warning');
-    expect(component.barColor(10, 100, 1)).toBe('var(--color-chart-series-2)');
+    expect(component.barColor(120, 100, 'FOOD_AND_DRINK')).toContain('error');
+    expect(component.barColor(85, 100, 'FOOD_AND_DRINK')).toContain('warning');
+    expect(component.barColor(10, 100, 'FOOD_AND_DRINK')).toBe('var(--color-chart-series-2)');
   });
 });
 

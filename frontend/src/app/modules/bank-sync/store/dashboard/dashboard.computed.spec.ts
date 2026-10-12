@@ -821,7 +821,24 @@ describe('dashboardComputed', () => {
       const c = projectionFor({monthlyFlow: [], topCategories: categories(8)});
 
       expect(c.categoryChartData().map(s => s.value)).toEqual([100, 99, 98, 97, 96, 95, 94, 93]);
-      expect(c.categoryChartData().every(s => !('color' in s))).toBe(true);
+    });
+
+    it('colours a category by its identity, not by its rank in the range', () => {
+      const stat = (category: string, totalSpend: number): CategoryStat => ({
+        category,
+        totalSpend,
+        percentOfTotal: 0,
+      });
+      const colourOf = (cats: CategoryStat[], category: string): unknown =>
+        projectionFor({monthlyFlow: [], topCategories: cats})
+          .categoryChartData()
+          .find((_, i) => cats[i].category === category)?.color;
+
+      const first = colourOf([stat('FOOD_AND_DRINK', 90), stat('TRAVEL', 50)], 'FOOD_AND_DRINK');
+      const second = colourOf([stat('TRAVEL', 90), stat('FOOD_AND_DRINK', 50)], 'FOOD_AND_DRINK');
+
+      expect(first).toBeDefined();
+      expect(first).toBe(second);
     });
 
     it('folds the tail past seven into one slate slice', () => {

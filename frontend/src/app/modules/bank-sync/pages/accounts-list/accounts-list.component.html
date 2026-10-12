@@ -110,8 +110,9 @@
               </div>
 
               <div
-                [class.text-status-error]="inst.totalInBaseCurrency < 0"
-                class="tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
+                [class.text-loss]="inst.totalInBaseCurrency < 0"
+                [class.text-text-primary]="inst.totalInBaseCurrency >= 0"
+                class="tabular-nums font-medium text-right min-w-[5.5rem]"
                 status
               >
                 {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
@@ -250,7 +251,7 @@
 <ng-template #amountCell let-account>
   @let bal = account | accountBalance: store.baseCurrency();
   <div class="shrink-0 text-right tabular-nums">
-    <div [class]="bal.owed ? 'text-status-error' : 'text-text-primary'" class="text-cmn-sm">
+    <div [class]="bal.owed ? 'text-loss' : 'text-text-primary'" class="text-cmn-sm">
       {{ bal.native }}
     </div>
     @if (bal.equivalent) {
