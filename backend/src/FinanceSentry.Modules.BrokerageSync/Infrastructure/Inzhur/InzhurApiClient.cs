@@ -12,12 +12,15 @@ public interface IInzhurApiClient
     /// <summary>Refreshes the cabinet session: a new access token, and the jar as the auth host left it.</summary>
     Task<InzhurSession> RefreshAsync(InzhurSession session, CancellationToken ct = default);
 
-    /// <summary>Reads holdings and the broker cash account with the session's access token.</summary>
+    /// <summary>Reads holdings, their catalog entries and the broker cash account with the session's access token.</summary>
     Task<InzhurPortfolio> GetPortfolioAsync(InzhurSession session, CancellationToken ct = default);
+
+    /// <summary>Reads the whole ledger, newest first, paging back to the account's first movement.</summary>
+    Task<IReadOnlyList<InzhurTransaction>> GetTransactionsAsync(InzhurSession session, CancellationToken ct = default);
 }
 
 /// <summary>
-/// The daily, cookie-and-bearer side of the cabinet: one refresh and two GETs. Read-only by construction — the only
+/// The daily, cookie-and-bearer side of the cabinet: one refresh and a handful of GETs. Read-only by construction — the only
 /// POST is the session refresh; there is no trade, withdrawal or logout call here (logout would revoke the refresh
 /// token). Cookies are carried per call from the stored jar, never in a handler-wide container, so one user's session
 /// can never ride along on another user's request.
@@ -31,6 +34,12 @@ public sealed class InzhurApiClient(
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     private const int MaxErrorTextLength = 200;
+
+    /// <summary>Ledger rows asked for per page; the cabinet may answer with fewer, so paging never relies on a full page.</summary>
+    public const int TransactionsPageSize = 100;
+
+    /// <summary>A ceiling on ledger pages per read, so a cabinet that keeps answering can never hold the sync open.</summary>
+    public const int MaxTransactionPages = 500;
 
     // Inzhur's own error texts that mean the session is gone (design report §1, "log in again").
     private static readonly string[] ReloginMarkers =
@@ -92,7 +101,51 @@ public sealed class InzhurApiClient(
         if (account is null || (account.AvailableBalanceUah is null && account.BlockedBalanceUah is null))
             throw new InzhurApiException(InzhurFailureKind.Unexpected, "Inzhur broker-account returned no balances.");
 
-        return new InzhurPortfolio(assets.Assets, account);
+        // User-asset rows carry no name; the cabinet takes it from this catalog, and so does the holding symbol.
+        var ids = assets.Assets.Select(a => a.IdText).Where(id => id.Length > 0).Distinct(StringComparer.Ordinal).ToList();
+        var catalog = ids.Count == 0
+            ? null
+            : await GetAsync<InzhurCatalogResponse>(
+                $"api/v1/assets/details?assetIds={Uri.EscapeDataString(string.Join(',', ids))}", session, ct);
+
+        return new InzhurPortfolio(assets.Assets, account, catalog?.Items ?? []);
+    }
+
+    // The cabinet pages its ledger newest first by the last row's externalCreatedAt. Whether that cursor is inclusive
+    // is not documented, so rows are de-duplicated by id and paging ends on an empty page or a page with nothing new,
+    // never on a short one (the cabinet may cap the page size below what was asked).
+    public async Task<IReadOnlyList<InzhurTransaction>> GetTransactionsAsync(InzhurSession session, CancellationToken ct = default)
+    {
+        const string path = "api/v1/users/transactions";
+        var rows = new List<InzhurTransaction>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+
+        for (var page = 0; page < MaxTransactionPages; page++)
+        {
+            var query = $"{path}?pageSize={TransactionsPageSize}"
+                + (cursor is null ? string.Empty : $"&lastExternalCreatedAt={Uri.EscapeDataString(cursor)}");
+            var batch = await GetAsync<List<InzhurTransaction>>(query, session, ct)
+                ?? throw new InzhurApiException(InzhurFailureKind.Unexpected, "Inzhur transactions returned no list.");
+
+            var added = 0;
+            foreach (var row in batch)
+            {
+                var id = row.IdText;
+                if (id.Length > 0 && seen.Add(id))
+                {
+                    rows.Add(row);
+                    added++;
+                }
+            }
+
+            cursor = batch.LastOrDefault()?.ExternalCreatedAt;
+            if (added == 0 || string.IsNullOrEmpty(cursor))
+                return rows;
+        }
+
+        logger.LogWarning("Inzhur ledger read stopped at the {MaxPages}-page ceiling; older rows were not read", MaxTransactionPages);
+        return rows;
     }
 
     private async Task<T?> GetAsync<T>(string path, InzhurSession session, CancellationToken ct)
@@ -103,11 +156,13 @@ public sealed class InzhurApiClient(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
         AddCookies(request, session.ToContainer(), uri);
 
-        using var response = await SendAsync(request, path, ct);
+        // Operations are named by their path alone: a query string (a cursor, asset ids) never reaches a log or an error.
+        var operation = path.Split('?')[0];
+        using var response = await SendAsync(request, operation, ct);
         if (!response.IsSuccessStatusCode)
-            throw await FailureAsync(response, path, ct);
+            throw await FailureAsync(response, operation, ct);
 
-        return await ReadAsync<T>(response, path, ct);
+        return await ReadAsync<T>(response, operation, ct);
     }
 
     private static void AddCabinetHeaders(HttpRequestMessage request)

@@ -134,14 +134,41 @@ muted beneath. The wealth summary's brokerage account rows carry the same pair a
 `UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next daily sync rewrites
 them.
 
+**Units.** The cabinet sends every UAH *amount* in kopecks: the asset details (`totalAmountUAH`,
+`investedUAH`), the broker account (`availableBalanceUAH`, `blockedBalanceUAH`, `totalBalanceUAH`) and every
+ledger `amount`. Its own web client divides them by 100 for display. *Prices* (`buyUAH`, `sellUAH`, `navUAH`)
+are hryvnia. `InzhurHoldingsMapper.FromMinorUnits` is the one place amounts become hryvnia. Rows synced
+before this rule (2026-10-12) were 100× too large and are rewritten by the next daily sync.
+
 - **Funds and bonds** — one row per asset from `user-assets`, instrument type `REIT` for a fund
   (real estate, so the equity universes built from `STK` never pick it up) and `BOND` for a war
-  bond. Quantity is the certificates held; value is the cabinet's own `totalAmount` when present,
-  else quantity × sell price (NAV when no sell price). Average cost is `invested / quantity`
-  when Inzhur reports an invested amount, else none. Two lots of one asset merge into one row
-  (quantity and value summed, cost quantity-weighted).
-- **Cash** — the broker account's available plus order-blocked UAH is one `UAH Cash` row (`CASH`
-  type), the way IBKR's cash ledger lands; a zero balance writes no row.
+  bond. Quantity is the certificates held; value is the cabinet's own `totalAmount` (kopecks, /100)
+  when present, else quantity × sell price (NAV when no sell price), and the two agree to price
+  rounding. Average cost is `invested / quantity` (invested /100) when Inzhur reports an invested
+  amount, else none. Two lots of one asset merge into one row (quantity and value summed, cost
+  quantity-weighted). The symbol is the asset's name, which the `user-assets` row usually lacks, so
+  it comes from the cabinet's catalog (`assets/details?assetIds=`). A bond is named by its ISIN first,
+  and an asset with neither falls back to `INZHUR-<id>`. The ledger names its rows by the same rule.
+- **Cash** — the broker account's available plus order-blocked UAH (kopecks, /100) is one `UAH Cash`
+  row (`CASH` type), the way IBKR's cash ledger lands; a zero balance writes no row.
+- **Ledger** — every sync pages the whole transaction history (`users/transactions`, newest first,
+  cursor `lastExternalCreatedAt`, rows de-duplicated by id). It is stored idempotently on Inzhur's own
+  id, in the same tables as IBKR's Flex history, with provider `inzhur` and currency `UAH`. The first
+  sync after deploy is therefore the full backfill. Rows that move certificates (Purchase, Purchase for
+  bonuses, Sale, Gift Agreement) go to `BrokerageTrades`:
+  - units are signed (gift and sale out), and price = amount / units;
+  - proceeds follow IBKR's sign (a purchase pays out, a sale brings in, a gift is 0).
+
+  Every other movement goes to `BrokerageCashTransactions` with the cabinet's type and a signed hryvnia
+  amount. Deposits, crediting of dividends, distributions and bonuses, and Conversion In are positive.
+  Withdrawals, payments out, every tax, the sale commission and Conversion Out or Surcharge are
+  negative. A distribution keeps its kind (`DIVIDEND`, `COUPON`, …) in `Code`. A purchase or sale
+  without a readable contract keeps its money as a cash row, with its units untracked. A type the
+  cabinet adds later is skipped and named in the log, never guessed. Nothing sums these rows today. The
+  ledger lets the cost-basis reconciliation (fs-688) verify the cabinet's average cost from the fills,
+  converted to USD once at that reader. A holding is explained only by fills of its own provider, so an IBKR
+  fill never explains an Inzhur row of the same name. Its net units per asset must equal the snapshot quantity, since
+  the snapshot, not the ledger, is the position.
 - **Reconcile** — after a successful read, `inzhur` rows Inzhur no longer returns are deleted
   (sold fund, redeemed bond); rows of other providers are never touched. A failed read changes
   nothing: the previous day's rows stay, and go stale. A read whose assets carry a nonzero invested
