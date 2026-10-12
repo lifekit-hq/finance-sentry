@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 
 namespace FinanceSentry.Modules.CryptoSync.Domain;
@@ -8,7 +9,7 @@ namespace FinanceSentry.Modules.CryptoSync.Domain;
 /// this row survives a position closing or the holding row disappearing. Idempotent on
 /// <c>(UserId, Provider, TradeId)</c>: a re-walk of an already-covered page adds nothing.
 /// </summary>
-public sealed class CryptoTradeRecord
+public sealed class CryptoTradeRecord : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

@@ -1,32 +1,11 @@
-using FinanceSentry.Core.Auth;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
-
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 
-public sealed class CryptoSyncDbContextFactory : IDesignTimeDbContextFactory<CryptoSyncDbContext>
+using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+public sealed class CryptoSyncDbContextFactory() : DesignTimeDbContextFactoryBase<CryptoSyncDbContext>("__ef_migrations_history")
 {
-    public CryptoSyncDbContext CreateDbContext(string[] args)
-    {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false)
-            .AddJsonFile("appsettings.Development.json", optional: true)
-            .AddEnvironmentVariables()
-            .Build();
-
-        var connectionString = configuration.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("Connection string 'Default' not found in configuration");
-
-        var optionsBuilder = new DbContextOptionsBuilder<CryptoSyncDbContext>();
-        optionsBuilder.UseNpgsql(
-            connectionString,
-            npgsqlBuilder =>
-            {
-                npgsqlBuilder.MigrationsHistoryTable("__ef_migrations_history", "public");
-            });
-
-        return new CryptoSyncDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
-    }
+    protected override CryptoSyncDbContext Create(DbContextOptions<CryptoSyncDbContext> options, ICurrentUser currentUser)
+        => new(options, currentUser);
 }

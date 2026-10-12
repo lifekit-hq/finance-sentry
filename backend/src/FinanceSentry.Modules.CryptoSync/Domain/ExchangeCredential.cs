@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 
 namespace FinanceSentry.Modules.CryptoSync.Domain;
@@ -9,7 +10,7 @@ namespace FinanceSentry.Modules.CryptoSync.Domain;
 /// Revolut X with an Ed25519 private key (PEM). Both halves are encrypted at rest under the same
 /// key version, so they rotate together.
 /// </summary>
-public sealed class ExchangeCredential
+public sealed class ExchangeCredential : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

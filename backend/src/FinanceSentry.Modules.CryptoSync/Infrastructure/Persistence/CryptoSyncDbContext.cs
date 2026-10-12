@@ -1,35 +1,24 @@
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 
-public sealed class CryptoSyncDbContext : DbContext
+public sealed class CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> options, ICurrentUser currentUser)
+    : OwnerScopedDbContext(options, currentUser)
 {
-    private readonly ICurrentUser _currentUser;
-
-    public CryptoSyncDbContext(DbContextOptions<CryptoSyncDbContext> options, ICurrentUser currentUser)
-        : base(options)
-    {
-        _currentUser = currentUser;
-    }
-
-    // Evaluated per query: EF parameterises the context member, so each context instance filters on its own principal.
-    private Guid? CurrentUserId => _currentUser.UserId;
-
     public DbSet<ExchangeCredential> ExchangeCredentials => Set<ExchangeCredential>();
     public DbSet<CryptoHolding> CryptoHoldings => Set<CryptoHolding>();
     public DbSet<CryptoTradeRecord> CryptoTrades => Set<CryptoTradeRecord>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("crypto_sync");
-        base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<ExchangeCredential>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("ExchangeCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider }).IsUnique();
@@ -49,7 +38,6 @@ public sealed class CryptoSyncDbContext : DbContext
 
         modelBuilder.Entity<CryptoHolding>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("CryptoHoldings");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.Asset }).IsUnique();
@@ -72,7 +60,6 @@ public sealed class CryptoSyncDbContext : DbContext
 
         modelBuilder.Entity<CryptoTradeRecord>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("CryptoTrades");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.TradeId }).IsUnique();
