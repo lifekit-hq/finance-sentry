@@ -8,6 +8,10 @@ public class RecommendationTrendRepository(ResearchDbContext db) : IRecommendati
 {
     private const int MaxMonths = 60;
 
+    // One INSERT ... ON CONFLICT over the unique (Ticker, Period) index: the write is atomic, so two overlapping
+    // ingests update the same rows instead of the loser failing on the index, and no read precedes it. It runs at
+    // once rather than at SaveChanges, and a trend already tracked by this context is not refreshed. RETURNING
+    // (xmax = 0) is true only for a freshly inserted row, which is what the inserted count reports.
     public async Task<int> UpsertAsync(
         IReadOnlyList<RecommendationTrend> trends, CancellationToken ct = default)
     {
@@ -16,35 +20,43 @@ public class RecommendationTrendRepository(ResearchDbContext db) : IRecommendati
             return 0;
         }
 
-        var tickers = trends.Select(t => t.Ticker).Distinct().ToArray();
-        var periods = trends.Select(t => t.Period).Distinct().ToArray();
-        var existing = await db.RecommendationTrends
-            .Where(t => tickers.Contains(t.Ticker) && periods.Contains(t.Period))
-            .ToDictionaryAsync(t => (t.Ticker, t.Period), ct);
+        // ON CONFLICT cannot touch one row twice in a statement, so a repeated (Ticker, Period) keeps its last trend.
+        var incoming = trends
+            .GroupBy(t => (t.Ticker, t.Period))
+            .Select(g => g.Last())
+            .ToList();
 
-        var inserted = 0;
-        foreach (var trend in trends)
-        {
-            if (existing.TryGetValue((trend.Ticker, trend.Period), out var row))
-            {
-                row.StrongBuy = trend.StrongBuy;
-                row.Buy = trend.Buy;
-                row.Hold = trend.Hold;
-                row.Sell = trend.Sell;
-                row.StrongSell = trend.StrongSell;
-                row.Source = trend.Source;
-                row.IngestedAt = trend.IngestedAt;
-            }
-            else
-            {
-                db.RecommendationTrends.Add(trend);
-                existing[(trend.Ticker, trend.Period)] = trend;
-                inserted++;
-            }
-        }
+        var ids = incoming.Select(t => t.Id).ToArray();
+        var tickers = incoming.Select(t => t.Ticker).ToArray();
+        var periods = incoming.Select(t => t.Period).ToArray();
+        var strongBuys = incoming.Select(t => t.StrongBuy).ToArray();
+        var buys = incoming.Select(t => t.Buy).ToArray();
+        var holds = incoming.Select(t => t.Hold).ToArray();
+        var sells = incoming.Select(t => t.Sell).ToArray();
+        var strongSells = incoming.Select(t => t.StrongSell).ToArray();
+        var sources = incoming.Select(t => t.Source).ToArray();
+        var ingestedAts = incoming.Select(t => t.IngestedAt).ToArray();
 
-        await db.SaveChangesAsync(ct);
-        return inserted;
+        var inserted = await db.Database.SqlQuery<bool>(
+            $"""
+            INSERT INTO research.recommendation_trends AS t
+                ("Id", "Ticker", "Period", "StrongBuy", "Buy", "Hold", "Sell", "StrongSell", "Source", "IngestedAt")
+            SELECT * FROM unnest(
+                {ids}::uuid[], {tickers}::varchar[], {periods}::date[], {strongBuys}::integer[], {buys}::integer[],
+                {holds}::integer[], {sells}::integer[], {strongSells}::integer[], {sources}::varchar[],
+                {ingestedAts}::timestamptz[])
+            ON CONFLICT ("Ticker", "Period") DO UPDATE SET
+                "StrongBuy" = EXCLUDED."StrongBuy",
+                "Buy" = EXCLUDED."Buy",
+                "Hold" = EXCLUDED."Hold",
+                "Sell" = EXCLUDED."Sell",
+                "StrongSell" = EXCLUDED."StrongSell",
+                "Source" = EXCLUDED."Source",
+                "IngestedAt" = EXCLUDED."IngestedAt"
+            RETURNING (xmax = 0) AS "Value"
+            """).ToListAsync(ct);
+
+        return inserted.Count(isNew => isNew);
     }
 
     public async Task<IReadOnlyList<RecommendationTrend>> GetLatestAsync(

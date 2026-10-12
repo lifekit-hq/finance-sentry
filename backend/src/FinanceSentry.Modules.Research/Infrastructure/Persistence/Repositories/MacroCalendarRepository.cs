@@ -33,6 +33,11 @@ public class MacroCalendarRepository(ResearchDbContext db) : IMacroCalendarRepos
         return await q.OrderBy(e => e.EventDate).ThenBy(e => e.EventTime).ToListAsync(ct);
     }
 
+    // One INSERT ... ON CONFLICT over the unique (EventDate, Region, Event) index: the write is atomic, so two
+    // overlapping calendar refreshes update the same rows instead of the loser failing on the index, and no read
+    // precedes it. It runs at once rather than at SaveChanges, and an event already tracked by this context is not
+    // refreshed. A re-published event takes the new time, importance and source; RETURNING (xmax = 0) is true only
+    // for a freshly inserted row, which is what the inserted count reports.
     public async Task<int> UpsertAsync(IReadOnlyCollection<MacroEvent> events, CancellationToken ct = default)
     {
         if (events.Count == 0)
@@ -40,32 +45,36 @@ public class MacroCalendarRepository(ResearchDbContext db) : IMacroCalendarRepos
             return 0;
         }
 
-        var dates = events.Select(e => e.EventDate).Distinct().ToArray();
-        var eventNames = events.Select(e => e.Event).Distinct().ToArray();
+        // ON CONFLICT cannot touch one row twice in a statement, so a repeated key keeps its first event.
+        var incoming = events
+            .GroupBy(e => (e.EventDate, e.Region, e.Event))
+            .Select(g => g.First())
+            .ToList();
 
-        var candidates = await db.MacroEvents
-            .Where(x => dates.Contains(x.EventDate) && eventNames.Contains(x.Event))
-            .ToListAsync(ct);
-        var existingMap = candidates.ToDictionary(x => (x.EventDate, x.Region, x.Event));
+        var ids = incoming.Select(e => e.Id).ToArray();
+        var dates = incoming.Select(e => e.EventDate).ToArray();
+        var times = incoming.Select(e => e.EventTime).ToArray();
+        var names = incoming.Select(e => e.Event).ToArray();
+        var regions = incoming.Select(e => e.Region).ToArray();
+        var importances = incoming.Select(e => e.Importance).ToArray();
+        var sources = incoming.Select(e => e.Source).ToArray();
+        var ingestedAts = incoming.Select(e => e.IngestedAt).ToArray();
 
-        var inserted = 0;
-        foreach (var ev in events)
-        {
-            if (existingMap.TryGetValue((ev.EventDate, ev.Region, ev.Event), out var row))
-            {
-                row.EventTime = ev.EventTime;
-                row.Importance = ev.Importance;
-                row.Source = ev.Source;
-            }
-            else
-            {
-                db.MacroEvents.Add(ev);
-                inserted++;
-            }
-        }
+        var inserted = await db.Database.SqlQuery<bool>(
+            $"""
+            INSERT INTO research.macro_events AS t
+                ("Id", "EventDate", "EventTime", "Event", "Region", "Importance", "Source", "IngestedAt")
+            SELECT * FROM unnest(
+                {ids}::uuid[], {dates}::date[], {times}::time[], {names}::varchar[], {regions}::varchar[],
+                {importances}::varchar[], {sources}::varchar[], {ingestedAts}::timestamptz[])
+            ON CONFLICT ("EventDate", "Region", "Event") DO UPDATE SET
+                "EventTime" = EXCLUDED."EventTime",
+                "Importance" = EXCLUDED."Importance",
+                "Source" = EXCLUDED."Source"
+            RETURNING (xmax = 0) AS "Value"
+            """).ToListAsync(ct);
 
-        await db.SaveChangesAsync(ct);
-        return inserted;
+        return inserted.Count(isNew => isNew);
     }
 
     private static int ImportanceRank(string importance) => importance.ToLowerInvariant() switch
