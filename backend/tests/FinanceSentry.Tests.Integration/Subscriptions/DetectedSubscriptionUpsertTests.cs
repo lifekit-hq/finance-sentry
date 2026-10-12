@@ -113,6 +113,33 @@ public sealed class DetectedSubscriptionUpsertTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task A_legacy_row_re_keyed_to_a_transaction_is_updated_in_place_under_its_id()
+    {
+        var legacy = DetectedSubscription.CreateManual(
+            _user, "Netflix", 15.99m, "USD", new DateOnly(2026, 8, 1), termCount: null,
+            kind: SubscriptionKinds.Subscription);
+        await using (var ctx = CreateContext())
+            await new DetectedSubscriptionRepository(ctx).UpsertAsync(legacy);
+
+        await using (var ctx = CreateContext())
+        {
+            var repo = new DetectedSubscriptionRepository(ctx);
+            var loaded = (await repo.FindByUserAndMerchantUnscopedAsync(_user, legacy.MerchantNameNormalized))!;
+            loaded.TrackFromTransaction(
+                Merchant, "Netflix", 17.99m, "USD", new DateOnly(2026, 9, 1), chargeCount: 3,
+                termCount: null, startDate: null, endDate: null, SubscriptionKinds.Subscription);
+
+            await repo.UpsertAsync(loaded);
+        }
+
+        var row = (await RowsAsync()).Should().ContainSingle().Subject;
+        row.Id.Should().Be(legacy.Id);
+        row.MerchantNameNormalized.Should().Be(Merchant);
+        row.LastKnownAmount.Should().Be(17.99m);
+        row.OccurrenceCount.Should().Be(3);
+    }
+
+    [DockerRequiredFact]
     public async Task Repeating_the_detection_result_keeps_one_row()
     {
         var detected = new DetectedSubscriptionData(

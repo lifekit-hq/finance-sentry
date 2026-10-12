@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 // Reads run under SubscriptionsDbContext's Owner query filter. The detection job and the cross-module readers run
 // with no person in scope, so they call the …Unscoped… methods, which opt out of the filter and keep their own
-// UserId predicate. The upsert is a single INSERT ... ON CONFLICT, which the Owner filter does not touch, so it
-// works with no person in scope too.
+// UserId predicate. A new row is written by a single INSERT ... ON CONFLICT, which the Owner filter does not touch, so
+// it works with no person in scope too.
 public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetectedSubscriptionRepository
 {
     private readonly SubscriptionsDbContext _db = db;
@@ -35,13 +35,19 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
         => AllUsers
             .FirstOrDefaultAsync(s => s.UserId == userId && s.MerchantNameNormalized == merchantNameNormalized, ct);
 
-    // One INSERT ... ON CONFLICT on the unique (UserId, MerchantNameNormalized) index: a new subscription is inserted, and
-    // one already stored under that key (the detection job re-finds it, or a row loaded and changed here) is updated in
-    // place with the caller's state, keeping its Id and DetectedAt. Two writers of one key leave one row instead of
-    // the loser failing on the index, and no read precedes it. It runs at once; a row this context tracks is marked
-    // unchanged so a later SaveChanges does not write it again.
+    // A row this context tracks was loaded, so it exists: it is written back by its Id, which also carries a changed
+    // key (a legacy row re-keyed when it is linked to a transaction). A new row is one INSERT ... ON CONFLICT on the
+    // unique (UserId, MerchantNameNormalized) index: one already stored under that key (the detection job re-finds it
+    // in a race) is updated in place with the caller's state, keeping its Id and DetectedAt, so two writers of one key
+    // leave one row instead of the loser failing on the index, and no read precedes it.
     public async Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
     {
+        if (_db.Entry(subscription).State != EntityState.Detached)
+        {
+            await _db.SaveChangesAsync(ct);
+            return;
+        }
+
         await _db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO public.detected_subscriptions
@@ -80,10 +86,6 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
                 "DismissedAt" = EXCLUDED."DismissedAt"
             """,
             ct);
-
-        var entry = _db.Entry(subscription);
-        if (entry.State != EntityState.Detached)
-            entry.State = EntityState.Unchanged;
     }
 
     public async Task DeleteAsync(DetectedSubscription subscription, CancellationToken ct = default)
