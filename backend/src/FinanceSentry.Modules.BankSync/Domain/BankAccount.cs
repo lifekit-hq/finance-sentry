@@ -1,9 +1,10 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
-public class BankAccount : Entity, IHasUpdatedAt
+public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
 {
     /// <summary>
     /// <see cref="Provider"/> of an account the startup smoke seed writes: fake data with no provider behind it,

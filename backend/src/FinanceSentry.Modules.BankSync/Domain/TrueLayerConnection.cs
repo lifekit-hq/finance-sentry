@@ -1,9 +1,10 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
-public class TrueLayerConnection : Entity, IHasUpdatedAt
+public class TrueLayerConnection : Entity, IHasUpdatedAt, IUserOwned
 {
     public Guid UserId { get; private set; }
     public string ProviderId { get; private set; } = string.Empty;

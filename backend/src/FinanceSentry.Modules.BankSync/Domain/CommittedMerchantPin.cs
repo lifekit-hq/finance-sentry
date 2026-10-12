@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
@@ -8,7 +9,7 @@ using FinanceSentry.Core.Domain;
 /// standing payment to a person, a gym with a lock-in period, a service billed too irregularly
 /// for the recurrence detector to promote it.
 /// </summary>
-public class CommittedMerchantPin : Entity
+public class CommittedMerchantPin : Entity, IUserOwned
 {
     /// <summary>Owning user. Pins are always personal — there is no system-default pin.</summary>
     public Guid UserId { get; set; }
