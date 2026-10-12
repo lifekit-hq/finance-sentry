@@ -13,6 +13,7 @@ import {
 import {APP_LOCALE, MS_PER_DAY} from '../../../../shared/constants/date/date.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
+import {CategoryColourUtils} from '../../../../shared/utils/category-colour.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
@@ -503,12 +504,13 @@ export function dashboardComputed(store: StateSignals) {
     // as a broken widget rather than as "not enough history".
     hasCashFlow: computed(() => completeMonths().length > 0),
 
-    // The donut cycles the categorical series colours, so past that many slices two categories
-    // would share one; the tail folds into a single slate slice instead. The table lists them all.
+    // Each slice takes its category's own colour, so it does not move with range or rank. Past the
+    // categorical step count the tail folds into a single slate slice. The table lists them all.
     categoryChartData: computed((): DonutSegment[] => {
       const segments = (store.data()?.topCategories ?? []).map(c => ({
         label: categoryStore.labelMap()[c.category] ?? MerchantCategoryUtils.format(c.category),
         value: c.totalSpend,
+        color: ChartColorUtils.canvas(CategoryColourUtils.of(c.category)),
       }));
       if (segments.length <= CATEGORICAL_STEPS.length) {
         return segments;
