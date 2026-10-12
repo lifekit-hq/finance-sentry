@@ -9,8 +9,9 @@ public readonly record struct JobFailureStreak(int Count, bool Alerted)
 }
 
 /// <summary>
-/// Durable store for the per-job consecutive-failure streak so a restart doesn't reset a live streak
-/// (data-model US4). Keyed by job name.
+/// Durable store for consecutive-failure streaks so a restart doesn't reset a live streak. Keyed by job
+/// name for <c>ConsecutiveFailureGaugeFilter</c>, and by credential for the crypto and IBKR sync jobs
+/// (which also use <see cref="JobFailureStreak.Alerted"/>).
 /// </summary>
 public interface IJobFailureStreakStore
 {

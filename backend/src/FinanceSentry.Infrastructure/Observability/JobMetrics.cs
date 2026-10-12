@@ -29,7 +29,7 @@ public sealed class JobMetrics : IDisposable
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRetentionRun = new();
     private DateTimeOffset? _lastBackupVerified;
 
-    // Current consecutive terminal-failure streak per job, written by ConsecutiveFailureAlertFilter.
+    // Current consecutive terminal-failure streak per job, written by ConsecutiveFailureGaugeFilter.
     private readonly ConcurrentDictionary<string, int> _consecutiveFailures = new();
 
     public JobMetrics()

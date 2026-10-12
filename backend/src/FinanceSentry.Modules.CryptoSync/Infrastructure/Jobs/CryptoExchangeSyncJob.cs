@@ -23,7 +23,7 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 /// timeout or network failure (the same per-user streak shape as <c>IBKRSyncJob</c>).
 ///
 /// A run in which EVERY user failed produced nothing, so it fails the job: that is what
-/// <c>ConsecutiveFailureAlertFilter</c> watches to raise the Telegram alert (#023). Swallowing it
+/// <c>ConsecutiveFailureGaugeFilter</c> counts toward the job's failure-streak gauge. Swallowing it
 /// would make a dead key or a venue outage indistinguishable from a quiet run.
 ///
 /// One subclass per venue, because Hangfire names a job by its type: each venue gets its own

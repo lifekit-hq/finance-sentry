@@ -162,8 +162,8 @@ public funnel), and Hangfire additionally requires the owner's sign-in; `/metric
 `Observability__Loki__Url` stays here (it defaults to `http://loki:3100`, which still resolves — the api
 is on the shared `lifekit-shared` network where lifekit-stack's Loki lives). `Observability__Otlp__Endpoint`
 likewise stays here; api and gateway both join `lifekit-shared` to reach lifekit-stack's OTLP collector. Alert rules are no longer deferred
-and no longer this repo's: they are provisioned files in lifekit-stack. Job silent-failure alerting (US4,
-N consecutive failures → Telegram) remains the app-side slice.
+and no longer this repo's: they are provisioned files in lifekit-stack, including job silent-failure alerting
+(`finance-job-consecutive-failures`, on the app's `finance_job_consecutive_failures{job}` gauge).
 
 ## Running Tests
 

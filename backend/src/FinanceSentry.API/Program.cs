@@ -203,12 +203,10 @@ app.MapHealthChecks("/api/v1/health/ready", new HealthCheckOptions
 GlobalJobFilters.Filters.Add(
     new DashboardObservability.JobMetricsFilter(app.Services.GetRequiredService<JobMetrics>()));
 
-// Alert on N consecutive job failures → Telegram (US4/FR-009); N configurable, default 3.
-GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertFilter(
-    app.Services,
+// Feed finance_job_consecutive_failures{job}; the Grafana rule finance-job-consecutive-failures alerts on it (#935).
+GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureGaugeFilter(
     new DashboardObservability.HangfireJobFailureStreakStore(),
-    app.Services.GetRequiredService<JobMetrics>(),
-    app.Configuration.GetValue("Observability:JobFailureAlertThreshold", 3)));
+    app.Services.GetRequiredService<JobMetrics>()));
 
 // Publish each registered recurring job's persisted streak so finance_job_consecutive_failures exists from
 // startup (the streak is durable; the gauge is in-memory). Best-effort: storage may be unreachable.
