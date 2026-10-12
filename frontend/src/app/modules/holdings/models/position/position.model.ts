@@ -9,6 +9,10 @@ export interface BrokeragePositionDto {
   provider?: string;
   /** Backend `AssetClassNormalizer` bucket of `instrumentType` (`Cash`, `Bonds`, `RealEstate`, `Equities`, ...). */
   assetClass?: string;
+  /** ISO code the broker denominates this position in; `USD` when it only reports USD. */
+  currency?: string;
+  /** The position's value in `currency` as the broker reported it; null for USD-only rows. */
+  nativeValue?: Nullable<number>;
 }
 
 export interface BrokerageHoldingsDto {
@@ -61,4 +65,8 @@ export interface Position {
   pnlPercent: Nullable<number>;
   /** Unrealized P&L in USD from the same provider cost basis as `pnlPercent`; null when that is. */
   pnlUsd: Nullable<number>;
+  /** Currency the provider denominates the row in, when it is not USD (`currentValue` stays USD). */
+  nativeCurrency?: string;
+  /** `currentValue` in `nativeCurrency`, exactly as the provider reported it (never converted). */
+  nativeValue?: Nullable<number>;
 }

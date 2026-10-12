@@ -59,6 +59,31 @@ describe('AccountBalancePipe', () => {
     expect(result).toEqual({native: '€1,200.00', equivalent: null, owed: false});
   });
 
+  it('shows a position in the currency its provider reported, with the base equivalent beneath', () => {
+    const result = pipe.transform(
+      account({
+        accountType: 'brokerage',
+        currency: 'Fund A',
+        currentBalance: 10,
+        balanceInBaseCurrency: 29,
+        nativeCurrency: 'UAH',
+        nativeValue: 1200,
+      }),
+      'USD'
+    );
+
+    expect(result).toEqual({native: '₴1,200.00', equivalent: '~ $29', owed: false});
+  });
+
+  it('omits the equivalent for a position already reported in the base currency', () => {
+    const result = pipe.transform(
+      account({currency: 'Fund A', nativeCurrency: 'UAH', nativeValue: 1200}),
+      'UAH'
+    );
+
+    expect(result.equivalent).toBeNull();
+  });
+
   it('omits the equivalent when no conversion exists', () => {
     expect(pipe.transform(account({balanceInBaseCurrency: null}), 'USD').equivalent).toBeNull();
   });

@@ -47,6 +47,22 @@ public class WealthBrokerageProvidersTests
     }
 
     [Fact]
+    public async Task A_row_with_a_provider_reported_value_carries_it_in_its_own_currency_next_to_the_USD_figure()
+    {
+        var fund = new BrokerageHoldingSummary("Fund A", "REIT", 10m, 29m, DateTime.UtcNow, "inzhur", Currency: "UAH", NativeValue: 1_200m);
+        var stock = Holding("ibkr", "AAPL", 1_000m, TimeSpan.FromMinutes(5));
+
+        var result = await Service([fund, stock]).GetWealthSummaryAsync(UserId, null, null);
+
+        var brokerage = result.Categories.Single(c => c.Category == "brokerage");
+        var inzhur = brokerage.Institutions.Single(i => i.Provider == "inzhur").Accounts.Single();
+        (inzhur.NativeCurrency, inzhur.NativeValue, inzhur.BalanceInBaseCurrency).Should().Be(("UAH", 1_200m, 29m));
+        var ibkr = brokerage.Institutions.Single(i => i.Provider == "ibkr").Accounts.Single();
+        (ibkr.NativeCurrency, ibkr.NativeValue).Should().Be(((string?)null, (decimal?)null));
+        brokerage.TotalInBaseCurrency.Should().Be(1_029m, "totals still sum the USD figure only");
+    }
+
+    [Fact]
     public async Task Broker_cash_rows_are_typed_cash_without_moving_the_brokerage_totals()
     {
         var cash = new BrokerageHoldingSummary("USD Cash", "CASH", 400m, 400m, DateTime.UtcNow, "ibkr");

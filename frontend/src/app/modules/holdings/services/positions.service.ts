@@ -6,6 +6,7 @@ import {catchError} from 'rxjs/operators';
 import {BROKERAGE_ASSET_CLASS} from '../constants/position/position.constants';
 import {
   type BrokerageHoldingsDto,
+  type BrokeragePositionDto,
   type CryptoHoldingDto,
   type CryptoHoldingsDto,
   type Position,
@@ -40,6 +41,15 @@ function cryptoUnitPrice(holding: CryptoHoldingDto): Nullable<number> {
   return quantity > 0 ? holding.usdValue / quantity : 0;
 }
 
+/** The provider's own currency and amount, kept only for a non-USD row that reported both. */
+function nativeAmount(p: BrokeragePositionDto): Pick<Position, 'nativeCurrency' | 'nativeValue'> {
+  const currency = p.currency?.toUpperCase();
+  if (!currency || currency === 'USD' || p.nativeValue == null) {
+    return {};
+  }
+  return {nativeCurrency: currency, nativeValue: p.nativeValue};
+}
+
 @Injectable({providedIn: 'root'})
 export class PositionsService extends ApiService {
   constructor() {
@@ -71,6 +81,7 @@ export class PositionsService extends ApiService {
             pnlUsd: providerPnlUsd(p.usdValue, costBasisUsd),
             isVenueCash: false,
             assetClass: BROKERAGE_ASSET_CLASS.get(p.assetClass ?? '') ?? 'equity',
+            ...nativeAmount(p),
           };
         });
 

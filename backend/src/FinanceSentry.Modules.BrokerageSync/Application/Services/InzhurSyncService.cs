@@ -114,7 +114,9 @@ public sealed class InzhurSyncService(
             p.UsdValue,
             InzhurHoldingsMapper.Provider,
             averageCostUsd: p.AverageCostUsd,
-            acquiredAt: p.AverageCostUsd.HasValue ? syncedAt : null)), ct);
+            acquiredAt: p.AverageCostUsd.HasValue ? syncedAt : null,
+            currency: p.Currency,
+            nativeValue: p.NativeValue)), ct);
         await holdingRepository.SaveChangesAsync(ct);
 
         var bySymbol = positions.ToDictionary(p => p.Symbol, StringComparer.Ordinal);

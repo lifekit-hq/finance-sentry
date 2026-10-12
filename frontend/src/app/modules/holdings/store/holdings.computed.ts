@@ -34,6 +34,10 @@ export interface PositionRow {
   quantity: number;
   currentPrice: Nullable<number>;
   currentValue: number;
+  /** Set when the provider denominates the row outside USD: its amounts are shown in that currency. */
+  nativeCurrency?: Nullable<string>;
+  nativeValue?: Nullable<number>;
+  nativePrice?: Nullable<number>;
   pnlPercent: Nullable<number>;
   pnlUsd: Nullable<number>;
   /** Today's move from the research quote; null when the row has no quote. */
@@ -108,6 +112,9 @@ export function holdingsComputed(store: StateSignals) {
         quantity: p.quantity,
         currentPrice: p.currentPrice,
         currentValue: p.currentValue,
+        nativeCurrency: p.nativeCurrency ?? null,
+        nativeValue: p.nativeValue ?? null,
+        nativePrice: p.nativeValue != null && p.quantity > 0 ? p.nativeValue / p.quantity : null,
         pnlPercent: p.pnlPercent,
         pnlUsd: p.pnlUsd,
         dayChangePct,

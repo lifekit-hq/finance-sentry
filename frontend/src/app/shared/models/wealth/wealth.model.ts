@@ -12,6 +12,9 @@ export interface AccountBalanceItem extends AccountIdentity {
   syncStatus: SyncStatus;
   lastSyncTimestamp: Nullable<string>;
   productType?: Nullable<string>;
+  /** A position's value as its provider reported it (an Inzhur fund in UAH); absent when `currentBalance` is already native. */
+  nativeCurrency?: Nullable<string>;
+  nativeValue?: Nullable<number>;
 }
 
 /**

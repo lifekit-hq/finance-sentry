@@ -87,6 +87,8 @@ public sealed class BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbConte
             entity.Property(e => e.InstrumentType).IsRequired().HasMaxLength(20);
             entity.Property(e => e.Quantity).HasPrecision(30, 10);
             entity.Property(e => e.UsdValue).HasPrecision(20, 4);
+            entity.Property(e => e.Currency).IsRequired().HasMaxLength(3).HasDefaultValue(BrokerageHolding.DefaultCurrency);
+            entity.Property(e => e.NativeValue).HasPrecision(20, 4);
             entity.Property(e => e.Provider).IsRequired().HasMaxLength(20).HasDefaultValue("ibkr");
             entity.Property(e => e.AverageCostUsd).HasPrecision(20, 8);
             entity.Property(e => e.CostBasisUsd).HasPrecision(20, 4);

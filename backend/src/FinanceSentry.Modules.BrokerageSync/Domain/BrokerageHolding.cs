@@ -10,6 +10,16 @@ public sealed class BrokerageHolding : IUserOwned
     public string InstrumentType { get; private set; } = string.Empty;
     public decimal Quantity { get; private set; }
     public decimal UsdValue { get; private set; }
+
+    /// <summary>ISO code the position is denominated in (<c>USD</c> unless the provider reports otherwise).</summary>
+    public string Currency { get; private set; } = DefaultCurrency;
+
+    /// <summary>
+    /// The position's value in <see cref="Currency"/>, exactly as the provider reported it (never converted).
+    /// Null when the provider's rows are USD-only, so a reader falls back to <see cref="UsdValue"/>.
+    /// </summary>
+    public decimal? NativeValue { get; private set; }
+
     public DateTime SyncedAt { get; private set; }
     public string Provider { get; private set; } = string.Empty;
 
@@ -26,6 +36,8 @@ public sealed class BrokerageHolding : IUserOwned
     /// </summary>
     public DateOnly? FlexAsOfDate { get; private set; }
 
+    public const string DefaultCurrency = "USD";
+
     private BrokerageHolding() { }
 
     public BrokerageHolding(
@@ -38,7 +50,9 @@ public sealed class BrokerageHolding : IUserOwned
         decimal? averageCostUsd = null,
         DateTime? acquiredAt = null,
         Guid? instrumentId = null,
-        DateOnly? flexAsOfDate = null)
+        DateOnly? flexAsOfDate = null,
+        string currency = DefaultCurrency,
+        decimal? nativeValue = null)
     {
         Id = Guid.NewGuid();
         UserId = userId;
@@ -53,6 +67,8 @@ public sealed class BrokerageHolding : IUserOwned
         AcquiredAt = acquiredAt;
         InstrumentId = instrumentId;
         FlexAsOfDate = flexAsOfDate;
+        Currency = currency;
+        NativeValue = nativeValue;
     }
 
     public void Update(decimal quantity, decimal usdValue, Guid? instrumentId = null, DateOnly? flexAsOfDate = null)

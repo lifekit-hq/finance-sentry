@@ -122,7 +122,17 @@ rows, so every reader sees one set:
 #### Inzhur (`InzhurSyncService`, `InzhurHoldingsMapper`)
 
 Inzhur (Ukrainian REIT funds and war bonds) is read once a day from the owner's own cabinet, read-only.
-Everything Inzhur reports is in UAH and is converted to USD once, at ingest (§3).
+Everything Inzhur reports is in UAH, unless the cabinet itself reports a currency for an asset or the
+broker account (then that code wins; a code `CurrencyConverter` has no rate for, or a non-string value,
+falls back to UAH). Each row keeps that currency and its amount as reported (`BrokerageHolding.Currency` /
+`NativeValue`, never converted) next to `UsdValue`, which is converted once, at ingest (§3).
+`GET /brokerage/holdings` returns both as `currency` / `nativeValue` (null `nativeValue` = USD-only row,
+e.g. IBKR); the Holdings page shows such a row's price and value in its own currency with the USD figure
+muted beneath. The wealth summary's brokerage account rows carry the same pair as `nativeCurrency` /
+`nativeValue` (the accounts list shows them in that currency with the base equivalent muted) and MCP
+`get_account_summary` reports such a row in its own currency. Totals, weights and the donut still sum
+`UsdValue` only. Rows stored before `nativeValue` existed read as USD until the next daily sync rewrites
+them.
 
 - **Funds and bonds** — one row per asset from `user-assets`, instrument type `REIT` for a fund
   (real estate, so the equity universes built from `STK` never pick it up) and `BOND` for a war

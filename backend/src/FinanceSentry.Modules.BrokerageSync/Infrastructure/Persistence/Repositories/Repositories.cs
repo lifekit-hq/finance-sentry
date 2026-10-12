@@ -195,7 +195,8 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
     // two overlapping syncs of one account update the same row instead of the loser failing on the index, and no
     // read precedes it. It runs at once rather than at SaveChanges, and a holding already tracked by this context
     // is not refreshed. The DO UPDATE list mirrors BrokerageHolding.Update (cost basis follows the new quantity
-    // only while an average cost is known; the instrument link is never cleared; AcquiredAt/AverageCostUsd stay).
+    // only while an average cost is known; the instrument link is never cleared; AcquiredAt/AverageCostUsd stay),
+    // plus Currency/NativeValue, which a provider that reports its own currency rewrites each sync.
     public async Task UpsertRangeAsync(IEnumerable<BrokerageHolding> holdings, CancellationToken ct = default)
     {
         foreach (var h in holdings)
@@ -204,13 +205,15 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
                 $"""
                 INSERT INTO brokerage_sync."BrokerageHoldings" AS t
                     ("Id", "UserId", "Symbol", "InstrumentType", "Quantity", "UsdValue", "SyncedAt", "Provider",
-                     "AverageCostUsd", "CostBasisUsd", "AcquiredAt", "InstrumentId", "FlexAsOfDate")
+                     "AverageCostUsd", "CostBasisUsd", "AcquiredAt", "InstrumentId", "FlexAsOfDate", "Currency", "NativeValue")
                 VALUES
                     ({h.Id}, {h.UserId}, {h.Symbol}, {h.InstrumentType}, {h.Quantity}, {h.UsdValue}, {h.SyncedAt}, {h.Provider},
-                     {h.AverageCostUsd}, {h.CostBasisUsd}, {h.AcquiredAt}, {h.InstrumentId}, {h.FlexAsOfDate})
+                     {h.AverageCostUsd}, {h.CostBasisUsd}, {h.AcquiredAt}, {h.InstrumentId}, {h.FlexAsOfDate}, {h.Currency}, {h.NativeValue})
                 ON CONFLICT ("UserId", "Symbol", "Provider") DO UPDATE SET
                     "Quantity" = EXCLUDED."Quantity",
                     "UsdValue" = EXCLUDED."UsdValue",
+                    "Currency" = EXCLUDED."Currency",
+                    "NativeValue" = EXCLUDED."NativeValue",
                     "SyncedAt" = EXCLUDED."SyncedAt",
                     "FlexAsOfDate" = EXCLUDED."FlexAsOfDate",
                     "InstrumentId" = COALESCE(EXCLUDED."InstrumentId", t."InstrumentId"),

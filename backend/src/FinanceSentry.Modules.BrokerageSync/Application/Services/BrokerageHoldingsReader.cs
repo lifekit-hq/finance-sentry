@@ -40,7 +40,9 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
                     h.Provider,
                     costBasisUsd,
                     reconciliation.State.ToString(),
-                    h.FlexAsOfDate);
+                    h.FlexAsOfDate,
+                    h.Currency,
+                    h.NativeValue);
             })
             .ToList();
     }

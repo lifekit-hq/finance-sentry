@@ -77,6 +77,74 @@ public class InzhurHoldingsMapperTests
     }
 
     [Fact]
+    public void Payload_without_a_currency_comes_out_as_UAH_with_the_amounts_unconverted()
+    {
+        var positions = InzhurHoldingsMapper.Map(Portfolio(
+            InzhurFakes.UserAssets(InzhurFakes.Fund("Fund A", 10m, 1_200m, 1_000m)),
+            InzhurFakes.BrokerAccount(500m, 100m)));
+
+        positions.Should().HaveCount(2);
+        positions.Should().OnlyContain(p => p.Currency == "UAH");
+        positions.Single(p => p.Symbol == "Fund A").NativeValue.Should().Be(1_200m);
+        positions.Single(p => p.Symbol == InzhurHoldingsMapper.CashSymbol).NativeValue.Should().Be(600m);
+    }
+
+    [Fact]
+    public void Payload_with_a_reported_currency_keeps_it_and_converts_the_USD_figure_from_it()
+    {
+        var fund = new
+        {
+            id = 1,
+            type = "fund",
+            name = "Fund E",
+            currency = "eur",
+            prices = new { sellUAH = 120m },
+            details = new { certificatesOwnedQuantity = 10m, totalAmountUAH = 1_200m },
+        };
+        var positions = InzhurHoldingsMapper.Map(Portfolio(
+            InzhurFakes.UserAssets(fund),
+            new { availableBalanceUAH = 50m, blockedBalanceUAH = 0m, currency = "EUR" }));
+
+        var asset = positions.Single(p => p.Symbol == "Fund E");
+        asset.Currency.Should().Be("EUR");
+        asset.NativeValue.Should().Be(1_200m);
+        asset.UsdValue.Should().Be(CurrencyConverter.ToUsd(1_200m, "EUR"));
+        var cash = positions.Single(p => p.Symbol == InzhurHoldingsMapper.CashSymbol);
+        cash.Currency.Should().Be("EUR");
+        cash.NativeValue.Should().Be(50m);
+    }
+
+    [Theory]
+    [InlineData(null, "UAH")]
+    [InlineData("", "UAH")]
+    [InlineData("hryvnia", "UAH")]
+    [InlineData(" uah ", "UAH")]
+    [InlineData("USD", "USD")]
+    [InlineData("PLN", "UAH")]
+    public void Reported_currency_is_used_only_when_a_rate_exists_for_it(string? reported, string expected)
+        => InzhurHoldingsMapper.CurrencyFor(reported).Should().Be(expected);
+
+    [Fact]
+    public void Currency_in_an_unexpected_shape_reads_as_not_reported_and_keeps_the_row_in_UAH()
+    {
+        var fund = new
+        {
+            id = 1,
+            type = "fund",
+            name = "Fund F",
+            currency = new { code = "EUR" },
+            details = new { certificatesOwnedQuantity = 10m, totalAmountUAH = 1_200m },
+        };
+        var positions = InzhurHoldingsMapper.Map(Portfolio(
+            InzhurFakes.UserAssets(fund),
+            new { availableBalanceUAH = 50m, currency = 980 }));
+
+        positions.Should().HaveCount(2);
+        positions.Should().OnlyContain(p => p.Currency == "UAH");
+        positions.Single(p => p.Symbol == "Fund F").UsdValue.Should().Be(CurrencyConverter.ToUsd(1_200m, "UAH"));
+    }
+
+    [Fact]
     public void Symbol_falls_back_from_name_to_title_to_isin_to_the_id()
     {
         static InzhurAsset Asset(string? name, string? title, string? isin)
