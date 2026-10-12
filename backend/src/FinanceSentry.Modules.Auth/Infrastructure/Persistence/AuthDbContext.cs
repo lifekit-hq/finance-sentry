@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -24,6 +25,15 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
     // Guid.ToString() (lower-case "D" format), so the acting person's id is compared in that same form; null (no
     // person in scope) matches no row.
     private string? CurrentUserKey => currentUser.UserId?.ToString();
+
+    // Not an OwnerScopedDbContext: it derives from IdentityDbContext<ApplicationUser>, and the person is keyed by string
+    // (Identity's id), not the Guid that base scopes. The Owner filters above stay hand-written; the column conventions
+    // are the shared ones. The Guid-key default and decimal precision stay off: this schema has neither.
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        PersistenceConventions.Apply(configurationBuilder);
+    }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
