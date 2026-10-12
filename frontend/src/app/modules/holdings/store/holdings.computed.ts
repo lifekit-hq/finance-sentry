@@ -1,6 +1,6 @@
-import {computed, inject, type Signal} from '@angular/core';
+import {computed, type Signal} from '@angular/core';
 import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
 import {
@@ -13,16 +13,13 @@ import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position, type PositionAssetClass} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
-import {type HoldingsState} from './holdings.state';
 
 interface StateSignals {
   positions: Signal<Position[]>;
-  positionsStatus: Signal<HoldingsState['positionsStatus']>;
-  positionsErrorCode: Signal<Nullable<string>>;
+  status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
 }
 
-const DEFAULT_POSITIONS_ERROR = 'Failed to load positions.';
 const WEIGHT_TO_PERCENT = 100;
 
 export type AssetClass = PositionAssetClass;
@@ -88,8 +85,6 @@ export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
 };
 
 export function holdingsComputed(store: StateSignals) {
-  const errorMessages = inject(ErrorMessageService);
-
   const totalPositionsValue = computed(() =>
     store.positions().reduce((sum, p) => sum + p.currentValue, 0)
   );
@@ -139,16 +134,7 @@ export function holdingsComputed(store: StateSignals) {
 
   return {
     positions: computed((): Position[] => store.positions()),
-    isPositionsLoading: computed(() => store.positionsStatus() === 'loading'),
-    positionsLoaded: computed(
-      () => store.positionsStatus() !== 'idle' || store.positions().length > 0
-    ),
-    positionsErrorMessage: computed(() => {
-      if (store.positionsStatus() !== 'error') {
-        return '';
-      }
-      return errorMessages.resolve(store.positionsErrorCode()) ?? DEFAULT_POSITIONS_ERROR;
-    }),
+    positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
     positionsByAssetClass,
     allocationSegments: computed((): DonutSegment[] =>

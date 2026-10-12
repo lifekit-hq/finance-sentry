@@ -1,11 +1,10 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ERROR_MESSAGES} from '@lifekit-hq/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {describe, expect, it} from 'vitest';
 
 import {type Position} from '../models/position/position.model';
 import {holdingsComputed} from './holdings.computed';
-import {type HoldingsState} from './holdings.state';
 
 function position(overrides: Partial<Position>): Position {
   return {
@@ -23,19 +22,26 @@ function position(overrides: Partial<Position>): Position {
   };
 }
 
-function build(positions: Position[], dayChangePctByTicker: Record<string, number> = {}) {
-  TestBed.configureTestingModule({providers: [{provide: ERROR_MESSAGES, useValue: {}}]});
+function build(
+  positions: Position[],
+  dayChangePctByTicker: Record<string, number> = {},
+  status: AsyncStatus = 'idle'
+) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
       positions: signal(positions),
-      positionsStatus: signal<HoldingsState['positionsStatus']>('idle'),
-      positionsErrorCode: signal<Nullable<string>>(null),
+      status: signal<AsyncStatus>(status),
       dayChangePctByTicker: signal(dayChangePctByTicker),
     })
   );
 }
 
 describe('holdingsComputed', () => {
+  it('positionsLoaded is false before the first load and true once it succeeds, even when empty', () => {
+    expect(build([]).positionsLoaded()).toBe(false);
+    expect(build([], {}, 'success').positionsLoaded()).toBe(true);
+  });
+
   it('groups venue fiat as venue cash, apart from the crypto held on the same venue', () => {
     const computed = build([
       position({symbol: 'BTC', currentValue: 6_000, currentPrice: 60_000, quantity: 0.1}),

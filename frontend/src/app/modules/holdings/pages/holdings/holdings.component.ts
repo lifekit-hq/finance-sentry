@@ -55,10 +55,10 @@ export class InvestmentsComponent {
   public readonly accountsRoute = AppRoute.AccountsInvestments;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
   public readonly positionsStatus = computed<AsyncStateStatus>(() => {
-    if (this.store.positionsErrorMessage()) {
+    if (this.store.errorMessage()) {
       return 'error';
     }
-    return this.store.isPositionsLoading() ? 'loading' : 'success';
+    return this.store.isLoading() ? 'loading' : 'success';
   });
   public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
   public readonly pnlNegativeClass = LOSS_TEXT_CLASS;

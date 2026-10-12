@@ -24,9 +24,10 @@ const EQUITY: Position = {
 
 function buildStore() {
   return {
-    setPositionsLoading: vi.fn(),
+    setLoading: vi.fn(),
+    setSuccess: vi.fn(),
     setPositions: vi.fn(),
-    setPositionsError: vi.fn(),
+    setError: vi.fn(),
     setDayChangePct: vi.fn(),
   };
 }
@@ -61,8 +62,9 @@ describe('holdingsEffects', () => {
       holdingsEffects(store).loadPositions();
     });
 
-    expect(store.setPositionsLoading).toHaveBeenCalledOnce();
+    expect(store.setLoading).toHaveBeenCalledOnce();
     expect(store.setPositions).toHaveBeenCalledWith(FAKE_POSITIONS);
+    expect(store.setSuccess).toHaveBeenCalledOnce();
   });
 
   it('loadPositions: error path forwards errorCode', () => {
@@ -79,7 +81,7 @@ describe('holdingsEffects', () => {
       holdingsEffects(store).loadPositions();
     });
 
-    expect(store.setPositionsError).toHaveBeenCalledWith('POSITIONS_FETCH_FAILED');
+    expect(store.setError).toHaveBeenCalledWith('POSITIONS_FETCH_FAILED');
   });
 
   it('loadPositions: quotes the held equities once and stores their day change', () => {
@@ -127,7 +129,7 @@ describe('holdingsEffects', () => {
     });
 
     expect(store.setPositions).toHaveBeenCalledWith([EQUITY]);
-    expect(store.setPositionsError).not.toHaveBeenCalled();
+    expect(store.setError).not.toHaveBeenCalled();
     expect(store.setDayChangePct).not.toHaveBeenCalled();
   });
 
