@@ -7,8 +7,6 @@ describe('initialEventsState', () => {
     expect(initialEventsState.view).toBe('calendar');
     expect(initialEventsState.horizonDays).toBe(30);
     expect(initialEventsState.kinds).toEqual([]);
-    expect(initialEventsState.upcomingStatus).toBe('idle');
-    expect(initialEventsState.firedStatus).toBe('idle');
     expect(initialEventsState.firedPage).toBe(1);
   });
 });

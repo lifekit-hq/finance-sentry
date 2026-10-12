@@ -19,9 +19,11 @@ interface EffectsStore {
   setHorizonDays: (days: number) => void;
   toggleKindLocal: (kind: EventKind) => void;
   setUpcomingLoading: () => void;
+  setUpcomingSuccess: () => void;
   setUpcoming: (result: UpcomingEventsResult) => void;
   setUpcomingError: (code: Nullable<string>) => void;
   setFiredLoading: () => void;
+  setFiredSuccess: () => void;
   setFired: (response: FiredEventsPageResponse) => void;
   appendFired: (response: FiredEventsPageResponse) => void;
   setFiredError: (code: Nullable<string>) => void;
@@ -33,7 +35,10 @@ export function eventsEffects(store: EffectsStore) {
   const fetchUpcoming = () => {
     const {from, to} = store.calendarWindow();
     return api.getUpcoming(from, to, store.kinds()).pipe(
-      tap(result => store.setUpcoming(result)),
+      tap(result => {
+        store.setUpcoming(result);
+        store.setUpcomingSuccess();
+      }),
       StoreErrorUtils.catchAndSetError({
         setError: (code: Nullable<string>) => store.setUpcomingError(code),
       })
@@ -62,7 +67,10 @@ export function eventsEffects(store: EffectsStore) {
         tap(() => store.setFiredLoading()),
         switchMap(() =>
           api.getFired(1, store.firedPageSize()).pipe(
-            tap(response => store.setFired(response)),
+            tap(response => {
+              store.setFired(response);
+              store.setFiredSuccess();
+            }),
             StoreErrorUtils.catchAndSetError({
               setError: (code: Nullable<string>) => store.setFiredError(code),
             })
@@ -75,7 +83,10 @@ export function eventsEffects(store: EffectsStore) {
         tap(() => store.setFiredLoading()),
         switchMap(() =>
           api.getFired(store.firedPage() + 1, store.firedPageSize()).pipe(
-            tap(response => store.appendFired(response)),
+            tap(response => {
+              store.appendFired(response);
+              store.setFiredSuccess();
+            }),
             StoreErrorUtils.catchAndSetError({
               setError: (code: Nullable<string>) => store.setFiredError(code),
             })

@@ -1,3 +1,4 @@
+import {withNamedAsyncStatus} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
 import {eventsComputed} from './events.computed';
@@ -7,6 +8,8 @@ import {initialEventsState} from './events.state';
 
 export const EventsStore = signalStore(
   withState(initialEventsState),
+  withNamedAsyncStatus('upcoming', {defaultErrorMessage: 'Failed to load upcoming events.'}),
+  withNamedAsyncStatus('fired', {defaultErrorMessage: 'Failed to load fired events.'}),
   withMethods(eventsMethods),
   withComputed(eventsComputed),
   withMethods(eventsEffects),

@@ -38,9 +38,11 @@ function buildStore(horizonDays = 30) {
     }),
     toggleKindLocal: vi.fn(),
     setUpcomingLoading: vi.fn(),
+    setUpcomingSuccess: vi.fn(),
     setUpcoming: vi.fn(),
     setUpcomingError: vi.fn(),
     setFiredLoading: vi.fn(),
+    setFiredSuccess: vi.fn(),
     setFired: vi.fn(),
     appendFired: vi.fn(),
     setFiredError: vi.fn(),
@@ -73,6 +75,7 @@ describe('eventsEffects', () => {
     expect(store.setUpcomingLoading).toHaveBeenCalledOnce();
     expect(api.getUpcoming).toHaveBeenCalledWith('2026-09-22', '2026-10-22', []);
     expect(store.setUpcoming).toHaveBeenCalledWith(UPCOMING);
+    expect(store.setUpcomingSuccess).toHaveBeenCalledOnce();
   });
 
   it('selectHorizon re-queries with the new window end', () => {
@@ -135,6 +138,7 @@ describe('eventsEffects', () => {
 
     expect(store.setUpcomingError).toHaveBeenCalledWith('EVENTS_WINDOW_INVALID');
     expect(store.setUpcoming).not.toHaveBeenCalled();
+    expect(store.setUpcomingSuccess).not.toHaveBeenCalled();
   });
 
   it('loadFired fetches the first page and loadMoreFired the next one', () => {
@@ -153,6 +157,7 @@ describe('eventsEffects', () => {
     expect(api.getFired).toHaveBeenNthCalledWith(2, 3, 20);
     expect(store.setFired).toHaveBeenCalledWith(FIRED);
     expect(store.appendFired).toHaveBeenCalledWith(FIRED);
+    expect(store.setFiredSuccess).toHaveBeenCalledTimes(2);
   });
 
   it('loadFired forwards the backend error code', () => {

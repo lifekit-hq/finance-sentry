@@ -1,5 +1,5 @@
-import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {computed, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 
 import {DateUtils} from '../../../shared/utils/date.utils';
 import {EVENT_SOURCE_LABELS, THIS_WEEK_DAYS} from '../constants/event/event.constants';
@@ -19,33 +19,19 @@ interface StateSignals {
   upcoming: Signal<UpcomingEvent[]>;
   sources: Signal<EventSourceStatusEntry[]>;
   upcomingStatus: Signal<AsyncStatus>;
-  upcomingErrorCode: Signal<Nullable<string>>;
   fired: Signal<FiredEvent[]>;
   firedTotalCount: Signal<number>;
   firedPage: Signal<number>;
   firedPageSize: Signal<number>;
   firedStatus: Signal<AsyncStatus>;
-  firedErrorCode: Signal<Nullable<string>>;
 }
 
-const DEFAULT_UPCOMING_ERROR = 'Failed to load upcoming events.';
-const DEFAULT_FIRED_ERROR = 'Failed to load fired events.';
-
 export function eventsComputed(store: StateSignals) {
-  const errorMessages = inject(ErrorMessageService);
-
   return {
     /** The window the calendar view asks for: today through today + horizon, local dates. */
     calendarWindow: computed((): CalendarWindow => {
       const from = DateUtils.isoDateLocal(new Date());
       return {from, to: EventDayUtils.addDays(from, store.horizonDays())};
-    }),
-    isUpcomingLoading: computed(() => store.upcomingStatus() === 'loading'),
-    upcomingErrorMessage: computed(() => {
-      if (store.upcomingStatus() !== 'error') {
-        return '';
-      }
-      return errorMessages.resolve(store.upcomingErrorCode()) ?? DEFAULT_UPCOMING_ERROR;
     }),
     /** Day groups split into "This week" and "Later"; a section with no days is left out. */
     upcomingSections: computed((): EventWeekSection[] => {
@@ -60,7 +46,7 @@ export function eventsComputed(store: StateSignals) {
       ).filter(section => section.groups.length > 0);
     }),
     isUpcomingEmpty: computed(
-      () => store.upcomingStatus() === 'idle' && store.upcoming().length === 0
+      () => store.upcomingStatus() === 'success' && store.upcoming().length === 0
     ),
     /** Human labels of the sources that failed on the last read; empty when all answered. */
     unavailableSourceLabels: computed(() =>
@@ -74,14 +60,7 @@ export function eventsComputed(store: StateSignals) {
       const selected = store.kinds();
       return (kind: EventKind): boolean => selected.includes(kind);
     }),
-    isFiredLoading: computed(() => store.firedStatus() === 'loading'),
-    firedErrorMessage: computed(() => {
-      if (store.firedStatus() !== 'error') {
-        return '';
-      }
-      return errorMessages.resolve(store.firedErrorCode()) ?? DEFAULT_FIRED_ERROR;
-    }),
-    isFiredEmpty: computed(() => store.firedStatus() === 'idle' && store.fired().length === 0),
+    isFiredEmpty: computed(() => store.firedStatus() === 'success' && store.fired().length === 0),
     hasFiredRows: computed(() => store.fired().length > 0),
     hasMoreFired: computed(
       () => store.firedPage() * store.firedPageSize() < store.firedTotalCount()
