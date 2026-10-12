@@ -6,12 +6,10 @@ export interface WhatsNewState {
   versions: WhatsNewVersion[];
   /** `whats-new.json` has been read; separates "not asked yet" from "nothing in it". */
   loaded: boolean;
-  status: AsyncStatus;
 }
 
 export const initialWhatsNewState: WhatsNewState = {
   lastSeen: null,
   versions: [],
   loaded: false,
-  status: 'idle',
 };

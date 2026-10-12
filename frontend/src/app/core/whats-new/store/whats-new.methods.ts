@@ -15,14 +15,8 @@ export function whatsNewMethods(store: WritableStateSource<WhatsNewState>) {
       WhatsNewSeenUtils.write(APP_VERSION);
       patchState(store, {lastSeen: APP_VERSION});
     },
-    setLoading(): void {
-      patchState(store, {status: 'loading'});
-    },
     setVersions(versions: WhatsNewVersion[]): void {
-      patchState(store, {versions, loaded: true, status: 'idle'});
-    },
-    setError(): void {
-      patchState(store, {status: 'error'});
+      patchState(store, {versions, loaded: true});
     },
   };
 }
