@@ -6,25 +6,24 @@ using Microsoft.EntityFrameworkCore;
 
 public class EventVerdictRepository(EventsDbContext db) : IEventVerdictRepository
 {
+    // One INSERT ... ON CONFLICT on the unique (UserId, CompanionEventId) index: a later record replaces the verdict in
+    // place (the row keeps its Id), so two records of one event leave one row instead of the loser failing on the
+    // index, and no read precedes it. It runs at once and the verdict is not tracked by this context.
     public async Task UpsertAsync(EventVerdict verdict, CancellationToken ct = default)
-    {
-        var existing = await db.Verdicts.FirstOrDefaultAsync(
-            v => v.UserId == verdict.UserId && v.CompanionEventId == verdict.CompanionEventId, ct);
-
-        if (existing is null)
-        {
-            db.Verdicts.Add(verdict);
-        }
-        else
-        {
-            existing.AlertId = verdict.AlertId;
-            existing.Verdict = verdict.Verdict;
-            existing.Notified = verdict.Notified;
-            existing.RecordedAt = verdict.RecordedAt;
-        }
-
-        await db.SaveChangesAsync(ct);
-    }
+        => await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO events.event_verdicts
+                ("Id", "UserId", "CompanionEventId", "AlertId", "Verdict", "Notified", "RecordedAt")
+            VALUES
+                ({verdict.Id}, {verdict.UserId}, {verdict.CompanionEventId}, {verdict.AlertId}, {verdict.Verdict},
+                 {verdict.Notified}, {verdict.RecordedAt.ToUniversalTime()})
+            ON CONFLICT ("UserId", "CompanionEventId") DO UPDATE SET
+                "AlertId" = EXCLUDED."AlertId",
+                "Verdict" = EXCLUDED."Verdict",
+                "Notified" = EXCLUDED."Notified",
+                "RecordedAt" = EXCLUDED."RecordedAt"
+            """,
+            ct);
 
     public async Task<IReadOnlyList<EventVerdict>> ListByAlertIdsAsync(
         Guid userId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)

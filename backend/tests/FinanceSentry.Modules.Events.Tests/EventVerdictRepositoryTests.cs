@@ -7,7 +7,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-/// <summary>Feature 049 US3: one verdict per (user, event), found by alert id; a later record replaces it.</summary>
+/// <summary>Feature 049 US3: verdicts are found by alert id, scoped to the user. The upsert is covered against Postgres in <c>EventVerdictUpsertTests</c>.</summary>
 public sealed class EventVerdictRepositoryTests : IDisposable
 {
     private static readonly Guid UserId = Guid.NewGuid();
@@ -25,29 +25,16 @@ public sealed class EventVerdictRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task Upsert_replaces_the_verdict_for_the_same_event()
-    {
-        var eventId = Guid.NewGuid();
-        var alertId = Guid.NewGuid();
-        await _repo.UpsertAsync(new EventVerdict { UserId = UserId, CompanionEventId = eventId, AlertId = alertId, Verdict = "first", Notified = false });
-        await _repo.UpsertAsync(new EventVerdict { UserId = UserId, CompanionEventId = eventId, AlertId = alertId, Verdict = "revised", Notified = true });
-
-        var rows = await _repo.ListByAlertIdsAsync(UserId, [alertId]);
-
-        var row = rows.Should().ContainSingle().Subject;
-        row.Verdict.Should().Be("revised");
-        row.Notified.Should().BeTrue();
-        _db.Verdicts.Count().Should().Be(1);
-    }
-
-    [Fact]
     public async Task List_is_scoped_to_the_user_and_the_requested_alerts()
     {
         var mine = Guid.NewGuid();
         var other = Guid.NewGuid();
-        await _repo.UpsertAsync(new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = mine, Verdict = "mine" });
-        await _repo.UpsertAsync(new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = Guid.NewGuid(), Verdict = "not asked for" });
-        await _repo.UpsertAsync(new EventVerdict { UserId = Guid.NewGuid(), CompanionEventId = Guid.NewGuid(), AlertId = other, Verdict = "someone else's" });
+        // Seeded directly: the repository's upsert is a raw INSERT ... ON CONFLICT that only Postgres runs.
+        _db.Verdicts.AddRange(
+            new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = mine, Verdict = "mine" },
+            new EventVerdict { UserId = UserId, CompanionEventId = Guid.NewGuid(), AlertId = Guid.NewGuid(), Verdict = "not asked for" },
+            new EventVerdict { UserId = Guid.NewGuid(), CompanionEventId = Guid.NewGuid(), AlertId = other, Verdict = "someone else's" });
+        await _db.SaveChangesAsync();
 
         var rows = await _repo.ListByAlertIdsAsync(UserId, [mine, other]);
 
