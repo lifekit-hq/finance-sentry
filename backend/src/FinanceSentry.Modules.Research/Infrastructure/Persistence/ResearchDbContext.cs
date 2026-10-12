@@ -192,6 +192,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
             c.Property(p => p.MaxPct).HasJsonPropertyName("maxPct");
         });
         ib.PrimitiveCollection(x => x.Exclusions).HasColumnType("jsonb");
+        // The single-object columns below (RebalancingRule, ContributionPlan) stay on the string conversion: as JSON
+        // complex properties they read on Postgres, but the EF InMemory provider the Research and MCP test fixtures
+        // run on cannot compile a query over them (KeyNotFoundException in its shaper). The non-null fallback is
+        // kept either way.
         ib.Property(x => x.RebalancingRule)
             .HasColumnType("jsonb")
             .HasConversion(
@@ -285,6 +289,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         csb.Property(x => x.ScoredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         csb.Property(x => x.CrowdingClass).IsRequired().HasConversion<string>().HasMaxLength(20);
         csb.Property(x => x.FormulaVersion).IsRequired();
+        // IpsFit and Evidence stay on the string conversion. IpsFit: a JSON complex property cannot be queried on the
+        // InMemory provider the test fixtures use (see InvestmentPolicyStatement above). Evidence: ScoreEvidence holds
+        // IReadOnlyDictionary<int, decimal?> members (RsByWindow, ReturnByWindow) that EF cannot bind in a JSON
+        // complex type.
         csb.Property(x => x.IpsFit)
             .HasColumnType("jsonb")
             .HasConversion(
