@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
@@ -12,7 +13,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// cabinet's refresh cookie and short-lived access token, replaced after every refresh in case it rotated).
 /// None of them is ever logged.
 /// </summary>
-public sealed class InzhurCredential
+public sealed class InzhurCredential : IUserOwned
 {
     /// <summary>Column width of <see cref="LastSyncError"/>.</summary>
     public const int LastErrorMaxLength = 1000;

@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
@@ -14,7 +15,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// only secret on this credential and is stored encrypted at rest (AES-256-GCM,
 /// same path as every other broker credential). The query id is not a secret.
 /// </summary>
-public sealed class IBKRFlexCredential
+public sealed class IBKRFlexCredential : IUserOwned
 {
     /// <summary>Column width of <see cref="LastError"/>.</summary>
     public const int LastErrorMaxLength = 1000;

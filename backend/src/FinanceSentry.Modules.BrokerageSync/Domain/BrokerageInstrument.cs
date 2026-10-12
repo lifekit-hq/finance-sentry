@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using System.Text.Json.Serialization;
 using FinanceSentry.Core.Domain;
 
@@ -31,7 +32,7 @@ public enum InstrumentClassification
 /// position sells out, this row is never deleted, because the tax classification
 /// a human attaches to it must outlive the position.
 /// </summary>
-public sealed class BrokerageInstrument : IHasUpdatedAt
+public sealed class BrokerageInstrument : IHasUpdatedAt, IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

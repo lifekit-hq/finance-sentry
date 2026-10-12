@@ -1,23 +1,14 @@
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 
-public sealed class BrokerageSyncDbContext : DbContext
+public sealed class BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbContext> options, ICurrentUser currentUser)
+    : OwnerScopedDbContext(options, currentUser)
 {
-    private readonly ICurrentUser _currentUser;
-
-    public BrokerageSyncDbContext(DbContextOptions<BrokerageSyncDbContext> options, ICurrentUser currentUser)
-        : base(options)
-    {
-        _currentUser = currentUser;
-    }
-
-    // Evaluated per query: EF parameterises the context member, so each context instance filters on its own principal.
-    private Guid? CurrentUserId => _currentUser.UserId;
-
     public DbSet<IBKRCredential> IBKRCredentials => Set<IBKRCredential>();
     public DbSet<IBKRFlexCredential> IBKRFlexCredentials => Set<IBKRFlexCredential>();
     public DbSet<InzhurCredential> InzhurCredentials => Set<InzhurCredential>();
@@ -26,14 +17,12 @@ public sealed class BrokerageSyncDbContext : DbContext
     public DbSet<BrokerageTrade> BrokerageTrades => Set<BrokerageTrade>();
     public DbSet<BrokerageCashTransaction> BrokerageCashTransactions => Set<BrokerageCashTransaction>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("brokerage_sync");
-        base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<IBKRCredential>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("IBKRCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -59,7 +48,6 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<IBKRFlexCredential>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("IBKRFlexCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -76,7 +64,6 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<InzhurCredential>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("InzhurCredentials");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -101,7 +88,6 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageHolding>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageHoldings");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Symbol, e.Provider }).IsUnique();
@@ -121,7 +107,6 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageInstrument>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageInstruments");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.Conid }).IsUnique();
@@ -129,14 +114,13 @@ public sealed class BrokerageSyncDbContext : DbContext
             entity.Property(e => e.Isin).HasMaxLength(12);
             entity.Property(e => e.Symbol).IsRequired().HasMaxLength(50);
             entity.Property(e => e.InstrumentType).IsRequired().HasMaxLength(20);
-            entity.Property(e => e.Classification).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Classification).HasMaxLength(30);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
         });
 
         modelBuilder.Entity<BrokerageTrade>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageTrades");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.IbExecutionId }).IsUnique();
@@ -166,7 +150,6 @@ public sealed class BrokerageSyncDbContext : DbContext
 
         modelBuilder.Entity<BrokerageCashTransaction>(entity =>
         {
-            entity.HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId);
             entity.ToTable("BrokerageCashTransactions");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.Provider, e.IdempotencyKey }).IsUnique();

@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One IBKR cash transaction row pulled from the Flex Web Service Activity Flex Query
 /// (fs-435 S5) — deposits/withdrawals, dividends, withholding, and similar cash events.
@@ -13,7 +15,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// Money is stored in the transaction's own <see cref="Currency"/>, never converted at
 /// ingestion — see <see cref="BrokerageTrade"/>'s doc comment for the same rule.
 /// </summary>
-public sealed class BrokerageCashTransaction
+public sealed class BrokerageCashTransaction : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
