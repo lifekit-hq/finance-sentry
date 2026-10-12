@@ -1,5 +1,4 @@
-import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {computed, type Signal} from '@angular/core';
 
 import {DUE_THIS_WEEK_DAYS} from '../../constants/subscription/subscription-form.constants';
 import {
@@ -14,16 +13,13 @@ interface StateSignals {
   subscriptions: Signal<Subscription[]>;
   sort: Signal<SubscriptionSort>;
   summary: Signal<Nullable<SubscriptionSummary>>;
-  status: Signal<AsyncStatus>;
-  loadErrorCode: Signal<Nullable<string>>;
   addErrorCode: Signal<Nullable<string>>;
+  addErrorMessage: Signal<string>;
   addErrorDetail: Signal<Nullable<string>>;
 }
 
 /** The only add error whose server text (it names the row that holds the charges) is shown. */
 const ALREADY_TRACKED_CODE = 'COMMITMENT_ALREADY_TRACKED';
-
-const DEFAULT_LOAD_ERROR = 'Failed to load subscriptions.';
 
 function sortBy(items: Subscription[], sort: SubscriptionSort): Subscription[] {
   return [...items].sort((a, b) => {
@@ -49,21 +45,15 @@ const isSubscription = (s: Subscription): boolean => s.kind === 'subscription';
 const isInstallment = (s: Subscription): boolean => s.kind === 'installment';
 
 export function subscriptionsComputed(store: StateSignals) {
-  const errorMessages = inject(ErrorMessageService);
   return {
-    isLoading: computed(() => store.status() === 'loading'),
-    loadErrorMessage: computed(() =>
-      store.status() === 'error'
-        ? (errorMessages.resolve(store.loadErrorCode()) ?? DEFAULT_LOAD_ERROR)
-        : ''
-    ),
-    addErrorMessage: computed(() => {
+    // An add that failed with no error code shows nothing, as before the slice move.
+    addAlertMessage: computed(() => {
       const code = store.addErrorCode();
       if (code === null) {
         return '';
       }
       const detail = code === ALREADY_TRACKED_CODE ? store.addErrorDetail() : null;
-      return detail ?? errorMessages.resolve(code) ?? 'Failed to add.';
+      return detail ?? store.addErrorMessage();
     }),
     activeSubscriptions: computed(() =>
       store.subscriptions().filter(s => s.status === 'active' && isSubscription(s))

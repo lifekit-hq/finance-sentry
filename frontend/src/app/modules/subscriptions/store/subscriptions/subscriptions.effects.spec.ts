@@ -66,13 +66,17 @@ const SUMMARY: SubscriptionSummary = {
 
 function buildStore() {
   return {
-    setLoading: vi.fn(),
+    setLoadLoading: vi.fn(),
+    setLoadSuccess: vi.fn(),
     setLoadError: vi.fn(),
     setData: vi.fn(),
     setSummary: vi.fn(),
     dismissSubscription: vi.fn(),
     restoreSubscription: vi.fn(),
+    setAddLoading: vi.fn(),
+    setAddSuccess: vi.fn(),
     setAddError: vi.fn(),
+    setAddErrorDetail: vi.fn(),
   };
 }
 
@@ -108,9 +112,10 @@ describe('subscriptionsEffects', () => {
     TestBed.runInInjectionContext(() => subscriptionsEffects(store).load());
 
     expect(service.getSubscriptions).toHaveBeenCalledWith(true);
-    expect(store.setLoading).toHaveBeenCalledTimes(1);
+    expect(store.setLoadLoading).toHaveBeenCalledTimes(1);
     expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
     expect(store.setSummary).toHaveBeenCalledWith(SUMMARY);
+    expect(store.setLoadSuccess).toHaveBeenCalledOnce();
     expect(store.setLoadError).not.toHaveBeenCalled();
   });
 
@@ -126,6 +131,7 @@ describe('subscriptionsEffects', () => {
     TestBed.runInInjectionContext(() => subscriptionsEffects(store).load());
 
     expect(store.setLoadError).toHaveBeenCalledWith('BOOM');
+    expect(store.setLoadSuccess).not.toHaveBeenCalled();
     expect(store.setData).not.toHaveBeenCalled();
   });
 
@@ -142,7 +148,7 @@ describe('subscriptionsEffects', () => {
     effects.load();
     effects.load();
 
-    expect(store.setLoading).toHaveBeenCalledTimes(2);
+    expect(store.setLoadLoading).toHaveBeenCalledTimes(2);
     expect(store.setLoadError).toHaveBeenCalledTimes(1);
     expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
   });
@@ -196,8 +202,10 @@ describe('subscriptionsEffects', () => {
     TestBed.runInInjectionContext(() => subscriptionsEffects(store).addCommitment(payload));
 
     expect(service.add).toHaveBeenCalledWith(payload);
-    expect(store.setAddError).toHaveBeenCalledWith(null);
+    expect(store.setAddLoading).toHaveBeenCalledOnce();
+    expect(store.setAddErrorDetail).toHaveBeenCalledWith(null);
     expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
+    expect(store.setAddSuccess).toHaveBeenCalledOnce();
   });
 
   it('addCommitment: keeps the error code when the add is refused', () => {
@@ -221,7 +229,9 @@ describe('subscriptionsEffects', () => {
       })
     );
 
-    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED', null);
+    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED');
+    expect(store.setAddErrorDetail).toHaveBeenLastCalledWith(null);
+    expect(store.setAddSuccess).not.toHaveBeenCalled();
     expect(store.setData).not.toHaveBeenCalled();
   });
 
@@ -253,8 +263,8 @@ describe('subscriptionsEffects', () => {
       })
     );
 
-    expect(store.setAddError).toHaveBeenLastCalledWith(
-      'COMMITMENT_ALREADY_TRACKED',
+    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED');
+    expect(store.setAddErrorDetail).toHaveBeenLastCalledWith(
       'These charges are already tracked as Acme.'
     );
   });
@@ -275,8 +285,10 @@ describe('subscriptionsEffects', () => {
     );
 
     expect(service.link).toHaveBeenCalledWith('sub-1', {transactionId: 'tx-1', cadence: 'monthly'});
-    expect(store.setAddError).toHaveBeenCalledWith(null);
+    expect(store.setAddLoading).toHaveBeenCalledOnce();
+    expect(store.setAddErrorDetail).toHaveBeenCalledWith(null);
     expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
+    expect(store.setAddSuccess).toHaveBeenCalledOnce();
   });
 
   it('linkCommitment: keeps the error when another row already holds the charges', () => {
@@ -300,10 +312,8 @@ describe('subscriptionsEffects', () => {
       })
     );
 
-    expect(store.setAddError).toHaveBeenLastCalledWith(
-      'COMMITMENT_ALREADY_TRACKED',
-      'Tracked as Acme.'
-    );
+    expect(store.setAddError).toHaveBeenLastCalledWith('COMMITMENT_ALREADY_TRACKED');
+    expect(store.setAddErrorDetail).toHaveBeenLastCalledWith('Tracked as Acme.');
     expect(store.setData).not.toHaveBeenCalled();
   });
 });

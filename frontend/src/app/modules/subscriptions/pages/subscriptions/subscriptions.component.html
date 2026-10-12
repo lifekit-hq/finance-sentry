@@ -2,8 +2,8 @@
   <div class="space-y-cmn-5">
     <p class="text-cmn-sm text-text-secondary">Recurring charges detected from your transactions</p>
 
-    @if (store.addErrorMessage()) {
-      <cmn-alert variant="error">{{ store.addErrorMessage() }}</cmn-alert>
+    @if (store.addAlertMessage()) {
+      <cmn-alert variant="error">{{ store.addAlertMessage() }}</cmn-alert>
     }
 
     <!-- Insufficient history banner -->

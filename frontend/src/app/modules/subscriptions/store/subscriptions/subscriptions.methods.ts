@@ -10,24 +10,13 @@ import {type SubscriptionsState} from './subscriptions.state';
 export function subscriptionsMethods(store: WritableStateSource<SubscriptionsState>) {
   return {
     setData(subscriptions: Subscription[], hasInsufficientHistory: boolean): void {
-      patchState(store, {
-        subscriptions,
-        hasInsufficientHistory,
-        status: 'idle',
-        loadErrorCode: null,
-      });
-    },
-    setLoading(): void {
-      patchState(store, {status: 'loading', loadErrorCode: null});
-    },
-    setLoadError(loadErrorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', loadErrorCode});
+      patchState(store, {subscriptions, hasInsufficientHistory});
     },
     setSummary(summary: SubscriptionSummary): void {
       patchState(store, {summary});
     },
-    setAddError(addErrorCode: Nullable<string>, addErrorDetail: Nullable<string> = null): void {
-      patchState(store, {addErrorCode, addErrorDetail});
+    setAddErrorDetail(addErrorDetail: Nullable<string>): void {
+      patchState(store, {addErrorDetail});
     },
     setSort(sort: SubscriptionSort): void {
       patchState(store, {sort});

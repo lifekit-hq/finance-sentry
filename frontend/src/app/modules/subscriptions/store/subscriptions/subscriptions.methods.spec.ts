@@ -62,7 +62,7 @@ function mkSummary(overrides: Partial<SubscriptionSummary> = {}): SubscriptionSu
 }
 
 describe('subscriptionsMethods', () => {
-  it('setData stores subscriptions and resets status', () => {
+  it('setData stores subscriptions', () => {
     const state = signalState(initialSubscriptionsState);
     const methods = subscriptionsMethods(state);
 
@@ -70,57 +70,16 @@ describe('subscriptionsMethods', () => {
 
     expect(state.subscriptions()).toHaveLength(1);
     expect(state.hasInsufficientHistory()).toBe(true);
-    expect(state.status()).toBe('idle');
   });
 
-  it('setLoading marks the load in flight and clears a previous load error', () => {
-    const state = signalState({
-      ...initialSubscriptionsState,
-      status: 'error' as AsyncStatus,
-      loadErrorCode: 'BOOM',
-    });
-    const methods = subscriptionsMethods(state);
-
-    methods.setLoading();
-
-    expect(state.status()).toBe('loading');
-    expect(state.loadErrorCode()).toBeNull();
-  });
-
-  it('setLoadError stores the code and setData clears it', () => {
+  it('setAddErrorDetail keeps the server text and clears it with null', () => {
     const state = signalState(initialSubscriptionsState);
     const methods = subscriptionsMethods(state);
 
-    methods.setLoadError('BOOM');
-
-    expect(state.status()).toBe('error');
-    expect(state.loadErrorCode()).toBe('BOOM');
-
-    methods.setData([], false);
-
-    expect(state.status()).toBe('idle');
-    expect(state.loadErrorCode()).toBeNull();
-  });
-
-  it('setAddError stores and clears the add error code', () => {
-    const state = signalState(initialSubscriptionsState);
-    const methods = subscriptionsMethods(state);
-
-    methods.setAddError('COMMITMENT_ALREADY_TRACKED');
-    expect(state.addErrorCode()).toBe('COMMITMENT_ALREADY_TRACKED');
-
-    methods.setAddError(null);
-    expect(state.addErrorCode()).toBeNull();
-  });
-
-  it('setAddError keeps the server text and clears it with the code', () => {
-    const state = signalState(initialSubscriptionsState);
-    const methods = subscriptionsMethods(state);
-
-    methods.setAddError('COMMITMENT_ALREADY_TRACKED', 'These charges are already tracked as Acme.');
+    methods.setAddErrorDetail('These charges are already tracked as Acme.');
     expect(state.addErrorDetail()).toBe('These charges are already tracked as Acme.');
 
-    methods.setAddError(null);
+    methods.setAddErrorDetail(null);
     expect(state.addErrorDetail()).toBeNull();
   });
 

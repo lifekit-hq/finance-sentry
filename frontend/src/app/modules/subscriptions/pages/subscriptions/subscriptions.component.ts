@@ -120,7 +120,7 @@ export class SubscriptionsComponent {
   public readonly view = computed(() => {
     const hasData = this.store.subscriptions().length > 0;
     return AsyncViewUtils.resolve({
-      isLoading: this.store.isLoading(),
+      isLoading: this.store.isLoadLoading(),
       hasData,
       errorMessage: this.store.loadErrorMessage(),
       offline: this.connectivity.offline() && !hasData,
