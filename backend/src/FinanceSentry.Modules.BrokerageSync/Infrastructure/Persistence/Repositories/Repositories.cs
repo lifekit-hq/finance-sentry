@@ -194,8 +194,9 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
     // One INSERT ... ON CONFLICT per holding on the unique (UserId, Symbol, Provider) index: the write is atomic, so
     // two overlapping syncs of one account update the same row instead of the loser failing on the index, and no
     // read precedes it. It runs at once rather than at SaveChanges, and a holding already tracked by this context
-    // is not refreshed. The DO UPDATE list mirrors BrokerageHolding.Update (plus the currency pair, which a provider that reports one rewrites each sync) (cost basis follows the new quantity
-    // only while an average cost is known; the instrument link is never cleared; AcquiredAt/AverageCostUsd stay).
+    // is not refreshed. The DO UPDATE list mirrors BrokerageHolding.Update (cost basis follows the new quantity
+    // only while an average cost is known; the instrument link is never cleared; AcquiredAt/AverageCostUsd stay),
+    // plus Currency/NativeValue, which a provider that reports its own currency rewrites each sync.
     public async Task UpsertRangeAsync(IEnumerable<BrokerageHolding> holdings, CancellationToken ct = default)
     {
         foreach (var h in holdings)

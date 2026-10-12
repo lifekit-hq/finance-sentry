@@ -7,7 +7,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 // Every member is optional: the cabinet is not a published API, so a missing field inside an asset degrades that row
 // instead of failing the sync. The two top-level containers (the assets list, the broker-account balances) are
 // required by InzhurApiClient: without them the answer is not a portfolio.
-// UAH amounts are the native ones (a currency the cabinet reports for them wins over that assumption); Inzhur's own USD figures are deliberately not read (money-semantics §3).
+// UAH amounts are the native ones (a currency the cabinet reports for them wins over that assumption); Inzhur's own
+// USD figures are deliberately not read (money-semantics §3).
 
 /// <summary><c>GET api/v1/user-assets</c>.</summary>
 public sealed record InzhurUserAssetsResponse(IReadOnlyList<InzhurAsset>? Assets);
