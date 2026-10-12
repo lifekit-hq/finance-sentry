@@ -1,7 +1,9 @@
 namespace FinanceSentry.Tests.Integration.BankSync;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Domain;
+using FinanceSentry.Modules.BankSync.Domain.Exceptions;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence.Repositories;
@@ -46,6 +48,13 @@ public sealed class CommittedMerchantPinUpsertTests : IAsyncLifetime
     {
         await using var ctx = CreateContext(userId);
         return await new CommittedMerchantPinRepository(ctx).AddIfAbsentAsync(NewPin(userId, key, displayName));
+    }
+
+    private async Task<PinCommittedMerchantResult> PinAsync(Guid userId, string merchant)
+    {
+        await using var ctx = CreateContext(userId);
+        return await new PinCommittedMerchantCommandHandler(new CommittedMerchantPinRepository(ctx))
+            .Handle(new PinCommittedMerchantCommand(userId, merchant), CancellationToken.None);
     }
 
     private async Task<List<CommittedMerchantPin>> PinsAsync(Guid userId)
@@ -94,5 +103,40 @@ public sealed class CommittedMerchantPinUpsertTests : IAsyncLifetime
         adds.Count(r => !r.AlreadyPinned).Should().Be(1);
         var row = (await PinsAsync(_user)).Should().ContainSingle().Subject;
         adds.Should().OnlyContain(r => r.Pin.Id == row.Id);
+    }
+
+    [DockerRequiredFact]
+    public async Task Pin_StoresTheNormalizedKeyAndKeepsWhatTheUserTyped()
+    {
+        var result = await PinAsync(_user, "  Mario Scalas  ");
+
+        result.AlreadyPinned.Should().BeFalse();
+        result.Pin.MerchantKey.Should().Be("mario scalas");
+        result.Pin.DisplayName.Should().Be("Mario Scalas");
+
+        var row = (await PinsAsync(_user)).Should().ContainSingle().Subject;
+        row.MerchantKey.Should().Be("mario scalas");
+        row.DisplayName.Should().Be("Mario Scalas");
+    }
+
+    [DockerRequiredFact]
+    public async Task Pin_TwoSpellingsOfOneMerchant_IsIdempotentAndStoresOneRow()
+    {
+        await PinAsync(_user, "NETFLIX.COM");
+
+        var second = await PinAsync(_user, "Netflix");
+
+        second.AlreadyPinned.Should().BeTrue();
+        second.Pin.DisplayName.Should().Be("NETFLIX.COM", "the first spelling is kept");
+        (await PinsAsync(_user)).Should().ContainSingle();
+    }
+
+    [DockerRequiredFact]
+    public async Task Pin_UnnameableMerchant_IsRejectedBeforeAnythingIsStored()
+    {
+        var pin = async () => await PinAsync(_user, "   ");
+
+        await pin.Should().ThrowAsync<UnpinnableMerchantException>();
+        (await PinsAsync(_user)).Should().BeEmpty();
     }
 }
