@@ -37,7 +37,7 @@ Interfaces this feature exposes. FR references are to `spec.md`.
 
 ## 6. Log query contract (Loki via Grafana, US2 / FR-003/011)
 
-- Logs queryable by label (`app`, `module`, `level`), correlation id, and free text; EF SQL absent at default level.
+- Logs queryable by label (`app`, `module`, `level`), W3C trace id, and free text; EF SQL absent at default level.
 - Verification (quickstart): filter `level=Error` last 1h → app errors, no raw SQL (SC-002 ≤ 2 min to find an injected error).
 
 ## Cross-cutting

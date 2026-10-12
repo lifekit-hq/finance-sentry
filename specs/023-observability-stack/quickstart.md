@@ -24,7 +24,7 @@ curl -s http://localhost:5001/api/v1/health/ready | jq            # Healthy + da
 ```
 Grafana → Explore → Loki → {app="finance-sentry"} | level="Error", last 1h
 → app errors appear with structured fields; NO raw EF SQL at default level (FR-011)
-→ search by correlation id groups related entries (SC-002: find an injected error in < 2 min)
+→ search by W3C trace id groups related entries (SC-002: find an injected error in < 2 min)
 ```
 
 **US3 — Job health with history (P3)**
