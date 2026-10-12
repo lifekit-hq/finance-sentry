@@ -610,7 +610,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     // The mocked history is all banking, so the banking band fills the plot.
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * LOWER_PLOT_FRACTION);
 
-    await expect(page).toHaveURL(/\/accounts\/list$/);
+    await expect(page).toHaveURL(/\/accounts\/investments$/);
   });
 });
 
