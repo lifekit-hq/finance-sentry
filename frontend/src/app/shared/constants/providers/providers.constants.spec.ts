@@ -50,7 +50,7 @@ describe('PROVIDER_CATALOG', () => {
     expect(byShape.get('binance')).toBe('key-secret');
     expect(byShape.get('revolut_x')).toBe('key-private-key');
     expect(byShape.get('ibkr')).toBe('user-pass');
-    expect(byShape.get('inzhur')).toBe('phone-password-sms');
+    expect(byShape.get('inzhur')).toBe('pasted-session');
     expect(byShape.get('truelayer')).toBe('open-banking-picker');
   });
 });

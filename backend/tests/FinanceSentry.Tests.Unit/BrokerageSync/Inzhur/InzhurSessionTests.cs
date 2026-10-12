@@ -18,6 +18,20 @@ public class InzhurSessionTests
     }
 
     [Fact]
+    public void A_pasted_refresh_cookie_is_sent_to_the_auth_host_only()
+    {
+        var session = InzhurSession.FromRefreshCookie(InzhurFakes.RefreshCookieName, "fake-pasted", new Uri("https://api.inzhur.reit/auth"));
+
+        var container = session.ToContainer();
+
+        session.AccessToken.Should().BeEmpty("the first refresh fetches one");
+        container.GetCookieHeader(new Uri("https://api.inzhur.reit/auth/api/v1/auth/refresh")).Should().Be($"{InzhurFakes.RefreshCookieName}=fake-pasted");
+        container.GetCookieHeader(new Uri("http://api.inzhur.reit/auth/api/v1/auth/refresh")).Should().BeEmpty("the cookie is Secure");
+        container.GetCookieHeader(new Uri("https://www.inzhur.reit/")).Should().BeEmpty();
+        session.ToString().Should().NotContain("fake-pasted");
+    }
+
+    [Fact]
     public void Container_round_trip_keeps_live_cookies_and_drops_expired_ones()
     {
         var session = new InzhurSession(InzhurFakes.AccessToken,
@@ -39,7 +53,6 @@ public class InzhurSessionTests
 
         session.ToString().Should().NotContain(InzhurFakes.AccessToken).And.NotContain("fake-refresh-secret");
         session.Cookies[0].ToString().Should().NotContain("fake-refresh-secret");
-        new InzhurLoginOutcome.Authenticated(session).ToString().Should().NotContain(InzhurFakes.AccessToken);
     }
 
     [Fact]

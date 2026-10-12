@@ -4,117 +4,51 @@
   [skeletonRows]="3"
   skeletonHeight="48px"
 >
-  <div class="flex flex-col gap-cmn-6">
-    @if (!inzhur.loginAvailable()) {
-      <cmn-alert variant="warning" title="Inzhur sign-in is not available">
-        The server can't sign in to Inzhur right now. Your saved holdings stay as they are.
+  <form [formGroup]="sessionForm" (ngSubmit)="connect()" class="flex flex-col gap-cmn-6">
+    @if (inzhur.isReconnect()) {
+      <cmn-alert variant="warning" icon="RefreshCw" title="Inzhur needs a new session">
+        The saved session ended. Sign in on inzhur.reit again and paste a fresh one to resume the
+        daily sync.
       </cmn-alert>
-      <cmn-dialog-actions align="start">
-        <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
-      </cmn-dialog-actions>
-    } @else if (inzhur.step() === 'code') {
-      <form [formGroup]="codeForm" (ngSubmit)="verify()" class="flex flex-col gap-cmn-6">
-        <p class="text-cmn-sm">
-          Inzhur sent a code to your phone. Enter it here to finish connecting.
-          @if (inzhur.codeExpiresAt(); as expiresAt) {
-            It works until {{ expiresAt | date: 'shortTime' }}.
-          }
-        </p>
-
-        <cmn-form-field [control]="codeForm.controls.code" label="SMS code">
-          <cmn-input
-            formControlName="code"
-            type="text"
-            inputmode="numeric"
-            enterkeyhint="done"
-            autocomplete="one-time-code"
-            placeholder="e.g. 123456"
-          />
-        </cmn-form-field>
-
-        @if (store.errorMessage()) {
-          <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
-        }
-
-        <cmn-dialog-actions align="between">
-          <cmn-button (clicked)="startOver()" variant="secondary" icon="ArrowLeft">
-            Start over
-          </cmn-button>
-          <cmn-button
-            [loading]="store.isBusy()"
-            [disabled]="store.isBusy()"
-            variant="primary"
-            type="submit"
-          >
-            Connect
-          </cmn-button>
-        </cmn-dialog-actions>
-      </form>
-    } @else {
-      <form [formGroup]="credentialsForm" (ngSubmit)="sendCode()" class="flex flex-col gap-cmn-6">
-        @if (inzhur.isReconnect()) {
-          <cmn-alert variant="warning" icon="RefreshCw" title="Inzhur needs you to sign in again">
-            The saved session ended. Sign in once more to resume the daily sync.
-          </cmn-alert>
-        }
-
-        @if (inzhur.asksForCredentials()) {
-          <p class="text-cmn-sm">Sign in with the phone number and password you use for Inzhur.</p>
-
-          <cmn-form-field
-            [control]="credentialsForm.controls.phone"
-            label="Phone number"
-            hint="Stored encrypted, used only to sign in to your own cabinet."
-          >
-            <cmn-input
-              formControlName="phone"
-              type="tel"
-              inputmode="tel"
-              enterkeyhint="next"
-              autocomplete="tel"
-              placeholder="+380"
-            />
-          </cmn-form-field>
-
-          <cmn-form-field [control]="credentialsForm.controls.password" label="Password">
-            <cmn-input
-              formControlName="password"
-              type="password"
-              enterkeyhint="send"
-              autocomplete="current-password"
-            />
-          </cmn-form-field>
-        } @else {
-          <p class="text-cmn-sm">
-            Your Inzhur phone number and password are saved. Send a code to sign in again.
-          </p>
-          <div>
-            <cmn-button (clicked)="inzhur.editCredentials()" variant="secondary" size="sm">
-              Use a different phone or password
-            </cmn-button>
-          </div>
-        }
-
-        @if (inzhur.startErrorMessage()) {
-          <cmn-alert variant="error">{{ inzhur.startErrorMessage() }}</cmn-alert>
-        }
-
-        <cmn-alert variant="accent" icon="ShieldCheck" title="Read-only">
-          {{ readOnlyNote }} {{ smsNote }}
-        </cmn-alert>
-
-        <cmn-dialog-actions align="between">
-          <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
-          <cmn-button
-            [loading]="inzhur.isStarting()"
-            [disabled]="inzhur.isStarting()"
-            variant="primary"
-            type="submit"
-          >
-            Send code
-          </cmn-button>
-        </cmn-dialog-actions>
-      </form>
     }
-  </div>
+
+    <ol class="list-decimal space-y-cmn-2 pl-cmn-5 text-cmn-sm">
+      @for (step of sessionSteps; track step) {
+        <li>{{ step }}</li>
+      }
+    </ol>
+
+    <cmn-form-field
+      [control]="sessionForm.controls.refreshToken"
+      [hint]="sessionNote"
+      label="Paste Inzhur session"
+    >
+      <cmn-input
+        formControlName="refreshToken"
+        type="password"
+        autocomplete="off"
+        placeholder="refreshToken value"
+      />
+    </cmn-form-field>
+
+    @if (store.errorMessage()) {
+      <cmn-alert variant="error">{{ store.errorMessage() }}</cmn-alert>
+    }
+
+    <cmn-alert variant="accent" icon="ShieldCheck" title="Read-only">
+      {{ readOnlyNote }}
+    </cmn-alert>
+
+    <cmn-dialog-actions align="between">
+      <cmn-button (clicked)="back()" variant="secondary" icon="ArrowLeft">Back</cmn-button>
+      <cmn-button
+        [loading]="store.isBusy()"
+        [disabled]="store.isBusy()"
+        variant="primary"
+        type="submit"
+      >
+        Connect
+      </cmn-button>
+    </cmn-dialog-actions>
+  </form>
 </cmn-async-state>

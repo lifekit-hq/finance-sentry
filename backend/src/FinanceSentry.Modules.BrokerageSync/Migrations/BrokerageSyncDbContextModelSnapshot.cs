@@ -462,22 +462,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<byte[]>("EncryptedPassword")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<byte[]>("EncryptedPhone")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
                     b.Property<byte[]>("EncryptedSession")
                         .IsRequired()
                         .HasColumnType("bytea");
-
-                    b.Property<int>("KeyVersion")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
 
                     b.Property<DateTime?>("LastSyncAt")
                         .HasColumnType("timestamp with time zone");
@@ -485,28 +472,6 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                     b.Property<string>("LastSyncError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<int>("LoginAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("LoginAttemptsDay")
-                        .HasColumnType("date");
-
-                    b.Property<byte[]>("PasswordAuthTag")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<byte[]>("PasswordIv")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<byte[]>("PhoneAuthTag")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<byte[]>("PhoneIv")
-                        .IsRequired()
-                        .HasColumnType("bytea");
 
                     b.Property<byte[]>("SessionAuthTag")
                         .IsRequired()

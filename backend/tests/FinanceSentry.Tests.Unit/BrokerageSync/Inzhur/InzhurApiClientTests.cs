@@ -34,6 +34,28 @@ public class InzhurApiClientTests
     }
 
     [Fact]
+    public async Task A_rotated_cookie_under_another_path_supersedes_the_pasted_one()
+    {
+        _handler
+            .Then(_ =>
+            {
+                var response = InzhurFakes.Json(HttpStatusCode.OK, new { accessToken = "fresh-token" });
+                response.Headers.Add("Set-Cookie", $"{InzhurFakes.RefreshCookieName}=fake-refresh-2; Path=/auth; Secure; HttpOnly");
+                response.Headers.Add("Set-Cookie", "other=fake-other; Path=/; Secure");
+                return response;
+            })
+            .Then(InzhurFakes.Json(HttpStatusCode.OK, new { accessToken = "next-token" }));
+        var pasted = InzhurSession.FromRefreshCookie(InzhurFakes.RefreshCookieName, "fake-pasted", new Uri(new InzhurOptions().AuthBaseUrl));
+
+        var refreshed = await Client().RefreshAsync(pasted);
+        await Client().RefreshAsync(refreshed);
+
+        refreshed.Cookies.Where(c => c.Name == InzhurFakes.RefreshCookieName).Should().ContainSingle().Which.Value.Should().Be("fake-refresh-2");
+        _handler.Requests[0].Cookie.Should().Be($"{InzhurFakes.RefreshCookieName}=fake-pasted");
+        _handler.Requests[1].Cookie.Should().Contain($"{InzhurFakes.RefreshCookieName}=fake-refresh-2").And.NotContain("fake-pasted");
+    }
+
+    [Fact]
     public async Task Portfolio_is_two_GETs_with_the_bearer_token()
     {
         _handler
