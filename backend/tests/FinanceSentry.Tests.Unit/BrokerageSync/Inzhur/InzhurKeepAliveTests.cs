@@ -40,6 +40,8 @@ public class InzhurKeepAliveTests
     private readonly FakeSessionGate _gate = new();
     private readonly Mock<IInzhurCredentialRepository> _credentials = new(MockBehavior.Loose);
     private readonly Mock<IBrokerageHoldingRepository> _holdings = new(MockBehavior.Loose);
+    private readonly Mock<IBrokerageTradeRepository> _trades = new(MockBehavior.Loose);
+    private readonly Mock<IBrokerageCashTransactionRepository> _cash = new(MockBehavior.Loose);
     private readonly InzhurCredential _credential;
     private readonly List<int> _gateHoldersAtLoad = [];
 
@@ -68,7 +70,8 @@ public class InzhurKeepAliveTests
         _credentials.Object, Api(), _gate, _encryption, _clock, NullLogger<InzhurKeepAliveService>.Instance);
 
     private InzhurSyncService DailyRead() => new(
-        _credentials.Object, _holdings.Object, Api(), _gate, _encryption, _clock, NullLogger<InzhurSyncService>.Instance);
+        _credentials.Object, _holdings.Object, _trades.Object, _cash.Object, Api(), _gate, _encryption, _clock,
+        NullLogger<InzhurSyncService>.Instance);
 
     // -- the reproduction ------------------------------------------------------------------------------------------
 
@@ -586,6 +589,8 @@ public class InzhurKeepAliveTests
                     "/auth/api/v1/auth/refresh" => Refresh(request),
                     "/core/api/v1/user-assets" => InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.UserAssets(InzhurFakes.Fund("Fund A", 10m, 1_200m, 1_000m))),
                     "/core/api/v1/users/broker-account" => InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.BrokerAccount(500m, 0m)),
+                    "/core/api/v1/assets/details" => InzhurFakes.Json(HttpStatusCode.OK, InzhurFakes.Catalog()),
+                    "/core/api/v1/users/transactions" => InzhurFakes.Json(HttpStatusCode.OK, Array.Empty<object>()),
                     _ => throw new InvalidOperationException($"Unexpected Inzhur call {request.Method} {request.RequestUri}."),
                 };
             }
