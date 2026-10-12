@@ -50,7 +50,8 @@ export function reportProblemEffects(store: EffectsStore) {
             }),
             catchError((err: unknown) => {
               const bareRateLimit =
-                err instanceof HttpErrorResponse && err.status === HttpStatusCode.TooManyRequests;
+                err instanceof HttpErrorResponse &&
+                (err.status as HttpStatusCode) === HttpStatusCode.TooManyRequests;
               store.setError(
                 extractErrorCode(err) ?? (bareRateLimit ? REPORT_PROBLEM_RATE_LIMITED_CODE : null)
               );
