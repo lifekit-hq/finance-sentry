@@ -120,9 +120,10 @@ async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
 }
 
 async function expectBaseline(page: Page, name: string): Promise<void> {
-  // The sidebar footer prints the app version, which changes on every release. The element's text is
-  // padded with whitespace, which a regex (unlike a string) is matched against verbatim.
-  const version = page.getByText(/^\s*v\d+\.\d+\.\d+\s*$/);
+  // The sidebar footer prints the app version next to "What's new", and the version changes on every
+  // release. The element's text may be padded with whitespace, which a regex (unlike a string) is
+  // matched against verbatim.
+  const version = page.getByText(/^\s*v\d+\.\d+\.\d+ · What's new\s*$/);
   // The More page prints it as a list row of its own.
   const moreVersion = page.getByTestId('more-version');
   await expect(page).toHaveScreenshot(name, {...SCREENSHOT_OPTIONS, mask: [version, moreVersion]});
