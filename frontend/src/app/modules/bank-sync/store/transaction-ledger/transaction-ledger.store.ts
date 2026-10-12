@@ -1,4 +1,4 @@
-import {withUrlSync} from '@lifekit-hq/core';
+import {withAsyncStatus, withUrlSync} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
 import {
@@ -33,6 +33,7 @@ export const TransactionLedgerStore = signalStore(
     to: {param: 'to', default: initialTransactionLedgerState.to, codec: ISO_DATE_PARAM_CODEC},
     search: {param: 'q', default: initialTransactionLedgerState.search},
   }),
+  withAsyncStatus({defaultErrorMessage: 'Failed to load transactions. Please try again.'}),
   withMethods(transactionLedgerMethods),
   withComputed(transactionLedgerComputed),
   withMethods(transactionLedgerEffects),

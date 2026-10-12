@@ -9,13 +9,9 @@ import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
-    /** `keepRows` holds the rows on screen while a retry or the next page loads. */
-    setLoading(keepRows = false): void {
-      patchState(store, {
-        status: 'loading',
-        errorCode: null,
-        ...(keepRows ? {} : {transactions: [], totalCount: 0, hasMore: false}),
-      });
+    /** A first page drops the rows; a retry or the next page keeps them on screen. */
+    clearRows(): void {
+      patchState(store, {transactions: [], totalCount: 0, hasMore: false});
     },
     setTransactions(
       transactions: GlobalTransactionDto[],
@@ -27,13 +23,8 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         totalCount,
         hasMore,
         offset: 0,
-        status: 'idle',
-        errorCode: null,
         lastSyncedAt: Date.now(),
       });
-    },
-    setError(errorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', errorCode});
     },
     setOffset(offset: number): void {
       patchState(store, {offset});
@@ -50,8 +41,6 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         transactions: [...state.transactions, ...transactions],
         totalCount,
         hasMore,
-        status: 'idle' as AsyncStatus,
-        errorCode: null,
         lastSyncedAt: Date.now(),
       }));
     },

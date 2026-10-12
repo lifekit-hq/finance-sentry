@@ -10,10 +10,8 @@ export interface TransactionLedgerState {
   totalCount: number;
   hasMore: boolean;
   offset: number;
-  status: AsyncStatus;
   /** Epoch ms of the last successful page load; drives the offline "last synced" notice. */
   lastSyncedAt: Nullable<number>;
-  errorCode: Nullable<string>;
   monthlyOutflowUsd: number | null;
   monthlyOutflowCurrency: string;
   /** Server-side filter: a single account, or null for all. */
@@ -37,9 +35,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   totalCount: 0,
   hasMore: false,
   offset: 0,
-  status: 'idle',
   lastSyncedAt: null,
-  errorCode: null,
   monthlyOutflowUsd: null,
   monthlyOutflowCurrency: DEFAULT_BASE_CURRENCY,
   accountId: null,

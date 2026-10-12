@@ -1,5 +1,5 @@
-import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {computed, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {
@@ -13,7 +13,6 @@ interface StateSignals {
   totalCount: Signal<number>;
   hasMore: Signal<boolean>;
   status: Signal<AsyncStatus>;
-  errorCode: Signal<Nullable<string>>;
   monthlyOutflowUsd: Signal<number | null>;
   monthlyOutflowCurrency: Signal<string>;
   accountId: Signal<Nullable<string>>;
@@ -35,11 +34,7 @@ export interface LedgerFilter {
   search: string;
 }
 
-const DEFAULT_ERROR = 'Failed to load transactions. Please try again.';
-
 export function transactionLedgerComputed(store: StateSignals) {
-  const errorMessages = inject(ErrorMessageService);
-
   return {
     filter: computed<LedgerFilter>(() => ({
       accountId: store.accountId(),
@@ -49,20 +44,13 @@ export function transactionLedgerComputed(store: StateSignals) {
       to: store.to(),
       search: store.search().trim(),
     })),
-    isLoading: computed(() => store.status() === 'loading'),
-    isEmpty: computed(() => store.status() === 'idle' && store.transactions().length === 0),
+    isEmpty: computed(() => store.status() === 'success' && store.transactions().length === 0),
     hasActiveFilter: computed(
       () =>
         store.accountId() !== null ||
         store.transactionType() !== null ||
         store.search().trim() !== ''
     ),
-    errorMessage: computed(() => {
-      if (store.status() !== 'error') {
-        return '';
-      }
-      return errorMessages.resolve(store.errorCode()) ?? DEFAULT_ERROR;
-    }),
     monthlyOutflow: computed(() => store.monthlyOutflowUsd()),
     monthlyOutflowCurrency: computed(() => store.monthlyOutflowCurrency()),
     topCategory: computed(() => {
