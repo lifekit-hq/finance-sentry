@@ -62,7 +62,7 @@ export class PeopleComponent {
     return AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
       hasData,
-      errorMessage: this.store.loadErrorMessage(),
+      errorMessage: this.store.peopleErrorMessage(),
       offline: this.connectivity.offline() && !hasData,
       lastSyncedAt: null,
     });

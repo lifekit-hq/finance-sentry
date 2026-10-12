@@ -17,64 +17,20 @@ function makeState() {
 }
 
 describe('peopleMethods', () => {
-  it('setLoading marks the list loading and clears a previous error', () => {
+  it('setPeople stores the list', () => {
     const {state, methods} = makeState();
-    methods.setLoadError('X');
-
-    methods.setLoading();
-
-    expect(state.status()).toBe('loading');
-    expect(state.errorCode()).toBeNull();
-  });
-
-  it('setPeople stores the list and returns to idle', () => {
-    const {state, methods} = makeState();
-    methods.setLoading();
 
     methods.setPeople([PERSON]);
 
     expect(state.people()).toEqual([PERSON]);
-    expect(state.status()).toBe('idle');
-  });
-
-  it('setLoadError records the code', () => {
-    const {state, methods} = makeState();
-
-    methods.setLoadError('FORBIDDEN');
-
-    expect(state.status()).toBe('error');
-    expect(state.errorCode()).toBe('FORBIDDEN');
-  });
-
-  it('setInviting clears the previous invite and error', () => {
-    const {state, methods} = makeState();
-    methods.setInvite(INVITE);
-    methods.setInviteError('DUPLICATE_EMAIL');
-
-    methods.setInviting();
-
-    expect(state.inviteStatus()).toBe('loading');
-    expect(state.inviteErrorCode()).toBeNull();
-    expect(state.lastInvite()).toBeNull();
   });
 
   it('setInvite keeps the invite for the one-time link', () => {
     const {state, methods} = makeState();
-    methods.setInviting();
 
     methods.setInvite(INVITE);
 
-    expect(state.inviteStatus()).toBe('idle');
     expect(state.lastInvite()).toEqual(INVITE);
-  });
-
-  it('setInviteError records the code', () => {
-    const {state, methods} = makeState();
-
-    methods.setInviteError('DUPLICATE_EMAIL');
-
-    expect(state.inviteStatus()).toBe('error');
-    expect(state.inviteErrorCode()).toBe('DUPLICATE_EMAIL');
   });
 
   it('dismissInvite forgets the link', () => {

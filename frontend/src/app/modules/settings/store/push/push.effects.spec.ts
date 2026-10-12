@@ -28,8 +28,9 @@ function buildStore(
     ),
     thisDeviceId: signal<Nullable<string>>(overrides.thisDeviceId ?? null),
     setLoading: vi.fn(),
+    setSuccess: vi.fn(),
+    setError: vi.fn(),
     setLoaded: vi.fn(),
-    setLoadError: vi.fn(),
     setAction: vi.fn(),
     setActionError: vi.fn(),
     setEnabled: vi.fn(),
@@ -94,6 +95,7 @@ describe('pushEffects', () => {
         {pushEnabled: true},
         'd-1'
       );
+      expect(store.setSuccess).toHaveBeenCalled();
     });
 
     it('reports the API error code', () => {
@@ -102,7 +104,8 @@ describe('pushEffects', () => {
 
       effects(store).load();
 
-      expect(store.setLoadError).toHaveBeenCalledWith('BOOM');
+      expect(store.setError).toHaveBeenCalledWith('BOOM');
+      expect(store.setSuccess).not.toHaveBeenCalled();
     });
 
     it('hooks load on init', () => {

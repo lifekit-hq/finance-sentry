@@ -7,12 +7,15 @@ import {type CreateInviteRequest, type Invite, type Person} from '../../models/p
 import {PeopleService} from '../../services/people.service';
 
 interface EffectsStore {
-  setLoading: () => void;
+  setPeopleLoading: () => void;
+  setPeopleSuccess: () => void;
+  setPeopleError: (errorCode: Nullable<string>) => void;
   setPeople: (people: Person[]) => void;
-  setLoadError: (errorCode: Nullable<string>) => void;
-  setInviting: () => void;
-  setInvite: (invite: Invite) => void;
+  setInviteLoading: () => void;
+  setInviteSuccess: () => void;
   setInviteError: (errorCode: Nullable<string>) => void;
+  setInvite: (invite: Invite) => void;
+  dismissInvite: () => void;
   setRevoking: (userId: string) => void;
   setRevoked: () => void;
   setRevokeError: (errorCode: Nullable<string>) => void;
@@ -23,12 +26,15 @@ export function peopleEffects(store: EffectsStore) {
 
   const load = rxMethod<void>(
     pipe(
-      tap(() => store.setLoading()),
+      tap(() => store.setPeopleLoading()),
       switchMap(() =>
         service.list().pipe(
-          tap(people => store.setPeople(people)),
+          tap(people => {
+            store.setPeople(people);
+            store.setPeopleSuccess();
+          }),
           catchError((err: unknown) => {
-            store.setLoadError(extractErrorCode(err));
+            store.setPeopleError(extractErrorCode(err));
             return EMPTY;
           })
         )
@@ -40,11 +46,15 @@ export function peopleEffects(store: EffectsStore) {
     load,
     createInvite: rxMethod<CreateInviteRequest>(
       pipe(
-        tap(() => store.setInviting()),
+        tap(() => {
+          store.setInviteLoading();
+          store.dismissInvite();
+        }),
         exhaustMap(request =>
           service.createInvite(request).pipe(
             tap(invite => {
               store.setInvite(invite);
+              store.setInviteSuccess();
               load();
             }),
             catchError((err: unknown) => {

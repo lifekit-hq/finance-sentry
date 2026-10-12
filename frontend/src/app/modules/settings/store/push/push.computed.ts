@@ -1,5 +1,5 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {type AsyncStatus, ErrorMessageService} from '@lifekit-hq/core';
 import {PushSubscriptionService} from '@lifekit-hq/core/pwa';
 
 import {type PushDevice, type PushDeviceRow} from '../../models/push/push.model';
@@ -7,7 +7,6 @@ import {type PushAction} from './push.state';
 
 interface StateSignals {
   status: Signal<AsyncStatus>;
-  errorCode: Signal<Nullable<string>>;
   available: Signal<boolean>;
   pushEnabled: Signal<boolean>;
   devices: Signal<PushDevice[]>;
@@ -23,7 +22,6 @@ export function pushComputed(store: StateSignals) {
   const thisDeviceRegistered = computed(() => store.thisDeviceId() !== null);
 
   return {
-    isLoading: computed(() => store.status() === 'loading' && store.devices().length === 0),
     isBusy: computed(() => store.action() !== 'idle'),
     thisDeviceRegistered,
     rows: computed<PushDeviceRow[]>(() =>
@@ -46,7 +44,7 @@ export function pushComputed(store: StateSignals) {
       return '';
     }),
     serverNotice: computed(() =>
-      store.status() === 'idle' && !store.available()
+      store.status() === 'success' && !store.available()
         ? 'Push notifications are not set up on this server yet.'
         : ''
     ),
@@ -58,11 +56,6 @@ export function pushComputed(store: StateSignals) {
           (store.available() &&
             (thisDeviceRegistered() ||
               (push.isSupported() && !push.requiresInstall() && push.permission() !== 'denied'))))
-    ),
-    loadErrorMessage: computed(() =>
-      store.status() === 'error'
-        ? (errorMessages.resolve(store.errorCode()) ?? 'Failed to load push settings.')
-        : ''
     ),
     actionErrorMessage: computed(() => {
       const code = store.actionErrorCode();

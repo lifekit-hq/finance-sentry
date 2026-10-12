@@ -3,8 +3,6 @@ import {type PushDevice} from '../../models/push/push.model';
 export type PushAction = 'idle' | 'enabling' | 'saving' | 'removing';
 
 export interface PushState {
-  status: AsyncStatus;
-  errorCode: Nullable<string>;
   available: boolean;
   publicKey: Nullable<string>;
   pushEnabled: boolean;
@@ -17,8 +15,6 @@ export interface PushState {
 }
 
 export const initialPushState: PushState = {
-  status: 'idle',
-  errorCode: null,
   available: false,
   publicKey: null,
   pushEnabled: false,

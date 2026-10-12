@@ -1,17 +1,13 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {type AsyncStatus, ErrorMessageService} from '@lifekit-hq/core';
 
 import {OWNER_ROLE} from '../../../../shared/constants/role/role.constants';
 import {AuthStore} from '../../../auth/store/auth.store';
-import {type Invite, type Person, type PersonRow} from '../../models/person/person.model';
+import {type Person, type PersonRow} from '../../models/person/person.model';
 
 interface StateSignals {
   people: Signal<Person[]>;
-  status: Signal<AsyncStatus>;
-  errorCode: Signal<Nullable<string>>;
-  inviteStatus: Signal<AsyncStatus>;
-  inviteErrorCode: Signal<Nullable<string>>;
-  lastInvite: Signal<Nullable<Invite>>;
+  peopleStatus: Signal<AsyncStatus>;
   revokeErrorCode: Signal<Nullable<string>>;
 }
 
@@ -20,8 +16,7 @@ export function peopleComputed(store: StateSignals) {
   const currentUserId = inject(AuthStore).userId;
 
   return {
-    isLoading: computed(() => store.status() === 'loading' && store.people().length === 0),
-    isInviting: computed(() => store.inviteStatus() === 'loading'),
+    isLoading: computed(() => store.peopleStatus() === 'loading' && store.people().length === 0),
     rows: computed<PersonRow[]>(() =>
       store.people().map(person => ({
         ...person,
@@ -31,16 +26,6 @@ export function peopleComputed(store: StateSignals) {
           person.id !== currentUserId() &&
           !person.roles.includes(OWNER_ROLE),
       }))
-    ),
-    loadErrorMessage: computed(() =>
-      store.status() === 'error'
-        ? (errorMessages.resolve(store.errorCode()) ?? 'Failed to load people.')
-        : ''
-    ),
-    inviteErrorMessage: computed(() =>
-      store.inviteStatus() === 'error'
-        ? (errorMessages.resolve(store.inviteErrorCode()) ?? 'Could not create the invite.')
-        : ''
     ),
     revokeErrorMessage: computed(() => {
       const code = store.revokeErrorCode();

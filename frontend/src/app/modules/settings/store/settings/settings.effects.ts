@@ -10,8 +10,11 @@ import {SettingsService} from '../../services/settings.service';
 
 interface EffectsStore {
   setProfile: (profile: UserProfile) => void;
-  setLoadError: (errorCode: Nullable<string>) => void;
-  setProfileSaving: (saving: boolean) => void;
+  setLoading: () => void;
+  setSuccess: () => void;
+  setError: (errorCode: Nullable<string>) => void;
+  setProfileSaveLoading: () => void;
+  setProfileSaveSuccess: () => void;
   setProfileSaveError: (errorCode: Nullable<string>) => void;
   profileSaveErrorMessage: () => string;
 }
@@ -25,14 +28,16 @@ export function settingsEffects(store: EffectsStore) {
   return {
     load: rxMethod<void>(
       pipe(
+        tap(() => store.setLoading()),
         switchMap(() =>
           service.getProfile().pipe(
             tap(profile => {
               store.setProfile(profile);
+              store.setSuccess();
               authStore.setProfileName(profile.firstName, profile.lastName);
             }),
             catchError(err => {
-              store.setLoadError(extractErrorCode(err));
+              store.setError(extractErrorCode(err));
               return EMPTY;
             })
           )
@@ -41,14 +46,14 @@ export function settingsEffects(store: EffectsStore) {
     ),
     saveProfile: rxMethod<UpdateProfileRequest>(
       pipe(
-        tap(() => store.setProfileSaving(true)),
+        tap(() => store.setProfileSaveLoading()),
         switchMap(request =>
           service.updateProfile(request).pipe(
             tap(profile => {
               store.setProfile(profile);
               authStore.setProfileName(profile.firstName, profile.lastName);
               themeService.setPreference(profile.theme);
-              store.setProfileSaving(false);
+              store.setProfileSaveSuccess();
               toast.show('Profile saved successfully', 'success');
             }),
             catchError(err => {
