@@ -43,6 +43,15 @@ async function open(page: Page, path: string): Promise<{requests: Request[]}> {
 
 async function shot(page: Page, name: string): Promise<void> {
   if (SHOTS) {
+    // The drawer slides in: wait for the finite transitions so the capture is the settled sheet, not mid-slide.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+          .map(a => a.finished)
+      )
+    );
     await page.screenshot({path: `${SHOTS}/${name}.png`});
   }
 }
