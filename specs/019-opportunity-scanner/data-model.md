@@ -18,9 +18,11 @@ Scoring DTOs are in-memory. Two new Core DTOs cross module boundaries.
 | `RejectedReason` | string? | set on reject |
 | `NominationReasons` | jsonb | list of reasons (why nominated; user-source = ["conviction"]) |
 
-**Indexes**: `(UserId, Status)`, `(UserId, Ticker)` (re-score lookup — one active candidate per ticker).
-**Invariant** (recorder/repo, not DB): one `Active` candidate per `(UserId, Ticker)` — re-score appends
-a `CandidateScore`, never a duplicate candidate (FR US1.4).
+**Indexes**: `(UserId, Status)`, `(UserId, Ticker)` (re-score lookup), and unique partial
+`ux_opportunity_candidates_user_ticker_active` on `(UserId, Ticker)` `WHERE Status = 'Active'` (M020).
+**Invariant**: one `Active` candidate per `(UserId, Ticker)` — re-score appends a `CandidateScore`, never a
+duplicate candidate (FR US1.4). `CandidateRepository.UpsertActiveAsync` checks first; the unique partial index
+settles a concurrent insert race (the loser re-reads and returns the winner's row).
 
 ## Table: `candidate_scores` (append-only)
 
