@@ -1,6 +1,7 @@
 import {defineConfig, devices} from '@playwright/test';
 
-const SPA_PORT = 4201;
+// E2E_PORT lets concurrent runs (separate worktrees on one box) each take their own port; CI keeps 4201.
+const SPA_PORT = Number(process.env['E2E_PORT'] ?? 4201);
 
 export default defineConfig({
   testDir: './e2e',

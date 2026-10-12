@@ -16,7 +16,7 @@
 # merge-base with origin/main: the backend half (restore, build, then every
 # test project except Tests.Integration) runs when `backend/` or a root
 # `Directory.*.props` changed, the frontend half (`npm ci`, build, `test:ci`)
-# when `frontend/` changed. If the merge-base or the diff fails, the diff is
+# when `frontend/` changed (Playwright takes a free port via E2E_PORT). If the merge-base or the diff fails, the diff is
 # empty, or any other path changed, both halves run. The frontend half also runs
 # the route-mocked Playwright specs the diff touches (`frontend/e2e/*.spec.ts`
 # added or changed); a diff that touches none runs no Playwright here. The full
@@ -103,6 +103,10 @@ commands:
     if [ "$fe" = 1 ]; then
       (cd frontend && npm ci && npm run build && npm run test:ci)
       if [ -n "$specs" ]; then
+        # A free port per run: concurrent runs from other worktrees must not collide on the
+        # config's fixed default (reuseExistingServer is off, so a taken port fails the run).
+        E2E_PORT=$(node -e "const s=require('net').createServer().listen(0,()=>{console.log(s.address().port);s.close()})")
+        export E2E_PORT
         (cd frontend && npx playwright install chromium && npx playwright test $specs)
       fi
     fi
