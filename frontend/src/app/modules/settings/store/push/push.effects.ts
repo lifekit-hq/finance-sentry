@@ -18,13 +18,14 @@ interface EffectsStore {
   publicKey: Signal<Nullable<string>>;
   thisDeviceId: Signal<Nullable<string>>;
   setLoading: () => void;
+  setSuccess: () => void;
+  setError: (errorCode: Nullable<string>) => void;
   setLoaded: (
     key: PushPublicKey,
     devices: PushDevice[],
     preferences: PushPreferences,
     storedDeviceId: Nullable<string>
   ) => void;
-  setLoadError: (errorCode: Nullable<string>) => void;
   setAction: (action: Exclude<PushAction, 'idle'>, removingId?: Nullable<string>) => void;
   setActionError: (errorCode: Nullable<string>) => void;
   setEnabled: (device: PushDevice) => void;
@@ -41,11 +42,12 @@ export function pushEffects(store: EffectsStore) {
       tap(() => store.setLoading()),
       switchMap(() =>
         forkJoin([service.getPublicKey(), service.listDevices(), service.getPreferences()]).pipe(
-          tap(([key, devices, preferences]) =>
-            store.setLoaded(key, devices, preferences, PushDeviceUtils.readId())
-          ),
+          tap(([key, devices, preferences]) => {
+            store.setLoaded(key, devices, preferences, PushDeviceUtils.readId());
+            store.setSuccess();
+          }),
           catchError((err: unknown) => {
-            store.setLoadError(extractErrorCode(err));
+            store.setError(extractErrorCode(err));
             return EMPTY;
           })
         )

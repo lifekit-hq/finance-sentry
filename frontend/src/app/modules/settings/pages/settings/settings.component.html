@@ -224,9 +224,9 @@
                 {{ push.serverNotice() || push.browserNotice() }}
               </p>
             }
-            @if (push.loadErrorMessage() || push.actionErrorMessage()) {
+            @if (push.errorMessage() || push.actionErrorMessage()) {
               <p class="text-cmn-xs text-status-error" role="alert">
-                {{ push.loadErrorMessage() || push.actionErrorMessage() }}
+                {{ push.errorMessage() || push.actionErrorMessage() }}
               </p>
             }
             @if (push.rows().length > 0) {

@@ -17,12 +17,15 @@ const INVITE: Invite = {
 
 function buildStore() {
   return {
-    setLoading: vi.fn(),
+    setPeopleLoading: vi.fn(),
+    setPeopleSuccess: vi.fn(),
+    setPeopleError: vi.fn(),
     setPeople: vi.fn(),
-    setLoadError: vi.fn(),
-    setInviting: vi.fn(),
-    setInvite: vi.fn(),
+    setInviteLoading: vi.fn(),
+    setInviteSuccess: vi.fn(),
     setInviteError: vi.fn(),
+    setInvite: vi.fn(),
+    dismissInvite: vi.fn(),
     setRevoking: vi.fn(),
     setRevoked: vi.fn(),
     setRevokeError: vi.fn(),
@@ -59,8 +62,9 @@ describe('peopleEffects', () => {
 
       effects(store).load();
 
-      expect(store.setLoading).toHaveBeenCalled();
+      expect(store.setPeopleLoading).toHaveBeenCalled();
       expect(store.setPeople).toHaveBeenCalledWith(PEOPLE);
+      expect(store.setPeopleSuccess).toHaveBeenCalled();
     });
 
     it('records the error code on failure', () => {
@@ -69,7 +73,8 @@ describe('peopleEffects', () => {
 
       effects(store).load();
 
-      expect(store.setLoadError).toHaveBeenCalledWith('FORBIDDEN');
+      expect(store.setPeopleError).toHaveBeenCalledWith('FORBIDDEN');
+      expect(store.setPeopleSuccess).not.toHaveBeenCalled();
     });
   });
 
@@ -81,8 +86,10 @@ describe('peopleEffects', () => {
       effects(store).createInvite({email: 'friend@test.com'});
 
       expect(service.createInvite).toHaveBeenCalledWith({email: 'friend@test.com'});
-      expect(store.setInviting).toHaveBeenCalled();
+      expect(store.setInviteLoading).toHaveBeenCalled();
+      expect(store.dismissInvite).toHaveBeenCalled();
       expect(store.setInvite).toHaveBeenCalledWith(INVITE);
+      expect(store.setInviteSuccess).toHaveBeenCalled();
       expect(service.list).toHaveBeenCalled();
     });
 
@@ -94,6 +101,7 @@ describe('peopleEffects', () => {
 
       expect(store.setInviteError).toHaveBeenCalledWith('DUPLICATE_EMAIL');
       expect(store.setInvite).not.toHaveBeenCalled();
+      expect(store.setInviteSuccess).not.toHaveBeenCalled();
     });
   });
 

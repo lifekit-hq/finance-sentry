@@ -5,8 +5,6 @@ export interface SettingsState {
   profileSaving: boolean;
   profileErrorCode: Nullable<string>;
   showDeleteConfirm: boolean;
-  status: AsyncStatus;
-  errorCode: Nullable<string>;
 }
 
 export const initialSettingsState: SettingsState = {
@@ -14,6 +12,4 @@ export const initialSettingsState: SettingsState = {
   profileSaving: false,
   profileErrorCode: null,
   showDeleteConfirm: false,
-  status: 'idle',
-  errorCode: null,
 };

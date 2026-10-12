@@ -24,14 +24,16 @@ function buildStore() {
   const errorMessage = signal('');
   return {
     setProfile: vi.fn(),
-    setLoadError: vi.fn(),
+    setLoading: vi.fn(),
+    setSuccess: vi.fn(),
+    setError: vi.fn(),
     setProfileSaving: vi.fn(),
     setProfileSaveError: vi.fn(() => errorMessage.set(SAVE_FAILED)),
     profileSaveErrorMessage: () => errorMessage(),
   };
 }
 
-describe('settingsEffects saveProfile', () => {
+describe('settingsEffects', () => {
   let service: {getProfile: ReturnType<typeof vi.fn>; updateProfile: ReturnType<typeof vi.fn>};
   let toast: {show: ReturnType<typeof vi.fn>};
 
@@ -51,6 +53,31 @@ describe('settingsEffects saveProfile', () => {
   function effects(store: ReturnType<typeof buildStore>) {
     return TestBed.runInInjectionContext(() => settingsEffects(store));
   }
+
+  describe('load', () => {
+    it('stores the profile and marks the load a success', () => {
+      const store = buildStore();
+      service.getProfile.mockReturnValue(of(PROFILE));
+
+      effects(store).load();
+
+      expect(store.setLoading).toHaveBeenCalled();
+      expect(store.setProfile).toHaveBeenCalledWith(PROFILE);
+      expect(store.setSuccess).toHaveBeenCalled();
+    });
+
+    it('records the error code when the load fails', () => {
+      const store = buildStore();
+      service.getProfile.mockReturnValue(
+        throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'BOOM'}}))
+      );
+
+      effects(store).load();
+
+      expect(store.setError).toHaveBeenCalledWith('BOOM');
+      expect(store.setSuccess).not.toHaveBeenCalled();
+    });
+  });
 
   it('toasts success only once the server has answered', () => {
     const store = buildStore();

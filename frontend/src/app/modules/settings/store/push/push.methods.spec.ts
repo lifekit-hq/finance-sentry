@@ -90,15 +90,6 @@ describe('pushMethods', () => {
     expect(state.actionErrorCode()).toBe('PUSH_UNAVAILABLE');
   });
 
-  it('setLoadError and setLoading drive the load status', () => {
-    const {state, methods} = build();
-    methods.setLoading();
-    expect(state.status()).toBe('loading');
-    methods.setLoadError('X');
-    expect(state.status()).toBe('error');
-    expect(state.errorCode()).toBe('X');
-  });
-
   it('setPreference stores the saved value', () => {
     const {state, methods} = build();
     methods.setAction('saving');

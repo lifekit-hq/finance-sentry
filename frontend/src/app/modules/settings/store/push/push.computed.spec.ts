@@ -1,6 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ErrorMessageService} from '@lifekit-hq/core';
+import {type AsyncStatus, ErrorMessageService} from '@lifekit-hq/core';
 import {PushSubscriptionService} from '@lifekit-hq/core/pwa';
 import {beforeEach, describe, expect, it} from 'vitest';
 
@@ -24,7 +24,6 @@ describe('pushComputed', () => {
   };
   const state = {
     status: signal<AsyncStatus>('idle'),
-    errorCode: signal<Nullable<string>>(null),
     available: signal(true),
     pushEnabled: signal(false),
     devices: signal<PushDevice[]>([]),
@@ -42,7 +41,6 @@ describe('pushComputed', () => {
     browser.requiresInstall.set(false);
     browser.permission.set('default');
     state.status.set('idle');
-    state.errorCode.set(null);
     state.available.set(true);
     state.pushEnabled.set(false);
     state.devices.set([]);
@@ -135,30 +133,26 @@ describe('pushComputed', () => {
     const c = computed();
     expect(c.serverNotice()).toBe('');
 
-    state.status.set('idle');
+    state.status.set('success');
     expect(c.serverNotice()).toContain('not set up');
     expect(c.browserNotice()).toBe('');
   });
 
-  it('resolves error codes with a fallback', () => {
-    state.status.set('error');
-    state.errorCode.set('KNOWN');
-    state.actionErrorCode.set('UNKNOWN');
+  it('resolves action error codes with a fallback', () => {
+    state.actionErrorCode.set('KNOWN');
     const c = computed();
+    expect(c.actionErrorMessage()).toBe('Known message');
 
-    expect(c.loadErrorMessage()).toBe('Known message');
+    state.actionErrorCode.set('UNKNOWN');
     expect(c.actionErrorMessage()).toBe('Could not update push notifications.');
-
-    state.errorCode.set(null);
-    expect(c.loadErrorMessage()).toBe('Failed to load push settings.');
   });
 
   it('reports loading only while there is nothing to show yet', () => {
     state.status.set('loading');
     const c = computed();
-    expect(c.isLoading()).toBe(true);
+    expect(c.isInitialLoading()).toBe(true);
 
     state.devices.set([device]);
-    expect(c.isLoading()).toBe(false);
+    expect(c.isInitialLoading()).toBe(false);
   });
 });

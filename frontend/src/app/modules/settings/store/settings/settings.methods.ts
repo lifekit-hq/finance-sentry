@@ -6,10 +6,7 @@ import {type SettingsState} from './settings.state';
 export function settingsMethods(store: WritableStateSource<SettingsState>) {
   return {
     setProfile(profile: UserProfile): void {
-      patchState(store, {profile, status: 'idle', errorCode: null});
-    },
-    setLoadError(errorCode: Nullable<string>): void {
-      patchState(store, {status: 'error', errorCode});
+      patchState(store, {profile});
     },
     updateProfile(partial: Partial<UserProfile>): void {
       patchState(store, (s: SettingsState) => ({

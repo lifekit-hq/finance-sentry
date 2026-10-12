@@ -3,7 +3,6 @@
    lifekit-common bug) — so the app declares them itself. */
 declare global {
   type Nullable<T> = T | null;
-  type Maybe<T> = Nullable<T> | undefined;
 
   type AsyncStatus = 'idle' | 'loading' | 'error';
 }

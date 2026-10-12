@@ -9,7 +9,6 @@ interface StateSignals {
   profileSaving: Signal<boolean>;
   profileErrorCode: Signal<Nullable<string>>;
   showDeleteConfirm: Signal<boolean>;
-  errorCode: Signal<Nullable<string>>;
 }
 
 export function settingsComputed(store: StateSignals) {
@@ -24,9 +23,6 @@ export function settingsComputed(store: StateSignals) {
       const p = store.profile();
       return p ? `${p.firstName} ${p.lastName}` : '';
     }),
-    loadErrorMessage: computed(
-      () => errorMessages.resolve(store.errorCode()) ?? 'Failed to load profile.'
-    ),
     profileSaveErrorMessage: computed(
       () => errorMessages.resolve(store.profileErrorCode()) ?? 'Failed to save profile.'
     ),
