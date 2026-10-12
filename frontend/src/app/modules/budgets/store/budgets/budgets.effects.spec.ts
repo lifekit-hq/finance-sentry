@@ -20,6 +20,8 @@ function buildStore() {
   return {
     setSummaryItems: vi.fn(),
     setLoading: vi.fn(),
+    setSuccess: vi.fn(),
+    clearRefreshFailed: vi.fn(),
     setError: vi.fn(),
     setRefreshFailed: vi.fn(),
     setEditing: vi.fn(),
@@ -62,6 +64,8 @@ describe('budgetsEffects', () => {
 
     expect(store.setLoading).toHaveBeenCalledTimes(1);
     expect(store.setSummaryItems).toHaveBeenCalledWith(SUMMARY.items);
+    expect(store.setSuccess).toHaveBeenCalledTimes(1);
+    expect(store.clearRefreshFailed).toHaveBeenCalledTimes(1);
     expect(store.setError).not.toHaveBeenCalled();
   });
 
@@ -72,7 +76,8 @@ describe('budgetsEffects', () => {
 
     effectsFor(service, store).loadSummary();
 
-    expect(store.setError).toHaveBeenCalledTimes(1);
+    expect(store.setError).toHaveBeenCalledWith(null);
+    expect(store.setSuccess).not.toHaveBeenCalled();
     expect(store.setRefreshFailed).not.toHaveBeenCalled();
   });
 

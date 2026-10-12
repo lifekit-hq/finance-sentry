@@ -8,7 +8,9 @@ import {BudgetsService} from '../../services/budgets.service';
 interface EffectsStore {
   setSummaryItems: (items: BudgetSummaryItem[]) => void;
   setLoading: () => void;
-  setError: () => void;
+  setSuccess: () => void;
+  setError: (errorCode: Nullable<string>) => void;
+  clearRefreshFailed: () => void;
   setRefreshFailed: () => void;
   setEditing: (id: Nullable<string>) => void;
   updateBudgetInList: (id: string, limit: number) => void;
@@ -22,14 +24,17 @@ export function budgetsEffects(store: EffectsStore) {
   const service = inject(BudgetsService);
 
   const fetchSummary = () =>
-    service
-      .getBudgetSummary(store.selectedYear(), store.selectedMonth())
-      .pipe(tap(res => store.setSummaryItems(res.items)));
+    service.getBudgetSummary(store.selectedYear(), store.selectedMonth()).pipe(
+      tap(res => {
+        store.setSummaryItems(res.items);
+        store.setSuccess();
+      })
+    );
 
   const loadMonth = () =>
     fetchSummary().pipe(
       catchError(() => {
-        store.setError();
+        store.setError(null);
         return EMPTY;
       })
     );
@@ -45,7 +50,10 @@ export function budgetsEffects(store: EffectsStore) {
   return {
     loadSummary: rxMethod<void>(
       pipe(
-        tap(() => store.setLoading()),
+        tap(() => {
+          store.clearRefreshFailed();
+          store.setLoading();
+        }),
         switchMap(() => loadMonth())
       )
     ),
@@ -89,6 +97,7 @@ export function budgetsEffects(store: EffectsStore) {
       pipe(
         tap(({year, month}) => {
           store.setSelectedPeriod(year, month);
+          store.clearRefreshFailed();
           store.setLoading();
         }),
         switchMap(() => loadMonth())

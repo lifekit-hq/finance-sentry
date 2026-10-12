@@ -1,6 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {Router} from '@angular/router';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
@@ -123,7 +124,7 @@ describe('BudgetsComponent hero copy', () => {
       overBudgetCount: signal(0),
       overallPct: signal(0),
       selectedMonthDate: signal(new Date(2026, 8, 1)),
-      status: signal<AsyncStatus>('idle'),
+      status: signal<AsyncStatus>('success'),
       refreshFailed: signal(false),
       loadSummary: vi.fn(),
       summaryItems: signal([
@@ -260,7 +261,7 @@ describe('BudgetsComponent async states', () => {
   });
 
   it('keeps the valid cards under the error when the refresh after an edit fails', () => {
-    const {host} = render('idle', true, true);
+    const {host} = render('success', true, true);
 
     expect(host.textContent).toContain('Failed to load budgets.');
     expect(host.textContent).toContain('Groceries');
