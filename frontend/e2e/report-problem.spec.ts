@@ -67,6 +67,7 @@ test.describe('report a problem (phone)', () => {
 
   test('More opens the sheet and the report carries only the route pattern', async ({page}) => {
     const {requests} = await open(page, '/more');
+    await expect(page.getByTestId('more-report-problem')).toBeVisible();
     await shot(page, 'phone-more');
 
     await page.getByTestId('more-report-problem').click();
