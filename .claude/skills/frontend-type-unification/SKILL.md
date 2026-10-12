@@ -36,7 +36,7 @@ Always check these first — extending an existing base is preferable to inventi
 | `Timestamped` | `createdAt: string` | `shared/models/timestamped/timestamped.model.ts` |
 
 Globally available (in `global.d.ts`):
-- `Nullable<T>`, `Maybe<T>`, `AsyncStatus`, `ApiErrorResponse`, `OffsetPagination`, `OffsetPaginationParams`
+- `Nullable<T>`, `AsyncStatus`, `ApiErrorResponse`, `OffsetPagination`, `OffsetPaginationParams`
 
 ## The audit loop
 
