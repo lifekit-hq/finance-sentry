@@ -40,4 +40,9 @@
     <ProjectReference Include="..\..\src\FinanceSentry.Modules.Radar\FinanceSentry.Modules.Radar.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Radar's upserts are Postgres-only SQL; the in-memory doubles that stand in for them are shared, not copied. -->
+    <Compile Include="..\FinanceSentry.Modules.Radar.Tests\InMemoryRadarRepositories.cs" Link="InMemoryRadarRepositories.cs" />
+  </ItemGroup>
+
 </Project>

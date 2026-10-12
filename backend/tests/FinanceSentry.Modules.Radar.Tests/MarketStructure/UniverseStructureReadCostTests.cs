@@ -84,8 +84,8 @@ public sealed class UniverseStructureReadCostTests
 
     private static async Task<ReaderFixture> SeedAsync(Infrastructure.Persistence.RadarDbContext db, int memberCount)
     {
-        var barRepo = new CountingDailyBarRepository(new DailyBarRepository(db));
-        var universeRepo = new CountingUniverseRepository(new RadarUniverseRepository(db));
+        var barRepo = new CountingDailyBarRepository(new InMemoryDailyBarRepository(db));
+        var universeRepo = new CountingUniverseRepository(new InMemoryRadarUniverseRepository(db));
 
         var members = new List<RadarUniverseMember>
         {
