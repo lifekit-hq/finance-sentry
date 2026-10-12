@@ -11,7 +11,8 @@ public interface IDetectedSubscriptionRepository
     Task<DetectedSubscription?> FindByUserAndMerchantUnscopedAsync(
         string userId, string merchantNameNormalized, CancellationToken ct = default);
 
-    Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default);
+    /// <summary>Writes the subscription and returns the Id of the row stored under its key, which is not the entity's own when a row for that key already existed.</summary>
+    Task<Guid> UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default);
 
     Task DeleteAsync(DetectedSubscription subscription, CancellationToken ct = default);
 
