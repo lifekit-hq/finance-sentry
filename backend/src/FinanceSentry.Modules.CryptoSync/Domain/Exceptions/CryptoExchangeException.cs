@@ -22,7 +22,7 @@ public abstract class CryptoExchangeException : ApiException
 
 /// <summary>
 /// A sync whose holdings landed but whose trade walk failed for some assets. Raised after every
-/// other asset was walked, so the run fails loudly (#023 job-failure alerting) without losing the
+/// other asset was walked, so the run fails loudly (it reaches the consecutive-failure gauge) without losing the
 /// rest; the failed assets resume from their unchanged cursors next run.
 /// </summary>
 public sealed class CryptoTradeHistoryException(string provider, IReadOnlyList<string> assets, Exception innerException)
