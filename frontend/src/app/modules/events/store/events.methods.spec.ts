@@ -44,12 +44,8 @@ describe('eventsMethods', () => {
     expect(state.kinds()).toEqual(['earnings']);
   });
 
-  it('setUpcoming stores items and sources and clears the error', () => {
-    const state = signalState({
-      ...initialEventsState,
-      upcomingStatus: 'error' as const,
-      upcomingErrorCode: 'X',
-    });
+  it('setUpcoming stores items and sources', () => {
+    const state = signalState(initialEventsState);
     const methods = eventsMethods(state);
 
     methods.setUpcoming({
@@ -59,17 +55,7 @@ describe('eventsMethods', () => {
       sources: [{source: 'macro', status: 'unavailable'}],
     });
 
-    expect(state.upcomingStatus()).toBe('idle');
-    expect(state.upcomingErrorCode()).toBeNull();
     expect(state.sources()).toEqual([{source: 'macro', status: 'unavailable'}]);
-  });
-
-  it('setUpcomingError flips the status and keeps the code', () => {
-    const state = signalState(initialEventsState);
-    eventsMethods(state).setUpcomingError('EVENTS_WINDOW_INVALID');
-
-    expect(state.upcomingStatus()).toBe('error');
-    expect(state.upcomingErrorCode()).toBe('EVENTS_WINDOW_INVALID');
   });
 
   it('setFired replaces the feed while appendFired extends it and advances the page', () => {
@@ -83,7 +69,6 @@ describe('eventsMethods', () => {
     methods.appendFired(page([fired('b'), fired('c')], 2, 3));
     expect(state.fired().map(f => f.alertId)).toEqual(['a', 'b', 'c']);
     expect(state.firedPage()).toBe(2);
-    expect(state.firedStatus()).toBe('idle');
   });
 
   it('appendFired skips rows already loaded when a page overlaps', () => {

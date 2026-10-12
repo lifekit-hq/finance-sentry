@@ -1,9 +1,8 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ERROR_MESSAGES} from '@lifekit-hq/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
 import {
   type EventKind,
   type EventSourceStatusEntry,
@@ -35,13 +34,11 @@ function buildSignals(
     upcoming: UpcomingEvent[];
     sources: EventSourceStatusEntry[];
     upcomingStatus: AsyncStatus;
-    upcomingErrorCode: Nullable<string>;
     fired: FiredEvent[];
     firedTotalCount: number;
     firedPage: number;
     firedPageSize: number;
     firedStatus: AsyncStatus;
-    firedErrorCode: Nullable<string>;
   }> = {}
 ) {
   return {
@@ -49,14 +46,12 @@ function buildSignals(
     kinds: signal<EventKind[]>(overrides.kinds ?? []),
     upcoming: signal<UpcomingEvent[]>(overrides.upcoming ?? []),
     sources: signal<EventSourceStatusEntry[]>(overrides.sources ?? []),
-    upcomingStatus: signal<AsyncStatus>(overrides.upcomingStatus ?? 'idle'),
-    upcomingErrorCode: signal<Nullable<string>>(overrides.upcomingErrorCode ?? null),
+    upcomingStatus: signal<AsyncStatus>(overrides.upcomingStatus ?? 'success'),
     fired: signal<FiredEvent[]>(overrides.fired ?? []),
     firedTotalCount: signal(overrides.firedTotalCount ?? 0),
     firedPage: signal(overrides.firedPage ?? 1),
     firedPageSize: signal(overrides.firedPageSize ?? 20),
-    firedStatus: signal<AsyncStatus>(overrides.firedStatus ?? 'idle'),
-    firedErrorCode: signal<Nullable<string>>(overrides.firedErrorCode ?? null),
+    firedStatus: signal<AsyncStatus>(overrides.firedStatus ?? 'success'),
   };
 }
 
@@ -69,9 +64,6 @@ describe('eventsComputed', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY}],
-    });
   });
 
   afterEach(() => {
@@ -120,23 +112,16 @@ describe('eventsComputed', () => {
     expect(build().upcomingSections()).toEqual([]);
   });
 
-  it('isUpcomingEmpty is true only when idle with nothing loaded', () => {
+  it('isUpcomingEmpty is true only once loaded with nothing to show', () => {
     expect(build().isUpcomingEmpty()).toBe(true);
     expect(build({upcomingStatus: 'loading'}).isUpcomingEmpty()).toBe(false);
     expect(build({upcoming: [upcoming('2026-09-22', 'MU')]}).isUpcomingEmpty()).toBe(false);
   });
 
-  it('upcomingErrorMessage resolves a known code and falls back otherwise', () => {
-    expect(
-      build({
-        upcomingStatus: 'error',
-        upcomingErrorCode: 'EVENTS_WINDOW_INVALID',
-      }).upcomingErrorMessage()
-    ).toContain('window is invalid');
-    expect(build({upcomingStatus: 'error', upcomingErrorCode: 'NOPE'}).upcomingErrorMessage()).toBe(
-      'Failed to load upcoming events.'
-    );
-    expect(build().upcomingErrorMessage()).toBe('');
+  it('isFiredEmpty is true only once loaded with nothing to show', () => {
+    expect(build().isFiredEmpty()).toBe(true);
+    expect(build({firedStatus: 'loading'}).isFiredEmpty()).toBe(false);
+    expect(build({firedStatus: 'idle'}).isFiredEmpty()).toBe(false);
   });
 
   it('hasFiredRows is true once any row is loaded', () => {
@@ -168,11 +153,5 @@ describe('eventsComputed', () => {
     expect(
       build({fired: [], firedPage: 2, firedPageSize: 20, firedTotalCount: 25}).hasMoreFired()
     ).toBe(false);
-  });
-
-  it('firedErrorMessage falls back to the feed default', () => {
-    expect(build({firedStatus: 'error', firedErrorCode: 'NOPE'}).firedErrorMessage()).toBe(
-      'Failed to load fired events.'
-    );
   });
 });

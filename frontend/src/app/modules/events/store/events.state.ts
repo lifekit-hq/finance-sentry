@@ -14,14 +14,10 @@ export interface EventsState {
   kinds: EventKind[];
   upcoming: UpcomingEvent[];
   sources: EventSourceStatusEntry[];
-  upcomingStatus: AsyncStatus;
-  upcomingErrorCode: Nullable<string>;
   fired: FiredEvent[];
   firedTotalCount: number;
   firedPage: number;
   firedPageSize: number;
-  firedStatus: AsyncStatus;
-  firedErrorCode: Nullable<string>;
 }
 
 export const initialEventsState: EventsState = {
@@ -30,12 +26,8 @@ export const initialEventsState: EventsState = {
   kinds: [],
   upcoming: [],
   sources: [],
-  upcomingStatus: 'idle',
-  upcomingErrorCode: null,
   fired: [],
   firedTotalCount: 0,
   firedPage: 1,
   firedPageSize: FIRED_PAGE_SIZE,
-  firedStatus: 'idle',
-  firedErrorCode: null,
 };
