@@ -12,8 +12,9 @@ import {type WhatsNewState} from './whats-new.state';
 interface StoreMethods {
   loaded: Signal<WhatsNewState['loaded']>;
   setLoading(): void;
+  setSuccess(): void;
   setVersions(versions: WhatsNewVersion[]): void;
-  setError(): void;
+  setError(errorCode: Nullable<string>): void;
 }
 
 export function whatsNewEffects(store: StoreMethods) {
@@ -26,9 +27,12 @@ export function whatsNewEffects(store: StoreMethods) {
       tap(() => store.setLoading()),
       switchMap(() =>
         service.load().pipe(
-          tap(data => store.setVersions(data.versions)),
+          tap(data => {
+            store.setVersions(data.versions);
+            store.setSuccess();
+          }),
           catchError(() => {
-            store.setError();
+            store.setError(null);
             return EMPTY;
           })
         )
