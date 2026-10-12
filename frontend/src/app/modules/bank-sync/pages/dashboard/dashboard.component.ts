@@ -240,7 +240,11 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               </div>
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
-              } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
+              } @else if (
+                !store.historyHasHistory() && (store.isLoading() || store.isHistoryLoading())
+              ) {
+                <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
+              } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
                 >

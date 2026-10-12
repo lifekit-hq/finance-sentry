@@ -141,11 +141,13 @@ test.describe('Alerts page', () => {
     await expect(resolved).toHaveCount(1);
     await expect(resolved).toContainText('Low balance on Revolut');
     await expect(resolved).toContainText('Resolved');
-    await expect(resolved).toHaveClass(/opacity-60/);
+    // Muted by recolour, not opacity: the text stays at full strength, only the leading icon fades.
+    await expect(resolved).not.toHaveClass(/(^|\s)opacity-/);
+    await expect(resolved.locator('cmn-alert-item div > cmn-icon')).toHaveCSS('opacity', '0.6');
 
     const repeated = page.getByTestId('alert-row').filter({hasText: 'Possible duplicate charge'});
     await expect(repeated).toContainText('×7');
-    await expect(repeated).not.toHaveClass(/opacity-60/);
+    await expect(repeated.locator('cmn-alert-item div > cmn-icon')).toHaveCSS('opacity', '1');
   });
 
   test('routes each alert type to its own page', async ({page}) => {
