@@ -42,8 +42,8 @@
 
     <!-- FluentResults / FluentValidation -->
     <PackageVersion Include="FluentResults" Version="4.0.0" />
-    <PackageVersion Include="FluentValidation" Version="12.1.1" />
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
 
     <!-- Hangfire -->
     <PackageVersion Include="Hangfire.Core" Version="1.8.25" />
@@ -55,7 +55,7 @@
     <PackageVersion Include="Lib.Net.Http.WebPush" Version="3.3.1" />
 
     <!-- Off-host backups (feature 024): Cloudflare R2 via the S3-compatible API -->
-    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.1" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.2" />
 
     <!-- Serilog -->
     <PackageVersion Include="Serilog" Version="4.4.0" />
@@ -90,14 +90,14 @@
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
 
     <!-- Swagger -->
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.2.3" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.3.0" />
 
     <!-- Ed25519 request signing (Revolut X, #472) — the BCL has no Ed25519 -->
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
 
     <!-- HTML parsing (companion data layer — MarketBeat / TrendForce) -->
-    <PackageVersion Include="AngleSharp" Version="1.8.3" />
+    <PackageVersion Include="AngleSharp" Version="1.8.4" />
 
     <!-- MCP -->
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
@@ -107,13 +107,13 @@
     <!-- Test stack -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
     <PackageVersion Include="Moq" Version="4.21.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
-    <PackageVersion Include="Testcontainers" Version="4.15.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="Testcontainers" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <!-- Namespace-level architecture tests (finance-sentry#502) -->
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <!-- Direct pin over Testcontainers' transitive SSH.NET 2023.0.0 (GHSA-q939-rpr3-3284, high). -->
