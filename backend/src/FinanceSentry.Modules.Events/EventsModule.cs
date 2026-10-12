@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Events.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
 
 /// <summary>
 /// Events (feature 049): the calendar of upcoming events, the fired-events feed and the reader's
@@ -26,10 +27,11 @@ public static class EventsModule
     public static IServiceCollection AddEventsModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<EventsDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")));
+                b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IEventVerdictRepository, EventVerdictRepository>();
 

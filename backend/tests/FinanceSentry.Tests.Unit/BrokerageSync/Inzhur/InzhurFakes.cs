@@ -7,13 +7,11 @@ using FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 namespace FinanceSentry.Tests.Unit.BrokerageSync.Inzhur;
 
 // Fakes of the Inzhur cabinet built from the shapes observed in the design report (data/fs-inzhur-sync-design). Every
-// value is a placeholder: no phone number, password, code or token of a real account appears in these tests.
+// value is a placeholder: no cookie or token of a real account appears in these tests.
 internal static class InzhurFakes
 {
-    public const string Phone = "000000000000";
-    public const string Password = "placeholder-password";
     public const string AccessToken = "fake-access-token";
-    public const string RefreshCookieName = "refresh_token";
+    public const string RefreshCookieName = "refreshToken";
     public const string AuthHost = "api.inzhur.reit";
 
     public static InzhurSession Session(string accessToken = AccessToken, string refreshValue = "fake-refresh-1")

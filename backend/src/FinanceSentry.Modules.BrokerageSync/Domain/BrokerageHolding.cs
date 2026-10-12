@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
 
-public sealed class BrokerageHolding
+using FinanceSentry.Core.Auth;
+
+public sealed class BrokerageHolding : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

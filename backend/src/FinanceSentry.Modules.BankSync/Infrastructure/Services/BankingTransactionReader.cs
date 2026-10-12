@@ -21,16 +21,10 @@ public class BankingTransactionReader(
         var providerByAccount = accountList.ToDictionary(a => a.Id, a => a.Provider);
         var currencyByAccount = accountList.ToDictionary(a => a.Id, a => a.Currency);
 
-        var txList = await _transactions.GetByUserIdUnscopedAsync(userId, ct);
+        var txList = await _transactions.GetByUserIdInRangeUnscopedAsync(userId, fromUtc, toUtc, ct);
 
         return txList
-            .Where(t => t.IsActive)
-            .Select(t =>
-            {
-                var effectiveDate = t.PostedDate ?? t.TransactionDate;
-                return new { t, effectiveDate };
-            })
-            .Where(x => x.effectiveDate >= fromUtc && x.effectiveDate <= toUtc)
+            .Select(t => new { t, effectiveDate = t.PostedDate ?? t.TransactionDate })
             .Select(x =>
             {
                 var currency = currencyByAccount.TryGetValue(x.t.AccountId, out var c) ? c : "USD";

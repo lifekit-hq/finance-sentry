@@ -16,5 +16,8 @@ COPY frontend/ ./
 
 EXPOSE 4200
 
+# `npx ng serve` bypasses the npm prestart hook, so generate public/whats-new.json here first. It reads
+# the CHANGELOG.md that docker-compose.dev.yml mounts at /CHANGELOG.md; a missing file only leaves the
+# What's new panel empty and must not stop the dev server.
 # --host 0.0.0.0 required to accept connections from outside the container
-CMD ["npx", "ng", "serve", "--host", "0.0.0.0", "--port", "4200"]
+CMD ["sh", "-c", "npm run whats-new || echo 'whats-new.json not generated - the What is new panel stays empty'; exec npx ng serve --host 0.0.0.0 --port 4200"]

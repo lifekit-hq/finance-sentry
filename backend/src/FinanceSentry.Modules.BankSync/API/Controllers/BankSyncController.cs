@@ -11,6 +11,7 @@ using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
+using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -35,6 +36,7 @@ public class BankSyncController(
     IBankAccountRepository accounts,
     ITransactionRepository transactions,
     IBackgroundJobClient backgroundJobs,
+    IRecurringJobManager recurringJobs,
     ISyncJobRepository syncJobs,
     ITransactionSyncCoordinator coordinator,
     FinanceSentry.Core.Interfaces.IAlertGeneratorService alerts,
@@ -87,8 +89,8 @@ public class BankSyncController(
         if (toDateError != null)
             return BadRequest(toDateError);
 
-        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
-        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
             ?? TransactionFilterValidator.ValidateAmountRange(minAmountUsd, maxAmountUsd)
@@ -146,8 +148,8 @@ public class BankSyncController(
         if (toDateError != null)
             return BadRequest(toDateError);
 
-        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue);
-        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue);
+        var fromDateTime = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toDateTime = toDate?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var validationError = TransactionFilterValidator.ValidateDateRange(fromDateTime, toDateTime)
             ?? TransactionFilterValidator.ValidateAmountRange(minAmount, maxAmount)
@@ -207,7 +209,7 @@ public class BankSyncController(
         if (account == null || account.UserId != userId)
             return NotFound(new ApiErrorBody("Account not found.", "ACCOUNT_NOT_FOUND"));
 
-        if (await _syncJobs.HasRunningJobAsync(accountId, ct))
+        if (account.SyncStatus == "syncing")
             return Conflict(new ApiErrorBody("A sync is already in progress for this account.", "SYNC_IN_PROGRESS"));
 
         var hangfireJobId = _backgroundJobs.Enqueue<Infrastructure.Jobs.ScheduledSyncJob>(
@@ -278,6 +280,7 @@ public class BankSyncController(
 
         await _transactions.SoftDeleteByAccountIdAsync(accountId, ct);
         await _accounts.DeleteAsync(accountId, ct);
+        recurringJobs.RemoveIfExists(SyncAccountJob.IdFor(accountId));
         await alerts.DeleteAlertsForAccountAsync(accountId, ct);
 
         return NoContent();

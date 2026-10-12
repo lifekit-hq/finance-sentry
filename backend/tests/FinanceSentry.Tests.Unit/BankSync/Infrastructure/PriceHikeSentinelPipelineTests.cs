@@ -6,7 +6,7 @@ using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Subscriptions.Application.Services;
 using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence;
-using FinanceSentry.Modules.Subscriptions.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Tests.Unit.Subscriptions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -50,7 +50,7 @@ public class PriceHikeSentinelPipelineTests
             NoCurrentUser.Instance);
 
         var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
-        var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
+        var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
 
         var reader = new SubscriptionHygieneSummaryReader(db);
@@ -203,7 +203,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
             NoCurrentUser.Instance);
 
-        var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
+        var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
 
         SubscriptionDetectionAlgorithm.TxRow[] beforeMove =
         [
@@ -261,7 +261,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
             NoCurrentUser.Instance);
 
-        var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
+        var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
         var detected = SubscriptionDetectionAlgorithm.DetectSubscriptions(charges).ToList();
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
         await upserts.UpsertDetectedSubscriptionsAsync(UserId.ToString(), detected);
@@ -285,7 +285,7 @@ public class PriceHikeSentinelPipelineTests
                 .UseInMemoryDatabase($"pricehike-{Guid.NewGuid():N}").Options,
             NoCurrentUser.Instance);
 
-        var upserts = new SubscriptionDetectionResultService(new DetectedSubscriptionRepository(db));
+        var upserts = new SubscriptionDetectionResultService(new InMemoryDetectedSubscriptionStore(db));
 
         SubscriptionDetectionAlgorithm.TxRow[] midHike =
         [

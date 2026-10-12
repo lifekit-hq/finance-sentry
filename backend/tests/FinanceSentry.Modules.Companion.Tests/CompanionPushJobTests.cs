@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Companion.Tests;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Domain.Repositories;
@@ -30,12 +31,15 @@ public sealed class CompanionPushJobTests
 
         public List<DateTimeOffset> Since { get; } = [];
 
+        /// <summary>Users whose push preference is off: their subscriptions are never listed as active.</summary>
+        public HashSet<Guid> OptedOut { get; } = [];
+
         public int Saves { get; private set; }
 
         public int Pruned { get; private set; }
 
         public Task<IReadOnlyList<PushSubscription>> ListActiveSubscriptionsUnscopedAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<PushSubscription>>([.. Subscriptions.Where(s => s.DisabledAt is null)]);
+            => Task.FromResult<IReadOnlyList<PushSubscription>>([.. Subscriptions.Where(s => s.DisabledAt is null && !OptedOut.Contains(s.UserId))]);
 
         public Task<IReadOnlyList<CompanionEvent>> ListUndeliveredEventsUnscopedAsync(
             Guid userId, Guid subscriptionId, DateTimeOffset since, bool includeOperational, int limit, CancellationToken ct = default)
@@ -46,6 +50,8 @@ public sealed class CompanionPushJobTests
                 .. Events
                     .Where(e => e.UserId == userId
                                 && e.CapturedAt >= since
+                                && !(e.Kind == CompanionEventKind.AnalystAction
+                                     && (e.Summary.Contains(" Upgrade " + e.Subject) || e.Summary.Contains(" Downgrade " + e.Subject)))
                                 && (includeOperational || e.Kind != CompanionEventKind.OperationalFailure)
                                 && !Deliveries.Any(d => d.EventId == e.Id && d.SubscriptionId == subscriptionId))
                     .OrderBy(e => e.CapturedAt)
@@ -54,16 +60,21 @@ public sealed class CompanionPushJobTests
             return Task.FromResult(events);
         }
 
+        public Task<IReadOnlySet<Guid>> ListUndeliveredAlertIdsUnscopedAsync(
+            Guid subscriptionId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<Guid>>(
+                alertIds.Where(id => !Deliveries.Any(d => d.AlertId == id && d.SubscriptionId == subscriptionId)).ToHashSet());
+
         public Task AddDeliveriesAsync(IReadOnlyCollection<PushDelivery> deliveries, CancellationToken ct = default)
         {
-            foreach (var d in deliveries.Where(d => !Deliveries.Any(x => x.EventId == d.EventId && x.SubscriptionId == d.SubscriptionId)))
+            foreach (var d in deliveries.Where(d => !Deliveries.Any(x => x.EventId == d.EventId && x.AlertId == d.AlertId && x.SubscriptionId == d.SubscriptionId)))
                 Deliveries.Add(d);
             return Task.CompletedTask;
         }
 
         public Task<IReadOnlyList<PushDelivery>> ListDueUnscopedAsync(DateTimeOffset now, int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<PushDelivery>>([
-                .. Deliveries.Where(d => d.Status == PushDeliveryStatus.Pending && (d.NextAttemptAt is null || d.NextAttemptAt <= now)).Take(limit)]);
+                .. Deliveries.Where(d => d.Status == PushDeliveryStatus.Pending && (d.NextAttemptAt is null || d.NextAttemptAt <= now) && !OptedOut.Contains(d.UserId)).Take(limit)]);
 
         public Task<IReadOnlyDictionary<Guid, CompanionEvent>> GetEventsUnscopedAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyDictionary<Guid, CompanionEvent>>(Events.Where(e => ids.Contains(e.Id)).ToDictionary(e => e.Id));
@@ -89,6 +100,21 @@ public sealed class CompanionPushJobTests
             Saves++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeAlerts : IPushAlertReader
+    {
+        public List<MaterialAlertRecord> Alerts { get; } = [];
+
+        public Task<IReadOnlyList<MaterialAlertRecord>> ListOfTypesSinceAsync(
+            IReadOnlyCollection<string> types, DateTimeOffset since, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MaterialAlertRecord>>(
+                [.. Alerts.Where(a => types.Contains(a.Type) && a.CreatedAt >= since)]);
+
+        public Task<IReadOnlyDictionary<Guid, MaterialAlertRecord>> GetOpenAsync(
+            IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyDictionary<Guid, MaterialAlertRecord>>(
+                Alerts.Where(a => alertIds.Contains(a.AlertId)).ToDictionary(a => a.AlertId));
     }
 
     private sealed class FakeSender(Func<PushSubscription, PushSendResult>? respond = null) : IPushSender
@@ -128,10 +154,27 @@ public sealed class CompanionPushJobTests
             CapturedAt = capturedAt ?? DateTimeOffset.UtcNow.AddMinutes(-1),
         };
 
-    private static CompanionPushJob Job(FakeRepository repo, IPushSender sender, bool configured = true)
+    private static CompanionEvent AnalystEvt(Guid userId, string actionType) => new()
+    {
+        UserId = userId,
+        Kind = CompanionEventKind.AnalystAction,
+        Subject = "NVDA",
+        Severity = "info",
+        Summary = $"Morgan Stanley {actionType} NVDA (target $150)",
+        DedupKey = $"analyst:{Guid.NewGuid():N}",
+        SourceModule = "research",
+        CapturedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+    };
+
+    private static MaterialAlertRecord RatingAlert(Guid userId, string ticker = "NVDA") => new(
+        Guid.NewGuid(), userId, "AnalystRatingChange", "info", $"Analyst upgrade: {ticker}", Guid.NewGuid(), ticker,
+        DateTimeOffset.UtcNow.AddMinutes(-1), $"/assets/{ticker}");
+
+    private static CompanionPushJob Job(FakeRepository repo, IPushSender sender, bool configured = true, FakeAlerts? alerts = null)
         => new(
             repo,
             sender,
+            alerts ?? new FakeAlerts(),
             new StubUserAuthorizationChecker(Admin),
             Options.Create(configured ? new WebPushOptions { PublicKey = "pub", PrivateKey = "priv" } : new WebPushOptions()),
             NullLogger<CompanionPushJob>.Instance);
@@ -443,11 +486,104 @@ public sealed class CompanionPushJobTests
         repo.Events.Add(Evt(Admin, CompanionEventKind.OperationalFailure));
         var checker = new StubUserAuthorizationChecker(Admin);
         var job = new CompanionPushJob(
-            repo, new FakeSender(), checker, Options.Create(new WebPushOptions { PublicKey = "p", PrivateKey = "k" }),
+            repo, new FakeSender(), new FakeAlerts(), checker, Options.Create(new WebPushOptions { PublicKey = "p", PrivateKey = "k" }),
             NullLogger<CompanionPushJob>.Instance);
 
         await job.ExecuteAsync();
 
         checker.CheckedPolicies.Should().OnlyContain(p => p == AuthPolicies.RequireOwner);
+    }
+
+    [Fact]
+    public async Task Other_analyst_actions_still_push_as_events_while_upgrades_and_downgrades_do_not()
+    {
+        var repo = new FakeRepository();
+        repo.Subscriptions.Add(Sub(Member));
+        var initiate = AnalystEvt(Member, "Initiate");
+        var targetChange = AnalystEvt(Member, "TargetChange");
+        repo.Events.AddRange([AnalystEvt(Member, "Upgrade"), AnalystEvt(Member, "Downgrade"), initiate, targetChange]);
+        var sender = new FakeSender();
+
+        await Job(repo, sender).ExecuteAsync();
+
+        sender.Sent.Should().HaveCount(2);
+        repo.Deliveries.Select(d => d.EventId).Should().BeEquivalentTo([initiate.Id, targetChange.Id]);
+        repo.Deliveries.Should().OnlyContain(d => d.Status == PushDeliveryStatus.Sent);
+    }
+
+    [Fact]
+    public async Task One_deduped_rating_change_alert_is_one_push_even_with_its_AnalystAction_events_and_repeated_runs()
+    {
+        var repo = new FakeRepository();
+        var device = Sub(Member);
+        repo.Subscriptions.Add(device);
+        // The same upgrade also captured one companion AnalystAction event per firm: those stay in-app.
+        repo.Events.AddRange([AnalystEvt(Member, "Upgrade"), AnalystEvt(Member, "Downgrade")]);
+        var alerts = new FakeAlerts();
+        alerts.Alerts.Add(RatingAlert(Member));
+        var sender = new FakeSender();
+        var job = Job(repo, sender, alerts: alerts);
+
+        await job.ExecuteAsync();
+        await job.ExecuteAsync();
+
+        var sent = sender.Sent.Should().ContainSingle().Subject;
+        sent.Payload.Should().Contain("Analyst upgrade").And.Contain("NVDA").And.Contain("/assets/NVDA");
+        repo.Deliveries.Should().ContainSingle().Which.Status.Should().Be(PushDeliveryStatus.Sent);
+    }
+
+    [Fact]
+    public async Task A_rating_change_alert_is_not_pushed_when_the_owner_has_push_off()
+    {
+        var repo = new FakeRepository();
+        repo.Subscriptions.Add(Sub(Member));
+        repo.OptedOut.Add(Member);
+        var alerts = new FakeAlerts();
+        alerts.Alerts.Add(RatingAlert(Member));
+        var sender = new FakeSender();
+
+        await Job(repo, sender, alerts: alerts).ExecuteAsync();
+
+        sender.Sent.Should().BeEmpty();
+        repo.Deliveries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_rating_change_alert_goes_only_to_its_owner_and_not_to_a_device_that_subscribed_later()
+    {
+        var repo = new FakeRepository();
+        var mine = Sub(Member);
+        var late = Sub(Member, DateTimeOffset.UtcNow);
+        var other = Sub(Admin);
+        repo.Subscriptions.AddRange([mine, late, other]);
+        var alerts = new FakeAlerts();
+        alerts.Alerts.Add(RatingAlert(Member));
+        var sender = new FakeSender();
+
+        await Job(repo, sender, alerts: alerts).ExecuteAsync();
+
+        sender.Sent.Select(s => s.SubscriptionId).Should().BeEquivalentTo([mine.Id]);
+    }
+
+    [Fact]
+    public async Task A_dismissed_rating_change_alert_expires_its_pending_push()
+    {
+        var repo = new FakeRepository();
+        var device = Sub(Member);
+        repo.Subscriptions.Add(device);
+        repo.Deliveries.Add(new PushDelivery { AlertId = Guid.NewGuid(), SubscriptionId = device.Id, UserId = Member });
+        var sender = new FakeSender();
+
+        await Job(repo, sender).ExecuteAsync();
+
+        sender.Sent.Should().BeEmpty();
+        repo.Deliveries.Should().ContainSingle().Which.Status.Should().Be(PushDeliveryStatus.Expired);
+    }
+
+    [Fact]
+    public void The_rating_change_alert_has_no_companion_event_of_its_own()
+    {
+        // The AnalystAction capture stays the only companion event for an upgrade; the alert is pushed directly.
+        new MaterialityPolicy().ClassifyAlert("AnalystRatingChange").Should().BeNull();
     }
 }

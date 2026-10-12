@@ -14,13 +14,16 @@ using Microsoft.Extensions.Options;
 /// subscription) for users who opted in, then sends what is due. It never reads or writes
 /// <see cref="CompanionEvent.Disposition"/> and ignores <see cref="NotificationMode"/>, quiet hours and the agent
 /// rate limit, so it runs alongside the agent/Telegram path without affecting it. Everyone gets their own events;
-/// <see cref="CompanionEventKind.OperationalFailure"/> goes to <c>ops.admin</c> holders only. Overlap-protected, and a
+/// <see cref="CompanionEventKind.OperationalFailure"/> goes to <c>ops.admin</c> holders only. The deduped rating-change alert
+/// (<see cref="PushDeliveryPolicy.PushedAlertTypes"/>) is pushed from the alert row itself, once per (alert, subscription),
+/// and the per-firm upgrade and downgrade <see cref="CompanionEventKind.AnalystAction"/> events are not pushed, so one upgrade is one push; other analyst actions push as events. Overlap-protected, and a
 /// keyless deployment (no VAPID keys) does nothing.
 /// </summary>
 [DisableConcurrentExecution(timeoutInSeconds: 120)]
 public sealed class CompanionPushJob(
     IPushDeliveryRepository repository,
     IPushSender sender,
+    IPushAlertReader alertReader,
     IUserAuthorizationChecker authorization,
     IOptions<WebPushOptions> options,
     ILogger<CompanionPushJob> logger)
@@ -44,6 +47,9 @@ public sealed class CompanionPushJob(
     {
         var opsByUser = new Dictionary<Guid, bool>();
         var queued = new List<PushDelivery>();
+        var alertsByUser = (await alertReader.ListOfTypesSinceAsync(
+                PushDeliveryPolicy.PushedAlertTypes, now - PushDeliveryPolicy.EventWindow, ct))
+            .ToLookup(a => a.UserId);
 
         foreach (var subscription in await repository.ListActiveSubscriptionsUnscopedAsync(ct))
         {
@@ -58,6 +64,21 @@ public sealed class CompanionPushJob(
                 SubscriptionId = subscription.Id,
                 UserId = subscription.UserId,
             }));
+
+            var userAlerts = alertsByUser[subscription.UserId]
+                .Where(a => a.CreatedAt >= subscription.CreatedAt)
+                .ToList();
+            if (userAlerts.Count > 0)
+            {
+                var undelivered = await repository.ListUndeliveredAlertIdsUnscopedAsync(
+                    subscription.Id, [.. userAlerts.Select(a => a.AlertId)], ct);
+                queued.AddRange(undelivered.Select(id => new PushDelivery
+                {
+                    AlertId = id,
+                    SubscriptionId = subscription.Id,
+                    UserId = subscription.UserId,
+                }));
+            }
         }
 
         if (queued.Count > 0)
@@ -70,18 +91,23 @@ public sealed class CompanionPushJob(
         if (due.Count == 0)
             return;
 
-        var events = await repository.GetEventsUnscopedAsync([.. due.Select(d => d.EventId).Distinct()], ct);
+        var events = await repository.GetEventsUnscopedAsync([.. due.Where(d => d.EventId is not null).Select(d => d.EventId!.Value).Distinct()], ct);
+        var alerts = await alertReader.GetOpenAsync([.. due.Where(d => d.AlertId is not null).Select(d => d.AlertId!.Value).Distinct()], ct);
         var subscriptions = await repository.GetSubscriptionsUnscopedAsync([.. due.Select(d => d.SubscriptionId).Distinct()], ct);
         var opsByUser = new Dictionary<Guid, bool>();
         var goneSubscriptions = new HashSet<Guid>();
 
         foreach (var delivery in due)
         {
+            CompanionEvent? evt = null;
+            MaterialAlertRecord? alert = null;
             if (!subscriptions.TryGetValue(delivery.SubscriptionId, out var subscription)
                 || subscription.DisabledAt is not null
                 || goneSubscriptions.Contains(subscription.Id)
-                || !events.TryGetValue(delivery.EventId, out var evt)
-                || (evt.Kind == CompanionEventKind.OperationalFailure
+                || !(delivery.EventId is { } eventId
+                    ? events.TryGetValue(eventId, out evt)
+                    : delivery.AlertId is { } alertId && alerts.TryGetValue(alertId, out alert))
+                || (evt?.Kind == CompanionEventKind.OperationalFailure
                     && !await IsOpsAdminAsync(subscription.UserId, opsByUser, ct)))
             {
                 delivery.Status = PushDeliveryStatus.Expired;
@@ -89,7 +115,8 @@ public sealed class CompanionPushJob(
                 continue;
             }
 
-            var result = await sender.SendAsync(subscription, PushPayload.Build(evt), ct);
+            var payload = evt is not null ? PushPayload.Build(evt) : PushPayload.BuildAlert(alert!);
+            var result = await sender.SendAsync(subscription, payload, ct);
             Apply(delivery, subscription, result, now);
             if (result.Outcome == PushSendOutcome.Gone)
                 goneSubscriptions.Add(subscription.Id);

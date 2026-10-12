@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -5,6 +6,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Inzhur;
 using Hangfire;
+using Hangfire.Server;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
@@ -12,8 +14,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// <summary>
 /// The once-a-day read of each connected Inzhur cabinet (design report §4): refresh the session, read holdings and
 /// cash, store them. It never signs in — a broken refresh chain flips the connection to reauth_required and tells
-/// the owner, who reconnects from the app. Inzhur being busy or down (429/5xx/network) is retried once after an hour
-/// and once more four hours later, then the day is skipped; nothing else retries.
+/// the owner, who reconnects from the app. Inzhur being busy or down (429/5xx/network) is retried by Hangfire once
+/// after an hour and once more four hours later, then the day is skipped and the job fails; nothing else retries.
 /// </summary>
 public sealed class InzhurSyncJob(
     IInzhurCredentialRepository credentialRepository,
@@ -30,8 +32,12 @@ public sealed class InzhurSyncJob(
     /// <summary>A connection read this recently (e.g. right after a reconnect) is not read again by the daily run.</summary>
     public static readonly TimeSpan RecentSyncWindow = TimeSpan.FromHours(6);
 
-    /// <summary>Delays before each retry of a transient failure; past the last one the day is skipped.</summary>
-    public static readonly IReadOnlyList<TimeSpan> RetryDelays = [TimeSpan.FromHours(1), TimeSpan.FromHours(4)];
+    /// <summary>Seconds before each retry of a transient failure (1 h, then 4 h); past the last one the day is skipped.</summary>
+    public const int FirstRetryDelaySeconds = 3600;
+    public const int SecondRetryDelaySeconds = 14400;
+
+    /// <summary>Retries Hangfire makes of one user's read after a transient failure.</summary>
+    public const int RetryAttempts = 2;
 
     [AutomaticRetry(Attempts = 0)]
     [DisableConcurrentExecution(timeoutInSeconds: 600)]
@@ -48,24 +54,29 @@ public sealed class InzhurSyncJob(
                 continue;
             }
 
-            await SyncOneAsync(credential, attempt: 0);
+            backgroundJobs.Enqueue<InzhurSyncJob>(j => j.SyncUserAsync(credential.UserId, null!));
         }
     }
 
-    /// <summary>A scheduled retry after a transient failure; <paramref name="attempt"/> counts retries already made.</summary>
-    [AutomaticRetry(Attempts = 0)]
+    /// <summary>
+    /// One user's read. A transient failure (Inzhur busy or down) is rethrown so Hangfire retries it after the declared
+    /// delays; when the last retry fails too the outage alert is raised and the job ends in the Failed state.
+    /// </summary>
+    [AutomaticRetry(Attempts = RetryAttempts, DelaysInSeconds = [FirstRetryDelaySeconds, SecondRetryDelaySeconds], OnAttemptsExceeded = AttemptsExceededAction.Fail)]
     [DisableConcurrentExecution(timeoutInSeconds: 600)]
-    public async Task RetryAsync(Guid userId, int attempt)
+    public async Task SyncUserAsync(Guid userId, PerformContext context)
     {
         var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId);
         if (credential is null || credential.Status != InzhurConnectionStatus.Active)
             return;
 
-        await SyncOneAsync(credential, attempt);
+        var retriesMade = context.GetJobParameter<int>("RetryCount");
+        await SyncOneAsync(credential, isLastAttempt: retriesMade >= RetryAttempts);
     }
 
-    private async Task SyncOneAsync(InzhurCredential credential, int attempt)
+    private async Task SyncOneAsync(InzhurCredential credential, bool isLastAttempt)
     {
+        ExceptionDispatchInfo? retry = null;
         try
         {
             if (await syncService.SyncAsync(credential.UserId) == InzhurSyncOutcome.Skipped)
@@ -84,10 +95,15 @@ public sealed class InzhurSyncJob(
 
             if (failure is { IsTransient: true })
             {
-                if (attempt < RetryDelays.Count)
-                    backgroundJobs.Schedule<InzhurSyncJob>(j => j.RetryAsync(credential.UserId, attempt + 1), RetryDelays[attempt]);
-                else
+                if (isLastAttempt)
+                {
+                    logger.LogError(
+                        "Inzhur sync for user {UserId} failed after {Retries} retries; skipping the day",
+                        credential.UserId, RetryAttempts);
                     await TryGenerateSyncFailureAsync(credential.UserId, failure.Kind.ToString(), SyncFailureClass.Outage);
+                }
+
+                retry = ExceptionDispatchInfo.Capture(ex);
             }
             else if (failure is { Kind: InzhurFailureKind.ReauthRequired })
             {
@@ -101,6 +117,10 @@ public sealed class InzhurSyncJob(
             await connectionHealth.RecordFailureAsync(
                 HealthSubject(credential), credential.Health, ToProviderFailure(ex), (health, ct) => SaveHealthAsync(credential, health, ct));
         }
+
+        // Rethrown outside the catch so the health record above is written first; Hangfire then schedules the retry
+        // (or, on the last attempt, marks the job Failed).
+        retry?.Throw();
     }
 
     private static ConnectionHealthSubject HealthSubject(InzhurCredential credential) =>

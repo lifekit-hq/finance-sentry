@@ -82,26 +82,26 @@ test.describe('Alerts open the server-resolved appPath', () => {
   });
 
   test('a LowBalance alert opens the ledger filtered to its account', async ({page}) => {
-    await page.getByRole('button').filter({hasText: 'Low balance on Revolut'}).click();
+    await page.getByRole('button', {name: 'Low balance on Revolut'}).click();
     await expect(page).toHaveURL(/\/transactions\?account=acc-1$/);
   });
 
   test('a budget breach keeps every query parameter of its path', async ({page}) => {
-    await page.getByRole('button').filter({hasText: 'Groceries over budget'}).click();
+    await page.getByRole('button', {name: 'Groceries over budget'}).click();
     await expect(page).toHaveURL(
       /\/transactions\?category=Groceries&from=2026-10-01&to=2026-10-31$/
     );
   });
 
   test('an alert without appPath falls back to its type destination', async ({page}) => {
-    await page.getByRole('button').filter({hasText: 'Netflix raised its price'}).click();
+    await page.getByRole('button', {name: 'Netflix raised its price'}).click();
     await expect(page).toHaveURL(/\/subscriptions$/);
   });
 
   test('an absolute-URL appPath is ignored and never leaves the app', async ({page}) => {
     let popups = 0;
     page.on('popup', () => popups++);
-    await page.getByRole('button').filter({hasText: 'Hostile path alert'}).click();
+    await page.getByRole('button', {name: 'Hostile path alert'}).click();
     await expect(page).toHaveURL(/\/subscriptions$/);
     expect(popups).toBe(0);
   });

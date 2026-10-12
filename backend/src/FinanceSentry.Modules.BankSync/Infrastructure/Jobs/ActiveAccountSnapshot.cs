@@ -33,7 +33,6 @@ public sealed class ActiveAccountSnapshot
     {
         var accounts = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
-            .Where(a => a.IsActive)
             .Select(a => new ActiveAccount(a.Id, a.UserId, a.Currency))
             .ToListAsync(ct);
 

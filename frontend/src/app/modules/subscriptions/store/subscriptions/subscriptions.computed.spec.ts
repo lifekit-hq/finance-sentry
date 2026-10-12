@@ -42,6 +42,8 @@ function build(subscriptions: Subscription[], sort: SubscriptionSort = 'date') {
       subscriptions: signal(subscriptions),
       sort: signal(sort),
       summary: signal(null),
+      status: signal<AsyncStatus>('idle'),
+      loadErrorCode: signal(null),
       addErrorCode: signal(null),
       addErrorDetail: signal(null),
     })
@@ -147,6 +149,8 @@ describe('subscriptionsComputed addErrorMessage', () => {
         subscriptions: signal([]),
         sort: signal('date'),
         summary: signal(null),
+        status: signal<AsyncStatus>('idle'),
+        loadErrorCode: signal(null),
         addErrorCode: signal(addErrorCode),
         addErrorDetail: signal(addErrorDetail),
       })
@@ -177,5 +181,45 @@ describe('subscriptionsComputed addErrorMessage', () => {
 
   it('falls back to a generic message for an unregistered code', () => {
     expect(withError('SOMETHING_ELSE')).toBe('Failed to add.');
+  });
+});
+
+describe('subscriptionsComputed load state', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [{provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY}],
+    });
+  });
+
+  function withLoad(status: AsyncStatus, loadErrorCode: Nullable<string> = null) {
+    return TestBed.runInInjectionContext(() =>
+      subscriptionsComputed({
+        subscriptions: signal([]),
+        sort: signal('date'),
+        summary: signal(null),
+        status: signal(status),
+        loadErrorCode: signal(loadErrorCode),
+        addErrorCode: signal(null),
+        addErrorDetail: signal(null),
+      })
+    );
+  }
+
+  it('is loading only while the status says so', () => {
+    expect(withLoad('loading').isLoading()).toBe(true);
+    expect(withLoad('idle').isLoading()).toBe(false);
+    expect(withLoad('error').isLoading()).toBe(false);
+  });
+
+  it('has no load error unless the load failed', () => {
+    expect(withLoad('idle', 'BOOM').loadErrorMessage()).toBe('');
+    expect(withLoad('loading').loadErrorMessage()).toBe('');
+  });
+
+  it('falls back to the generic load message for an unregistered code', () => {
+    expect(withLoad('error', 'SOMETHING_ELSE').loadErrorMessage()).toBe(
+      'Failed to load subscriptions.'
+    );
+    expect(withLoad('error').loadErrorMessage()).toBe('Failed to load subscriptions.');
   });
 });

@@ -1,11 +1,13 @@
 namespace FinanceSentry.Modules.Analytics.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One executed or rejected analytics query (feature 033, US3). Written on the app's normal writable
 /// connection — NOT the read-only connection the query itself runs on — so the audit trail is durable
 /// even though the query path has no write privilege.
 /// </summary>
-public sealed class QueryAuditRecord
+public sealed class QueryAuditRecord : IUserOwned
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

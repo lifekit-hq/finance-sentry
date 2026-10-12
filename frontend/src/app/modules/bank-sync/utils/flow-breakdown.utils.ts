@@ -1,8 +1,8 @@
+import {DateUtils} from '../../../shared/utils/date.utils';
 import {type FlowBreakdownItem} from '../models/flow-breakdown/flow-breakdown.model';
 import {type GlobalTransactionDto} from '../models/transaction/transaction.model';
 
 const MONTH_KEY_LENGTH = 7;
-const DAY_PAD = 2;
 
 /** Helpers for turning the flow breakdown's rows and window into ledger drill-down inputs. */
 export class FlowBreakdownUtils {
@@ -35,8 +35,8 @@ export class FlowBreakdownUtils {
       return {};
     }
     const [year, monthNumber] = month.split('-').map(Number);
-    const lastDay = new Date(Date.UTC(year ?? 0, monthNumber ?? 1, 0)).getUTCDate();
-    return {from: `${month}-01`, to: `${month}-${String(lastDay).padStart(DAY_PAD, '0')}`};
+    const lastDay = new Date(Date.UTC(year ?? 0, monthNumber ?? 1, 0));
+    return {from: `${month}-01`, to: DateUtils.isoDateUtc(lastDay)};
   }
 
   /**

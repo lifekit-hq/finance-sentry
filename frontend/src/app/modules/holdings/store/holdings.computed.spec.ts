@@ -18,6 +18,7 @@ function position(overrides: Partial<Position>): Position {
     pnlPercent: null,
     pnlUsd: null,
     isVenueCash: false,
+    assetClass: 'crypto',
     ...overrides,
   };
 }
@@ -44,19 +45,26 @@ describe('holdingsComputed', () => {
         currentPrice: null,
         quantity: 1_850,
         isVenueCash: true,
+        assetClass: 'cash',
       }),
-      position({symbol: 'AAPL', provider: 'ibkr', currentValue: 2_000, currentPrice: 200}),
+      position({
+        symbol: 'AAPL',
+        provider: 'ibkr',
+        currentValue: 2_000,
+        currentPrice: 200,
+        assetClass: 'equity',
+      }),
     ]);
 
     const groups = computed.positionsByAssetClass();
 
     expect(groups.map(g => [g.assetClass, g.label, g.totalValue])).toEqual([
+      ['cash', 'Cash', 2_000],
       ['equity', 'Equities', 2_000],
       ['crypto', 'Crypto', 6_000],
-      ['venueCash', 'Venue cash', 2_000],
     ]);
-    expect(groups[1].rows.map(r => r.symbol)).toEqual(['BTC']);
-    expect(groups[2].rows).toEqual([
+    expect(groups[2].rows.map(r => r.symbol)).toEqual(['BTC']);
+    expect(groups[0].rows).toEqual([
       expect.objectContaining({
         symbol: 'EUR',
         provider: 'revolut_x',
@@ -65,9 +73,73 @@ describe('holdingsComputed', () => {
       }),
     ]);
     expect(computed.allocationBreakdown().map(r => [r.label, r.percent])).toEqual([
+      ['Cash', 20],
       ['Equities', 20],
       ['Crypto', 60],
-      ['Venue cash', 20],
+    ]);
+  });
+
+  it('puts broker cash in the Cash slice with venue cash, out of the Equities weights', () => {
+    const computed = build([
+      position({
+        symbol: 'USD Cash',
+        provider: 'ibkr',
+        instrumentType: 'CASH',
+        currentValue: 300,
+        assetClass: 'cash',
+      }),
+      position({
+        symbol: 'UAH Cash',
+        provider: 'inzhur',
+        instrumentType: 'CASH',
+        currentValue: 100,
+        assetClass: 'cash',
+      }),
+      position({
+        symbol: 'EUR',
+        currentValue: 100,
+        currentPrice: null,
+        isVenueCash: true,
+        assetClass: 'cash',
+      }),
+      position({
+        symbol: 'AAPL',
+        provider: 'ibkr',
+        instrumentType: 'STK',
+        currentValue: 400,
+        assetClass: 'equity',
+      }),
+      position({
+        symbol: 'UA-BOND',
+        provider: 'inzhur',
+        instrumentType: 'BOND',
+        currentValue: 100,
+        assetClass: 'bonds',
+      }),
+      position({
+        symbol: 'REIT',
+        provider: 'inzhur',
+        instrumentType: 'REIT',
+        currentValue: 100,
+        assetClass: 'realEstate',
+      }),
+    ]);
+
+    const groups = computed.positionsByAssetClass();
+
+    expect(groups.map(g => [g.label, g.totalValue])).toEqual([
+      ['Cash', 500],
+      ['Bonds', 100],
+      ['Real estate', 100],
+      ['Equities', 400],
+    ]);
+    expect(groups[0].rows.map(r => r.symbol).sort()).toEqual(['EUR', 'UAH Cash', 'USD Cash']);
+    expect(groups.find(g => g.assetClass === 'equity')?.rows.map(r => r.symbol)).toEqual(['AAPL']);
+    expect(computed.allocationSegments().map(s => s.label)).toEqual([
+      'Cash',
+      'Bonds',
+      'Real estate',
+      'Equities',
     ]);
   });
 
@@ -92,14 +164,26 @@ describe('holdingsComputed', () => {
   });
 
   it('maps the day change onto stock rows and leaves rows without a quote empty', () => {
-    const stock = {provider: 'ibkr', instrumentType: 'STK'};
+    const stock = {provider: 'ibkr', instrumentType: 'STK', assetClass: 'equity' as const};
     const computed = build(
       [
         position({...stock, symbol: 'AAPL', currentValue: 110, currentPrice: 110}),
         position({...stock, symbol: 'MSFT', currentValue: 50, currentPrice: 50}),
         position({symbol: 'BTC', provider: 'binance', currentValue: 60}),
-        position({symbol: 'EUR', provider: 'revolut_x', currentValue: 20, isVenueCash: true}),
-        position({symbol: 'USD Cash', provider: 'ibkr', instrumentType: 'CASH', currentValue: 5}),
+        position({
+          symbol: 'EUR',
+          provider: 'revolut_x',
+          currentValue: 20,
+          isVenueCash: true,
+          assetClass: 'cash',
+        }),
+        position({
+          symbol: 'USD Cash',
+          provider: 'ibkr',
+          instrumentType: 'CASH',
+          currentValue: 5,
+          assetClass: 'cash',
+        }),
       ],
       {AAPL: 10, BTC: 5, 'USD CASH': 1}
     );

@@ -92,7 +92,7 @@ public class BrokerageControllerConnectContractTests(BrokerageApiFactory factory
 
 public record BrokerageErrorShape(string ErrorCode, string ErrorMessage);
 public record ResultShape(int HoldingsCount, DateTime ConnectedAt, string AccountId);
-public record BrokeragePositionShape(string Symbol, string InstrumentType, decimal Quantity, decimal UsdValue);
+public record BrokeragePositionShape(string Symbol, string InstrumentType, decimal Quantity, decimal UsdValue, string AssetClass);
 public record BrokerageHoldingsResponseShape(
     string Provider,
     DateTime? SyncedAt,

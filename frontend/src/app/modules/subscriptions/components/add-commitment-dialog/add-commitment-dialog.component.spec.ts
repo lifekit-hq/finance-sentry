@@ -1,13 +1,17 @@
 import {DialogRef} from '@angular/cdk/dialog';
+import {HttpErrorResponse} from '@angular/common/http';
+import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {CMN_DIALOG_DATA} from '@lifekit-hq/ui';
-import {type Observable, of, Subject} from 'rxjs';
+import {NEVER, type Observable, of, Subject, throwError} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {type CommitmentCandidate} from '../../models/commitment-candidate/commitment-candidate.model';
 import {type CommitmentDialogData} from '../../models/commitment-candidate/commitment-dialog.model';
 import {CommitmentCandidatesService} from '../../services/commitment-candidates.service';
 import {SubscriptionsService} from '../../services/subscriptions.service';
+import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
 import {AddCommitmentDialogComponent} from './add-commitment-dialog.component';
 
 const CANDIDATE: CommitmentCandidate = {
@@ -266,5 +270,135 @@ describe('AddCommitmentDialogComponent', () => {
     const {component, close} = setup();
     component.cancel();
     expect(close).toHaveBeenCalledWith();
+  });
+
+  describe('single-choice controls', () => {
+    function render(data?: CommitmentDialogData) {
+      setup(data);
+      const fixture = TestBed.createComponent(AddCommitmentDialogComponent);
+      fixture.detectChanges();
+      return {fixture, component: fixture.componentInstance};
+    }
+
+    function segmented(fixture: {nativeElement: HTMLElement}, label: string) {
+      return fixture.nativeElement.querySelector<
+        HTMLElement & {options: {label: string; value: string}[]; value: string}
+      >(`lk-segmented[label="${label}"]`);
+    }
+
+    function choose(control: HTMLElement | null, value: string) {
+      control?.dispatchEvent(new CustomEvent('lk-segmented-change', {detail: {value}}));
+    }
+
+    it('offers the kind as a segmented control on the current kind', () => {
+      const {fixture} = render();
+      const control = segmented(fixture, 'Type');
+
+      expect(control?.options.map(o => o.value)).toEqual(['subscription', 'installment']);
+      expect(control?.value).toBe('subscription');
+    });
+
+    it('changes the kind and re-reads the anchor when the control changes', () => {
+      const {fixture, component} = render();
+      const setKind = vi.spyOn(component, 'setKind');
+
+      choose(segmented(fixture, 'Type'), 'installment');
+
+      expect(setKind).toHaveBeenCalledWith('installment');
+      expect(component.form.controls.kind.value).toBe('installment');
+    });
+
+    it('does not offer the kind when linking an existing row', () => {
+      const {fixture} = render({linkTo: 'Apple Store', kind: 'installment'});
+
+      expect(segmented(fixture, 'Type')).toBeNull();
+    });
+
+    it('offers the billing cadence once a charge is picked and applies the choice', () => {
+      const {fixture, component} = render();
+      expect(segmented(fixture, 'Billed')).toBeNull();
+
+      component.pick(CANDIDATE);
+      fixture.detectChanges();
+      const control = segmented(fixture, 'Billed');
+      choose(control, 'annual');
+
+      expect(control?.options.map(o => o.value)).toEqual(['monthly', 'annual']);
+      expect(component.form.controls.cadence.value).toBe('annual');
+      expect(component.form.controls.cadence.dirty).toBe(true);
+    });
+  });
+});
+
+describe('AddCommitmentDialogComponent candidate list states', () => {
+  const PAGE = {items: [CANDIDATE], totalCount: 1, offset: 0, limit: 30, hasMore: false};
+
+  function render(search: ReturnType<typeof vi.fn>, offline = false) {
+    TestBed.configureTestingModule({
+      providers: [
+        {provide: ConnectivityService, useValue: {offline: signal(offline)}},
+        {provide: DialogRef, useValue: {close: vi.fn()}},
+        {provide: CMN_DIALOG_DATA, useValue: undefined},
+        {provide: SubscriptionsService, useValue: {getCommitmentAnchor: vi.fn()}},
+        {provide: CommitmentCandidatesService, useValue: {search}},
+      ],
+    });
+    const fixture = TestBed.createComponent(AddCommitmentDialogComponent);
+    fixture.detectChanges();
+    return {fixture, host: fixture.nativeElement as HTMLElement};
+  }
+
+  function retryButton(host: HTMLElement) {
+    return Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry');
+  }
+
+  it('lists the matching transactions', () => {
+    const {host} = render(vi.fn(() => of(PAGE)));
+
+    expect(host.textContent).toContain('Acme Hosting');
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+  });
+
+  it('shows a skeleton while the candidates load, not the empty copy', () => {
+    const {host} = render(vi.fn(() => NEVER));
+
+    expect(host.querySelector('[data-testid="candidates-skeleton"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+  });
+
+  it('shows the empty copy when nothing matches', () => {
+    const {host} = render(vi.fn(() => of({...PAGE, items: [], totalCount: 0})));
+
+    expect(host.textContent).toContain('No matching outgoing transactions');
+  });
+
+  it('shows the load error and searches again on Retry', () => {
+    const search = vi.fn(() => throwError(() => new HttpErrorResponse({status: 500})));
+    const {host, fixture} = render(search);
+
+    expect(host.textContent).toContain('Failed to load transactions.');
+    expect(host.textContent).not.toContain('No matching outgoing transactions');
+    expect(search).toHaveBeenCalledTimes(1);
+
+    search.mockReturnValue(of(PAGE) as never);
+    retryButton(host)?.click();
+    fixture.detectChanges();
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(host.textContent).toContain('Acme Hosting');
+    expect(host.textContent).not.toContain('Failed to load transactions.');
+  });
+
+  it('keeps the candidates under the load error when a reload fails while offline', () => {
+    const search = vi.fn(() => of(PAGE));
+    const {fixture, host} = render(search, true);
+    expect(host.textContent).toContain('Acme Hosting');
+
+    search.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})) as never);
+    fixture.debugElement.injector.get(CommitmentPickerStore).load();
+    fixture.detectChanges();
+
+    expect(host.textContent).toContain('Failed to load transactions.');
+    expect(host.textContent).toContain('Acme Hosting');
   });
 });

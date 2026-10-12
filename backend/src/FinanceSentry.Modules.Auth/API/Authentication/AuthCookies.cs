@@ -18,6 +18,9 @@ public static class AuthCookies
 {
     public const string AccessToken = "fs_access_token";
     public const string RefreshToken = "fs_refresh_token";
+
+    /// <summary>The provider's ID token from sign-in, kept to hint which session to end at sign-out.</summary>
+    public const string OidcIdToken = "fs_oidc_id_token";
     public const string HostPrefix = "__Host-";
 
     /// <summary>The name a cookie is written under.</summary>

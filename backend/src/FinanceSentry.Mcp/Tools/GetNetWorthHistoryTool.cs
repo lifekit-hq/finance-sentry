@@ -18,7 +18,7 @@ public sealed class GetNetWorthHistoryTool(
     private readonly ILogger<GetNetWorthHistoryTool> _logger = logger;
 
     [McpServerTool(Name = "get_net_worth_history")]
-    [Description("Returns historical net worth snapshots (banking + brokerage + crypto totals per day), optionally bounded by from/to dates. staleSleeves lists any sleeves whose value was carried forward from a prior day because that provider's feed was stale/disconnected/failed — treat a day with staleSleeves as a partially estimated net worth, not real movement. isApproximate marks a reconstructed, banking-only day (brokerage/crypto forced to 0, current-not-historical FX rate) rather than a real measured snapshot.")]
+    [Description("Returns historical net worth snapshots (banking + brokerage + crypto totals per day), optionally bounded by from/to dates. staleSleeves lists any sleeves whose value was carried forward from a prior day because that provider's feed was stale/disconnected/failed — treat a day with staleSleeves as a partially estimated net worth, not real movement. isApproximate marks a reconstructed, banking-only day (brokerage/crypto forced to 0, current-not-historical FX rate) rather than a real measured snapshot. cashTotal (bank balances with card debt netted in, idle broker cash, venue fiat) plus brokerageInvested plus cryptoInvested equals totalNetWorth; brokerageInvested/cryptoInvested are the sleeves without their cash. All three are null for days with no split (before roughly 2026-07-08, or a day the split could not be measured) — null means unknown, never zero.")]
     public async Task<IReadOnlyList<NetWorthHistoryEntry>> ExecuteAsync(
         [Description("Optional inclusive start date (e.g. 2024-01-01).")] DateOnly? fromDate = null,
         [Description("Optional inclusive end date (e.g. 2024-12-31).")] DateOnly? toDate = null,
@@ -50,7 +50,10 @@ public sealed class GetNetWorthHistoryTool(
                 s.TotalNetWorth,
                 s.Currency,
                 s.StaleSleeves,
-                s.IsApproximate))
+                s.IsApproximate,
+                s.CashTotal,
+                s.BrokerageInvested,
+                s.CryptoInvested))
             .ToList();
     }
 }
@@ -63,4 +66,7 @@ public sealed record NetWorthHistoryEntry(
     decimal TotalNetWorth,
     string Currency,
     string? StaleSleeves,
-    bool IsApproximate);
+    bool IsApproximate,
+    decimal? CashTotal = null,
+    decimal? BrokerageInvested = null,
+    decimal? CryptoInvested = null);

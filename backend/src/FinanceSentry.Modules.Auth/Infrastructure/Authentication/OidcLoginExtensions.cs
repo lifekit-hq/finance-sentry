@@ -18,6 +18,9 @@ public static class OidcLoginExtensions
     public const string FailureRedirectCode = "OIDC_FAILED";
     public const string AccountUnavailableCode = "ACCOUNT_UNAVAILABLE";
 
+    /// <summary><c>HttpContext.Items</c> key under which the sign-out event leaves the provider's end-session URL.</summary>
+    public const string EndSessionUrlItem = "oidc.end_session_url";
+
     public static IServiceCollection AddOidcLogin(this IServiceCollection services, IConfiguration config)
     {
         var options = config.GetSection(OidcLoginOptions.SectionName).Get<OidcLoginOptions>() ?? new OidcLoginOptions();
@@ -45,7 +48,8 @@ public static class OidcLoginExtensions
             o.Scope.Add("openid");
             o.Scope.Add("email");
             o.Scope.Add("profile");
-            o.SaveTokens = false;
+            // The ID token is the end-session hint; the callback moves it into its own cookie and drops the rest with the external cookie.
+            o.SaveTokens = true;
             o.MapInboundClaims = false;
             // Logto serves the email claims on userinfo, not in the ID token.
             o.GetClaimsFromUserInfoEndpoint = true;
@@ -65,6 +69,21 @@ public static class OidcLoginExtensions
                 // The browser follows this redirect, so it must target the public address even when discovery ran on the back channel.
                 if (!string.IsNullOrWhiteSpace(options.BackchannelAuthority) && context.ProtocolMessage.IssuerAddress is { Length: > 0 } issuerAddress)
                     context.ProtocolMessage.IssuerAddress = OidcAuthorityRewriteHandler.ToPublic(issuerAddress, options.Authority, options.BackchannelAuthority);
+                return Task.CompletedTask;
+            };
+            // Sign-out never redirects here: the controller reads the URL the handler built from the discovered end-session
+            // endpoint and hands it to the SPA, which navigates the browser (a fetch cannot follow a cross-origin redirect).
+            o.Events.OnRedirectToIdentityProviderForSignOut = context =>
+            {
+                var message = context.ProtocolMessage;
+                message.IdTokenHint = context.Properties.GetTokenValue(OpenIdConnectParameterNames.IdToken);
+                message.ClientId = options.ClientId;
+                message.PostLogoutRedirectUri = options.PostLogoutRedirectUri;
+                if (!string.IsNullOrWhiteSpace(options.BackchannelAuthority) && message.IssuerAddress is { Length: > 0 } issuerAddress)
+                    message.IssuerAddress = OidcAuthorityRewriteHandler.ToPublic(issuerAddress, options.Authority, options.BackchannelAuthority);
+                if (!string.IsNullOrWhiteSpace(message.IssuerAddress))
+                    context.HttpContext.Items[EndSessionUrlItem] = message.CreateLogoutRequestUrl();
+                context.HandleResponse();
                 return Task.CompletedTask;
             };
             o.Events.OnAuthorizationCodeReceived = context =>

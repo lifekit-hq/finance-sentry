@@ -417,7 +417,7 @@ public class BankSyncApiFactory : WebApplicationFactory<Program>
         return client;
     }
 
-    private static string GenerateTestJwt(Guid userId)
+    public static string GenerateTestJwt(Guid userId)
     {
         const string secret = "test-jwt-secret-key-for-integration-tests-minimum-32-chars";
         var key = new SymmetricSecurityKey(System.Text.Encoding.ASCII.GetBytes(secret));

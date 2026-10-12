@@ -3,13 +3,17 @@ import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 
 import {AuthStore} from '../../../modules/auth/store/auth.store';
+import {APP_VERSION} from '../../../shared/constants/version/version.constants';
 import {Permission} from '../../../shared/enums/permission/permission.enum';
+import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
+import {WhatsNewStore} from '../../whats-new/store/whats-new.store';
 import {MorePageComponent} from './more-page.component';
 
 describe('MorePageComponent', () => {
   const logout = vi.fn();
+  const open = vi.fn();
 
-  const render = (permissions: string[]): HTMLElement => {
+  const render = (permissions: string[], unread = false): HTMLElement => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -17,6 +21,8 @@ describe('MorePageComponent', () => {
           provide: AuthStore,
           useValue: {permissions: signal(permissions), email: signal('me@test.dev'), logout},
         },
+        {provide: WhatsNewStore, useValue: {hasUnread: signal(unread)}},
+        {provide: WhatsNewPanelService, useValue: {open}},
       ],
     });
     const fixture = TestBed.createComponent(MorePageComponent);
@@ -49,5 +55,27 @@ describe('MorePageComponent', () => {
     expect(row?.textContent).toContain('me@test.dev');
     row?.click();
     expect(logout).toHaveBeenCalledOnce();
+  });
+
+  it("opens the what's new panel from its row, with no dot once read", () => {
+    const host = render([]);
+    const row = host.querySelector<HTMLButtonElement>('[data-testid="more-whats-new"]');
+
+    expect(row?.textContent).toContain("What's new");
+    expect(row?.querySelector('.cmn-badge-indicator')).toBeNull();
+    row?.click();
+    expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("marks the what's new row while a release is unread", () => {
+    const row = render([], true).querySelector('[data-testid="more-whats-new"]');
+
+    expect(row?.querySelector('.cmn-badge-indicator')).not.toBeNull();
+  });
+
+  it('shows the running version in a row of its own', () => {
+    const row = render([]).querySelector('[data-testid="more-version"]');
+
+    expect(row?.textContent).toContain(`Version ${APP_VERSION}`);
   });
 });

@@ -3,10 +3,9 @@ import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
 import {
+  type ConnectInzhurSessionRequest,
   type InzhurConnectionStatus,
   type InzhurConnectResult,
-  type StartInzhurLoginRequest,
-  type VerifyInzhurLoginRequest,
 } from '../models/inzhur/inzhur.model';
 
 @Injectable({providedIn: 'root'})
@@ -19,13 +18,9 @@ export class InzhurService extends ApiService {
     return this.get<InzhurConnectionStatus>('status');
   }
 
-  /** May make Inzhur send the owner an SMS; capped server-side per day. */
-  public startLogin(payload: StartInzhurLoginRequest): Observable<InzhurConnectResult> {
-    return this.post<InzhurConnectResult>('login/start', payload);
-  }
-
-  public verifyLogin(payload: VerifyInzhurLoginRequest): Observable<InzhurConnectResult> {
-    return this.post<InzhurConnectResult>('login/verify', payload);
+  /** Hands over the session the owner signed in to on inzhur.reit; the backend refreshes it once. */
+  public connectSession(payload: ConnectInzhurSessionRequest): Observable<InzhurConnectResult> {
+    return this.post<InzhurConnectResult>('session', payload);
   }
 
   public disconnect(): Observable<void> {

@@ -14,89 +14,177 @@
       </cmn-alert>
     }
 
-    <!-- Summary cards -->
-    @let summary = store.summary();
-    <div class="grid grid-cols-2 gap-cmn-4">
-      <cmn-stat-card
-        [value]="summary ? ((summary.combined.monthly | money: summary.currency) ?? '—') : '—'"
-        label="Monthly total"
-        icon="Zap"
-      />
-      <cmn-stat-card
-        [value]="summary ? ((summary.combined.next12Months | money: summary.currency) ?? '—') : '—'"
-        label="Next 12 mo"
-        icon="TrendingUp"
-      />
-    </div>
-
-    <!-- Subscriptions never end on their own, so "Next 12 months" projects them at full
-         run-rate; installments only count the payments they actually have left. -->
-    @if (summary?.combined?.hasUnknownSchedule) {
-      <p class="text-cmn-xs text-text-secondary">
-        Some plans have no term set — their totals assume the payments continue. Set a term to see
-        the real figure.
-      </p>
-    }
-
-    <!-- Sort controls + active list -->
-    <div class="space-y-cmn-4">
-      <div class="flex flex-wrap items-center justify-between gap-cmn-2">
-        <span
-          class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >
-          Active · {{ store.activeSubscriptions().length }}
-        </span>
-        <div class="flex items-center gap-cmn-1 overflow-x-auto">
-          @for (opt of sortOptions; track opt.value) {
-            <cmn-chip [selected]="store.sort() === opt.value" (clicked)="setSort(opt.value)">
-              {{ opt.label }}
-            </cmn-chip>
-          }
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [isEmpty]="isEmpty()"
+      [emptyMessage]="noActiveCopy.message"
+      [emptySubMessage]="noActiveCopy.subMessage"
+      [emptyIcon]="noActiveCopy.icon"
+      (retry)="store.load()"
+      class="block space-y-cmn-5"
+      errorPlacement="above"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-5" data-testid="subscriptions-skeleton">
+        <div class="grid grid-cols-2 gap-cmn-4">
+          <cmn-skeleton height="5rem" />
+          <cmn-skeleton height="5rem" />
         </div>
-      </div>
-
-      @for (section of store.activeSections(); track section.id) {
-        <div>
-          @if (section.label) {
-            <div
-              [class.text-status-warning]="section.id === 'due'"
-              [class.text-text-secondary]="section.id !== 'due'"
-              class="mb-cmn-2 text-cmn-xs font-semibold"
-            >
-              {{ section.label }}
+        <cmn-card padding="none">
+          @for (row of skeletonRows; track row) {
+            <div class="p-cmn-4 space-y-cmn-2">
+              <cmn-skeleton width="40%" height="14px" />
+              <cmn-skeleton width="20%" height="12px" />
             </div>
           }
+        </cmn-card>
+      </div>
+
+      <!-- Summary cards -->
+      @let summary = store.summary();
+      <div class="grid grid-cols-2 gap-cmn-4">
+        <cmn-stat-card
+          [value]="summary ? ((summary.combined.monthly | money: summary.currency) ?? '—') : '—'"
+          label="Monthly total"
+          icon="Zap"
+        />
+        <cmn-stat-card
+          [value]="
+            summary ? ((summary.combined.next12Months | money: summary.currency) ?? '—') : '—'
+          "
+          label="Next 12 mo"
+          icon="TrendingUp"
+        />
+      </div>
+
+      <!-- Subscriptions never end on their own, so "Next 12 months" projects them at full
+         run-rate; installments only count the payments they actually have left. -->
+      @if (summary?.combined?.hasUnknownSchedule) {
+        <p class="text-cmn-xs text-text-secondary">
+          Some plans have no term set — their totals assume the payments continue. Set a term to see
+          the real figure.
+        </p>
+      }
+
+      <!-- Sort controls + active list -->
+      <div class="space-y-cmn-4">
+        <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+          <span
+            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >
+            Active · {{ store.activeSubscriptions().length }}
+          </span>
+          <lk-segmented
+            [options]="sortOptions"
+            [value]="store.sort()"
+            (lk-segmented-change)="onSortChange($event)"
+            label="Sort subscriptions"
+          />
+        </div>
+
+        @for (section of store.activeSections(); track section.id) {
+          <div>
+            @if (section.label) {
+              <div
+                [class.text-status-warning]="section.id === 'due'"
+                [class.text-text-secondary]="section.id !== 'due'"
+                class="mb-cmn-2 text-cmn-xs font-semibold"
+              >
+                {{ section.label }}
+              </div>
+            }
+            <cmn-card padding="none">
+              @for (sub of section.items; track sub.id) {
+                <cmn-list-item-row
+                  [label]="sub.merchantName || 'Unknown'"
+                  [sublabel]="
+                    section.id === 'unlinked'
+                      ? cadenceLabels[sub.cadence]
+                      : cadenceLabels[sub.cadence] +
+                        (section.id === 'missed' ? ' · expected ' : ' · next ') +
+                        (sub.nextExpectedDate | date: 'd MMM')
+                  "
+                >
+                  <div
+                    [style.background]="sub.merchantName | merchantColor"
+                    avatar
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
+                  >
+                    {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
+                  </div>
+                  <div amount class="min-w-[72px] text-right">
+                    <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
+                    <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
+                      {{ sub.monthlyEquivalent | money: sub.currency }}
+                    </div>
+                    <div class="text-cmn-xs text-text-disabled">/ mo</div>
+                  </div>
+                  <div actions class="flex shrink-0 gap-cmn-1">
+                    <cmn-menu
+                      [items]="subscriptionMenuItems(sub)"
+                      (itemSelect)="onSubscriptionAction($event.id, sub)"
+                      ariaLabel="Subscription actions"
+                      triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
+                    >
+                      <cmn-icon name="Ellipsis" size="sm" />
+                    </cmn-menu>
+                  </div>
+                </cmn-list-item-row>
+              }
+            </cmn-card>
+          </div>
+        }
+
+        @if (store.activeSubscriptions().length === 0 && !store.hasInsufficientHistory()) {
+          <cmn-empty-state
+            [message]="noActiveCopy.message"
+            [subMessage]="noActiveCopy.subMessage"
+            [icon]="noActiveCopy.icon"
+          />
+        }
+      </div>
+
+      <!-- Installments -->
+      <div>
+        <div class="mb-cmn-3">
+          <span
+            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >
+            Installments · {{ store.activeInstallments().length }}
+          </span>
+        </div>
+
+        @if (store.activeInstallments().length > 0) {
           <cmn-card padding="none">
-            @for (sub of section.items; track sub.id) {
+            @for (item of store.sortedInstallments(); track item.id) {
               <cmn-list-item-row
-                [label]="sub.merchantName || 'Unknown'"
+                [label]="item.merchantName || 'Unknown'"
                 [sublabel]="
-                  section.id === 'unlinked'
-                    ? cadenceLabels[sub.cadence]
-                    : cadenceLabels[sub.cadence] +
-                      (section.id === 'missed' ? ' · expected ' : ' · next ') +
-                      (sub.nextExpectedDate | date: 'd MMM')
+                  (item | installmentProgress) +
+                  (item.isTracked
+                    ? ' · next ' + (item.nextExpectedDate | date: 'd MMM')
+                    : ' · not linked to transactions')
                 "
               >
                 <div
-                  [style.background]="sub.merchantName | merchantColor"
+                  [style.background]="item.merchantName | merchantColor"
                   avatar
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
                 >
-                  {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
+                  {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
                 </div>
                 <div amount class="min-w-[72px] text-right">
-                  <!-- Render each row in its own currency (UAH/EUR/USD) — not the default $ -->
-                  <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                    {{ sub.monthlyEquivalent | money: sub.currency }}
+                  <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
+                    {{ item.monthlyEquivalent | money: item.currency }}
                   </div>
                   <div class="text-cmn-xs text-text-disabled">/ mo</div>
                 </div>
                 <div actions class="flex shrink-0 gap-cmn-1">
                   <cmn-menu
-                    [items]="subscriptionMenuItems(sub)"
-                    (itemSelect)="onSubscriptionAction($event.id, sub)"
-                    ariaLabel="Subscription actions"
+                    [items]="installmentMenuItems(item)"
+                    (itemSelect)="onInstallmentAction($event.id, item)"
+                    ariaLabel="Installment actions"
                     triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
                   >
                     <cmn-icon name="Ellipsis" size="sm" />
@@ -105,146 +193,87 @@
               </cmn-list-item-row>
             }
           </cmn-card>
-        </div>
-      }
+        }
 
-      @if (store.activeSubscriptions().length === 0 && !store.hasInsufficientHistory()) {
-        <cmn-empty-state
-          message="No active subscriptions yet"
-          subMessage="Recurring charges show up here once they are detected, or add one yourself."
-          icon="Repeat"
-        />
-      }
-    </div>
-
-    <!-- Installments -->
-    <div>
-      <div class="mb-cmn-3">
-        <span
-          class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-        >
-          Installments · {{ store.activeInstallments().length }}
-        </span>
+        @if (store.completedInstallments().length > 0) {
+          <div class="mt-cmn-3">
+            <div class="mb-cmn-2">
+              <span
+                class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-disabled"
+              >
+                Completed · {{ store.completedInstallments().length }}
+              </span>
+            </div>
+            <cmn-card padding="none">
+              @for (item of store.completedInstallments(); track item.id) {
+                <cmn-list-item-row [label]="item.merchantName || 'Unknown'" [dimmed]="true">
+                  <div
+                    [style.background]="item.merchantName | merchantColor"
+                    avatar
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
+                  >
+                    {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
+                  </div>
+                  <div meta class="min-w-[110px] text-center text-cmn-xs text-text-disabled">
+                    {{ item.occurrenceCount }} payments · done
+                  </div>
+                  <div amount class="min-w-[72px] text-right">
+                    <div class="tabular-nums text-cmn-sm font-semibold text-text-secondary">
+                      {{ item.monthlyEquivalent | money: item.currency }}
+                    </div>
+                    <div class="text-cmn-xs text-text-disabled">/ mo</div>
+                  </div>
+                  <div actions class="flex shrink-0 gap-cmn-1">
+                    <cmn-button
+                      (clicked)="deleteInstallment(item)"
+                      variant="secondary"
+                      size="sm"
+                      icon="Trash2"
+                    />
+                  </div>
+                </cmn-list-item-row>
+              }
+            </cmn-card>
+          </div>
+        }
       </div>
 
-      @if (store.activeInstallments().length > 0) {
-        <cmn-card padding="none">
-          @for (item of store.sortedInstallments(); track item.id) {
-            <cmn-list-item-row
-              [label]="item.merchantName || 'Unknown'"
-              [sublabel]="
-                (item | installmentProgress) +
-                (item.isTracked
-                  ? ' · next ' + (item.nextExpectedDate | date: 'd MMM')
-                  : ' · not linked to transactions')
-              "
-            >
-              <div
-                [style.background]="item.merchantName | merchantColor"
-                avatar
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
-              >
-                {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
-              </div>
-              <div amount class="min-w-[72px] text-right">
-                <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                  {{ item.monthlyEquivalent | money: item.currency }}
-                </div>
-                <div class="text-cmn-xs text-text-disabled">/ mo</div>
-              </div>
-              <div actions class="flex shrink-0 gap-cmn-1">
-                <cmn-menu
-                  [items]="installmentMenuItems(item)"
-                  (itemSelect)="onInstallmentAction($event.id, item)"
-                  ariaLabel="Installment actions"
-                  triggerClass="h-8 w-8 text-text-secondary hover:bg-surface-raised"
-                >
-                  <cmn-icon name="Ellipsis" size="sm" />
-                </cmn-menu>
-              </div>
-            </cmn-list-item-row>
-          }
-        </cmn-card>
-      }
-
-      @if (store.completedInstallments().length > 0) {
-        <div class="mt-cmn-3">
-          <div class="mb-cmn-2">
+      <!-- Dismissed list -->
+      @if (store.dismissedSubscriptions().length > 0) {
+        <div>
+          <div class="mb-cmn-3">
             <span
-              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-disabled"
+              class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
             >
-              Completed · {{ store.completedInstallments().length }}
+              Dismissed · {{ store.dismissedSubscriptions().length }}
             </span>
           </div>
           <cmn-card padding="none">
-            @for (item of store.completedInstallments(); track item.id) {
-              <cmn-list-item-row [label]="item.merchantName || 'Unknown'" [dimmed]="true">
+            @for (sub of store.sortedDismissed(); track sub.id) {
+              <cmn-list-item-row [label]="sub.merchantName || 'Unknown'" [dimmed]="true">
                 <div
-                  [style.background]="item.merchantName | merchantColor"
+                  [style.background]="sub.merchantName | merchantColor"
                   avatar
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-text-inverse"
                 >
-                  {{ item.merchantName || '?' | slice: 0 : 1 | uppercase }}
-                </div>
-                <div meta class="min-w-[110px] text-center text-cmn-xs text-text-disabled">
-                  {{ item.occurrenceCount }} payments · done
+                  {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
                 </div>
                 <div amount class="min-w-[72px] text-right">
-                  <div class="font-mono text-cmn-sm font-semibold text-text-secondary">
-                    {{ item.monthlyEquivalent | money: item.currency }}
+                  <div class="tabular-nums text-cmn-sm font-semibold text-text-primary">
+                    {{ sub.monthlyEquivalent | money: sub.currency }}
                   </div>
                   <div class="text-cmn-xs text-text-disabled">/ mo</div>
                 </div>
                 <div actions class="flex shrink-0 gap-cmn-1">
-                  <cmn-button
-                    (clicked)="deleteInstallment(item)"
-                    variant="secondary"
-                    size="sm"
-                    icon="Trash2"
-                  />
+                  <cmn-button (clicked)="restore(sub.id)" variant="secondary" size="sm"
+                    >Restore</cmn-button
+                  >
                 </div>
               </cmn-list-item-row>
             }
           </cmn-card>
         </div>
       }
-    </div>
-
-    <!-- Dismissed list -->
-    @if (store.dismissedSubscriptions().length > 0) {
-      <div>
-        <div class="mb-cmn-3">
-          <span
-            class="font-label text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
-          >
-            Dismissed · {{ store.dismissedSubscriptions().length }}
-          </span>
-        </div>
-        <cmn-card padding="none">
-          @for (sub of store.sortedDismissed(); track sub.id) {
-            <cmn-list-item-row [label]="sub.merchantName || 'Unknown'" [dimmed]="true">
-              <div
-                [style.background]="sub.merchantName | merchantColor"
-                avatar
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-cmn-md font-bold text-white"
-              >
-                {{ sub.merchantName || '?' | slice: 0 : 1 | uppercase }}
-              </div>
-              <div amount class="min-w-[72px] text-right">
-                <div class="font-mono text-cmn-sm font-semibold text-text-primary">
-                  {{ sub.monthlyEquivalent | money: sub.currency }}
-                </div>
-                <div class="text-cmn-xs text-text-disabled">/ mo</div>
-              </div>
-              <div actions class="flex shrink-0 gap-cmn-1">
-                <cmn-button (clicked)="restore(sub.id)" variant="secondary" size="sm"
-                  >Restore</cmn-button
-                >
-              </div>
-            </cmn-list-item-row>
-          }
-        </cmn-card>
-      </div>
-    }
+    </cmn-async-state>
   </div>
 </cmn-page-container>

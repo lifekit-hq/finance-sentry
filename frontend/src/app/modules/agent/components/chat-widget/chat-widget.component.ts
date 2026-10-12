@@ -1,5 +1,15 @@
 import {BreakpointObserver} from '@angular/cdk/layout';
-import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {NavigationEnd, Router} from '@angular/router';
 import {
@@ -38,7 +48,12 @@ export class ChatWidgetComponent {
     {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
   );
 
+  private readonly injector = inject(Injector);
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+  private readonly toggleButton = viewChild<ElementRef<HTMLElement>>('toggleButton');
+
   public readonly store = inject(AgentChatStore);
+  public readonly panelId = 'fns-chat-widget-panel';
   public readonly isOpen = signal(false);
   // The full-page Ledger already hosts a chat — the floating widget would be redundant there.
   public readonly isHidden = computed(
@@ -52,7 +67,32 @@ export class ChatWidgetComponent {
   public readonly chatStream: CmnChatStreamFn = text => this.store.stream(text);
 
   public toggle(): void {
-    this.isOpen.update(open => !open);
+    if (this.isOpen()) {
+      this.close();
+    } else {
+      this.open();
+    }
+  }
+
+  /** Closes the panel and hands focus back to the toggle that opened it. */
+  public close(): void {
+    if (!this.isOpen()) {
+      return;
+    }
+    this.isOpen.set(false);
+    afterNextRender(() => this.toggleButton()?.nativeElement.focus(), {injector: this.injector});
+  }
+
+  private open(): void {
+    this.isOpen.set(true);
+    afterNextRender(
+      () => {
+        const panel = this.panel()?.nativeElement;
+        const target = panel?.querySelector<HTMLElement>('textarea, input') ?? panel;
+        target?.focus();
+      },
+      {injector: this.injector}
+    );
   }
 
   public onNewChat(): void {

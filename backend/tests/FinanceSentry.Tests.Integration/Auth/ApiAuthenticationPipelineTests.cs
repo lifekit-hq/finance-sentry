@@ -9,7 +9,6 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Modules.Auth.API.Authentication;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
-using FinanceSentry.Modules.Auth.Infrastructure.Identity;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
@@ -44,7 +43,6 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         "GET /api/v1/auth/methods",
         "GET /api/v1/auth/oidc/callback",
         "GET /api/v1/auth/oidc/start",
-        "POST /api/v1/auth/invite/accept",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/logout",
         "POST /api/v1/auth/mcp/revoke",
@@ -235,31 +233,6 @@ public class ApiAuthenticationPipelineTests(AuthApiFactory factory) : IClassFixt
         using var scope = factory.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         (await users.IsLockedOutAsync((await users.FindByEmailAsync(email))!)).Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task AcceptInvite_WithCommonPassword_Returns400()
-    {
-        var (userId, token) = await factory.CreatePendingInviteAsync("pipeline-common-password@test.com");
-
-        var response = await Client().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token, password = "Password1" });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponseShape>();
-        body!.ErrorCode.Should().Be("VALIDATION_ERROR");
-        body.Details.Should().Contain(CommonPasswordValidator.ErrorDescription);
-    }
-
-    [Fact]
-    public async Task AcceptInvite_WithLongPasswordWithoutCompositionRules_Succeeds()
-    {
-        var (userId, token) = await factory.CreatePendingInviteAsync("pipeline-passphrase@test.com");
-
-        var response = await Client().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token, password = "quiet lantern orchard" });
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private static IEnumerable<string> Describe(RouteEndpoint endpoint)

@@ -94,13 +94,13 @@
                       @if (upcomingTarget(item); as target) {
                         <a
                           [routerLink]="target.commands"
-                          class="font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                          class="tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                           data-testid="event-link"
                         >
                           {{ item.subject }}
                         </a>
                       } @else {
-                        <span class="font-mono text-cmn-sm font-semibold text-text-primary">
+                        <span class="tabular-nums text-cmn-sm font-semibold text-text-primary">
                           {{ item.subject }}
                         </span>
                       }
@@ -132,8 +132,29 @@
       }
     </cmn-async-state>
   } @else {
-    @if (store.hasFiredRows()) {
-      <div class="mt-cmn-5 space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
+    <cmn-async-state
+      [status]="firedStatus()"
+      [errorMessage]="store.firedErrorMessage() ?? ''"
+      [isEmpty]="store.isFiredEmpty()"
+      (retry)="retryFired()"
+      class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
+      errorPlacement="above"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-2" data-testid="fired-loading">
+        @for (row of skeletonRows; track row) {
+          <cmn-skeleton height="4rem" width="100%" />
+        }
+      </div>
+      <div empty class="flex min-h-0 flex-1 items-center justify-center">
+        <cmn-empty-state
+          message="Nothing has fired"
+          subMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
+          icon="BellOff"
+          iconClass="text-text-secondary"
+        />
+      </div>
+      <div class="space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
         @for (event of store.fired(); track event.alertId) {
           <article
             class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
@@ -147,7 +168,7 @@
               @if (target?.kind === 'route') {
                 <a
                   [routerLink]="routeCommands(target)"
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                   data-testid="fired-link"
                 >
                   {{ event.subject }}
@@ -155,7 +176,7 @@
               } @else if (target?.kind === 'external') {
                 <a
                   [href]="externalUrl(target)"
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary hover:underline"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary hover:underline"
                   data-testid="fired-link"
                   rel="noopener noreferrer"
                   target="_blank"
@@ -164,7 +185,7 @@
                 </a>
               } @else {
                 <span
-                  class="min-w-0 truncate font-mono text-cmn-sm font-semibold text-text-primary"
+                  class="min-w-0 truncate tabular-nums text-cmn-sm font-semibold text-text-primary"
                 >
                   {{ event.subject }}
                 </span>
@@ -200,43 +221,19 @@
           </article>
         }
         @if (store.isFiredLoading()) {
-          <div class="space-y-cmn-2" data-testid="fired-loading">
+          <div class="space-y-cmn-2" data-testid="fired-loading-more">
             @for (row of skeletonRows; track row) {
               <cmn-skeleton height="4rem" width="100%" />
             }
           </div>
-        } @else {
-          @if (store.firedErrorMessage(); as error) {
-            <cmn-alert variant="error" class="block" data-testid="fired-more-error">
-              {{ error }}
-            </cmn-alert>
-          }
-          @if (store.hasMoreFired()) {
-            <div class="flex justify-center p-cmn-4">
-              <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
-                >Load more</cmn-button
-              >
-            </div>
-          }
+        } @else if (store.hasMoreFired()) {
+          <div class="flex justify-center p-cmn-4">
+            <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
+              >Load more</cmn-button
+            >
+          </div>
         }
       </div>
-    } @else if (store.firedErrorMessage(); as error) {
-      <cmn-alert variant="error" class="mt-cmn-4 block">{{ error }}</cmn-alert>
-    } @else if (store.isFiredEmpty()) {
-      <div class="flex min-h-0 flex-1 items-center justify-center">
-        <cmn-empty-state
-          message="Nothing has fired"
-          subMessage="Detector firings for your book will show up here with the reader's verdict, or its silence."
-          icon="BellOff"
-          iconClass="text-text-secondary"
-        />
-      </div>
-    } @else {
-      <div class="mt-cmn-5 space-y-cmn-2" data-testid="fired-loading">
-        @for (row of skeletonRows; track row) {
-          <cmn-skeleton height="4rem" width="100%" />
-        }
-      </div>
-    }
+    </cmn-async-state>
   }
 </cmn-page-container>

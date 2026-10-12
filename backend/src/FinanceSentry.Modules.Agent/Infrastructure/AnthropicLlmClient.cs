@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Agent.Infrastructure;
 
 using System.Net.Http.Headers;
+using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -58,25 +59,12 @@ public sealed class AnthropicLlmClient(
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var reader = new StreamReader(stream, Encoding.UTF8);
 
         var accumulator = new StreamAccumulator();
 
-        while (true)
+        await foreach (var sse in SseParser.Create(stream).EnumerateAsync(ct))
         {
-            ct.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(ct);
-            if (line is null)
-            {
-                break;
-            }
-
-            if (!line.StartsWith("data:", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var data = line["data:".Length..].Trim();
+            var data = sse.Data.Trim();
             if (data.Length == 0)
             {
                 continue;

@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain;
@@ -15,7 +16,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain;
 /// IBeam container, no 2FA prompt, and no session conflict with the IBKR mobile
 /// app.
 /// </summary>
-public sealed class IBKRCredential
+public sealed class IBKRCredential : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

@@ -1,12 +1,17 @@
 import {computed, inject, type Signal} from '@angular/core';
-import {SERIES, seriesColor} from '@lifekit-hq/charts-core';
+import {CATEGORICAL_STEPS} from '@lifekit-hq/charts-core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 import {type DonutSegment} from '@lifekit-hq/ui';
 
+import {
+  CASH_COLOUR,
+  CRYPTO_COLOUR,
+  EQUITY_COLOUR,
+} from '../../../shared/constants/chart-colour/chart-colour.constants';
+import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
-import {CRYPTO_PROVIDERS} from '../constants/position/position.constants';
-import {type Position} from '../models/position/position.model';
+import {type Position, type PositionAssetClass} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
 import {type HoldingsState} from './holdings.state';
 
@@ -20,7 +25,7 @@ interface StateSignals {
 const DEFAULT_POSITIONS_ERROR = 'Failed to load positions.';
 const WEIGHT_TO_PERCENT = 100;
 
-export type AssetClass = 'equity' | 'crypto' | 'venueCash';
+export type AssetClass = PositionAssetClass;
 
 export interface PositionRow {
   symbol: string;
@@ -51,27 +56,32 @@ export interface AllocationBreakdownRow {
   percent: number;
 }
 
-const ASSET_CLASS_ORDER: readonly AssetClass[] = ['equity', 'crypto', 'venueCash'];
+const ASSET_CLASS_ORDER: readonly AssetClass[] = [
+  'cash',
+  'bonds',
+  'realEstate',
+  'equity',
+  'crypto',
+];
 
 const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
+  cash: 'Cash',
+  bonds: 'Bonds',
+  realEstate: 'Real estate',
   equity: 'Equities',
   crypto: 'Crypto',
-  venueCash: 'Venue cash',
 };
 
-// Chart-series steps; resolved when the donut is built, since a canvas cannot read a CSS var.
-const ASSET_CLASS_SERIES: Record<AssetClass, number> = {
-  equity: SERIES.accent,
-  crypto: SERIES.amber,
-  venueCash: SERIES.green,
+// Equity, crypto and cash wear their fixed asset tokens (never the theme); bonds and real estate
+// have no fixed meaning and take series steps. A canvas cannot read a CSS var, so the donut resolves
+// the colour when it is built.
+export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
+  cash: CASH_COLOUR,
+  bonds: {step: CATEGORICAL_STEPS[3]},
+  realEstate: {step: CATEGORICAL_STEPS[4]},
+  equity: EQUITY_COLOUR,
+  crypto: CRYPTO_COLOUR,
 };
-
-function resolveAssetClass(position: Position): AssetClass {
-  if (position.isVenueCash) {
-    return 'venueCash';
-  }
-  return CRYPTO_PROVIDERS.has(position.provider) ? 'crypto' : 'equity';
-}
 
 export function holdingsComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
@@ -87,7 +97,7 @@ export function holdingsComputed(store: StateSignals) {
     const groups = new Map<AssetClass, PositionRow[]>();
 
     for (const p of positions) {
-      const assetClass = resolveAssetClass(p);
+      const assetClass = p.assetClass;
       const dayChangePct = DayChangeUtils.isQuotable(p)
         ? (dayChanges[p.symbol.toUpperCase()] ?? null)
         : null;
@@ -138,7 +148,7 @@ export function holdingsComputed(store: StateSignals) {
       positionsByAssetClass().map(group => ({
         label: group.label,
         value: group.totalValue,
-        color: seriesColor(ASSET_CLASS_SERIES[group.assetClass]),
+        color: ChartColorUtils.canvas(ASSET_CLASS_COLOUR[group.assetClass]),
       }))
     ),
     allocationBreakdown: computed((): AllocationBreakdownRow[] => {
@@ -146,7 +156,7 @@ export function holdingsComputed(store: StateSignals) {
       const total = groups.reduce((sum, g) => sum + g.totalValue, 0);
       return groups.map(group => ({
         label: group.label,
-        color: ChartColorUtils.series(ASSET_CLASS_SERIES[group.assetClass]),
+        color: ChartColorUtils.css(ASSET_CLASS_COLOUR[group.assetClass]),
         value: group.totalValue,
         percent: total > 0 ? (group.totalValue / total) * WEIGHT_TO_PERCENT : 0,
       }));

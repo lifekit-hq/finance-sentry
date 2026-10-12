@@ -1,23 +1,22 @@
-import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {Router, RouterOutlet} from '@angular/router';
 import {
   AppLayoutAccount,
   AppLayoutComponent,
-  CMN_MEDIA_MD,
+  CmnShellService,
   CommandPaletteItem,
   type MenuItem,
   type NavItem,
   PALETTE_THEME_ACTION,
 } from '@lifekit-hq/ui';
-import {map} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
+import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../whats-new/constants/whats-new.constants';
+import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
 import {CONNECT_ACTION_ID, NAV_ITEMS, PHONE_TAB_ROUTES} from './app-shell.constants';
 import {PaletteEntitiesStore} from './store/palette-entities.store';
 import {NavUtils} from './utils/nav.utils';
@@ -40,12 +39,14 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
   {id: AppRoute.SettingsPeople, label: 'People', icon: 'Users', group: 'Pages'},
   {id: CONNECT_ACTION_ID, label: 'Connect Account', icon: 'Link', group: 'Actions'},
+  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone', group: 'Actions'},
   {id: PALETTE_THEME_ACTION, label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
   {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},
 ];
 
 const AVATAR_MENU_ITEMS: MenuItem[] = [
   {id: '/settings', label: 'Settings', icon: 'Settings2'},
+  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone'},
   {id: '_logout', label: 'Log out', icon: 'LogOut', destructive: true},
 ];
 
@@ -70,23 +71,19 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       brand="Finance Sentry"
     >
       <router-outlet />
+      @if (canUseAi()) {
+        <fns-chat-widget cmnAppLayoutFab />
+      }
     </cmn-app-layout>
-
-    @if (canUseAi()) {
-      <fns-chat-widget />
-    }
   `,
 })
 export class AppShellComponent {
   private readonly router = inject(Router);
-  private readonly breakpoints = inject(BreakpointObserver);
+  private readonly shell = inject(CmnShellService);
   private readonly authStore = inject(AuthStore);
   private readonly alertsStore = inject(AlertsStore);
+  private readonly whatsNewPanel = inject(WhatsNewPanelService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
-  private readonly sidebarShown = toSignal(
-    this.breakpoints.observe(CMN_MEDIA_MD).pipe(map(state => state.matches)),
-    {initialValue: this.breakpoints.isMatched(CMN_MEDIA_MD)}
-  );
   private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
     (item.route as AppRoute) === AppRoute.Alerts
       ? {...item, badge: (): number => this.alertsStore.unreadCount()}
@@ -108,9 +105,9 @@ export class AppShellComponent {
     menuItems: AVATAR_MENU_ITEMS,
   }));
 
-  /** The sidebar leaves navigating to the app; the phone tab bar navigates itself (lifekit 2.0). */
+  /** The rail and the sidebar leave navigating to the app; the phone tab bar navigates itself. */
   public navigate(item: NavItem): void {
-    if (this.sidebarShown()) {
+    if (!this.shell.isPhone()) {
       void this.router.navigateByUrl(item.route);
     }
   }
@@ -118,6 +115,10 @@ export class AppShellComponent {
   public handleAvatarMenuSelect(item: MenuItem): void {
     if (item.id === '/settings') {
       void this.router.navigateByUrl(AppRoute.Settings);
+      return;
+    }
+    if (item.id === WHATS_NEW_ACTION_ID) {
+      this.whatsNewPanel.open();
       return;
     }
     if (item.id === '_logout') {
@@ -130,6 +131,8 @@ export class AppShellComponent {
       this.authStore.logout();
     } else if (id === CONNECT_ACTION_ID) {
       void this.router.navigateByUrl(AppRoute.AccountsList);
+    } else if (id === WHATS_NEW_ACTION_ID) {
+      this.whatsNewPanel.open();
     }
   }
 

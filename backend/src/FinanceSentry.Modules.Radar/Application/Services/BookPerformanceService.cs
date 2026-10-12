@@ -5,9 +5,10 @@ using FinanceSentry.Modules.Radar.Domain.Repositories;
 namespace FinanceSentry.Modules.Radar.Application.Services;
 
 /// <summary>
-/// Computes time-weighted return (HPR approximation) for the brokerage book versus SPY over
-/// configurable lookback windows. Uses adjusted close from daily bars for SPY and brokerage-sleeve
-/// totals from net-worth snapshots for the portfolio.
+/// Computes time-weighted return (HPR approximation) for the invested brokerage book versus SPY over
+/// configurable lookback windows. Uses adjusted close from daily bars for SPY and the invested brokerage
+/// value (idle broker cash excluded) from net-worth snapshots for the portfolio. Deposits and withdrawals
+/// are not adjusted for, so a contribution reads as a gain.
 /// </summary>
 public sealed class BookPerformanceService(
     IDailyBarRepository bars,
@@ -16,6 +17,12 @@ public sealed class BookPerformanceService(
     private const string BenchmarkTicker = "SPY";
 
     private const decimal OutperformThreshold = 0.001m;
+
+    private const decimal EdgeGapPeriodRatio = 0.1m;
+
+    private const int MinEdgeGapDays = 1;
+
+    private const int MaxEdgeGapDays = 7;
 
     public async Task<BookPerformanceResult> GetAsync(
         Guid userId,
@@ -50,7 +57,7 @@ public sealed class BookPerformanceService(
         IReadOnlyList<DailyPortfolioValue> portfolioSnapshots)
     {
         var spyTwr = ComputeSpyTwr(spyBars, since);
-        var bookTwr = ComputeBookTwr(portfolioSnapshots, since);
+        var bookTwr = ComputeBookTwr(portfolioSnapshots, since, today);
 
         if (spyTwr is null && bookTwr is null)
         {
@@ -90,12 +97,19 @@ public sealed class BookPerformanceService(
         return Math.Round((endBar.AdjClose - startBar.AdjClose) / startBar.AdjClose, 4);
     }
 
-    private static decimal? ComputeBookTwr(IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since)
+    private static decimal? ComputeBookTwr(IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since, DateOnly today)
     {
         var startSnapshot = snapshots.FirstOrDefault(s => s.Date >= since);
         var endSnapshot = snapshots.LastOrDefault();
 
-        if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageValueUsd == 0m)
+        if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageInvestedUsd == 0m)
+        {
+            return null;
+        }
+
+        var allowedGapDays = AllowedEdgeGapDays(today.DayNumber - since.DayNumber);
+        if (startSnapshot.Date > since.AddDays(allowedGapDays)
+            || endSnapshot.Date < today.AddDays(-allowedGapDays))
         {
             return null;
         }
@@ -106,9 +120,15 @@ public sealed class BookPerformanceService(
         }
 
         return Math.Round(
-            (endSnapshot.BrokerageValueUsd - startSnapshot.BrokerageValueUsd) / startSnapshot.BrokerageValueUsd,
+            (endSnapshot.BrokerageInvestedUsd - startSnapshot.BrokerageInvestedUsd) / startSnapshot.BrokerageInvestedUsd,
             4);
     }
+
+    private static int AllowedEdgeGapDays(int periodDays) =>
+        Math.Clamp(
+            (int)Math.Round(periodDays * EdgeGapPeriodRatio, MidpointRounding.AwayFromZero),
+            MinEdgeGapDays,
+            MaxEdgeGapDays);
 
     private static DateOnly StartDate(DateOnly today, BookPerformancePeriod period) => period switch
     {

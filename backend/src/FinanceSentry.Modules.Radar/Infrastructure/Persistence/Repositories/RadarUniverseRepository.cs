@@ -17,6 +17,10 @@ public sealed class RadarUniverseRepository(RadarDbContext db) : IRadarUniverseR
             .OrderBy(m => m.Ticker)
             .ToListAsync(ct);
 
+    // One INSERT ... ON CONFLICT per member on the unique Ticker index: the write is atomic, so two overlapping
+    // refreshes update the same row instead of the loser failing on the index, and no read precedes it. It runs at
+    // once rather than at SaveChanges, and a member already tracked by this context is not refreshed. A re-listed
+    // member is reactivated and takes the new kind and source.
     public async Task UpsertMembersAsync(
         IReadOnlyCollection<RadarUniverseMember> members, CancellationToken ct = default)
     {
@@ -25,26 +29,19 @@ public sealed class RadarUniverseRepository(RadarDbContext db) : IRadarUniverseR
             return;
         }
 
-        var tickers = members.Select(m => m.Ticker).Distinct().ToArray();
-        var existing = await db.UniverseMembers
-            .Where(m => tickers.Contains(m.Ticker))
-            .ToDictionaryAsync(m => m.Ticker, ct);
-
-        foreach (var member in members)
+        foreach (var m in members)
         {
-            if (existing.TryGetValue(member.Ticker, out var current))
-            {
-                current.Active = true;
-                current.Kind = member.Kind;
-                current.Source = member.Source;
-            }
-            else
-            {
-                db.UniverseMembers.Add(member);
-            }
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO radar.radar_universe_members ("Ticker", "Kind", "Source", "Active")
+                VALUES ({m.Ticker}, {m.Kind.ToString()}, {m.Source.ToString()}, true)
+                ON CONFLICT ("Ticker") DO UPDATE SET
+                    "Active" = true,
+                    "Kind" = EXCLUDED."Kind",
+                    "Source" = EXCLUDED."Source"
+                """,
+                ct);
         }
-
-        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeactivateAsync(IReadOnlyCollection<string> tickers, CancellationToken ct = default)

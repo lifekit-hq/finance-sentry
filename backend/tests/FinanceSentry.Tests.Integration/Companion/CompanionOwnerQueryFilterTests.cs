@@ -9,6 +9,8 @@ using FinanceSentry.Modules.Companion.Domain;
 using FinanceSentry.Modules.Companion.Infrastructure.Jobs;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence;
 using FinanceSentry.Modules.Companion.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Infrastructure.Persistence;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +86,15 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         DispatchedAt = dispatchedAt,
     };
 
+    private static CompanionEvent NewAnalystEvent(Guid userId, string actionType)
+    {
+        var evt = NewEvent(userId, EventDisposition.Pending);
+        evt.Kind = CompanionEventKind.AnalystAction;
+        evt.Subject = "NVDA";
+        evt.Summary = $"Morgan Stanley {actionType} NVDA (target $150)";
+        return evt;
+    }
+
     private async Task SeedAsync(params object[] entities)
     {
         // Inserts are not filtered, so a no-person context writes any user's rows.
@@ -99,7 +110,7 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(4);
+        perUser.Should().HaveCount(5);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -112,6 +123,69 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         P256dh = "p256dh-key",
         Auth = "auth-secret",
     };
+
+    private static ProblemReport NewReport(Guid userId, ProblemReportStatus status = ProblemReportStatus.Pending, DateTimeOffset? nextAttemptAt = null) => new()
+    {
+        UserId = userId,
+        Role = "member",
+        Text = "broken",
+        RoutePattern = "/accounts/:id",
+        AppVersion = "1.15.0",
+        Device = ProblemReportDevice.Phone,
+        Client = "iOS Safari",
+        CorrelationId = "corr",
+        CreatedAt = DateTimeOffset.UtcNow,
+        Status = status,
+        NextAttemptAt = nextAttemptAt,
+    };
+
+    [DockerRequiredFact]
+    public async Task Problem_reports_are_scoped_to_their_owner_and_invisible_with_no_person_in_scope()
+    {
+        await SeedAsync(NewReport(_userA), NewReport(_userB));
+
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new ProblemReportRepository(asA);
+            (await asA.ProblemReports.Select(r => r.UserId).ToListAsync()).Should().Equal(_userA);
+            (await repo.ListCreatedAtSinceAsync(_userB, DateTimeOffset.UtcNow.AddDays(-1))).Should().BeEmpty(
+                "naming another person does not lift the owner scope");
+            (await repo.ListCreatedAtSinceAsync(_userA, DateTimeOffset.UtcNow.AddDays(-1))).Should().HaveCount(1);
+        }
+
+        await using (var asB = CreateContext(_userB))
+            (await asB.ProblemReports.AnyAsync(r => r.UserId == _userA)).Should().BeFalse();
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.ProblemReports.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task The_problem_report_forwarder_reads_and_updates_across_users_with_no_person_in_scope()
+    {
+        var due = NewReport(_userA);
+        var later = NewReport(_userB, nextAttemptAt: DateTimeOffset.UtcNow.AddHours(1));
+        var done = NewReport(_userB, ProblemReportStatus.Forwarded);
+        await SeedAsync(due, later, done);
+
+        await using (var job = CreateContext())
+        {
+            var repo = new ProblemReportRepository(job);
+            var found = await repo.ListDueUnscopedAsync(DateTimeOffset.UtcNow, 50);
+            found.Select(r => r.Id).Should().Equal(due.Id);
+
+            found[0].Status = ProblemReportStatus.Forwarded;
+            found[0].ForwardedAt = DateTimeOffset.UtcNow;
+            await repo.UpdateUnscopedAsync(found[0]);
+        }
+
+        await using (var job = CreateContext())
+            (await new ProblemReportRepository(job).ListDueUnscopedAsync(DateTimeOffset.UtcNow, 50)).Should().BeEmpty();
+
+        await using var asA = CreateContext(_userA);
+        (await asA.ProblemReports.SingleAsync()).Status.Should().Be(ProblemReportStatus.Forwarded,
+            "the update the job made with no person in scope reached A's row");
+    }
 
     [DockerRequiredFact]
     public async Task Push_rows_are_scoped_to_their_owner()
@@ -179,8 +253,13 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         var operational = NewEvent(_userA, EventDisposition.Pending);
         operational.Kind = CompanionEventKind.OperationalFailure;
         var delivered = NewEvent(_userA, EventDisposition.Delivered);
+        var upgrade = NewAnalystEvent(_userA, "Upgrade");
+        var downgrade = NewAnalystEvent(_userA, "Downgrade");
+        var initiate = NewAnalystEvent(_userA, "Initiate");
+        var targetChange = NewAnalystEvent(_userA, "TargetChange");
         await SeedAsync(
-            optedIn, optedOut, subA, subADisabled, subB, plain, operational, delivered, NewEvent(_userB, EventDisposition.Pending),
+            optedIn, optedOut, subA, subADisabled, subB, plain, operational, delivered, upgrade, downgrade, initiate, targetChange,
+            NewEvent(_userB, EventDisposition.Pending),
             new PushDelivery { EventId = delivered.Id, SubscriptionId = subA.Id, UserId = _userA });
 
         await using var job = CreateContext();
@@ -190,9 +269,9 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         (await repo.ListActiveSubscriptionsUnscopedAsync()).Select(s => s.Id).Should().Equal(subA.Id);
 
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: false, 50))
-            .Select(e => e.Id).Should().Equal(plain.Id);
+            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, initiate.Id, targetChange.Id]);
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, since, includeOperational: true, 50))
-            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, operational.Id]);
+            .Select(e => e.Id).Should().BeEquivalentTo([plain.Id, operational.Id, initiate.Id, targetChange.Id]);
         (await repo.ListUndeliveredEventsUnscopedAsync(_userA, subA.Id, DateTimeOffset.UtcNow.AddMinutes(1), includeOperational: true, 50))
             .Should().BeEmpty();
 
@@ -259,6 +338,56 @@ public sealed class CompanionOwnerQueryFilterTests : IAsyncLifetime
         (await Settings(asNoOne).GetOrDefaultUnscopedAsync(_userA)).Mode.Should().Be(NotificationMode.Realtime);
         (await new CompanionEventRepository(asNoOne).ListRealtimePendingUnscopedAsync(10))
             .Select(e => e.Id).Should().BeEquivalentTo([eventA.Id, eventB.Id]);
+    }
+
+    [DockerRequiredFact]
+    public async Task Events_captured_from_analyst_actions_are_pushed_except_upgrades_and_downgrades()
+    {
+        await SeedAsync(NewSetting(_userA, NotificationMode.Realtime));
+        var sub = NewSubscription(_userA);
+        await SeedAsync(sub);
+
+        var researchOptions = new DbContextOptionsBuilder<ResearchDbContext>()
+            .UseInMemoryDatabase($"analyst-push-{Guid.NewGuid():N}").Options;
+        await using var research = new ResearchDbContext(researchOptions, NoCurrentUser.Instance);
+        var actionTypes = Enum.GetValues<AnalystActionType>();
+        research.AnalystActions.AddRange(actionTypes.Select(t => new AnalystAction
+        {
+            Ticker = "NVDA",
+            Firm = "Acme",
+            ActionType = t,
+            NewTarget = 150m,
+            ActionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            Source = "marketbeat",
+        }));
+        await research.SaveChangesAsync();
+
+        var alerts = new Mock<IMaterialAlertReader>();
+        alerts.Setup(a => a.GetNewSinceAsync(It.IsAny<DateTimeOffset>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var banking = new Mock<IBankingTotalsReader>();
+        banking.Setup(b => b.GetActiveUserIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([_userA]);
+        var holdings = new Mock<IBrokerageHoldingsReader>();
+        holdings.Setup(h => h.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new BrokerageHoldingSummary("NVDA", "Equity", 1m, 100m, DateTime.UtcNow, "ibkr")]);
+
+        await using (var ctx = CreateContext())
+        {
+            var capture = new CompanionEventCapture(
+                alerts.Object, new AnalystActionFeedReader(research), holdings.Object, banking.Object,
+                Mock.Of<IBankingAccountsReader>(), Settings(ctx), new CompanionEventRepository(ctx),
+                new CompanionCaptureStateRepository(ctx), _policy, Options.Create(new CompanionOptions()),
+                NullLogger<CompanionEventCapture>.Instance);
+            (await capture.CaptureAsync()).Should().Be(actionTypes.Length);
+        }
+
+        await using var job = CreateContext();
+        var pushed = await new PushDeliveryRepository(job).ListUndeliveredEventsUnscopedAsync(
+            _userA, sub.Id, DateTimeOffset.UtcNow.AddHours(-1), includeOperational: false, 50);
+
+        var expected = actionTypes.Where(t => t is not (AnalystActionType.Upgrade or AnalystActionType.Downgrade)).Select(t => t.ToString());
+        pushed.Should().OnlyContain(e => e.Kind == CompanionEventKind.AnalystAction);
+        pushed.Select(e => e.Summary.Split(' ')[1]).Should().BeEquivalentTo(expected);
     }
 
     [DockerRequiredFact]

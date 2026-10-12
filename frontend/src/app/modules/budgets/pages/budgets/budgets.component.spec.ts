@@ -123,7 +123,9 @@ describe('BudgetsComponent hero copy', () => {
       overBudgetCount: signal(0),
       overallPct: signal(0),
       selectedMonthDate: signal(new Date(2026, 8, 1)),
-      status: signal('loaded'),
+      status: signal<AsyncStatus>('idle'),
+      refreshFailed: signal(false),
+      loadSummary: vi.fn(),
       summaryItems: signal([
         {
           id: 'b1',
@@ -175,5 +177,110 @@ describe('BudgetsComponent hero copy', () => {
 
   it('says nothing about pace when the budget is on pace', () => {
     expect(render(100, 150)).not.toContain('On track to finish');
+  });
+});
+
+describe('BudgetsComponent async states', () => {
+  function render(status: AsyncStatus, withItems = false, refreshFailed = false) {
+    const store = {
+      editingId: signal<string | null>(null),
+      monthName: signal('September'),
+      overBudgetCount: signal(0),
+      overallPct: signal(0),
+      selectedMonthDate: signal(new Date(2026, 8, 1)),
+      selectedYear: signal(2026),
+      selectedMonth: signal(9),
+      status: signal<AsyncStatus>(status),
+      refreshFailed: signal(refreshFailed),
+      loadSummary: vi.fn(),
+      summaryItems: signal(
+        withItems
+          ? [
+              {
+                id: 'b1',
+                category: 'groceries',
+                categoryLabel: 'Groceries',
+                monthlyLimit: 150,
+                spent: 100,
+                remaining: 50,
+                isOverBudget: false,
+                currency: 'USD',
+                paceRatio: 1,
+                projectedMonthEndSpend: 100,
+                isOffPace: false,
+              },
+            ]
+          : []
+      ),
+      totalBudget: signal(150),
+      totalSpent: signal(100),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        {provide: Router, useValue: {navigate: vi.fn()}},
+        {provide: CmnDialogService, useValue: {open: vi.fn()}},
+        {provide: CategoryStore, useValue: {categories: signal([])}},
+      ],
+    });
+    TestBed.overrideComponent(BudgetsComponent, {
+      set: {providers: [{provide: BudgetsStore, useValue: store}]},
+    });
+    const fixture = TestBed.createComponent(BudgetsComponent);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    return {fixture, host, store};
+  }
+
+  it('shows a skeleton while the month loads, never the empty copy', () => {
+    const {host} = render('loading');
+
+    expect(host.querySelector('[data-testid="budgets-skeleton"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('No budgets for September');
+  });
+
+  it('shows the load error with a Retry that reloads the month', () => {
+    const {host, store, fixture} = render('error');
+
+    expect(host.textContent).toContain('Failed to load budgets.');
+    expect(host.textContent).not.toContain('No budgets for September');
+
+    Array.from(host.querySelectorAll('button'))
+      .find(b => b.textContent?.trim() === 'Retry')
+      ?.click();
+    fixture.detectChanges();
+
+    expect(store.loadSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces the cards with the error when the month fails to load', () => {
+    const {host} = render('error', true);
+
+    expect(host.textContent).toContain('Failed to load budgets.');
+    expect(host.textContent).not.toContain('Groceries');
+  });
+
+  it('keeps the valid cards under the error when the refresh after an edit fails', () => {
+    const {host} = render('idle', true, true);
+
+    expect(host.textContent).toContain('Failed to load budgets.');
+    expect(host.textContent).toContain('Groceries');
+    expect(host.querySelector('[data-testid="budgets-skeleton"]')).toBeNull();
+  });
+
+  it('shows the empty state with its prompt when the month has no budgets', () => {
+    const {host} = render('idle');
+
+    expect(host.textContent).toContain('No budgets for September');
+    expect(host.textContent).toContain(
+      'Set a monthly limit for a category to see how much you have left.'
+    );
+  });
+
+  it('shows the category cards once loaded', () => {
+    const {host} = render('idle', true);
+
+    expect(host.textContent).toContain('Groceries');
+    expect(host.querySelector('[data-testid="budgets-skeleton"]')).toBeNull();
+    expect(host.textContent).not.toContain('No budgets for September');
   });
 });

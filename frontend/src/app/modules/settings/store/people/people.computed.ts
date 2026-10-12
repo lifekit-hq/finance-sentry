@@ -1,11 +1,9 @@
-import {DOCUMENT} from '@angular/common';
 import {computed, inject, type Signal} from '@angular/core';
 import {ErrorMessageService} from '@lifekit-hq/core';
 
+import {OWNER_ROLE} from '../../../../shared/constants/role/role.constants';
 import {AuthStore} from '../../../auth/store/auth.store';
-import {OWNER_ROLE} from '../../constants/person/person.constants';
 import {type Invite, type Person, type PersonRow} from '../../models/person/person.model';
-import {InviteLinkUtils} from '../../utils/invite-link.utils';
 
 interface StateSignals {
   people: Signal<Person[]>;
@@ -20,7 +18,6 @@ interface StateSignals {
 export function peopleComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
   const currentUserId = inject(AuthStore).userId;
-  const origin = inject(DOCUMENT).location.origin;
 
   return {
     isLoading: computed(() => store.status() === 'loading' && store.people().length === 0),
@@ -35,10 +32,6 @@ export function peopleComputed(store: StateSignals) {
           !person.roles.includes(OWNER_ROLE),
       }))
     ),
-    inviteLink: computed(() => {
-      const invite = store.lastInvite();
-      return invite ? InviteLinkUtils.build(origin, invite.userId, invite.token) : null;
-    }),
     loadErrorMessage: computed(() =>
       store.status() === 'error'
         ? (errorMessages.resolve(store.errorCode()) ?? 'Failed to load people.')

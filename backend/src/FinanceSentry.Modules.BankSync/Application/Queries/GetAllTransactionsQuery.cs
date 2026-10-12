@@ -122,7 +122,7 @@ public class GetAllTransactionsQueryHandler(
         var txList = (request.From is { } from
             ? await _transactions.GetByUserIdSinceAsync(request.UserId, from, ct)
             : await _transactions.GetByUserIdAsync(request.UserId, ct)).ToList();
-        var accountCurrencies = accounts.Where(a => a.IsActive).ToDictionary(a => a.Id, a => a.Currency);
+        var accountCurrencies = accounts.ToDictionary(a => a.Id, a => a.Currency);
 
         var classification = await _counterpartyClassification.ClassifyAsync(
             request.UserId, txList, accountCurrencies, ct);

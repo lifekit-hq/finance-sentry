@@ -1,4 +1,25 @@
+import {type UrlParamCodec} from '@lifekit-hq/core';
+
+import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type HistoryRange} from '../../models/dashboard/dashboard.model';
+
+export const HISTORY_RANGES: readonly HistoryRange[] = [
+  '1w',
+  'mtd',
+  '1m',
+  '3m',
+  'ytd',
+  '1y',
+  'all',
+];
+
+export const DEFAULT_HISTORY_RANGE: HistoryRange = '3m';
+
+/** The `range` query param: an unknown value reads as the default range. */
+export const HISTORY_RANGE_CODEC: UrlParamCodec<HistoryRange> = {
+  encode: range => range,
+  decode: raw => HISTORY_RANGES.find(range => range === raw) ?? DEFAULT_HISTORY_RANGE,
+};
 
 /**
  * One selected range drives every dashboard widget — the net-worth chart via from/to
@@ -48,3 +69,23 @@ export const PROJECTION_HORIZON_MONTHS = 12;
  * hidden until the complete-month window is at least this deep.
  */
 export const MIN_PROJECTION_MONTHS = 3;
+
+/**
+ * Where a click on a net-worth band opens: the page that lists the accounts behind it. Keyed by
+ * the series label the chart emits; the "No split" band is a total with no single owner page, so
+ * it is absent and its click does nothing.
+ */
+export const NET_WORTH_SERIES_ROUTES: ReadonlyMap<string, AppRoute> = new Map([
+  ['Banking', AppRoute.AccountsList],
+  ['Cash', AppRoute.AccountsList],
+  ['Brokerage', AppRoute.AccountsInvestments],
+  ['Brokerage invested', AppRoute.AccountsInvestments],
+  ['Crypto', AppRoute.AccountsInvestments],
+  ['Crypto invested', AppRoute.AccountsInvestments],
+]);
+
+/** The transactions `type` each income-vs-spending series drills into. */
+export const CASH_FLOW_SERIES_TYPES: ReadonlyMap<string, 'credit' | 'debit'> = new Map([
+  ['Income', 'credit'],
+  ['Spending', 'debit'],
+]);

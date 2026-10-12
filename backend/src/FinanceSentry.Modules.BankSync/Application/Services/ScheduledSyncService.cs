@@ -81,24 +81,39 @@ public class ScheduledSyncService(
     {
         var startedAt = DateTime.UtcNow;
 
-        var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
-        if (account == null)
-            return new SyncResult(false, 0, 0, "ACCOUNT_NOT_FOUND", "Account not found.");
-
-        var job = new SyncJob(accountId, account.UserId)
+        // The atomic claim is the only lock: of any concurrent starts for this account exactly one wins.
+        // It runs before the account is loaded, so the entity read below already carries "syncing".
+        if (!await _accounts.TryClaimSyncUnscopedAsync(accountId, ct))
         {
-            Status = "running",
-            StartedAt = startedAt
-        };
-        await _syncJobs.AddAsync(job, ct);
+            return await _accounts.GetByIdUnscopedAsync(accountId, ct) is null
+                ? new SyncResult(false, 0, 0, "ACCOUNT_NOT_FOUND", "Account not found.")
+                : new SyncResult(false, 0, 0, "SYNC_IN_PROGRESS", "A sync is already in progress for this account.");
+        }
+
+        Domain.BankAccount account;
+        SyncJob job;
+        try
+        {
+            account = await _accounts.GetByIdUnscopedAsync(accountId, ct)
+                ?? throw new InvalidOperationException($"Account {accountId} vanished after its sync was claimed.");
+
+            job = new SyncJob(accountId, account.UserId)
+            {
+                Status = "running",
+                StartedAt = startedAt
+            };
+            await _syncJobs.AddAsync(job, ct);
+        }
+        catch
+        {
+            await ReleaseClaimAsync(accountId, CancellationToken.None);
+            throw;
+        }
 
         _logger.SyncStarted(job.CorrelationId ?? job.Id.ToString(), accountId);
 
         try
         {
-            account.BeginSync();
-            await _accounts.UpdateAsync(account, ct);
-
             SyncResult result;
 
             if (account.Provider == "monobank")
@@ -121,12 +136,23 @@ public class ScheduledSyncService(
             var (errorCode, failureClass) = Classify(ex, account.Provider);
             var isTransient = failureClass == FailureKind.Transient;
 
-            job.MarkFailed(ex.Message, errorCode);
-            await _syncJobs.UpdateAsync(job, ct);
+            var correlationId = job.CorrelationId ?? job.Id.ToString();
+
+            // Bookkeeping that frees the claim runs on CancellationToken.None: a cancelled caller token
+            // must not leave the account "syncing" with a "running" job.
+            try
+            {
+                job.MarkFailed(ex.Message, errorCode);
+                await _syncJobs.UpdateAsync(job, CancellationToken.None);
+            }
+            catch (Exception jobEx)
+            {
+                _logger.SyncFailed(correlationId, accountId, JobUpdateFailedCode, jobEx.Message, job.RetryCount);
+            }
 
             try
             {
-                var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, ct);
+                var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, CancellationToken.None);
                 if (freshAccount != null)
                 {
                     if (failureClass == FailureKind.Reauth)
@@ -136,12 +162,13 @@ public class ScheduledSyncService(
                     else if (freshAccount.SyncStatus == "syncing")
                         freshAccount.MarkFailed(DescribeFailure(errorCode, ex));
 
-                    await _accounts.UpdateAsync(freshAccount, ct);
+                    await _accounts.UpdateAsync(freshAccount, CancellationToken.None);
                 }
             }
-            catch
+            catch (Exception releaseEx)
             {
-                // best-effort
+                _logger.SyncFailed(correlationId, accountId, ClaimReleaseFailedCode, releaseEx.Message, job.RetryCount);
+                await ReleaseClaimAsync(accountId, CancellationToken.None);
             }
 
             await _connectionHealth.RecordFailureAsync(
@@ -168,6 +195,24 @@ public class ScheduledSyncService(
             }
 
             return new SyncResult(false, 0, 0, errorCode, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Frees the claim with a single conditional UPDATE that does not depend on the change tracker, so it holds
+    /// when a failed save has left the context unusable. Used where there is no job to fail yet and as the
+    /// fallback when the failure bookkeeping itself throws; only a startup sweep would otherwise release it.
+    /// A failed release is logged.
+    /// </summary>
+    private async Task ReleaseClaimAsync(Guid accountId, CancellationToken ct)
+    {
+        try
+        {
+            await _accounts.ReleaseSyncUnscopedAsync(accountId, ct);
+        }
+        catch (Exception releaseEx)
+        {
+            _logger.SyncFailed(accountId.ToString(), accountId, ClaimReleaseFailedCode, releaseEx.Message, 0);
         }
     }
 
@@ -490,6 +535,8 @@ public class ScheduledSyncService(
     private static bool IsUpstreamServerError(ApiException ex) =>
         ex.StatusCode >= ServerErrorStatus && !LocalFailureCodes.Contains(ex.ErrorCode);
     private const int MaxLastSyncErrorLength = 500;
+    private const string ClaimReleaseFailedCode = "SYNC_CLAIM_RELEASE_FAILED";
+    private const string JobUpdateFailedCode = "SYNC_JOB_UPDATE_FAILED";
 
     /// <summary>
     /// Classifies a failed sync from the typed exception (<see cref="TrueLayerException"/> /

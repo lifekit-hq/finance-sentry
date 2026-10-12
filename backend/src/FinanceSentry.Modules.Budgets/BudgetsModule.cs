@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class BudgetsModule
 {
@@ -43,8 +44,9 @@ public static class BudgetsModule
     public static IServiceCollection AddBudgetsModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<BudgetsDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<ICategoryNormalizationService, CategoryNormalizationService>();

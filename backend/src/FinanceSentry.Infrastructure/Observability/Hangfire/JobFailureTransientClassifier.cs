@@ -2,10 +2,12 @@ namespace FinanceSentry.Infrastructure.Observability.Hangfire;
 
 using System.Net.Http;
 using System.Net.Sockets;
-using FinanceSentry.Infrastructure.Retry;
+using FinanceSentry.Infrastructure.Http;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 /// <summary>
-/// Classifies a failed job's exception as transient/self-healing (US4) so throttling and network blips
+/// Classifies a failed job's exception as transient/self-healing so throttling and network blips
 /// don't count toward a consecutive-failure streak — mirroring the sync layer's transient set
 /// (timeout / rate-limit / 5xx / network) so only genuine, sticky failures alert.
 /// </summary>
@@ -26,12 +28,13 @@ public static class JobFailureTransientClassifier
             return inner.Count > 0 && inner.All(IsTransient);
         }
 
-        if (exception is TimeoutException or TaskCanceledException or OperationCanceledException or SocketException)
+        if (exception is TimeoutException or TaskCanceledException or OperationCanceledException or SocketException
+            or TimeoutRejectedException or BrokenCircuitException)
             return true;
 
         if (exception is HttpRequestException http
             && http.StatusCode is { } status
-            && RetryPolicies.IsTransientHttpError(status))
+            && TransientHttpStatus.IsTransient(status))
             return true;
 
         // A connect or DNS failure has no status code and, depending on the runtime path, no

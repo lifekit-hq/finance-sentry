@@ -2,11 +2,12 @@ namespace FinanceSentry.Tests.Unit.BankSync.Monobank;
 
 using System.Security.Claims;
 using System.Text.Json;
+using FinanceSentry.API.Errors;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.API.Controllers;
-using FinanceSentry.Modules.BankSync.API.Middleware;
 using FinanceSentry.Modules.BankSync.Application.Commands;
 using FinanceSentry.Modules.BankSync.Application.Queries;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -27,7 +28,7 @@ using Xunit;
 /// Contract tests for POST /api/v1/accounts/monobank/connect (T011):
 /// 201 created, 400 invalid token, 409 duplicate, 429 rate limit.
 /// The 201 path exercises the real controller action; the error paths run the
-/// real command handler through ErrorHandlingMiddleware, which owns the
+/// real command handler through ApiExceptionHandler, which owns the
 /// exception → HTTP status mapping for the endpoint. No database, no live HTTP.
 /// </summary>
 public class ConnectMonobankContractTests
@@ -104,7 +105,7 @@ public class ConnectMonobankContractTests
             .ThrowsAsync(new MonobankException(
                 "MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400));
 
-        var (status, errorCode) = await RunThroughErrorMiddlewareAsync(
+        var (status, errorCode) = await RunThroughExceptionHandlerAsync(
             () => CreateHandler().Handle(new ConnectMonobankAccountCommand(UserId, Token), default));
 
         status.Should().Be(400);
@@ -123,7 +124,7 @@ public class ConnectMonobankContractTests
             .Setup(c => c.GetByUserIdAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCredential(UserId, [1], [2], [3], 1));
 
-        var (status, errorCode) = await RunThroughErrorMiddlewareAsync(
+        var (status, errorCode) = await RunThroughExceptionHandlerAsync(
             () => CreateHandler().Handle(new ConnectMonobankAccountCommand(UserId, Token), default));
 
         status.Should().Be(409);
@@ -145,7 +146,7 @@ public class ConnectMonobankContractTests
                 "MONOBANK_RATE_LIMITED",
                 "Monobank API rate limit exceeded. Please try again in 60 seconds.", 429));
 
-        var (status, errorCode) = await RunThroughErrorMiddlewareAsync(
+        var (status, errorCode) = await RunThroughExceptionHandlerAsync(
             () => CreateHandler().Handle(new ConnectMonobankAccountCommand(UserId, Token), default));
 
         status.Should().Be(429);
@@ -155,19 +156,25 @@ public class ConnectMonobankContractTests
     // ── Plumbing ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Runs <paramref name="action"/> behind the real ErrorHandlingMiddleware and
+    /// Runs <paramref name="action"/> and hands any exception to the real ApiExceptionHandler, then
     /// returns the HTTP status code and errorCode the API contract exposes.
     /// </summary>
-    private static async Task<(int Status, string? ErrorCode)> RunThroughErrorMiddlewareAsync(
+    private static async Task<(int Status, string? ErrorCode)> RunThroughExceptionHandlerAsync(
         Func<Task> action)
     {
-        var middleware = new ErrorHandlingMiddleware(
-            _ => action(), NullLogger<ErrorHandlingMiddleware>.Instance);
+        var handler = new ApiExceptionHandler(NullLogger<ApiExceptionHandler>.Instance, new CorrelationIdAccessor());
 
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
 
-        await middleware.InvokeAsync(context);
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            await handler.TryHandleAsync(context, ex, default);
+        }
 
         context.Response.Body.Position = 0;
         using var doc = await JsonDocument.ParseAsync(context.Response.Body);
@@ -189,6 +196,7 @@ public class ConnectMonobankContractTests
             _accounts.Object,
             new Mock<ITransactionRepository>().Object,
             _backgroundJobs.Object,
+            new Mock<IRecurringJobManager>().Object,
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,

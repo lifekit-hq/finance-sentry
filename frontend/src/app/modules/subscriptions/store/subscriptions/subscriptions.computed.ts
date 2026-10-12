@@ -14,12 +14,16 @@ interface StateSignals {
   subscriptions: Signal<Subscription[]>;
   sort: Signal<SubscriptionSort>;
   summary: Signal<Nullable<SubscriptionSummary>>;
+  status: Signal<AsyncStatus>;
+  loadErrorCode: Signal<Nullable<string>>;
   addErrorCode: Signal<Nullable<string>>;
   addErrorDetail: Signal<Nullable<string>>;
 }
 
 /** The only add error whose server text (it names the row that holds the charges) is shown. */
 const ALREADY_TRACKED_CODE = 'COMMITMENT_ALREADY_TRACKED';
+
+const DEFAULT_LOAD_ERROR = 'Failed to load subscriptions.';
 
 function sortBy(items: Subscription[], sort: SubscriptionSort): Subscription[] {
   return [...items].sort((a, b) => {
@@ -47,6 +51,12 @@ const isInstallment = (s: Subscription): boolean => s.kind === 'installment';
 export function subscriptionsComputed(store: StateSignals) {
   const errorMessages = inject(ErrorMessageService);
   return {
+    isLoading: computed(() => store.status() === 'loading'),
+    loadErrorMessage: computed(() =>
+      store.status() === 'error'
+        ? (errorMessages.resolve(store.loadErrorCode()) ?? DEFAULT_LOAD_ERROR)
+        : ''
+    ),
     addErrorMessage: computed(() => {
       const code = store.addErrorCode();
       if (code === null) {

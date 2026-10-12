@@ -29,25 +29,33 @@ function setupFixture(
   isPhone: boolean,
   overrides: Partial<Institution> = {},
   extraProviders: unknown[] = [],
-  state: {isLoading?: boolean; isEmpty?: boolean; errorMessage?: string; load?: () => void} = {}
+  state: {
+    isLoading?: boolean;
+    isEmpty?: boolean;
+    errorMessage?: string;
+    hasData?: boolean;
+    load?: () => void;
+  } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
   const store = {
     isLoading: signal(state.isLoading ?? false),
     isEmpty: signal(state.isEmpty ?? false),
-    errorMessage: signal(state.errorMessage ?? null),
+    errorMessage: signal(state.errorMessage ?? ''),
+    summary: signal(state.hasData ? {} : null),
+    lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
     totalNetWorth: signal(0),
     netWorthBreakdown: signal([]),
     baseCurrency: signal('USD'),
     categorySections: signal([
       {
-        category: 'banking',
+        category: institution.category,
         title: 'Banks',
         institutionNoun: 'bank',
         rowNoun: 'account',
         summary: {
-          category: 'banking',
+          category: institution.category,
           totalInBaseCurrency: 100,
           institutionCount: 1,
           institutions: [institution],
@@ -146,6 +154,54 @@ describe('AccountsListComponent account row', () => {
   });
 });
 
+describe('AccountsListComponent cash rows', () => {
+  function brokerageRow(
+    accountId: string,
+    symbol: string,
+    accountType: string
+  ): AccountBalanceItem {
+    return {
+      accountId,
+      bankName: 'Interactive Brokers',
+      accountType,
+      accountNumberLast4: symbol.slice(0, 4),
+      currency: symbol,
+      provider: 'ibkr',
+      category: 'brokerage',
+      currentBalance: 400,
+      balanceInBaseCurrency: 400,
+      syncStatus: 'synced',
+      lastSyncTimestamp: null,
+    };
+  }
+
+  function brokerageElement(): HTMLElement {
+    const fixture = setupFixture(false, {
+      provider: 'ibkr',
+      category: 'brokerage',
+      syncStatus: 'synced',
+      accounts: [brokerageRow('a1', 'AAPL', 'brokerage'), brokerageRow('a2', 'USD Cash', 'cash')],
+    });
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('tags a cash row with a Cash label and leaves positions untagged', () => {
+    const element = brokerageElement();
+
+    const labels = element.querySelectorAll('[data-testid="cash-label"]');
+    expect(labels).toHaveLength(1);
+    expect(labels[0].textContent?.trim()).toBe('Cash');
+    expect(element.querySelector('[data-testid="cash-row"]')?.textContent).toContain('USD Cash');
+  });
+
+  it('does not link a cash row to an asset dossier', () => {
+    const element = brokerageElement();
+
+    expect(element.querySelector('[data-testid="cash-row"] button')).toBeNull();
+    expect(element.textContent).toContain('AAPL');
+  });
+});
+
 describe('AccountsListComponent reconnect and disconnect', () => {
   function setupActions(provider: string) {
     const connectStore = {openModal: vi.fn(), selectPickedProvider: vi.fn()};
@@ -221,6 +277,30 @@ describe('AccountsListComponent async states', () => {
     );
     retry?.querySelector('button')?.click();
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('never renders an error as the empty state', () => {
+    const el = render({errorMessage: 'Failed to load accounts.', isEmpty: false});
+
+    expect(el.textContent).not.toContain('No accounts connected yet.');
+  });
+
+  it('keeps the loaded accounts on screen while a retry loads', () => {
+    const el = render({isLoading: true, hasData: true});
+
+    expect(el.querySelector('cmn-disclosure-row')).not.toBeNull();
+  });
+
+  it('shows the last data with a last-synced notice instead of an error while offline', () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const el = render({errorMessage: 'Failed to load accounts.', hasData: true});
+
+    expect(el.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+      "You're offline"
+    );
+    expect(el.textContent).not.toContain('Failed to load accounts.');
+    expect(el.querySelector('cmn-disclosure-row')).not.toBeNull();
+    vi.restoreAllMocks();
   });
 
   it('shows the institutions with no banner when loaded', () => {

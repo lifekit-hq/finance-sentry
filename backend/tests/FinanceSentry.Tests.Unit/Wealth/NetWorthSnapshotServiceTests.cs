@@ -147,4 +147,150 @@ public class NetWorthSnapshotServiceTests
             r => r.GetLatestByUserIdUnscopedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WithMeasuredInvestedParts_StoresCashAsTheRemainderOfTheTotal()
+    {
+        var (repo, captured) = SetupUpsertCapture(previous: null);
+        var data = MakeData() with { BrokerageInvested = 400m, CryptoInvested = 200m };
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.BrokerageInvested.Should().Be(400m);
+        snapshot.CryptoInvested.Should().Be(200m);
+        snapshot.CashTotal.Should().Be(1_150m, "bank 1000 + broker cash 100 + venue cash 50");
+        (snapshot.CashTotal + snapshot.BrokerageInvested + snapshot.CryptoInvested).Should().Be(snapshot.TotalNetWorth);
+        snapshot.TotalNetWorth.Should().Be(1_750m, "the totals are unchanged by the split");
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WithoutInvestedParts_LeavesTheSplitNullNotZero()
+    {
+        var (repo, captured) = SetupUpsertCapture(previous: null);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, MakeData(), CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.BrokerageInvested.Should().BeNull();
+        snapshot.CryptoInvested.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_WithOnlyOneInvestedPart_LeavesTheWholeSplitNull()
+    {
+        var (repo, captured) = SetupUpsertCapture(previous: null);
+        var data = MakeData() with { BrokerageInvested = 400m };
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.BrokerageInvested.Should().BeNull();
+        snapshot.CryptoInvested.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_CarriedForwardSleeve_CarriesItsInvestedPartAndKeepsTheSplitSummingToTheTotal()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 240m,
+            TotalNetWorth = 1_620m,
+            CashTotal = 1_000m,
+            BrokerageInvested = 380m,
+            CryptoInvested = 240m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        // Brokerage feed is stale this run: its total is carried (480) and its measured invested part is ignored.
+        var data = MakeData() with { BrokerageFresh = false, BrokerageInvested = 0m, CryptoInvested = 200m };
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.StaleSleeves.Should().Be("brokerage");
+        snapshot.BrokerageTotal.Should().Be(480m);
+        snapshot.BrokerageInvested.Should().Be(380m);
+        snapshot.CryptoInvested.Should().Be(200m);
+        (snapshot.CashTotal + snapshot.BrokerageInvested + snapshot.CryptoInvested).Should().Be(snapshot.TotalNetWorth);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_CarriedForwardSleeveWhosePreviousHadNoSplit_LeavesTheSplitNull()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 240m,
+            TotalNetWorth = 1_620m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = MakeData() with { BrokerageFresh = false, BrokerageInvested = 400m, CryptoInvested = 200m };
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.BrokerageInvested.Should().BeNull();
+        snapshot.CryptoInvested.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_PermanentlyEmptySleeveWhosePreviousPredatesTheSplit_StartsTheSplitAtZeroInvested()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 0m,
+            TotalNetWorth = 1_380m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 0m,
+            CryptoFresh: false, BrokerageInvested: 400m, CryptoInvested: 0m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.StaleSleeves.Should().Be("crypto");
+        snapshot.CryptoInvested.Should().Be(0m);
+        snapshot.BrokerageInvested.Should().Be(400m);
+        snapshot.CashTotal.Should().Be(1_100m);
+    }
+
+    [Fact]
+    public async Task PersistSnapshotAsync_CarriedNonEmptySleeveWhosePreviousHadNoSplit_DoesNotInventZeroInvested()
+    {
+        var previous = new NetWorthSnapshot
+        {
+            UserId = UserId,
+            SnapshotDate = SnapshotDate.AddDays(-1),
+            BankingTotal = 900m,
+            BrokerageTotal = 480m,
+            CryptoTotal = 240m,
+            TotalNetWorth = 1_620m,
+        };
+        var (repo, captured) = SetupUpsertCapture(previous);
+        var data = new NetWorthSnapshotData(
+            SnapshotDate, BankingTotal: 1000m, BrokerageTotal: 500m, CryptoTotal: 0m,
+            CryptoFresh: false, BrokerageInvested: 400m, CryptoInvested: 0m);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+
+        var snapshot = captured()!;
+        snapshot.CryptoTotal.Should().Be(240m);
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.CryptoInvested.Should().BeNull();
+    }
 }

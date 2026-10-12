@@ -74,11 +74,11 @@ describe('TransactionGroupUtils.dayLabel', () => {
   });
 
   it('uses weekday, month and day within the current year', () => {
-    expect(TransactionGroupUtils.dayLabel('2026-08-03', NOW)).toBe('Mon, Aug 3');
+    expect(TransactionGroupUtils.dayLabel('2026-08-03', NOW)).toBe('Mon 3 Aug');
   });
 
   it('adds the year outside the current year', () => {
-    expect(TransactionGroupUtils.dayLabel('2025-12-31', NOW)).toBe('Wed, Dec 31, 2025');
+    expect(TransactionGroupUtils.dayLabel('2025-12-31', NOW)).toBe('Wed 31 Dec 2025');
   });
 
   it('echoes an unparseable key', () => {

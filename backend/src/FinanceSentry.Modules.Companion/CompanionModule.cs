@@ -12,6 +12,8 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Http;
 
 public static class CompanionModule
 {
@@ -41,16 +43,21 @@ public static class CompanionModule
             // Web Push sender (spec 859): independent of the dispatch job and of the notification mode.
             mgr.AddOrUpdate<CompanionPushJob>(
                 "companion-push", job => job.ExecuteAsync(CancellationToken.None), "* * * * *");
+
+            // Problem reports to the fleet inbox: a no-op until the relay key is set up, so reports wait pending.
+            mgr.AddOrUpdate<ProblemReportForwardJob>(
+                "problem-reports-forward", job => job.ExecuteAsync(CancellationToken.None), "* * * * *");
         }
     }
 
     public static IServiceCollection AddCompanionModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<CompanionDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<CompanionOptions>(config.GetSection(CompanionOptions.SectionName));
 
@@ -69,13 +76,22 @@ public static class CompanionModule
         services.AddScoped<IOutboxDeliveryReader, OutboxDeliveryReader>();
         services.AddScoped<IAgentWakeDispatcher, WebhookAgentWakeDispatcher>();
 
+        var wakeTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(WebhookAgentWakeDispatcher.HttpClientName, client =>
-            client.Timeout = TimeSpan.FromSeconds(10));
+            client.Timeout = wakeTimeout)
+            .AddProviderResilience(wakeTimeout, maxRetries: 0);
 
         services.AddScoped<IPushSender, WebPushSender>();
         // No redirects: an allow-listed push service must not be able to bounce the request to another host.
-        services.AddHttpClient(WebPushSender.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+        var webPushTimeout = TimeSpan.FromSeconds(15);
+        services.AddHttpClient(WebPushSender.HttpClientName, client => client.Timeout = webPushTimeout)
+            .AddProviderResilience(webPushTimeout, maxRetries: 0)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+
+        services.Configure<ProblemReportOptions>(config.GetSection(ProblemReportOptions.SectionName));
+        services.AddScoped<IProblemReportRepository, ProblemReportRepository>();
+        services.AddSingleton<IProblemReportRelay, SshProblemReportRelay>();
+        services.AddScoped<ProblemReportForwardJob>();
 
         services.AddScoped<CompanionPushJob>();
         services.AddScoped<CompanionCaptureJob>();

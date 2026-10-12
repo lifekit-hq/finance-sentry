@@ -1,22 +1,29 @@
 import {DialogRef} from '@angular/cdk/dialog';
 import {DatePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
-  AlertComponent,
+  AsyncStateComponent,
   ButtonComponent,
-  ChipComponent,
   CMN_DIALOG_DATA,
   DialogActionsComponent,
-  EmptyStateComponent,
   FormFieldComponent,
   InputComponent,
   SelectableCardComponent,
+  SkeletonComponent,
 } from '@lifekit-hq/ui';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {
   COMMITMENT_CADENCE_OPTIONS,
   COMMITMENT_KIND_OPTIONS,
@@ -37,22 +44,24 @@ import {
 } from '../../models/subscription/subscription.model';
 import {CommitmentPickerStore} from '../../store/commitment-picker/commitment-picker.store';
 
+const SKELETON_ROWS = 3;
+
 @Component({
   selector: 'fns-add-commitment-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     InputHintsDirective,
-    AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
-    ChipComponent,
     DatePipe,
     DialogActionsComponent,
-    EmptyStateComponent,
     FormFieldComponent,
     InputComponent,
     MoneyPipe,
     ReactiveFormsModule,
     SelectableCardComponent,
+    SkeletonComponent,
   ],
   providers: [CommitmentPickerStore],
   templateUrl: './add-commitment-dialog.component.html',
@@ -61,11 +70,25 @@ export class AddCommitmentDialogComponent {
   private readonly dialogRef =
     inject<DialogRef<AddCommitmentRequest | LinkCommitmentRequest>>(DialogRef);
   private readonly data = inject<Nullable<CommitmentDialogData>>(CMN_DIALOG_DATA, {optional: true});
+  private readonly connectivity = inject(ConnectivityService);
 
   /** Linking an existing row only needs the transaction; the row keeps its own name and plan. */
   public readonly isLinking = (this.data?.linkTo ?? null) !== null;
 
   public readonly picker = inject(CommitmentPickerStore);
+  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  // Offline only reaches `resolve` while nothing is on screen: with candidates, a failed reload
+  // keeps its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.picker.candidates().length > 0;
+    return AsyncViewUtils.resolve({
+      isLoading: this.picker.isLoading(),
+      hasData,
+      errorMessage: this.picker.errorMessage(),
+      offline: this.connectivity.offline() && !hasData,
+      lastSyncedAt: null,
+    });
+  });
   public readonly kindOptions = COMMITMENT_KIND_OPTIONS;
   public readonly cadenceOptions = COMMITMENT_CADENCE_OPTIONS;
   public readonly searchControl = new FormControl('', {nonNullable: true});
@@ -87,6 +110,16 @@ export class AddCommitmentDialogComponent {
 
   constructor() {
     this.picker.applySearch(toSignal(this.searchControl.valueChanges, {initialValue: ''}));
+  }
+
+  public onKindChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionKind}>).detail;
+    this.setKind(value);
+  }
+
+  public onCadenceChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionCadence}>).detail;
+    this.setCadence(value);
   }
 
   public setKind(kind: SubscriptionKind): void {

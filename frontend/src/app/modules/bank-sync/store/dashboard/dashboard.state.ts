@@ -1,3 +1,4 @@
+import {DEFAULT_HISTORY_RANGE} from '../../constants/dashboard/dashboard.constants';
 import {
   type DashboardData,
   type HistoryRange,
@@ -6,6 +7,8 @@ import {
 
 export interface DashboardState {
   data: Nullable<DashboardData>;
+  /** Epoch ms of the last successful dashboard load; drives the offline "last synced" notice. */
+  lastSyncedAt: Nullable<number>;
   netWorthHistory: NetWorthSnapshotDto[];
   historyRange: HistoryRange;
   historyHasHistory: boolean;
@@ -17,8 +20,9 @@ export interface DashboardState {
 
 export const initialDashboardState: DashboardState = {
   data: null,
+  lastSyncedAt: null,
   netWorthHistory: [],
-  historyRange: '3m',
+  historyRange: DEFAULT_HISTORY_RANGE,
   historyHasHistory: false,
   historyLoading: false,
   historyError: null,

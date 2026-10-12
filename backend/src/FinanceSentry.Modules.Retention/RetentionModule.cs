@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Persistence;
 
 /// <summary>
 /// Cross-cutting retention &amp; backup module (feature 024). Owns the <c>retention</c> schema and the
@@ -54,10 +55,11 @@ public static class RetentionModule
     public static IServiceCollection AddRetentionModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<RetentionDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_retention", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_retention", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<RetentionOptions>(config.GetSection(RetentionOptions.SectionName));
         services.Configure<BackupOptions>(config.GetSection(BackupOptions.SectionName));

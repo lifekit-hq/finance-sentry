@@ -49,7 +49,7 @@ public class AccountDiscoveryServiceTests
         var backgroundJobs = new Mock<IBackgroundJobClient>();
         var logger = new Mock<ILogger<AccountDiscoveryService>>();
 
-        var monobankBalanceCache = new MonobankBalanceCache();
+        var monobankBalanceCache = new MonobankBalanceCache(TimeProvider.System);
 
         // Stateful fake: rows added by one run are visible to the existence check of the next.
         var storedAccounts = new List<BankAccount>();

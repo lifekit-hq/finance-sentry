@@ -1,9 +1,10 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
-public class MonobankCredential : Entity
+public class MonobankCredential : Entity, IUserOwned
 {
     public Guid UserId { get; private set; }
     public byte[] EncryptedToken { get; private set; } = [];

@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
-public class InvestmentThesis
+using FinanceSentry.Core.Domain;
+
+public class InvestmentThesis : IHasUpdatedAt
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }

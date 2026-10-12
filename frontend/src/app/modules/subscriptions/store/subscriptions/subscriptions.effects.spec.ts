@@ -66,6 +66,8 @@ const SUMMARY: SubscriptionSummary = {
 
 function buildStore() {
   return {
+    setLoading: vi.fn(),
+    setLoadError: vi.fn(),
     setData: vi.fn(),
     setSummary: vi.fn(),
     dismissSubscription: vi.fn(),
@@ -106,8 +108,43 @@ describe('subscriptionsEffects', () => {
     TestBed.runInInjectionContext(() => subscriptionsEffects(store).load());
 
     expect(service.getSubscriptions).toHaveBeenCalledWith(true);
+    expect(store.setLoading).toHaveBeenCalledTimes(1);
     expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
     expect(store.setSummary).toHaveBeenCalledWith(SUMMARY);
+    expect(store.setLoadError).not.toHaveBeenCalled();
+  });
+
+  it('load: keeps the error code when the list fails', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.getSubscriptions.mockReturnValue(
+      throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'BOOM'}}))
+    );
+    service.getSummary.mockReturnValue(of(SUMMARY));
+    configure(service);
+
+    TestBed.runInInjectionContext(() => subscriptionsEffects(store).load());
+
+    expect(store.setLoadError).toHaveBeenCalledWith('BOOM');
+    expect(store.setData).not.toHaveBeenCalled();
+  });
+
+  it('load: reloads when called again after a failure', () => {
+    const store = buildStore();
+    const service = buildService();
+    service.getSubscriptions
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({status: 500})))
+      .mockReturnValue(of(LIST_RESPONSE));
+    service.getSummary.mockReturnValue(of(SUMMARY));
+    configure(service);
+
+    const effects = TestBed.runInInjectionContext(() => subscriptionsEffects(store));
+    effects.load();
+    effects.load();
+
+    expect(store.setLoading).toHaveBeenCalledTimes(2);
+    expect(store.setLoadError).toHaveBeenCalledTimes(1);
+    expect(store.setData).toHaveBeenCalledWith([SUBSCRIPTION], false);
   });
 
   it('dismiss: updates the list row and refetches the summary', () => {

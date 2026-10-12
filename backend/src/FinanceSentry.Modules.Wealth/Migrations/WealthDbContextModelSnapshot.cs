@@ -32,8 +32,20 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     b.Property<decimal>("BankingTotal")
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal?>("BrokerageInvested")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("brokerage_invested");
+
                     b.Property<decimal>("BrokerageTotal")
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("CashTotal")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cash_total");
+
+                    b.Property<decimal?>("CryptoInvested")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("crypto_invested");
 
                     b.Property<decimal>("CryptoTotal")
                         .HasColumnType("numeric(18,2)");

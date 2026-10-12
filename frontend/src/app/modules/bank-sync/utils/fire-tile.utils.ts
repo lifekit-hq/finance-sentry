@@ -1,10 +1,11 @@
+import {APP_LOCALE} from '../../../shared/constants/date/date.constants';
 import {MoneyUtils} from '../../../shared/utils/money.utils';
 import {PercentUtils} from '../../../shared/utils/percent.utils';
 import {type FireProjection} from '../models/fire/fire.model';
 
 const MONTHS_PER_YEAR = 12;
 const FULL_PERCENT = 100;
-const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+const DATE_FORMATTER = new Intl.DateTimeFormat(APP_LOCALE, {
   month: 'short',
   year: 'numeric',
   timeZone: 'UTC',

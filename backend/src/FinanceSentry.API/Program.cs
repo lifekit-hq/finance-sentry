@@ -3,6 +3,7 @@ using FinanceSentry.API.Adapters;
 using FinanceSentry.API.Authentication;
 using FinanceSentry.API.Commands;
 using FinanceSentry.API.Conventions;
+using FinanceSentry.API.Errors;
 using FinanceSentry.Integration;
 using FinanceSentry.API.Hangfire;
 using FinanceSentry.API.Logging;
@@ -14,7 +15,6 @@ using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Infrastructure.Observability;
 using FinanceSentry.Infrastructure.Observability.HealthChecks;
 using FinanceSentry.Core.Auth;
-using FinanceSentry.Modules.BankSync.API.Middleware;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using Hangfire;
@@ -51,6 +51,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers(options =>
     options.Conventions.Add(new ApiVersionPrefixConvention("api/v1")));
+builder.Services.AddApiErrorHandling();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -120,6 +121,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(RateLimitingPolicies.Authenticated, RateLimitPartitions.Authenticated);
     options.AddPolicy(RateLimitingPolicies.Anonymous, RateLimitPartitions.Anonymous);
     options.AddPolicy(RateLimitingPolicies.Exempt, RateLimitPartitions.Exempt);
+    options.AddPolicy(RateLimitingPolicies.ProblemReport, RateLimitPartitions.ProblemReport);
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
@@ -154,9 +156,10 @@ if (args.Length > 0 && RetentionCommand.Handles(args[0]))
 // Must run before request logging so logs capture the real client IP (025, FR-006).
 app.UseForwardedHeaders();
 app.UseSerilogRequestLogging();
-app.UseCors("Frontend");
-app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseCors("Frontend");
+// After CorrelationIdMiddleware so the error logs written by ApiExceptionHandler carry the correlation scope.
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseRateLimiter();
 
@@ -200,11 +203,27 @@ app.MapHealthChecks("/api/v1/health/ready", new HealthCheckOptions
 GlobalJobFilters.Filters.Add(
     new DashboardObservability.JobMetricsFilter(app.Services.GetRequiredService<JobMetrics>()));
 
-// Alert on N consecutive job failures → Telegram (US4/FR-009); N configurable, default 3.
-GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureAlertFilter(
-    app.Services,
+// Feed finance_job_consecutive_failures{job}; the Grafana rule finance-job-consecutive-failures alerts on it (#935).
+GlobalJobFilters.Filters.Add(new DashboardObservability.ConsecutiveFailureGaugeFilter(
     new DashboardObservability.HangfireJobFailureStreakStore(),
-    app.Configuration.GetValue("Observability:JobFailureAlertThreshold", 3)));
+    app.Services.GetRequiredService<JobMetrics>()));
+
+// Publish each registered recurring job's persisted streak so finance_job_consecutive_failures exists from
+// startup (the streak is durable; the gauge is in-memory). Best-effort: storage may be unreachable.
+if (!app.Services.GetRequiredService<StartupMigrationStatus>().MigrationsSkipped)
+{
+    try
+    {
+        DashboardObservability.JobFailureGaugePrimer.Seed(
+            app.Services.GetRequiredService<JobStorage>(),
+            new DashboardObservability.HangfireJobFailureStreakStore(),
+            app.Services.GetRequiredService<JobMetrics>());
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not seed finance_job_consecutive_failures; it will populate on each job's next outcome.");
+    }
+}
 
 // Propagate trace context into job execution spans (spec 023 amendment, #616).
 GlobalJobFilters.Filters.Add(new DashboardObservability.HangfireTracingFilter());

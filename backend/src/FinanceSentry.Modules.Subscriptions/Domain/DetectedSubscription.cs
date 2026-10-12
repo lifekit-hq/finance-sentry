@@ -1,9 +1,10 @@
 namespace FinanceSentry.Modules.Subscriptions.Domain;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Utils;
 
-public class DetectedSubscription
+public class DetectedSubscription : IHasUpdatedAt
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public string UserId { get; private set; } = string.Empty;
@@ -207,7 +208,6 @@ public class DetectedSubscription
         IsManual = true;
         Status = SubscriptionStatus.Active;
         DismissedAt = null;
-        UpdatedAt = DateTimeOffset.UtcNow;
         EvaluateCompletion(false);
     }
 
@@ -230,7 +230,6 @@ public class DetectedSubscription
             Currency = currency;
         OccurrenceCount++;
         Status = SubscriptionStatus.Active;
-        UpdatedAt = DateTimeOffset.UtcNow;
         EvaluateCompletion(false);
         return true;
     }
@@ -273,7 +272,6 @@ public class DetectedSubscription
         Category = category;
         Kind = kind;
         Status = SubscriptionStatus.Active;
-        UpdatedAt = DateTimeOffset.UtcNow;
         EvaluateCompletion(isCompleted);
     }
 
@@ -286,14 +284,12 @@ public class DetectedSubscription
         TermCount = termCount is > 0 ? termCount : null;
         EndDate = endDate;
         StartDate = startDate;
-        UpdatedAt = DateTimeOffset.UtcNow;
         EvaluateCompletion(false);
     }
 
     public void MarkCompleted()
     {
         Status = SubscriptionStatus.Completed;
-        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     /// <summary>Completes the installment when a payoff was seen, the term has been reached, or the final payment month has passed.</summary>
@@ -311,19 +307,16 @@ public class DetectedSubscription
     {
         Status = SubscriptionStatus.Dismissed;
         DismissedAt = DateTimeOffset.UtcNow;
-        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void Restore()
     {
         Status = SubscriptionStatus.Active;
         DismissedAt = null;
-        UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public void MarkPotentiallyCancelled()
     {
         Status = SubscriptionStatus.PotentiallyCancelled;
-        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

@@ -79,7 +79,7 @@ async function openAlerts(page: Page, insets?: {top: number; bottom: number}): P
     await simulateInsets(page, insets.top, insets.bottom);
     await page.reload();
   }
-  await expect(page.locator('fns-alerts [role="button"]')).toHaveCount(ALERT_COUNT);
+  await expect(page.locator('fns-alerts [data-testid="alert-row"]')).toHaveCount(ALERT_COUNT);
 }
 
 // The shell never scrolls: html/body fit the viewport, a scroll attempt leaves the window at 0,
@@ -173,7 +173,7 @@ for (const scheme of ['light', 'dark'] as const) {
       expect(main.y).toBeLessThanOrEqual(topBox.y);
       expect(main.y + main.height).toBeGreaterThanOrEqual(tabBox.y + tabBox.height);
 
-      const rows = page.locator('fns-alerts [role="button"]');
+      const rows = page.locator('fns-alerts [data-testid="alert-row"]');
       const firstAtRest = await box(rows.first());
       expect(firstAtRest.y).toBeGreaterThanOrEqual(topBox.y + topBox.height);
       await page.screenshot({path: `test-results/phone-overlay-${scheme}.png`});

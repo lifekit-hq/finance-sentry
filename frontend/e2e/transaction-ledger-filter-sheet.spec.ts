@@ -68,12 +68,12 @@ test.describe('Transaction ledger — filter sheet', () => {
         tx('pay', 'Synthetic pay row', today, 'credit', null),
       ];
       const categories = q.getAll('category');
-      const from = q.get('from');
-      const to = q.get('to');
+      const fromBound = q.get('from') ?? '';
+      const toBound = q.get('to') ?? '';
       const items = all.filter(
         t =>
-          (!from || String(t.date) >= from) &&
-          (!to || String(t.date) <= to) &&
+          (!fromBound || String(t.date) >= fromBound) &&
+          (!toBound || String(t.date) <= toBound) &&
           (!q.get('transactionType') || t.transactionType === q.get('transactionType')) &&
           (categories.length === 0 || categories.includes(String(t.merchantCategory)))
       );

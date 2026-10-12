@@ -340,46 +340,6 @@ public class AlertGeneratorServiceTests
         _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
     }
 
-    /// <summary>
-    /// A second failure streak for the same job while the first JobFailure alert is still open must
-    /// supersede it (resolve the old, insert the new) rather than collide with idx_alert_dedup and
-    /// throw — the newest streak is the current truth, and an unread stale one adds nothing.
-    /// </summary>
-    [Fact]
-    public async Task GenerateJobFailure_SecondStreakWhileFirstAlertOpen_ResolvesFirstAndInsertsSecond()
-    {
-        var referenceId = Guid.NewGuid();
-        var ledger = new List<Alert>();
-        _repo.Setup(r => r.HasRecentAsync(
-                _userId, AlertType.JobFailure, referenceId, "nightly-sync", It.IsAny<DateTimeOffset>(), default))
-            .ReturnsAsync(false);
-        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.JobFailure, referenceId, default))
-            .ReturnsAsync(() => ledger.FirstOrDefault(a => !a.IsResolved));
-        _repo.Setup(r => r.ResolveAsync(It.IsAny<Guid>(), default))
-            .Callback<Guid, CancellationToken>((id, _) => ledger.Single(a => a.Id == id).IsResolved = true)
-            .Returns(Task.CompletedTask);
-        _repo.Setup(r => r.AddAsync(It.IsAny<Alert>(), default))
-            .Callback<Alert, CancellationToken>((a, _) =>
-            {
-                a.Id = Guid.NewGuid();
-                ledger.Add(a);
-            })
-            .Returns(Task.CompletedTask);
-
-        var act = async () =>
-        {
-            await _service.GenerateJobFailureAlertAsync(_userId, referenceId, "nightly-sync", 3, "timeout");
-            await _service.GenerateJobFailureAlertAsync(_userId, referenceId, "nightly-sync", 5, "timeout again");
-        };
-
-        await act.Should().NotThrowAsync();
-        ledger.Should().HaveCount(2);
-        ledger.Count(a => !a.IsResolved).Should().Be(1);
-        ledger[0].IsResolved.Should().BeTrue();
-        ledger[1].IsResolved.Should().BeFalse();
-        ledger[1].Message.Should().Contain("5 times");
-    }
-
     // --- 044 hygiene sentinels -------------------------------------------------------------
     // Every generator runs the same dedup discipline: an open alert on the same reference wins,
     // then the type's silence window. Each sentinel is pinned on both gates because two of them
@@ -1265,6 +1225,8 @@ public class AlertGeneratorServiceTests
         var retired = new[] { AlertType.UnusualSpend };
         // Deduped once per reference, ever — no silence window applies.
         var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange };
+        // The silent-detector alert is the only generator left on JobFailure and sets its own window per draft.
+        var windowPerDraft = new[] { AlertType.JobFailure };
 
         var declared = (Dictionary<string, TimeSpan>)typeof(AlertGeneratorService)
             .GetField("SilenceWindows", BindingFlags.NonPublic | BindingFlags.Static)!
@@ -1274,7 +1236,7 @@ public class AlertGeneratorServiceTests
             .GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(f => f.IsLiteral && f.FieldType == typeof(string))
             .Select(f => (string)f.GetRawConstantValue()!)
-            .Where(t => !retired.Contains(t) && !oncePerReference.Contains(t))
+            .Where(t => !retired.Contains(t) && !oncePerReference.Contains(t) && !windowPerDraft.Contains(t))
             .ToList();
 
         Assert.NotEmpty(live);

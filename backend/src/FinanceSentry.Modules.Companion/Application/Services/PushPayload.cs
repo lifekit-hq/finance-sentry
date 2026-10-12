@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Companion.Application.Services;
 
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Companion.Domain;
 
 /// <summary>
@@ -36,9 +37,35 @@ public static partial class PushPayload
         return JsonSerializer.Serialize(new { notification }, JsonOptions);
     }
 
+    /// <summary>The lock-screen notification for an alert pushed without a companion event: its headline ("Analyst upgrade")
+    /// as the title, its subject (the ticker) as the body and its own app path as the link.</summary>
+    public static string BuildAlert(MaterialAlertRecord alert)
+    {
+        var colon = alert.Title.IndexOf(':', StringComparison.Ordinal);
+        var title = (colon > 0 ? alert.Title[..colon] : alert.Title).Trim();
+        var notification = new Dictionary<string, object>
+        {
+            ["title"] = title,
+            ["tag"] = alert.AlertId.ToString(),
+            ["data"] = new
+            {
+                onActionClick = new
+                {
+                    @default = new { operation = "navigateLastFocusedOrOpen", url = LinkFor(alert.AppPath) },
+                },
+            },
+        };
+        if (!string.IsNullOrWhiteSpace(alert.ReferenceLabel))
+            notification["body"] = alert.ReferenceLabel.Trim();
+
+        return JsonSerializer.Serialize(new { notification }, JsonOptions);
+    }
+
     /// <summary>The event's own path when it is a path inside this app, otherwise <see cref="DeepLink"/>.</summary>
-    public static string LinkFor(CompanionEvent evt)
-        => evt.AppPath is { } path && path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal)
+    public static string LinkFor(CompanionEvent evt) => LinkFor(evt.AppPath);
+
+    private static string LinkFor(string? appPath)
+        => appPath is { } path && path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal)
             ? path
             : DeepLink;
 

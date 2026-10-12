@@ -191,26 +191,34 @@ public sealed class BrokerageHoldingRepository : IBrokerageHoldingRepository
         _context = context;
     }
 
+    // One INSERT ... ON CONFLICT per holding on the unique (UserId, Symbol, Provider) index: the write is atomic, so
+    // two overlapping syncs of one account update the same row instead of the loser failing on the index, and no
+    // read precedes it. It runs at once rather than at SaveChanges, and a holding already tracked by this context
+    // is not refreshed. The DO UPDATE list mirrors BrokerageHolding.Update (cost basis follows the new quantity
+    // only while an average cost is known; the instrument link is never cleared; AcquiredAt/AverageCostUsd stay).
     public async Task UpsertRangeAsync(IEnumerable<BrokerageHolding> holdings, CancellationToken ct = default)
     {
-        foreach (var holding in holdings)
+        foreach (var h in holdings)
         {
-            var existing = await _context.BrokerageHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
-                .FirstOrDefaultAsync(
-                    h => h.UserId == holding.UserId
-                        && h.Symbol == holding.Symbol
-                        && h.Provider == holding.Provider,
-                    ct);
-
-            if (existing is not null)
-            {
-                existing.Update(holding.Quantity, holding.UsdValue, holding.InstrumentId, holding.FlexAsOfDate);
-                _context.BrokerageHoldings.Update(existing);
-            }
-            else
-            {
-                await _context.BrokerageHoldings.AddAsync(holding, ct);
-            }
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO brokerage_sync."BrokerageHoldings" AS t
+                    ("Id", "UserId", "Symbol", "InstrumentType", "Quantity", "UsdValue", "SyncedAt", "Provider",
+                     "AverageCostUsd", "CostBasisUsd", "AcquiredAt", "InstrumentId", "FlexAsOfDate")
+                VALUES
+                    ({h.Id}, {h.UserId}, {h.Symbol}, {h.InstrumentType}, {h.Quantity}, {h.UsdValue}, {h.SyncedAt}, {h.Provider},
+                     {h.AverageCostUsd}, {h.CostBasisUsd}, {h.AcquiredAt}, {h.InstrumentId}, {h.FlexAsOfDate})
+                ON CONFLICT ("UserId", "Symbol", "Provider") DO UPDATE SET
+                    "Quantity" = EXCLUDED."Quantity",
+                    "UsdValue" = EXCLUDED."UsdValue",
+                    "SyncedAt" = EXCLUDED."SyncedAt",
+                    "FlexAsOfDate" = EXCLUDED."FlexAsOfDate",
+                    "InstrumentId" = COALESCE(EXCLUDED."InstrumentId", t."InstrumentId"),
+                    "CostBasisUsd" = CASE WHEN t."AverageCostUsd" IS NOT NULL
+                                          THEN ROUND(t."AverageCostUsd" * EXCLUDED."Quantity", 4)
+                                          ELSE t."CostBasisUsd" END
+                """,
+                ct);
         }
     }
 

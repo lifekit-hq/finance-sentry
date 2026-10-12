@@ -2,7 +2,7 @@
 
 ## Backend Build Gate — mandatory
 
-After writing or modifying **any** `.cs` file, run `dotnet build backend/` and fix **all warnings** before moving on. Non-negotiable:
+After writing or modifying **any** `.cs` file, run `dotnet build backend/FinanceSentry.sln` and fix **all warnings** before moving on. Where `dotnet` is not on the PATH (the fleet box), run it inside `mcr.microsoft.com/dotnet/sdk:10.0` the way the `test` command in `.no-mistakes.yaml` does - never skip it. Non-negotiable:
 - Remove unused `using` directives (`IDE0005`)
 - Apply primary constructor where suggested (`IDE0290`)
 - Resolve nullable reference warnings (`CS8618`, `CS8600`–`CS8604`) — do not suppress with `!` without a comment
@@ -27,7 +27,7 @@ The convention, enforced structurally:
 
 ## Owner Query Filter - per-user DbContexts
 
-A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and declares the named filter on every per-user entity: `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
+A DbContext converted to owner scoping takes `ICurrentUser` (`FinanceSentry.Core.Auth`) and carries the named filter on every per-user entity: declared by hand as `HasQueryFilter(OwnerQueryFilter.Name, e => e.UserId == CurrentUserId)`, or - in a context derived from `OwnerScopedDbContext` (`WealthDbContext`, `BudgetsDbContext`, `EventsDbContext`, `RiskDbContext`, `AgentDbContext`, `AlertsDbContext`, `AnalyticsDbContext`, `BankSyncDbContext`, `BrokerageSyncDbContext`, `CryptoSyncDbContext` so far) - applied by the base to every entity that implements `IUserOwned`. A request sees only its principal's rows; a background job has no principal, so the filter matches nothing.
 
 - Every job or sweep that legitimately reads across users opts out explicitly with `IgnoreQueryFilters([OwnerQueryFilter.Name])` and keeps its own `UserId` predicate. Inserts and `SaveChanges` are not filtered; `ExecuteUpdate`/`ExecuteDelete` are.
 - Each converted context ships a two-user isolation test and a no-principal test per cross-user job (see `AlertsOwnerQueryFilterTests`).

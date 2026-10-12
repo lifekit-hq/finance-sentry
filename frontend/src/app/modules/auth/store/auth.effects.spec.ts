@@ -1,5 +1,4 @@
 import {DOCUMENT} from '@angular/common';
-import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {NavigationEnd, Router} from '@angular/router';
@@ -11,28 +10,21 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
-import {FALLBACK_SIGN_IN_METHODS} from '../constants/auth/auth.constants';
-import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
+import {type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
 import {type FlashMessage} from './auth.state';
-
-const SAMPLE_RESPONSE: AuthResponse = {
-  user: {id: 'u-1', email: 'user@test.com', roles: [], permissions: []},
-  expiresAt: '2099-01-01T00:00:00Z',
-};
 
 function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<string>} = {}) {
   const flashMessage = signal<Nullable<FlashMessage>>(null);
   return {
     applyAuthResponse: vi.fn(),
     clearSession: vi.fn(),
-    setLoading: vi.fn(),
-    setError: vi.fn(),
     setReturnUrl: vi.fn(),
     setFlashMessage: vi.fn((message: Nullable<FlashMessage>) => flashMessage.set(message)),
     setProfileName: vi.fn(),
     setSignInMethods: vi.fn(),
+    setSignInMethodsStatus: vi.fn(),
     loadProfileName: vi.fn(),
     loadSignInMethods: vi.fn(),
     firstName: signal<Nullable<string>>(null),
@@ -46,9 +38,7 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
 
 function buildService() {
   return {
-    login: vi.fn(),
-    acceptInvite: vi.fn(),
-    getSignInMethods: vi.fn().mockReturnValue(of(FALLBACK_SIGN_IN_METHODS)),
+    getSignInMethods: vi.fn().mockReturnValue(of({oidc: true})),
     logout: vi.fn().mockReturnValue(of(null)),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
   };
@@ -88,106 +78,6 @@ function configure(
 }
 
 describe('authEffects', () => {
-  describe('login', () => {
-    it('sets loading, calls service, and applies response on success', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.login.mockReturnValue(of(SAMPLE_RESPONSE));
-      const router = buildRouter();
-      configure(service, router);
-
-      TestBed.runInInjectionContext(() => {
-        const effects = authEffects(store);
-        effects.login({email: 'a@b.c', password: 'pw'});
-      });
-
-      expect(store.setLoading).toHaveBeenCalledWith('login');
-      expect(service.login).toHaveBeenCalledWith({email: 'a@b.c', password: 'pw'});
-      expect(store.applyAuthResponse).toHaveBeenCalledWith(SAMPLE_RESPONSE);
-      expect(store.setError).not.toHaveBeenCalled();
-    });
-
-    it('sets error with extracted errorCode on failure', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.login.mockReturnValue(
-        throwError(() => ({error: {errorCode: 'INVALID_CREDENTIALS'}}))
-      );
-      const router = buildRouter();
-      configure(service, router);
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).login({email: 'a@b.c', password: 'pw'});
-      });
-
-      expect(store.setError).toHaveBeenCalledWith('INVALID_CREDENTIALS', 'login', null);
-      expect(store.applyAuthResponse).not.toHaveBeenCalled();
-    });
-
-    it('passes the server message through for a lockout', () => {
-      const store = buildStore();
-      const service = buildService();
-      const error = 'Too many failed sign-in attempts. Try again in 3 minutes.';
-      service.login.mockReturnValue(
-        throwError(() => ({error: {errorCode: 'ACCOUNT_LOCKED', error}}))
-      );
-      configure(service, buildRouter());
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).login({email: 'a@b.c', password: 'pw'});
-      });
-
-      expect(store.setError).toHaveBeenCalledWith('ACCOUNT_LOCKED', 'login', error);
-    });
-
-    it('sets null errorCode when error payload is unstructured', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.login.mockReturnValue(throwError(() => new Error('boom')));
-      configure(service, buildRouter());
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).login({email: 'a@b.c', password: 'pw'});
-      });
-
-      expect(store.setError).toHaveBeenCalledWith(null, 'login', null);
-    });
-  });
-
-  describe('acceptInvite', () => {
-    const request = {userId: 'u-1', token: 'one-time-token', password: 'quiet lantern orchard'};
-
-    it('tags the flow and applies the response on success', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.acceptInvite.mockReturnValue(of(SAMPLE_RESPONSE));
-      configure(service, buildRouter());
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).acceptInvite(request);
-      });
-
-      expect(service.acceptInvite).toHaveBeenCalledWith(request);
-      expect(store.setLoading).toHaveBeenCalledWith('acceptInvite');
-      expect(store.applyAuthResponse).toHaveBeenCalledWith(SAMPLE_RESPONSE);
-    });
-
-    it('records the error code under the acceptInvite flow on failure', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.acceptInvite.mockReturnValue(
-        throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'INVALID_INVITE'}}))
-      );
-      configure(service, buildRouter());
-
-      TestBed.runInInjectionContext(() => {
-        authEffects(store).acceptInvite(request);
-      });
-
-      expect(store.setError).toHaveBeenCalledWith('INVALID_INVITE', 'acceptInvite');
-    });
-  });
-
   describe('logout', () => {
     it('calls service.logout, clears session, and navigates to login', () => {
       const store = buildStore({isAuthenticated: true});
@@ -205,6 +95,22 @@ describe('authEffects', () => {
       expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
         queryParams: {info: 'signed_out'},
       });
+    });
+
+    it('ends the identity provider session by navigating to the URL the API returns', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of({endSessionUrl: 'https://idp.test/oidc/session/end?x=1'}));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).logout());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).toHaveBeenCalledWith('https://idp.test/oidc/session/end?x=1');
+      expect(router.navigate).not.toHaveBeenCalled();
     });
 
     it('does not release push when the session is already cleared', () => {
@@ -237,6 +143,81 @@ describe('authEffects', () => {
     });
   });
 
+  describe('logout and expireSession', () => {
+    const endSession = {endSessionUrl: 'https://idp.test/oidc/session/end?x=1'};
+
+    it('a repeated sign-out while one is in flight calls the API once', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      configure(service, buildRouter());
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledTimes(1);
+    });
+
+    it('an expired session after a sign-out cannot navigate away from the end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.expireSession();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(1);
+      expect(assign).toHaveBeenCalledWith(endSession.endSessionUrl);
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('an expired session clears the app session and goes to /login without an end-session hop', () => {
+      const assign = vi.fn();
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      service.logout.mockReturnValue(of(endSession));
+      const router = buildRouter();
+      configure(service, router);
+      TestBed.overrideProvider(DOCUMENT, {useValue: {location: {assign}}});
+
+      TestBed.runInInjectionContext(() => authEffects(store).expireSession());
+
+      expect(store.clearSession).toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith([AppRoute.Login], {
+        queryParams: {info: 'signed_out'},
+      });
+    });
+
+    it('a sign-out can be retried after the API answered without an end-session URL', () => {
+      const store = buildStore({isAuthenticated: true});
+      const service = buildService();
+      const router = buildRouter();
+      configure(service, router);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = authEffects(store);
+        effects.logout();
+        effects.logout();
+      });
+
+      expect(service.logout).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('startOidcSignIn', () => {
     it('navigates the browser to the API start endpoint with the return path', () => {
       const assign = vi.fn();
@@ -256,7 +237,7 @@ describe('authEffects', () => {
     it('stores the methods the API reports', () => {
       const store = buildStore();
       const service = buildService();
-      const methods = {oidc: true, passwordLogin: false};
+      const methods = {oidc: true};
       service.getSignInMethods.mockReturnValue(of(methods));
       configure(service, buildRouter());
 
@@ -265,7 +246,7 @@ describe('authEffects', () => {
       expect(store.setSignInMethods).toHaveBeenCalledWith(methods);
     });
 
-    it('falls back to the pre-OIDC methods when the request fails', () => {
+    it('reports the failure instead of guessing a method set', () => {
       const store = buildStore();
       const service = buildService();
       service.getSignInMethods.mockReturnValue(throwError(() => new Error('down')));
@@ -273,7 +254,9 @@ describe('authEffects', () => {
 
       TestBed.runInInjectionContext(() => authEffects(store).loadSignInMethods());
 
-      expect(store.setSignInMethods).toHaveBeenCalledWith(FALLBACK_SIGN_IN_METHODS);
+      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('loading');
+      expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('error');
+      expect(store.setSignInMethods).not.toHaveBeenCalled();
     });
   });
 
@@ -408,7 +391,7 @@ describe('authHooks', () => {
   });
 
   describe('OIDC-only forward', () => {
-    const OIDC_ONLY: SignInMethods = {oidc: true, passwordLogin: false};
+    const OIDC_ONLY: SignInMethods = {oidc: true};
 
     function hooksOn(url: string, params: [string, string][] = [], isAuthenticated = false) {
       const store = buildStore({isAuthenticated});
@@ -428,10 +411,10 @@ describe('authHooks', () => {
       expect(store.startOidcSignIn).toHaveBeenCalledOnce();
     });
 
-    it('keeps the form when password sign-in is still enabled', () => {
+    it('does not forward when the API reports no OIDC sign-in', () => {
       const {store} = hooksOn('/login');
 
-      store.signInMethods.set({oidc: true, passwordLogin: true});
+      store.signInMethods.set({oidc: false});
       TestBed.flushEffects();
 
       expect(store.startOidcSignIn).not.toHaveBeenCalled();
@@ -458,8 +441,8 @@ describe('authHooks', () => {
       expect(store.startOidcSignIn).not.toHaveBeenCalled();
     });
 
-    it('does not forward from other pages such as the invite page', () => {
-      const {store} = hooksOn(`${AppRoute.AcceptInvite}?user=u-1&token=t`);
+    it('does not forward from other pages such as the MCP connect page', () => {
+      const {store} = hooksOn(AppRoute.McpConnect);
 
       store.signInMethods.set(OIDC_ONLY);
       TestBed.flushEffects();
@@ -493,19 +476,6 @@ describe('authHooks', () => {
   it('falls back to /accounts when returnUrl is null', () => {
     const store = buildStore({isAuthenticated: false, returnUrl: null});
     const router = buildRouter('/login');
-    configure(buildService(), router);
-
-    TestBed.runInInjectionContext(() => authHooks(store));
-
-    store.isAuthenticated.set(true);
-    TestBed.flushEffects();
-
-    expect(router.navigateByUrl).toHaveBeenCalledWith(AppRoute.Accounts);
-  });
-
-  it('navigates away from the accept-invite page once signed in', () => {
-    const store = buildStore({isAuthenticated: false, returnUrl: null});
-    const router = buildRouter(`${AppRoute.AcceptInvite}?user=u-1&token=t`);
     configure(buildService(), router);
 
     TestBed.runInInjectionContext(() => authHooks(store));

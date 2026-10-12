@@ -1,9 +1,9 @@
 <div>
-  @if (!store.isLoading() && store.totalNetWorth() !== 0) {
+  @if (store.summary() !== null && store.totalNetWorth() !== 0) {
     <cmn-card class="block mb-cmn-8">
       <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Total Net Worth</p>
       <p
-        class="mt-cmn-1 font-mono text-cmn-2xl font-bold tabular-nums text-text-primary"
+        class="mt-cmn-1 text-cmn-2xl font-bold tabular-nums text-text-primary"
         data-testid="accounts-net-worth"
       >
         {{ store.totalNetWorth() | money: store.baseCurrency() }}
@@ -21,7 +21,7 @@
               <span class="text-cmn-xs tabular-nums text-text-secondary"
                 >{{ row.percent | number: '1.0-0' }}%</span
               >
-              <span class="ml-auto font-mono text-cmn-sm tabular-nums text-text-primary">
+              <span class="ml-auto text-cmn-sm tabular-nums text-text-primary">
                 {{ row.value | money: store.baseCurrency() }}
               </span>
             </div>
@@ -31,9 +31,15 @@
     </cmn-card>
   }
 
+  @if (view().offlineNotice; as notice) {
+    <cmn-alert variant="info" class="mb-cmn-4 block" data-testid="offline-notice">{{
+      notice
+    }}</cmn-alert>
+  }
+
   <cmn-async-state
-    [status]="accountsStatus()"
-    [errorMessage]="store.errorMessage()"
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
     [isEmpty]="store.isEmpty()"
     errorPlacement="above"
   >
@@ -105,7 +111,7 @@
 
               <div
                 [class.text-status-error]="inst.totalInBaseCurrency < 0"
-                class="font-mono tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
+                class="tabular-nums font-medium text-text-primary text-right min-w-[5.5rem]"
                 status
               >
                 {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
@@ -143,7 +149,7 @@
                           <span class="font-medium text-cmn-sm text-text-primary">{{
                             card.displayName
                           }}</span>
-                          <span class="font-mono tabular-nums text-cmn-xs text-text-secondary">{{
+                          <span class="tabular-nums text-cmn-xs text-text-secondary">{{
                             card.totalInBaseCurrency | netBalance: store.baseCurrency()
                           }}</span>
                         </div>
@@ -174,25 +180,47 @@
                     account of inst.accounts;
                     track account.accountId + account.accountNumberLast4
                   ) {
-                    <li class="border-t border-border-default">
-                      <button
-                        (click)="navigateToDossier(account.accountNumberLast4)"
-                        class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
-                        type="button"
+                    @if (account.accountType === 'cash') {
+                      <li
+                        class="flex items-center justify-between gap-cmn-4 border-t border-border-default py-cmn-3 pl-cmn-12 pr-cmn-4"
+                        data-testid="cash-row"
                       >
                         <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
-                          <cmn-institution-avatar
-                            [name]="account.accountNumberLast4"
-                            [logoUrl]="account.accountNumberLast4 | assetLogo: account.provider"
-                            size="sm"
-                          />
-                          <span class="truncate">{{ account.accountNumberLast4 }}</span>
+                          <cmn-institution-avatar [name]="account.currency" size="sm" />
+                          <span class="truncate">{{ account.currency }}</span>
+                          <span
+                            class="shrink-0 rounded-full border border-border-default px-cmn-2 text-cmn-xs text-text-secondary"
+                            data-testid="cash-label"
+                            >Cash</span
+                          >
                         </span>
                         <ng-container
                           *ngTemplateOutlet="amountCell; context: {$implicit: account}"
                         />
-                      </button>
-                    </li>
+                      </li>
+                    } @else {
+                      <li class="border-t border-border-default">
+                        <button
+                          (click)="navigateToDossier(account.accountNumberLast4)"
+                          class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
+                          type="button"
+                        >
+                          <span
+                            class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary"
+                          >
+                            <cmn-institution-avatar
+                              [name]="account.accountNumberLast4"
+                              [logoUrl]="account.accountNumberLast4 | assetLogo: account.provider"
+                              size="sm"
+                            />
+                            <span class="truncate">{{ account.accountNumberLast4 }}</span>
+                          </span>
+                          <ng-container
+                            *ngTemplateOutlet="amountCell; context: {$implicit: account}"
+                          />
+                        </button>
+                      </li>
+                    }
                   }
                 }
               </ul>
@@ -221,7 +249,7 @@
 
 <ng-template #amountCell let-account>
   @let bal = account | accountBalance: store.baseCurrency();
-  <div class="shrink-0 text-right font-mono tabular-nums">
+  <div class="shrink-0 text-right tabular-nums">
     <div [class]="bal.owed ? 'text-status-error' : 'text-text-primary'" class="text-cmn-sm">
       {{ bal.native }}
     </div>

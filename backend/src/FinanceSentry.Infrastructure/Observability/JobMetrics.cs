@@ -29,6 +29,9 @@ public sealed class JobMetrics : IDisposable
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRetentionRun = new();
     private DateTimeOffset? _lastBackupVerified;
 
+    // Current consecutive terminal-failure streak per job, written by ConsecutiveFailureGaugeFilter.
+    private readonly ConcurrentDictionary<string, int> _consecutiveFailures = new();
+
     public JobMetrics()
     {
         _meter = new Meter(MeterName);
@@ -49,6 +52,11 @@ public sealed class JobMetrics : IDisposable
             "finance_jobs_scheduled",
             ObserveScheduled,
             description: "Jobs currently enqueued or scheduled and awaiting execution.");
+
+        _meter.CreateObservableGauge(
+            "finance_job_consecutive_failures",
+            ObserveConsecutiveFailures,
+            description: "Consecutive terminal failures of a scheduled job since its last success (0 once it succeeds).");
 
         // ── Data retention & backups (feature 024) ──────────────────────────────────────────────
         _retentionRowsRemoved = _meter.CreateCounter<long>(
@@ -92,6 +100,13 @@ public sealed class JobMetrics : IDisposable
             _duration.Record(durationSeconds, tag);
     }
 
+    /// <summary>
+    /// Publishes a job's current consecutive-failure streak (0 after a success). The series stays at 0
+    /// rather than disappearing so an alert rule sees the recovery.
+    /// </summary>
+    public void SetConsecutiveFailures(string job, int count)
+        => _consecutiveFailures[job] = count;
+
     /// <summary>Records rows removed by a retention purge for a table (feature 024).</summary>
     public void RecordRetentionRowsRemoved(string table, long rows)
         => _retentionRowsRemoved.Add(rows, new KeyValuePair<string, object?>("table", table));
@@ -107,6 +122,12 @@ public sealed class JobMetrics : IDisposable
     private static IEnumerable<Measurement<long>> ObserveScheduled()
     {
         yield return new Measurement<long>(SafeScheduledCount());
+    }
+
+    private IEnumerable<Measurement<int>> ObserveConsecutiveFailures()
+    {
+        foreach (var (job, count) in _consecutiveFailures)
+            yield return new Measurement<int>(count, new KeyValuePair<string, object?>("job", job));
     }
 
     private IEnumerable<Measurement<double>> ObserveRetentionAge()

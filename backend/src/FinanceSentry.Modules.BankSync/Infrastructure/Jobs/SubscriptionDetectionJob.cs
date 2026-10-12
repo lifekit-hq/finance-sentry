@@ -38,7 +38,7 @@ public sealed class SubscriptionDetectionJob(
                      && t.Amount != 0m   // skip €0.00 auth holds / reversals that skew amount stability
                      && t.TransactionDate >= cutoff
                      && (t.TransactionType == null || t.TransactionType == "debit"))
-            .Join(db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).Where(a => a.IsActive),
+            .Join(db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]),
                 t => t.AccountId, a => a.Id, (t, a) => new SubscriptionDetectionAlgorithm.TxRow(
                     t.UserId, t.MerchantName, t.Description, t.Amount,
                     t.TransactionDate, t.MerchantCategory, t.Mcc, a.Currency))

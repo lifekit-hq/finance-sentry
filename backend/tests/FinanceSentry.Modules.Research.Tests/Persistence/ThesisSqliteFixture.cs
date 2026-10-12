@@ -9,9 +9,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 /// <summary>
 /// A SQLite-backed <see cref="ResearchDbContext"/> holding the tables the thesis write path
-/// touches — <c>theses</c> and the <c>quote_cache</c> its Created-event hook refreshes — so the
-/// #443 save-to-read guarantee and the #626 unit-of-work guarantee can both be exercised over real
-/// SQL on any host, no Docker and no network.
+/// touches — <c>theses</c> — so the #443 save-to-read guarantee can be exercised over real SQL on
+/// any host, no Docker and no network.
 ///
 /// Two deliberate deviations from the production Postgres mapping, both narrowly scoped:
 /// <list type="bullet">
@@ -32,17 +31,9 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
 {
     private const string ThesisTextLengthCheckConstraint = "ck_theses_thesis_text_length";
 
-    private const string QuoteTickerLengthCheckConstraint = "ck_quote_cache_ticker_length";
-
-    /// <summary>
-    /// <see cref="QuoteCacheEntry"/> is kept alongside the thesis because the two share the scoped
-    /// context: <c>ThesisEventRecorder</c> refreshes quotes between the thesis write and the
-    /// event write, so a quote-cache failure lands in the middle of the thesis unit of work.
-    /// </summary>
     private static readonly HashSet<Type> KeptEntityTypes =
     [
         typeof(InvestmentThesis),
-        typeof(QuoteCacheEntry),
     ];
 
     private readonly SqliteConnection connection;
@@ -92,24 +83,11 @@ public sealed class ThesisSqliteFixture : IAsyncDisposable
             thesis.Property(x => x.CreatedAt).HasDefaultValueSql(null);
             thesis.Property(x => x.UpdatedAt).HasDefaultValueSql(null);
             thesis.Property(x => x.EntryPrice).HasColumnType(null);
-            thesis.Property(x => x.KeyDataPoints).HasColumnType(null);
-            thesis.Property(x => x.Catalysts).HasColumnType(null);
             thesis.Property(x => x.InvalidationTriggers).HasColumnType(null);
 
             thesis.ToTable(t => t.HasCheckConstraint(
                 ThesisTextLengthCheckConstraint,
                 $"length(\"ThesisText\") <= {DeclaredMaxLength(thesis.Metadata, nameof(InvestmentThesis.ThesisText))}"));
-
-            var quote = modelBuilder.Entity<QuoteCacheEntry>();
-            quote.Property(x => x.FetchedAt).HasDefaultValueSql(null);
-            quote.Property(x => x.Price).HasColumnType(null);
-            quote.Property(x => x.PreviousClose).HasColumnType(null);
-
-            // Gives a test a deterministic way to make the cache write fail mid-unit-of-work, the
-            // way a constraint violation does on Postgres.
-            quote.ToTable(t => t.HasCheckConstraint(
-                QuoteTickerLengthCheckConstraint,
-                $"length(\"Ticker\") <= {DeclaredMaxLength(quote.Metadata, nameof(QuoteCacheEntry.Ticker))}"));
         }
 
         private static int DeclaredMaxLength(IMutableEntityType entityType, string propertyName)

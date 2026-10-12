@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Integration.Research;
 
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Json;
@@ -8,6 +9,8 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Agent.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
@@ -293,6 +296,7 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
     public Mock<IValuationHistoryService> ValuationHistoryMock { get; } = new(MockBehavior.Loose);
     public Mock<ILedgerNarrator> NarratorMock { get; } = new(MockBehavior.Loose);
     public Mock<IAgentConversationService> AgentConversationMock { get; } = new(MockBehavior.Loose);
+    public InMemoryAssetLedgerReadRepository LedgerReads { get; } = new();
 
     public Guid TestUserId { get; } = Guid.NewGuid();
     public Guid NonOwnerUserId { get; } = Guid.NewGuid();
@@ -311,6 +315,10 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             ReplaceService(services, BrokerageHoldingsReaderMock.Object);
             ReplaceService(services, NarratorMock.Object);
             ReplaceService(services, AgentConversationMock.Object);
+
+            // The real upsert is one INSERT ... ON CONFLICT, which the in-memory provider cannot run
+            // (ResearchUpsertTests covers it on Postgres).
+            ReplaceService<IAssetLedgerReadRepository>(services, LedgerReads);
 
             // Default stubs: return empty/null so tests that don't set up mocks still get 200.
             BookFiguresMock
@@ -423,4 +431,40 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
         services.AddDbContext<TContext>(options =>
             options.UseInMemoryDatabase(dbName));
     }
+}
+
+public sealed class InMemoryAssetLedgerReadRepository : IAssetLedgerReadRepository
+{
+    private readonly ConcurrentDictionary<(Guid UserId, string Symbol), AssetLedgerRead> _reads = new();
+
+    public Task<AssetLedgerRead?> GetAsync(Guid userId, string symbol, CancellationToken ct = default)
+        => Task.FromResult(_reads.GetValueOrDefault((userId, Normalize(symbol))));
+
+    public Task UpsertAsync(AssetLedgerRead read, CancellationToken ct = default)
+    {
+        var symbol = Normalize(read.Symbol);
+        _reads.AddOrUpdate(
+            (read.UserId, symbol),
+            _ => new AssetLedgerRead
+            {
+                Id = read.Id == Guid.Empty ? Guid.NewGuid() : read.Id,
+                UserId = read.UserId,
+                Symbol = symbol,
+                Narrative = read.Narrative,
+                SourceFingerprint = read.SourceFingerprint,
+                GeneratedAt = read.GeneratedAt,
+            },
+            (_, stored) => new AssetLedgerRead
+            {
+                Id = stored.Id,
+                UserId = stored.UserId,
+                Symbol = stored.Symbol,
+                Narrative = read.Narrative,
+                SourceFingerprint = read.SourceFingerprint,
+                GeneratedAt = read.GeneratedAt,
+            });
+        return Task.CompletedTask;
+    }
+
+    private static string Normalize(string symbol) => symbol.Trim().ToUpperInvariant();
 }

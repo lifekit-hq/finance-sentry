@@ -39,7 +39,10 @@ function item(
 function groupsFor(items: FlowBreakdownItem[], accountFilter: Nullable<string> = null) {
   const store = {
     breakdown: signal<Nullable<FlowBreakdown>>({month: '2026-09', items}),
-    month: signal('2026-09'),
+    selectedMonth: signal('2026-09'),
+    from: signal<Nullable<string>>(null),
+    to: signal<Nullable<string>>(null),
+    months: signal(1),
     accountFilter: signal(accountFilter),
     status: signal<AsyncStatus>('idle'),
     errorCode: signal<Nullable<string>>(null),

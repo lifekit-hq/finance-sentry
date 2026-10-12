@@ -53,6 +53,36 @@ public sealed class BenchmarkRelativeRecordRepositoryTests : IAsyncLifetime
     };
 
     [DockerRequiredFact]
+    public async Task ReplaceRun_WhenTheInsertFails_KeepsTheExistingRun()
+    {
+        await using (var setup = CreateContext())
+        {
+            await setup.Database.EnsureCreatedAsync();
+        }
+
+        var userId = Guid.NewGuid();
+
+        await using (var ctx = CreateContext())
+        {
+            await new BenchmarkRelativeRecordRepository(ctx).ReplaceRunAsync(userId, Monday, [Book(userId, Monday, -6m)]);
+        }
+
+        // Two rows with the same (user, as-of, scope, key, window) violate the unique index on insert.
+        await using (var ctx = CreateContext())
+        {
+            var act = () => new BenchmarkRelativeRecordRepository(ctx).ReplaceRunAsync(
+                userId, Monday, [Book(userId, Monday, -1m), Book(userId, Monday, -2m)]);
+            await act.Should().ThrowAsync<DbUpdateException>();
+        }
+
+        await using (var ctx = CreateContext(userId))
+        {
+            var latest = await new BenchmarkRelativeRecordRepository(ctx).ListLatestRunAsync(userId);
+            latest.Should().ContainSingle().Which.ExcessReturnPct.Should().Be(-6m);
+        }
+    }
+
+    [DockerRequiredFact]
     public async Task SameDayRerun_ReplacesTheRun_AndPreviousRunReadsTheEarlierDay()
     {
         await using (var setup = CreateContext())

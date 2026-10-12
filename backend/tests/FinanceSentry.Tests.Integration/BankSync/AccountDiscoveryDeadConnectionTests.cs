@@ -91,7 +91,7 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
 
         var sut = new AccountDiscoveryService(
             connections, client.Object, refresh, monobankCredentials.Object, new Mock<IMonobankAdapter>().Object,
-            new MonobankBalanceCache(), encryption.Object, accounts, jobs.Object,
+            new MonobankBalanceCache(TimeProvider.System), encryption.Object, accounts, jobs.Object,
             NullLogger<AccountDiscoveryService>.Instance);
         return (sut, client);
     }

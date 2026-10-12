@@ -1,16 +1,28 @@
 <cmn-page-container spacing="none" fill>
   <p class="text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
 
-  <div class="mt-cmn-4 flex gap-cmn-2 overflow-x-auto">
-    @for (opt of filterOptions; track opt.id) {
-      <cmn-chip [selected]="store.filter() === opt.id" (clicked)="store.setFilter(opt.id)">
-        {{ opt.label() }}
-      </cmn-chip>
-    }
-  </div>
+  <lk-segmented
+    [options]="filterOptions()"
+    [value]="store.filter()"
+    (lk-segmented-change)="onFilterChange($event)"
+    class="mt-cmn-4 block"
+    label="Filter alerts"
+  />
 
-  @if (store.alerts().length === 0) {
-    <div class="flex min-h-0 flex-1 items-center justify-center">
+  <cmn-async-state
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
+    [isEmpty]="store.alerts().length === 0"
+    (retry)="store.load(store.query())"
+    class="mt-cmn-3 flex min-h-0 flex-1 flex-col"
+    retryable
+  >
+    <div skeleton class="space-y-cmn-2" data-testid="alerts-skeleton">
+      @for (row of skeletonRows; track row) {
+        <cmn-skeleton height="4rem" />
+      }
+    </div>
+    <div empty class="flex min-h-0 flex-1 items-center justify-center">
       <cmn-empty-state
         [message]="emptyTitle()"
         [subMessage]="emptySubtext()"
@@ -18,18 +30,13 @@
         iconClass="text-status-success"
       />
     </div>
-  } @else {
-    <div class="mt-cmn-3 md:min-h-0 md:flex-1 md:overflow-auto">
+    <div class="md:min-h-0 md:flex-1 md:overflow-auto">
       @for (alert of store.alerts(); track alert.id) {
         <div
-          [class.opacity-60]="alert.isResolved"
+          [class]="alert.isResolved ? resolvedRowClass : ''"
           [attr.data-resolved]="alert.isResolved"
-          (click)="openAlert(alert)"
-          (keydown.enter)="onRowKey($event, alert)"
-          (keydown.space)="onRowKey($event, alert)"
-          class="rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          role="button"
-          tabindex="0"
+          class="relative rounded-cmn-md"
+          data-testid="alert-row"
         >
           <cmn-alert-item
             [title]="alert.title"
@@ -42,50 +49,57 @@
             [isRead]="alert.isRead || alert.isResolved"
             [description]="alert | alertCaption"
             (dismissed)="dismiss(alert.id)"
+            class="[&_button]:relative [&_button]:z-10"
             density="flat"
           />
+          <button
+            [attr.aria-label]="alert.title"
+            (click)="openAlert(alert)"
+            class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+            type="button"
+            data-testid="alert-row-open"
+          ></button>
         </div>
       }
     </div>
+  </cmn-async-state>
 
-    @if (showPager()) {
-      <nav
-        class="mt-cmn-3 flex flex-wrap items-center justify-between gap-cmn-3"
-        aria-label="Alerts pages"
-        data-testid="alerts-pager"
-      >
-        <div class="flex items-center gap-cmn-2">
-          <cmn-button
-            [disabled]="!store.hasPreviousPage()"
-            (clicked)="store.setPage(store.currentPage() - 1)"
-            variant="secondary"
-            size="sm"
-            data-testid="alerts-prev"
-            icon="ChevronLeft"
-            >Previous</cmn-button
-          >
-          <span class="text-cmn-sm text-text-secondary" data-testid="alerts-page-label">
-            Page {{ store.currentPage() }} of {{ store.totalPages() }}
-          </span>
-          <cmn-button
-            [disabled]="!store.hasNextPage()"
-            (clicked)="store.setPage(store.currentPage() + 1)"
-            variant="secondary"
-            size="sm"
-            data-testid="alerts-next"
-            icon="ChevronRight"
-            iconPosition="suffix"
-            >Next</cmn-button
-          >
-        </div>
-        <div class="flex items-center gap-cmn-2">
-          @for (size of pageSizeOptions; track size) {
-            <cmn-chip [selected]="store.pageSize() === size" (clicked)="store.setPageSize(size)">
-              {{ size }} per page
-            </cmn-chip>
-          }
-        </div>
-      </nav>
-    }
+  @if (store.alerts().length > 0 && showPager()) {
+    <nav
+      class="mt-cmn-3 flex flex-wrap items-center justify-between gap-cmn-3"
+      aria-label="Alerts pages"
+      data-testid="alerts-pager"
+    >
+      <div class="flex items-center gap-cmn-2">
+        <cmn-button
+          [disabled]="!store.hasPreviousPage()"
+          (clicked)="store.setPage(store.currentPage() - 1)"
+          variant="secondary"
+          size="sm"
+          data-testid="alerts-prev"
+          icon="ChevronLeft"
+          >Previous</cmn-button
+        >
+        <span class="text-cmn-sm text-text-secondary" data-testid="alerts-page-label">
+          Page {{ store.currentPage() }} of {{ store.totalPages() }}
+        </span>
+        <cmn-button
+          [disabled]="!store.hasNextPage()"
+          (clicked)="store.setPage(store.currentPage() + 1)"
+          variant="secondary"
+          size="sm"
+          data-testid="alerts-next"
+          icon="ChevronRight"
+          iconPosition="suffix"
+          >Next</cmn-button
+        >
+      </div>
+      <lk-segmented
+        [options]="pageSizeOptions"
+        [value]="'' + store.pageSize()"
+        (lk-segmented-change)="onPageSizeChange($event)"
+        label="Alerts per page"
+      />
+    </nav>
   }
 </cmn-page-container>

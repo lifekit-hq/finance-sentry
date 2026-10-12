@@ -5,7 +5,7 @@ using FinanceSentry.Modules.Wealth.Domain.Ports;
 
 /// <summary>
 /// 412: implements the Radar module's <see cref="IPortfolioValueSource"/> by reading daily
-/// brokerage-sleeve totals through the Wealth module's published <see cref="IBrokerageValueHistoryReader"/>
+/// invested brokerage values (broker cash excluded) through the Wealth module's published <see cref="IBrokerageValueHistoryReader"/>
 /// port (#673). Lives in the Integration layer so neither module references the other directly.
 /// </summary>
 public sealed class RadarPortfolioValueSource(IBrokerageValueHistoryReader brokerageHistory)
@@ -15,8 +15,10 @@ public sealed class RadarPortfolioValueSource(IBrokerageValueHistoryReader broke
         Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         var daily = await brokerageHistory.GetDailyAsync(userId, from, to, ct);
+        // A day with no split is skipped: neither zero nor the cash-inclusive total stands in for it.
         return daily
-            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageTotalUsd))
+            .Where(d => d.BrokerageInvestedUsd is not null)
+            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageInvestedUsd!.Value))
             .ToList();
     }
 }

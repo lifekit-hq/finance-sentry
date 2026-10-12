@@ -1,7 +1,5 @@
 namespace FinanceSentry.Tests.Integration.Auth;
 
-using System.Net;
-using System.Net.Http.Json;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Domain.Entities;
@@ -9,15 +7,14 @@ using FinanceSentry.Modules.Auth.Domain.Exceptions;
 using FinanceSentry.Modules.Auth.Infrastructure.Authorization;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 /// <summary>
-/// The provider-agnostic external sign-in (<see cref="ExternalLoginCommand"/>) and the switch that turns the
-/// password endpoint off.
+/// The provider-agnostic external sign-in (<see cref="ExternalLoginCommand"/>), which is how every account
+/// signs in now that the password endpoint is a break-glass path behind a flag.
 /// </summary>
 public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
@@ -26,7 +23,7 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
     [Fact]
     public async Task InvitedAccount_IsRelinkedByVerifiedEmail()
     {
-        var (userId, _) = await factory.CreatePendingInviteAsync("ext-invited@test.com");
+        var userId = await factory.CreatePendingInviteAsync("ext-invited@test.com");
 
         var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-invited", "ext-invited@test.com", true));
 
@@ -147,42 +144,19 @@ public class ExternalLoginTests(AuthApiFactory factory) : IClassFixture<AuthApiF
     }
 
     [Fact]
-    public async Task PasswordLoginDisabled_LoginReturns403()
+    public async Task InviteeWithNoPassword_SignsInThroughTheProviderAndAnUninvitedEmailIsRefused()
     {
-        await factory.EnsureUserExistsAsync("pw-off@test.com", "TestPass123!");
-        using var disabled = factory.WithWebHostBuilder(b => b.UseSetting("Auth:PasswordLogin:Enabled", "false"));
-        var client = disabled.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-        var login = await client.PostAsJsonAsync("/api/v1/auth/login",
-            new { email = "pw-off@test.com", password = "TestPass123!" });
-
-        login.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await login.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
-    }
-
-    [Fact]
-    public async Task PasswordLoginDisabled_AcceptInviteIsRefusedAndTheInviteeSignsInThroughTheProvider()
-    {
-        var (userId, token) = await factory.CreatePendingInviteAsync("pw-off-invitee@test.com");
-        using var disabled = factory.WithWebHostBuilder(b => b.UseSetting("Auth:PasswordLogin:Enabled", "false"));
-        var client = disabled.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-        var accept = await client.PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token, password = "quiet lantern orchard" });
-
-        accept.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await accept.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("SIGN_IN_METHOD_DISABLED");
-        accept.Headers.Contains("Set-Cookie").Should().BeFalse();
-        using (var scope = factory.Services.CreateScope())
-        {
-            var invitee = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByIdAsync(userId);
-            invitee!.PasswordHash.Should().BeNull();
-        }
+        var userId = await factory.CreatePendingInviteAsync("pw-off-invitee@test.com");
 
         var result = await SignInAsync(new ExternalLoginCommand(Provider, "sub-pw-off-invitee", "pw-off-invitee@test.com", true));
 
         result.Response.User.Id.Should().Be(userId);
         (await FindByLoginAsync("sub-pw-off-invitee"))!.Id.Should().Be(userId);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var invitee = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByIdAsync(userId);
+            invitee!.PasswordHash.Should().BeNull();
+        }
 
         var uninvited = async () => await SignInAsync(new ExternalLoginCommand(Provider, "sub-pw-off-stranger", "pw-off-stranger@test.com", true));
         await uninvited.Should().ThrowAsync<AccountNotInvitedException>();

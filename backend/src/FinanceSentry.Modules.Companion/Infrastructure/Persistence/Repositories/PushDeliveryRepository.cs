@@ -25,6 +25,9 @@ public class PushDeliveryRepository(CompanionDbContext db) : IPushDeliveryReposi
         return await db.Events.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .Where(e => e.UserId == userId
                         && e.CapturedAt >= since
+                        && !(e.Kind == CompanionEventKind.AnalystAction
+                             && (EF.Functions.Like(e.Summary, "% Upgrade " + e.Subject + "%")
+                                 || EF.Functions.Like(e.Summary, "% Downgrade " + e.Subject + "%")))
                         && (includeOperational || e.Kind != CompanionEventKind.OperationalFailure)
                         && !deliveries.Any(d => d.EventId == e.Id && d.SubscriptionId == subscriptionId))
             .OrderBy(e => e.CapturedAt)
@@ -32,12 +35,25 @@ public class PushDeliveryRepository(CompanionDbContext db) : IPushDeliveryReposi
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlySet<Guid>> ListUndeliveredAlertIdsUnscopedAsync(
+        Guid subscriptionId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default)
+    {
+        var delivered = await db.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(d => d.SubscriptionId == subscriptionId && d.AlertId != null && alertIds.Contains(d.AlertId.Value))
+            .Select(d => d.AlertId!.Value)
+            .ToListAsync(ct);
+        return alertIds.Except(delivered).ToHashSet();
+    }
+
     public async Task AddDeliveriesAsync(IReadOnlyCollection<PushDelivery> deliveries, CancellationToken ct = default)
     {
         foreach (var delivery in deliveries)
         {
             var exists = await db.PushDeliveries.IgnoreQueryFilters([OwnerQueryFilter.Name])
-                .AnyAsync(d => d.EventId == delivery.EventId && d.SubscriptionId == delivery.SubscriptionId, ct);
+                .AnyAsync(d => d.SubscriptionId == delivery.SubscriptionId
+                               && (delivery.EventId != null
+                                   ? d.EventId == delivery.EventId
+                                   : d.AlertId == delivery.AlertId), ct);
             if (!exists)
                 db.PushDeliveries.Add(delivery);
         }

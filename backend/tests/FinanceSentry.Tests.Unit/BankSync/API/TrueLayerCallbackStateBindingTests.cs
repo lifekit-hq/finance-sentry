@@ -125,6 +125,7 @@ public class TrueLayerCallbackStateBindingTests
             new Mock<IBankAccountRepository>().Object,
             new Mock<ITransactionRepository>().Object,
             new Mock<IBackgroundJobClient>().Object,
+            new Mock<IRecurringJobManager>().Object,
             new Mock<ISyncJobRepository>().Object,
             new Mock<ITransactionSyncCoordinator>().Object,
             new Mock<IAlertGeneratorService>().Object,

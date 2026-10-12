@@ -9,7 +9,7 @@ using global::Hangfire.Storage;
 /// as each job reaches a terminal state. Registered globally via the Hangfire configuration.
 ///
 /// <c>FailedState</c> is only reached after all automatic retries are exhausted, so it represents a
-/// terminal failure — the same semantics the consecutive-failure alerting relies on.
+/// terminal failure — the same semantics the consecutive-failure gauge relies on.
 /// </summary>
 public sealed class JobMetricsFilter(JobMetrics metrics) : IApplyStateFilter
 {

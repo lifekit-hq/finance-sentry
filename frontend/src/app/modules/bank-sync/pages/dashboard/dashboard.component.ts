@@ -6,11 +6,11 @@ import {
   inject,
 } from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
+import {type ChartPointClick, type DonutSegmentClick} from '@lifekit-hq/charts-core';
 import {
   AlertComponent,
   AreaChartComponent,
   AsyncStateComponent,
-  type AsyncStateStatus,
   BarChartComponent,
   ButtonComponent,
   CardComponent,
@@ -24,13 +24,21 @@ import {
 } from '@lifekit-hq/ui';
 
 import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {FireTileComponent} from '../../components/fire-tile/fire-tile.component';
 import {
+  CASH_FLOW_SERIES_TYPES,
   HISTORY_RANGE_LABELS,
   HISTORY_RANGE_TILE_HEADINGS,
+  NET_WORTH_SERIES_ROUTES,
 } from '../../constants/dashboard/dashboard.constants';
 import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashboard.model';
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
@@ -77,13 +85,22 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
       <div>
         <p class="text-cmn-sm text-text-secondary">How your money is trending over time</p>
 
+        @if (view().offlineNotice; as notice) {
+          <cmn-alert variant="info" class="mt-cmn-3 block" data-testid="offline-notice">{{
+            notice
+          }}</cmn-alert>
+        }
+
         <cmn-async-state
-          [status]="dashboardStatus()"
-          [errorMessage]="store.errorMessage()"
+          [status]="view().status"
+          [errorMessage]="view().errorMessage"
           [isEmpty]="showEmptyState()"
+          [errorPlacement]="errorPlacement()"
           class="block space-y-cmn-6"
-          errorPlacement="above"
         >
+          <cmn-button (clicked)="retry()" error-action variant="secondary" size="sm"
+            >Retry</cmn-button
+          >
           <cmn-card empty>
             <div class="flex flex-col items-center gap-cmn-4 py-cmn-10 text-center">
               <div
@@ -123,20 +140,43 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 </a>
               </div>
               @if (store.isLoading()) {
-                <cmn-skeleton height="2.25rem" width="50%" />
+                <cmn-skeleton height="1.875rem" width="50%" />
               } @else {
                 <p
-                  class="font-mono text-cmn-2xl font-semibold tabular-nums text-text-primary"
+                  class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
                   data-testid="net-worth-value"
                 >
                   {{ store.totalBalanceFormatted() }}
                 </p>
-                @if (store.netWorthChangeFormatted()) {
+              }
+              <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
+              <div class="h-4 leading-4" data-testid="net-worth-split-slot">
+                @if (store.isLoading()) {
+                  <cmn-skeleton height="0.875rem" width="45%" />
+                } @else if (store.bookSplitFormatted()) {
+                  <p
+                    class="text-cmn-xs leading-4 text-text-secondary tabular-nums"
+                    data-testid="net-worth-split"
+                  >
+                    {{ store.bookSplitFormatted() }}
+                  </p>
+                }
+              </div>
+              <!--
+                Both lines under the figure own a fixed-height slot, so the hero keeps one height
+                across every range, while the history loads and while scrubbing: a line that does
+                not apply (or has no number yet) leaves its slot empty instead of collapsing it.
+              -->
+              <div class="h-5 leading-5" data-testid="net-worth-change-slot">
+                @if (store.isLoading() || store.isHistoryLoading()) {
+                  <cmn-skeleton height="1rem" width="40%" />
+                } @else if (store.netWorthChangeFormatted()) {
                   <p
                     [class]="changeClass()"
-                    class="font-label text-cmn-sm font-medium"
+                    class="font-label text-cmn-sm font-medium leading-5"
                     data-testid="net-worth-change"
                   >
+                    <span class="font-normal text-text-secondary">Change</span>
                     {{ store.netWorthChangeFormatted() }}
                     @if (store.netWorthChangePercentFormatted()) {
                       ({{ store.netWorthChangePercentFormatted() }})
@@ -146,24 +186,65 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                     >
                   </p>
                 }
-              }
+              </div>
+              <!--
+                The invested book's change (brokerage + crypto positions, cash excluded) over the
+                days that have a split. A change in value, deposits included, not a return. Empty
+                below two split days, so a range reaching before the backfill shows nothing here.
+              -->
+              <div class="h-4 leading-4" data-testid="net-worth-invested-change-slot">
+                @if (!store.isLoading() && !store.isHistoryLoading()) {
+                  @if (store.investedChangeFormatted()) {
+                    <p
+                      [class]="investedChangeClass()"
+                      class="font-label text-cmn-xs font-medium leading-4"
+                      data-testid="net-worth-invested-change"
+                    >
+                      <span class="font-normal text-text-secondary">Invested change</span>
+                      {{ store.investedChangeFormatted() }}
+                      @if (store.investedChangePercentFormatted()) {
+                        ({{ store.investedChangePercentFormatted() }})
+                      }
+                      <span class="font-normal text-text-secondary"
+                        >·
+                        {{
+                          store.investedChangeSinceFormatted() ??
+                            store.scrubDateFormatted() ??
+                            rangeLabel()
+                        }}</span
+                      >
+                    </p>
+                  }
+                }
+              </div>
               <!--
                 Projected from contributions, never from the net-worth line: most of the book is
                 market-marked, so a trend fitted to that line would forecast the market and call
-                it a savings forecast. Hidden below three complete months by hasProjection().
+                it a savings forecast. Empty below three complete months (hasProjection()).
               -->
-              @if (store.hasProjection()) {
-                <p [title]="store.projectionBasisLabel()" class="text-cmn-xs text-text-secondary">
-                  At this pace:
-                  <span class="font-medium text-text-primary">{{
-                    store.projectedNetWorthFormatted()
-                  }}</span>
-                  in 12 months
-                </p>
-              }
+              <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
+                @if (store.isLoading() || store.isHistoryLoading()) {
+                  <cmn-skeleton height="0.875rem" width="55%" />
+                } @else if (store.hasProjection()) {
+                  <p
+                    [title]="store.projectionBasisLabel()"
+                    class="text-cmn-xs leading-4 text-text-secondary"
+                  >
+                    At this pace:
+                    <span class="font-medium text-text-primary">{{
+                      store.projectedNetWorthFormatted()
+                    }}</span>
+                    in 12 months
+                  </p>
+                }
+              </div>
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
-              } @else if (!store.historyHasHistory() && !store.isHistoryLoading()) {
+              } @else if (
+                !store.historyHasHistory() && (store.isLoading() || store.isHistoryLoading())
+              ) {
+                <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
+              } @else if (!store.historyHasHistory()) {
                 <cmn-alert variant="info"
                   >Net worth history starts after tonight's snapshot.</cmn-alert
                 >
@@ -173,9 +254,10 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   [stacked]="true"
                   [currency]="store.baseCurrency()"
                   [scrubbable]="true"
+                  [label]="store.netWorthChartLabel()"
                   (scrub)="store.setScrubIndex($event.index)"
+                  (pointClick)="onNetWorthClick($event)"
                   (scrubEnd)="store.setScrubIndex(null)"
-                  label="Net worth by sleeve"
                 />
                 @if (store.netWorthStaleNotice()) {
                   <div class="mt-cmn-2">
@@ -228,10 +310,12 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       >{{ tile.label }}</span
                     >
                     @if (store.isLoading()) {
-                      <cmn-skeleton height="1.5rem" width="70%" />
+                      <span class="block h-6 sm:h-[1.5625rem]">
+                        <cmn-skeleton height="100%" width="70%" />
+                      </span>
                     } @else {
                       <span
-                        class="block truncate font-mono text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
+                        class="block truncate text-cmn-md font-semibold tabular-nums text-text-primary sm:text-cmn-xl"
                         >{{ tile.value() }}</span
                       >
                     }
@@ -246,6 +330,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
                 [currency]="store.baseCurrency()"
+                (barClick)="onCashFlowBarClick($event)"
                 label="Income vs Spending (complete months)"
               />
             </div>
@@ -257,6 +342,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 [segments]="store.categoryChartData()"
                 [label]="topCategoriesLabel()"
                 [currency]="store.baseCurrency()"
+                (segmentClick)="onCategorySegmentClick($event)"
               />
             </div>
             <div class="lg:col-span-2">
@@ -289,16 +375,32 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
 })
 export class DashboardComponent {
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(DashboardStore);
   public readonly rangeOptions = HISTORY_RANGES;
   public readonly breakdownRoute = AppRoute.FlowBreakdown;
   public readonly accountsRoute = AppRoute.AccountsList;
-  public readonly showEmptyState = computed(
-    () => !this.store.isLoading() && (this.store.data()?.accountCount ?? 0) === 0
+  // An error leaves `data` null, which must never read as "no accounts connected".
+  public readonly showEmptyState = computed(() => {
+    const data = this.store.data();
+    return (
+      !this.store.isLoading() && !this.store.hasError() && data !== null && data.accountCount === 0
+    );
+  });
+  // With no data to keep, the error replaces the zeroed widgets instead of sitting above them.
+  public readonly errorPlacement = computed(() =>
+    this.store.data() === null ? 'replace' : 'above'
   );
-  public readonly dashboardStatus = computed<AsyncStateStatus>(() =>
-    this.store.errorMessage() ? 'error' : 'success'
+  // Loading stays out of the status: the dashboard renders per-widget skeletons in place.
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: false,
+      hasData: this.store.data() !== null,
+      errorMessage: this.store.errorMessage(),
+      offline: this.connectivity.offline(),
+      lastSyncedAt: this.store.lastSyncedAt(),
+    })
   );
   public readonly breakdownParams = computed(() =>
     DashboardRangeUtils.breakdownParams(this.store.historyRange())
@@ -312,6 +414,9 @@ export class DashboardComponent {
   );
   public readonly changeClass = computed(() =>
     this.paceClass(this.store.netWorthChangeDirection())
+  );
+  public readonly investedChangeClass = computed(() =>
+    this.paceClass(this.store.investedChangeDirection())
   );
   // The three window figures read as one card. Savings opens the audit view, which
   // shows every money bucket at once.
@@ -341,12 +446,17 @@ export class DashboardComponent {
     if (!delta) {
       return 'text-text-secondary';
     }
-    return delta > 0 ? 'text-status-success' : 'text-status-error';
+    return delta > 0 ? GAIN_TEXT_CLASS : LOSS_TEXT_CLASS;
   }
 
   public onRangeChange(event: Event): void {
     const {value} = (event as CustomEvent<{value: HistoryRange}>).detail;
     this.store.setHistoryRange(value);
+  }
+
+  public retry(): void {
+    this.store.load(this.store.historyRange());
+    this.store.loadNetWorthHistory(this.store.historyRange());
   }
 
   public goToAccounts(): void {
@@ -375,8 +485,40 @@ export class DashboardComponent {
 
   // Top spendings counts outflows only, so the drill-down lists the category's debits.
   public onCategoryClick(row: CategoryStat): void {
+    this.openCategory(row.category);
+  }
+
+  // A band is a sleeve of the book, so it opens the accounts page that lists that sleeve.
+  public onNetWorthClick(click: ChartPointClick): void {
+    const route = NET_WORTH_SERIES_ROUTES.get(click.seriesLabel);
+    if (route) {
+      void this.router.navigateByUrl(route);
+    }
+  }
+
+  // A bar is one month of income or spending, so it lists that month's credits or debits.
+  public onCashFlowBarClick(click: ChartPointClick): void {
+    const type = CASH_FLOW_SERIES_TYPES.get(click.seriesLabel);
+    const monthKey = this.store.incomeVsSpendingMonthKeys()[click.index];
+    if (!type || !monthKey) {
+      return;
+    }
     void this.router.navigate([AppRoute.Transactions], {
-      queryParams: {type: 'debit', category: row.category, ...this.rangeDates()},
+      queryParams: {type, ...DashboardRangeUtils.monthDates(monthKey)},
+    });
+  }
+
+  // The folded "Other categories" slice stands for several categories, so it opens nothing.
+  public onCategorySegmentClick(click: DonutSegmentClick): void {
+    const category = this.store.categoryChartKeys()[click.index];
+    if (category) {
+      this.openCategory(category);
+    }
+  }
+
+  private openCategory(category: string): void {
+    void this.router.navigate([AppRoute.Transactions], {
+      queryParams: {type: 'debit', category, ...this.rangeDates()},
     });
   }
 

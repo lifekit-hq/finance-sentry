@@ -10,6 +10,21 @@ export interface NetWorthSnapshotDto {
   /** Comma-separated sleeves ('banking','brokerage','crypto') carried forward because their
    * feed was stale that day — the value is estimated, not measured. Null when all fresh. */
   staleSleeves?: string | null;
+  /** Cash / invested split of `totalNetWorth` (cash is the remainder, so the three add up to it).
+   * All three are null together on a day with no split — before the backfill window, or a
+   * source that was stale at capture. Null means "no split", never zero. */
+  cashTotal?: Nullable<number>;
+  brokerageInvested?: Nullable<number>;
+  cryptoInvested?: Nullable<number>;
+}
+
+/** A snapshot's cash / invested split, once all three parts are known. */
+export interface NetWorthSplit {
+  cash: number;
+  brokerageInvested: number;
+  cryptoInvested: number;
+  /** `brokerageInvested + cryptoInvested`. */
+  invested: number;
 }
 
 export interface NetWorthHistoryResponse {
@@ -60,4 +75,8 @@ export interface DashboardData {
   /** Currency every `…Usd` figure and category total is expressed in — the profile's base
    * currency (the field names keep their historical suffix). */
   baseCurrency?: string;
+  /** Cash and invested split of the book (`IBookFiguresService`), in `baseCurrency`. Cash nets
+   * card debt, so it can be negative. Null when the book was not read in full. */
+  cashUsd?: Nullable<number>;
+  investedUsd?: Nullable<number>;
 }

@@ -26,7 +26,7 @@
 |-------|--------|----------|
 | Credentials encrypted at rest | ✅ | AES-256-GCM, key never in DB (`EncryptedCredential` stores cipher only) |
 | No tokens in logs | ✅ | Code review: no `LogInformation`/`LogError` calls with token fields |
-| No stack traces to client | ✅ | `ErrorHandlingMiddleware` logs server-side, returns sanitized message |
+| No stack traces to client | ✅ | `ApiExceptionHandler` logs server-side, returns sanitized message |
 | Audit logs contain no PII | ✅ | `AuditLog` stores action + resource ID only; no amounts/descriptions |
 
 ### Transport Security

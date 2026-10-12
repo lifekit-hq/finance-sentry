@@ -1,12 +1,19 @@
 import {DatePipe, SlicePipe, UpperCasePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+  ViewContainerRef,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertComponent,
+  AsyncStateComponent,
   ButtonComponent,
   CardComponent,
-  ChipComponent,
   CmnDialogService,
   CmnPageActionsService,
   ConfirmDialogComponent,
@@ -16,6 +23,7 @@ import {
   MenuComponent,
   type MenuItem,
   PageContainerComponent,
+  SkeletonComponent,
   StatCardComponent,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
@@ -23,6 +31,8 @@ import {take} from 'rxjs';
 import {SUBSCRIPTIONS_ADD_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {AddCommitmentDialogComponent} from '../../components/add-commitment-dialog/add-commitment-dialog.component';
 import {SetTermDialogComponent} from '../../components/set-term-dialog/set-term-dialog.component';
 import {CADENCE_LABELS} from '../../constants/subscription/subscription-form.constants';
@@ -37,6 +47,9 @@ import {InstallmentProgressPipe} from '../../pipes/installment-progress.pipe';
 import {MerchantColorPipe} from '../../pipes/merchant-color.pipe';
 import {SubscriptionsStore} from '../../store/subscriptions/subscriptions.store';
 import {SubscriptionUtils} from '../../utils/subscription.utils';
+import {NO_ACTIVE_SUBSCRIPTIONS_COPY} from './subscriptions.constants';
+
+const SKELETON_ROWS = 3;
 
 const SORT_OPTIONS: {value: SubscriptionSort; label: string}[] = [
   {value: 'date', label: 'Next charge'},
@@ -71,7 +84,7 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     ButtonComponent,
     CardComponent,
     AlertComponent,
-    ChipComponent,
+    AsyncStateComponent,
     DatePipe,
     EmptyStateComponent,
     IconComponent,
@@ -80,11 +93,13 @@ const UNLINKED_SUBSCRIPTION_MENU_ITEMS: MenuItem[] = [LINK_MENU_ITEM, ...SUBSCRI
     MenuComponent,
     MerchantColorPipe,
     MoneyPipe,
+    SkeletonComponent,
     SlicePipe,
     StatCardComponent,
     UpperCasePipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [SubscriptionsStore],
   templateUrl: './subscriptions.component.html',
 })
@@ -92,8 +107,27 @@ export class SubscriptionsComponent {
   private readonly dialog = inject(CmnDialogService);
   private readonly router = inject(Router);
   private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(SubscriptionsStore);
+  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  /** Nothing tracked at all: with too little history to detect any, the page explains that instead. */
+  public readonly isEmpty = computed(
+    () => this.store.subscriptions().length === 0 && !this.store.hasInsufficientHistory()
+  );
+  // Offline only reaches `resolve` while nothing is on screen: with rows, a failed reload keeps
+  // its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.store.subscriptions().length > 0;
+    return AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData,
+      errorMessage: this.store.loadErrorMessage(),
+      offline: this.connectivity.offline() && !hasData,
+      lastSyncedAt: null,
+    });
+  });
+  public readonly noActiveCopy = NO_ACTIVE_SUBSCRIPTIONS_COPY;
   public readonly sortOptions = SORT_OPTIONS;
   public readonly cadenceLabels = CADENCE_LABELS;
 
@@ -120,6 +154,11 @@ export class SubscriptionsComponent {
     if (q) {
       void this.router.navigate([AppRoute.Transactions], {queryParams: {q}});
     }
+  }
+
+  public onSortChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: SubscriptionSort}>).detail;
+    this.setSort(value);
   }
 
   public setSort(sort: SubscriptionSort): void {

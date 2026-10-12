@@ -194,7 +194,7 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('dossier-price')?.textContent).toContain('$189.30');
       const change = byTestId('dossier-day-change');
       expect(change?.textContent).toContain('+1.23%');
-      expect(change?.className).toContain('text-status-success');
+      expect(change?.className).toContain('text-gain');
       expect(byTestId('dossier-price')?.className).not.toContain('text-status');
     });
 
@@ -202,7 +202,7 @@ describe('AssetDossierComponent', () => {
       mockStore.quoteHeader.set({priceText: '$189.30', changeText: '-0.50%', direction: 'down'});
       fixture.detectChanges();
 
-      expect(byTestId('dossier-day-change')?.className).toContain('text-status-error');
+      expect(byTestId('dossier-day-change')?.className).toContain('text-loss');
     });
 
     it('keeps an empty reserved slot when the quote is missing', () => {

@@ -1,7 +1,9 @@
 namespace FinanceSentry.Modules.Agent.Tests;
 
+using System.Net.ServerSentEvents;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Nodes;
 using FinanceSentry.API.Controllers;
 using FinanceSentry.Infrastructure.Auth;
 using FinanceSentry.Modules.Agent.Application.Commands;
@@ -82,7 +84,7 @@ public sealed class AgentChatContractTests
         var harness = BuildHarness(ConfiguredOptions(), new FakeLlmClient().EnqueueText("Net worth: $1.8M."));
         Authenticate(harness.Controller, userId, out var body);
 
-        await harness.Controller.Chat(new AgentChatRequest(null, "what's my net worth?"), CancellationToken.None);
+        await ExecuteChatAsync(harness.Controller, new AgentChatRequest(null, "what's my net worth?"));
 
         var sse = Encoding.UTF8.GetString(body.ToArray());
         sse.Should().Contain("event: conversation");
@@ -97,13 +99,50 @@ public sealed class AgentChatContractTests
     }
 
     [Fact]
+    public async Task Chat_EventStream_RoundTripsThroughSseParser_IncludingNewlinePayload()
+    {
+        const string reply = "line one\nline two\n\nevent: injected";
+        var harness = BuildHarness(ConfiguredOptions(), new FakeLlmClient().EnqueueText(reply));
+        Authenticate(harness.Controller, Guid.NewGuid(), out var body);
+
+        await ExecuteChatAsync(harness.Controller, new AgentChatRequest(null, "hi"));
+
+        body.Position = 0;
+        var items = new List<SseItem<string>>();
+        await foreach (var item in SseParser.Create(body).EnumerateAsync())
+        {
+            items.Add(item);
+        }
+
+        items.Select(i => i.EventType).Should().Equal("conversation", "text", "done");
+        items.All(i => !i.Data.Contains('\n')).Should().BeTrue();
+        JsonNode.Parse(items[0].Data)!["conversationId"]!.GetValue<Guid>().Should().NotBeEmpty();
+        JsonNode.Parse(items[1].Data)!["delta"]!.GetValue<string>().Should().Be(reply);
+        JsonNode.Parse(items[2].Data)!["messageId"].Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Chat_SetsSseHeaders()
+    {
+        var harness = BuildHarness(ConfiguredOptions(), new FakeLlmClient().EnqueueText("hi"));
+        Authenticate(harness.Controller, Guid.NewGuid(), out _);
+
+        await ExecuteChatAsync(harness.Controller, new AgentChatRequest(null, "hi"));
+
+        var response = harness.Controller.ControllerContext.HttpContext.Response;
+        response.ContentType.Should().StartWith("text/event-stream");
+        response.Headers.CacheControl.ToString().Should().Contain("no-cache");
+        response.Headers["X-Accel-Buffering"].ToString().Should().Be("no");
+    }
+
+    [Fact]
     public async Task Chat_Keyless_EmitsSingleAgentNotConfiguredError()
     {
         var options = new AgentOptions { PersonaRootPath = RepoPaths.RepoRoot() }; // no key
         var harness = BuildHarness(options, new FakeLlmClient().EnqueueText("should not run"));
         Authenticate(harness.Controller, Guid.NewGuid(), out var body);
 
-        await harness.Controller.Chat(new AgentChatRequest(null, "hi"), CancellationToken.None);
+        await ExecuteChatAsync(harness.Controller, new AgentChatRequest(null, "hi"));
 
         var sse = Encoding.UTF8.GetString(body.ToArray());
         sse.Should().Contain("event: error");
@@ -121,7 +160,7 @@ public sealed class AgentChatContractTests
         var foreign = await harness.Repo.CreateAsync(otherUser, "theirs", "claude-sonnet-5", CancellationToken.None);
 
         Authenticate(harness.Controller, Guid.NewGuid(), out var body);
-        await harness.Controller.Chat(new AgentChatRequest(foreign.Id, "peek"), CancellationToken.None);
+        await ExecuteChatAsync(harness.Controller, new AgentChatRequest(foreign.Id, "peek"));
 
         var sse = Encoding.UTF8.GetString(body.ToArray());
         sse.Should().Contain("conversation_not_found");
@@ -166,6 +205,14 @@ public sealed class AgentChatContractTests
 
         var act = async () => await harness.Controller.Chat(new AgentChatRequest(null, "hi"), CancellationToken.None);
         act.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    private static async Task ExecuteChatAsync(AgentChatController controller, AgentChatRequest request)
+    {
+        var httpContext = controller.ControllerContext.HttpContext;
+        httpContext.RequestServices = new ServiceCollection().AddLogging().AddOptions().BuildServiceProvider();
+        var result = await controller.Chat(request, CancellationToken.None);
+        await result.ExecuteAsync(httpContext);
     }
 
     private sealed record Harness(AgentChatController Controller, ConversationRepository Repo, AgentDbContext Db);

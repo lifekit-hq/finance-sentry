@@ -73,6 +73,12 @@ function sectionsOf(items: UpcomingEvent[]): EventWeekSection[] {
   ];
 }
 
+function retryButton(host: HTMLElement): Nullable<HTMLButtonElement> {
+  return (
+    Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Retry') ?? null
+  );
+}
+
 describe('EventsComponent', () => {
   let mockStore: {
     view: ReturnType<typeof signal<EventsView>>;
@@ -94,6 +100,7 @@ describe('EventsComponent', () => {
     selectHorizon: ReturnType<typeof vi.fn>;
     toggleKind: ReturnType<typeof vi.fn>;
     loadMoreFired: ReturnType<typeof vi.fn>;
+    loadFired: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -137,6 +144,7 @@ describe('EventsComponent', () => {
       selectHorizon: vi.fn(),
       toggleKind: vi.fn(),
       loadMoreFired: vi.fn(),
+      loadFired: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -314,30 +322,65 @@ describe('EventsComponent', () => {
     expect(render().text).toContain('Nothing has fired');
   });
 
-  it('keeps the loaded rows on screen when the next page fails', () => {
+  it('keeps the loaded rows under the error and retries the next page', () => {
     mockStore.view.set('fired');
     mockStore.hasMoreFired.set(true);
     mockStore.firedErrorMessage.set('Failed to load fired events.');
 
-    const {host, text} = render();
+    const {host, text, fixture} = render();
 
     expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(3);
-    expect(host.querySelector('[data-testid="fired-more-error"]')).not.toBeNull();
     expect(text).toContain('Failed to load fired events.');
     expect(text).toContain('Load more');
+
+    retryButton(host)?.click();
+    fixture.detectChanges();
+
+    expect(mockStore.loadMoreFired).toHaveBeenCalledTimes(1);
+    expect(mockStore.loadFired).not.toHaveBeenCalled();
   });
 
-  it('shows only the error when the first page fails', () => {
+  it('shows only the error when the first page fails, and Retry reloads the first page', () => {
     mockStore.view.set('fired');
     mockStore.fired.set([]);
     mockStore.hasFiredRows.set(false);
     mockStore.firedErrorMessage.set('Failed to load fired events.');
 
-    const {host, text} = render();
+    const {host, text, fixture} = render();
 
     expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(0);
-    expect(host.querySelector('[data-testid="fired-more-error"]')).toBeNull();
     expect(text).toContain('Failed to load fired events.');
+    expect(text).not.toContain('Nothing has fired');
+
+    retryButton(host)?.click();
+    fixture.detectChanges();
+
+    expect(mockStore.loadFired).toHaveBeenCalledTimes(1);
+    expect(mockStore.loadMoreFired).not.toHaveBeenCalled();
+  });
+
+  it('shows a skeleton, not the empty state, while the first page loads', () => {
+    mockStore.view.set('fired');
+    mockStore.fired.set([]);
+    mockStore.hasFiredRows.set(false);
+    mockStore.isFiredLoading.set(true);
+
+    const {host, text} = render();
+
+    expect(host.querySelector('[data-testid="fired-loading"]')).not.toBeNull();
+    expect(text).not.toContain('Nothing has fired');
+  });
+
+  it('keeps the rows and adds a skeleton below them while the next page loads', () => {
+    mockStore.view.set('fired');
+    mockStore.hasMoreFired.set(true);
+    mockStore.isFiredLoading.set(true);
+
+    const {host, text} = render();
+
+    expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(3);
+    expect(host.querySelector('[data-testid="fired-loading-more"]')).not.toBeNull();
+    expect(text).not.toContain('Load more');
   });
 
   it('offers load more only while the feed has more rows', () => {

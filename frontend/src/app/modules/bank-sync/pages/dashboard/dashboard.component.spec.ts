@@ -4,9 +4,9 @@ import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
-import {type ChartScrubPoint} from '@lifekit-hq/charts-core';
+import {type ChartPointClick, type ChartScrubPoint} from '@lifekit-hq/charts-core';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
-import {AreaChartComponent} from '@lifekit-hq/ui';
+import {AreaChartComponent, BarChartComponent, DonutChartComponent} from '@lifekit-hq/ui';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -21,7 +21,12 @@ const NOW = new Date('2026-08-12T10:00:00.000Z');
  * The page reads dozens of store signals; only the ones that matter here are real, every other
  * property is an empty-list signal, which the chart inputs accept and the text bindings render blank.
  */
-function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCategories: []}) {
+function fakeStore(
+  range: HistoryRange,
+  data: unknown = {accountCount: 1, topCategories: []},
+  bookSplit: string | null = null,
+  overrides: Record<string, unknown> = {}
+) {
   const historyRange = signal<HistoryRange>(range);
   const setScrubIndex = vi.fn();
   const setHistoryRange = vi.fn((next: HistoryRange) => historyRange.set(next));
@@ -36,19 +41,35 @@ function fakeStore(range: HistoryRange, data: unknown = {accountCount: 1, topCat
     hasCashFlow: signal(false),
     hasProjection: signal(false),
     historyHasHistory: signal(true),
-    errorMessage: signal(null),
+    errorMessage: signal(''),
+    hasError: signal(false),
+    lastSyncedAt: signal<number | null>(null),
+    load: vi.fn(),
+    loadNetWorthHistory: vi.fn(),
     historyErrorMessage: signal(null),
     netWorthStaleNotice: signal(null),
     netWorthChangeFormatted: signal(null),
     netWorthChangePercentFormatted: signal(null),
+    investedChangeFormatted: signal(''),
+    investedChangePercentFormatted: signal(''),
+    investedChangeDirection: signal(0),
+    investedChangeSinceFormatted: signal(null),
+    netWorthChartLabel: signal('Net worth by sleeve'),
+    bookSplitFormatted: signal(bookSplit),
+    ...overrides,
   };
   return new Proxy(real, {
     get: (target, prop: string) => target[prop] ?? signal([]),
   });
 }
 
-function render(range: HistoryRange = '3m', data?: unknown) {
-  const store = fakeStore(range, data);
+function render(
+  range: HistoryRange = '3m',
+  data?: unknown,
+  bookSplit: string | null = null,
+  overrides: Record<string, unknown> = {}
+) {
+  const store = fakeStore(range, data, bookSplit, overrides);
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -114,6 +135,66 @@ describe('DashboardComponent range presets', () => {
     expect(order[1]?.compareDocumentPosition(order[2] as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
+  });
+
+  it('states the invested / cash split under the hero figure', () => {
+    const el = render('3m', undefined, 'invested €9,300 · cash €700').el;
+    const split = el.querySelector('[data-testid="net-worth-split"]');
+    const value = el.querySelector('[data-testid="net-worth-value"]');
+
+    expect(split?.textContent?.trim()).toBe('invested €9,300 · cash €700');
+    expect(value?.compareDocumentPosition(split as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps the split slot but leaves it empty when the split is unknown', () => {
+    const el = render().el;
+
+    expect(el.querySelector('[data-testid="net-worth-split-slot"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="net-worth-split"]')).toBeNull();
+  });
+
+  it('labels the net-worth figure a change, with the invested change on the line below', () => {
+    const el = render('3m', undefined, null, {
+      netWorthChangeFormatted: signal('+$320'),
+      netWorthChangePercentFormatted: signal('+3.2%'),
+      netWorthChangeDirection: signal(1),
+      scrubDateFormatted: signal(null),
+      investedChangeFormatted: signal('+$500'),
+      investedChangePercentFormatted: signal('+8.3%'),
+      investedChangeDirection: signal(1),
+    }).el;
+    const change = el.querySelector('[data-testid="net-worth-change"]');
+    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
+
+    expect(change?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Change +$320 (+3.2%) · 3M');
+    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Invested change +$500 (+8.3%) · 3M'
+    );
+    expect(change?.compareDocumentPosition(invested as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('dates the invested change from its first split day when that is after the range start', () => {
+    const el = render('1y', undefined, null, {
+      scrubDateFormatted: signal(null),
+      investedChangeFormatted: signal('+$500'),
+      investedChangePercentFormatted: signal('+8.3%'),
+      investedChangeDirection: signal(1),
+      investedChangeSinceFormatted: signal('since Jul 8, 2026'),
+    }).el;
+    const invested = el.querySelector('[data-testid="net-worth-invested-change"]');
+
+    expect(invested?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Invested change +$500 (+8.3%) · since Jul 8, 2026'
+    );
+  });
+
+  it('keeps the invested-change slot but leaves it empty below two split days', () => {
+    const el = render().el;
+
+    expect(el.querySelector('[data-testid="net-worth-invested-change-slot"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="net-worth-invested-change"]')).toBeNull();
   });
 
   it('scrubs the hero figure to the point under the pointer and snaps back on release', () => {
@@ -188,6 +269,121 @@ describe('DashboardComponent range presets', () => {
   });
 });
 
+describe('DashboardComponent chart click-through', () => {
+  const pointClick = (seriesLabel: string, index = 0): ChartPointClick => ({
+    index,
+    seriesIndex: 0,
+    label: 'x',
+    seriesLabel,
+    value: 1,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({toFake: ['Date']});
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function chart<T>(fixture: ReturnType<typeof render>['fixture'], type: new (...a: never[]) => T) {
+    return fixture.debugElement.query(By.directive(type)).componentInstance as T;
+  }
+
+  describe('net-worth area chart', () => {
+    it.each([
+      ['Banking', '/accounts/list'],
+      ['Cash', '/accounts/list'],
+      ['Brokerage', '/accounts/investments'],
+      ['Brokerage invested', '/accounts/investments'],
+      ['Crypto', '/accounts/investments'],
+      ['Crypto invested', '/accounts/investments'],
+    ])('opens the accounts page behind the %s band', (label, url) => {
+      const {fixture} = render();
+      const navigateByUrl = vi
+        .spyOn(TestBed.inject(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
+
+      chart(fixture, AreaChartComponent).pointClick.emit(pointClick(label));
+
+      expect(navigateByUrl).toHaveBeenCalledWith(url);
+    });
+
+    it('opens nothing for the unsplit total band', () => {
+      const {fixture} = render();
+      const navigateByUrl = vi
+        .spyOn(TestBed.inject(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
+
+      chart(fixture, AreaChartComponent).pointClick.emit(pointClick('No split'));
+
+      expect(navigateByUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('income vs spending bar chart', () => {
+    const overrides = {
+      hasCashFlow: signal(true),
+      incomeVsSpendingMonthKeys: signal(['2026-06', '2026-07']),
+    };
+
+    it('lists the credits of the clicked month for an Income bar', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Income', 1));
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'credit', from: '2026-07-01', to: '2026-07-31'},
+      });
+    });
+
+    it('lists the debits of the clicked month for a Spending bar', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Spending', 0));
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'debit', from: '2026-06-01', to: '2026-06-30'},
+      });
+    });
+
+    it('opens nothing for a month the chart no longer holds', () => {
+      const {fixture, navigate} = render('3m', undefined, null, overrides);
+
+      chart(fixture, BarChartComponent).barClick.emit(pointClick('Income', 5));
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('category donut', () => {
+    const overrides = {categoryChartKeys: signal<(string | null)[]>(['groceries', null])};
+
+    it('lists the clicked category in the selected window', () => {
+      const {fixture, navigate} = render('mtd', undefined, null, overrides);
+
+      chart(fixture, DonutChartComponent).segmentClick.emit({
+        index: 0,
+        label: 'Groceries',
+        value: 1,
+      });
+
+      expect(navigate).toHaveBeenCalledWith([AppRoute.Transactions], {
+        queryParams: {type: 'debit', category: 'groceries', from: '2026-08-01', to: '2026-08-12'},
+      });
+    });
+
+    it('opens nothing for the folded "Other categories" slice', () => {
+      const {fixture, navigate} = render('mtd', undefined, null, overrides);
+
+      chart(fixture, DonutChartComponent).segmentClick.emit({index: 1, label: 'Other', value: 1});
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe('DashboardComponent base currency (#851)', () => {
   it('shows category totals in the base currency the store names, not dollars', () => {
     const {fixture, el} = render('3m', {
@@ -203,6 +399,50 @@ describe('DashboardComponent base currency (#851)', () => {
 });
 
 describe('DashboardComponent async states', () => {
+  describe('net-worth chart loading vs empty', () => {
+    const CHART = 'cmn-area-chart';
+    const SKELETON = '[data-testid="net-worth-chart-skeleton"]';
+
+    it.each([
+      ['the page', {isLoading: signal(true)}],
+      ['the history', {isHistoryLoading: signal(true)}],
+    ])('shows the skeleton, not the chart or its empty state, while %s loads', (_, loading) => {
+      const {el} = render('3m', undefined, null, {historyHasHistory: signal(false), ...loading});
+
+      expect(el.querySelector(SKELETON)).not.toBeNull();
+      expect(el.querySelector(CHART)).toBeNull();
+      // Scoped to the hero card: the category donut below has its own empty copy.
+      const hero = el.querySelector('cmn-card')?.textContent;
+      expect(hero).not.toContain('No data yet');
+      expect(hero).not.toContain('starts after tonight');
+    });
+
+    it('says history starts tonight only once loaded with no history', () => {
+      const {el} = render('3m', undefined, null, {historyHasHistory: signal(false)});
+
+      expect(el.querySelector(SKELETON)).toBeNull();
+      expect(el.querySelector(CHART)).toBeNull();
+      expect(el.textContent).toContain("Net worth history starts after tonight's snapshot.");
+    });
+
+    it.each([
+      ['the page', {isLoading: signal(true)}],
+      ['the history', {isHistoryLoading: signal(true)}],
+    ])('keeps the chart mounted when %s reloads over existing history', (_, loading) => {
+      const {el} = render('3m', undefined, null, {historyHasHistory: signal(true), ...loading});
+
+      expect(el.querySelector(SKELETON)).toBeNull();
+      expect(el.querySelector(CHART)).not.toBeNull();
+    });
+
+    it('mounts the chart once history has loaded', () => {
+      const {el} = render();
+
+      expect(el.querySelector(SKELETON)).toBeNull();
+      expect(el.querySelector(CHART)).not.toBeNull();
+    });
+  });
+
   it('shows the connect-account empty state when no account is linked', () => {
     const {el} = render('3m', {accountCount: 0, topCategories: []});
 
@@ -219,7 +459,7 @@ describe('DashboardComponent async states', () => {
 
   it('keeps the dashboard rendered under a persistent error banner', () => {
     const store = fakeStore('3m');
-    (store as unknown as {errorMessage: ReturnType<typeof signal<string | null>>}).errorMessage.set(
+    (store as unknown as {errorMessage: ReturnType<typeof signal<string>>}).errorMessage.set(
       'Failed to load dashboard data.'
     );
     TestBed.configureTestingModule({
@@ -239,5 +479,60 @@ describe('DashboardComponent async states', () => {
 
     expect(el.querySelector('cmn-alert')?.textContent).toContain('Failed to load dashboard data.');
     expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+  });
+
+  describe('honest states', () => {
+    function renderFailed(data: unknown, offline = false) {
+      if (offline) {
+        vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+      }
+      const store = fakeStore('3m', data) as unknown as Record<
+        string,
+        ReturnType<typeof signal<never>>
+      >;
+      store['errorMessage'].set('Failed to load dashboard data.' as never);
+      store['hasError'].set(true as never);
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(withXhr()),
+          provideHttpClientTesting(),
+          provideApiBaseUrl('http://localhost/api/v1'),
+        ],
+      });
+      TestBed.overrideComponent(DashboardComponent, {
+        set: {providers: [{provide: DashboardStore, useValue: store}]},
+      });
+      const fixture = TestBed.createComponent(DashboardComponent);
+      fixture.detectChanges();
+      return {store, el: fixture.nativeElement as HTMLElement};
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('shows an error with Retry, never the connect-account empty state, when nothing loaded', () => {
+      const {el, store} = renderFailed(null);
+
+      expect(el.querySelector('cmn-alert')?.textContent).toContain(
+        'Failed to load dashboard data.'
+      );
+      expect(el.textContent).not.toContain('Connect your first account');
+      expect(el.querySelector('[data-testid="net-worth-link"]')).toBeNull();
+      el.querySelector<HTMLElement>('cmn-alert cmn-button button')?.click();
+      expect(store['load']).toHaveBeenCalledOnce();
+      expect(store['loadNetWorthHistory']).toHaveBeenCalledOnce();
+    });
+
+    it('shows the last data with a last-synced notice instead of an error while offline', () => {
+      const {el} = renderFailed({accountCount: 1, topCategories: []}, true);
+
+      expect(el.textContent).not.toContain('Failed to load dashboard data.');
+      expect(el.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+        "You're offline"
+      );
+      expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
+    });
   });
 });

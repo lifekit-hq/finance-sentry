@@ -4,11 +4,6 @@ import {type Observable} from 'rxjs';
 
 import {type UpdateProfileRequest, type UserProfile} from '../models/settings/settings.model';
 
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
 @Injectable({providedIn: 'root'})
 export class SettingsService extends ApiService {
   constructor() {
@@ -21,9 +16,5 @@ export class SettingsService extends ApiService {
 
   public updateProfile(request: UpdateProfileRequest): Observable<UserProfile> {
     return this.put<UserProfile>('', request);
-  }
-
-  public changePassword(request: ChangePasswordRequest): Observable<void> {
-    return this.post<void>('change-password', request);
   }
 }

@@ -1,4 +1,4 @@
-/** Derived on the server from the account: no password and no Google link yet, signed up, or revoked. */
+/** Derived on the server from the account: not signed in yet, signed in, or revoked. */
 export type PersonStatus = 'Invited' | 'Active' | 'Revoked';
 
 export interface Person {
@@ -18,10 +18,8 @@ export interface CreateInviteRequest {
   email: string;
 }
 
-/** A freshly created invite. The token is shown once, inside the link the owner sends by hand. */
+/** A freshly created invite: the person signs in through the identity provider with this email. */
 export interface Invite {
   userId: string;
   email: string;
-  token: string;
-  expiresAt: string;
 }

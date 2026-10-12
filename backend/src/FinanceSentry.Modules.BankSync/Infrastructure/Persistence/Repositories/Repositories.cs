@@ -20,6 +20,14 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 
     private IQueryable<BankAccount> AllUsers => _context.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
+    // Removed (soft-deleted) accounts still occupy the unique external id and still need their sync health and
+    // claim released, so those paths opt out of the IsActive filter by name, never of the Owner filter.
+    private IQueryable<BankAccount> AllUsersIncludingRemoved => _context.BankAccounts
+        .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.AccountActiveFilterName]);
+
+    private IQueryable<BankAccount> OwnedIncludingRemoved => _context.BankAccounts
+        .IgnoreQueryFilters([BankSyncDbContext.AccountActiveFilterName]);
+
     public async Task<BankAccount> AddAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
         account.ValidateInvariants();
@@ -39,32 +47,32 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<BankAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.BankAccounts
-            .FirstOrDefaultAsync(ba => ba.Id == id && ba.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
     }
 
     public async Task<BankAccount?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .FirstOrDefaultAsync(ba => ba.Id == id && ba.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
     }
 
     public async Task<BankAccount?> GetByExternalAccountIdUnscopedAsync(string externalAccountId, CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .FirstOrDefaultAsync(ba => ba.ExternalAccountId == externalAccountId && ba.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(ba => ba.ExternalAccountId == externalAccountId, cancellationToken);
     }
 
     public async Task<bool> ExistsByExternalAccountIdUnscopedAsync(string externalAccountId, CancellationToken cancellationToken = default)
     {
         // External account ids are unique across users, so the duplicate check must see every user's rows.
-        return await AllUsers
+        return await AllUsersIncludingRemoved
             .AnyAsync(ba => ba.ExternalAccountId == externalAccountId, cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.BankAccounts
-            .Where(ba => ba.UserId == userId && ba.IsActive)
+            .Where(ba => ba.UserId == userId)
             .OrderByDescending(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
     }
@@ -72,7 +80,7 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
     public async Task<IEnumerable<BankAccount>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .Where(ba => ba.UserId == userId && ba.IsActive)
+            .Where(ba => ba.UserId == userId)
             .OrderByDescending(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
     }
@@ -87,14 +95,14 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 
     public async Task SaveHealthUnscopedAsync(Guid accountId, ConnectionHealth health, CancellationToken cancellationToken = default)
     {
-        await AllUsers
+        await AllUsersIncludingRemoved
             .Where(ba => ba.Id == accountId)
             .ExecuteUpdateAsync(s => s.SetConnectionHealth(ba => ba.Health, health), cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var account = await _context.BankAccounts.FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
+        var account = await OwnedIncludingRemoved.FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
         if (account == null)
             return false;
 
@@ -106,7 +114,7 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
 
     public async Task<bool> HardDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var account = await _context.BankAccounts
+        var account = await OwnedIncludingRemoved
             .Include(ba => ba.Transactions)
             .Include(ba => ba.SyncJobs)
             .FirstOrDefaultAsync(ba => ba.Id == id, cancellationToken);
@@ -118,17 +126,47 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
         return true;
     }
 
+    public async Task<bool> TryClaimSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        var claimed = await AllUsers
+            .Where(ba => ba.Id == accountId && ba.SyncStatus != "syncing")
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.SyncStatus, "syncing").SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+
+        // ExecuteUpdate bypasses the change tracker; refresh an instance this scope already loaded
+        // (the coordinator reads the account first) so it does not report the pre-claim status.
+        if (claimed == 1)
+        {
+            foreach (var entry in _context.ChangeTracker.Entries<BankAccount>().Where(e => e.Entity.Id == accountId).ToList())
+                await entry.ReloadAsync(cancellationToken);
+        }
+
+        return claimed == 1;
+    }
+
+    public async Task ReleaseSyncUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
+    {
+        await AllUsersIncludingRemoved
+            .Where(ba => ba.Id == accountId && ba.SyncStatus == "syncing")
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(ba => ba.SyncStatus, "active")
+                    .SetProperty(ba => ba.LastSyncError, (string?)null)
+                    .SetProperty(ba => ba.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
+    }
+
     public async Task<IEnumerable<BankAccount>> GetBySyncStatusUnscopedAsync(string status, CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .Where(ba => ba.SyncStatus == status && ba.IsActive)
+            .Where(ba => ba.SyncStatus == status)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<BankAccount>> GetAllActiveUnscopedAsync(CancellationToken cancellationToken = default)
     {
         return await AllUsers
-            .Where(ba => ba.IsActive && ba.Provider != BankAccount.SeededProvider)
+            .Where(ba => ba.Provider != BankAccount.SeededProvider)
             .OrderBy(ba => ba.CreatedAt)
             .ToListAsync(cancellationToken);
     }
@@ -262,6 +300,16 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IEnumerable<Transaction>> GetByUserIdInRangeUnscopedAsync(Guid userId, DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+    {
+        return await AllUsers
+            .Where(t => t.UserId == userId
+                && (t.PostedDate ?? t.TransactionDate) >= fromUtc
+                && (t.PostedDate ?? t.TransactionDate) <= toUtc)
+            .OrderByDescending(t => t.PostedDate ?? t.TransactionDate)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetFilteredByUserIdAsync(
         Guid userId, TransactionFilter filter, int offset, int limit, CancellationToken cancellationToken = default)
     {
@@ -357,19 +405,15 @@ public class TransactionRepository(BankSyncDbContext context) : ITransactionRepo
         var now = DateTime.UtcNow;
         // Opting out of the IsActive filter covers already-inactive rows too, making this operation
         // idempotent; the Owner filter stays on (a request acting for another person matches nothing).
-        var transactions = await _context.Transactions
+        await _context.Transactions
             .IgnoreQueryFilters([BankSyncDbContext.ActiveFilterName])
             .Where(t => t.AccountId == accountId && t.IsActive)
-            .ToListAsync(cancellationToken);
-
-        foreach (var t in transactions)
-        {
-            t.IsActive = false;
-            t.DeletedAt = now;
-            t.ArchivedReason = "account_deleted";
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(t => t.IsActive, false)
+                    .SetProperty(t => t.DeletedAt, now)
+                    .SetProperty(t => t.ArchivedReason, "account_deleted"),
+                cancellationToken);
     }
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -443,18 +487,6 @@ public class SyncJobRepository(BankSyncDbContext context) : ISyncJobRepository
         _context.SyncJobs.Remove(job);
         await _context.SaveChangesAsync(cancellationToken);
         return true;
-    }
-
-    public async Task<bool> HasRunningJobAsync(Guid accountId, CancellationToken cancellationToken = default)
-    {
-        return await _context.SyncJobs
-            .AnyAsync(sj => sj.AccountId == accountId && sj.Status == "running", cancellationToken);
-    }
-
-    public async Task<bool> HasRunningJobUnscopedAsync(Guid accountId, CancellationToken cancellationToken = default)
-    {
-        return await AllUsers
-            .AnyAsync(sj => sj.AccountId == accountId && sj.Status == "running", cancellationToken);
     }
 
     public async Task<SyncJob?> GetLatestSuccessfulByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)

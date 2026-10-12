@@ -82,12 +82,12 @@
       role="group"
       aria-label="Account filter"
     >
-      <cmn-chip [selected]="!activeAccount()" (clicked)="selectAccount(null)" class="shrink-0">
+      <cmn-chip [selected]="!store.accountId()" (clicked)="selectAccount(null)" class="shrink-0">
         All accounts
       </cmn-chip>
       @for (account of store.accounts(); track account.accountId) {
         <cmn-chip
-          [selected]="activeAccount() === account.accountId"
+          [selected]="store.accountId() === account.accountId"
           (clicked)="selectAccount(account.accountId)"
           class="shrink-0"
         >
@@ -97,14 +97,20 @@
     </div>
   }
 
+  @if (view().offlineNotice; as notice) {
+    <cmn-alert variant="info" class="mb-cmn-4 block" data-testid="offline-notice">{{
+      notice
+    }}</cmn-alert>
+  }
+
   <cmn-async-state
-    [status]="ledgerStatus()"
-    [errorMessage]="store.errorMessage()"
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
     [isEmpty]="store.isEmpty()"
     class="flex min-h-0 flex-1 flex-col"
     errorPlacement="above"
   >
-    <cmn-button (clicked)="store.load()" error-action variant="secondary" size="sm"
+    <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
       >Retry</cmn-button
     >
     <cmn-card skeleton padding="none" class="min-h-0 flex-1">
@@ -144,14 +150,7 @@
           </h2>
           <cmn-card padding="none">
             @for (t of group.items; track t.transactionId) {
-              <div
-                (click)="openDrawer(t)"
-                (keydown.enter)="openDrawer(t)"
-                class="cursor-pointer"
-                role="button"
-                tabindex="0"
-                data-testid="ledger-row"
-              >
+              <div class="relative" data-testid="ledger-row">
                 <cmn-list-item-row
                   [label]="t.description"
                   [sublabel]="
@@ -169,12 +168,19 @@
                   />
                   <span
                     [class]="t | transactionAmountClass"
-                    class="shrink-0 whitespace-nowrap font-mono text-cmn-sm font-medium tabular-nums"
+                    class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
                     amount
                   >
                     {{ t | transactionAmount }}
                   </span>
                 </cmn-list-item-row>
+                <button
+                  [attr.aria-label]="t.description"
+                  (click)="openDrawer(t)"
+                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                  type="button"
+                  data-testid="ledger-row-open"
+                ></button>
               </div>
             }
           </cmn-card>

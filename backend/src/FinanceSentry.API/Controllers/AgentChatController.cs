@@ -1,5 +1,7 @@
 namespace FinanceSentry.API.Controllers;
 
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using FinanceSentry.Core.Api;
 using FinanceSentry.Core.Auth;
@@ -8,7 +10,6 @@ using FinanceSentry.Modules.Agent.Application.Commands;
 using FinanceSentry.Modules.Agent.Application.Queries;
 using FinanceSentry.Modules.Agent.Application.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
@@ -35,29 +36,17 @@ public sealed class AgentChatController(
 
     /// <summary>Send a message and stream the reply (SSE).</summary>
     [HttpPost("chat")]
-    public async Task Chat([FromBody] AgentChatRequest request, CancellationToken ct)
+    public async Task<IResult> Chat([FromBody] AgentChatRequest request, CancellationToken ct)
     {
         var userId = User.RequireUserId();
 
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
         Response.Headers["X-Accel-Buffering"] = "no";
-        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
 
         var message = request.Message ?? string.Empty;
         var command = new SendAgentMessageCommand(userId, request.ConversationId, message);
         var stream = await _sendHandler.Handle(command, ct);
 
-        await foreach (var evt in stream.WithCancellation(ct))
-        {
-            var (name, payload) = Map(evt);
-            if (name is null)
-            {
-                continue;
-            }
-
-            await WriteEventAsync(name, payload!, ct);
-        }
+        return TypedResults.ServerSentEvents(ToSseItems(stream, ct));
     }
 
     /// <summary>List the caller's conversations, newest first.</summary>
@@ -98,11 +87,20 @@ public sealed class AgentChatController(
         _ => (null, null),
     };
 
-    private async Task WriteEventAsync(string name, object payload, CancellationToken ct)
+    private static async IAsyncEnumerable<SseItem<string>> ToSseItems(
+        IAsyncEnumerable<AgentStreamEvent> stream,
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(payload, SseJson);
-        await Response.WriteAsync($"event: {name}\ndata: {json}\n\n", ct);
-        await Response.Body.FlushAsync(ct);
+        await foreach (var evt in stream.WithCancellation(ct))
+        {
+            var (name, payload) = Map(evt);
+            if (name is null)
+            {
+                continue;
+            }
+
+            yield return new SseItem<string>(JsonSerializer.Serialize(payload, SseJson), name);
+        }
     }
 }
 

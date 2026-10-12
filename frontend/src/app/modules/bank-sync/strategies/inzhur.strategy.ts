@@ -1,17 +1,13 @@
 import {inject, Injectable, type Type} from '@angular/core';
-import {type Observable, of, switchMap, throwError} from 'rxjs';
+import {map, type Observable} from 'rxjs';
 
 import {type Provider} from '../../../shared/models/provider/provider.model';
 import {InzhurFormComponent} from '../components/connect-modal/inzhur-form.component';
-import {INZHUR_INVALID_CODE} from '../constants/inzhur/inzhur.constants';
-import {type VerifyInzhurLoginRequest} from '../models/inzhur/inzhur.model';
+import {type ConnectInzhurSessionRequest} from '../models/inzhur/inzhur.model';
 import {InzhurService} from '../services/inzhur.service';
 import {type ConnectOutcome, type ConnectStrategy} from './connect-strategy';
 
-/**
- * Submits the SMS code: the last step of an Inzhur sign-in. The first step (phone + password,
- * which sends the SMS) runs in the form's InzhurConnectStore.
- */
+/** Hands the pasted Inzhur session to the backend, which proves it with one refresh. */
 @Injectable({providedIn: 'root'})
 export class InzhurConnectStrategy implements ConnectStrategy {
   private readonly inzhur = inject(InzhurService);
@@ -20,15 +16,12 @@ export class InzhurConnectStrategy implements ConnectStrategy {
   public readonly formComponent: Type<unknown> = InzhurFormComponent;
 
   public submit(input: unknown): Observable<ConnectOutcome> {
-    return this.inzhur.verifyLogin(input as VerifyInzhurLoginRequest).pipe(
-      switchMap(result =>
-        result.status === 'connected'
-          ? of({successCode: 'CONNECTED' as const, count: 0, institutionType: 'broker' as const})
-          : throwError(() => ({
-              errorCode: INZHUR_INVALID_CODE,
-              attemptsLeft: result.attemptsLeft,
-            }))
-      )
+    return this.inzhur.connectSession(input as ConnectInzhurSessionRequest).pipe(
+      map(() => ({
+        successCode: 'CONNECTED' as const,
+        count: 0,
+        institutionType: 'broker' as const,
+      }))
     );
   }
 }

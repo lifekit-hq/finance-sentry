@@ -38,35 +38,32 @@ public class DataRetentionJob(BankSyncDbContext db, ILogger<DataRetentionJob> lo
 
         // Sweeps every user (no person in scope) and includes already-inactive rows (idempotency), so it
         // opts out of both the Owner and the soft-delete filter by name.
-        var candidates = await _db.Transactions
+        var candidates = _db.Transactions
             .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.ActiveFilterName])
             .Where(t => t.IsActive
                      && t.PostedDate.HasValue
-                     && t.PostedDate.Value < cutoff)
-            .ToListAsync(ct);
-
-        _logger.LogInformation(
-            "DataRetentionJob found {Count} transactions to archive (posted before {Cutoff}).",
-            candidates.Count, cutoff.ToString("yyyy-MM-dd"));
+                     && t.PostedDate.Value < cutoff);
 
         if (dryRun)
         {
+            _logger.LogInformation(
+                "DataRetentionJob found {Count} transactions to archive (posted before {Cutoff}).",
+                await candidates.CountAsync(ct), cutoff.ToString("yyyy-MM-dd"));
             _logger.LogInformation("DataRetentionJob dry-run complete. No changes written.");
             return;
         }
 
+        // One set-based UPDATE: the archive never loads the rows into memory.
         var now = DateTime.UtcNow;
-        foreach (var tx in candidates)
-        {
-            tx.IsActive = false;
-            tx.DeletedAt = now;
-            tx.ArchivedReason = ArchiveReason;
-        }
-
-        await _db.SaveChangesAsync(ct);
+        var archived = await candidates.ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(t => t.IsActive, false)
+                .SetProperty(t => t.DeletedAt, now)
+                .SetProperty(t => t.ArchivedReason, ArchiveReason),
+            ct);
 
         _logger.LogInformation(
-            "DataRetentionJob completed. Archived {Count} transactions. Timestamp: {Timestamp}",
-            candidates.Count, now);
+            "DataRetentionJob completed. Archived {Count} transactions (posted before {Cutoff}). Timestamp: {Timestamp}",
+            archived, cutoff.ToString("yyyy-MM-dd"), now);
     }
 }

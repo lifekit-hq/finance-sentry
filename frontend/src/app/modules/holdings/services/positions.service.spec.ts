@@ -146,4 +146,77 @@ describe('PositionsService', () => {
       ['EUR', true, null, 1_000],
     ]);
   });
+
+  it('tags broker rows with the backend asset class, cash included, defaulting to equity', () => {
+    const brokerage: BrokerageHoldingsDto = {
+      provider: 'mixed',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: 0,
+      positions: [
+        {
+          symbol: 'USD Cash',
+          instrumentType: 'CASH',
+          assetClass: 'Cash',
+          quantity: 100,
+          usdValue: 100,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+        {
+          symbol: 'UAH Cash',
+          instrumentType: 'CASH',
+          assetClass: 'Cash',
+          quantity: 4_000,
+          usdValue: 100,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'inzhur',
+        },
+        {
+          symbol: 'AAPL',
+          instrumentType: 'STK',
+          assetClass: 'Equities',
+          quantity: 1,
+          usdValue: 200,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+        {
+          symbol: 'WAR',
+          instrumentType: 'BOND',
+          assetClass: 'Bonds',
+          quantity: 1,
+          usdValue: 50,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'inzhur',
+        },
+        {
+          symbol: 'OLD',
+          instrumentType: 'STK',
+          quantity: 1,
+          usdValue: 10,
+          costBasisUsd: null,
+          averageCostUsd: null,
+          provider: 'ibkr',
+        },
+      ],
+    };
+
+    let positions: Position[] = [];
+    service.getPositions().subscribe(p => (positions = p));
+    http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
+    http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(null);
+
+    expect(positions.map(p => [p.symbol, p.assetClass])).toEqual([
+      ['USD Cash', 'cash'],
+      ['UAH Cash', 'cash'],
+      ['AAPL', 'equity'],
+      ['WAR', 'bonds'],
+      ['OLD', 'equity'],
+    ]);
+  });
 });

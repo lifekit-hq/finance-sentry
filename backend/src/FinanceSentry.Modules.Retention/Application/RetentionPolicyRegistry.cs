@@ -51,6 +51,7 @@ public static class RetentionPolicyRegistry
         Purge(Analytics, "query_audit", "CreatedAt", 180, "Analytics query audit (feature 033)."),
         Purge(Companion, "companion_events", "CapturedAt", 90, "Dispatched outbox rows; watermark in companion_capture_state survives."),
         Purge(Companion, "push_deliveries", "CreatedAt", 90, "Push delivery ledger; matches the 90d companion_events it points at."),
+        Purge(Companion, "problem_reports", "CreatedAt", 90, "Problem reports; forwarded to the fleet inbox within minutes, the saved copy is only the retry ledger."),
         Purge(Research, "candidate_scores", "ScoredAt", 180, "Opportunity scoring history."),
         Purge(Research, "valuation_snapshots", "CapturedAt", 365, "Point-in-time valuation observations."),
         Purge(Research, "macro_events", "EventDate", 365, "Past macro-calendar entries."),

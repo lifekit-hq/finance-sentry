@@ -33,24 +33,20 @@ public class ResearchRetrievalRepository(
             query = query.Where(d => (d.PublishedAt ?? d.CapturedAt) <= filter.To);
         }
 
-        var documents = await query.ToListAsync(ct);
-
-        // Ticker/thesis columns are jsonb stored via string conversion, so these filters cannot
-        // translate to SQL; apply them in memory over the structurally narrowed set.
         if (filter.Tickers.Count > 0)
         {
-            var tickers = filter.Tickers.Select(t => t.ToUpperInvariant()).ToHashSet();
-            documents = documents.Where(d => d.Tickers.Any(tickers.Contains)).ToList();
+            var tickers = filter.Tickers.Select(t => t.ToUpperInvariant()).ToList();
+            query = query.Where(d => d.Tickers.Any(t => tickers.Contains(t)));
         }
 
-        if (filter.ThesisId is not null)
+        if (filter.ThesisId is { } thesisId)
         {
-            documents = documents.Where(d => d.ThesisIds.Contains(filter.ThesisId.Value)).ToList();
+            query = query.Where(d => d.ThesisIds.Contains(thesisId));
         }
 
-        documents = documents
+        var documents = await query
             .OrderByDescending(d => d.PublishedAt ?? d.CapturedAt)
-            .ToList();
+            .ToListAsync(ct);
 
         var byDocument = documents.ToDictionary(d => d.Id);
         var documentIds = documents.Select(d => d.Id).ToList();

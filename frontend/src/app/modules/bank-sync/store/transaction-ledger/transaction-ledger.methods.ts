@@ -4,21 +4,33 @@ import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.co
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
-  type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
-    setLoading(): void {
-      patchState(store, {status: 'loading', errorCode: null});
+    /** `keepRows` holds the rows on screen while a retry or the next page loads. */
+    setLoading(keepRows = false): void {
+      patchState(store, {
+        status: 'loading',
+        errorCode: null,
+        ...(keepRows ? {} : {transactions: [], totalCount: 0, hasMore: false}),
+      });
     },
     setTransactions(
       transactions: GlobalTransactionDto[],
       totalCount: number,
       hasMore: boolean
     ): void {
-      patchState(store, {transactions, totalCount, hasMore, status: 'idle', errorCode: null});
+      patchState(store, {
+        transactions,
+        totalCount,
+        hasMore,
+        offset: 0,
+        status: 'idle',
+        errorCode: null,
+        lastSyncedAt: Date.now(),
+      });
     },
     setError(errorCode: Nullable<string>): void {
       patchState(store, {status: 'error', errorCode});
@@ -40,25 +52,15 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         hasMore,
         status: 'idle' as AsyncStatus,
         errorCode: null,
+        lastSyncedAt: Date.now(),
       }));
     },
     setMonthlyOutflowUsd(value: number | null, currency: string = DEFAULT_BASE_CURRENCY): void {
       patchState(store, {monthlyOutflowUsd: value, monthlyOutflowCurrency: currency});
     },
-    setAccountId(accountId: Nullable<string>): void {
-      patchState(store, {accountId, offset: 0});
-    },
-    setTransactionType(transactionType: Nullable<TransactionType>): void {
-      patchState(store, {transactionType, offset: 0});
-    },
-    setCategories(categories: string[]): void {
-      patchState(store, {categories, offset: 0});
-    },
-    setDateRange(from: Nullable<string>, to: Nullable<string>): void {
-      patchState(store, {from, to, offset: 0});
-    },
+    /** A blank box reads as no search, so it never reaches the `q` query param. */
     setSearch(search: string): void {
-      patchState(store, {search, offset: 0});
+      patchState(store, {search: search.trim() === '' ? '' : search, offset: 0});
     },
     setAccounts(accounts: TransactionAccountOption[]): void {
       patchState(store, {accounts});

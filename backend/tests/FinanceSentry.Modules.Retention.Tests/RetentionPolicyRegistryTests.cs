@@ -120,7 +120,7 @@ public sealed class RetentionPolicyRegistryTests
     public void Generic_purge_set_matches_expected_count()
     {
         // Guards against accidental additions/removals to the actively-purged set.
-        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(14);
+        RetentionPolicyRegistry.GenericPurgePolicies.Should().HaveCount(15);
     }
 
     [Fact]

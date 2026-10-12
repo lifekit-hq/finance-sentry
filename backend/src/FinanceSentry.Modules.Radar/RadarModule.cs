@@ -13,6 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Http;
 
 public static class RadarModule
 {
@@ -67,10 +69,11 @@ public static class RadarModule
     public static IServiceCollection AddRadarModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<RadarDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<RadarOptions>(config.GetSection(RadarOptions.SectionName));
         services.Configure<RegimeOptions>(config.GetSection(RegimeOptions.SectionName));
@@ -95,24 +98,28 @@ public static class RadarModule
         services.AddScoped<RadarFreshnessWatchdogJob>();
         services.AddScoped<PortfolioScannerJob>();
 
+        var yahooHistoryTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(YahooMarketHistorySource.HttpClientName, client =>
         {
             client.BaseAddress = new Uri("https://query1.finance.yahoo.com");
-            client.Timeout = TimeSpan.FromSeconds(10);
+            client.Timeout = yahooHistoryTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
-        });
+        })
+            .AddProviderResilience(yahooHistoryTimeout);
         services.AddScoped<IMarketHistorySource, YahooMarketHistorySource>();
 
         // Feature 021 — market regime: keyless-silent FRED yield-curve source + read-only port.
         var regimeOptions = config.GetSection(RegimeOptions.SectionName).Get<RegimeOptions>() ?? new RegimeOptions();
+        var fredTimeout = TimeSpan.FromSeconds(10);
         services.AddHttpClient(FredYieldCurveSource.HttpClientName, client =>
         {
             client.BaseAddress = new Uri(regimeOptions.Fred.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromSeconds(10);
+            client.Timeout = fredTimeout;
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (compatible; FinanceSentry/1.0; +https://finance-sentry.local)");
-        });
+        })
+            .AddProviderResilience(fredTimeout);
         services.AddScoped<IYieldCurveSource, FredYieldCurveSource>();
         services.AddScoped<IMarketRegimeSource, MarketRegimeSource>();
         services.AddScoped<RegimeComputeJob>();

@@ -68,6 +68,28 @@ public sealed class GetNetWorthHistoryToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ExposesTheCashInvestedSplit_AndNullsForDaysWithoutOne()
+    {
+        var withSplit = new NetWorthSnapshotDto(
+            new DateOnly(2026, 10, 2), 1000m, 500m, 250m, 1750m, "USD", null, false,
+            CashTotal: 1150m, BrokerageInvested: 400m, CryptoInvested: 200m);
+        var withoutSplit = new NetWorthSnapshotDto(new DateOnly(2026, 5, 1), 900m, 0m, 0m, 900m, "USD", null, false);
+
+        _handler
+            .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new NetWorthHistoryResponse([withoutSplit, withSplit], true));
+
+        var result = await CreateSut().ExecuteAsync();
+
+        result[0].CashTotal.Should().BeNull();
+        result[0].BrokerageInvested.Should().BeNull();
+        result[0].CryptoInvested.Should().BeNull();
+        result[1].CashTotal.Should().Be(1150m);
+        result[1].BrokerageInvested.Should().Be(400m);
+        result[1].CryptoInvested.Should().Be(200m);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_PassesDateBounds_ToQueryHandler()
     {
         var from = new DateOnly(2024, 1, 1);

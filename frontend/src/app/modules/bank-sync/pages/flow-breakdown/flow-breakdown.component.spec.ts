@@ -206,14 +206,14 @@ describe('FlowBreakdownComponent drill-downs', () => {
     expect(el.textContent).toContain('Landlord');
   });
 
-  it('opens the transaction drawer from a row without following the account link', () => {
+  it('opens the transaction drawer from the row button without following the account link', () => {
     drawer.open.mockClear();
     const el = render();
 
     el.querySelector<HTMLElement>('[data-testid="breakdown-account-link"]')?.click();
     expect(drawer.open).not.toHaveBeenCalled();
 
-    el.querySelector<HTMLElement>('tr[data-testid="breakdown-row"]')?.click();
+    el.querySelector<HTMLElement>('tr[data-testid="breakdown-row"] button')?.click();
     expect(drawer.open).toHaveBeenCalledWith(
       TransactionDrawerComponent,
       expect.objectContaining({
@@ -222,20 +222,28 @@ describe('FlowBreakdownComponent drill-downs', () => {
     );
   });
 
-  it('keeps Enter on the account and category links from also opening the drawer', () => {
-    drawer.open.mockClear();
+  it('keeps table rows as native rows with a native button and links that stay outside it', () => {
     const el = render({...GROUP, items: [{...GROUP.items[0], category: 'groceries'}]});
+    const row = el.querySelector('tr[data-testid="breakdown-row"]');
+    const open = row?.querySelector('button[data-testid="breakdown-row-open"]');
 
+    expect(row?.hasAttribute('role')).toBe(false);
+    expect(row?.hasAttribute('tabindex')).toBe(false);
+    expect(open?.getAttribute('type')).toBe('button');
     for (const testId of ['breakdown-account-link', 'breakdown-category-link']) {
-      el.querySelector(`[data-testid="${testId}"]`)?.dispatchEvent(
-        new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
-      );
+      const link = row?.querySelector(`a[data-testid="${testId}"]`);
+      expect(link).not.toBeNull();
+      expect(open?.contains(link ?? null)).toBe(false);
     }
-    expect(drawer.open).not.toHaveBeenCalled();
+  });
 
-    el.querySelector('tr[data-testid="breakdown-row"]')?.dispatchEvent(
-      new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
-    );
+  it('opens the transaction drawer from the mobile row button', () => {
+    drawer.open.mockClear();
+    const el = render();
+    const row = el.querySelector('div[data-testid="breakdown-row"]');
+
+    expect(row?.hasAttribute('role')).toBe(false);
+    row?.querySelector<HTMLElement>('button[data-testid="breakdown-row-open"]')?.click();
     expect(drawer.open).toHaveBeenCalledTimes(1);
   });
 });

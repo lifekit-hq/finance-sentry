@@ -1,19 +1,28 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
 import {
   AlertItemComponent,
   type AlertItemSeverity,
+  AsyncStateComponent,
   ButtonComponent,
-  ChipComponent,
   CmnPageActionsService,
   EmptyStateComponent,
   type LucideIconName,
   PageContainerComponent,
+  SkeletonComponent,
   ToastService,
 } from '@lifekit-hq/ui';
 
 import {ALERTS_MARK_ALL_READ_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {
   type Alert,
   type AlertFilter,
@@ -25,7 +34,9 @@ import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
-import {ALERT_PAGE_SIZE_OPTIONS} from './alerts.constants';
+import {ALERT_PAGE_SIZE_OPTIONS, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
+
+const SKELETON_ROWS = 5;
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -45,19 +56,36 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,
+    AsyncStateComponent,
     ButtonComponent,
-    ChipComponent,
     EmptyStateComponent,
+    SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {class: 'block h-full'},
   templateUrl: './alerts.component.html',
 })
 export class AlertsComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(AlertsStore);
+  public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
+  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+
+  // The list is bound to the filter and page, so a stale page never stands in for the one being
+  // fetched: `hasData` stays false and a reload shows the skeleton instead of the previous rows.
+  public readonly view = computed(() =>
+    AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData: false,
+      errorMessage: this.store.errorMessage() ?? '',
+      offline: this.connectivity.offline(),
+      lastSyncedAt: null,
+    })
+  );
 
   public readonly alertsSubtitle = computed(() => {
     const count = this.store.unreadCount();
@@ -75,19 +103,23 @@ export class AlertsComponent {
     this.store.filter() === 'all' ? 'All your accounts are healthy.' : 'Try a different filter.'
   );
 
-  public readonly filterOptions: {id: AlertFilter; label: () => string}[] = [
-    {id: 'all', label: () => 'All'},
+  // lk-segmented reads `value` as a string, so the options carry the filter ids and the page sizes
+  // as strings; the change handlers convert back.
+  public readonly filterOptions = computed<{value: AlertFilter; label: string}[]>(() => [
+    {value: 'all', label: 'All'},
     {
-      id: 'unread',
-      label: () =>
-        this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
+      value: 'unread',
+      label: this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
     },
-    {id: 'error', label: () => 'Errors'},
-    {id: 'warning', label: () => 'Warnings'},
-    {id: 'info', label: () => 'Info'},
-  ];
+    {value: 'error', label: 'Errors'},
+    {value: 'warning', label: 'Warnings'},
+    {value: 'info', label: 'Info'},
+  ]);
 
-  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS;
+  public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS.map(size => ({
+    value: String(size),
+    label: `${size} per page`,
+  }));
 
   // Everything fits on one page of the smallest size → no pager to show.
   public readonly showPager = computed(
@@ -99,6 +131,16 @@ export class AlertsComponent {
       .on(ALERTS_MARK_ALL_READ_ACTION)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.markAllRead());
+  }
+
+  public onFilterChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: AlertFilter}>).detail;
+    this.store.setFilter(value);
+  }
+
+  public onPageSizeChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: string}>).detail;
+    this.store.setPageSize(Number(value));
   }
 
   public iconFor(type: AlertType): LucideIconName {
@@ -124,14 +166,6 @@ export class AlertsComponent {
   public dismiss(id: string): void {
     this.store.dismiss(id);
     this.toast.show('Alert dismissed', 'info');
-  }
-
-  public onRowKey(event: Event, item: Alert): void {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
-    event.preventDefault();
-    this.openAlert(item);
   }
 
   public openAlert(item: Alert): void {

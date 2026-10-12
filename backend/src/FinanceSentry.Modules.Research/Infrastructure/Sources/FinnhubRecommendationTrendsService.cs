@@ -27,10 +27,6 @@ public sealed class FinnhubRecommendationTrendsService(
     /// <summary>Restated months per ticker worth persisting; bounds writes on long histories.</summary>
     private const int MaxMonthsPerTicker = 12;
 
-    // One bounded retry after a 429, spaced several pacing intervals out so a drained
-    // per-minute window has a chance to refill (FR-005).
-    private const int RetryDelayIntervals = 5;
-
     private static readonly string[] CountFields = ["strongBuy", "buy", "hold", "sell", "strongSell"];
 
     public bool IsConfigured =>
@@ -64,7 +60,7 @@ public sealed class FinnhubRecommendationTrendsService(
             }
 
             first = false;
-            var rows = await FetchTickerAsync(client, ticker, interval, ct);
+            var rows = await FetchTickerAsync(client, ticker, ct);
             if (rows is null)
             {
                 failures++;
@@ -86,11 +82,12 @@ public sealed class FinnhubRecommendationTrendsService(
         return all;
     }
 
-    // Returns null on a swallowed per-ticker failure (counted toward the all-failed check).
+    // A 429 (or 5xx) is retried by the named client's resilience handler, which honours Retry-After; what
+    // reaches this method is the final answer. Returns null on a swallowed per-ticker failure (counted toward the all-failed check).
     // Auth failures throw immediately: they are global, and retrying other tickers only hammers
     // the provider with a bad key (or a paywalled endpoint) — the health/alert path must fire.
     private async Task<IReadOnlyList<RecommendationTrend>?> FetchTickerAsync(
-        HttpClient client, string ticker, TimeSpan interval, CancellationToken ct)
+        HttpClient client, string ticker, CancellationToken ct)
     {
         var url = $"stock/recommendation?symbol={Uri.EscapeDataString(ticker)}";
 
@@ -102,21 +99,6 @@ public sealed class FinnhubRecommendationTrendsService(
             {
                 throw new AnalystSourceParseException(
                     $"Finnhub returned {(int)response.StatusCode} — invalid API key or endpoint moved behind a paywall.");
-            }
-
-            if (response.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                await Task.Delay(interval * RetryDelayIntervals, ct);
-                using var retry = await client.GetAsync(url, ct);
-                if (!retry.IsSuccessStatusCode)
-                {
-                    logger.LogDebug(
-                        "Finnhub recommendation still {Status} for {Ticker} after retry — skipping",
-                        (int)retry.StatusCode, ticker);
-                    return null;
-                }
-
-                return StampAndTrim(Parse(await retry.Content.ReadAsStringAsync(ct), ticker));
             }
 
             if (!response.IsSuccessStatusCode)

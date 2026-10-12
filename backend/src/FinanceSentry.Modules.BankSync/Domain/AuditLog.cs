@@ -1,11 +1,13 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// Immutable audit log record — records every data access event.
 /// Constitution V compliance: all data access must be logged.
 /// Never stores sensitive data (no tokens, no account numbers beyond last 4).
 /// </summary>
-public class AuditLog
+public class AuditLog : IUserOwned
 {
     public Guid AuditId { get; private set; }
     public Guid UserId { get; private set; }

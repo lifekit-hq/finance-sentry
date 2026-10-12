@@ -5,7 +5,7 @@ Interfaces this feature exposes. FR references are to `spec.md`.
 ## 1. Metrics — `GET /metrics` (new, FR-001/002/006)
 
 - Prometheus exposition text (`text/plain; version=0.0.4`); reachable only over the compose network / Tailscale, not the public funnel (FR-006).
-- **200** includes stock `http_server_request_duration_*`, `process_*`, `dotnet_*` and custom `finance_jobs_succeeded_total{job}`, `finance_jobs_failed_total{job}`, `finance_job_duration_seconds{job}`, `finance_jobs_scheduled`.
+- **200** includes stock `http_server_request_duration_*`, `process_*`, `dotnet_*` and custom `finance_jobs_succeeded_total{job}`, `finance_jobs_failed_total{job}`, `finance_job_duration_seconds{job}`, `finance_jobs_scheduled`, `finance_job_consecutive_failures{job}` (gauge: current consecutive terminal-failure streak per job, 0 after a success; transient errors excluded).
 - No PII / bounded-cardinality labels (FR-007).
 - Contract test: 200 + exposition contains the custom `finance_jobs_*` names; a public-funnel request is refused.
 

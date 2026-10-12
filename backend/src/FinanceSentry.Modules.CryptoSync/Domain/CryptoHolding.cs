@@ -1,10 +1,12 @@
 namespace FinanceSentry.Modules.CryptoSync.Domain;
 
+using FinanceSentry.Core.Auth;
+
 /// <summary>
 /// One asset held on one venue. Unique on <c>(UserId, Provider, Asset)</c> (#472): BTC on Binance
 /// and BTC on Revolut X are two rows, and neither provider's sync touches the other's.
 /// </summary>
-public sealed class CryptoHolding
+public sealed class CryptoHolding : IUserOwned
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

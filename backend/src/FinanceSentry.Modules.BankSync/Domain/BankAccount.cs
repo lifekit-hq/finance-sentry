@@ -1,9 +1,10 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Domain;
 
-public class BankAccount : Entity
+public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
 {
     /// <summary>
     /// <see cref="Provider"/> of an account the startup smoke seed writes: fake data with no provider behind it,
@@ -112,7 +113,6 @@ public class BankAccount : Entity
         SyncStatus = "active";
         CurrentBalance = balance;
         LastSyncError = null;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkFailed(string? errorCode = null)
@@ -122,7 +122,6 @@ public class BankAccount : Entity
                 $"Cannot mark account failed from status '{SyncStatus}'.");
         SyncStatus = "failed";
         LastSyncError = errorCode;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -138,7 +137,6 @@ public class BankAccount : Entity
                 $"Cannot mark account transient-retry from status '{SyncStatus}'.");
         SyncStatus = "active";
         LastSyncError = null;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void BeginSync()
@@ -146,13 +144,11 @@ public class BankAccount : Entity
         if (SyncStatus == "syncing")
             throw new InvalidOperationException($"Account {Id} is already syncing.");
         SyncStatus = "syncing";
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkReauthRequired()
     {
         SyncStatus = "reauth_required";
-        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -167,7 +163,6 @@ public class BankAccount : Entity
         SyncStatus = "active";
         CurrentBalance = balance;
         LastSyncError = null;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void ValidateInvariants()

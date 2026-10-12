@@ -17,9 +17,11 @@
 # test project except Tests.Integration) runs when `backend/` or a root
 # `Directory.*.props` changed, the frontend half (`npm ci`, build, `test:ci`)
 # when `frontend/` changed. If the merge-base or the diff fails, the diff is
-# empty, or any other path changed, both halves run. Playwright, the e2e suite
-# and the Integration suite are not run here: GitHub CI runs them on every PR
-# and the pipeline's CI step waits for that result. `test.instructions` below
+# empty, or any other path changed, both halves run. The frontend half also runs
+# the route-mocked Playwright specs the diff touches (`frontend/e2e/*.spec.ts`
+# added or changed); a diff that touches none runs no Playwright here. The full
+# e2e suite and the Integration suite are not run here: GitHub CI runs them on
+# every PR and the pipeline's CI step waits for that result. `test.instructions` below
 # scales the agent's own evidence to the change the same way.
 #
 # Both npm-based commands self-provision `node_modules` with `npm ci` the way
@@ -61,11 +63,13 @@ commands:
     set -e
     be=0
     fe=0
+    specs=
     if base=$(git merge-base HEAD origin/main 2>/dev/null) && files=$(git diff --name-only "$base" 2>/dev/null) && [ -n "$files" ]; then
       set -f
       for f in $files; do
         case "$f" in
           backend/*|Directory.*.props) be=1 ;;
+          frontend/e2e/*.spec.ts) fe=1; [ -f "$f" ] && specs="$specs ${f#frontend/}" ;;
           frontend/*) fe=1 ;;
           *) be=1; fe=1 ;;
         esac
@@ -98,13 +102,22 @@ commands:
     fi
     if [ "$fe" = 1 ]; then
       (cd frontend && npm ci && npm run build && npm run test:ci)
+      if [ -n "$specs" ]; then
+        (cd frontend && npx playwright install chromium && npx playwright test $specs)
+      fi
     fi
+
+# Corrections only: AGENTS.md, CLAUDE.md and docs/claude/* are extended by
+# deliberate human edits and the periodic instruction pass, never by the gate.
+document:
+  instructions: |
+    Edit AGENTS.md, CLAUDE.md and docs/claude/* only to correct text that is factually wrong, including text this change made wrong. Do not add knowledge because it is missing, and do not add counts, sections, headings or pointers. If you think something should be added, report it as a finding and leave the file unchanged; additions wait for the periodic instruction pass.
 
 # Scale the test agent's own evidence to the change. Suites GitHub CI already
 # runs stay out of the gate: the test command above is the local pre-check.
 test:
   instructions: |
-    Scale evidence to what the change touches; do not re-run suites GitHub CI already runs (the unit, module and Integration suites, the frontend lint/build/test jobs, and Playwright e2e).
+    Scale evidence to what the change touches; do not re-run suites GitHub CI already runs (the unit, module and Integration suites, the frontend lint/build/test jobs, and the full Playwright e2e suite; the pre-check command already runs the e2e specs the diff touches).
     For a backend-only change, gather API-level evidence: start the local stack with `cd docker && docker compose -f docker-compose.dev.yml up -d --build postgres api`, then exercise the affected endpoints against http://localhost:5001/api/v1 using the QA test user from docs/claude/qa.md, and report the requests and responses.
     Do not run `docker compose ... --build` (or any image build) when only `frontend/` changed: the API is unchanged, so reuse the deployed image instead. Take the tag the production container runs (`docker inspect finance-sentry-api --format '{{.Config.Image}}'`, read-only) and run it as a throwaway container on its own network with its own throwaway postgres, never the production compose project or its containers.
     Gather UI evidence only when files under `frontend/` changed, and only for the affected screens.

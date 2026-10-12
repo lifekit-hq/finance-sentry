@@ -156,21 +156,57 @@ public sealed class ReadPortCompositionTests
     }
 
     [Fact]
-    public async Task Portfolio_value_reads_the_brokerage_sleeve_of_each_snapshot()
+    public async Task Portfolio_value_reads_the_invested_brokerage_not_the_cash_inclusive_total()
     {
         var from = new DateOnly(2026, 9, 1);
         var to = new DateOnly(2026, 9, 2);
-        var snapshots = new Mock<INetWorthSnapshotRepository>();
-        snapshots.Setup(s => s.GetByUserIdUnscopedAsync(User, from, to, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([
-                new NetWorthSnapshot { UserId = User, SnapshotDate = from, BankingTotal = 5m, BrokerageTotal = 100m, TotalNetWorth = 105m },
-                new NetWorthSnapshot { UserId = User, SnapshotDate = to, BankingTotal = 5m, BrokerageTotal = 110m, TotalNetWorth = 115m },
-            ]);
+        var snapshots = SnapshotsOf(from, to,
+            new NetWorthSnapshot { UserId = User, SnapshotDate = from, BankingTotal = 5m, BrokerageTotal = 100m, BrokerageInvested = 80m, TotalNetWorth = 105m },
+            new NetWorthSnapshot { UserId = User, SnapshotDate = to, BankingTotal = 5m, BrokerageTotal = 110m, BrokerageInvested = 85m, TotalNetWorth = 115m });
 
         var rows = await new RadarPortfolioValueSource(new BrokerageValueHistoryReader(snapshots.Object))
             .GetAsync(User, from, to);
 
-        rows.Select(r => (r.Date, r.BrokerageValueUsd)).Should().Equal((from, 100m), (to, 110m));
+        rows.Select(r => (r.Date, r.BrokerageInvestedUsd)).Should().Equal((from, 80m), (to, 85m));
+    }
+
+    [Fact]
+    public async Task Portfolio_value_skips_days_with_no_split_instead_of_zeroing_or_using_the_total()
+    {
+        var from = new DateOnly(2026, 9, 1);
+        var to = new DateOnly(2026, 9, 3);
+        var snapshots = SnapshotsOf(from, to,
+            new NetWorthSnapshot { UserId = User, SnapshotDate = from, BrokerageTotal = 100m, TotalNetWorth = 100m },
+            new NetWorthSnapshot { UserId = User, SnapshotDate = from.AddDays(1), BrokerageTotal = 105m, BrokerageInvested = 90m, TotalNetWorth = 105m },
+            new NetWorthSnapshot { UserId = User, SnapshotDate = to, BrokerageTotal = 110m, BrokerageInvested = 0m, TotalNetWorth = 110m });
+
+        var rows = await new RadarPortfolioValueSource(new BrokerageValueHistoryReader(snapshots.Object))
+            .GetAsync(User, from, to);
+
+        rows.Select(r => (r.Date, r.BrokerageInvestedUsd)).Should().Equal((from.AddDays(1), 90m), (to, 0m));
+    }
+
+    [Fact]
+    public async Task Portfolio_value_is_empty_when_no_day_has_a_split()
+    {
+        var from = new DateOnly(2026, 9, 1);
+        var to = new DateOnly(2026, 9, 2);
+        var snapshots = SnapshotsOf(from, to,
+            new NetWorthSnapshot { UserId = User, SnapshotDate = from, BrokerageTotal = 100m, TotalNetWorth = 100m },
+            new NetWorthSnapshot { UserId = User, SnapshotDate = to, BrokerageTotal = 110m, TotalNetWorth = 110m });
+
+        var rows = await new RadarPortfolioValueSource(new BrokerageValueHistoryReader(snapshots.Object))
+            .GetAsync(User, from, to);
+
+        rows.Should().BeEmpty();
+    }
+
+    private static Mock<INetWorthSnapshotRepository> SnapshotsOf(DateOnly from, DateOnly to, params NetWorthSnapshot[] rows)
+    {
+        var snapshots = new Mock<INetWorthSnapshotRepository>();
+        snapshots.Setup(s => s.GetByUserIdUnscopedAsync(User, from, to, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rows);
+        return snapshots;
     }
 
     [Fact]

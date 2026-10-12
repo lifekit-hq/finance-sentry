@@ -13,14 +13,17 @@ public class BenchmarkRelativeRecordRepository(ResearchDbContext db) : IBenchmar
     public async Task ReplaceRunAsync(
         Guid userId, DateTimeOffset asOf, IReadOnlyList<BenchmarkRelativeRecord> rows, CancellationToken ct = default)
     {
-        var existing = await db.BenchmarkRelativeRecords
+        // The delete is its own statement now, so a transaction keeps the replace atomic: a failed insert
+        // must not leave the run deleted.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.BenchmarkRelativeRecords
             .IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(r => r.UserId == userId && r.AsOf == asOf)
-            .ToListAsync(ct);
+            .ExecuteDeleteAsync(ct);
 
-        db.BenchmarkRelativeRecords.RemoveRange(existing);
         db.BenchmarkRelativeRecords.AddRange(rows);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     public async Task<IReadOnlyList<BenchmarkRelativeRecord>> ListPreviousRunUnscopedAsync(

@@ -15,6 +15,7 @@ function position(overrides: Partial<Position>): Position {
     pnlPercent: null,
     pnlUsd: null,
     isVenueCash: false,
+    assetClass: 'equity',
     ...overrides,
   };
 }
@@ -44,7 +45,13 @@ describe('DayChangeUtils', () => {
     it('skips crypto, venue cash and non-stock brokerage rows', () => {
       const tickers = DayChangeUtils.quotableTickers([
         position({symbol: 'BTC', provider: 'binance', instrumentType: null}),
-        position({symbol: 'EUR', provider: 'revolut_x', instrumentType: null, isVenueCash: true}),
+        position({
+          symbol: 'EUR',
+          provider: 'revolut_x',
+          instrumentType: null,
+          isVenueCash: true,
+          assetClass: 'cash',
+        }),
         position({symbol: 'USD Cash', instrumentType: 'CASH'}),
         position({symbol: 'UA4000227045', instrumentType: 'BOND'}),
         position({symbol: 'Fund A', provider: 'inzhur', instrumentType: 'REIT'}),

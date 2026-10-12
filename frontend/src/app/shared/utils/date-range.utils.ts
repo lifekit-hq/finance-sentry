@@ -1,3 +1,5 @@
+import {DateUtils} from './date.utils';
+
 export interface DateRange {
   from: string | null;
   to: string;
@@ -8,15 +10,10 @@ export type DayWindowRange = '1w' | 'mtd' | '1m';
 
 export type RelativeRange = DayWindowRange | '3m' | 'ytd' | '1y' | 'all';
 
-const ISO_DATE_LENGTH = 10;
 const MONTHS_3 = 3;
 const DAYS_IN_WEEK = 7;
 
 export class DateRangeUtils {
-  public static toIsoDate(d: Date): string {
-    return d.toISOString().slice(0, ISO_DATE_LENGTH);
-  }
-
   /**
    * First UTC calendar day of a day-resolution window, running through `now`'s day. Like the
    * rest of the dashboard it is anchored in UTC, not the viewer's zone.
@@ -40,10 +37,10 @@ export class DateRangeUtils {
   }
 
   public static fromRelativeRange(range: RelativeRange, now = new Date()): DateRange {
-    const to = DateRangeUtils.toIsoDate(now);
+    const to = DateUtils.isoDateUtc(now);
 
     if (range === '1w' || range === 'mtd' || range === '1m') {
-      return {from: DateRangeUtils.toIsoDate(DateRangeUtils.dayWindowStart(range, now)), to};
+      return {from: DateUtils.isoDateUtc(DateRangeUtils.dayWindowStart(range, now)), to};
     }
     if (range === 'ytd') {
       return {from: `${now.getUTCFullYear()}-01-01`, to};
@@ -58,7 +55,7 @@ export class DateRangeUtils {
       return {from: null, to};
     }
 
-    return {from: DateRangeUtils.toIsoDate(d), to};
+    return {from: DateUtils.isoDateUtc(d), to};
   }
 
   public static toHttpParams(range: DateRange): Record<string, string> {

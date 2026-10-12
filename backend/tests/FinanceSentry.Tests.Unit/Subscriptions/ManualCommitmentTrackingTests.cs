@@ -228,6 +228,8 @@ public class ManualCommitmentTrackingTests
         var repo = new Mock<IDetectedSubscriptionRepository>();
         repo.Setup(r => r.FindByUserAndMerchantUnscopedAsync(UserId, Key, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DetectedSubscription s, CancellationToken _) => s.Id);
         var reader = new Mock<ICommitmentTransactionReader>();
         reader.Setup(r => r.FindAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
         reader.Setup(r => r.FindInstallmentAsync(UserGuid, TransactionId, It.IsAny<CancellationToken>())).ReturnsAsync(transaction);
@@ -295,6 +297,20 @@ public class ManualCommitmentTrackingTests
 
         (await act.Should().ThrowAsync<CommitmentAlreadyTrackedException>())
             .Which.Message.Should().Contain("Acme Hosting");
+    }
+
+    [Fact]
+    public async Task Add_ReturnsTheIdOfTheRowTheRepositoryStored()
+    {
+        var (sut, repo) = AddHandler(Picked);
+        var storedId = Guid.NewGuid();
+        repo.Setup(r => r.UpsertAsync(It.IsAny<DetectedSubscription>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storedId);
+
+        var id = await sut.Handle(new AddCommitmentCommand(
+            UserGuid, TransactionId, SubscriptionKinds.Subscription, "Acme", null, null), default);
+
+        id.Should().Be(storedId);
     }
 
     [Theory]

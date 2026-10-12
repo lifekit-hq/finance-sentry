@@ -10,6 +10,7 @@ import {
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {type LedgerFilter} from './transaction-ledger.computed';
 import {SEARCH_DEBOUNCE_MS, transactionLedgerEffects} from './transaction-ledger.effects';
 import {PAGE_SIZE} from './transaction-ledger.state';
 
@@ -24,6 +25,15 @@ function prevUtcMonthKey(): string {
   const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
 }
+
+const NO_FILTER: LedgerFilter = {
+  accountId: null,
+  transactionType: null,
+  categories: [],
+  from: null,
+  to: null,
+  search: '',
+};
 
 const TX_ITEM: GlobalTransactionDto = {
   transactionId: 'tx-1',
@@ -109,9 +119,10 @@ const ACCOUNTS: AccountsResponse = {
 };
 
 // Signals are real so the EffectsStore type constraint is satisfied.
-// Pass initialOffset to simulate the state after nextPage() has advanced the cursor.
-function buildStore(initialOffset = 0) {
+// Pass initialOffset to simulate the offset of the last page already on screen.
+function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []) {
   return {
+    transactions: signal(transactions),
     offset: signal(initialOffset),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
@@ -125,10 +136,6 @@ function buildStore(initialOffset = 0) {
     nextPage: vi.fn(),
     setError: vi.fn(),
     setMonthlyOutflowUsd: vi.fn(),
-    setAccountId: vi.fn(),
-    setTransactionType: vi.fn(),
-    setCategories: vi.fn(),
-    setDateRange: vi.fn(),
     setSearch: vi.fn(),
     setAccounts: vi.fn(),
   };
@@ -203,7 +210,7 @@ describe('transactionLedgerEffects', () => {
 
     it('sends the active category to the server', () => {
       const store = buildStore();
-      store.categories.set(['FAMILY_SUPPORT', 'FOOD_AND_DRINK']);
+      store.categories.set(['FAMILY_SUPPORT']);
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
@@ -213,7 +220,7 @@ describe('transactionLedgerEffects', () => {
       expect(service.getAllTransactions).toHaveBeenCalledWith({
         offset: 0,
         limit: PAGE_SIZE,
-        category: ['FAMILY_SUPPORT', 'FOOD_AND_DRINK'],
+        category: ['FAMILY_SUPPORT'],
       });
     });
 
@@ -301,23 +308,54 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('loadMore', () => {
-    it('calls nextPage, then fetches the next page using the updated offset', () => {
-      // initialOffset=PAGE_SIZE simulates the state after nextPage() has advanced the cursor.
-      // The real nextPage() mutates store state; here it is a vi.fn(), so we seed the offset.
+    it('fetches the page after the loaded one, then advances the offset and appends', () => {
       const store = buildStore(PAGE_SIZE);
       const service = buildService();
-      const PAGE2 = {items: [], totalCount: 1, offset: PAGE_SIZE, limit: PAGE_SIZE, hasMore: false};
-      service.getAllTransactions.mockReturnValue(of(PAGE2));
+      const PAGE3 = {
+        items: [],
+        totalCount: 1,
+        offset: 2 * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        hasMore: false,
+      };
+      service.getAllTransactions.mockReturnValue(of(PAGE3));
       configure(service);
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
 
-      expect(store.nextPage).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({
+        offset: 2 * PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.nextPage).toHaveBeenCalled();
+      expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+    });
+
+    it('keeps the offset on a failed next page so Load More repeats the same request', () => {
+      const store = buildStore(0, [TX_ITEM]);
+      store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
+      const service = buildService();
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of({...TX_RESPONSE, offset: PAGE_SIZE}));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.loadMore();
+        effects.loadMore();
+      });
+
+      expect(service.getAllTransactions).toHaveBeenNthCalledWith(1, {
         offset: PAGE_SIZE,
         limit: PAGE_SIZE,
       });
-      expect(store.appendTransactions).toHaveBeenCalledWith([], 1, false);
+      expect(service.getAllTransactions).toHaveBeenNthCalledWith(2, {
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.appendTransactions).toHaveBeenCalledTimes(1);
+      expect(store.offset()).toBe(PAGE_SIZE);
     });
 
     it('drops an in-flight next page when a filter change reloads the first page', () => {
@@ -332,7 +370,7 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => {
         const effects = transactionLedgerEffects(store);
         effects.loadMore();
-        effects.applyAccount('acc-1');
+        effects.watchFilter(of({...NO_FILTER, accountId: 'acc-1'}));
       });
       stalePage.next({
         items: [TX_ITEM],
@@ -347,109 +385,109 @@ describe('transactionLedgerEffects', () => {
     });
   });
 
-  describe('applyAccount', () => {
-    it('stores a changed account and reloads from the first page', () => {
-      const store = buildStore();
+  describe('retry', () => {
+    it('re-fetches a failed next page at the same offset and appends it', () => {
+      const store = buildStore(0, [TX_ITEM]);
+      store.nextPage.mockImplementation(() => store.offset.update(o => o + PAGE_SIZE));
       const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      const PAGE2 = {
+        items: [TX_ITEM],
+        totalCount: 99,
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+        hasMore: true,
+      };
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of(PAGE2));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount('acc-1'));
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.loadMore();
+        effects.retry();
+      });
 
-      expect(store.setAccountId).toHaveBeenCalledWith('acc-1');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+      expect(store.setError).toHaveBeenCalledTimes(1);
+      expect(service.getAllTransactions).toHaveBeenLastCalledWith({
+        offset: PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      expect(store.appendTransactions).toHaveBeenCalledWith([TX_ITEM], 99, true);
+      expect(store.setTransactions).not.toHaveBeenCalled();
+      expect(store.offset()).toBe(PAGE_SIZE);
     });
 
-    it('ignores a value the store already holds', () => {
+    it('re-fetches a failed first page and replaces the rows', () => {
       const store = buildStore();
       const service = buildService();
+      service.getAllTransactions
+        .mockReturnValueOnce(throwError(() => new Error('boom')))
+        .mockReturnValueOnce(of(TX_RESPONSE));
       configure(service);
 
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyAccount(null));
+      TestBed.runInInjectionContext(() => {
+        const effects = transactionLedgerEffects(store);
+        effects.load();
+        effects.retry();
+      });
 
-      expect(store.setAccountId).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('applyType', () => {
-    it('stores a changed type and reloads from the first page', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType('debit'));
-
-      expect(store.setTransactionType).toHaveBeenCalledWith('debit');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-    });
-
-    it('ignores a value the store already holds', () => {
-      const store = buildStore();
-      const service = buildService();
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyType(null));
-
-      expect(store.setTransactionType).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('applyCategories', () => {
-    it('stores changed categories and reloads from the first page', () => {
-      const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
-
-      TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyCategories(['FOOD_AND_DRINK'])
-      );
-
-      expect(store.setCategories).toHaveBeenCalledWith(['FOOD_AND_DRINK']);
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-    });
-
-    it('ignores a value the store already holds', () => {
-      const store = buildStore();
-      const service = buildService();
-      configure(service);
-
-      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applyCategories([]));
-
-      expect(store.setCategories).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(service.getAllTransactions).toHaveBeenLastCalledWith({offset: 0, limit: PAGE_SIZE});
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.appendTransactions).not.toHaveBeenCalled();
     });
   });
 
-  describe('applyDateRange', () => {
-    it('stores changed bounds and reloads with them as from/to', () => {
+  describe('watchFilter', () => {
+    it('loads the first page for the filter it starts with', () => {
       const store = buildStore();
       const service = buildService();
       service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
+      const filter = signal(NO_FILTER);
 
-      TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyDateRange({from: '2026-06-01', to: '2026-08-31'})
-      );
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchFilter(filter));
+      TestBed.tick();
 
-      expect(store.setDateRange).toHaveBeenCalledWith('2026-06-01', '2026-08-31');
       expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
     });
 
-    it('ignores bounds the store already holds', () => {
+    it.each<[string, Partial<LedgerFilter>]>([
+      ['account', {accountId: 'acc-1'}],
+      ['type', {transactionType: 'debit'}],
+      ['category', {categories: ['FOOD_AND_DRINK']}],
+      ['from bound', {from: '2026-06-01'}],
+      ['to bound', {to: '2026-08-31'}],
+      ['search', {search: 'coffee'}],
+    ])('reloads from the first page when the %s changes', (_, change) => {
       const store = buildStore();
       const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
       configure(service);
+      const filter = signal(NO_FILTER);
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchFilter(filter));
+      TestBed.tick();
 
-      TestBed.runInInjectionContext(() =>
-        transactionLedgerEffects(store).applyDateRange({from: null, to: null})
-      );
+      filter.set({...NO_FILTER, ...change});
+      TestBed.tick();
 
-      expect(store.setDateRange).not.toHaveBeenCalled();
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores a filter that carries the same values', () => {
+      const store = buildStore();
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+      const filter = signal(NO_FILTER);
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).watchFilter(filter));
+      TestBed.tick();
+
+      filter.set({...NO_FILTER});
+      TestBed.tick();
+
+      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -462,25 +500,22 @@ describe('transactionLedgerEffects', () => {
       vi.useRealTimers();
     });
 
-    it('waits for typing to pause, then stores the term and reloads once', () => {
+    it('waits for typing to pause, then stores the term once', () => {
       const store = buildStore();
-      const service = buildService();
-      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
-      configure(service);
+      configure(buildService());
       const typed = new Subject<string>();
 
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).applySearch(typed));
       typed.next('co');
       typed.next('coffee');
-      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(store.setSearch).not.toHaveBeenCalled();
       vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
 
       expect(store.setSearch).toHaveBeenCalledTimes(1);
       expect(store.setSearch).toHaveBeenCalledWith('coffee');
-      expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
     });
 
-    it('does not reload when the term is unchanged', () => {
+    it('does not store a term that only differs by whitespace', () => {
       const store = buildStore();
       const service = buildService();
       configure(service);

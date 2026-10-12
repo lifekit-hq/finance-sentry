@@ -10,7 +10,7 @@ namespace FinanceSentry.Modules.Auth.Application.Commands;
 
 /// <summary>
 /// Revokes a person's access: a permanent lockout, every role and per-person permission grant removed, the
-/// security stamp rotated (voiding an outstanding invite link), and every refresh and MCP service token revoked.
+/// security stamp rotated, and every refresh and MCP service token revoked.
 /// The API loads the account per request, so a token already issued stops working on its next request.
 /// Idempotent. The caller's own account and Owner accounts cannot be revoked.
 /// </summary>

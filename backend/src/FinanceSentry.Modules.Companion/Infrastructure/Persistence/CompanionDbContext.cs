@@ -21,6 +21,8 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
 
     public DbSet<PushDelivery> PushDeliveries => Set<PushDelivery>();
 
+    public DbSet<ProblemReport> ProblemReports => Set<ProblemReport>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -72,11 +74,32 @@ public class CompanionDbContext(DbContextOptions<CompanionDbContext> options, IC
             e.ToTable("push_deliveries");
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.EventId, x.SubscriptionId }).IsUnique();
+            e.HasIndex(x => new { x.AlertId, x.SubscriptionId }).IsUnique();
             e.HasIndex(x => new { x.Status, x.NextAttemptAt });
             e.HasOne<CompanionEvent>().WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<PushSubscription>().WithMany().HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Cascade);
             e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<ProblemReport>(e =>
+        {
+            e.ToTable("problem_reports");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            e.HasIndex(x => new { x.Status, x.NextAttemptAt });
+            e.HasQueryFilter(OwnerQueryFilter.Name, x => x.UserId == CurrentUserId);
+            e.Property(x => x.Role).HasMaxLength(16);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Device).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Text).HasMaxLength(ProblemReportLimits.TextMaxLength);
+            e.Property(x => x.RoutePattern).HasMaxLength(ProblemReportLimits.RouteMaxLength);
+            e.Property(x => x.AppVersion).HasMaxLength(ProblemReportLimits.VersionMaxLength);
+            e.Property(x => x.Client).HasMaxLength((2 * ProblemReportLimits.ClientPartMaxLength) + 1);
+            e.Property(x => x.CorrelationId).HasMaxLength(64);
+            e.Property(x => x.LastError).HasMaxLength(300);
         });
 
         modelBuilder.Entity<CompanionCaptureState>(e =>

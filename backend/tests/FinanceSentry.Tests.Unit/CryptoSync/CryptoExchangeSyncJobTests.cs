@@ -119,10 +119,10 @@ public class CryptoExchangeSyncJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_EveryUserFails_FailsTheJob_SoTheConsecutiveFailureAlertCanFire()
+    public async Task ExecuteAsync_EveryUserFails_FailsTheJob_SoTheFailureStreakGaugeCanCount()
     {
-        // A swallowed total failure is a Hangfire success, and ConsecutiveFailureAlertFilter
-        // (the Telegram path, #023) only ever sees failed runs.
+        // A swallowed total failure is a Hangfire success, and ConsecutiveFailureGaugeFilter
+        // (the Grafana alert's gauge) only ever sees failed runs.
         var userId = Guid.NewGuid();
         GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
 

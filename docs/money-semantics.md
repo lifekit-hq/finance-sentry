@@ -65,7 +65,8 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   valued 1:1 and logged. It counts toward the venue's value and net worth, and in
   `BookFigures` it is **venue cash** — `VenueCashUsd`, part of `CashUsd` — never a crypto
   position and never `BankingCashUsd` (`CryptoHoldingSummary.IsVenueFiat`). The Holdings page
-  groups it as "Venue cash" with no unit price (`holdings.computed.ts`).
+  groups it in the **Cash** slice (with broker cash, below) with no unit price
+  (`holdings.computed.ts`).
 - **Cost basis — Binance** is reconstructed from the full fill history
   (`CostBasisCalculator`) and resumes from the per-holding `TradeCursor` (next trade id per
   quote pair).
@@ -92,7 +93,7 @@ so sums over holdings are USD sums (§3). Crypto holdings reach the book as
   position to zero clears the unknown lots. `RealizedPnlUsd` is the P&L of sells made while
   every held lot was priced. A failed walk leaves that holding's ledger and cursor untouched
   and fails the sync after the other holdings are walked (`CryptoTradeHistoryException`), so it
-  reaches the job-failure Telegram alert (#023) instead of freezing cost basis silently.
+  reaches the consecutive-failure gauge (`finance_job_consecutive_failures`, #935) instead of freezing cost basis silently.
 
 ### Brokerage holdings (`FinanceSentry.Modules.BrokerageSync`)
 
@@ -140,6 +141,32 @@ Everything Inzhur reports is in UAH and is converted to USD once, at ingest (§3
   their last sync (`BrokerageFreshness.Daily`), so one missed daily run is not yet stale.
 - **Net worth** — the rows are ordinary brokerage holdings, so they enter the brokerage total
   (§8) with no Inzhur-specific path.
+
+**Holdings page slices.** `GET /brokerage/holdings` tags each position with `assetClass`, the
+`AssetClassNormalizer` bucket of its `InstrumentType`. The Holdings page donut, allocation rows
+and weights slice **Cash, Bonds, Real estate, Equities, Crypto**: broker `CASH` rows (IBKR
+`<CCY> Cash`, Inzhur `UAH Cash`) and venue fiat share the Cash slice; Inzhur `BOND` and `REIT`
+rows are Bonds and Real estate; other classes (commodities, unclassified) stay with Equities;
+non-fiat crypto is Crypto. A row's weight is its share of the whole page total, cash included,
+so Cash is a slice and cash never inflates the Equities rows. Cash rows are not holdings with a
+dossier: they link nowhere, and the command palette omits them.
+
+**Cash rows elsewhere.** The same cash definition (`AssetClassNormalizer.Cash` on a broker
+`InstrumentType`, `IsVenueFiat` on a venue balance) tags cash on three more surfaces; none of them
+changes a number:
+
+- **Accounts list** (`GET /wealth/summary`): a broker `CASH` row has `accountType = "cash"` (venue
+  fiat already did) instead of `"brokerage"`, and the page shows a **Cash** label on it and does
+  not link it to a dossier. The type is read only by `AccountBalanceMath` (credit accounts), so the
+  institution, category and net-worth totals and the category % are exactly as before: cash stays
+  in its sleeve, because that page is where the money is held.
+- **MCP `get_account_summary`**: each entry carries `isCash`, true for non-credit bank accounts,
+  broker cash and venue fiat, false for invested positions and for credit accounts (a debt is not
+  cash). The `isCash` entries sum to cash held; `BookFigures.CashUsd` also nets the owed credit
+  balances. A credit account is still listed with its provider balance (the amount owed, §2), as
+  before.
+- **MCP `get_tax_lots`**: cash rows are not lots and are left out. They have no cost basis or gain
+  to report.
 
 ### Failure behaviour
 
@@ -636,7 +663,10 @@ and the last day of the current month otherwise, so the list covers what the til
 the breakdown page on the same window (`DashboardRangeUtils.breakdownParams`: `from` / `to`
 through today, plus the `months` of history the dashboard loaded so transfer pairs resolve the
 same way; `All` sends only `to`). The ledger shows the active bounds as a removable
-"Dates" chip and ignores malformed values.
+"Dates" chip and ignores malformed values. The charts drill the same way: a Top spendings
+donut slice behaves as its category row (the folded "Other categories" slice opens nothing),
+and an Income-vs-Spending bar opens that one calendar month's credits or debits
+(`DashboardRangeUtils.monthDates`, not the selected window, since the bars are closed months).
 
 This is the same split Binance and IBKR use: the current period feeds the tiles; the bars
 are closed periods.
@@ -646,6 +676,16 @@ are closed periods.
 - **Headline stat** ("Net Worth" card): computed **live** per request —
   banking (signed per §2, USD per §3) + crypto holdings + brokerage holdings
   (`DashboardQueryService`).
+- **Cash / invested sub-line** ("invested X · cash Y" under the headline): `cashUsd` and
+  `investedUsd` on the dashboard payload are `IBookFiguresService`'s `CashUsd` and
+  `InvestedValueUsd` (bank + broker + venue cash vs everything else), converted to the
+  profile base currency at the controller like the headline. Credit-card debt nets against
+  cash (§2: cash is what you would have after paying the cards, so it can be negative), and
+  USDT/USDC are crypto positions, not cash. The split is presentation only: the headline
+  total stays the live sum above and is not derived from the two figures. When a book source
+  was stale (`BookFigures.IsStale`) both are null and the sub-line is hidden rather than
+  showing a partial split; it is also hidden while the chart is being scrubbed, as the split
+  is live only.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point
@@ -656,6 +696,49 @@ are closed periods.
   previous day's value is carried forward and the sleeve is listed in `StaleSleeves`
   (`NetWorthSnapshotService`). The baseline is the latest snapshot *strictly before* the
   snapshot date, so a same-day refresh never carries forward from itself.
+- **Cash / invested split per snapshot** (`net_worth_snapshots.cash_total`, `brokerage_invested`,
+  `crypto_invested`; exposed as `cashTotal` / `brokerageInvested` / `cryptoInvested` on
+  `/net-worth/history` and the MCP `get_net_worth_history` tool): `brokerageInvested` and
+  `cryptoInvested` are the invested positions of each sleeve (`IBookFiguresService` positions, crypto
+  by `AssetClassNormalizer.Crypto`, everything else brokerage; stablecoins stay crypto, §8
+  sub-line), and `cashTotal` is the **remainder** - `totalNetWorth - brokerageInvested -
+  cryptoInvested` - so the three always add up to the stored total, including after a
+  carry-forward. On a fresh capture that remainder is exactly the dashboard's `cashUsd` (bank +
+  broker + venue cash, card debt netted, §2). A carried-forward brokerage or crypto sleeve
+  carries that sleeve's invested value forward with it; a book source that was stale at capture
+  (`BookFigures.IsStale`) leaves the whole split **null**. Null means "no split", never zero:
+  the columns are nullable and additive, `totalNetWorth` and the sleeve totals are untouched.
+- **Split backfill** (`NetWorthSplitBackfillService`, run by the worker's background catch-up
+  `NetWorthSnapshotCatchUpHostedService` after the missed-day backfill - not in the migration, and it
+  never blocks startup): fills the split of older rows from the invested positions in
+  Risk's `holding_snapshots` (latest run per UTC day, via `IInvestedHistoryReader`): cash is the row's
+  own stored total minus that day's Risk-run invested value. The two are captured at different
+  moments, so intraday moves can shift a little between cash and invested. That table keeps 180 days (about 2026-07-08 onward at
+  the time of writing), so days before it keep a null split. Rows flagged `IsApproximate` or
+  with a non-empty brokerage/crypto sleeve in `StaleSleeves` are skipped (their stored sleeve value is not
+  what the positions describe), as is a day where a sleeve's stored total is non-zero but
+  `holding_snapshots` holds no positions for it (a source that failed when Risk ran), so a stale
+  book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
+  records 0 invested for it even when the previous row has no split. Idempotent and bounded: it fills only null columns, never
+  overwrites, and reads at most one history window per user.
+- **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
+  has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
+  Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
+  its stored `totalNetWorth` (a negative cash band is drawn as it is). A charted day with no split is
+  never dropped and never drawn as zeros in the three bands: it is one neutral **No split** band
+  carrying the day's total (its sleeves summed, with the carry-forward below), so the stack top is the
+  total on every day and a long range shows the split only where it exists. A window with no split
+  day at all keeps the old Banking / Brokerage / Crypto sleeve stack. The figure under the headline
+  is labelled **Change** (last minus first `totalNetWorth` in the range, in amount and percent): it
+  is a change in net worth, savings and cash included, not a return. Beside it, **Invested change**
+  is the change in `brokerageInvested + cryptoInvested` from the first to the last day that has a
+  split in the range (percent of the starting invested value, omitted when that is 0). It is a change
+  in invested value, so deposits into the brokerage or a venue count in it - it is not a return - and
+  it is hidden when the range has fewer than two days with a split. It carries the headline's range
+  label when the split covers the whole range, and "since <first split date>" when the split starts
+  later. While scrubbing, it runs from the
+  first split day to the scrubbed day, and is hidden when the scrubbed day has no split. The
+  "At this pace" projection is untouched (built from savings, not from this line).
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,
@@ -780,6 +863,28 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   raise no alert, because a thesis-level relative breach is what a `relative_return`
   invalidation trigger is for. Settings:
   `ThesisTrackRecord:RelativePerformance` (`ThresholdPct`, `SustainedRuns`, `Window`).
+
+### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
+
+- **Invested brokerage only.** The book return is measured on `net_worth_snapshots.brokerage_invested`
+  (the brokerage sleeve without idle broker cash, §8), not on `brokerage_total`. SPY holds no cash, so
+  comparing a return that includes cash with it would be apples to oranges. Crypto, banking and venue
+  fiat are not in the series.
+- **Days with no split are skipped.** A snapshot whose `brokerage_invested` is null (a row from before the
+  split, or one the split could not be measured for) is left out of the series - never counted as zero and
+  never replaced by the cash-inclusive total. The window opens on the first split day at or after its start
+  and closes on the latest split day. SPY's window runs from the period's start to today, so the two must
+  cover the same span. Both ends of the book window are held to one tolerance,
+  `clamp(round(periodDays × 0.1), 1, 7)` days (`periodDays` = today minus the period's start; 1W → 1,
+  1M → 3, 3M and 1Y → 7): when the first split day is later than that after the period's start (split
+  history is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), or the latest
+  split day is earlier than that before today, the book side is unavailable rather than compared over a
+  shorter window. With fewer than two split days, a zero opening value, or a first or last split day
+  outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
+  SPY is missing too), as it already is with too little history. The brief shows it as `Book N/A`.
+- **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
+  contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
+  loss. It is a holding-period return approximation, not a time-weighted or money-weighted return.
 
 ## 11. FIRE projection (#433)
 

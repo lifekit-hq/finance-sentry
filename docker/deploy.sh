@@ -138,6 +138,21 @@ docker network inspect identity-oidc >/dev/null 2>&1 || docker network create id
 echo "[deploy] pull published images @ $IMAGE_TAG"
 "${COMPOSE[@]}" pull "${PUBLISHED[@]}"
 
+# --- One-shot project rename: "docker" -> "finance-sentry" ---------------------
+# The stack used to run as compose project "docker" (the directory name) and is now pinned to
+# `name: finance-sentry`. container_name is fixed, so the old project's containers must be gone
+# before the new project's can start. Its named volumes are pinned in the compose file to their
+# docker_* names, so the new project mounts the same data. `down` without -v removes only
+# containers and the project's networks; it never touches a volume. Once the old project is gone
+# this finds nothing and does nothing. Only a project whose containers came from this compose
+# file counts: another stack that happens to live in a directory named "docker" is left alone.
+legacy_files="$(docker ps -a --filter label=com.docker.compose.project=docker \
+  --format '{{.Label "com.docker.compose.project.config_files"}}')"
+if grep -q 'docker-compose\.prod\.yml' <<<"$legacy_files"; then
+  echo "[deploy] retire legacy compose project 'docker' (containers only; volumes kept)"
+  docker compose -p docker -f docker/docker-compose.prod.yml --env-file docker/.env --env-file "$DEPLOY_ENV_FILE" down
+fi
+
 echo "[deploy] docker compose up (no build)"
 "${COMPOSE[@]}" up -d --no-build --remove-orphans
 
@@ -163,6 +178,26 @@ until curl -sf http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; do
 done
 
 echo "[deploy] ok — api reachable via gateway on 127.0.0.1:8080"
+
+# The gateway's passive health check marks the api destination unhealthy when a request meets
+# "Connection refused" during the api's startup, and keeps it so for the cluster's
+# ReactivationPeriod (1 minute, appsettings.json). The health wait above still passes (YARP
+# forwards when every destination is unhealthy), but /gateway/ready — the contract's ready item
+# for the gateway — answers 503 for that whole minute, longer than the contract's retries span.
+# So wait for it here, with a budget well past the reactivation period, before the contract runs.
+GATEWAY_READY_BUDGET_SECONDS=180
+echo "[deploy] wait for gateway ready (every cluster has an available destination)"
+deadline=$((SECONDS + GATEWAY_READY_BUDGET_SECONDS))
+until curl -sf http://127.0.0.1:8080/gateway/ready >/dev/null 2>&1; do
+  if [[ $SECONDS -gt $deadline ]]; then
+    echo "error: gateway readiness timed out after ${GATEWAY_READY_BUDGET_SECONDS}s" >&2
+    curl -s http://127.0.0.1:8080/gateway/ready >&2 || true
+    "${COMPOSE[@]}" logs --tail 60 gateway
+    exit 1
+  fi
+  sleep 2
+done
+echo "[deploy] ok — gateway ready"
 
 # Runtime gate: probe the running containers (health, ready, metrics, scraped, logs).
 # Bounded retry: the health wait above returns the moment the api answers, but the

@@ -305,10 +305,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("AllocationTargets")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("ContributionPlan")
                         .HasColumnType("jsonb");
 
@@ -323,11 +319,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<decimal?>("EmergencyCushionUsd")
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("Exclusions")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Goals")
+                    b.PrimitiveCollection<List<string>>("Exclusions")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -376,6 +368,51 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<int>("Version")
                         .HasColumnType("integer");
 
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "AllocationTargets", "FinanceSentry.Modules.Research.Domain.InvestmentPolicyStatement.AllocationTargets#AllocationTarget", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("AssetClass")
+                                .IsRequired()
+                                .HasJsonPropertyName("assetClass");
+
+                            b1.Property<decimal>("MaxPct")
+                                .HasJsonPropertyName("maxPct");
+
+                            b1.Property<decimal>("MinPct")
+                                .HasJsonPropertyName("minPct");
+
+                            b1.Property<decimal>("TargetPct")
+                                .HasJsonPropertyName("targetPct");
+
+                            b1
+                                .ToJson("AllocationTargets")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Goals", "FinanceSentry.Modules.Research.Domain.InvestmentPolicyStatement.Goals#InvestmentGoal", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Label")
+                                .IsRequired()
+                                .HasJsonPropertyName("label");
+
+                            b1.Property<string>("Priority")
+                                .IsRequired()
+                                .HasJsonPropertyName("priority");
+
+                            b1.Property<decimal?>("TargetAmountUsd")
+                                .HasJsonPropertyName("targetAmountUsd");
+
+                            b1.Property<DateOnly?>("TargetDate")
+                                .HasJsonPropertyName("targetDate");
+
+                            b1
+                                .ToJson("Goals")
+                                .HasColumnType("jsonb");
+                        });
+
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "IsCurrent")
@@ -402,10 +439,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("Catalysts")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -415,10 +448,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("numeric(18,6)");
 
                     b.Property<string>("InvalidationTriggers")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("KeyDataPoints")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -439,6 +468,46 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Catalysts", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.Catalysts#ThesisCatalyst", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<DateOnly>("Date")
+                                .HasJsonPropertyName("date");
+
+                            b1.Property<string>("Event")
+                                .IsRequired()
+                                .HasJsonPropertyName("event");
+
+                            b1
+                                .ToJson("Catalysts")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "KeyDataPoints", "FinanceSentry.Modules.Research.Domain.InvestmentThesis.KeyDataPoints#ThesisDataPoint", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Direction")
+                                .IsRequired()
+                                .HasJsonPropertyName("direction");
+
+                            b1.Property<string>("Metric")
+                                .IsRequired()
+                                .HasJsonPropertyName("metric");
+
+                            b1.Property<string>("Source")
+                                .IsRequired()
+                                .HasJsonPropertyName("source");
+
+                            b1.Property<decimal>("Threshold")
+                                .HasJsonPropertyName("threshold");
+
+                            b1
+                                .ToJson("KeyDataPoints")
+                                .HasColumnType("jsonb");
+                        });
 
                     b.HasKey("Id");
 
@@ -534,7 +603,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("Categories")
+                    b.PrimitiveCollection<List<string>>("Categories")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -560,11 +629,11 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<string>("ThesisIds")
+                    b.PrimitiveCollection<List<Guid>>("ThesisIds")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("Tickers")
+                    b.PrimitiveCollection<List<string>>("Tickers")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -609,7 +678,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Keywords")
+                    b.PrimitiveCollection<List<string>>("Keywords")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -669,7 +738,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("NominationReasons")
+                    b.PrimitiveCollection<List<string>>("NominationReasons")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -716,10 +785,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("Adjustments")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<DateTimeOffset>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -744,10 +809,6 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("Sleeves")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<decimal>("TotalValueUsd")
                         .HasColumnType("numeric(18,2)");
 
@@ -756,6 +817,65 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.Property<bool>("WasMissed")
                         .HasColumnType("boolean");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Adjustments", "FinanceSentry.Modules.Research.Domain.PolicyReviews.PolicyReview.Adjustments#PolicyReviewAdjustment", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Action")
+                                .IsRequired()
+                                .HasJsonPropertyName("action");
+
+                            b1.Property<decimal>("ApproxAmountUsd")
+                                .HasJsonPropertyName("approxAmountUsd");
+
+                            b1.Property<string>("AssetClass")
+                                .IsRequired()
+                                .HasJsonPropertyName("assetClass");
+
+                            b1.Property<string>("Rationale")
+                                .IsRequired()
+                                .HasJsonPropertyName("rationale");
+
+                            b1
+                                .ToJson("Adjustments")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Sleeves", "FinanceSentry.Modules.Research.Domain.PolicyReviews.PolicyReview.Sleeves#PolicyReviewSleeve", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("ActualPct")
+                                .HasJsonPropertyName("actualPct");
+
+                            b1.Property<decimal>("ActualValueUsd")
+                                .HasJsonPropertyName("actualValueUsd");
+
+                            b1.Property<string>("AssetClass")
+                                .IsRequired()
+                                .HasJsonPropertyName("assetClass");
+
+                            b1.Property<decimal>("DriftPct")
+                                .HasJsonPropertyName("driftPct");
+
+                            b1.Property<decimal>("MaxPct")
+                                .HasJsonPropertyName("maxPct");
+
+                            b1.Property<decimal>("MinPct")
+                                .HasJsonPropertyName("minPct");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasJsonPropertyName("status");
+
+                            b1.Property<decimal>("TargetPct")
+                                .HasJsonPropertyName("targetPct");
+
+                            b1
+                                .ToJson("Sleeves")
+                                .HasColumnType("jsonb");
+                        });
 
                     b.HasKey("Id");
 
@@ -969,11 +1089,11 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ThesisIds")
+                    b.PrimitiveCollection<List<Guid>>("ThesisIds")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("Tickers")
+                    b.PrimitiveCollection<List<string>>("Tickers")
                         .IsRequired()
                         .HasColumnType("jsonb");
 

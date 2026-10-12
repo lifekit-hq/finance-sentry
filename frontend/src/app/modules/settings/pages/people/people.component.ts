@@ -1,24 +1,29 @@
-import {Clipboard} from '@angular/cdk/clipboard';
-import {DatePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, inject, ViewContainerRef} from '@angular/core';
-import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  ViewContainerRef,
+} from '@angular/core';
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   AlertComponent,
+  AsyncStateComponent,
   ButtonComponent,
   CardComponent,
   CmnDialogService,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FormFieldComponent,
   InputComponent,
   ListItemRowComponent,
   PageContainerComponent,
   SkeletonComponent,
   TagComponent,
-  ToastService,
 } from '@lifekit-hq/ui';
 import {take} from 'rxjs';
 
+import {ConnectivityService} from '../../../../shared/services/connectivity.service';
+import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {PERSON_STATUS_TAG_VARIANT} from '../../constants/person/person.constants';
 import {type PersonRow} from '../../models/person/person.model';
 import {PeopleStore} from '../../store/people/people.store';
@@ -29,13 +34,11 @@ const SKELETON_ROWS = 3;
   selector: 'fns-people',
   imports: [
     PageContainerComponent,
-    DatePipe,
-    FormsModule,
     ReactiveFormsModule,
     AlertComponent,
+    AsyncStateComponent,
     ButtonComponent,
     CardComponent,
-    EmptyStateComponent,
     FormFieldComponent,
     InputComponent,
     ListItemRowComponent,
@@ -47,12 +50,23 @@ const SKELETON_ROWS = 3;
   templateUrl: './people.component.html',
 })
 export class PeopleComponent {
-  private readonly clipboard = inject(Clipboard);
   private readonly dialog = inject(CmnDialogService);
-  private readonly toast = inject(ToastService);
   private readonly viewContainerRef = inject(ViewContainerRef);
+  private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(PeopleStore);
+  // Offline only reaches `resolve` while nothing is on screen: with rows, a failed reload keeps
+  // its error banner instead of reading as a successful (stale) load.
+  public readonly view = computed(() => {
+    const hasData = this.store.rows().length > 0;
+    return AsyncViewUtils.resolve({
+      isLoading: this.store.isLoading(),
+      hasData,
+      errorMessage: this.store.loadErrorMessage(),
+      offline: this.connectivity.offline() && !hasData,
+      lastSyncedAt: null,
+    });
+  });
   public readonly statusVariant = PERSON_STATUS_TAG_VARIANT;
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
   public readonly inviteForm = inject(FormBuilder).group({
@@ -67,20 +81,11 @@ export class PeopleComponent {
     this.inviteForm.reset();
   }
 
-  public copyInviteLink(link: string): void {
-    if (this.clipboard.copy(link)) {
-      this.toast.show('Invite link copied', 'success');
-    } else {
-      this.toast.show('Could not copy the link. Select it and copy it manually.', 'error');
-    }
-  }
-
   public requestRevoke(person: PersonRow): void {
     const ref = this.dialog.open<boolean>(ConfirmDialogComponent, {
       data: {
         title: `Revoke access for ${person.email}?`,
-        message:
-          'They are signed out on their next request and can no longer sign in. Any unused invite link stops working.',
+        message: 'They are signed out on their next request and can no longer sign in.',
         confirmLabel: 'Revoke access',
         cancelLabel: 'Cancel',
         confirmVariant: 'destructive',

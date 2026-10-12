@@ -16,7 +16,7 @@ using Xunit;
 /// <summary>
 /// Failure posture of the weekly brief job (feature 414, US2). One user's brief failing must not
 /// cost the others theirs, but a run in which every user failed produced nothing at all and has to
-/// reach Hangfire as a failure — otherwise <c>ConsecutiveFailureAlertFilter</c> never sees a streak
+/// reach Hangfire as a failure — otherwise <c>ConsecutiveFailureGaugeFilter</c> never sees a streak
 /// and a total outage is indistinguishable from a quiet week.
 /// </summary>
 public sealed class BookPerformanceBriefJobTests

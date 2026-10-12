@@ -1,7 +1,9 @@
 import {DecimalPipe} from '@angular/common';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
+import {DonutChartComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
@@ -81,6 +83,7 @@ describe('InvestmentsComponent — positions view', () => {
           pnlPercent: 25.3,
           pnlUsd: 20.2,
           isVenueCash: false,
+          assetClass: 'equity',
         },
         {
           symbol: 'SOL',
@@ -92,14 +95,15 @@ describe('InvestmentsComponent — positions view', () => {
           pnlPercent: null,
           pnlUsd: null,
           isVenueCash: false,
+          assetClass: 'crypto',
         },
       ]),
       positionsByAssetClass: signal<PositionAssetGroup[]>([EQUITY_GROUP, CRYPTO_GROUP]),
       totalPositionsValue: signal(150),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
-        {label: 'Equities', color: 'var(--color-chart-series-1)', value: 100, percent: 67},
-        {label: 'Crypto', color: 'var(--color-chart-series-2)', value: 50, percent: 33},
+        {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},
+        {label: 'Crypto', color: 'var(--color-asset-crypto)', value: 50, percent: 33},
       ]),
     };
 
@@ -153,7 +157,7 @@ describe('InvestmentsComponent — positions view', () => {
     );
     const up = cells.find(c => c.textContent?.includes('+1.25%'));
     const none = cells.find(c => c.textContent?.trim() === '—');
-    expect(up?.className).toContain('text-status-success');
+    expect(up?.className).toContain('text-gain');
     expect(none?.className).toContain('text-text-secondary');
   });
 
@@ -169,7 +173,7 @@ describe('InvestmentsComponent — positions view', () => {
       '[data-testid="holding-day-change"]'
     );
     expect(cell?.textContent).toContain('-0.80%');
-    expect(cell?.className).toContain('text-status-error');
+    expect(cell?.className).toContain('text-loss');
   });
 
   it('shows the provider as a subtitle under the symbol', () => {
@@ -260,5 +264,63 @@ describe('InvestmentsComponent — positions view', () => {
     link?.addEventListener('click', e => e.preventDefault());
     link?.click();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('renders no dossier link for a cash row', () => {
+    mockStore.positionsByAssetClass.set([
+      {
+        assetClass: 'cash',
+        label: 'Cash',
+        totalValue: 300,
+        rows: [
+          {...EQUITY_GROUP.rows[0], symbol: 'USD Cash', currentPrice: null, dayChangePct: null},
+        ],
+      },
+    ]);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('USD Cash');
+    root.querySelector<HTMLElement>('[data-testid="list-row"], tbody tr')?.click();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  describe('allocation donut click-through', () => {
+    function clickSegment(index: number): ReturnType<typeof vi.fn> {
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const fixture = TestBed.createComponent(InvestmentsComponent);
+      fixture.detectChanges();
+      const donut = fixture.debugElement.query(By.directive(DonutChartComponent))
+        .componentInstance as DonutChartComponent;
+      donut.segmentClick.emit({index, label: 'x', value: 1});
+      return navigate;
+    }
+
+    it('opens the dossier of the only position in a clicked asset class', () => {
+      expect(clickSegment(0)).toHaveBeenCalledWith(['/assets', 'DRAM']);
+    });
+
+    it('opens the crypto position of the clicked crypto slice', () => {
+      expect(clickSegment(1)).toHaveBeenCalledWith(['/assets', 'SOL']);
+    });
+
+    it('opens nothing for a class holding several positions', () => {
+      mockStore.positionsByAssetClass.set([
+        {...EQUITY_GROUP, rows: [EQUITY_GROUP.rows[0], {...EQUITY_GROUP.rows[0], symbol: 'VOO'}]},
+      ]);
+
+      expect(clickSegment(0)).not.toHaveBeenCalled();
+    });
+
+    it('opens nothing for the cash slice', () => {
+      mockStore.positionsByAssetClass.set([
+        {assetClass: 'cash', label: 'Cash', totalValue: 300, rows: [EQUITY_GROUP.rows[0]]},
+      ]);
+
+      expect(clickSegment(0)).not.toHaveBeenCalled();
+    });
   });
 });

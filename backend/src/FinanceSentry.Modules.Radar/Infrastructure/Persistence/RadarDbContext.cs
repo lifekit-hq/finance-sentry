@@ -57,6 +57,9 @@ public class RadarDbContext(DbContextOptions<RadarDbContext> options, ICurrentUs
         sig.Property(x => x.UserId);
         sig.Property(x => x.DedupKey).IsRequired().HasMaxLength(200);
         sig.Property(x => x.PayloadVersion).IsRequired().HasDefaultValue(1);
+        // Stays on the string conversion: an open-shaped Dictionary<string, object> has no EF mapping (not a
+        // primitive collection, no fixed shape for a JSON complex type); Npgsql only writes it through the
+        // provider-wide EnableDynamicJson() opt-in on every host's data source.
         sig.Property(x => x.Payload)
             .HasColumnType("jsonb")
             .HasConversion(

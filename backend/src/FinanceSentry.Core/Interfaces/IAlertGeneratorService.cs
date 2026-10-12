@@ -146,29 +146,7 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Raises an operational Alert that a scheduled job has failed <paramref name="consecutiveCount"/>
-    /// times in a row (US4 / FR-009). <paramref name="referenceId"/> is a stable per-job id so the streak
-    /// dedups within the silence window; the caller (the Hangfire failure filter) guarantees one call per
-    /// streak and clears the streak on the next success so a later failure can re-alert. A newer streak
-    /// supersedes a still-open (unread, undismissed) earlier alert for the same job — the old row is
-    /// resolved and a fresh one inserted — so re-alerting never collides with <c>idx_alert_dedup</c>.
-    /// </summary>
-    Task GenerateJobFailureAlertAsync(
-        Guid userId,
-        Guid referenceId,
-        string jobName,
-        int consecutiveCount,
-        string? lastError,
-        CancellationToken ct = default);
-
-    /// <summary>Resolves the job-failure Alert once the job's next run succeeds.</summary>
-    Task ResolveJobFailureAlertAsync(
-        Guid userId,
-        Guid referenceId,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Raises a Warning operational alert (surfaced like a job failure) that a scheduled detector has
+    /// Raises a Warning operational alert that a scheduled detector has
     /// raised nothing for <paramref name="silentDays"/> days although it watched
     /// <paramref name="inputCount"/> inputs the whole time (#698): a detector that runs green but never
     /// fires is indistinguishable from a quiet week without it. One open alert per detector; a

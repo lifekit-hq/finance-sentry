@@ -27,8 +27,8 @@ const PROFILE = {
   lowBalanceAlerts: false,
   lowBalanceThreshold: 100,
   syncFailureAlerts: false,
-  safeWithdrawalRate: 4,
-  realAnnualReturn: 5,
+  safeWithdrawalRate: 0.04,
+  realAnnualReturn: 0.05,
   twoFactor: false,
 };
 
@@ -40,9 +40,7 @@ function json(body: unknown, status = 200) {
 
 async function stubGuestApi(page: Page): Promise<void> {
   await page.route(`${API}/**`, route => route.fulfill(json({}, 401)));
-  await page.route(`${API}/auth/methods`, route =>
-    route.fulfill(json({oidc: false, passwordLogin: true}))
-  );
+  await page.route(`${API}/auth/methods`, route => route.fulfill(json({oidc: false})));
 }
 
 async function stubSignedInApi(page: Page): Promise<{putBodies: unknown[]}> {

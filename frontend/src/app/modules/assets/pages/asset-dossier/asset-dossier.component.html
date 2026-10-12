@@ -190,10 +190,10 @@
                     <div
                       class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
                     >
-                      <span class="font-mono tabular-nums text-text-primary">{{
+                      <span class="tabular-nums text-text-primary">{{
                         lot.quantity | number: '1.0-8'
                       }}</span>
-                      <span class="font-mono tabular-nums text-text-primary">{{
+                      <span class="tabular-nums text-text-primary">{{
                         lot.currentValueUsd | money
                       }}</span>
                       @if (lot.unrealizedPnlPercent !== null) {
@@ -201,7 +201,7 @@
                           [class]="
                             lot.unrealizedPnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass
                           "
-                          class="font-mono tabular-nums"
+                          class="tabular-nums"
                         >
                           {{ lot.unrealizedPnlPercent | number: '1.2-2' }}%
                         </span>
@@ -278,7 +278,7 @@
                 <ul class="space-y-cmn-1">
                   @for (catalyst of thesis.catalysts; track $index) {
                     <li class="flex items-start gap-cmn-3 text-cmn-sm">
-                      <span class="shrink-0 font-mono text-text-secondary">{{
+                      <span class="shrink-0 tabular-nums text-text-secondary">{{
                         catalyst.date
                       }}</span>
                       <span class="text-text-primary">{{ catalyst.event }}</span>
@@ -390,7 +390,7 @@
                       <span class="text-text-primary">→ {{ action.newRating }}</span>
                     }
                     @if (action.newTarget !== null) {
-                      <span class="font-mono tabular-nums text-text-secondary"
+                      <span class="tabular-nums text-text-secondary"
                         >PT {{ action.newTarget | money }}</span
                       >
                     }
@@ -413,7 +413,7 @@
                   <cmn-data-table [rows]="analysts.trends" mode="list">
                     <cmn-column key="period" listSlot="primary">
                       <ng-template let-trend cmnCell>
-                        <span class="font-mono text-text-secondary">{{
+                        <span class="tabular-nums text-text-secondary">{{
                           trend.period | date: 'MMM yyyy'
                         }}</span>
                       </ng-template>
@@ -421,28 +421,28 @@
                     <cmn-column key="strongBuy" listSlot="secondary">
                       <ng-template let-trend cmnCell>
                         Strong buy
-                        <span class="font-mono text-status-success">{{ trend.strongBuy }}</span>
+                        <span class="tabular-nums text-status-success">{{ trend.strongBuy }}</span>
                       </ng-template>
                     </cmn-column>
                     <cmn-column key="buy" listSlot="secondary">
                       <ng-template let-trend cmnCell>
-                        Buy <span class="font-mono text-status-success">{{ trend.buy }}</span>
+                        Buy <span class="tabular-nums text-status-success">{{ trend.buy }}</span>
                       </ng-template>
                     </cmn-column>
                     <cmn-column key="hold" listSlot="secondary">
                       <ng-template let-trend cmnCell>
-                        Hold <span class="font-mono">{{ trend.hold }}</span>
+                        Hold <span class="tabular-nums">{{ trend.hold }}</span>
                       </ng-template>
                     </cmn-column>
                     <cmn-column key="sell" listSlot="trailing-secondary">
                       <ng-template let-trend cmnCell>
-                        Sell <span class="font-mono text-status-error">{{ trend.sell }}</span>
+                        Sell <span class="tabular-nums text-status-error">{{ trend.sell }}</span>
                       </ng-template>
                     </cmn-column>
                     <cmn-column key="strongSell" listSlot="trailing-secondary">
                       <ng-template let-trend cmnCell>
                         Strong sell
-                        <span class="font-mono text-status-error">{{ trend.strongSell }}</span>
+                        <span class="tabular-nums text-status-error">{{ trend.strongSell }}</span>
                       </ng-template>
                     </cmn-column>
                   </cmn-data-table>
@@ -457,7 +457,7 @@
           <cmn-card class="block">
             <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Next Earnings</h2>
             <div class="mt-cmn-3 flex flex-wrap items-center gap-cmn-4">
-              <span class="font-mono text-cmn-lg font-semibold tabular-nums text-text-primary">
+              <span class="text-cmn-lg font-semibold tabular-nums text-text-primary">
                 {{ earnings.eventDate }}
               </span>
               <span class="text-cmn-sm text-text-secondary">{{ earnings.eventType }}</span>
@@ -538,7 +538,7 @@
                 <li
                   class="flex flex-wrap items-center gap-cmn-3 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
                 >
-                  <span class="shrink-0 font-mono text-cmn-xs text-text-secondary">
+                  <span class="shrink-0 tabular-nums text-cmn-xs text-text-secondary">
                     {{ signal.timestamp | date: 'mediumDate' }}
                   </span>
                   <span class="font-medium text-text-primary">{{

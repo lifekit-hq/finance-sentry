@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 using FluentAssertions;
@@ -36,6 +37,15 @@ public class NetWorthSnapshotJobTests
         return mock;
     }
 
+    private static IBookFiguresService BookStub(
+        IReadOnlyList<BookFigurePosition>? positions = null, bool isStale = false)
+    {
+        var book = new BookFigures(0m, 0m, 0m, 0m, 0m, positions ?? [], isStale, isStale ? ["crypto"] : []);
+        var mock = new Mock<IBookFiguresService>();
+        mock.Setup(b => b.ReadAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(book);
+        return mock.Object;
+    }
+
     [Fact]
     public async Task ExecuteAsync_SumsAllAssetClassesAndPersistsSnapshot()
     {
@@ -50,7 +60,8 @@ public class NetWorthSnapshotJobTests
             BankingMock(total: 2000m).Object,
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
-            snapshotServiceMock.Object);
+            snapshotServiceMock.Object,
+            BookStub());
 
         await sut.ExecuteAsync();
 
@@ -84,7 +95,8 @@ public class NetWorthSnapshotJobTests
             bankingMock.Object,
             CryptoMock(usdValue: 0m).Object,
             BrokerageMock(usdValue: 0m).Object,
-            snapshotServiceMock.Object);
+            snapshotServiceMock.Object,
+            BookStub());
 
         await sut.ExecuteForUserAsync(UserId);
 
@@ -106,7 +118,8 @@ public class NetWorthSnapshotJobTests
             BankingMock(total: 2000m).Object,
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
-            snapshotServiceMock.Object);
+            snapshotServiceMock.Object,
+            BookStub());
 
         var snapshotDate = new DateOnly(2026, 6, 29);
 
@@ -114,5 +127,60 @@ public class NetWorthSnapshotJobTests
 
         captured.Should().NotBeNull();
         captured!.SnapshotDate.Should().Be(snapshotDate);
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_PassesInvestedPartOfEachSleeveFromTheBookFigures()
+    {
+        NetWorthSnapshotData? captured = null;
+        var snapshotServiceMock = new Mock<INetWorthSnapshotService>();
+        snapshotServiceMock
+            .Setup(s => s.PersistSnapshotAsync(UserId, It.IsAny<NetWorthSnapshotData>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, NetWorthSnapshotData, CancellationToken>((_, data, _) => captured = data)
+            .Returns(Task.CompletedTask);
+        var positions = new BookFigurePosition[]
+        {
+            new("AAPL", AssetClassNormalizer.Equities, 10m, null, 700m, "ibkr"),
+            new("UA-BOND", AssetClassNormalizer.Bonds, 1m, null, 100m, "inzhur"),
+            new("BTC", AssetClassNormalizer.Crypto, 1m, null, 400m, "binance"),
+        };
+
+        var sut = new NetWorthSnapshotJob(
+            BankingMock(total: 2000m).Object,
+            CryptoMock(usdValue: 500m).Object,
+            BrokerageMock(usdValue: 1000m).Object,
+            snapshotServiceMock.Object,
+            BookStub(positions));
+
+        await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
+
+        captured!.BrokerageInvested.Should().Be(800m, "every non-crypto position, idle broker cash excluded");
+        captured.CryptoInvested.Should().Be(400m, "venue fiat is not a position");
+        captured.BrokerageTotal.Should().Be(1000m, "the sleeve totals stay byte-identical");
+        captured.CryptoTotal.Should().Be(500m);
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_WithAStaleBookSource_WithholdsTheSplit()
+    {
+        NetWorthSnapshotData? captured = null;
+        var snapshotServiceMock = new Mock<INetWorthSnapshotService>();
+        snapshotServiceMock
+            .Setup(s => s.PersistSnapshotAsync(UserId, It.IsAny<NetWorthSnapshotData>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, NetWorthSnapshotData, CancellationToken>((_, data, _) => captured = data)
+            .Returns(Task.CompletedTask);
+
+        var sut = new NetWorthSnapshotJob(
+            BankingMock(total: 2000m).Object,
+            CryptoMock(usdValue: 500m).Object,
+            BrokerageMock(usdValue: 1000m).Object,
+            snapshotServiceMock.Object,
+            BookStub(isStale: true));
+
+        await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
+
+        captured!.BrokerageInvested.Should().BeNull();
+        captured.CryptoInvested.Should().BeNull();
+        captured.BankingTotal.Should().Be(2000m);
     }
 }

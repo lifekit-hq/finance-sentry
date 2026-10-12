@@ -1,15 +1,11 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-cmn-4">
   @if (!isLinking) {
-    <div class="flex items-center gap-cmn-1" role="group" aria-label="Type">
-      @for (opt of kindOptions; track opt.value) {
-        <cmn-chip
-          [selected]="form.controls.kind.value === opt.value"
-          (clicked)="setKind(opt.value)"
-        >
-          {{ opt.label }}
-        </cmn-chip>
-      }
-    </div>
+    <lk-segmented
+      [options]="kindOptions"
+      [value]="form.controls.kind.value"
+      (lk-segmented-change)="onKindChange($event)"
+      label="Type"
+    />
   }
 
   <cmn-form-field
@@ -24,35 +20,44 @@
     />
   </cmn-form-field>
 
-  @if (picker.errorMessage()) {
-    <cmn-alert variant="error">{{ picker.errorMessage() }}</cmn-alert>
-  }
-
-  <div class="max-h-64 space-y-cmn-1 overflow-y-auto">
-    @for (tx of picker.candidates(); track tx.transactionId) {
-      <cmn-selectable-card
-        [selected]="picker.selected()?.transactionId === tx.transactionId"
-        (clicked)="pick(tx)"
-        orientation="horizontal"
-      >
-        <div class="min-w-0 text-left">
-          <div class="truncate text-cmn-sm font-medium text-text-primary">
-            {{ tx.merchantName || tx.description }}
-          </div>
-          <div class="truncate text-cmn-xs text-text-secondary">
-            {{ tx.bankName }} · {{ tx.date | date: 'd MMM y' }}
-          </div>
-        </div>
-        <span trailing class="font-mono text-cmn-sm font-semibold text-text-primary">
-          {{ tx.amount | money: tx.currency }}
-        </span>
-      </cmn-selectable-card>
-    } @empty {
-      @if (!picker.isLoading() && !picker.errorMessage()) {
-        <cmn-empty-state message="No matching outgoing transactions" variant="bare" icon="Search" />
+  <cmn-async-state
+    [status]="view().status"
+    [errorMessage]="view().errorMessage"
+    [isEmpty]="picker.candidates().length === 0"
+    (retry)="picker.load()"
+    class="block"
+    emptyMessage="No matching outgoing transactions"
+    emptyIcon="Search"
+    errorPlacement="above"
+    retryable
+  >
+    <div skeleton class="space-y-cmn-1" data-testid="candidates-skeleton">
+      @for (row of skeletonRows; track row) {
+        <cmn-skeleton height="3.5rem" />
       }
-    }
-  </div>
+    </div>
+    <div class="max-h-64 space-y-cmn-1 overflow-y-auto">
+      @for (tx of picker.candidates(); track tx.transactionId) {
+        <cmn-selectable-card
+          [selected]="picker.selected()?.transactionId === tx.transactionId"
+          (clicked)="pick(tx)"
+          orientation="horizontal"
+        >
+          <div class="min-w-0 text-left">
+            <div class="truncate text-cmn-sm font-medium text-text-primary">
+              {{ tx.merchantName || tx.description }}
+            </div>
+            <div class="truncate text-cmn-xs text-text-secondary">
+              {{ tx.bankName }} · {{ tx.date | date: 'd MMM y' }}
+            </div>
+          </div>
+          <span trailing class="tabular-nums text-cmn-sm font-semibold text-text-primary">
+            {{ tx.amount | money: tx.currency }}
+          </span>
+        </cmn-selectable-card>
+      }
+    </div>
+  </cmn-async-state>
 
   @if (picker.anchor(); as anchor) {
     <p class="text-cmn-xs text-text-secondary">
@@ -62,16 +67,12 @@
   }
 
   @if (picker.selected()) {
-    <div class="flex items-center gap-cmn-1" role="group" aria-label="Billed">
-      @for (opt of cadenceOptions; track opt.value) {
-        <cmn-chip
-          [selected]="form.controls.cadence.value === opt.value"
-          (clicked)="setCadence(opt.value)"
-        >
-          {{ opt.label }}
-        </cmn-chip>
-      }
-    </div>
+    <lk-segmented
+      [options]="cadenceOptions"
+      [value]="form.controls.cadence.value"
+      (lk-segmented-change)="onCadenceChange($event)"
+      label="Billed"
+    />
   }
 
   @if (picker.selected() && !isLinking) {

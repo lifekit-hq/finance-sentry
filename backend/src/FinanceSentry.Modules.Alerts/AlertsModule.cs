@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class AlertsModule
 {
@@ -35,12 +36,14 @@ public static class AlertsModule
     public static IServiceCollection AddAlertsModule(
         this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<AlertsDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();
         services.AddScoped<IMaterialAlertReader, Infrastructure.Persistence.MaterialAlertReader>();
+        services.AddScoped<IPushAlertReader, Infrastructure.Persistence.MaterialAlertReader>();
         services.AddScoped<IAlertFireHistoryReader, AlertFireHistoryReader>();
         // #673: published read port - the Integration adapter reaches Alerts only through it.
         services.AddScoped<IAlertsByTypeReader, AlertsByTypeReader>();

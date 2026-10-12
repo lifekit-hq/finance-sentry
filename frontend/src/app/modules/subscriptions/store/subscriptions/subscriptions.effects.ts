@@ -15,6 +15,8 @@ import {SubscriptionsService} from '../../services/subscriptions.service';
 interface EffectsStore {
   setData: (subscriptions: Subscription[], hasInsufficientHistory: boolean) => void;
   setSummary: (summary: SubscriptionSummary) => void;
+  setLoading: () => void;
+  setLoadError: (errorCode: Nullable<string>) => void;
   dismissSubscription: (id: string) => void;
   restoreSubscription: (id: string) => void;
   setAddError: (errorCode: Nullable<string>, errorDetail?: Nullable<string>) => void;
@@ -43,7 +45,19 @@ export function subscriptionsEffects(store: EffectsStore) {
     service.getSummary().pipe(tap(summary => store.setSummary(summary)));
 
   return {
-    load: rxMethod<void>(pipe(switchMap(() => refresh()))),
+    load: rxMethod<void>(
+      pipe(
+        tap(() => store.setLoading()),
+        switchMap(() =>
+          refresh().pipe(
+            catchError((err: unknown) => {
+              store.setLoadError(extractErrorCode(err));
+              return EMPTY;
+            })
+          )
+        )
+      )
+    ),
     dismiss: rxMethod<string>(
       pipe(
         switchMap(id =>

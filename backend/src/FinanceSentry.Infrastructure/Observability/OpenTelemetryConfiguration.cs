@@ -23,6 +23,7 @@ public static class OpenTelemetryConfiguration
     private const string DefaultOtlpEndpoint = "http://otel-collector:4318";
     private const string OtlpTracesPath = "/v1/traces";
     private const string MetricsPath = "/metrics";
+    private const string PollyMeterName = "Polly";
 
     public static IServiceCollection AddObservabilityMetrics(this IServiceCollection services, IConfiguration configuration)
     {
@@ -35,6 +36,8 @@ public static class OpenTelemetryConfiguration
                 .AddAspNetCoreInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter(JobMetrics.MeterName)
+                // Polly's meter: Microsoft.Extensions.Http.Resilience reports retries, timeouts and breaker state here.
+                .AddMeter(PollyMeterName)
                 .AddPrometheusExporter())
             .WithTracing(tracing => tracing.AddObservabilityTracing(configuration));
 

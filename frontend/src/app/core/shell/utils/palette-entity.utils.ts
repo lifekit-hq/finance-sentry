@@ -10,6 +10,8 @@ export const PALETTE_GROUP_ACCOUNTS = 'Accounts';
 /** The ledger's existing account filter (`?account=`), so an account item opens its transactions. */
 const LEDGER_ACCOUNT_PARAM = 'account';
 
+const PALETTE_CASH_CLASS = 'cash';
+
 export class PaletteEntityUtils {
   /** Dossier route of a ticker; the symbol is encoded because the router takes it as one segment. */
   public static assetRoute(symbol: string): string {
@@ -34,7 +36,7 @@ export class PaletteEntityUtils {
     };
 
     const held = entities.holdings
-      .filter(h => !h.isVenueCash)
+      .filter(h => h.assetClass !== PALETTE_CASH_CLASS)
       .flatMap(h => asset(h.symbol, PALETTE_GROUP_HOLDINGS));
     const watched = entities.watchlist.flatMap(w => asset(w.ticker, PALETTE_GROUP_WATCHLIST));
     const accounts = entities.accounts.map(a => ({

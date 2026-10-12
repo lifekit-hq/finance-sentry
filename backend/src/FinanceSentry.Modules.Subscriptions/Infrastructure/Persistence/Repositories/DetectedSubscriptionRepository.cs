@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 // Reads run under SubscriptionsDbContext's Owner query filter. The detection job and the cross-module readers run
 // with no person in scope, so they call the …Unscoped… methods, which opt out of the filter and keep their own
-// UserId predicate. The upsert's existence check opts out too: with no person in scope a filtered check finds
-// nothing and re-adds a row that already exists.
+// UserId predicate. A new row is written by a single INSERT ... ON CONFLICT, which the Owner filter does not touch, so
+// it works with no person in scope too.
 public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetectedSubscriptionRepository
 {
     private readonly SubscriptionsDbContext _db = db;
@@ -35,15 +35,68 @@ public class DetectedSubscriptionRepository(SubscriptionsDbContext db) : IDetect
         => AllUsers
             .FirstOrDefaultAsync(s => s.UserId == userId && s.MerchantNameNormalized == merchantNameNormalized, ct);
 
-    public async Task UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
+    // A row this context tracks was loaded, so it exists: it is written back by its Id, which also carries a changed
+    // key (a legacy row re-keyed when it is linked to a transaction). A new row is one INSERT ... ON CONFLICT on the
+    // unique (UserId, MerchantNameNormalized) index: one already stored under that key (the detection job re-finds it
+    // in a race) is updated in place with the caller's state, keeping its Id and DetectedAt, so two writers of one key
+    // leave one row instead of the loser failing on the index, and no read precedes it. A writer that is not manual
+    // (the detection job) never replaces a manual or dismissed row, the same rule SubscriptionDetectionResultService
+    // applies to a row it has read; in that case the stored row is left as it was. The Id returned is the stored row's.
+    public async Task<Guid> UpsertAsync(DetectedSubscription subscription, CancellationToken ct = default)
     {
-        var existing = await AllUsers
-            .FirstOrDefaultAsync(s => s.Id == subscription.Id, ct);
+        if (_db.Entry(subscription).State != EntityState.Detached)
+        {
+            await _db.SaveChangesAsync(ct);
+            return subscription.Id;
+        }
 
-        if (existing is null)
-            _db.DetectedSubscriptions.Add(subscription);
+        var ids = await _db.Database.SqlQuery<Guid>(
+            $"""
+            INSERT INTO public.detected_subscriptions
+                ("Id", "UserId", "MerchantNameNormalized", "MerchantNameDisplay", "Cadence", "AverageAmount",
+                 "LastKnownAmount", "PreviousAmount", "Currency", "Kind", "LastChargeDate", "NextExpectedDate", "Status",
+                 "OccurrenceCount", "ConfidenceScore", "Category", "TermCount", "EndDate", "StartDate", "IsManual",
+                 "DetectedAt", "UpdatedAt", "DismissedAt")
+            VALUES
+                ({subscription.Id}, {subscription.UserId}, {subscription.MerchantNameNormalized},
+                 {subscription.MerchantNameDisplay}, {subscription.Cadence}, {subscription.AverageAmount},
+                 {subscription.LastKnownAmount}, {subscription.PreviousAmount}, {subscription.Currency},
+                 {subscription.Kind}, {subscription.LastChargeDate}, {subscription.NextExpectedDate},
+                 {subscription.Status}, {subscription.OccurrenceCount}, {subscription.ConfidenceScore},
+                 {subscription.Category}, {subscription.TermCount}, {subscription.EndDate}, {subscription.StartDate},
+                 {subscription.IsManual}, {subscription.DetectedAt.ToUniversalTime()}, now(),
+                 {subscription.DismissedAt?.ToUniversalTime()})
+            ON CONFLICT ("UserId", "MerchantNameNormalized") DO UPDATE SET
+                "MerchantNameDisplay" = EXCLUDED."MerchantNameDisplay",
+                "Cadence" = EXCLUDED."Cadence",
+                "AverageAmount" = EXCLUDED."AverageAmount",
+                "LastKnownAmount" = EXCLUDED."LastKnownAmount",
+                "PreviousAmount" = EXCLUDED."PreviousAmount",
+                "Currency" = EXCLUDED."Currency",
+                "Kind" = EXCLUDED."Kind",
+                "LastChargeDate" = EXCLUDED."LastChargeDate",
+                "NextExpectedDate" = EXCLUDED."NextExpectedDate",
+                "Status" = EXCLUDED."Status",
+                "OccurrenceCount" = EXCLUDED."OccurrenceCount",
+                "ConfidenceScore" = EXCLUDED."ConfidenceScore",
+                "Category" = EXCLUDED."Category",
+                "TermCount" = EXCLUDED."TermCount",
+                "EndDate" = EXCLUDED."EndDate",
+                "StartDate" = EXCLUDED."StartDate",
+                "IsManual" = EXCLUDED."IsManual",
+                "UpdatedAt" = now(),
+                "DismissedAt" = EXCLUDED."DismissedAt"
+            WHERE EXCLUDED."IsManual"
+                OR (NOT detected_subscriptions."IsManual" AND detected_subscriptions."Status" <> {SubscriptionStatus.Dismissed})
+            RETURNING "Id" AS "Value"
+            """).ToListAsync(ct);
+        if (ids.Count > 0)
+            return ids[0];
 
-        await _db.SaveChangesAsync(ct);
+        return await AllUsers.AsNoTracking()
+            .Where(s => s.UserId == subscription.UserId && s.MerchantNameNormalized == subscription.MerchantNameNormalized)
+            .Select(s => s.Id)
+            .SingleAsync(ct);
     }
 
     public async Task DeleteAsync(DetectedSubscription subscription, CancellationToken ct = default)

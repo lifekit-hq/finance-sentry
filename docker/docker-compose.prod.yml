@@ -21,6 +21,11 @@
 # sets no-new-privileges and a pids limit, and mounts its root filesystem read-only with tmpfs for
 # the paths it writes at runtime. Named volumes stay writable.
 
+# Project name pinned instead of inherited from the directory ("docker"). Compose prefixes every
+# unpinned named volume with it, so the volumes below carry explicit `name:`s: the live data sits
+# under the old "docker_" prefix and a renamed project would otherwise mount fresh empty ones.
+name: finance-sentry
+
 services:
   api:
     build:
@@ -56,6 +61,13 @@ services:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${DB_NAME:-finance_sentry};Username=${DB_USER:-finance_user};Password=${DB_PASSWORD}"
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:?set JWT_ISSUER to the public https origin the API is served under}
+      # Wraps the Data Protection key ring (invite tokens, OIDC state cookies), which the api keeps in the Auth
+      # database because its filesystem is read-only. Base64 of a password-less PKCS#12 with an RSA key; the mcp
+      # host takes the same value because it shares that ring. A self-signed one is enough:
+      #   openssl req -x509 -newkey rsa:2048 -nodes -keyout k.pem -out c.pem -subj /CN=finance-sentry-dataprotection -days 3650
+      #   openssl pkcs12 -export -inkey k.pem -in c.pem -passout pass: | base64 -w0
+      # Rotating it means re-wrapping the stored keys, so keep it for as long as the ring has keys.
+      DataProtection__CertificatePfxBase64: ${DATA_PROTECTION_CERT_PFX_BASE64:?set DATA_PROTECTION_CERT_PFX_BASE64 (docker/.env.sops) to protect the Data Protection key ring at rest}
       Jwt__ExpiryMinutes: ${JWT_EXPIRATION_MINUTES:-60}
       Deduplication__MasterKeyBase64: ${DEDUPLICATION_MASTER_KEY_BASE64}
       # AES-256-GCM keys for stored bank credentials (issue #493). REQUIRED: outside
@@ -129,9 +141,10 @@ services:
       # Account granted the Owner role at startup (Hangfire dashboard, owner-only features). Empty =
       # promote the sole registered user while nobody holds the role. Not a secret. See the runbook §4.
       Auth__OwnerEmail: ${AUTH_OWNER_EMAIL:-}
-      # Password sign-in (login and invite acceptance) is fixed off in production: Logto is the only way in. The code
-      # default is on, so this literal must stay; there is deliberately no env override.
-      Auth__PasswordLogin__Enabled: "false"
+      # Break-glass only: POST /api/v1/auth/login (an existing account's password) exists only while this is
+      # "true"; off by default, so Logto is the only way in. An operator turns it on for an emergency and back off
+      # after (runbook §11); no user-facing screen offers it.
+      Auth__PasswordLogin__Enabled: ${AUTH_PASSWORD_LOGIN_ENABLED:-false}
       # Account the post-deploy live smoke signs in as, through Logto: seeded at startup as a passwordless Member
       # with fake data, never the owner. It must carry the email of the dedicated Logto smoke user. Empty = no seed.
       # The deploy workflow passes it from the E2E_LIVE_LOGTO_EMAIL GitHub Actions secret, not docker/.env.sops.
@@ -146,8 +159,13 @@ services:
       # cannot reliably reach the host's tailnet address); the issuer and the browser stay on the public Authority.
       Auth__Oidc__BackchannelAuthority: ${AUTH_OIDC_BACKCHANNEL_AUTHORITY:-http://logto:3001/oidc}
       Auth__Oidc__RequireHttpsMetadata: ${AUTH_OIDC_REQUIRE_HTTPS_METADATA:-true}
-      # Inzhur sign-in runs in the inzhur-browser sidecar (owner-initiated only; the daily sync never opens it).
-      Inzhur__BrowserUrl: http://inzhur-browser:9222
+      # Problem reports are saved, then forwarded to the fleet inbox through the host's kit-relay (ssh forced command,
+      # `fs-` sender). The forwarder runs only while this file exists; without it reports stay saved and pending, so
+      # the api starts and serves the same either way. The ssh_config and key come with the relay sender (see FS_RELAY_DIR).
+      ProblemReports__RelayConfigPath: /run/lifekit/fs-relay/ssh_config
+    # host.docker.internal is how the relay's ssh_config reaches the host's sshd from inside the container.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # No host port — reachable only via the gateway (025 cutover, 2026-08-12).
     depends_on:
       postgres:
@@ -158,7 +176,6 @@ services:
       identity-oidc: {}    # back channel to the org identity provider (Logto) by name
       finance-sentry-edge:
         aliases: [api-edge]   # the gateway's upstream — see finance-sentry-edge below
-      inzhur-browser: {}   # DevTools hop to the Inzhur sign-in sidecar, shared with nothing else
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
       interval: 30s
@@ -167,6 +184,10 @@ services:
       start_period: 40s
     volumes:
       - api_logs:/app/logs
+      # The relay sender's key dir (id_ed25519, pinned known_hosts, ssh_config), read-only. Inert until the operator
+      # sets FS_RELAY_DIR=/srv/lifekit-secrets/fs-relay in docker/.env.sops: unset, it binds /dev/null (always present),
+      # so a missing key dir can never stop the api container from starting.
+      - ${FS_RELAY_DIR:-/dev/null}:/run/lifekit/fs-relay:ro
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -198,6 +219,7 @@ services:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${DB_NAME:-finance_sentry};Username=${DB_USER:-finance_user};Password=${DB_PASSWORD}"
       Deduplication__MasterKeyBase64: ${DEDUPLICATION_MASTER_KEY_BASE64}
       Jwt__Secret: ${JWT_SECRET}
+      DataProtection__CertificatePfxBase64: ${DATA_PROTECTION_CERT_PFX_BASE64:?see the api service}
       Mcp__ApiBaseUrl: http://api:5000/api/v1
       Mcp__FrontendBaseUrl: ${FRONTEND_BASE_URL:?set FRONTEND_BASE_URL to the frontend origin}
       Companion__PublicBaseUrl: ${FRONTEND_BASE_URL}
@@ -342,41 +364,6 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  # Headless Chromium for the owner's Inzhur sign-in. Inzhur has no API and guards its login with reCAPTCHA v3,
-  # which only scores a real page, so the api drives the cabinet's own sign-in page here over the DevTools
-  # protocol when the owner taps Connect/Reconnect and types the SMS code; the daily sync never uses it (it
-  # refreshes the stored session over plain HTTPS). DevTools is unauthenticated, so the sidecar sits alone with
-  # the api on the inzhur-browser network and publishes no port. Not a product: no contract probes.
-  inzhur-browser:
-    image: chromedp/headless-shell:155.0.8059.40
-    container_name: finance-sentry-inzhur-browser
-    restart: unless-stopped
-    user: "65534:65534"     # nobody; Chromium runs unsandboxed (--no-sandbox in the image's run.sh) inside the container
-    mem_limit: 768m         # idle 45 MiB; one sign-in page is a few hundred
-    shm_size: 256m          # Chromium's renderer shared memory; the 64m default crashes tabs
-    pids_limit: 256
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    read_only: true
-    tmpfs:
-      - /tmp:size=128m      # profile, cache and crash dumps; HOME points here
-    environment:
-      HOME: /tmp
-    labels:
-      lifekit.contract: "none"   # platform piece (upstream image), not a product
-    networks:
-      - inzhur-browser
-    healthcheck:
-      # The image has no curl; a TCP connect to Chromium's own DevTools port shows the browser is up.
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9223"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
-
   postgres:
     image: postgres:14-alpine
     container_name: finance-sentry-postgres
@@ -429,10 +416,15 @@ services:
   # api reaches the moved Loki unchanged: it is on the `lifekit-shared` network,
   # where lifekit-stack's `loki` service name resolves.
 
+# Every named volume is pinned to the name it had under the old "docker" project; never drop a pin.
+# .github/scripts/check-compose-volume-names.sh fails CI when one is missing.
 volumes:
   postgres_data:
+    name: docker_postgres_data
   api_logs:
+    name: docker_api_logs
   gateway_keys:   # data-protection key cache for the non-root gateway (025) — only used when TLS/ACME is enabled
+    name: docker_gateway_keys
 
 networks:
   finance-sentry:
@@ -444,9 +436,6 @@ networks:
   # Gateway <-> API hop with pinned addresses: forwarded-header trust on both hosts names these
   # addresses (bridge .1 = host ingress, .2 = gateway) instead of trusting every sender. ip_range
   # keeps dynamic allocation (the API) on .4-.7 so it can never take the gateway's pinned .2.
-  # api <-> inzhur-browser only. Not `internal`: the browser must reach www.inzhur.reit to load the sign-in page.
-  inzhur-browser:
-    name: finance-sentry-inzhur-browser
   finance-sentry-edge:
     name: finance-sentry-edge
     ipam:

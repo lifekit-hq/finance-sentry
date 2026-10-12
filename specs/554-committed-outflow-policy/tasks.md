@@ -39,9 +39,9 @@
       cannot be swapped at a call site
 - [x] `ICommittedMerchantPinRepository` moves to its own file out of `IRepositories.cs`
 - [x] `AddIfAbsentAsync` on the repository (precedent: `CompanionEventRepository.InsertIfNewAsync`)
-      — concurrent pins of one merchant return `AlreadyPinned`; a non-duplicate
-      `DbUpdateException` still surfaces; `FindAsync` leaves the port
-- [x] Tests: both race paths, over a context that fails the first save after a competing commit
+      — one `INSERT ... ON CONFLICT DO NOTHING`; concurrent pins of one merchant return
+      `AlreadyPinned`; a non-duplicate write failure still surfaces; `FindAsync` leaves the port
+- [x] Tests: the race path on real Postgres (`CommittedMerchantPinUpsertTests`)
 - [x] Rekey the persisted keys the idempotence fix moves: `M006` (detected subscriptions) and
       `M018` (pins) strip the domain suffix that used to hide behind trailing digits
 - [x] `docs/money-semantics.md` §5a — unpin takes one key form

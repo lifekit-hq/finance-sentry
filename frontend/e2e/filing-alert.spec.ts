@@ -79,7 +79,7 @@ test.describe('Filing alerts', () => {
   test('shows the sentence without the raw SEC URL', async ({page}) => {
     await page.goto('/alerts');
 
-    const row = page.getByRole('button').filter({hasText: 'AAPL filed a 10-Q'});
+    const row = page.getByTestId('alert-row').filter({hasText: 'AAPL filed a 10-Q'});
     await expect(row).toContainText('AAPL filed a 10-Q on 2024-08-02.');
     await expect(row).not.toContainText('sec.gov');
     await expect(row).not.toContainText('https://');
@@ -91,7 +91,7 @@ test.describe('Filing alerts', () => {
     await page.goto('/alerts');
 
     const popupPromise = page.waitForEvent('popup');
-    await page.getByRole('button').filter({hasText: 'AAPL filed a 10-Q'}).click();
+    await page.getByRole('button', {name: 'AAPL filed a 10-Q'}).click();
     const popup = await popupPromise;
 
     expect(popup.url()).toBe(FILING_URL);
@@ -104,7 +104,7 @@ test.describe('Filing alerts', () => {
     let popups = 0;
     page.on('popup', () => popups++);
 
-    await page.getByRole('button').filter({hasText: 'Low balance on Revolut'}).click();
+    await page.getByRole('button', {name: 'Low balance on Revolut'}).click();
 
     await expect(page).toHaveURL(/\/accounts\/list$/);
     expect(popups).toBe(0);

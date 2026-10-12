@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BrokerageSync;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -22,6 +23,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Encryption;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class BrokerageSyncModule
 {
@@ -57,8 +59,9 @@ public static class BrokerageSyncModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddConnectionHealthShadow(config);
+        services.AddUpdatedAtStamping();
         services.AddDbContext<BrokerageSyncDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         // Blocking connect: request-scoped, awaited by the controller. No
         // session store, no polling — the HTTP request itself is the state
@@ -71,7 +74,8 @@ public static class BrokerageSyncModule
         // sign requests directly against IBKR's Web API.
         services.Configure<IbkrOAuthOptions>(config.GetSection(IbkrOAuthOptions.SectionName));
         services.AddScoped<IIbkrCredentialResolver, IbkrCredentialResolver>();
-        services.AddHttpClient<IbkrOAuthClient>();
+        services.AddHttpClient<IbkrOAuthClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddScoped<IBrokerAdapter, IbkrOAuthAdapter>();
 
         services.AddScoped<IIBKRCredentialRepository, IBKRCredentialRepository>();
@@ -85,7 +89,8 @@ public static class BrokerageSyncModule
         services.AddScoped<IIbkrFlexConnector, IbkrFlexConnector>();
         services.AddScoped<IIbkrFlexCredentialResolver, IbkrFlexCredentialResolver>();
         services.AddSingleton<IbkrFlexRateLimiter>();
-        services.AddHttpClient<IIbkrFlexClient, IbkrFlexClient>();
+        services.AddHttpClient<IIbkrFlexClient, IbkrFlexClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddScoped<IIbkrFlexStatementFetcher, IbkrFlexStatementFetcher>();
         services.AddScoped<IIBKRFlexCredentialRepository, IBKRFlexCredentialRepository>();
         services.AddScoped<ICredentialRotationTarget, IBKRFlexCredentialRotationTarget>();
@@ -99,12 +104,13 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         // #673: published read port - the Integration adapter reaches tax lots only through it.
         services.AddScoped<ITaxLotReader, TaxLotReader>();
-        // Shared with the Hangfire consecutive-failure-alert filter (Program.cs) — same
+        // Shared with the Hangfire ConsecutiveFailureGaugeFilter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
-        // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in from the connect modal
-        // through a headless Chromium sidecar (reCAPTCHA v3 scores the real sign-in page); the daily job only
-        // refreshes that session and reads the portfolio. Read-only: no trade or other write call to Inzhur exists.
+        // Inzhur cabinet (design report: data/fs-inzhur-sync-design): the owner signs in on inzhur.reit in his own
+        // browser and pastes the session's refresh cookie (the sign-in's reCAPTCHA rejects this server's IP,
+        // data/fs-inzhur-recaptcha); the daily job only refreshes that session and reads the portfolio. Read-only: no
+        // trade or other write call to Inzhur exists.
         services.Configure<InzhurOptions>(config.GetSection(InzhurOptions.SectionName));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IInzhurCredentialRepository, InzhurCredentialRepository>();
@@ -114,10 +120,10 @@ public static class BrokerageSyncModule
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(sp.GetRequiredService<IOptions<InzhurOptions>>().Value.UserAgent);
                 client.Timeout = InzhurApiClient.RequestTimeout;
             })
+            .AddProviderResilience(InzhurApiClient.RequestTimeout)
             // The session's cookies are kept in the encrypted jar, not a handler-wide container shared across users.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
             .RedactLoggedHeaders(_ => true);
-        services.AddSingleton<IInzhurBrowserLogin, PuppeteerInzhurBrowserLogin>();
         services.AddScoped<IInzhurSyncService, InzhurSyncService>();
         services.AddScoped<IInzhurConnector, InzhurConnector>();
         services.AddScoped<InzhurSyncJob>();

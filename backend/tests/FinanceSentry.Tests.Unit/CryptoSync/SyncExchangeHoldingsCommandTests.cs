@@ -1,4 +1,5 @@
 using FinanceSentry.Tests.Unit.BankSync;
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Services;
@@ -9,6 +10,7 @@ using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
+using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Unit.CryptoSync.RevolutX;
@@ -61,7 +63,7 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
     private SyncExchangeHoldingsCommandHandler CreateHandler() =>
         new(
             new ExchangeCredentialRepository(_db),
-            new CryptoHoldingRepository(_db),
+            new InMemoryUpsertHoldings(_db),
             new CryptoTradeRepository(_db),
             new CryptoExchangeAdapterRegistry([_binance.Object, _revolutX.Object]),
             _encryption.Object,
@@ -579,4 +581,56 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
             new CryptoHoldingsReader(new CryptoHoldingRepository(_db)),
             NullLogger<BookFiguresService>.Instance).ReadAsync(_userId);
     }
+}
+
+/// <summary>
+/// The real repository for every read and write except the upsert, which is raw
+/// <c>INSERT ... ON CONFLICT</c> SQL the in-memory provider cannot run (it is covered on Postgres by
+/// <c>CryptoHoldingUpsertTests</c>); here it does the equivalent query-then-insert so the handler's
+/// orchestration is still exercised.
+/// </summary>
+file sealed class InMemoryUpsertHoldings(CryptoSyncDbContext db) : ICryptoHoldingRepository
+{
+    private readonly CryptoHoldingRepository _inner = new(db);
+
+    public async Task UpsertRangeAsync(IReadOnlyList<CryptoHolding> holdings, CancellationToken ct = default)
+    {
+        foreach (var holding in holdings)
+        {
+            var existing = await db.CryptoHoldings.IgnoreQueryFilters([OwnerQueryFilter.Name])
+                .FirstOrDefaultAsync(h => h.UserId == holding.UserId
+                    && h.Provider == holding.Provider
+                    && h.Asset == holding.Asset, ct);
+
+            if (existing is null)
+                await db.CryptoHoldings.AddAsync(holding, ct);
+            else
+                existing.Update(holding.FreeQuantity, holding.LockedQuantity, holding.UsdValue, holding.IsFiat);
+        }
+    }
+
+    public Task<IReadOnlyList<CryptoHolding>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+        => _inner.GetByUserIdAsync(userId, ct);
+
+    public Task<IReadOnlyList<CryptoHolding>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default)
+        => _inner.GetByUserIdUnscopedAsync(userId, ct);
+
+    public Task<IReadOnlyList<CryptoHolding>> GetByUserAndProviderUnscopedAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+        => _inner.GetByUserAndProviderUnscopedAsync(userId, provider, ct);
+
+    public Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+        => _inner.GetAllByUserAndProviderAsync(userId, provider, ct);
+
+    public Task<IReadOnlyList<CryptoHolding>> GetAllByUserAndProviderUnscopedAsync(
+        Guid userId, string provider, CancellationToken ct = default)
+        => _inner.GetAllByUserAndProviderUnscopedAsync(userId, provider, ct);
+
+    public void RemoveRange(IEnumerable<CryptoHolding> holdings) => _inner.RemoveRange(holdings);
+
+    public Task DeleteByUserAndProviderAsync(Guid userId, string provider, CancellationToken ct = default)
+        => _inner.DeleteByUserAndProviderAsync(userId, provider, ct);
+
+    public Task SaveChangesAsync(CancellationToken ct = default) => _inner.SaveChangesAsync(ct);
 }

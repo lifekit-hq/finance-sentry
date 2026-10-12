@@ -30,9 +30,7 @@ function routerMock(url = '/login') {
 
 function authServiceMock(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    login: vi.fn(),
-    acceptInvite: vi.fn(),
-    getSignInMethods: vi.fn().mockReturnValue(of({oidc: false, passwordLogin: true})),
+    getSignInMethods: vi.fn().mockReturnValue(of({oidc: true})),
     refresh: vi.fn().mockReturnValue(throwError(() => new Error('no cookie'))),
     logout: vi.fn().mockReturnValue(of(null)),
     getMe: vi.fn().mockReturnValue(throwError(() => new Error('no session'))),
@@ -66,41 +64,24 @@ describe('AuthStore (integration)', () => {
     expect(store.isAuthenticated()).toBe(false);
   });
 
-  it('successful login stores userId and email in state', () => {
-    const authService = authServiceMock({login: vi.fn().mockReturnValue(of(SAMPLE_RESPONSE))});
-    configure(authService);
+  it('applying an auth response stores userId and email in state', () => {
+    configure(authServiceMock());
 
     const store = TestBed.inject(AuthStore);
-    store.login({email: 'a@b.c', password: 'pw'});
+    store.applyAuthResponse(SAMPLE_RESPONSE);
 
     expect(store.userId()).toBe(SAMPLE_RESPONSE.user.id);
     expect(store.email()).toBe(SAMPLE_RESPONSE.user.email);
     expect(store.isAuthenticated()).toBe(true);
-    expect(store.errorMessage()).toBe('');
-  });
-
-  it('failed login maps error code through errorMessage computed', () => {
-    const authService = authServiceMock({
-      login: vi
-        .fn()
-        .mockReturnValue(throwError(() => ({error: {errorCode: 'EXTERNAL_ACCOUNT_ONLY'}}))),
-    });
-    configure(authService);
-
-    const store = TestBed.inject(AuthStore);
-    store.login({email: 'a@b.c', password: 'pw'});
-
-    expect(store.userId()).toBeNull();
-    expect(store.errorMessage()).toContain('single sign-on');
   });
 
   it('logout clears userId and email and navigates', () => {
-    const authService = authServiceMock({login: vi.fn().mockReturnValue(of(SAMPLE_RESPONSE))});
+    const authService = authServiceMock();
     const router = routerMock();
     configure(authService, router);
 
     const store = TestBed.inject(AuthStore);
-    store.login({email: 'a@b.c', password: 'pw'});
+    store.applyAuthResponse(SAMPLE_RESPONSE);
     expect(store.userId()).toBe(SAMPLE_RESPONSE.user.id);
 
     store.logout();
@@ -108,5 +89,23 @@ describe('AuthStore (integration)', () => {
     expect(store.userId()).toBeNull();
     expect(store.email()).toBeNull();
     expect(router.navigate).toHaveBeenCalled();
+  });
+
+  it('a failed auth/methods call is an error, not a guessed method set, and Retry recovers', () => {
+    const methods = {oidc: true};
+    const getSignInMethods = vi
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(methods));
+    configure(authServiceMock({getSignInMethods}));
+
+    const store = TestBed.inject(AuthStore);
+    expect(store.signInMethodsStatus()).toBe('error');
+    expect(store.signInMethods()).toBeNull();
+
+    store.loadSignInMethods();
+
+    expect(store.signInMethodsStatus()).toBe('success');
+    expect(store.signInMethods()).toEqual(methods);
   });
 });

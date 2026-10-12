@@ -3,27 +3,29 @@ namespace FinanceSentry.Tests.Integration.Auth;
 using System.Net;
 using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Modules.Auth.Application.Commands;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// Invite-only onboarding: an owner creates an invite on the People page (an account with no password plus a
-/// one-time password-reset token), the invited person sets a password with it and is signed in. Self-service
-/// registration no longer exists.
+/// Invite-only onboarding: an owner invites an email on the People page, which creates a passwordless Member
+/// account; the invited person's first Logto sign-in with that verified email links to it. There is no invite
+/// link, no token and no password step. Self-service registration no longer exists.
 /// </summary>
 public class PeopleInviteContractTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
     private const string Password = "TestPass123!";
     private const string NewPassword = "quiet lantern orchard";
+    private const string Provider = "TestIdp";
 
     [Fact]
-    public async Task CreateInvite_AsOwner_ReturnsOneTimeTokenAndListsThePersonAsInvited()
+    public async Task CreateInvite_AsOwner_ListsThePersonAsInvited()
     {
         using var owner = await OwnerClientAsync("invite-owner-create@test.com");
 
@@ -32,8 +34,6 @@ public class PeopleInviteContractTests(AuthApiFactory factory) : IClassFixture<A
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var invite = (await response.Content.ReadFromJsonAsync<InviteShape>())!;
         invite.Email.Should().Be("friend-create@test.com");
-        invite.Token.Should().NotBeNullOrWhiteSpace();
-        invite.ExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(6));
 
         var person = (await ListAsync(owner)).Single(p => p.Email == "friend-create@test.com");
         person.Id.Should().Be(invite.UserId);
@@ -55,64 +55,52 @@ public class PeopleInviteContractTests(AuthApiFactory factory) : IClassFixture<A
     }
 
     [Fact]
-    public async Task AcceptInvite_SetsThePasswordSignsInAndActivatesTheAccount()
+    public async Task InvitedPerson_SignsInThroughTheProviderWithoutAPasswordStep()
     {
         using var owner = await OwnerClientAsync("invite-owner-accept@test.com");
         var invite = await InviteAsync(owner, "friend-accept@test.com");
 
-        var accept = await factory.CookieClient().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId = invite.UserId, token = invite.Token, password = NewPassword });
+        AuthResult result;
+        using (var scope = factory.Services.CreateScope())
+        {
+            result = await scope.ServiceProvider
+                .GetRequiredService<ICommandHandler<ExternalLoginCommand, AuthResult>>()
+                .Handle(new ExternalLoginCommand(Provider, "sub-friend-accept", "friend-accept@test.com", true), CancellationToken.None);
+        }
 
-        accept.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = (await accept.Content.ReadFromJsonAsync<AuthResponseShape>())!;
-        body.User.Id.Should().Be(invite.UserId);
-        body.User.Roles.Should().Equal(AuthRoles.Member);
-        accept.Headers.GetValues("Set-Cookie").Should().Contain(c => c.StartsWith("fs_access_token="));
+        result.Response.User.Id.Should().Be(invite.UserId);
+        result.Response.User.Roles.Should().Equal(AuthRoles.Member);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var user = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByIdAsync(invite.UserId);
+            user!.PasswordHash.Should().BeNull("the invite sets no password");
+        }
 
-        await factory.SignInAsync("friend-accept@test.com", NewPassword);
         (await ListAsync(owner)).Single(p => p.Email == "friend-accept@test.com").Status.Should().Be("Active");
     }
 
     [Fact]
-    public async Task AcceptInvite_UsedTwice_SecondUseReturnsInvalidInvite()
+    public async Task InviteAcceptEndpoint_IsRemoved()
     {
-        using var owner = await OwnerClientAsync("invite-owner-once@test.com");
-        var invite = await InviteAsync(owner, "friend-once@test.com");
-        using var anonymous = factory.CookieClient();
-
-        (await anonymous.PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId = invite.UserId, token = invite.Token, password = NewPassword })).StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var again = await anonymous.PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId = invite.UserId, token = invite.Token, password = "another long passphrase" });
-
-        await ShouldBeInvalidInviteAsync(again);
-    }
-
-    [Fact]
-    public async Task AcceptInvite_WithWrongToken_ReturnsInvalidInvite()
-    {
-        var (userId, _) = await factory.CreatePendingInviteAsync("friend-wrong-token@test.com");
+        var userId = await factory.CreatePendingInviteAsync("friend-no-accept@test.com");
 
         var response = await factory.CookieClient().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token = "not-a-token", password = NewPassword });
+            new { userId, token = "any", password = NewPassword });
 
-        await ShouldBeInvalidInviteAsync(response);
+        // An unmapped route falls under the deny-all fallback policy.
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Headers.Contains("Set-Cookie").Should().BeFalse();
     }
 
     [Fact]
-    public async Task CreateInvite_ForAPendingEmail_IssuesAFreshTokenAndVoidsTheEarlierOne()
+    public async Task CreateInvite_ForAPendingEmail_IsIdempotent()
     {
         using var owner = await OwnerClientAsync("invite-owner-reissue@test.com");
         var first = await InviteAsync(owner, "friend-reissue@test.com");
         var second = await InviteAsync(owner, "friend-reissue@test.com");
-        second.UserId.Should().Be(first.UserId);
-        using var anonymous = factory.CookieClient();
 
-        await ShouldBeInvalidInviteAsync(await anonymous.PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId = first.UserId, token = first.Token, password = NewPassword }));
-        (await anonymous.PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId = second.UserId, token = second.Token, password = NewPassword })).StatusCode.Should().Be(HttpStatusCode.OK);
+        second.UserId.Should().Be(first.UserId);
+        (await ListAsync(owner)).Count(p => p.Email == "friend-reissue@test.com").Should().Be(1);
     }
 
     [Fact]
@@ -194,48 +182,9 @@ public class PeopleInviteContractTests(AuthApiFactory factory) : IClassFixture<A
         return (await response.Content.ReadFromJsonAsync<IReadOnlyList<PersonShape>>())!;
     }
 
-    internal static async Task ShouldBeInvalidInviteAsync(HttpResponseMessage response)
-    {
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await response.Content.ReadFromJsonAsync<ErrorShape>())!.ErrorCode.Should().Be("INVALID_INVITE");
-    }
-
-    private sealed record InviteShape(string UserId, string Email, string Token, DateTime ExpiresAt);
+    private sealed record InviteShape(string UserId, string Email);
 
     private sealed record PersonShape(string Id, string Email, IReadOnlyList<string> Roles, string Status);
 
-    private sealed record UserShape(string Id, string Email, IReadOnlyList<string> Roles);
-
-    private sealed record AuthResponseShape(UserShape User, DateTime ExpiresAt);
-
     private sealed record ErrorShape(string Error, string ErrorCode);
-}
-
-/// <summary>An invite token past its lifespan is refused (the lifespan is set to zero for this host).</summary>
-public class PeopleInviteExpiryTests(PeopleInviteExpiryTests.ExpiredInviteApiFactory factory)
-    : IClassFixture<PeopleInviteExpiryTests.ExpiredInviteApiFactory>
-{
-    [Fact]
-    public async Task AcceptInvite_AfterTheTokenExpired_ReturnsInvalidInvite()
-    {
-        var (userId, token) = await factory.CreatePendingInviteAsync("friend-expired@test.com");
-
-        var response = await factory.CookieClient().PostAsJsonAsync("/api/v1/auth/invite/accept",
-            new { userId, token, password = "quiet lantern orchard" });
-
-        await PeopleInviteContractTests.ShouldBeInvalidInviteAsync(response);
-        using var scope = factory.Services.CreateScope();
-        var user = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByIdAsync(userId);
-        user!.PasswordHash.Should().BeNull("an expired invite must not set a password");
-    }
-
-    public sealed class ExpiredInviteApiFactory : AuthApiFactory
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            base.ConfigureWebHost(builder);
-            builder.ConfigureServices(services =>
-                services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.Zero));
-        }
-    }
 }

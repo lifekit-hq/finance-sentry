@@ -1,18 +1,34 @@
+import {provideHttpClient} from '@angular/common/http';
+import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {ActivatedRoute, convertToParamMap, provideRouter, Router} from '@angular/router';
+import {provideRouter, Router} from '@angular/router';
+import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {CmnDrawerService} from '@lifekit-hq/ui';
-import {BehaviorSubject, Subject} from 'rxjs';
+import {Subject} from 'rxjs';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {type TransactionFilterSelection} from '../../models/transaction/transaction-filter.model';
-import {SEARCH_DEBOUNCE_MS} from '../../store/transaction-ledger/transaction-ledger.effects';
 import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction-ledger.store';
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionLedgerComponent} from './transaction-ledger.component';
 
+const ROW = {
+  transactionId: 't1',
+  accountId: 'a1',
+  bankName: 'Monzo',
+  currency: 'USD',
+  amount: -5,
+  amountUsd: -5,
+  date: '2026-10-06T09:00:00Z',
+  postedDate: null,
+  description: 'Coffee',
+  transactionType: 'debit',
+  merchantCategory: null,
+  isPending: false,
+};
+
 function setup(type: string | null, extra: Record<string, string | string[]> = {}) {
-  const params$ = new BehaviorSubject(convertToParamMap({...(type ? {type} : {}), ...extra}));
   const closed$ = new Subject<TransactionFilterSelection | undefined>();
   const drawerOpen = vi.fn(() => ({afterClosed: () => closed$}));
   const store = {
@@ -20,18 +36,22 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
     monthlyOutflow: signal(null),
     monthlyOutflowCurrency: signal('USD'),
     topCategory: signal(null),
-    errorMessage: signal<string | null>(null),
+    errorMessage: signal(''),
     load: vi.fn(),
+    retry: vi.fn(),
+    lastSyncedAt: signal<number | null>(null),
     isLoading: signal(false),
     isEmpty: signal(true),
     hasActiveFilter: signal(false),
     hasMore: signal(false),
     transactions: signal([]),
-    applyAccount: () => undefined,
-    applyType: vi.fn(),
-    applyCategories: vi.fn(),
-    applyDateRange: vi.fn(),
-    applySearch: () => undefined,
+    accountId: signal<string | null>((extra['account'] as string | undefined) ?? null),
+    transactionType: signal<string | null>(type),
+    categories: signal<string[]>([extra['category'] ?? []].flat()),
+    from: signal<string | null>((extra['from'] as string | undefined) ?? null),
+    to: signal<string | null>((extra['to'] as string | undefined) ?? null),
+    search: signal((extra['q'] as string | undefined) ?? ''),
+    applySearch: vi.fn(),
   };
   TestBed.overrideComponent(TransactionLedgerComponent, {
     set: {providers: [{provide: TransactionLedgerStore, useValue: store}]},
@@ -39,7 +59,9 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      {provide: ActivatedRoute, useValue: {queryParamMap: params$}},
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideApiBaseUrl('http://localhost/api/v1'),
       {provide: CmnDrawerService, useValue: {open: drawerOpen}},
       {
         provide: CategoryStore,
@@ -56,11 +78,11 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
   fixture.detectChanges();
   const root = fixture.nativeElement as HTMLElement;
   const chip = (id: string) => root.querySelector(`[data-testid="${id}"]`) as HTMLElement;
-  return {chip, navigate, root, store, params$, fixture, drawerOpen, closed$};
+  return {chip, navigate, root, store, fixture, drawerOpen, closed$};
 }
 
 describe('TransactionLedgerComponent filter sheet', () => {
-  it('opens the responsive Filters sheet seeded with the filters in the URL', () => {
+  it('opens the responsive Filters sheet seeded with the filters in the store', () => {
     const {chip, drawerOpen} = setup('credit', {
       from: '2026-06-01',
       to: '2026-08-31',
@@ -192,72 +214,85 @@ describe('TransactionLedgerComponent applied filter chips', () => {
     const {root} = setup('debit', {category: ['FOOD', 'FAMILY_SUPPORT'], from: '2026-06-01'});
     expect(root.querySelector('cmn-badge')?.textContent).toContain('4');
   });
+});
 
-  it('drives the store from the type, category and date params', () => {
-    const {store} = setup('credit', {category: ['FOOD', 'FAMILY_SUPPORT']});
-    expect((store.applyType.mock.calls[0][0] as () => unknown)()).toBe('credit');
-    expect((store.applyCategories.mock.calls[0][0] as () => unknown)()).toEqual([
-      'FOOD',
-      'FAMILY_SUPPORT',
-    ]);
-  });
+describe('TransactionLedgerComponent account filter', () => {
+  it('selects an account through the URL, pushing a history entry', () => {
+    const {navigate, store, fixture, root} = setup(null);
+    store.accounts.set([
+      {accountId: 'a1', label: 'Monzo'},
+      {accountId: 'a2', label: 'AIB'},
+    ] as never);
+    fixture.detectChanges();
 
-  it('treats an unknown type and malformed dates as no filter', () => {
-    const {root, store} = setup('bogus', {from: 'garbage', to: '2026-8-1'});
-    expect((store.applyType.mock.calls[0][0] as () => unknown)()).toBeNull();
-    expect(root.querySelector('[data-testid="applied-filters"]')).toBeNull();
+    const aib = Array.from(root.querySelectorAll<HTMLElement>('cmn-chip button')).find(b =>
+      b.textContent?.includes('AIB')
+    );
+    aib?.click();
+
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {account: 'a2'},
+      queryParamsHandling: 'merge',
+    });
   });
 });
 
-describe('TransactionLedgerComponent search param', () => {
+describe('TransactionLedgerComponent search box', () => {
   const searchBox = (root: HTMLElement) =>
-    root.querySelector('input[type="search"], input') as HTMLInputElement;
+    root.querySelector('input[type="search"]') as HTMLInputElement;
 
-  afterEach(() => vi.useRealTimers());
-
-  it('reads the initial search from q and feeds the store', () => {
-    const {root, store} = setup(null, {q: 'netflix'});
+  it('starts from the search the store holds', () => {
+    const {root} = setup(null, {q: 'netflix'});
     expect(searchBox(root).value).toBe('netflix');
-    expect(store.applyDateRange).toHaveBeenCalled();
   });
 
-  it('writes typed search to q, debounced, replacing history and keeping the other params', () => {
-    vi.useFakeTimers();
-    const {root, navigate} = setup(null, {account: 'a1', category: 'FOOD'});
+  it('feeds typed text to the store', () => {
+    const {root, store} = setup(null);
+    const typed: string[] = [];
+    const feed = store.applySearch.mock.calls[0][0] as {
+      subscribe: (fn: (v: string) => void) => void;
+    };
+    feed.subscribe(value => typed.push(value));
+
+    const input = searchBox(root);
+    input.value = 'spotify';
+    input.dispatchEvent(new Event('input'));
+
+    expect(typed).toEqual(['spotify']);
+  });
+
+  it('never writes the URL itself', () => {
+    const {root, navigate} = setup(null);
     const input = searchBox(root);
     input.value = 'spotify';
     input.dispatchEvent(new Event('input'));
     expect(navigate).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {q: 'spotify'},
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
   });
 
-  it('drops q from the URL when the box is cleared', () => {
-    vi.useFakeTimers();
-    const {root, navigate} = setup(null, {q: 'spotify'});
-    const input = searchBox(root);
-    input.value = '';
-    input.dispatchEvent(new Event('input'));
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
-    expect(navigate).toHaveBeenCalledWith([], {
-      queryParams: {q: null},
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  });
-
-  it('restores the box from q on back/forward without writing the URL again', () => {
-    vi.useFakeTimers();
-    const {root, navigate, params$, fixture} = setup(null, {q: 'netflix'});
-    params$.next(convertToParamMap({q: 'spotify', account: 'a1'}));
+  it('restores the box when the store search changes (back/forward)', () => {
+    const {root, store, fixture} = setup(null, {q: 'netflix'});
+    store.search.set('spotify');
     fixture.detectChanges();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
     expect(searchBox(root).value).toBe('spotify');
-    expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('TransactionLedgerComponent rows', () => {
+  it('opens the drawer from a native button stretched over the row', () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    const openDrawer = vi.spyOn(fixture.componentInstance, 'openDrawer').mockReturnValue();
+    fixture.detectChanges();
+
+    const row = root.querySelector('[data-testid="ledger-row"]');
+    const open = row?.querySelector<HTMLButtonElement>('button[data-testid="ledger-row-open"]');
+    expect(row?.hasAttribute('role')).toBe(false);
+    expect(open?.type).toBe('button');
+    expect(open?.getAttribute('aria-label')).toBe('Coffee');
+
+    open?.click();
+    expect(openDrawer).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -289,6 +324,43 @@ describe('TransactionLedgerComponent async states', () => {
 
     expect(root.querySelector('cmn-alert')?.textContent).toContain('Failed to load transactions.');
     root.querySelector<HTMLElement>('cmn-alert cmn-button button')?.click();
-    expect(store.load).toHaveBeenCalledOnce();
+    expect(store.retry).toHaveBeenCalledOnce();
+  });
+
+  it('never renders an error as the empty state', () => {
+    const {store, fixture, root} = setup(null);
+    store.errorMessage.set('Failed to load transactions.');
+    store.isEmpty.set(false);
+    fixture.detectChanges();
+
+    expect(root.textContent).not.toContain('No transactions found');
+  });
+
+  it('keeps the loaded rows under the error and through a retry', () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    store.isLoading.set(true);
+    fixture.detectChanges();
+
+    expect(root.querySelector('cmn-skeleton')).toBeNull();
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+  });
+
+  it('shows the last data with a last-synced notice instead of an error while offline', () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    store.lastSyncedAt.set(Date.now());
+    store.errorMessage.set('Failed to load transactions.');
+    fixture.detectChanges();
+
+    expect(root.querySelector('[data-testid="offline-notice"]')?.textContent).toContain(
+      "You're offline"
+    );
+    expect(root.textContent).not.toContain('Failed to load transactions.');
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+    vi.restoreAllMocks();
   });
 });

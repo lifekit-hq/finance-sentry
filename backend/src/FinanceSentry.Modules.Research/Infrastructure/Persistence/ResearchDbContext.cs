@@ -86,16 +86,25 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         tb.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         tb.Property(x => x.EntryPrice).HasColumnType("numeric(18,6)");
         tb.Property(x => x.BrokenReason).HasMaxLength(1000);
-        tb.Property(x => x.KeyDataPoints)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<ThesisDataPoint>>(v, jsonOptions) ?? new());
-        tb.Property(x => x.Catalysts)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<ThesisCatalyst>>(v, jsonOptions) ?? new());
+        // JSON-mapped complex collections; the property names stay the camelCase the former string
+        // conversion wrote (System.Text.Json web defaults), so stored rows read back unchanged.
+        tb.ComplexCollection(x => x.KeyDataPoints, c =>
+        {
+            c.ToJson("KeyDataPoints");
+            c.Property(p => p.Metric).HasJsonPropertyName("metric");
+            c.Property(p => p.Direction).HasJsonPropertyName("direction");
+            c.Property(p => p.Threshold).HasJsonPropertyName("threshold");
+            c.Property(p => p.Source).HasJsonPropertyName("source");
+        });
+        tb.ComplexCollection(x => x.Catalysts, c =>
+        {
+            c.ToJson("Catalysts");
+            c.Property(p => p.Date).HasJsonPropertyName("date");
+            c.Property(p => p.Event).HasJsonPropertyName("event");
+        });
+        // Stays on the System.Text.Json conversion: a trigger stored before the monitor existed has no
+        // consecutivePeriods key and must read back as the record default (1); a JSON complex collection
+        // would materialise a missing key as 0.
         tb.Property(x => x.InvalidationTriggers)
             .HasColumnType("jsonb")
             .HasConversion(
@@ -114,22 +123,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         nb.Property(x => x.ContentHash).IsRequired().HasMaxLength(64);
         nb.Property(x => x.PublishedAt).IsRequired();
         nb.Property(x => x.IngestedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        nb.Property(x => x.Tickers)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
-        nb.Property(x => x.Categories)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
-        nb.Property(x => x.ThesisIds)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<Guid>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(GuidListComparer);
+        nb.PrimitiveCollection(x => x.Tickers).HasColumnType("jsonb");
+        nb.PrimitiveCollection(x => x.Categories).HasColumnType("jsonb");
+        nb.PrimitiveCollection(x => x.ThesisIds).HasColumnType("jsonb");
         nb.HasIndex(x => x.ContentHash).IsUnique().HasDatabaseName("idx_news_hash");
         nb.HasIndex(x => x.PublishedAt).IsDescending().HasDatabaseName("idx_news_published");
 
@@ -178,21 +174,28 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         ib.Property(x => x.ReviewCadence).IsRequired().HasMaxLength(20);
         ib.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ib.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        ib.Property(x => x.Goals)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<InvestmentGoal>>(v, jsonOptions) ?? new());
-        ib.Property(x => x.AllocationTargets)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<AllocationTarget>>(v, jsonOptions) ?? new());
-        ib.Property(x => x.Exclusions)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new());
+        // JSON-mapped complex collections with the camelCase names the former string conversion wrote.
+        ib.ComplexCollection(x => x.Goals, c =>
+        {
+            c.ToJson("Goals");
+            c.Property(p => p.Label).HasJsonPropertyName("label");
+            c.Property(p => p.TargetAmountUsd).HasJsonPropertyName("targetAmountUsd");
+            c.Property(p => p.TargetDate).HasJsonPropertyName("targetDate");
+            c.Property(p => p.Priority).HasJsonPropertyName("priority");
+        });
+        ib.ComplexCollection(x => x.AllocationTargets, c =>
+        {
+            c.ToJson("AllocationTargets");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.TargetPct).HasJsonPropertyName("targetPct");
+            c.Property(p => p.MinPct).HasJsonPropertyName("minPct");
+            c.Property(p => p.MaxPct).HasJsonPropertyName("maxPct");
+        });
+        ib.PrimitiveCollection(x => x.Exclusions).HasColumnType("jsonb");
+        // The single-object columns below (RebalancingRule, ContributionPlan) stay on the string conversion: as JSON
+        // complex properties they read on Postgres, but the EF InMemory provider the Research and MCP test fixtures
+        // run on cannot compile a query over them (KeyNotFoundException in its shaper). The non-null fallback is
+        // kept either way.
         ib.Property(x => x.RebalancingRule)
             .HasColumnType("jsonb")
             .HasConversion(
@@ -217,16 +220,26 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         prb.Property(x => x.ReviewCadence).IsRequired().HasMaxLength(20);
         prb.Property(x => x.TotalValueUsd).HasColumnType("numeric(18,2)");
         prb.Property(x => x.Rationale).IsRequired();
-        prb.Property(x => x.Sleeves)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<PolicyReviewSleeve>>(v, jsonOptions) ?? new());
-        prb.Property(x => x.Adjustments)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<PolicyReviewAdjustment>>(v, jsonOptions) ?? new());
+        prb.ComplexCollection(x => x.Sleeves, c =>
+        {
+            c.ToJson("Sleeves");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.TargetPct).HasJsonPropertyName("targetPct");
+            c.Property(p => p.MinPct).HasJsonPropertyName("minPct");
+            c.Property(p => p.MaxPct).HasJsonPropertyName("maxPct");
+            c.Property(p => p.ActualPct).HasJsonPropertyName("actualPct");
+            c.Property(p => p.ActualValueUsd).HasJsonPropertyName("actualValueUsd");
+            c.Property(p => p.DriftPct).HasJsonPropertyName("driftPct");
+            c.Property(p => p.Status).HasJsonPropertyName("status");
+        });
+        prb.ComplexCollection(x => x.Adjustments, c =>
+        {
+            c.ToJson("Adjustments");
+            c.Property(p => p.AssetClass).HasJsonPropertyName("assetClass");
+            c.Property(p => p.Action).HasJsonPropertyName("action");
+            c.Property(p => p.ApproxAmountUsd).HasJsonPropertyName("approxAmountUsd");
+            c.Property(p => p.Rationale).HasJsonPropertyName("rationale");
+        });
         prb.HasIndex(x => new { x.UserId, x.CompletedAt }).HasDatabaseName("idx_policy_reviews_user_completed");
 
         var teb = modelBuilder.Entity<ThesisEvent>();
@@ -264,12 +277,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         ocb.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         ocb.Property(x => x.ExpiresAt).IsRequired();
         ocb.Property(x => x.RejectedReason).HasMaxLength(1000);
-        ocb.Property(x => x.NominationReasons)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
+        ocb.PrimitiveCollection(x => x.NominationReasons).HasColumnType("jsonb");
         ocb.HasIndex(x => new { x.UserId, x.Status }).HasDatabaseName("idx_opportunity_candidates_user_status");
         ocb.HasIndex(x => new { x.UserId, x.Ticker }).HasDatabaseName("idx_opportunity_candidates_user_ticker");
 
@@ -281,6 +289,10 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         csb.Property(x => x.ScoredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         csb.Property(x => x.CrowdingClass).IsRequired().HasConversion<string>().HasMaxLength(20);
         csb.Property(x => x.FormulaVersion).IsRequired();
+        // IpsFit and Evidence stay on the string conversion. IpsFit: a JSON complex property cannot be queried on the
+        // InMemory provider the test fixtures use (see InvestmentPolicyStatement above). Evidence: ScoreEvidence holds
+        // IReadOnlyDictionary<int, decimal?> members (RsByWindow, ReturnByWindow) that EF cannot bind in a JSON
+        // complex type.
         csb.Property(x => x.IpsFit)
             .HasColumnType("jsonb")
             .HasConversion(
@@ -332,12 +344,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         nsb.Property(x => x.Name).IsRequired().HasMaxLength(80);
         nsb.Property(x => x.Kind).IsRequired().HasConversion<string>().HasMaxLength(10);
         nsb.Property(x => x.Url).IsRequired();
-        nsb.Property(x => x.Keywords)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
+        nsb.PrimitiveCollection(x => x.Keywords).HasColumnType("jsonb");
         nsb.Property(x => x.ThesisId);
         nsb.Property(x => x.Enabled).IsRequired();
         nsb.Property(x => x.ConsecutiveFailures).IsRequired();
@@ -425,18 +432,9 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         rdb.Property(x => x.Text).IsRequired();
         rdb.Property(x => x.CapturedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         rdb.Property(x => x.IndexStatus).IsRequired().HasConversion<string>().HasMaxLength(30);
-        rdb.Property(x => x.Tickers)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<string>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(StringListComparer);
-        rdb.Property(x => x.ThesisIds)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, jsonOptions),
-                v => JsonSerializer.Deserialize<List<Guid>>(v, jsonOptions) ?? new())
-            .Metadata.SetValueComparer(GuidListComparer);
+        // Primitive collections stored as a jsonb array, so Contains/Any translate to SQL.
+        rdb.PrimitiveCollection(x => x.Tickers).HasColumnType("jsonb");
+        rdb.PrimitiveCollection(x => x.ThesisIds).HasColumnType("jsonb");
         // Postgres 14 treats NULLs as distinct in unique indexes, so this cannot dedupe two global
         // (null-user) rows by itself; the indexer upserts by this identity before inserting.
         rdb.HasIndex(x => new { x.SourceType, x.SourceId, x.UserId })
@@ -483,16 +481,6 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         alr.HasIndex(x => new { x.UserId, x.Symbol })
             .IsUnique().HasDatabaseName("idx_asset_ledger_reads_user_symbol");
     }
-
-    private static readonly ValueComparer<List<string>> StringListComparer = new(
-        (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
-        v => v.Aggregate(0, (hash, s) => HashCode.Combine(hash, s.GetHashCode())),
-        v => v.ToList());
-
-    private static readonly ValueComparer<List<Guid>> GuidListComparer = new(
-        (a, b) => (a ?? new()).SequenceEqual(b ?? new()),
-        v => v.Aggregate(0, (hash, g) => HashCode.Combine(hash, g.GetHashCode())),
-        v => v.ToList());
 
     private static readonly ValueComparer<float[]> FloatArrayComparer = new(
         (a, b) => (a ?? Array.Empty<float>()).SequenceEqual(b ?? Array.Empty<float>()),

@@ -6,10 +6,10 @@
 
 **Steps:**
 1. Check `sync_jobs` table for `error_message` and `error_code`.
-2. If `error_code = 'MONOBANK_RATE_LIMITED'`, `MONOBANK_SERVER_ERROR`, `MONOBANK_UNAVAILABLE` / `TRUELAYER_UNAVAILABLE` (network or timeout), or a TrueLayer 429/5xx: the provider is throttling or down. These are classified transient from the typed exception (`ScheduledSyncService.Classify`): the account is not marked failed and no alert fires. Wait and let the next scheduled cycle retry (there is no inline retry; the scheduled cycle is the retry). A failure that is not transient keeps its code in `LastSyncError` (Monobank also its status and response body) and alerts the user.
+2. If `error_code = 'MONOBANK_RATE_LIMITED'`, `MONOBANK_SERVER_ERROR`, `MONOBANK_UNAVAILABLE` / `TRUELAYER_UNAVAILABLE` (network or timeout), or a TrueLayer 429/5xx: the provider is throttling or down. These are classified transient from the typed exception (`ScheduledSyncService.Classify`): the account is not marked failed and no alert fires. Wait and let the next scheduled cycle retry (each provider call already retried transient failures inline - the shared resilience pipeline, `ProviderHttpResilience`, and Monobank's `Retry-After`-aware one, `MonobankResilience` - so what reaches the account has outlasted those; the scheduled cycle is the retry). A failure that is not transient keeps its code in `LastSyncError` (Monobank also its status and response body) and alerts the user.
 3. If `error_code = 'ITEM_LOGIN_REQUIRED'`: User must re-link (expired TrueLayer consent or revoked Monobank token). Account status = `reauth_required`. Notify user.
 4. If `error_code = 'DATABASE_ERROR'`: Check DB connectivity. Run `SELECT 1` against PostgreSQL.
-5. `error_code = 'STALE_JOB_REAPED'` on a `sync_jobs` row: a sync was orphaned by a restart or crash and reaped by `StaleSyncReaperJob`. The account returns to `active` with no error (not a provider failure); the next cycle re-runs it. No action.
+5. `error_code = 'STALE_JOB_REAPED'` on a `sync_jobs` row: a sync was orphaned by a restart or crash and reaped by the `StaleSyncReaperJob` startup sweep (it no longer runs on a schedule; a sync is claimed atomically, so a hung-but-alive sync holds its account until the next restart). The account returns to `active` with no error (not a provider failure); the next cycle re-runs it. No action.
 6. IBKR Flex (`IBKRFlexCredentials.LastError`): the daily Flex sync and the dashboard-triggered backfill record any failure there; it raises no alert. Check the column if trades stop updating.
 7. MCP `get_sync_health` reports `reauth_required` accounts and EXPIRED TrueLayer connections as "error".
 8. Manually trigger re-sync once root cause resolved:
@@ -59,10 +59,12 @@ registered account, and only while nobody holds it — so once a second account 
 `auth."AspNetUserRoles"`. The API host rebuilds the principal from the account's current roles on every request
 (`AccessTokenPrincipalLoader`, no cache), so a role change, lockout or People-page revoke applies to the next request.
 
-**Smoke account:** production has password sign-in (login and invite acceptance) fixed off
-(`Auth__PasswordLogin__Enabled: "false"` in `docker-compose.prod.yml`, no env override), so the post-deploy live smoke
+**Smoke account:** production has password sign-in off (`Auth__PasswordLogin__Enabled`, fed by `AUTH_PASSWORD_LOGIN_ENABLED`, default `false`; see §11), so the post-deploy live smoke
 (`frontend/e2e/live/smoke.spec.ts`) signs in through Logto as a dedicated Logto user by driving the real Logto sign-in page (`E2E_LIVE_LOGTO_EMAIL` /
-`E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). The API
+`E2E_LIVE_LOGTO_PASSWORD` GitHub Actions secrets; Logto's password method is tenant-wide, so no per-app setting). It signs
+in once per run (a serial describe sharing one page: each sign-in spends several requests of the anonymous 10-per-minute
+rate-limit budget, so a second one inside the minute gets 429) and clicks Skip on the "create a passkey" page Logto shows
+on that user's first sign-in (passkey sign-in is on tenant-wide), so it never binds a passkey. The API
 seeds the matching finance-sentry account at startup from `Auth__SmokeAccount__Email` (prod: compose reads
 `SMOKE_ACCOUNT_EMAIL`, which `deploy.yml` fills from `E2E_LIVE_LOGTO_EMAIL`): a passwordless Member marked with the
 `seeded-account: smoke` user claim, plus one fake `seeded` bank account with a few transactions. The first Logto sign-in
@@ -71,7 +73,7 @@ marked account that still carries a password has it removed at startup. Email un
 account it did not create, is never granted Owner, is not shared with anyone, and its `seeded` account is excluded from
 every cross-user read (`GetAllActiveUnscopedAsync`), so it gets no provider sync, snapshot, alert or external lookup from
 any background job. A People-page revoke stays in effect; to retire it, revoke it there, disable the Logto user and delete
-the two secrets. If Logto is down, recovery is restoring Logto; there is no password fallback.
+the two secrets. If Logto is down, restore Logto; §11 is the break-glass fallback.
 
 **Steps:**
 1. Navigate to `/hangfire` in browser (see *Dashboard access* above).
@@ -134,6 +136,23 @@ GET /health/ready → 503
 
 - Dry run: dispatch *Prune Host Images* with `dry_run` ticked, or run `docker/prune-host-images.sh --dry-run` on the host. The job log lists every `removed` / `would remove` / `keep` decision.
 - Change the retention: edit the `KEEP_NEWEST` constant in `docker/prune-host-images.sh`.
+
+## 10. Problem Reports Not Reaching the Fleet Inbox
+
+`POST /api/v1/feedback` saves the report (`companion.problem_reports`, status `Pending`) and answers `202` with `FS-R-<id>`; the Hangfire job `problem-reports-forward` (every minute) then sends it through the host's `kit-relay` over ssh as request id `fs-report-<id>`. A report is never lost to a relay problem: it stays saved, and a retry is the same note because the relay dedups on the request id.
+
+- **Pending and no errors in the log**: the relay sender is not set up. The job runs only when `ProblemReports__RelayConfigPath` (`/run/lifekit/fs-relay/ssh_config`) exists in the api container, and the compose bind for that directory is `${FS_RELAY_DIR:-/dev/null}`. Provision the `fs-` relay key dir (`id_ed25519`, pinned `known_hosts`, `ssh_config`, readable by `nobody`) on the host, set `FS_RELAY_DIR=/srv/lifekit-secrets/fs-relay` in `docker/.env.sops` and redeploy; the pending reports go out on the next run.
+- **Warnings `Problem report <id> not forwarded (attempt n)`**: ssh or the relay refused it; `LastError` on the row carries the exit code and stderr. Retried with backoff 1 min, 5 min, 15 min, 1 h, 4 h.
+- **Error `Problem report <id> failed after 6 attempts`**: status `Failed`, no further retries. Fix the cause, then `UPDATE companion.problem_reports SET "Status" = 'Pending', "Attempts" = 0, "NextAttemptAt" = NULL WHERE "Id" = <id>`.
+- The relay itself limits a sender to 30 notes per hour; past that the job pauses the batch without counting an attempt. Rows are purged after 90 days.
+
+## 11. Logto Unavailable (Break-glass Password Sign-in)
+
+Normal sign-in is Logto only. The one password path left is `POST /api/v1/auth/login` for an account that **already has a password hash**; no screen offers it, nothing creates passwords any more, and with the flag off (the default) the route answers `404` as if it did not exist. Use it only while Logto cannot be restored in time:
+
+1. Set `AUTH_PASSWORD_LOGIN_ENABLED=true` in `docker/.env.sops` (prod) or `docker/.env` (dev) and recreate the `api` container.
+2. From the app's origin, in the browser console: `fetch('/api/v1/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email: '<owner email>', password: '<password>'})})`. The response sets the session cookies; reload the app. Five failed attempts lock the account for five minutes.
+3. When Logto is back, set the flag back to `false` (or remove it) and recreate the `api` container. Passwords already stored stay as they are; accounts created by invite have none and cannot use this path.
 
 ## Contact
 

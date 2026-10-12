@@ -1,12 +1,13 @@
 namespace FinanceSentry.Modules.BankSync.Domain;
 
+using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Domain;
 
 /// <summary>
 /// Domain entity representing a sync job attempt.
 /// Tracks sync operation history and status for monitoring.
 /// </summary>
-public class SyncJob : Entity
+public class SyncJob : Entity, IUserOwned
 {
     /// <summary>
     /// Foreign key to BankAccount.

@@ -1,6 +1,7 @@
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
+import {type DonutSegmentClick} from '@lifekit-hq/charts-core';
 import {
   AsyncStateComponent,
   type AsyncStateStatus,
@@ -13,10 +14,15 @@ import {
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
+import {
+  GAIN_TEXT_CLASS,
+  LOSS_TEXT_CLASS,
+} from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
+import {type AssetClass} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 
 const SKELETON_ROWS = 4;
@@ -54,10 +60,26 @@ export class InvestmentsComponent {
     }
     return this.store.isPositionsLoading() ? 'loading' : 'success';
   });
-  public readonly pnlPositiveClass = 'text-status-success';
-  public readonly pnlNegativeClass = 'text-status-error';
+  public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
+  public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
 
-  public navigateToDossier(symbol: string): void {
+  /** Cash rows are currency balances, not holdings - they have no dossier to open. */
+  public openDossier(assetClass: AssetClass, symbol: string): void {
+    if (assetClass === 'cash') {
+      return;
+    }
     void this.router.navigate([AppRoute.AssetDossier, symbol]);
+  }
+
+  /**
+   * A slice is an asset class, which has no page of its own; the one case with an entity behind it
+   * is a class holding a single position, which opens that position's dossier. Cash and classes
+   * with several positions open nothing.
+   */
+  public openSegment(click: DonutSegmentClick): void {
+    const group = this.store.positionsByAssetClass()[click.index];
+    if (group?.rows.length === 1) {
+      this.openDossier(group.assetClass, group.rows[0].symbol);
+    }
   }
 }

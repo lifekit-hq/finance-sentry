@@ -12,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
+using FinanceSentry.Infrastructure.Persistence;
+using FinanceSentry.Infrastructure.Http;
 
 /// <summary>
 /// Registers the in-app finance agent (feature 040): the Anthropic LLM client, the MCP-tool bridge, the
@@ -30,10 +32,11 @@ public static class AgentModule
 
     public static IServiceCollection AddAgentModule(this IServiceCollection services, IConfiguration config)
     {
+        services.AddUpdatedAtStamping();
         services.AddDbContext<AgentDbContext>(
-            o => o.UseNpgsql(
+            (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
-                b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")));
+                b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<AgentOptions>(config.GetSection(AgentOptions.SectionName));
 
@@ -49,22 +52,26 @@ public static class AgentModule
         if (agentOptions.Provider == AgentProvider.OpenClaw)
         {
             services.AddScoped<IAgentConversationService, OpenClawAgentConversationService>();
+            var openClawTimeout = TimeSpan.FromMinutes(5);
             services.AddHttpClient(OpenClawAgentConversationService.HttpClientName, client =>
             {
                 client.BaseAddress = new Uri(agentOptions.OpenClaw.BaseUrl!.TrimEnd('/') + "/");
-                client.Timeout = TimeSpan.FromMinutes(5);
-            });
+                client.Timeout = openClawTimeout;
+            })
+            .AddProviderResilience(openClawTimeout, maxRetries: 0);
         }
         else
         {
             services.AddScoped<IAgentConversationService, AgentConversationService>();
         }
 
+        var anthropicTimeout = TimeSpan.FromMinutes(5);
         services.AddHttpClient(AnthropicLlmClient.HttpClientName, client =>
         {
             client.BaseAddress = new Uri(agentOptions.Anthropic.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromMinutes(5);
-        });
+            client.Timeout = anthropicTimeout;
+        })
+            .AddProviderResilience(anthropicTimeout, maxRetries: 0);
 
         RegisterMcpToolSurface(services);
 
@@ -81,7 +88,7 @@ public static class AgentModule
     {
         services.AddHttpContextAccessor();
         services.AddSingleton<LocalMcpCredentialStore>();
-        services.AddSingleton<McpOAuthTokenClient>();
+        services.AddMcpOAuthTokenClient();
         services.AddSingleton<LocalMcpSession>();
         services.AddSingleton<IIdentityResolver, TransportAwareIdentityResolver>();
 

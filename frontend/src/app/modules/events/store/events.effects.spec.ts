@@ -1,3 +1,4 @@
+import {HttpErrorResponse} from '@angular/common/http';
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {of, Subject, throwError} from 'rxjs';
@@ -124,7 +125,9 @@ describe('eventsEffects', () => {
     const store = buildStore();
     const api = buildApi();
     api.getUpcoming.mockReturnValue(
-      throwError(() => ({error: {errorCode: 'EVENTS_WINDOW_INVALID'}}))
+      throwError(
+        () => new HttpErrorResponse({status: 400, error: {errorCode: 'EVENTS_WINDOW_INVALID'}})
+      )
     );
     configure(api);
 
@@ -155,7 +158,9 @@ describe('eventsEffects', () => {
   it('loadFired forwards the backend error code', () => {
     const store = buildStore();
     const api = buildApi();
-    api.getFired.mockReturnValue(throwError(() => ({error: {errorCode: 'BOOM'}})));
+    api.getFired.mockReturnValue(
+      throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'BOOM'}}))
+    );
     configure(api);
 
     TestBed.runInInjectionContext(() => eventsEffects(store).loadFired());

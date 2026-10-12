@@ -13,12 +13,16 @@ public interface IPushDeliveryRepository
     Task<IReadOnlyList<PushSubscription>> ListActiveSubscriptionsUnscopedAsync(CancellationToken ct = default);
 
     /// <summary>The subscription's owner's events captured at or after <paramref name="since"/> that have no delivery row for
-    /// this subscription yet, oldest first. <c>OperationalFailure</c> events are left out unless
+    /// this subscription yet, oldest first. <c>AnalystAction</c> upgrade and downgrade events are left out (the deduped rating-change alert is pushed instead); other analyst actions are kept. <c>OperationalFailure</c> events are left out unless
     /// <paramref name="includeOperational"/>. Never reads or filters on <c>Disposition</c>.</summary>
     Task<IReadOnlyList<CompanionEvent>> ListUndeliveredEventsUnscopedAsync(
         Guid userId, Guid subscriptionId, DateTimeOffset since, bool includeOperational, int limit, CancellationToken ct = default);
 
-    /// <summary>Insert delivery rows; a row that already exists for (event, subscription) is skipped, so an overlapping
+    /// <summary>The subset of <paramref name="alertIds"/> that has no delivery row for <paramref name="subscriptionId"/> yet.</summary>
+    Task<IReadOnlySet<Guid>> ListUndeliveredAlertIdsUnscopedAsync(
+        Guid subscriptionId, IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
+
+    /// <summary>Insert delivery rows; a row that already exists for (event or alert, subscription) is skipped, so an overlapping
     /// run never queues the same push twice.</summary>
     Task AddDeliveriesAsync(IReadOnlyCollection<PushDelivery> deliveries, CancellationToken ct = default);
 

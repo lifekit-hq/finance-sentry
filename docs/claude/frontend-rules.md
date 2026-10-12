@@ -18,7 +18,7 @@ After writing or modifying **any** Angular `.ts` file, run `npx eslint <file>` f
 
 **Any new UI component MUST be created in [`lifekit-hq/lifekit-common`](https://github.com/lifekit-hq/lifekit-common) first** (`@lifekit-hq/ui`, Storybook-first — see that repo's CLAUDE.md), then consumed here as a published package. Components are never built directly in the host Angular app (`frontend/`). The `cmn-` selector prefix is reserved for library components.
 
-**Before writing any Angular template or UI element**, check the component catalog first — the hosted Storybook at https://lifekit-hq.github.io/lifekit-common/ or `node_modules/@lifekit-hq/ui`. Use `cmn-button`, `cmn-input`, `cmn-form-field`, `cmn-alert`, `cmn-card`, etc. — never raw `<input>`, `<button>`, or `<div class="error">` when the library already has the component.
+**Before writing any Angular template or UI element**, check the component catalog first — the hosted Storybook at https://lifekit-hq.github.io/lifekit-common/ or `node_modules/@lifekit-hq/ui` (after `npm ci` in `frontend/` - a reused worktree's tree can lag `package.json`). Use `cmn-button`, `cmn-input`, `cmn-form-field`, `cmn-alert`, `cmn-card`, etc. — never raw `<input>`, `<button>`, or `<div class="error">` when the library already has the component.
 
 **Registry auth**: `@lifekit-hq/*` installs from GitHub Packages — `frontend/.npmrc` expects `NODE_AUTH_TOKEN` in the environment (`export NODE_AUTH_TOKEN=$(gh auth token)`, token needs `read:packages`). CI passes `secrets.GITHUB_TOKEN` (deploy no longer builds the frontend — it pulls the CI-built image; only the break-glass local build in `docker/deploy.sh` needs it); Docker builds take it as the `npm_token` BuildKit secret.
 
@@ -77,7 +77,7 @@ Pure helper functions are NEVER bare `export function`s in a random file. Each h
 
 ```ts
 export class ErrorUtils {
-  public static extractCode(err: unknown): Nullable<string> { ... }
+  public static extractMessage(err: unknown): Nullable<string> { ... }
 }
 ```
 
@@ -118,16 +118,20 @@ Error-code → user-message mapping is centralized. **Do not** add an `if/else` 
 - Mechanism lives in `@lifekit-hq/ui`: `ERROR_MESSAGES` injection token + `ErrorMessageService.resolve(code)` → `string | null`.
 - App provides the registry: `src/app/core/errors/error-messages.registry.ts` holds the flat `Record<string, string>` covering all backend `errorCode` values. Wired via `provideErrorMessages()` in `app.config.ts`.
 - Stores consume via `inject(ErrorMessageService)` inside `*.computed.ts`, falling back to a feature-specific default (`'Failed to load dashboard data.'`, `'Invalid email or password.'`, etc.) when `resolve()` returns `null`.
-- **When adding a new error code on the backend:** append the message to the registry in the same PR. The `error?.errorCode` extraction helper stays local to `*.effects.ts` (the `extractErrorCode(err)` pattern).
+- **When adding a new error code on the backend:** append the message to the registry in the same PR. Stores read the code with `extractErrorCode(err)` from `@lifekit-hq/core` (it only recognizes a real `HttpErrorResponse`, so specs must throw `new HttpErrorResponse({status, error: {errorCode}})`, not a plain object); do not write a local extractor.
 - **Exception — server-composed messages:** `ACCOUNT_LOCKED` (login lockout, 429 + `Retry-After`) is deliberately not in the registry: its text carries the remaining wait, so `auth.computed.ts` shows the server's `error` text (`ErrorUtils.extractMessage`, kept in `AuthStore.errorDetail`) for that code only. Every other unregistered code keeps the flow fallback.
 
 ---
 
 ## Async State — `cmn-async-state`
 
-A region that swaps between loading, error, empty and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[errorPlacement]`, `[isEmpty]`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Each page derives an `AsyncStateStatus` computed (`loading` > `error` > `success`) and projects into the primitive's slots: `[skeleton]` (a placeholder shaped like the content), `[empty]` (rich empty state), `[error-action]` (e.g. Retry). `errorPlacement="above"` keeps content under a persistent banner; the default replaces it.
+A region that swaps between loading, error, empty and content uses `cmn-async-state` from `@lifekit-hq/ui` (`[status]`, `[errorMessage]`, `[errorPlacement]`, `[isEmpty]`, `[emptyMessage]` / `[emptySubMessage]` / `[emptyIcon]`, `retryable` + `(retry)`, `[skeletonRows]`, `[skeletonHeight]`) instead of local `@if (...Loading())` / error branching. Each page derives an `AsyncStateStatus` computed (`loading` > `error` > `success`) and projects into the primitive's slots: `[skeleton]` (a placeholder shaped like the content), `[empty]` (rich empty state), `[error-action]` (a custom action next to the message). `errorPlacement="above"` keeps content under a persistent banner; the default replaces it. A plain "try again" is the primitive's own `retryable` button wired to `(retry)="store.load()"` - never a hand-rolled Retry button; a plain empty message takes `emptyMessage` / `emptySubMessage` / `emptyIcon`, and only an empty state with a CTA or its own layout goes in the `[empty]` slot.
 
-Adopters: `events`, `truelayer-picker`, `inzhur-form`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`.
+Dashboard, accounts-list and transaction-ledger derive that status through `AsyncViewUtils.resolve` (`shared/utils/async-view.utils.ts`) instead of a local computed: a retry keeps the stale data instead of a skeleton, an error never reads as empty, and while offline (`ConnectivityService`) data on screen stays with a "last synced" notice above it. Their stores record `lastSyncedAt` on each successful load, and the Retry in `[error-action]` repeats the failed request.
+
+A list bound to a query (the alerts filter and page, the budgets month) passes `hasData: false` to `AsyncViewUtils.resolve` and keeps the default placement, so a reload shows the skeleton and a failure replaces the previous query's rows with the error; a list that reloads in place (people, subscriptions, the fired feed, the commitment picker) passes its real `hasData`, renders `errorPlacement="above"` and keeps its rows under the banner. People, subscriptions and the commitment picker store no `lastSyncedAt` and render no offline notice: they hand `resolve` `offline` only while nothing is on screen, so a failed reload with rows still shows its error banner instead of reading as a successful offline load. Budgets keeps its list under the banner only when the refresh after an edit fails (`refreshFailed`, `errorPlacement="above"`); a failed month load replaces it.
+
+Adopters: `events` (calendar and fired), `truelayer-picker`, `inzhur-form`, `holdings`, `asset-dossier`, `dashboard`, `flow-breakdown`, `accounts-list`, `transaction-ledger`, `people`, `budgets`, `subscriptions`, `alerts`, `add-commitment-dialog`.
 
 When the primitive wraps several children, put the parent's spacing (`space-y-cmn-5` of `cmn-page-container`, or the page's own `space-y-*`) on the `cmn-async-state` host: the children are no longer direct children of the old parent.
 

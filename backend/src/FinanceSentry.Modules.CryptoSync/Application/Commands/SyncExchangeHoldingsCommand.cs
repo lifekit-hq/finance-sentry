@@ -221,7 +221,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
     /// Forward cost basis for a venue whose fills start at connect (#472). A holding whose walk
     /// fails keeps its ledger and cursor, and the failure fails the sync once every other holding
     /// has been walked: the next run resumes from the same cursor, and the failed run reaches the
-    /// job-failure alerting instead of silently freezing cost basis.
+    /// consecutive-failure gauge instead of silently freezing cost basis.
     /// </summary>
     private async Task UpdateForwardLedgerAsync(
         ICryptoExchangeAdapter adapter,

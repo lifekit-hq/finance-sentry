@@ -1,13 +1,14 @@
-import {BreakpointObserver} from '@angular/cdk/layout';
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {CmnShellService, type MenuItem} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
+import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
 import {AppShellComponent} from './app-shell.component';
 import {PaletteEntitiesService} from './services/palette-entities.service';
 
@@ -18,24 +19,20 @@ import {PaletteEntitiesService} from './services/palette-entities.service';
 })
 class ChatWidgetStubComponent {}
 
-/** `CmnShellService` derives phone / rail / sidebar from these width queries. */
-const wideBreakpoints = (wide: boolean): Record<string, boolean> => ({
-  '(min-width: 600px)': wide,
-  '(min-width: 840px)': wide,
-});
-
 describe('AppShellComponent FAB clearance', () => {
+  const openWhatsNew = vi.fn();
+
+  beforeEach(() => {
+    openWhatsNew.mockClear();
+  });
   const canUseAi = signal(true);
 
   const setup = async (url: string, wide = false): Promise<ComponentFixture<AppShellComponent>> => {
     TestBed.configureTestingModule({
       providers: [
         {
-          provide: BreakpointObserver,
-          useValue: {
-            observe: () => of({matches: wide, breakpoints: wideBreakpoints(wide)}),
-            isMatched: () => wide,
-          },
+          provide: CmnShellService,
+          useValue: {mode: signal(wide ? 'sidebar' : 'phone'), isPhone: signal(!wide)},
         },
         provideRouter([{path: '**', children: []}]),
         {
@@ -47,13 +44,14 @@ describe('AppShellComponent FAB clearance', () => {
             logout: () => undefined,
           },
         },
+        {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
         {
           provide: PaletteEntitiesService,
           useValue: {
             load: () =>
               of({
-                holdings: [{symbol: 'AAPL', isVenueCash: false}],
+                holdings: [{symbol: 'AAPL', assetClass: 'equity'}],
                 watchlist: [{ticker: 'NVDA'}],
                 accounts: [{accountId: 'a1', bankName: 'Monobank', accountNumberLast4: '1234'}],
               }),
@@ -98,5 +96,25 @@ describe('AppShellComponent FAB clearance', () => {
     fixture.componentInstance.navigate({label: 'Budgets', icon: 'Zap', route: AppRoute.Budgets});
     await fixture.whenStable();
     expect(router.url).toBe(AppRoute.Settings);
+  });
+
+  it("opens the what's new panel from the avatar menu", async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const item = fixture.componentInstance
+      .account()
+      .menuItems.find(entry => entry.label === "What's new");
+    expect(item).toBeDefined();
+    fixture.componentInstance.handleAvatarMenuSelect(item as MenuItem);
+    expect(openWhatsNew).toHaveBeenCalledOnce();
+  });
+
+  it("opens the what's new panel from the command palette", async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const entry = fixture.componentInstance
+      .paletteItems()
+      .find(item => item.label === "What's new");
+    expect(entry).toBeDefined();
+    fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
+    expect(openWhatsNew).toHaveBeenCalledOnce();
   });
 });

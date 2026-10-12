@@ -19,11 +19,14 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class BankSyncModule
 {
@@ -95,10 +98,9 @@ public static class BankSyncModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily());
 
-            mgr.AddOrUpdate<StaleSyncReaperJob>(
-                "stale-sync-reaper",
-                job => job.ReapAsync(),
-                "*/15 * * * *");
+            // Retired by the atomic sync claim (#931): the reaper is crash recovery only, run by the startup
+            // sweep. Hangfire keeps recurring definitions in storage, so withdraw the old schedule by name.
+            mgr.RemoveIfExists("stale-sync-reaper");
 
             mgr.AddOrUpdate<ConsentExpiryReminderJob>(
                 "consent-expiry-reminder",
@@ -116,7 +118,7 @@ public static class BankSyncModule
 
     /// <summary>
     /// Startup sweep: any job still "running"/account still "syncing" after a restart was orphaned
-    /// mid-sync and would otherwise deadlock the scheduler — reap them all first, then (re)schedule
+    /// mid-sync and would otherwise stay claimed forever — reap them all first, then (re)schedule
     /// the active accounts.
     /// </summary>
     private sealed class StartupSweep : IStartupSweep
@@ -126,7 +128,7 @@ public static class BankSyncModule
             var jobs = sp.GetRequiredService<IBackgroundJobClient>();
 
             jobs.Enqueue<StaleSyncReaperJob>(
-                job => job.ExecuteAsync(true, CancellationToken.None));
+                job => job.ExecuteAsync(CancellationToken.None));
 
             jobs.Enqueue<SyncScheduler>(
                 s => s.ScheduleAllActiveAccounts(CancellationToken.None));
@@ -140,7 +142,8 @@ public static class BankSyncModule
         services.AddConnectionHealthShadow(config);
         var connectionString = config.GetConnectionString("Default")!;
 
-        services.AddDbContext<BankSyncDbContext>(o => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+        services.AddUpdatedAtStamping();
+        services.AddDbContext<BankSyncDbContext>((sp, o) => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
 
@@ -167,7 +170,9 @@ public static class BankSyncModule
         services.AddScoped<ICategoryReadService, CategoryReadService>();
 
         services.AddHttpClient<MonobankHttpClient>(client =>
-            client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"));
+                client.BaseAddress = new Uri(config["Monobank:BaseUrl"] ?? "https://api.monobank.ua"))
+            .AddMonobankResilience();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<MonobankBalanceCache>();
         services.AddScoped<IMonobankAdapter, MonobankAdapter>();
         services.AddScoped<MonobankAdapter>();
@@ -175,8 +180,10 @@ public static class BankSyncModule
 
         var trueLayerAuthBase = new Uri(config["TrueLayer:AuthBaseUrl"] ?? "https://auth.truelayer-sandbox.com");
         var trueLayerApiBase = new Uri(config["TrueLayer:ApiBaseUrl"] ?? "https://api.truelayer-sandbox.com");
-        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, c => c.BaseAddress = trueLayerAuthBase);
-        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, c => c.BaseAddress = trueLayerApiBase);
+        services.AddHttpClient(TrueLayerHttpClient.AuthClientName, c => c.BaseAddress = trueLayerAuthBase)
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
+        services.AddHttpClient(TrueLayerHttpClient.ApiClientName, c => c.BaseAddress = trueLayerApiBase)
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout);
         services.AddSingleton<ITrueLayerClient, TrueLayerHttpClient>();
         services.AddSingleton<TrueLayerCategoryMapper>();
         services.AddScoped<TrueLayerAdapter>();

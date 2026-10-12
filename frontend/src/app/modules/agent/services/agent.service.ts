@@ -1,6 +1,7 @@
+import {type HttpEvent, HttpEventType} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ApiService} from '@lifekit-hq/core';
-import {Observable} from 'rxjs';
+import {concatMap, defer, Observable} from 'rxjs';
 
 import {type AgentSseEvent, type SendChatRequest} from '../models/chat/chat.model';
 import {
@@ -18,6 +19,17 @@ export class AgentService extends ApiService {
 
   private static str(value: unknown, fallback = ''): string {
     return typeof value === 'string' ? value : fallback;
+  }
+
+  private static bodySoFar(event: HttpEvent<string>): string {
+    switch (event.type) {
+      case HttpEventType.DownloadProgress:
+        return event.partialText ?? '';
+      case HttpEventType.Response:
+        return event.body ?? '';
+      default:
+        return '';
+    }
   }
 
   private static parseFrame(frame: string): AgentSseEvent | null {
@@ -78,62 +90,39 @@ export class AgentService extends ApiService {
   }
 
   /**
-   * Streams the chat reply over SSE. HttpClient can't surface incremental SSE deltas, so this uses
-   * fetch with the auth cookie (credentials: 'include'), parses `event:`/`data:` frames, and emits a
-   * typed event per frame. Aborting the subscription cancels the request.
+   * Streams the chat reply over SSE through HttpClient, so the auth interceptor's silent refresh
+   * covers it like every other call. `partialText` is the cumulative body so far; the `event:`/`data:`
+   * frames not yet consumed are parsed into a typed event each. Unsubscribing cancels the request.
    */
   public streamChat(request: SendChatRequest): Observable<AgentSseEvent> {
-    return new Observable<AgentSseEvent>(subscriber => {
-      const controller = new AbortController();
+    return defer(() => {
+      let consumed = 0;
 
-      const run = async (): Promise<void> => {
-        const response = await fetch(`${this.baseUrl}/chat`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {'Content-Type': 'application/json', accept: 'text/event-stream'},
-          body: JSON.stringify(request),
-          signal: controller.signal,
-        });
+      return this.http
+        .post(`${this.baseUrl}/chat`, request, {
+          headers: {accept: 'text/event-stream'},
+          observe: 'events',
+          reportProgress: true,
+          responseType: 'text',
+        })
+        .pipe(
+          concatMap(httpEvent => {
+            const text = AgentService.bodySoFar(httpEvent);
+            const events: AgentSseEvent[] = [];
+            let boundary = text.indexOf(SSE_DELIMITER, consumed);
+            while (boundary >= 0) {
+              const event = AgentService.parseFrame(text.slice(consumed, boundary));
+              if (event !== null) {
+                events.push(event);
+              }
 
-        if (!response.ok || response.body === null) {
-          subscriber.error(new Error(`Chat request failed with status ${response.status}.`));
-          return;
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        for (;;) {
-          const {done, value} = await reader.read();
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(value, {stream: true});
-          let boundary = buffer.indexOf(SSE_DELIMITER);
-          while (boundary >= 0) {
-            const frame = buffer.slice(0, boundary);
-            buffer = buffer.slice(boundary + SSE_DELIMITER.length);
-            const event = AgentService.parseFrame(frame);
-            if (event !== null) {
-              subscriber.next(event);
+              consumed = boundary + SSE_DELIMITER.length;
+              boundary = text.indexOf(SSE_DELIMITER, consumed);
             }
 
-            boundary = buffer.indexOf(SSE_DELIMITER);
-          }
-        }
-
-        subscriber.complete();
-      };
-
-      run().catch((err: unknown) => {
-        if (!controller.signal.aborted) {
-          subscriber.error(err);
-        }
-      });
-
-      return () => controller.abort();
+            return events;
+          })
+        );
     });
   }
 }

@@ -55,7 +55,6 @@ public class AddCommitmentCommandHandler(
             transaction.Key, display, amount, transaction.Currency, transaction.Date,
             transaction.ChargeCount, command.TermCount, null, null, command.Kind, cadence);
 
-        await repository.UpsertAsync(item, ct);
-        return item.Id;
+        return await repository.UpsertAsync(item, ct);
     }
 }

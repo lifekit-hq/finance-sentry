@@ -47,6 +47,25 @@ public class WealthBrokerageProvidersTests
     }
 
     [Fact]
+    public async Task Broker_cash_rows_are_typed_cash_without_moving_the_brokerage_totals()
+    {
+        var cash = new BrokerageHoldingSummary("USD Cash", "CASH", 400m, 400m, DateTime.UtcNow, "ibkr");
+        var withCash = await Service([Holding("ibkr", "AAPL", 1_000m, TimeSpan.FromMinutes(5)), cash])
+            .GetWealthSummaryAsync(UserId, null, null);
+        var withoutCash = await Service([Holding("ibkr", "AAPL", 1_000m, TimeSpan.FromMinutes(5))])
+            .GetWealthSummaryAsync(UserId, null, null);
+
+        var brokerage = withCash.Categories.Single(c => c.Category == "brokerage");
+        var accounts = brokerage.Institutions.Single().Accounts;
+        accounts.Single(a => a.Currency == "USD Cash").AccountType.Should().Be("cash");
+        accounts.Single(a => a.Currency == "AAPL").AccountType.Should().Be("brokerage");
+        brokerage.Category.Should().Be("brokerage");
+        brokerage.TotalInBaseCurrency.Should().Be(1_400m, "cash stays in the sleeve total: this page is where the money is held");
+        brokerage.Institutions.Single().TotalInBaseCurrency.Should().Be(1_400m);
+        withCash.TotalNetWorth.Should().Be(withoutCash.TotalNetWorth + 400m);
+    }
+
+    [Fact]
     public async Task Inzhur_holdings_older_than_a_day_and_a_half_are_stale()
     {
         var result = await Service([Holding("inzhur", "Fund A", 250m, TimeSpan.FromHours(40))]).GetWealthSummaryAsync(UserId, null, null);

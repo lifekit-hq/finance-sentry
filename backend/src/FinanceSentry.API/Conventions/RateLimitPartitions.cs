@@ -16,6 +16,8 @@ public static class RateLimitPartitions
     private const int DefaultAnonymousPermitPerMinute = 10;
     public const string AuthenticatedPermitKey = "RateLimiting:Authenticated:PermitPerMinute";
     public const string AnonymousPermitKey = "RateLimiting:Anonymous:PermitPerMinute";
+    private const int ProblemReportPermitPerHour = 5;
+    private const int ProblemReportSegments = 12;
     private const string UnknownClient = "unknown";
 
     public static RateLimitPartition<string> Authenticated(HttpContext context)
@@ -27,6 +29,21 @@ public static class RateLimitPartitions
 
     public static RateLimitPartition<string> Anonymous(HttpContext context)
         => FixedWindow($"ip:{ClientAddress(context)}", Permit(context, AnonymousPermitKey, DefaultAnonymousPermitPerMinute));
+
+    /// <summary>Problem reports: a sliding hour per signed-in person (per address if somehow anonymous).</summary>
+    public static RateLimitPartition<string> ProblemReport(HttpContext context)
+    {
+        var userId = context.User.Identity?.IsAuthenticated == true ? context.User.GetUserId() : null;
+        var key = userId is { } id ? $"report-user:{id}" : $"report-ip:{ClientAddress(context)}";
+        return RateLimitPartition.GetSlidingWindowLimiter(key, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = ProblemReportPermitPerHour,
+            Window = TimeSpan.FromHours(1),
+            SegmentsPerWindow = ProblemReportSegments,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
+    }
 
     public static RateLimitPartition<string> Exempt(HttpContext context)
         => RateLimitPartition.GetNoLimiter(RateLimitingPolicies.Exempt);

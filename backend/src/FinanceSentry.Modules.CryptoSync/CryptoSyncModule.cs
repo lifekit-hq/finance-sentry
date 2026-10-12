@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.CryptoSync;
 
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
+using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
@@ -18,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FinanceSentry.Infrastructure.Persistence;
 
 public static class CryptoSyncModule
 {
@@ -41,17 +43,20 @@ public static class CryptoSyncModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddConnectionHealthShadow(config);
+        services.AddUpdatedAtStamping();
         services.AddDbContext<CryptoSyncDbContext>(
-            o => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+            (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();
 
-        services.AddHttpClient<BinanceHttpClient>();
+        services.AddHttpClient<BinanceHttpClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddSingleton<BinanceHoldingsAggregator>();
         services.AddScoped<ICryptoExchangeAdapter, BinanceAdapter>();
 
-        services.AddHttpClient<RevolutXHttpClient>();
+        services.AddHttpClient<RevolutXHttpClient>()
+            .AddProviderResilience(ProviderHttpResilience.DefaultTimeout, maxRetries: 0);
         services.AddSingleton<RevolutXHoldingsAggregator>();
         services.AddScoped<ICryptoExchangeAdapter, RevolutXAdapter>();
 

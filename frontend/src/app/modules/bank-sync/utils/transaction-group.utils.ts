@@ -1,3 +1,5 @@
+import {MS_PER_DAY} from '../../../shared/constants/date/date.constants';
+import {DateUtils} from '../../../shared/utils/date.utils';
 import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
@@ -5,9 +7,6 @@ import {
 } from '../models/transaction/transaction.model';
 
 const DAY_KEY_LENGTH = 10;
-const DATE_PART_WIDTH = 2;
-const MS_PER_DAY = 86_400_000;
-const LABEL_LOCALE = 'en-US';
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export class TransactionGroupUtils {
@@ -44,16 +43,16 @@ export class TransactionGroupUtils {
     const instant = new Date(raw);
     return Number.isNaN(instant.getTime())
       ? raw.slice(0, DAY_KEY_LENGTH)
-      : TransactionGroupUtils.localDayKey(instant);
+      : DateUtils.isoDateLocal(instant);
   }
 
-  /** "Today", "Yesterday", otherwise "Mon, Aug 10" (the year is added outside the current one). */
+  /** "Today", "Yesterday", otherwise "Mon 10 Aug" (the year is added outside the current one). */
   public static dayLabel(dayKey: string, now: Date = new Date()): string {
-    const today = TransactionGroupUtils.localDayKey(now);
+    const today = DateUtils.isoDateLocal(now);
     if (dayKey === today) {
       return 'Today';
     }
-    if (dayKey === TransactionGroupUtils.localDayKey(new Date(now.getTime() - MS_PER_DAY))) {
+    if (dayKey === DateUtils.isoDateLocal(new Date(now.getTime() - MS_PER_DAY))) {
       return 'Yesterday';
     }
     const date = new Date(`${dayKey}T00:00:00`);
@@ -61,12 +60,7 @@ export class TransactionGroupUtils {
       return dayKey;
     }
     const sameYear = date.getFullYear() === now.getFullYear();
-    return date.toLocaleDateString(LABEL_LOCALE, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      ...(sameYear ? {} : {year: 'numeric'}),
-    });
+    return DateUtils.dayLabel(dayKey, !sameYear);
   }
 
   public static accountLabel(account: {bankName: string; accountNumberLast4: string}): string {
@@ -82,11 +76,5 @@ export class TransactionGroupUtils {
       accountId: a.accountId,
       label: TransactionGroupUtils.accountLabel(a),
     }));
-  }
-
-  private static localDayKey(date: Date): string {
-    const month = String(date.getMonth() + 1).padStart(DATE_PART_WIDTH, '0');
-    const day = String(date.getDate()).padStart(DATE_PART_WIDTH, '0');
-    return `${date.getFullYear()}-${month}-${day}`;
   }
 }
