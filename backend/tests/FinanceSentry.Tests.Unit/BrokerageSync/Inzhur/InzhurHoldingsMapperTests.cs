@@ -120,8 +120,29 @@ public class InzhurHoldingsMapperTests
     [InlineData("hryvnia", "UAH")]
     [InlineData(" uah ", "UAH")]
     [InlineData("USD", "USD")]
-    public void Reported_currency_is_used_only_when_it_is_an_ISO_code(string? reported, string expected)
+    [InlineData("PLN", "UAH")]
+    public void Reported_currency_is_used_only_when_a_rate_exists_for_it(string? reported, string expected)
         => InzhurHoldingsMapper.CurrencyFor(reported).Should().Be(expected);
+
+    [Fact]
+    public void Currency_in_an_unexpected_shape_reads_as_not_reported_and_keeps_the_row_in_UAH()
+    {
+        var fund = new
+        {
+            id = 1,
+            type = "fund",
+            name = "Fund F",
+            currency = new { code = "EUR" },
+            details = new { certificatesOwnedQuantity = 10m, totalAmountUAH = 1_200m },
+        };
+        var positions = InzhurHoldingsMapper.Map(Portfolio(
+            InzhurFakes.UserAssets(fund),
+            new { availableBalanceUAH = 50m, currency = 980 }));
+
+        positions.Should().HaveCount(2);
+        positions.Should().OnlyContain(p => p.Currency == "UAH");
+        positions.Single(p => p.Symbol == "Fund F").UsdValue.Should().Be(CurrencyConverter.ToUsd(1_200m, "UAH"));
+    }
 
     [Fact]
     public void Symbol_falls_back_from_name_to_title_to_isin_to_the_id()

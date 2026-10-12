@@ -26,6 +26,7 @@ public sealed record InzhurAsset(
 {
     /// <summary>The currency the cabinet reports for this asset's amounts, when it reports one.</summary>
     [JsonPropertyName("currency")]
+    [JsonConverter(typeof(InzhurStringOrNullConverter))]
     public string? Currency { get; init; }
 
     /// <summary>Fields not modelled above; only their names are ever logged, to learn where the asset name lives.</summary>
@@ -64,6 +65,7 @@ public sealed record InzhurBrokerAccount(
 {
     /// <summary>The currency the cabinet reports for the account's balances, when it reports one.</summary>
     [JsonPropertyName("currency")]
+    [JsonConverter(typeof(InzhurStringOrNullConverter))]
     public string? Currency { get; init; }
 }
 

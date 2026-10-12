@@ -27,7 +27,6 @@ public static class InzhurHoldingsMapper
     /// <summary>What every Inzhur amount is denominated in unless the cabinet reports a currency itself.</summary>
     public const string DefaultCurrency = "UAH";
 
-    private const int CurrencyCodeLength = 3;
     private const string BondType = "bond";
     private const string FallbackSymbolPrefix = "INZHUR-";
     private const int SymbolMaxLength = 50;
@@ -54,11 +53,11 @@ public static class InzhurHoldingsMapper
         return positions;
     }
 
-    /// <summary>The currency the cabinet reported when it is a plain ISO code, else <see cref="DefaultCurrency"/>.</summary>
+    /// <summary>The currency the cabinet reported when a rate exists for it, else <see cref="DefaultCurrency"/>.</summary>
     public static string CurrencyFor(string? reported)
     {
         var code = reported?.Trim().ToUpperInvariant();
-        return code is { Length: CurrencyCodeLength } && code.All(char.IsAsciiLetter) ? code : DefaultCurrency;
+        return CurrencyConverter.IsKnown(code) ? code! : DefaultCurrency;
     }
 
     public static string SymbolFor(InzhurAsset asset)
