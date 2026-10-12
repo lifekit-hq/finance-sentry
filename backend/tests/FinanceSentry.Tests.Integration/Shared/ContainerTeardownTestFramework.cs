@@ -36,15 +36,28 @@ public sealed class ContainerTeardownTestFramework(IMessageSink diagnosticMessag
             IEnumerable<IXunitTestCase> testCases,
             IMessageSink executionMessageSink,
             ITestFrameworkExecutionOptions executionOptions) =>
-            base.RunTestCases(testCases, new TeardownBeforeFinishedSink(executionMessageSink), executionOptions);
+            base.RunTestCases(
+                testCases,
+                new TeardownBeforeFinishedSink(executionMessageSink, DiagnosticMessageSink),
+                executionOptions);
     }
 
-    private sealed class TeardownBeforeFinishedSink(IMessageSink inner) : LongLivedMarshalByRefObject, IMessageSink
+    private sealed class TeardownBeforeFinishedSink(IMessageSink inner, IMessageSink diagnosticMessageSink) : LongLivedMarshalByRefObject, IMessageSink
     {
         public bool OnMessage(IMessageSinkMessage message)
         {
             if (message is ITestAssemblyFinished)
-                Task.Run(PostgresServer.DisposeAllAsync).GetAwaiter().GetResult();
+            {
+                try
+                {
+                    Task.Run(PostgresServer.DisposeAllAsync).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    diagnosticMessageSink.OnMessage(
+                        new DiagnosticMessage($"Postgres container teardown failed; Ryuk is the backstop: {ex}"));
+                }
+            }
 
             return inner.OnMessage(message);
         }
