@@ -17,7 +17,7 @@ The registry entry. Lives in code (`RetentionPolicyRegistry.All`), never in the 
 | Field | Type | Notes |
 |---|---|---|
 | `Schema` | string | Postgres schema (e.g. `bank_sync`) |
-| `Table` | string | Physical table name (e.g. `audit_logs`) |
+| `Table` | string | Physical table name (e.g. `companion_events`) |
 | `TimestampColumn` | string? | Column the cutoff compares against; null for `Keep` |
 | `Action` | `RetentionAction` enum | `Purge` \| `Downsample` \| `Keep` |
 | `WindowDays` | int? | Rows older than this are out-of-policy; null for `Keep` |
@@ -48,7 +48,7 @@ One row per generic purge or downsample job execution.
 | `StartedAt` | timestamptz | not null |
 | `CompletedAt` | timestamptz | nullable until done |
 | `Outcome` | text | `Success` \| `PartialSuccess` \| `Failed` |
-| `TableResults` | jsonb | `[{ "table": "bank_sync.audit_logs", "examined": N, "removed": M }]` |
+| `TableResults` | jsonb | `[{ "table": "bank_sync.SyncJobs", "examined": N, "removed": M }]` |
 | `Error` | text | nullable; failure detail (no secrets) |
 
 Index: `(RunType, StartedAt desc)`. Duration is derived (`CompletedAt - StartedAt`).

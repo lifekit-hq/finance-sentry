@@ -97,8 +97,8 @@ recommendations.
 
 All financial data is encrypted at rest and in transit. Authentication is enforced at
 API boundary and per-module. User data isolation is absolute—queries, caching, and
-reports must be user-scoped. Secrets are never logged. Audit logs record all data
-access. No shortcuts on security—violations require explicit team lead approval.
+reports must be user-scoped. Secrets are never logged. Data access is observable through
+the application logs and metrics. No shortcuts on security—violations require explicit team lead approval.
 
 **Token storage (non-negotiable):** The access token MUST live only in application
 memory (the `AuthStore` signal). It MUST NOT be written to `localStorage`,

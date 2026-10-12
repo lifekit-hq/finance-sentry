@@ -19,7 +19,7 @@ public sealed class RetentionOptions
     public int DefaultBatchSize { get; set; } = 5000;
 
     /// <summary>
-    /// Per-table window overrides keyed by qualified table name (e.g. <c>bank_sync.audit_logs</c> → 180).
+    /// Per-table window overrides keyed by qualified table name (e.g. <c>bank_sync.SyncJobs</c> → 30).
     /// Absent keys fall back to the registry default.
     /// </summary>
     public Dictionary<string, int> WindowOverrides { get; set; } = [];

@@ -11,9 +11,9 @@ using Xunit;
 /// </summary>
 public sealed class RetentionSqlTests
 {
-    // Mixed-case on purpose: bank_sync is snake, SyncJobs is Pascal — both must be quoted verbatim.
+    // Mixed-case on purpose: companion_events is snake, SyncJobs is Pascal — both must be quoted verbatim.
     private static readonly RetentionPolicy Snake =
-        new("bank_sync", "audit_logs", "PerformedAt", RetentionAction.Purge, 365);
+        new("companion", "companion_events", "CapturedAt", RetentionAction.Purge, 90);
     private static readonly RetentionPolicy Pascal =
         new("bank_sync", "SyncJobs", "CreatedAt", RetentionAction.Purge, 90);
 
@@ -21,7 +21,7 @@ public sealed class RetentionSqlTests
     public void Count_sql_quotes_identifiers_and_binds_cutoff()
     {
         RetentionSql.Count(Snake).Should().Be(
-            "SELECT COUNT(*)::bigint FROM \"bank_sync\".\"audit_logs\" WHERE \"PerformedAt\" < @cutoff");
+            "SELECT COUNT(*)::bigint FROM \"companion\".\"companion_events\" WHERE \"CapturedAt\" < @cutoff");
     }
 
     [Fact]

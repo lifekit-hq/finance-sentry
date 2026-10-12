@@ -23,53 +23,6 @@ namespace FinanceSentry.Modules.BankSync.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.AuditLog", b =>
-                {
-                    b.Property<Guid>("AuditId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
-
-                    b.Property<DateTime>("PerformedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ResourceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("UserAgent")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("AuditId");
-
-                    b.HasIndex("ResourceType", "ResourceId")
-                        .HasDatabaseName("idx_audit_log_resource");
-
-                    b.HasIndex("UserId", "PerformedAt")
-                        .HasDatabaseName("idx_audit_log_user_performed_at");
-
-                    b.ToTable("audit_logs", "bank_sync");
-                });
-
             modelBuilder.Entity("FinanceSentry.Modules.BankSync.Domain.BankAccount", b =>
                 {
                     b.Property<Guid>("Id")

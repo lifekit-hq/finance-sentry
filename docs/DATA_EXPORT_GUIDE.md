@@ -36,7 +36,7 @@ User data is exported as a JSON file with the following structure:
 }
 ```
 
-**Never exported:** access tokens, encryption keys, full account numbers, audit logs containing IP addresses.
+**Never exported:** access tokens, encryption keys, full account numbers.
 
 ## Triggering an Export (Developer)
 
@@ -70,8 +70,7 @@ To fully delete a user's data:
 1. Soft-delete all accounts (`is_active = false`).
 2. Soft-delete all transactions (cascade via EF or manual SQL).
 3. Delete `encrypted_credentials` rows.
-4. Delete `audit_logs` rows for the user.
-5. Log the erasure event in a separate compliance log (outside the main DB).
+4. Log the erasure event in a separate compliance log (outside the main DB).
 
 Retain: billing records and fraud prevention records as required by applicable law (typically 5–7 years).
 
