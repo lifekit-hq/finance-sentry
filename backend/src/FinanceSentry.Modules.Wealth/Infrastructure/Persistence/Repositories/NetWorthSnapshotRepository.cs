@@ -19,16 +19,34 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
         await _db.SaveChangesAsync(ct);
     }
 
+    // One INSERT ... ON CONFLICT on the unique (UserId, SnapshotDate) index: the day's row is refreshed in place, so
+    // two snapshots of one day leave one row instead of the loser failing on the index, and no read precedes it. The
+    // row keeps its Id. It runs at once and the snapshot is not tracked by this context.
     public async Task UpsertAsync(NetWorthSnapshot snapshot, CancellationToken ct = default)
-    {
-        var existing = await _db.NetWorthSnapshots.IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .FirstOrDefaultAsync(s => s.UserId == snapshot.UserId && s.SnapshotDate == snapshot.SnapshotDate, ct);
-        if (existing is not null)
-            _db.NetWorthSnapshots.Remove(existing);
-
-        _db.NetWorthSnapshots.Add(snapshot);
-        await _db.SaveChangesAsync(ct);
-    }
+        => await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public.net_worth_snapshots
+                ("Id", "UserId", "SnapshotDate", "BankingTotal", "BrokerageTotal", "CryptoTotal", "TotalNetWorth",
+                 "Currency", "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested, crypto_invested)
+            VALUES
+                ({snapshot.Id}, {snapshot.UserId}, {snapshot.SnapshotDate}, {snapshot.BankingTotal},
+                 {snapshot.BrokerageTotal}, {snapshot.CryptoTotal}, {snapshot.TotalNetWorth}, {snapshot.Currency},
+                 {snapshot.TakenAt.ToUniversalTime()}, {snapshot.StaleSleeves}, {snapshot.IsApproximate},
+                 {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested})
+            ON CONFLICT ("UserId", "SnapshotDate") DO UPDATE SET
+                "BankingTotal" = EXCLUDED."BankingTotal",
+                "BrokerageTotal" = EXCLUDED."BrokerageTotal",
+                "CryptoTotal" = EXCLUDED."CryptoTotal",
+                "TotalNetWorth" = EXCLUDED."TotalNetWorth",
+                "Currency" = EXCLUDED."Currency",
+                "TakenAt" = EXCLUDED."TakenAt",
+                stale_sleeves = EXCLUDED.stale_sleeves,
+                is_approximate = EXCLUDED.is_approximate,
+                cash_total = EXCLUDED.cash_total,
+                brokerage_invested = EXCLUDED.brokerage_invested,
+                crypto_invested = EXCLUDED.crypto_invested
+            """,
+            ct);
 
     public Task<bool> ExistsAsync(Guid userId, DateOnly snapshotDate, CancellationToken ct = default)
         => _db.NetWorthSnapshots.AnyAsync(s => s.UserId == userId && s.SnapshotDate == snapshotDate, ct);
@@ -59,24 +77,36 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
             .ThenBy(s => s.TakenAt)
             .FirstOrDefaultAsync(ct);
 
+    // One INSERT ... ON CONFLICT DO NOTHING per row on the unique (UserId, SnapshotDate) index, in one transaction: a
+    // day that already has a row is never overwritten, a re-run inserts nothing, and a concurrent writer of the same
+    // day makes the loser skip it instead of failing on the index.
     public async Task<int> InsertMissingAsync(IReadOnlyCollection<NetWorthSnapshot> snapshots, CancellationToken ct = default)
     {
         if (snapshots.Count == 0)
             return 0;
 
-        var userId = snapshots.First().UserId;
-        var existingDates = await _db.NetWorthSnapshots
-            .Where(s => s.UserId == userId)
-            .Select(s => s.SnapshotDate)
-            .ToHashSetAsync(ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var inserted = 0;
+        foreach (var snapshot in snapshots)
+        {
+            inserted += await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public.net_worth_snapshots
+                    ("Id", "UserId", "SnapshotDate", "BankingTotal", "BrokerageTotal", "CryptoTotal", "TotalNetWorth",
+                     "Currency", "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested,
+                     crypto_invested)
+                VALUES
+                    ({snapshot.Id}, {snapshot.UserId}, {snapshot.SnapshotDate}, {snapshot.BankingTotal},
+                     {snapshot.BrokerageTotal}, {snapshot.CryptoTotal}, {snapshot.TotalNetWorth}, {snapshot.Currency},
+                     {snapshot.TakenAt.ToUniversalTime()}, {snapshot.StaleSleeves}, {snapshot.IsApproximate},
+                     {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested})
+                ON CONFLICT ("UserId", "SnapshotDate") DO NOTHING
+                """,
+                ct);
+        }
 
-        var toInsert = snapshots.Where(s => !existingDates.Contains(s.SnapshotDate)).ToList();
-        if (toInsert.Count == 0)
-            return 0;
-
-        _db.NetWorthSnapshots.AddRange(toInsert);
-        await _db.SaveChangesAsync(ct);
-        return toInsert.Count;
+        await transaction.CommitAsync(ct);
+        return inserted;
     }
 
     public async Task<int> FillMissingSplitAsync(Guid userId, IReadOnlyCollection<NetWorthSplit> splits, CancellationToken ct = default)
