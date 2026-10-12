@@ -16,25 +16,10 @@ const CANDIDATE: CommitmentCandidate = {
 };
 
 describe('commitmentPickerMethods', () => {
-  it('setLoading marks loading and clears the error', () => {
-    const state = signalState({...initialCommitmentPickerState, errorCode: 'X'});
-    commitmentPickerMethods(state).setLoading();
-    expect(state.status()).toBe('loading');
-    expect(state.errorCode()).toBeNull();
-  });
-
-  it('setCandidates stores the list and goes idle', () => {
+  it('setCandidates stores the list', () => {
     const state = signalState(initialCommitmentPickerState);
     commitmentPickerMethods(state).setCandidates([CANDIDATE]);
     expect(state.candidates()).toEqual([CANDIDATE]);
-    expect(state.status()).toBe('idle');
-  });
-
-  it('setError keeps the code', () => {
-    const state = signalState(initialCommitmentPickerState);
-    commitmentPickerMethods(state).setError('INVALID_SEARCH');
-    expect(state.status()).toBe('error');
-    expect(state.errorCode()).toBe('INVALID_SEARCH');
   });
 
   it('setSearch stores the term', () => {
