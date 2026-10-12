@@ -32,13 +32,18 @@ public sealed class InzhurSyncService(
     IBrokerageTradeRepository tradeRepository,
     IBrokerageCashTransactionRepository cashTransactionRepository,
     IInzhurApiClient api,
+    IInzhurSessionGate gate,
     ICredentialEncryptionService encryption,
     TimeProvider clock,
     ILogger<InzhurSyncService> logger) : IInzhurSyncService
 {
     public async Task<InzhurSyncOutcome> SyncAsync(Guid userId, CancellationToken ct = default)
     {
-        var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId, ct);
+        // The whole read holds the user's turn: the keep-alive may rotate the refresh token while this runs, and the
+        // jar is read only once the turn is ours so it is the latest one.
+        using var turn = await gate.EnterAsync(userId, ct);
+
+        var credential = await credentialRepository.GetFreshByUserIdUnscopedAsync(userId, ct);
         if (credential is null || credential.Status != InzhurConnectionStatus.Active || !credential.HasSession)
             return InzhurSyncOutcome.Skipped;
 
@@ -77,7 +82,7 @@ public sealed class InzhurSyncService(
         }
         catch (InzhurApiException ex) when (ex.Kind == InzhurFailureKind.ReauthRequired)
         {
-            // Session lifetime is the open question the first weeks answer; log it when the chain breaks.
+            // How long a session lived and sat unrefreshed is what the keep-alive cadence is tuned from.
             logger.LogWarning(
                 "Inzhur session for user {UserId} ended (started {SessionStartedAt:o}, last refreshed {SessionRefreshedAt:o}); reconnect needed",
                 userId, credential.SessionStartedAt, credential.SessionRefreshedAt);

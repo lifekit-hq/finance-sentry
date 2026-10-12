@@ -41,7 +41,7 @@ public class InzhurConnectorTests
     }
 
     private InzhurConnector Connector() => new(
-        _credentials.Object, _holdings.Object, _api.Object, _sync.Object, _encryption, _alerts.Object,
+        _credentials.Object, _holdings.Object, _api.Object, _sync.Object, new FakeSessionGate(), _encryption, _alerts.Object,
         Options.Create(new InzhurOptions()), _clock, _logger);
 
     private void RefreshReturns(InzhurSession session)

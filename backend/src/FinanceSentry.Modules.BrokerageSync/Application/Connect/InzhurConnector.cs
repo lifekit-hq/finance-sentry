@@ -40,14 +40,15 @@ public interface IInzhurConnector
 /// <summary>
 /// The owner-initiated half of the Inzhur sync. finance-sentry never signs in to Inzhur: its sign-in sits behind a
 /// reCAPTCHA v3 that rejects this server's datacenter IP (data/fs-inzhur-recaptcha), so the owner signs in in his own
-/// browser and hands over the session's refresh cookie. The refresh endpoint has no bot check; the daily job keeps the
-/// session alive from there.
+/// browser and hands over the session's refresh cookie. The refresh endpoint has no bot check; the keep-alive job keeps
+/// the session alive from there.
 /// </summary>
 public sealed class InzhurConnector(
     IInzhurCredentialRepository credentialRepository,
     IBrokerageHoldingRepository holdingRepository,
     IInzhurApiClient api,
     IInzhurSyncService syncService,
+    IInzhurSessionGate gate,
     ICredentialEncryptionService encryption,
     IAlertGeneratorService alerts,
     IOptions<InzhurOptions> options,
@@ -83,15 +84,30 @@ public sealed class InzhurConnector(
             };
         }
 
-        var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
-        if (credential is null)
+        // The new jar replaces whatever the keep-alive or a read is rotating, so it waits for that turn to end.
+        IDisposable turn;
+        try
         {
-            credential = new InzhurCredential(userId);
-            await credentialRepository.AddAsync(credential, ct);
+            turn = await gate.EnterAsync(userId, ct);
+        }
+        catch (InzhurApiException)
+        {
+            throw Error(StatusCodes.Status503ServiceUnavailable, InzhurErrorCodes.Unavailable, "Inzhur is unavailable right now. Try again later.");
         }
 
-        credential.StartSession(Encrypt(session.Serialize()), Now);
-        await credentialRepository.SaveChangesAsync(ct);
+        using (turn)
+        {
+            var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
+            if (credential is null)
+            {
+                credential = new InzhurCredential(userId);
+                await credentialRepository.AddAsync(credential, ct);
+            }
+
+            credential.StartSession(Encrypt(session.Serialize()), Now);
+            await credentialRepository.SaveChangesAsync(ct);
+        }
+
         logger.LogInformation("Inzhur connected for user {UserId}", userId);
         await TryResolveAlertAsync(userId);
         await TrySyncAsync(userId, ct);

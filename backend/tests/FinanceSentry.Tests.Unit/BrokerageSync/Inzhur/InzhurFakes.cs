@@ -141,3 +141,42 @@ internal sealed class ManualClock(DateTimeOffset now) : TimeProvider
 
     public override DateTimeOffset GetUtcNow() => Now;
 }
+
+/// <summary>
+/// A per-user gate that behaves like the distributed lock: one holder per user at a time, the next waits for the
+/// release. <see cref="Entered"/> counts turns granted and <see cref="MaxConcurrent"/> the most holders seen at once.
+/// </summary>
+internal sealed class FakeSessionGate : IInzhurSessionGate
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> _turns = new();
+    private int _holders;
+
+    public int Entered { get; private set; }
+
+    /// <summary>How many callers hold a turn right now.</summary>
+    public int Holders => Volatile.Read(ref _holders);
+
+    public int MaxConcurrent { get; private set; }
+
+    public async Task<IDisposable> EnterAsync(Guid userId, CancellationToken ct = default)
+    {
+        var turn = _turns.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        await turn.WaitAsync(ct);
+        lock (_turns)
+        {
+            Entered++;
+            MaxConcurrent = Math.Max(MaxConcurrent, ++_holders);
+        }
+
+        return new Release(() =>
+        {
+            lock (_turns) _holders--;
+            turn.Release();
+        });
+    }
+
+    private sealed class Release(Action release) : IDisposable
+    {
+        public void Dispose() => release();
+    }
+}
