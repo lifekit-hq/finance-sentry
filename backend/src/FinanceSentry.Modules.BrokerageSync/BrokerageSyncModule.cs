@@ -52,6 +52,8 @@ public static class BrokerageSyncModule
 
             var inzhur = sp.GetRequiredService<IOptions<InzhurOptions>>().Value;
             mgr.AddOrUpdate<InzhurSyncJob>("inzhur-sync", job => job.ExecuteAsync(), inzhur.SyncCron);
+            // The session refresh, apart from the once-a-day read: sized from the session's lifetime (hourly).
+            mgr.AddOrUpdate<InzhurKeepAliveJob>("inzhur-keepalive", job => job.ExecuteAsync(), inzhur.KeepAliveCron);
         }
     }
 
@@ -125,8 +127,11 @@ public static class BrokerageSyncModule
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
             .RedactLoggedHeaders(_ => true);
         services.AddScoped<IInzhurSyncService, InzhurSyncService>();
+        services.AddScoped<IInzhurKeepAliveService, InzhurKeepAliveService>();
+        services.AddSingleton<IInzhurSessionGate>(_ => new HangfireInzhurSessionGate(() => JobStorage.Current));
         services.AddScoped<IInzhurConnector, InzhurConnector>();
         services.AddScoped<InzhurSyncJob>();
+        services.AddScoped<InzhurKeepAliveJob>();
         services.AddScoped<IBrokerageConnectionStatusReader, BrokerageConnectionStatusReader>();
 
         services.AddScoped<IBKRSyncJob>();

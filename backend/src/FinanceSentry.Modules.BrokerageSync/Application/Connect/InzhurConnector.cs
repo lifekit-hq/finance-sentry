@@ -48,6 +48,7 @@ public sealed class InzhurConnector(
     IBrokerageHoldingRepository holdingRepository,
     IInzhurApiClient api,
     IInzhurSyncService syncService,
+    IInzhurSessionGate gate,
     ICredentialEncryptionService encryption,
     IAlertGeneratorService alerts,
     IOptions<InzhurOptions> options,
@@ -83,15 +84,30 @@ public sealed class InzhurConnector(
             };
         }
 
-        var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
-        if (credential is null)
+        // The new jar replaces whatever the keep-alive or a read is rotating, so it waits for that turn to end.
+        IDisposable turn;
+        try
         {
-            credential = new InzhurCredential(userId);
-            await credentialRepository.AddAsync(credential, ct);
+            turn = await gate.EnterAsync(userId, ct);
+        }
+        catch (InzhurApiException)
+        {
+            throw Error(StatusCodes.Status503ServiceUnavailable, InzhurErrorCodes.Unavailable, "Inzhur is unavailable right now. Try again later.");
         }
 
-        credential.StartSession(Encrypt(session.Serialize()), Now);
-        await credentialRepository.SaveChangesAsync(ct);
+        using (turn)
+        {
+            var credential = await credentialRepository.GetByUserIdAsync(userId, ct);
+            if (credential is null)
+            {
+                credential = new InzhurCredential(userId);
+                await credentialRepository.AddAsync(credential, ct);
+            }
+
+            credential.StartSession(Encrypt(session.Serialize()), Now);
+            await credentialRepository.SaveChangesAsync(ct);
+        }
+
         logger.LogInformation("Inzhur connected for user {UserId}", userId);
         await TryResolveAlertAsync(userId);
         await TrySyncAsync(userId, ct);

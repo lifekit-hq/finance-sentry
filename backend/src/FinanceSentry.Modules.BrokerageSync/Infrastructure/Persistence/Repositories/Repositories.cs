@@ -152,6 +152,17 @@ public sealed class InzhurCredentialRepository(BrokerageSyncDbContext context) :
             .FirstOrDefaultAsync(c => c.UserId == userId, ct);
     }
 
+    public async Task<InzhurCredential?> GetFreshByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default)
+    {
+        var tracked = context.InzhurCredentials.Local.FirstOrDefault(c => c.UserId == userId);
+        if (tracked is null)
+            return await GetByUserIdUnscopedAsync(userId, ct);
+
+        var entry = context.Entry(tracked);
+        await entry.ReloadAsync(ct);
+        return entry.State == EntityState.Detached ? null : tracked;
+    }
+
     public async Task<IReadOnlyList<InzhurCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default)
     {
         return await context.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])

@@ -14,7 +14,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// <summary>
 /// The once-a-day read of each connected Inzhur cabinet (design report §4): refresh the session, read holdings and
 /// cash, store them. It never signs in — a broken refresh chain flips the connection to reauth_required and tells
-/// the owner, who reconnects from the app. Inzhur being busy or down (429/5xx/network) is retried by Hangfire once
+/// the owner, who reconnects from the app. Keeping the session alive between the reads is the hourly
+/// <see cref="InzhurKeepAliveJob"/>'s work, not this once-a-day run's. Inzhur being busy or down (429/5xx/network) is retried by Hangfire once
 /// after an hour and once more four hours later, then the day is skipped and the job fails; nothing else retries.
 /// </summary>
 public sealed class InzhurSyncJob(

@@ -65,6 +65,13 @@ public interface IInzhurCredentialRepository
     /// <summary>The user's credential for the no-person sync. Opts out of the Owner query filter.</summary>
     Task<InzhurCredential?> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Like <see cref="GetByUserIdUnscopedAsync"/>, but a credential this context already tracks is re-read from the
+    /// row first: another job may have rotated the session since it was loaded, and refreshing from the older jar
+    /// would present a refresh token the cabinet has already replaced.
+    /// </summary>
+    Task<InzhurCredential?> GetFreshByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>Every user's credential holding a live session, for the daily sweep. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<InzhurCredential>> GetAllActiveUnscopedAsync(CancellationToken ct = default);
 

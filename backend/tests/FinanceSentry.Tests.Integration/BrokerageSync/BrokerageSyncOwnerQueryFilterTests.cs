@@ -229,6 +229,33 @@ public sealed class BrokerageSyncOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Inzhur_fresh_read_with_no_person_sees_a_session_another_job_rotated_meanwhile()
+    {
+        var a = NewInzhurCredential(_userA);
+        a.StartSession(new EncryptedSecret([3], [3], [3], 1), DateTime.UtcNow);
+        await SeedAsync(a);
+
+        // The keep-alive loads the credential, then waits for the user's turn while the daily read rotates the jar.
+        await using var waiting = CreateContext();
+        var repository = new InzhurCredentialRepository(waiting);
+        var loaded = (await repository.GetByUserIdUnscopedAsync(_userA))!;
+        await using (var rotating = CreateContext())
+        {
+            var rotated = (await new InzhurCredentialRepository(rotating).GetByUserIdUnscopedAsync(_userA))!;
+            rotated.RefreshSession(new EncryptedSecret([9], [9], [9], 1), DateTime.UtcNow);
+            await rotating.SaveChangesAsync();
+        }
+
+        (await repository.GetByUserIdUnscopedAsync(_userA))!.EncryptedSession.Should().Equal([3], "the tracked row is served as loaded");
+
+        var fresh = await repository.GetFreshByUserIdUnscopedAsync(_userA);
+
+        fresh.Should().BeSameAs(loaded);
+        fresh!.EncryptedSession.Should().Equal([9]);
+        (await repository.GetFreshByUserIdUnscopedAsync(_userB)).Should().BeNull();
+    }
+
+    [DockerRequiredFact]
     public async Task Inzhur_rotation_with_no_person_rotates_every_users_secrets()
     {
         var encryption = new Mock<ICredentialEncryptionService>();

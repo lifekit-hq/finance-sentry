@@ -40,7 +40,7 @@ public class InzhurSyncServiceTests
     {
         var credential = new InzhurCredential(_userId);
         credential.StartSession(Secret(InzhurFakes.Session().Serialize()), Now.UtcDateTime.AddDays(-3));
-        _credentials.Setup(r => r.GetByUserIdUnscopedAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        _credentials.Setup(r => r.GetFreshByUserIdUnscopedAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
         return credential;
     }
 
@@ -54,6 +54,7 @@ public class InzhurSyncServiceTests
         _credentials.Object,
         _holdings.Object,
         new InzhurApiClient(new HttpClient(_cabinet), Options.Create(new InzhurOptions()), NullLogger<InzhurApiClient>.Instance),
+        new FakeSessionGate(),
         _encryption,
         new ManualClock(Now),
         NullLogger<InzhurSyncService>.Instance);
