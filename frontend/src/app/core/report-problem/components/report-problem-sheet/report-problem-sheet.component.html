@@ -1,0 +1,43 @@
+<form [formGroup]="form" (ngSubmit)="send()" class="flex flex-col gap-cmn-6 p-cmn-4 md:p-cmn-6">
+  <section class="flex flex-col gap-cmn-2" aria-labelledby="report-kind-heading">
+    <h3
+      id="report-kind-heading"
+      class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      What kind of problem? (optional)
+    </h3>
+    <div class="flex flex-wrap gap-cmn-2" role="group" aria-labelledby="report-kind-heading">
+      @for (kind of kinds; track kind.value) {
+        <cmn-chip
+          [selected]="store.kind() === kind.value"
+          [attr.data-testid]="'report-kind-' + kind.value"
+          (clicked)="store.toggleKind(kind.value)"
+        >
+          {{ kind.label }}
+        </cmn-chip>
+      }
+    </div>
+  </section>
+
+  <cmn-form-field [hint]="helper" label="What happened? (optional)">
+    <cmn-textarea
+      [maxlength]="maxLength"
+      [rows]="rows"
+      formControlName="text"
+      data-testid="report-text"
+    />
+  </cmn-form-field>
+
+  @if (store.errorMessage(); as message) {
+    <cmn-alert variant="error" data-testid="report-error">{{ message }}</cmn-alert>
+  }
+
+  <cmn-button
+    [disabled]="!canSend()"
+    [loading]="store.isSubmitting()"
+    type="submit"
+    data-testid="report-send"
+  >
+    Send report
+  </cmn-button>
+</form>

@@ -5,6 +5,7 @@ import {provideRouter} from '@angular/router';
 import {AuthStore} from '../../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
 import {Permission} from '../../../shared/enums/permission/permission.enum';
+import {ReportProblemPanelService} from '../../report-problem/services/report-problem-panel.service';
 import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
 import {WhatsNewStore} from '../../whats-new/store/whats-new.store';
 import {MorePageComponent} from './more-page.component';
@@ -12,6 +13,7 @@ import {MorePageComponent} from './more-page.component';
 describe('MorePageComponent', () => {
   const logout = vi.fn();
   const open = vi.fn();
+  const openReport = vi.fn();
 
   const render = (permissions: string[], unread = false): HTMLElement => {
     TestBed.configureTestingModule({
@@ -23,6 +25,7 @@ describe('MorePageComponent', () => {
         },
         {provide: WhatsNewStore, useValue: {hasUnread: signal(unread)}},
         {provide: WhatsNewPanelService, useValue: {open}},
+        {provide: ReportProblemPanelService, useValue: {open: openReport}},
       ],
     });
     const fixture = TestBed.createComponent(MorePageComponent);
@@ -77,5 +80,13 @@ describe('MorePageComponent', () => {
     const row = render([]).querySelector('[data-testid="more-version"]');
 
     expect(row?.textContent).toContain(`Version ${APP_VERSION}`);
+  });
+
+  it('opens the report sheet from its row', () => {
+    const row = render([]).querySelector<HTMLButtonElement>('[data-testid="more-report-problem"]');
+
+    expect(row?.textContent).toContain('Report a problem');
+    row?.click();
+    expect(openReport).toHaveBeenCalledOnce();
   });
 });

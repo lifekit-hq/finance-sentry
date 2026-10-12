@@ -7,8 +7,11 @@ import {of} from 'rxjs';
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
 import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
+import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
+import {ReportProblemPanelService} from '../report-problem/services/report-problem-panel.service';
 import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
+import {WhatsNewStore} from '../whats-new/store/whats-new.store';
 import {AppShellComponent} from './app-shell.component';
 import {PaletteEntitiesService} from './services/palette-entities.service';
 
@@ -21,9 +24,13 @@ class ChatWidgetStubComponent {}
 
 describe('AppShellComponent FAB clearance', () => {
   const openWhatsNew = vi.fn();
+  const openReport = vi.fn();
+  const hasUnread = signal(false);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
+    openReport.mockClear();
+    hasUnread.set(false);
   });
   const canUseAi = signal(true);
 
@@ -45,6 +52,8 @@ describe('AppShellComponent FAB clearance', () => {
           },
         },
         {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
+        {provide: WhatsNewStore, useValue: {hasUnread}},
+        {provide: ReportProblemPanelService, useValue: {open: openReport}},
         {provide: AlertsStore, useValue: {unreadCount: signal(0)}},
         {
           provide: PaletteEntitiesService,
@@ -116,5 +125,50 @@ describe('AppShellComponent FAB clearance', () => {
     expect(entry).toBeDefined();
     fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
     expect(openWhatsNew).toHaveBeenCalledOnce();
+  });
+
+  it('opens the report sheet from the avatar menu', async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const item = fixture.componentInstance
+      .account()
+      .menuItems.find(entry => entry.label === 'Report a problem');
+    expect(item).toBeDefined();
+    fixture.componentInstance.handleAvatarMenuSelect(item as MenuItem);
+    expect(openReport).toHaveBeenCalledOnce();
+  });
+
+  it('opens the report sheet from the command palette', async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const entry = fixture.componentInstance
+      .paletteItems()
+      .find(item => item.label === 'Report a problem');
+    expect(entry).toBeDefined();
+    fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
+    expect(openReport).toHaveBeenCalledOnce();
+  });
+
+  describe('sidebar version footer', () => {
+    const footer = (fixture: ComponentFixture<AppShellComponent>): HTMLButtonElement | null =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        'aside button[type="button"].border-t'
+      );
+
+    it("is a button labelled with the version and What's new that opens the panel", async () => {
+      const fixture = await setup(AppRoute.Settings, true);
+      const button = footer(fixture);
+
+      expect(button?.textContent).toContain(`v${APP_VERSION} · What's new`);
+      button?.click();
+      expect(openWhatsNew).toHaveBeenCalledOnce();
+    });
+
+    it('shows the unread dot only while the release is unread', async () => {
+      const fixture = await setup(AppRoute.Settings, true);
+      expect(footer(fixture)?.querySelector('.cmn-badge-indicator')).toBeNull();
+
+      hasUnread.set(true);
+      fixture.detectChanges();
+      expect(footer(fixture)?.querySelector('.cmn-badge-indicator')).not.toBeNull();
+    });
   });
 });
