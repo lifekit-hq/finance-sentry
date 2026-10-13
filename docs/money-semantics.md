@@ -212,20 +212,32 @@ crypto fills are not ingested):
 - **Coverage.** `complete` when the fills explain the whole holding (units after the walk equal the
   quantity held, and no sell exceeds what was bought). `partial` when they do not (history before the
   first ingested fill): only the holding's own cost-basis gain (value minus the provider's
-  `CostBasisUsd`) and the dividends stand, realized and currency are null. `unavailable` when nothing
-  was ingested: unrealized is the cost-basis gain, the rest null. Never filled with zero.
+  `CostBasisUsd`) and the dividends stand, realized and currency are null; dividends are null too when
+  no income row was ingested. `unavailable` when nothing was ingested: unrealized is the cost-basis
+  gain, the rest null. Never filled with zero.
 - **Average cost** (`AverageCostNative`, `CostCurrency`): open native cost over units, set only for
   complete coverage in a single trade currency. The chart's avg-cost line uses it when that currency
   is the chart's quote currency; otherwise, on a USD-quoted chart only, `CostBasisUsd / quantity`;
   otherwise no line.
 
 **Asset chart and performance strip** (`GET /research/assets/{symbol}/chart`, `AssetDossierResult.Performance`).
-Closes are the Yahoo chart series in the asset's own quote currency (crypto as `{SYM}-USD`), never converted.
+Closes are the Yahoo chart series in the asset's own quote currency (crypto as `{SYM}-USD`), never converted
+across currencies; a minor-unit quote (`GBp`/`GBX`, `ZAc`, `ILA`) is divided by 100 and labelled `GBP`/`ZAR`/`ILS`
+(`MinorUnitCurrency`), as are the valuation price and analyst targets, so price, band and the user's target
+share one unit.
 The S&P 500 line is SPY's close on (or carried forward to) each of the asset's dates, rebased so it starts at
-the asset's first close: it compares the two paths, not prices. Change % is first to last close of the
+the asset's close on the benchmark's first date: it compares the two paths, not prices. It covers the window
+only when that first benchmark close is within 5 calendar days of the asset's first close (a weekend or
+holiday start); otherwise its change % is null and the page draws no line (an asset older than SPY, as on the
+Max tab). Change % is first to last close of the
 window; the 52-week high and low are closing values, not intraday extremes; "from 52w high" is the last
 close over that high minus 1. Trade markers are the ingested fills inside the window, each at its own
 trade price and currency.
+
+**User target** (`PUT`/`DELETE /research/assets/{symbol}/target`, `AssetPriceTarget`). A per-person fair-value
+price for one symbol, stored as entered (above 0, at most 1e9) with the major currency of the price it was
+set against (optional ISO code). It is the user's own number, drawn beside the analyst mean and low/high (Yahoo `financialData`,
+source named); the app computes no fair value of its own.
 
 **Cash rows elsewhere.** The same cash definition (`AssetClassNormalizer.Cash` on a broker
 `InstrumentType`, `IsVenueFiat` on a venue balance) tags cash on three more surfaces; none of them
