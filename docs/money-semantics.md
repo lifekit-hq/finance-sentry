@@ -194,6 +194,19 @@ Holdings row's weight - rounded to two decimals; null when the book total is not
 `PositionCapPercent` beside it is the IPS single-position cap (`MaxPositionWeight` x 100), the bar the
 size-vs-cap meter and the "within the cap" check compare the share with.
 
+**Recommendation sizing** (`RecommendationSizing`, `RecommendationPositionReader`, the Ledger's Decisions
+queue and the dossier card, #1069). A proposal is sized against the same canonical book: the position's
+USD value (summed across venues) over `TotalValueUsd`, cash included, so "12.2% to 9.5% of book" uses the
+same denominator as the share of book above. The unit price is the live quote in the listing's major
+currency (minor units such as GBp are normalized), converted with `CurrencyConverter.ToUsd`; without a
+quote it falls back to the holding's own USD value per unit. Exit sells the whole position; Trim sells
+the requested USD or, without one, the excess over the single-position cap, rounded **up** to whole
+shares so the trim reaches the cap; Add buys the requested USD after the risk gate (clamped to its
+`MaxCompliantSizeUsd`), rounded **down** so it never exceeds the request; crypto sizes to six decimals.
+`sizeUsd` is shares x the USD unit price (2 dp) and before/after shares of book are rounded to two
+decimals. The order text's limit is the quote in its own currency. These are proposals: Finance Sentry
+never places the order, and the book only moves when the owner's own fill is ingested.
+
 **Return decomposition** (`DossierPositionSection.Returns`, `PositionReturnCalculator`, asset dossier
 hero). Where a holding's return came from, in USD, read from the fills and dividend rows ingested for
 the symbol (`IPositionLedgerSource`: IBKR Flex trades and cash transactions, Inzhur cabinet rows;

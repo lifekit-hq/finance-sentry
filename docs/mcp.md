@@ -21,7 +21,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 68 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 72 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -57,6 +57,9 @@ The current runtime surface contains 68 tools. The canonical list is the `Agreed
 | `remove_from_watchlist` | Write | Research | `itemId` | Removes a watchlist entry |
 | `save_thesis` | Write | Research | `ticker`, `thesisText`, `keyDataPoints`, `catalysts`, `invalidationTriggers`, `id?` | Creates or updates a thesis |
 | `delete_thesis` | Write | Research | `id` | Deletes a thesis |
+| `propose_recommendation` | Write | Research | `ticker`, `action`, `triggerKind`, `triggerRef?`, `rationale`, `confidence`, `invalidationTrigger`, `evidence?`, `sizeUsd?`, `expiresInDays?` | Queues one rule-anchored proposal (Add / Trim / Exit; Hold only answering a fired event, `triggerKind=EventVerdict`) in the owner's Decisions queue (#1069). The server checks the trigger is true now (ThesisBreak, IpsBand, RiskRule, RadarSignal, EventVerdict), sizes it from the book and a quote through the risk gate, and returns shares, USD, share of book before / after and the exact order text. One pending proposal per ticker - a newer one supersedes it. Silent: queueing pushes nothing. Never places, stages or transmits an order |
+| `list_recommendations` | Read | Research | - | The Decisions queue: pending proposals oldest first, and those decided, expired or superseded in the last 30 days with their execution and return vs the S&P 500 |
+| `decide_recommendation` | Write | Research | `id`, `verdict` (`Confirm`\|`Reject`), `note?` | Records the owner's own verdict; Reject needs the reason (kept as the counterfactual). Writes a price-stamped decision-journal event (a confirmed Exit also closes the thesis, a confirmed Trim marks it trimmed). Confirm records the decision only - the owner places the returned order text at the broker themselves |
 
 ## Research Retrieval Guidance
 
