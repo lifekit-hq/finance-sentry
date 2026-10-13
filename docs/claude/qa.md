@@ -8,7 +8,7 @@
 
 | Page | Golden path | Key assertions |
 |---|---|---|
-| **Login** | Click Sign in (forwards to Logto) | Redirects to `/accounts/list`; no JS errors |
+| **Login** | Click Sign in (forwards to Logto) | Redirects to `/dashboard` (or the originally requested route); no JS errors |
 | **Accounts** | Load page | Banking/Brokerage/Digital Assets tables render; totalConnections > 0; Net worth shown |
 | **Dashboard** | Load page | Total Balance ≠ $0.00 (if accounts exist); category table shows human-readable labels (not `FOOD_AND_DRINK`) |
 | **Transactions** | Load page | Transaction rows render; categories human-readable; no spinner stuck |

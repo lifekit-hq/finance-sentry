@@ -9,7 +9,6 @@ import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {PushSessionService} from '../../settings/services/push-session.service';
-import {SettingsService} from '../../settings/services/settings.service';
 import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
 import {type AuthResponse, type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
@@ -19,7 +18,6 @@ import {type FlashMessage, type SignInMethodsStatus} from './auth.state';
 interface EffectsStore {
   applyAuthResponse: (res: AuthResponse) => void;
   clearSession: () => void;
-  setProfileName: (firstName: Nullable<string>, lastName: Nullable<string>) => void;
   setReturnUrl: (returnUrl: Nullable<string>) => void;
   setFlashMessage: (flashMessage: Nullable<FlashMessage>) => void;
   setSignInMethods: (signInMethods: SignInMethods) => void;
@@ -29,11 +27,9 @@ interface EffectsStore {
 }
 
 interface HookStore extends EffectsStore {
-  firstName: Signal<Nullable<string>>;
   signInMethods: Signal<Nullable<SignInMethods>>;
   flashMessage: Signal<Nullable<FlashMessage>>;
   startOidcSignIn: () => void;
-  loadProfileName: () => void;
   loadSignInMethods: () => void;
 }
 
@@ -59,7 +55,6 @@ function pathOf(url: string): string {
 export function authEffects(store: EffectsStore) {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const settingsService = inject(SettingsService);
   const pushSession = inject(PushSessionService);
   const doc = inject(DOCUMENT);
   let signingOut = false;
@@ -89,17 +84,6 @@ export function authEffects(store: EffectsStore) {
               store.setSignInMethodsStatus('error');
               return EMPTY;
             })
-          )
-        )
-      )
-    ),
-    loadProfileName: rxMethod<void>(
-      pipe(
-        switchMap(() =>
-          settingsService.getProfile().pipe(
-            filter(() => store.isAuthenticated()),
-            tap(profile => store.setProfileName(profile.firstName, profile.lastName)),
-            catchError(() => EMPTY)
           )
         )
       )
@@ -198,10 +182,7 @@ export function authHooks(store: HookStore): void {
       return;
     }
     untracked(() => {
-      if (store.firstName() === null) {
-        store.loadProfileName();
-      }
-      const target = store.returnUrl() ?? AppRoute.Accounts;
+      const target = store.returnUrl() ?? AppRoute.Dashboard;
       const currentPath = pathOf(router.url);
       if (currentPath === loginRoute) {
         void router.navigateByUrl(target);

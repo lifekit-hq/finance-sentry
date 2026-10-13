@@ -44,14 +44,12 @@
               </cmn-form-field>
             </div>
           }
-          <cmn-form-field label="Email Address" fieldId="s-email">
-            <cmn-input
-              [ngModel]="profile.email"
-              (ngModelChange)="store.updateProfile({email: $event})"
-              id="s-email"
-              type="email"
-              autocomplete="email"
-            />
+          <cmn-form-field
+            label="Email Address"
+            fieldId="s-email"
+            hint="Set by your sign-in provider; change it there."
+          >
+            <cmn-input [ngModel]="profile.email" [readonly]="true" id="s-email" type="email" />
           </cmn-form-field>
         </div>
       </cmn-settings-section>
@@ -92,7 +90,8 @@
             <cmn-form-field
               (focusout)="commitThreshold()"
               (keydown.enter)="commitThreshold()"
-              label="Low balance threshold (USD)"
+              label="Low balance threshold"
+              hint="Each account is compared in its own currency."
               class="block"
               fieldId="s-thresh"
             >
@@ -238,18 +237,10 @@
         }
       </cmn-settings-section>
 
-      <cmn-settings-section heading="Security" description="Manage two-factor authentication.">
-        <cmn-setting-row
-          label="Two-factor authentication"
-          description="Add an extra layer of security with an authenticator app."
-        >
-          <cmn-toggle
-            [checked]="profile.twoFactor"
-            (toggled)="store.updateProfile({twoFactor: $event})"
-            label="Two-factor authentication"
-          />
-        </cmn-setting-row>
-      </cmn-settings-section>
+      <cmn-settings-section
+        heading="Security"
+        description="Sign-in, including two-factor authentication, is handled by your identity provider."
+      />
 
       @if (canManageUsers()) {
         <cmn-settings-section
