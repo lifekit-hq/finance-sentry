@@ -33,6 +33,15 @@ public class SetAssetPriceTargetCommandTests
     }
 
     [Fact]
+    public async Task Set_SubCentPrice_KeepsItsSignificantDigits()
+    {
+        var result = await Handler().Handle(
+            new SetAssetPriceTargetCommand(Guid.NewGuid(), "SHIB-USD", 0.00002345m, "USD"), CancellationToken.None);
+
+        result.TargetPrice.Should().Be(0.00002345m);
+    }
+
+    [Fact]
     public async Task Set_BlankCurrency_IsStoredAsNone()
     {
         var result = await Handler().Handle(

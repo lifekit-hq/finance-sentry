@@ -183,8 +183,8 @@ namespace FinanceSentry.Modules.Research.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("TargetPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(22, 12)
+                        .HasColumnType("numeric(22,12)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -811,6 +811,9 @@ namespace FinanceSentry.Modules.Research.Migrations
 
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("idx_opportunity_candidates_user_status");
+
+                    b.HasIndex("UserId", "Ticker")
+                        .HasDatabaseName("idx_opportunity_candidates_user_ticker");
 
                     b.HasIndex("UserId", "Ticker")
                         .IsUnique()

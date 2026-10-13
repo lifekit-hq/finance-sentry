@@ -66,7 +66,7 @@ export function dossierComputed(store: StateSignals) {
       );
     }),
     // Crypto carries no valuation, analyst or ownership data: those sections are hidden, not mocked.
-    isCrypto: computed(() => store.dossier()?.valuation?.notApplicable === true),
+    isCrypto: computed(() => DossierViewUtils.isCrypto(store.dossier())),
     // The thesis is a wall of text on a phone: show the first paragraph, the rest behind "Read more".
     thesisParagraphs,
     thesisHasMore: computed(() => thesisParagraphs().length > 1),

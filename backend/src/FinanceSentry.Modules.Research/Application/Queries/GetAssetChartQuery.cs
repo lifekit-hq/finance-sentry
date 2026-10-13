@@ -4,6 +4,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Dossier;
 
 /// <summary>
@@ -20,7 +21,6 @@ public sealed class GetAssetChartQueryHandler(
 {
     private const string Source = "yahoo:chart";
     private const string Usd = "USD";
-    private const int PriceDecimals = 4;
 
     public async Task<AssetChartResult> Handle(GetAssetChartQuery request, CancellationToken ct)
     {
@@ -99,7 +99,7 @@ public sealed class GetAssetChartQueryHandler(
             {
                 var raw = benchmarkByDate[cursor].Close;
                 baseBenchmark ??= raw;
-                rebased = baseBenchmark > 0m ? Math.Round(firstClose * raw / baseBenchmark.Value, PriceDecimals) : null;
+                rebased = baseBenchmark > 0m ? PriceRounding.Round(firstClose * raw / baseBenchmark.Value) : null;
             }
 
             points.Add(new AssetChartPoint(close.Date, close.Close, rebased));
@@ -120,7 +120,7 @@ public sealed class GetAssetChartQueryHandler(
         // The provider's own cost basis is in USD, so it can only be drawn on a USD-quoted chart.
         return position.CostBasisUsd is decimal basis && position.Quantity > 0m
             && Usd.Equals(chartCurrency, StringComparison.OrdinalIgnoreCase)
-                ? Math.Round(basis / position.Quantity, PriceDecimals)
+                ? PriceRounding.Round(basis / position.Quantity)
                 : null;
     }
 }

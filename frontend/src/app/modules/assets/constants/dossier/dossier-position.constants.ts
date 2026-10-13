@@ -26,3 +26,6 @@ export const ANALYST_TARGET_SOURCE = 'yahoo-finance';
 
 /** The API rejects a target at or above this (INVALID_PRICE_TARGET); the editor checks first. */
 export const MAX_TARGET_PRICE = 1_000_000_000;
+
+/** A plain decimal, or one whose commas are all thousands separators: "12,5" is not 125. */
+export const TARGET_TEXT = /^(\d{1,3}(,\d{3})+|\d*)(\.\d*)?$/;

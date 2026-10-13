@@ -17,10 +17,9 @@ public sealed record SetAssetPriceTargetCommand(Guid UserId, string Symbol, deci
 public sealed partial class SetAssetPriceTargetCommandHandler(IAssetPriceTargetRepository targets, TimeProvider clock)
     : ICommandHandler<SetAssetPriceTargetCommand, DossierUserTarget>
 {
-    /// <summary>The column holds 18 digits with 4 decimals; no listed price comes near this.</summary>
+    /// <summary>The column holds 22 digits with 12 decimals; no listed price comes near this.</summary>
     public const decimal MaxTargetPrice = 1_000_000_000m;
     public const int MaxSymbolLength = 20;
-    private const int PriceDecimals = 4;
 
     public async Task<DossierUserTarget> Handle(SetAssetPriceTargetCommand command, CancellationToken ct)
     {
@@ -45,7 +44,7 @@ public sealed partial class SetAssetPriceTargetCommandHandler(IAssetPriceTargetR
         {
             UserId = command.UserId,
             Symbol = symbol,
-            TargetPrice = Math.Round(command.TargetPrice, PriceDecimals),
+            TargetPrice = PriceRounding.Round(command.TargetPrice),
             Currency = currency,
             UpdatedAt = clock.GetUtcNow(),
         };

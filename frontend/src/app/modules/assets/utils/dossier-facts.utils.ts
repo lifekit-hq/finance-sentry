@@ -222,7 +222,7 @@ export class DossierFactsUtils {
         note: null,
       },
     ];
-    const isCrypto = dossier.valuation?.notApplicable === true;
+    const isCrypto = DossierViewUtils.isCrypto(dossier);
     const valuation = dossier.valuation && !isCrypto ? dossier.valuation : null;
     if (valuation) {
       rows.push({

@@ -264,6 +264,16 @@ describe('DossierPositionUtils.parseTarget', () => {
     expect(DossierPositionUtils.parseTarget('abc')).toBeNull();
   });
 
+  it('rejects a decimal comma instead of reading 12,5 as 125', () => {
+    expect(DossierPositionUtils.parseTarget('12,5')).toBeNull();
+    expect(DossierPositionUtils.parseTarget('1,25')).toBeNull();
+  });
+
+  it('reads a plain or leading-dot decimal', () => {
+    expect(DossierPositionUtils.parseTarget('12.5')).toBe(12.5);
+    expect(DossierPositionUtils.parseTarget('.5')).toBe(0.5);
+  });
+
   it('rejects zero and negatives', () => {
     expect(DossierPositionUtils.parseTarget('0')).toBeNull();
     expect(DossierPositionUtils.parseTarget('-3')).toBeNull();

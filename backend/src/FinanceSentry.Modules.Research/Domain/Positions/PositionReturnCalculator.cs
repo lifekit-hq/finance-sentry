@@ -36,7 +36,6 @@ public static class PositionReturnCalculator
     // Quantities are compared with this tolerance: fractional shares and certificates carry rounding.
     private const decimal QuantityTolerance = 0.0001m;
     private const int MoneyDecimals = 2;
-    private const int PriceDecimals = 4;
 
     /// <param name="ledger">The symbol's fills and dividend rows, any order.</param>
     /// <param name="heldQuantity">Units held now.</param>
@@ -128,7 +127,7 @@ public static class PositionReturnCalculator
         var currencyEffect = units > QuantityTolerance ? costUsdNow - costUsdThen : 0m;
         var singleCurrency = currencies.Count == 1 ? currencies.First().ToUpperInvariant() : null;
         var averageCost = singleCurrency is not null && units > QuantityTolerance
-            ? Math.Round(costNative / units, PriceDecimals)
+            ? PriceRounding.Round(costNative / units)
             : (decimal?)null;
 
         return Result(unrealized, realized, dividends, currencyEffect, Complete, averageCost,

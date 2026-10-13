@@ -17,6 +17,7 @@ public sealed class YahooPriceHistoryService(
     ILogger<YahooPriceHistoryService> logger) : IPriceHistoryService, IDisposable
 {
     private const int MaxCachedSeries = 256;
+    private const decimal MinorUnitsPerMajor = 100m;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
 
     private readonly TtlCache<PriceHistory> cache = new(clock, CacheTtl, MaxCachedSeries);
@@ -82,19 +83,35 @@ public sealed class YahooPriceHistoryService(
         }
 
         var result = results[0];
-        var currency = result.TryGetProperty("meta", out var meta)
+        var quoted = result.TryGetProperty("meta", out var meta)
             && meta.TryGetProperty("currency", out var c)
             && c.ValueKind is JsonValueKind.String
-                ? c.GetString()?.ToUpperInvariant()
+                ? c.GetString()?.Trim()
                 : null;
+        var (currency, divisor) = NormalizeCurrency(quoted);
 
         // A weekly or monthly series can carry the live day as a second bar in its last period; keep one per date.
         var closes = YahooMarketDataService.ReadDailyBars(result)
             .GroupBy(b => b.Date)
             .Select(g => g.Last())
             .OrderBy(b => b.Date)
+            .Select(b => divisor == 1m ? b : b with { Close = b.Close / divisor })
             .ToList();
 
         return new PriceHistory(currency, closes);
     }
+
+    /// <summary>
+    /// Yahoo quotes some exchanges in a minor unit (LSE pence "GBp"/"GBX", Johannesburg cents "ZAc", Tel Aviv
+    /// agorot "ILA"); the series is returned in the major currency, with the divisor that converts the quoted values.
+    /// </summary>
+    private static (string? Currency, decimal Divisor) NormalizeCurrency(string? quoted)
+        => quoted switch
+        {
+            null or "" => (null, 1m),
+            "GBp" or "GBX" => ("GBP", MinorUnitsPerMajor),
+            "ZAc" => ("ZAR", MinorUnitsPerMajor),
+            "ILA" => ("ILS", MinorUnitsPerMajor),
+            _ => (quoted.ToUpperInvariant(), 1m),
+        };
 }

@@ -200,6 +200,11 @@ public static class DossierChecksBuilder
     {
         const string key = "has_thesis";
         const string label = "Has a written thesis that still holds";
+        if (!i.IsHeld)
+        {
+            return Unevaluated(key, label, None, null, "not held");
+        }
+
         if (!i.HasThesis)
         {
             return new DossierCheckRule(key, label, false, null, null, None, "no thesis written");

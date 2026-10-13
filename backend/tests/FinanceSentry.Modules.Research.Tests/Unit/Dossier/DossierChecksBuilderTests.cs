@@ -148,9 +148,21 @@ public class DossierChecksBuilderTests
     [InlineData(true, true, false)]
     public void Fit_ThesisWrittenAndNotBroken(bool hasThesis, bool broken, bool passed)
     {
-        var rule = Axis(Empty with { HasThesis = hasThesis, ThesisBroken = broken }, "fit").Rules.Single(r => r.Key == "has_thesis");
+        var rule = Axis(Empty with { IsHeld = true, HasThesis = hasThesis, ThesisBroken = broken }, "fit")
+            .Rules.Single(r => r.Key == "has_thesis");
 
         rule.Passed.Should().Be(passed);
+    }
+
+    [Fact]
+    public void Fit_ThesisOnAnAssetNotHeld_IsUnevaluated()
+    {
+        var axis = Axis(Empty with { IsHeld = false, HasThesis = false }, "fit");
+        var rule = axis.Rules.Single(r => r.Key == "has_thesis");
+
+        rule.Passed.Should().BeNull();
+        rule.Note.Should().Be("not held");
+        axis.Evaluated.Should().Be(0);
     }
 
     private static DossierCheckAxis Axis(DossierCheckInputs inputs, string key)

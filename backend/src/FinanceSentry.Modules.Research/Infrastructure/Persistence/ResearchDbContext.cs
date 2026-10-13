@@ -471,7 +471,7 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         apt.HasKey(x => x.Id);
         apt.Property(x => x.UserId).IsRequired();
         apt.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
-        apt.Property(x => x.TargetPrice).HasPrecision(18, 4);
+        apt.Property(x => x.TargetPrice).HasPrecision(22, 12);
         apt.Property(x => x.Currency).HasMaxLength(3);
         apt.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         apt.HasIndex(x => new { x.UserId, x.Symbol })

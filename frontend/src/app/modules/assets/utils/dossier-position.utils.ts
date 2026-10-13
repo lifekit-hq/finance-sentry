@@ -5,6 +5,7 @@ import {
   RETURN_LEG_LABELS,
   RETURNS_COVERAGE_NOTES,
   TARGET_SCALE_PADDING,
+  TARGET_TEXT,
 } from '../constants/dossier/dossier-position.constants';
 import {
   type DossierPositionSection,
@@ -139,11 +140,11 @@ export class DossierPositionUtils {
 
   /** The editor's text as a target price: a positive number below the API's ceiling, else null. */
   public static parseTarget(text: string): Nullable<number> {
-    const trimmed = text.trim().replaceAll(',', '');
-    if (trimmed === '') {
+    const trimmed = text.trim();
+    if (!TARGET_TEXT.test(trimmed)) {
       return null;
     }
-    const value = Number(trimmed);
+    const value = Number(trimmed.replaceAll(',', ''));
     return Number.isFinite(value) && value > 0 && value <= MAX_TARGET_PRICE ? value : null;
   }
 

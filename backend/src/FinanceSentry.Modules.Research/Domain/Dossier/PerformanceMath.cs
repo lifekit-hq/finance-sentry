@@ -19,7 +19,6 @@ public static class PerformanceMath
 {
     private const int PercentScale = 100;
     private const int Decimals = 1;
-    private const int PriceDecimals = 4;
 
     /// <summary>Percent change from the first to the last value, or null with fewer than two or a non-positive start.</summary>
     public static decimal? ChangePct(IReadOnlyList<decimal> closes)
@@ -44,10 +43,10 @@ public static class PerformanceMath
         var fromHigh = high > 0m ? Math.Round((last / high - 1m) * PercentScale, Decimals) : (decimal?)null;
 
         return new DossierPerformance(
-            Math.Round(last, PriceDecimals),
+            PriceRounding.Round(last),
             ChangePct(values),
-            Math.Round(high, PriceDecimals),
-            Math.Round(low, PriceDecimals),
+            PriceRounding.Round(high),
+            PriceRounding.Round(low),
             fromHigh,
             ChangePct(benchmarkYearCloses),
             currency,

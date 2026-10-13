@@ -17,6 +17,7 @@ import {
 const PERCENT_SCALE = 100;
 const YIELD_FRACTION_DIGITS = 2;
 const DETAIL_SEPARATOR = ' · ';
+const CRYPTO_ASSET_CLASS = 'crypto';
 
 export class DossierViewUtils {
   /**
@@ -62,6 +63,17 @@ export class DossierViewUtils {
       verdictCount: winner.count,
       segments,
     };
+  }
+
+  /**
+   * Crypto has no valuation, analyst or ownership data. The same rule as the backend: the holding's asset
+   * class, or a valuation the source reported as not applicable (an unheld coin).
+   */
+  public static isCrypto(dossier: Nullable<AssetDossierDto>): boolean {
+    return (
+      dossier?.position?.assetClass?.toLowerCase() === CRYPTO_ASSET_CLASS ||
+      dossier?.valuation?.notApplicable === true
+    );
   }
 
   /** Company name and "Sector · Industry" from the valuation source; a holding falls back to its asset class. */

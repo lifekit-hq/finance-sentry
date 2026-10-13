@@ -18,7 +18,7 @@ namespace FinanceSentry.Modules.Research.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     Symbol = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    TargetPrice = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    TargetPrice = table.Column<decimal>(type: "numeric(22,12)", precision: 22, scale: 12, nullable: false),
                     Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: true),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
                 },

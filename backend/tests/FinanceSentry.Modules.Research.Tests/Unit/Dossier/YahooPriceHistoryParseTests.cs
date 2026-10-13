@@ -20,6 +20,28 @@ public class YahooPriceHistoryParseTests
         history.Closes[0].Date.Should().Be(new DateOnly(2026, 10, 12));
     }
 
+    [Theory]
+    [InlineData("GBp", "GBP")]
+    [InlineData("GBX", "GBP")]
+    [InlineData("ZAc", "ZAR")]
+    [InlineData("ILA", "ILS")]
+    public void Parse_MinorUnitQuote_IsReturnedInTheMajorCurrency(string quoted, string expected)
+    {
+        var history = YahooPriceHistoryService.Parse(Chart(quoted, [Monday, Monday + Day], ["1250", "1262.5"]));
+
+        history.Currency.Should().Be(expected);
+        history.Closes.Select(c => c.Close).Should().Equal(12.5m, 12.625m);
+    }
+
+    [Fact]
+    public void Parse_MajorCurrency_IsNotRescaled()
+    {
+        var history = YahooPriceHistoryService.Parse(Chart("GBP", [Monday], ["12.5"]));
+
+        history.Currency.Should().Be("GBP");
+        history.Closes.Single().Close.Should().Be(12.5m);
+    }
+
     [Fact]
     public void Parse_SkipsNullClosesAndKeepsOneBarPerDate()
     {

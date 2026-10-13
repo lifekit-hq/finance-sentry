@@ -206,6 +206,37 @@ describe('DossierViewUtils.heroProfile', () => {
   });
 });
 
+describe('DossierViewUtils.isCrypto', () => {
+  const holding = (assetClass: string): AssetDossierDto['position'] => ({
+    provider: 'binance',
+    assetClass,
+    quantity: 1,
+    currentValueUsd: 100,
+    costBasisUsd: null,
+    unrealizedPnlUsd: null,
+    unrealizedPnlPercent: null,
+    shareOfBookPercent: null,
+    taxLots: [],
+  });
+
+  it('is true for a crypto holding even when the valuation source failed', () => {
+    expect(DossierViewUtils.isCrypto(dossier({position: holding('Crypto'), valuation: null}))).toBe(
+      true
+    );
+  });
+
+  it('is true for an unheld symbol the valuation source marks not applicable', () => {
+    expect(DossierViewUtils.isCrypto(dossier({valuation: valuation({notApplicable: true})}))).toBe(
+      true
+    );
+  });
+
+  it('is false for an equity and without a dossier', () => {
+    expect(DossierViewUtils.isCrypto(dossier({position: holding('Equities')}))).toBe(false);
+    expect(DossierViewUtils.isCrypto(null)).toBe(false);
+  });
+});
+
 describe('DossierViewUtils.dividendYield', () => {
   it('formats the fraction as a percent', () => {
     expect(DossierViewUtils.dividendYield(0.0295)).toBe('2.95%');

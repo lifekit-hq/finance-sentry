@@ -38,6 +38,18 @@ public class PerformanceMathTests
     }
 
     [Fact]
+    public void Build_SubCentPrices_KeepTheirSignificantDigits()
+    {
+        var closes = new[] { 0.000012m, 0.0000135m, 0.0000118m }.Select((c, i) => (Start.AddDays(i), c)).ToList();
+
+        var performance = PerformanceMath.Build(closes, [], "USD");
+
+        performance.LastClose.Should().Be(0.0000118m);
+        performance.High52Week.Should().Be(0.0000135m);
+        performance.Low52Week.Should().Be(0.0000118m);
+    }
+
+    [Fact]
     public void Build_NoCloses_KeepsOnlyTheBenchmark()
     {
         var performance = PerformanceMath.Build([], [400m, 440m], null);
