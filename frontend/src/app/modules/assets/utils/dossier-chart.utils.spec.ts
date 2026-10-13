@@ -66,6 +66,21 @@ describe('DossierChartUtils.view', () => {
     expect(view.series[1].points.map(p => p.value)).toEqual([104, 104, 104]);
   });
 
+  it('leaves the benchmark out when the API reports it does not cover the window', () => {
+    const view = DossierChartUtils.view(
+      chart({
+        points: [
+          {date: '2025-10-13', close: 100, benchmark: null},
+          {date: '2025-10-20', close: 110, benchmark: 110},
+          {date: '2025-10-21', close: 120, benchmark: 115},
+        ],
+        benchmarkChangePct: null,
+      })
+    ) as DossierChartView;
+
+    expect(view.series.map(s => s.label)).toEqual(['Price']);
+  });
+
   it('leaves the benchmark out when the index has no close in the window', () => {
     const view = DossierChartUtils.view(
       chart({points: [{date: '2025-10-13', close: 100, benchmark: null}]})

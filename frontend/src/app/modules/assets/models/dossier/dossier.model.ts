@@ -94,7 +94,7 @@ export type ChartRangeId = '1M' | '6M' | 'YTD' | '1Y' | '5Y' | 'MAX';
 export interface AssetChartPointDto {
   date: string;
   close: number;
-  /** The S&P 500 rebased onto the asset's first close; null where it has no close yet. */
+  /** The S&P 500 rebased onto the asset's close on the index's first date; null where it has no close yet. */
   benchmark: Nullable<number>;
 }
 

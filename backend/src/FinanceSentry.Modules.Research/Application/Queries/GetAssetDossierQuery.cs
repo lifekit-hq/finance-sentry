@@ -203,9 +203,9 @@ public sealed class GetAssetDossierQueryHandler(
             var periodType = facts.Any(f => FundamentalMath.MatchesPeriodType(f, ThesisPeriodType.Quarter))
                 ? ThesisPeriodType.Quarter
                 : ThesisPeriodType.Annual;
-            revenueYoy = AsPercent(FundamentalMath.LatestYoy(
+            revenueYoy = AsPercent(PositiveBaseYoy(
                 facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.RevenueYoy], periodType));
-            epsYoy = AsPercent(FundamentalMath.LatestYoy(
+            epsYoy = AsPercent(PositiveBaseYoy(
                 facts, FundamentalMath.YoyConceptByMetric[ThesisMetric.EpsYoy], periodType));
         }
 
@@ -228,6 +228,24 @@ public sealed class GetAssetDossierQueryHandler(
             PositionCapPercent: capPercent,
             HasThesis: thesis is not null,
             ThesisBroken: thesis?.BrokenAt is not null);
+    }
+
+    /// <summary>
+    /// Latest year-over-year change of a concept, or null when the same period a year earlier is missing or not
+    /// positive: growth off a zero or loss-making base is not a meaningful rate (a loss-to-profit turnaround
+    /// would otherwise read as a collapse), so a check shows "no comparable filing" rather than a wrong figure.
+    /// </summary>
+    public static decimal? PositiveBaseYoy(
+        IReadOnlyList<FundamentalFact> facts, string concept, ThesisPeriodType periodType)
+    {
+        var periods = FundamentalMath.SelectPeriods(facts, concept, periodType);
+        if (periods.Count == 0)
+        {
+            return null;
+        }
+
+        var prior = FundamentalMath.PriorYearFact(periods[0], periods);
+        return prior is { Value: > 0m } ? FundamentalMath.SafeYoy(periods[0].Value, prior.Value) : null;
     }
 
     private static ValuationSnapshotResult? InMajorUnits(ValuationSnapshotResult? valuation)

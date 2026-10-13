@@ -65,9 +65,46 @@ public class AssetChartRebaseTests
     }
 
     [Fact]
-    public void BenchmarkChangePct_BenchmarkStartingLater_IsNullRatherThanAShorterWindow()
+    public void BenchmarkChangePct_CryptoWindowStartingOnAWeekend_IsShownFromTheFirstBenchmarkClose()
     {
-        var points = GetAssetChartQueryHandler.Rebase(History((0, 10m), (1, 100m), (2, 120m)), History((1, 400m), (2, 440m)));
+        // Friday + 1 is a Saturday; the S&P 500's first close is the Monday after.
+        var asset = History((1, 100m), (2, 101m), (3, 102m), (4, 103m));
+        var benchmark = History((3, 400m), (4, 404m));
+
+        var points = GetAssetChartQueryHandler.Rebase(asset, benchmark);
+
+        points.Select(p => p.Benchmark).Should().Equal(null, null, 102m, 103.02m);
+        GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().Be(1m);
+    }
+
+    [Fact]
+    public void BenchmarkChangePct_BenchmarkStartingFiveDaysLate_IsStillShown()
+    {
+        var asset = History((0, 10m), (5, 100m), (6, 120m));
+        var benchmark = History((5, 400m), (6, 440m));
+
+        var points = GetAssetChartQueryHandler.Rebase(asset, benchmark);
+
+        GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().Be(10m);
+    }
+
+    [Fact]
+    public void BenchmarkChangePct_BenchmarkStartingMuchLater_IsNullRatherThanAShorterWindow()
+    {
+        // A MAX window of a stock listed before the S&P 500 ETF existed.
+        var asset = History((0, 10m), (6, 100m), (7, 120m));
+        var benchmark = History((6, 400m), (7, 440m));
+
+        var points = GetAssetChartQueryHandler.Rebase(asset, benchmark);
+
+        points[1].Benchmark.Should().Be(100m, "the line itself still starts at the benchmark's first close");
+        GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().BeNull();
+    }
+
+    [Fact]
+    public void BenchmarkChangePct_NoBenchmarkClose_IsNull()
+    {
+        var points = GetAssetChartQueryHandler.Rebase(History((0, 50m), (3, 60m)), PriceHistory.Empty);
 
         GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().BeNull();
     }

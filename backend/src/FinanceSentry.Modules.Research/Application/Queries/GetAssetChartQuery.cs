@@ -21,6 +21,7 @@ public sealed class GetAssetChartQueryHandler(
 {
     private const string Source = "yahoo:chart";
     private const string Usd = "USD";
+    private const int BenchmarkStartToleranceDays = 5;
 
     public async Task<AssetChartResult> Handle(GetAssetChartQuery request, CancellationToken ct)
     {
@@ -70,13 +71,17 @@ public sealed class GetAssetChartQueryHandler(
     }
 
     /// <summary>
-    /// The benchmark's change over the whole chart window, or null when the benchmark starts after the asset's
-    /// first point: its line then covers a shorter window than <see cref="AssetChartResult.ChangePct"/>.
+    /// The benchmark's change over the chart window from its first close, or null when that close falls more than
+    /// <see cref="BenchmarkStartToleranceDays"/> days after the asset's first point: its line then covers a shorter
+    /// window than <see cref="AssetChartResult.ChangePct"/>. A weekend or holiday start is within the tolerance.
     /// </summary>
     public static decimal? BenchmarkChangePct(IReadOnlyList<AssetChartPoint> points)
-        => points.Count > 0 && points[0].Benchmark is not null
-            ? PerformanceMath.ChangePct(points.Select(p => p.Benchmark!.Value).ToList())
+    {
+        var covered = points.Where(p => p.Benchmark is not null).ToList();
+        return covered.Count > 0 && covered[0].Date.DayNumber - points[0].Date.DayNumber <= BenchmarkStartToleranceDays
+            ? PerformanceMath.ChangePct(covered.Select(p => p.Benchmark!.Value).ToList())
             : null;
+    }
 
     /// <summary>
     /// The asset's closes with the benchmark's close on (or carried forward to) each date, rebased so the

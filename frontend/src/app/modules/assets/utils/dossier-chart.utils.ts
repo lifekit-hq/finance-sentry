@@ -85,9 +85,13 @@ export class DossierChartUtils {
 
   /**
    * The benchmark as a complete line: a day the index had no close carries the previous close
-   * (leading gaps take the first one). Null when the index has no close in the window.
+   * (leading gaps take the first one). Null when the API reports it does not cover the window
+   * (`benchmarkChangePct` null), so the line and the percentage never disagree.
    */
   private static filledBenchmark(chart: AssetChartDto): Nullable<number[]> {
+    if (chart.benchmarkChangePct === null) {
+      return null;
+    }
     const first = chart.points.find(p => p.benchmark !== null)?.benchmark ?? null;
     if (first === null) {
       return null;
