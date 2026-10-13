@@ -119,7 +119,7 @@ describe('DecisionsComponent', () => {
     expect(open).toHaveBeenCalledWith(pending, 'confirm');
   });
 
-  it('shows decided outcomes with the decision's value against the S&P 500 toned by sign', () => {
+  it("shows decided outcomes with the owner's decision valued against the S&P 500, toned by sign", () => {
     const {host} = render({
       pending: [],
       decided: [
@@ -140,27 +140,68 @@ describe('DecisionsComponent', () => {
           decidedAt: '2026-10-04T00:00:00Z',
           excessReturnPct: 1.5,
         }),
-        mkRecommendation({id: 'c', ticker: 'NVDA', status: 'Expired', excessReturnPct: 0}),
-        mkRecommendation({id: 'd', ticker: 'MSFT', status: 'Superseded'}),
+        mkRecommendation({
+          id: 'c',
+          ticker: 'AAPL',
+          action: 'Exit',
+          status: 'Confirmed',
+          execution: 'Executed',
+          decidedAt: '2026-10-03T00:00:00Z',
+          excessReturnPct: 2,
+        }),
+        mkRecommendation({
+          id: 'd',
+          ticker: 'MSFT',
+          action: 'Add',
+          status: 'Rejected',
+          decidedAt: '2026-10-02T00:00:00Z',
+          excessReturnPct: 4,
+        }),
+        mkRecommendation({
+          id: 'e',
+          ticker: 'AMZN',
+          action: 'Trim',
+          status: 'Confirmed',
+          execution: 'Unexecuted',
+          decidedAt: '2026-10-01T00:00:00Z',
+          excessReturnPct: 6,
+        }),
+        mkRecommendation({
+          id: 'f',
+          ticker: 'KO',
+          action: 'Hold',
+          status: 'Rejected',
+          decidedAt: '2026-09-30T00:00:00Z',
+          excessReturnPct: 0.8,
+        }),
+        mkRecommendation({id: 'g', ticker: 'NVDA', status: 'Expired', excessReturnPct: 0}),
+        mkRecommendation({id: 'h', ticker: 'META', status: 'Superseded'}),
       ],
     });
 
     expect(host.textContent).toContain('Nothing is waiting on you.');
     const rows = Array.from(host.querySelectorAll('[data-testid="decisions-decided"] li'));
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(8);
     expect(rows[0].textContent).toContain('Placed at the broker');
     expect(rows[0].textContent).toContain('Oct 5, 2026');
     expect(rows[1].textContent).toContain('Rejected: Still a core holding.');
-    expect(rows[2].textContent).toContain('Oct 19, 2026');
+    expect(rows[4].textContent).toContain('Not placed within a week');
+    expect(rows[6].textContent).toContain('Oct 19, 2026');
     const excess = Array.from(host.querySelectorAll('[data-testid="decisions-excess"]'));
     expect(excess.map(e => e.textContent?.trim())).toEqual([
       'decision +3.2 pts vs S&P 500',
-      'decision -1.5 pts vs S&P 500',
-      'decision 0.0 pts vs S&P 500',
+      'decision +1.5 pts vs S&P 500',
+      'decision -2.0 pts vs S&P 500',
+      'decision -4.0 pts vs S&P 500',
+      'name +0.8 pts vs S&P 500',
     ]);
     expect(excess[0].className).toContain(GAIN_TEXT_CLASS);
-    expect(excess[1].className).toContain(LOSS_TEXT_CLASS);
-    expect(excess[2].className).toContain('text-text-secondary');
-    expect(rows[3].querySelector('[data-testid="decisions-excess"]')).toBeNull();
+    expect(excess[1].className).toContain(GAIN_TEXT_CLASS);
+    expect(excess[2].className).toContain(LOSS_TEXT_CLASS);
+    expect(excess[3].className).toContain(LOSS_TEXT_CLASS);
+    expect(excess[4].className).toContain('text-text-secondary');
+    expect(rows[4].querySelector('[data-testid="decisions-excess"]')).toBeNull();
+    expect(rows[6].querySelector('[data-testid="decisions-excess"]')).toBeNull();
+    expect(rows[7].querySelector('[data-testid="decisions-excess"]')).toBeNull();
   });
 });

@@ -29,14 +29,14 @@ public class GetPostmortemPacketQueryHandler(
         // FR-006/FR-008c: a break is a terminal outcome — a thesis broken during the period
         // belongs in the review packet.
         ThesisEventType.Broken,
-        // #1069: a confirmed recommendation is a decision taken; a rejected one is already a counterfactual.
-        ThesisEventType.Confirmed,
     ];
 
     public async Task<PostmortemPacketDto> Handle(GetPostmortemPacketQuery query, CancellationToken ct)
     {
-        var periodEvents = await eventRepo.ListForPeriodAsync(
-            query.UserId, query.PeriodStart, query.PeriodEnd, ct);
+        var periodEvents = (await eventRepo.ListForPeriodAsync(
+                query.UserId, query.PeriodStart, query.PeriodEnd, ct))
+            .Where(e => e.SubjectType != ThesisSubjectType.Recommendation)
+            .ToList();
 
         var terminal = periodEvents
             .Where(e => TerminalNonCounterfactualTypes.Contains(e.EventType))

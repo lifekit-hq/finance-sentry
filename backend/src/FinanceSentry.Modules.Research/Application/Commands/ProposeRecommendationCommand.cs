@@ -177,8 +177,13 @@ public sealed class ProposeRecommendationCommandHandler(
                 var reading = await drift.GetAsync(c.UserId, ct);
                 var sleeve = reading.Sleeves.FirstOrDefault(s => s.AssetClass.Equals(triggerRef, StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidRecommendationException("triggerRef must name an IPS sleeve (asset class) for an IpsBand trigger.");
-                if (position?.AssetClass is not { } held
-                    || !AssetClassNormalizer.Normalize(held).Equals(AssetClassNormalizer.Normalize(sleeve.AssetClass), StringComparison.Ordinal))
+                if (position?.AssetClass is not { } held)
+                {
+                    throw new InvalidRecommendationException(
+                        $"Cannot verify the asset class of {ticker}; IPS-band Add recommendations cover held names only for now.");
+                }
+
+                if (!AssetClassNormalizer.Normalize(held).Equals(AssetClassNormalizer.Normalize(sleeve.AssetClass), StringComparison.Ordinal))
                 {
                     throw new InvalidRecommendationException($"{ticker} is not in the {sleeve.AssetClass} sleeve, so that band does not call for {c.Action} on it.");
                 }

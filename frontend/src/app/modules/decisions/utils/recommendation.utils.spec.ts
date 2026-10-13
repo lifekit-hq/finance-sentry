@@ -172,72 +172,150 @@ describe('RecommendationUtils.outcome', () => {
 });
 
 describe('RecommendationUtils.excessLine', () => {
+  const scored = (overrides: Partial<RecommendationDto>) =>
+    mkRecommendation({status: 'Confirmed', execution: 'Executed', ...overrides});
+
   it('is empty until scored', () => {
     expect(RecommendationUtils.excessLine(mkRecommendation())).toBe('');
   });
 
-  it('reads an add as the name return over the S&P 500', () => {
-    expect(
-      RecommendationUtils.excessLine(mkRecommendation({action: 'Add', excessReturnPct: 3.21}))
-    ).toBe('decision +3.2 pts vs S&P 500');
+  it('reads a confirmed add as the name return over the S&P 500', () => {
+    expect(RecommendationUtils.excessLine(scored({action: 'Add', excessReturnPct: 3.21}))).toBe(
+      'decision +3.2 pts vs S&P 500'
+    );
   });
 
-  it('reads a hold as the name return over the S&P 500', () => {
+  it('reads a confirmed hold as the name return over the S&P 500', () => {
     expect(
-      RecommendationUtils.excessLine(mkRecommendation({action: 'Hold', excessReturnPct: -1.5}))
+      RecommendationUtils.excessLine(
+        scored({action: 'Hold', execution: 'NotApplicable', excessReturnPct: -1.5})
+      )
     ).toBe('decision -1.5 pts vs S&P 500');
   });
 
-  it('reads an exit as the S&P 500 over the name, so the name lagging is a plus', () => {
+  it('reads a confirmed exit as the S&P 500 over the name, so the name lagging is a plus', () => {
+    expect(RecommendationUtils.excessLine(scored({action: 'Exit', excessReturnPct: -5.3}))).toBe(
+      'decision +5.3 pts vs S&P 500'
+    );
+  });
+
+  it('reads a confirmed trim whose name kept outperforming as a cost', () => {
+    expect(RecommendationUtils.excessLine(scored({action: 'Trim', excessReturnPct: 2}))).toBe(
+      'decision -2.0 pts vs S&P 500'
+    );
+  });
+
+  it('reads a rejected exit as the name return over the S&P 500, since the name was kept', () => {
     expect(
-      RecommendationUtils.excessLine(mkRecommendation({action: 'Exit', excessReturnPct: -5.3}))
+      RecommendationUtils.excessLine(
+        mkRecommendation({action: 'Exit', status: 'Rejected', excessReturnPct: 5.3})
+      )
     ).toBe('decision +5.3 pts vs S&P 500');
   });
 
-  it('reads a trim whose name kept outperforming as a cost', () => {
+  it('reads a rejected add as the S&P 500 over the name, since the name was not bought', () => {
     expect(
-      RecommendationUtils.excessLine(mkRecommendation({action: 'Trim', excessReturnPct: 2}))
-    ).toBe('decision -2.0 pts vs S&P 500');
+      RecommendationUtils.excessLine(
+        mkRecommendation({action: 'Add', status: 'Rejected', excessReturnPct: 4})
+      )
+    ).toBe('decision -4.0 pts vs S&P 500');
+  });
+
+  it('reads a rejected hold as the plain name figure, not a decision score', () => {
+    expect(
+      RecommendationUtils.excessLine(
+        mkRecommendation({action: 'Hold', status: 'Rejected', excessReturnPct: 2.4})
+      )
+    ).toBe('name +2.4 pts vs S&P 500');
+  });
+
+  it('is empty for a confirmed order that was never placed', () => {
+    expect(
+      RecommendationUtils.excessLine(
+        scored({action: 'Exit', execution: 'Unexecuted', excessReturnPct: -5.3})
+      )
+    ).toBe('');
+  });
+
+  it('is empty for a proposal that closed undecided', () => {
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({status: 'Expired', excessReturnPct: 1}))
+    ).toBe('');
   });
 
   it('reads par without a sign', () => {
-    expect(
-      RecommendationUtils.excessLine(mkRecommendation({action: 'Trim', excessReturnPct: 0}))
-    ).toBe('decision 0.0 pts vs S&P 500');
+    expect(RecommendationUtils.excessLine(scored({action: 'Trim', excessReturnPct: 0}))).toBe(
+      'decision 0.0 pts vs S&P 500'
+    );
   });
 });
 
 describe('RecommendationUtils.excessTone', () => {
+  const scored = (overrides: Partial<RecommendationDto>) =>
+    mkRecommendation({status: 'Confirmed', execution: 'Executed', ...overrides});
+
   it('has no tone until scored', () => {
     expect(RecommendationUtils.excessTone(mkRecommendation())).toBeNull();
   });
 
   it('has no tone at par', () => {
-    expect(RecommendationUtils.excessTone(mkRecommendation({excessReturnPct: 0}))).toBeNull();
+    expect(RecommendationUtils.excessTone(scored({excessReturnPct: 0}))).toBeNull();
   });
 
-  it('is a gain when an add picked a name that beat the S&P 500', () => {
-    expect(RecommendationUtils.excessTone(mkRecommendation({action: 'Add', excessReturnPct: 2}))).toBe(
+  it('is a gain when a confirmed add picked a name that beat the S&P 500', () => {
+    expect(RecommendationUtils.excessTone(scored({action: 'Add', excessReturnPct: 2}))).toBe(
       'gain'
     );
   });
 
-  it('is a loss when an add picked a name that lagged', () => {
-    expect(
-      RecommendationUtils.excessTone(mkRecommendation({action: 'Add', excessReturnPct: -2}))
-    ).toBe('loss');
+  it('is a loss when a confirmed add picked a name that lagged', () => {
+    expect(RecommendationUtils.excessTone(scored({action: 'Add', excessReturnPct: -2}))).toBe(
+      'loss'
+    );
   });
 
-  it('is a gain when an exit sold a name that then lagged', () => {
+  it('is a gain when a confirmed exit sold a name that then lagged', () => {
+    expect(RecommendationUtils.excessTone(scored({action: 'Exit', excessReturnPct: -2}))).toBe(
+      'gain'
+    );
+  });
+
+  it('is a loss when a confirmed trim sold a name that kept beating the S&P 500', () => {
+    expect(RecommendationUtils.excessTone(scored({action: 'Trim', excessReturnPct: 2}))).toBe(
+      'loss'
+    );
+  });
+
+  it('is a gain when a rejected exit kept a name that beat the S&P 500', () => {
     expect(
-      RecommendationUtils.excessTone(mkRecommendation({action: 'Exit', excessReturnPct: -2}))
+      RecommendationUtils.excessTone(
+        mkRecommendation({action: 'Exit', status: 'Rejected', excessReturnPct: 2})
+      )
     ).toBe('gain');
   });
 
-  it('is a loss when a trim sold a name that kept beating the S&P 500', () => {
+  it('is a loss when a rejected add passed on a name that beat the S&P 500', () => {
     expect(
-      RecommendationUtils.excessTone(mkRecommendation({action: 'Trim', excessReturnPct: 2}))
+      RecommendationUtils.excessTone(
+        mkRecommendation({action: 'Add', status: 'Rejected', excessReturnPct: 2})
+      )
     ).toBe('loss');
+  });
+
+  it('has no tone for a rejected hold', () => {
+    expect(
+      RecommendationUtils.excessTone(
+        mkRecommendation({action: 'Hold', status: 'Rejected', excessReturnPct: 2})
+      )
+    ).toBeNull();
+  });
+
+  it('has no tone for a confirmed order that was never placed', () => {
+    expect(
+      RecommendationUtils.excessTone(
+        scored({action: 'Exit', execution: 'Unexecuted', excessReturnPct: -2})
+      )
+    ).toBeNull();
   });
 });
 

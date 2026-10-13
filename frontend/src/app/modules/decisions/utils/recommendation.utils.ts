@@ -72,19 +72,21 @@ export class RecommendationUtils {
   }
 
   /**
-   * "decision +3.2 pts vs S&P 500" once scored, signed; empty until then. The value is the decision's own: a
-   * Trim or Exit is worth what the S&P 500 did over the name, since the name outperforming after a sell is its cost.
+   * The name against the S&P 500 since the decision, signed; empty until scored. Where the owner's decision has a
+   * direction it reads as the decision's value ("decision +3.2 pts vs S&P 500"); a rejected Hold has none, so it
+   * reads as the plain name figure ("name +3.2 pts vs S&P 500").
    */
   public static excessLine(rec: RecommendationDto): string {
     const value = RecommendationUtils.decisionValue(rec);
-    if (value === null) {
-      return '';
+    if (value !== null) {
+      return `decision ${RecommendationUtils.signed(value)} pts vs S&P 500`;
     }
-    const sign = value > 0 ? '+' : '';
-    return `decision ${sign}${RecommendationUtils.number(value, PCT_FRACTION_DIGITS)} pts vs S&P 500`;
+    return rec.excessReturnPct !== null && rec.status === 'Rejected'
+      ? `name ${RecommendationUtils.signed(rec.excessReturnPct)} pts vs S&P 500`
+      : '';
   }
 
-  /** Gain when the decision added value against the S&P 500 since it was made, loss when it cost value, none at par. */
+  /** Gain when the decision added value against the S&P 500 since it was made, loss when it cost value; none at par or without one. */
   public static excessTone(rec: RecommendationDto): Nullable<OutcomeTone> {
     const value = RecommendationUtils.decisionValue(rec);
     if (value === null || value === 0) {
@@ -93,12 +95,31 @@ export class RecommendationUtils {
     return value > 0 ? 'gain' : 'loss';
   }
 
-  /** Name return minus S&P 500 return for an Add or Hold; the reverse for a Trim or Exit. Null until scored. */
+  /**
+   * What the owner's own decision earned over the S&P 500: name minus S&P 500 where exposure was kept or added
+   * (a confirmed Add or Hold, a rejected Trim or Exit), S&P 500 minus name where it was reduced or declined (a
+   * confirmed Trim or Exit, a rejected Add). Null when unscored, when a confirmed order was never placed, and for a
+   * rejected Hold, whose direction is unknown.
+   */
   private static decisionValue(rec: RecommendationDto): Nullable<number> {
-    if (rec.excessReturnPct === null) {
+    const excess = rec.excessReturnPct;
+    if (excess === null) {
       return null;
     }
-    return rec.action === 'Trim' || rec.action === 'Exit' ? 0 - rec.excessReturnPct : rec.excessReturnPct;
+    if (rec.status === 'Confirmed') {
+      if (rec.execution === 'Unexecuted') {
+        return null;
+      }
+      return rec.action === 'Trim' || rec.action === 'Exit' ? 0 - excess : excess;
+    }
+    if (rec.status === 'Rejected' && rec.action !== 'Hold') {
+      return rec.action === 'Add' ? 0 - excess : excess;
+    }
+    return null;
+  }
+
+  private static signed(value: number): string {
+    return `${value > 0 ? '+' : ''}${RecommendationUtils.number(value, PCT_FRACTION_DIGITS)}`;
   }
 
   /** "SELL 348 GRAB / LIMIT 3.13 USD DAY / IBKR" as its three lines: the order, the price terms, the venue. */

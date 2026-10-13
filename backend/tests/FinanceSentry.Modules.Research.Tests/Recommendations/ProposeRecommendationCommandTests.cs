@@ -193,6 +193,21 @@ public sealed class ProposeRecommendationCommandTests
     }
 
     [Fact]
+    public async Task An_ips_band_add_on_a_name_not_in_the_book_is_refused_as_unverifiable()
+    {
+        _drift.Setup(d => d.GetAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(new AllocationDriftReading(
+            true, [new SleeveDriftReading("Equity", 60m, 48m, 12m, "UnderBand")]));
+
+        var act = () => Handler().Handle(
+            Command(RecommendationAction.Add, RecommendationTriggerKind.IpsBand, ticker: "msft", triggerRef: "Equity", sizeUsd: 1_000m),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidRecommendationException>()
+            .WithMessage("*Cannot verify the asset class of MSFT; IPS-band Add recommendations cover held names only for now.");
+        _repo.Rows.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_broken_thesis_does_not_justify_adding_to_the_name()
     {
         var handler = Handler();
