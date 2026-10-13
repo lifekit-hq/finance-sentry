@@ -1,6 +1,8 @@
 namespace FinanceSentry.Modules.Research.Application.Commands;
 
+using System.Text.RegularExpressions;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Services;
@@ -155,6 +157,11 @@ public sealed class ProposeRecommendationCommandHandler(
         {
             case RecommendationTriggerKind.ThesisBreak:
             {
+                if (c.Action == RecommendationAction.Add)
+                {
+                    throw new InvalidRecommendationException("A broken thesis does not call for adding to the name.");
+                }
+
                 var broken = (await theses.FindByTickerAsync(c.UserId, ticker, ct))
                     .Where(t => t.BrokenAt is not null)
                     .OrderByDescending(t => t.BrokenAt)
@@ -170,6 +177,12 @@ public sealed class ProposeRecommendationCommandHandler(
                 var reading = await drift.GetAsync(c.UserId, ct);
                 var sleeve = reading.Sleeves.FirstOrDefault(s => s.AssetClass.Equals(triggerRef, StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidRecommendationException("triggerRef must name an IPS sleeve (asset class) for an IpsBand trigger.");
+                if (position?.AssetClass is not { } held
+                    || !AssetClassNormalizer.Normalize(held).Equals(AssetClassNormalizer.Normalize(sleeve.AssetClass), StringComparison.Ordinal))
+                {
+                    throw new InvalidRecommendationException($"{ticker} is not in the {sleeve.AssetClass} sleeve, so that band does not call for {c.Action} on it.");
+                }
+
                 var expected = c.Action == RecommendationAction.Add ? UnderBand : OverBand;
                 if (!sleeve.Status.Equals(expected, StringComparison.OrdinalIgnoreCase))
                 {
@@ -226,6 +239,12 @@ public sealed class ProposeRecommendationCommandHandler(
 
                 var fired = await firedEvents.FindAsync(c.UserId, eventId, ct)
                     ?? throw new InvalidRecommendationException("No fired event with that id.");
+                if (!Regex.IsMatch(
+                        fired.Subject, $"(?<![A-Za-z0-9]){Regex.Escape(ticker)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase))
+                {
+                    throw new InvalidRecommendationException($"That fired event is about {fired.Subject}, not {ticker}.");
+                }
+
                 evidence.Insert(0, new RecommendationEvidence(
                     RecommendationEvidenceKind.Event, $"{fired.Kind}: {fired.Subject} ({fired.OccurredAt:yyyy-MM-dd})", fired.EventId.ToString()));
                 return fired.EventId.ToString();

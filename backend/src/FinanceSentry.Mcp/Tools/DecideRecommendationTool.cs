@@ -14,7 +14,7 @@ public sealed class DecideRecommendationTool(
     IIdentityResolver identity)
 {
     [McpServerTool(Name = "decide_recommendation")]
-    [Description("Records the owner's verdict on a pending proposal - only when the owner has told you their decision in this conversation; never decide on their behalf. verdict Confirm records the decision and nothing else: Finance Sentry never places, stages or transmits the order - give the owner the returned order text to place at the broker themselves. verdict Reject needs the owner's real reason in note; it is kept as the counterfactual. Both write a price-stamped decision-journal event (feeding get_track_record and get_postmortem_packet); a confirmed Exit also closes the ticker's thesis in the journal and a confirmed Trim marks it trimmed. Returns the decided proposal; errors when it is not pending or has expired.")]
+    [Description("Records the owner's verdict on a pending proposal - only when the owner has told you their decision in this conversation; never decide on their behalf. verdict Confirm records the decision and nothing else: Finance Sentry never places, stages or transmits the order - give the owner the returned order text to place at the broker themselves. verdict Reject needs the owner's real reason in note; it is kept as the counterfactual. Both write a price-stamped decision-journal event on the recommendation; no thesis is touched. Returns the decided proposal; errors when it is not pending or has expired.")]
     public async Task<RecommendationDto?> ExecuteAsync(
         [Description("The proposal id from list_recommendations.")] Guid id,
         [Description("Confirm or Reject.")] string verdict,

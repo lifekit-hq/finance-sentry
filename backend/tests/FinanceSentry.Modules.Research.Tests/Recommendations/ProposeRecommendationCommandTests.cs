@@ -180,6 +180,48 @@ public sealed class ProposeRecommendationCommandTests
     }
 
     [Fact]
+    public async Task An_ips_band_trigger_on_a_name_outside_the_sleeve_is_refused()
+    {
+        _drift.Setup(d => d.GetAsync(User, It.IsAny<CancellationToken>())).ReturnsAsync(new AllocationDriftReading(
+            true, [new SleeveDriftReading("Bonds", 20m, 32m, 12m, "OverBand")]));
+
+        var act = () => Handler().Handle(
+            Command(trigger: RecommendationTriggerKind.IpsBand, triggerRef: "Bonds", sizeUsd: 1_000m), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidRecommendationException>().WithMessage("*not in the Bonds sleeve*");
+        _repo.Rows.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_broken_thesis_does_not_justify_adding_to_the_name()
+    {
+        var handler = Handler();
+        var thesis = new InvestmentThesis { UserId = User, Ticker = "GRAB", BrokenAt = DateTimeOffset.UtcNow, BrokenReason = "margin fell" };
+        _theses.Setup(t => t.FindByTickerAsync(User, "GRAB", It.IsAny<CancellationToken>())).ReturnsAsync([thesis]);
+
+        var act = () => handler.Handle(
+            Command(RecommendationAction.Add, RecommendationTriggerKind.ThesisBreak, sizeUsd: 500m), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidRecommendationException>().WithMessage("*broken thesis*");
+        _repo.Rows.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_fired_event_about_another_name_cannot_anchor_the_proposal()
+    {
+        var eventId = Guid.NewGuid();
+        _events.Setup(e => e.FindAsync(User, eventId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FiredEventReference(eventId, "earnings", "MSFT Q3 results", DateTimeOffset.UtcNow));
+
+        var act = () => Handler().Handle(
+            Command(RecommendationAction.Hold, RecommendationTriggerKind.EventVerdict, triggerRef: eventId.ToString()),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidRecommendationException>().WithMessage("*MSFT*not GRAB*");
+        _repo.Rows.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task An_add_the_risk_policy_refuses_is_clamped_to_the_compliant_size_and_says_so()
     {
         _signals.Setup(s => s.GetRecentAsync("GRAB", It.IsAny<int>(), It.IsAny<CancellationToken>()))

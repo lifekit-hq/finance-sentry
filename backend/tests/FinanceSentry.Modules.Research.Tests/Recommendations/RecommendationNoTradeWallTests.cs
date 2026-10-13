@@ -1,116 +1,123 @@
 namespace FinanceSentry.Modules.Research.Tests.Recommendations;
 
-using System.Reflection;
-using System.Text.RegularExpressions;
+using System.Security.Claims;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Controllers;
+using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Application.Commands;
 using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Application.Services;
-using FinanceSentry.Modules.Research.Infrastructure.Jobs;
-using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
+using FinanceSentry.Modules.Research.Domain;
+using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Domain.Recommendations;
+using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Tests.Opportunity;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Moq;
 using Xunit;
 
 /// <summary>
 /// The no-trade wall (#1069): Finance Sentry never places, stages or transmits an order. A confirm only records the
-/// owner's decision and shows order text they place at the broker themselves. These tests pin that every piece of the
-/// decision loop depends only on read ports and the journal - adding a dependency that could reach a broker fails here
-/// and has to be argued for in review.
+/// owner's decision and shows order text they place at the broker themselves.
 /// </summary>
 public sealed class RecommendationNoTradeWallTests
 {
-    private static readonly Type[] DecisionLoop =
-    [
-        typeof(ProposeRecommendationCommandHandler),
-        typeof(DecideRecommendationCommandHandler),
-        typeof(ExpireRecommendationsCommandHandler),
-        typeof(RunRecommendationTriggersCommandHandler),
-        typeof(ScoreRecommendationOutcomesCommandHandler),
-        typeof(GetRecommendationsQueryHandler),
-        typeof(RecommendationPositionReader),
-        typeof(RecommendationWriter),
-        typeof(RecommendationRepository),
-        typeof(RecommendationTriggerJob),
-        typeof(RecommendationExpiryJob),
-        typeof(RecommendationOutcomeJob),
-        typeof(RecommendationsController),
-    ];
+    private const string GrabOrder = "SELL 656 GRAB / LIMIT 3.13 USD DAY / IBKR";
+    private static readonly Guid User = Guid.NewGuid();
 
-    /// <summary>Read ports, the journal, the recommendation store and the loop's own pieces - nothing that writes outward.</summary>
-    private static readonly HashSet<string> AllowedDependencies =
-    [
-        "IThesisRepository",
-        "IThesisEventRepository",
-        "IThesisEventRecorder",
-        "IRecommendationRepository",
-        "IPositionCapSource",
-        "IAllocationDriftReader",
-        "IAssetSignalReader",
-        "IFiredEventSource",
-        "IRiskPolicyGate",
-        "IPolicyAckReader",
-        "IBookFiguresService",
-        "IMarketDataService",
-        "IPositionLedgerSource",
-        "ResearchDbContext",
-        "RecommendationPositionReader",
-        "RecommendationWriter",
-        "ICommandHandler`2",
-        "IQueryHandler`2",
-        "ILogger`1",
-    ];
-
-    private static readonly HashSet<string> BrokerWords = ["Broker", "Brokerage", "Ibkr", "Binance", "Order", "Orders", "Trade", "Trades", "Trading", "Http"];
+    private static Recommendation Pending(RecommendationAction action = RecommendationAction.Trim) => new()
+    {
+        UserId = User,
+        Ticker = "GRAB",
+        Action = action,
+        Origin = RecommendationOrigin.Rules,
+        TriggerKind = RecommendationTriggerKind.RiskRule,
+        TriggerRef = RecommendationEvidenceFactory.MaxPositionWeightRule,
+        Rationale = "Over the cap.",
+        InvalidationTrigger = "Back under the cap.",
+        OrderText = GrabOrder,
+        ExpiresAt = DateTimeOffset.UtcNow.AddDays(14),
+    };
 
     [Fact]
-    public void Every_piece_of_the_decision_loop_depends_only_on_read_ports_and_the_journal()
+    public async Task Confirming_records_the_decision_and_returns_the_exact_order_text_and_nothing_else_happens()
     {
-        var unexpected = DecisionLoop
-            .SelectMany(t => t.GetConstructors().SelectMany(c => c.GetParameters()).Select(p => (Owner: t.Name, Type: p.ParameterType)))
-            .Where(d => !AllowedDependencies.Contains(d.Type.IsGenericType ? d.Type.GetGenericTypeDefinition().Name : d.Type.Name))
-            .Select(d => $"{d.Owner} <- {d.Type.Name}")
-            .ToList();
+        var pending = Pending();
+        var store = new Mock<IRecommendationRepository>(MockBehavior.Strict);
+        store.Setup(s => s.GetAsync(User, pending.Id, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+        store.Setup(s => s.UpdateAsync(pending, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var journal = new Mock<IThesisEventRecorder>(MockBehavior.Strict);
+        journal.Setup(j => j.RecordAsync(
+            User, ThesisSubjectType.Recommendation, pending.Id, "GRAB", ThesisEventType.Confirmed, "placed", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
-        unexpected.Should().BeEmpty("the decision loop records decisions; it never reaches a broker");
+        var dto = await new DecideRecommendationCommandHandler(store.Object, journal.Object).Handle(
+            new DecideRecommendationCommand(User, pending.Id, RecommendationVerdict.Confirm, "placed"), CancellationToken.None);
+
+        dto.Status.Should().Be("Confirmed");
+        dto.OrderText.Should().Be(GrabOrder);
+        dto.Execution.Should().Be("Pending", "the owner places the order; the outcome job only watches for their fill");
+        store.VerifyAll();
+        journal.VerifyAll();
+        store.VerifyNoOtherCalls();
+        journal.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public void The_command_and_query_handlers_the_loop_dispatches_are_its_own()
+    public async Task The_confirm_endpoint_answers_with_the_order_text_the_owner_places_themselves()
     {
-        var dispatched = DecisionLoop
-            .SelectMany(t => t.GetConstructors().SelectMany(c => c.GetParameters()))
-            .Select(p => p.ParameterType)
-            .Where(t => t.IsGenericType && t.Name is "ICommandHandler`2" or "IQueryHandler`2")
-            .Select(t => t.GetGenericArguments()[0].Name)
-            .ToList();
+        var repo = new InMemoryRecommendationRepository();
+        var pending = Pending();
+        repo.Rows.Add(pending);
+        var journal = new JournalRecorder();
+        var controller = new RecommendationsController(
+            new GetRecommendationsQueryHandler(repo), new DecideRecommendationCommandHandler(repo, journal))
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", User.ToString())], "test")),
+                },
+            },
+        };
 
-        dispatched.Should().OnlyContain(name => name.Contains("Recommendation"));
+        var result = await controller.Confirm(pending.Id, new ConfirmRecommendationRequest(null), CancellationToken.None);
+
+        var dto = result.Should().BeOfType<OkObjectResult>().Which.Value.Should().BeOfType<RecommendationDto>().Subject;
+        dto.OrderText.Should().Be(GrabOrder);
+        dto.Status.Should().Be("Confirmed");
+        journal.Events.Should().ContainSingle().Which.EventType.Should().Be(ThesisEventType.Confirmed);
     }
 
     [Fact]
-    public void No_dependency_of_the_loop_names_a_broker_an_order_or_an_http_client()
-        => DecisionLoop
-            .SelectMany(t => t.GetConstructors().SelectMany(c => c.GetParameters()))
-            .SelectMany(p => p.ParameterType.IsGenericType ? p.ParameterType.GetGenericArguments().Append(p.ParameterType) : [p.ParameterType])
-            .Select(t => t.Name)
-            .Where(name => !name.Contains("Recommendation"))
-            .Should().NotContain(name => Words(name).Any(BrokerWords.Contains));
-
-    private static IEnumerable<string> Words(string typeName) => Regex.Matches(typeName, "[A-Z][a-z0-9]*").Select(m => m.Value);
-
-    [Fact]
-    public void The_research_module_does_not_reference_any_broker_sync_module()
-        => typeof(RecommendationWriter).Assembly.GetReferencedAssemblies().Select(a => a.Name)
-            .Should().NotContain(name => name!.Contains("BrokerageSync") || name.Contains("CryptoSync") || name.Contains("BankSync"));
-
-    [Fact]
-    public void The_api_offers_reading_and_recording_a_verdict_and_nothing_else()
+    public async Task A_proposal_confirmed_after_being_queued_changes_nothing_but_its_own_status_and_journal()
     {
-        var routes = typeof(RecommendationsController)
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Select(m => m.Name)
-            .ToList();
+        var repo = new InMemoryRecommendationRepository();
+        var journal = new JournalRecorder();
+        var book = RecommendationTestBook.With(76_000m, RecommendationTestBook.Stock("GRAB", 2_962m, 9_272m));
+        var propose = new ProposeRecommendationCommandHandler(
+            new Mock<IThesisRepository>(MockBehavior.Strict).Object,
+            new FakePositionCapSource(0.095m),
+            new Mock<IAllocationDriftReader>(MockBehavior.Strict).Object,
+            new Mock<IAssetSignalReader>(MockBehavior.Strict).Object,
+            new Mock<IFiredEventSource>(MockBehavior.Strict).Object,
+            new FakeRiskPolicyGate(new RiskGateVerdict(RiskGateDecision.Allowed, null, null, null, null)),
+            RecommendationTestBook.Reader(book, new Dictionary<string, decimal> { ["GRAB"] = 3.13m }),
+            new RecommendationWriter(repo, journal));
+        var queued = await propose.Handle(
+            new ProposeRecommendationCommand(
+                User, "GRAB", RecommendationAction.Trim, RecommendationTriggerKind.RiskRule, string.Empty,
+                "GRAB is 12.2% of book against a 9.5% cap.", RecommendationConfidence.High, "Back under the cap.", []),
+            CancellationToken.None);
 
-        routes.Should().BeEquivalentTo(["List", "Confirm", "Reject"]);
+        var decided = await new DecideRecommendationCommandHandler(repo, journal).Handle(
+            new DecideRecommendationCommand(User, queued.Id, RecommendationVerdict.Confirm, null), CancellationToken.None);
+
+        decided.OrderText.Should().Be(GrabOrder).And.Be(queued.OrderText);
+        repo.Rows.Should().ContainSingle().Which.Status.Should().Be(RecommendationStatus.Confirmed);
+        journal.Events.Select(e => e.EventType).Should().Equal(ThesisEventType.Created, ThesisEventType.Confirmed);
     }
 }

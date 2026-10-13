@@ -35,9 +35,10 @@ public interface IRecommendationRepository
 
     /// <summary>
     /// Inserts a pending proposal. Throws <see cref="Exceptions.RecommendationConflictException"/> when another pending
-    /// proposal on the ticker landed first (the partial unique index).
+    /// proposal on the ticker landed first (the partial unique index). <paramref name="supersedes"/>, an already-changed
+    /// tracked row, is saved in the same transaction so a failed insert leaves it as it was.
     /// </summary>
-    Task AddPendingAsync(Recommendation recommendation, CancellationToken ct = default);
+    Task AddPendingAsync(Recommendation recommendation, Recommendation? supersedes = null, CancellationToken ct = default);
 
     /// <summary>Saves a changed row. Jobs write with no person in scope; SaveChanges is not filtered.</summary>
     Task UpdateAsync(Recommendation recommendation, CancellationToken ct = default);

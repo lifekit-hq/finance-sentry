@@ -71,21 +71,34 @@ export class RecommendationUtils {
     }
   }
 
-  /** "+3.2 pts vs S&P 500" once scored, signed; empty until then. */
+  /**
+   * "decision +3.2 pts vs S&P 500" once scored, signed; empty until then. The value is the decision's own: a
+   * Trim or Exit is worth what the S&P 500 did over the name, since the name outperforming after a sell is its cost.
+   */
   public static excessLine(rec: RecommendationDto): string {
-    if (rec.excessReturnPct === null) {
+    const value = RecommendationUtils.decisionValue(rec);
+    if (value === null) {
       return '';
     }
-    const sign = rec.excessReturnPct > 0 ? '+' : '';
-    return `${sign}${RecommendationUtils.number(rec.excessReturnPct, PCT_FRACTION_DIGITS)} pts vs S&P 500`;
+    const sign = value > 0 ? '+' : '';
+    return `decision ${sign}${RecommendationUtils.number(value, PCT_FRACTION_DIGITS)} pts vs S&P 500`;
   }
 
-  /** Gain when the decided name beat the S&P 500 since the decision, loss when it lagged, none at par. */
+  /** Gain when the decision added value against the S&P 500 since it was made, loss when it cost value, none at par. */
   public static excessTone(rec: RecommendationDto): Nullable<OutcomeTone> {
-    if (rec.excessReturnPct === null || rec.excessReturnPct === 0) {
+    const value = RecommendationUtils.decisionValue(rec);
+    if (value === null || value === 0) {
       return null;
     }
-    return rec.excessReturnPct > 0 ? 'gain' : 'loss';
+    return value > 0 ? 'gain' : 'loss';
+  }
+
+  /** Name return minus S&P 500 return for an Add or Hold; the reverse for a Trim or Exit. Null until scored. */
+  private static decisionValue(rec: RecommendationDto): Nullable<number> {
+    if (rec.excessReturnPct === null) {
+      return null;
+    }
+    return rec.action === 'Trim' || rec.action === 'Exit' ? 0 - rec.excessReturnPct : rec.excessReturnPct;
   }
 
   /** "SELL 348 GRAB / LIMIT 3.13 USD DAY / IBKR" as its three lines: the order, the price terms, the venue. */

@@ -47,7 +47,7 @@ internal sealed class InMemoryRecommendationRepository : IRecommendationReposito
             .Where(r => r.Status is RecommendationStatus.Confirmed or RecommendationStatus.Rejected
                 && r.DecidedAt != null && r.OutcomeScoredAt == null).ToList());
 
-    public Task AddPendingAsync(Recommendation recommendation, CancellationToken ct = default)
+    public Task AddPendingAsync(Recommendation recommendation, Recommendation? supersedes = null, CancellationToken ct = default)
     {
         if (Rows.Any(r => r.UserId == recommendation.UserId && r.Ticker == recommendation.Ticker
             && r.Status == RecommendationStatus.Pending))

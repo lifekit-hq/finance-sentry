@@ -5,9 +5,7 @@ using FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Exceptions;
 using FinanceSentry.Modules.Research.Domain.Recommendations;
-using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
-using Moq;
 using Xunit;
 
 public sealed class DecideRecommendationCommandTests
@@ -16,9 +14,8 @@ public sealed class DecideRecommendationCommandTests
 
     private readonly InMemoryRecommendationRepository _repo = new();
     private readonly JournalRecorder _journal = new();
-    private readonly Mock<IThesisRepository> _theses = new();
 
-    private DecideRecommendationCommandHandler Handler() => new(_repo, _theses.Object, _journal);
+    private DecideRecommendationCommandHandler Handler() => new(_repo, _journal);
 
     private Recommendation Pending(RecommendationAction action = RecommendationAction.Trim, DateTimeOffset? expiresAt = null)
     {
@@ -39,17 +36,10 @@ public sealed class DecideRecommendationCommandTests
         return r;
     }
 
-    private void HasThesis(out InvestmentThesis thesis)
-    {
-        thesis = new InvestmentThesis { UserId = User, Ticker = "GRAB" };
-        _theses.Setup(t => t.FindByTickerAsync(User, "GRAB", It.IsAny<CancellationToken>())).ReturnsAsync([thesis]);
-    }
-
     [Fact]
     public async Task Confirm_records_the_decision_and_journals_it_without_anything_else()
     {
         var r = Pending();
-        _theses.Setup(t => t.FindByTickerAsync(User, "GRAB", It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         var dto = await Handler().Handle(new DecideRecommendationCommand(User, r.Id, RecommendationVerdict.Confirm, "  Placed at the open "), CancellationToken.None);
 
@@ -62,33 +52,20 @@ public sealed class DecideRecommendationCommandTests
     }
 
     [Fact]
-    public async Task Confirming_an_exit_closes_the_tickers_thesis_in_the_journal()
+    public async Task Confirming_an_exit_journals_only_the_recommendation()
     {
         var r = Pending(RecommendationAction.Exit);
-        HasThesis(out var thesis);
 
         await Handler().Handle(new DecideRecommendationCommand(User, r.Id, RecommendationVerdict.Confirm, null), CancellationToken.None);
 
-        _journal.Events.Should().Contain(e => e.SubjectType == ThesisSubjectType.Thesis
-            && e.SubjectId == thesis.Id && e.EventType == ThesisEventType.Closed);
+        _journal.Events.Should().ContainSingle()
+            .Which.Should().Be((ThesisSubjectType.Recommendation, r.Id, ThesisEventType.Confirmed, (string?)null));
     }
 
     [Fact]
-    public async Task Confirming_a_trim_marks_the_thesis_trimmed()
-    {
-        var r = Pending();
-        HasThesis(out var thesis);
-
-        await Handler().Handle(new DecideRecommendationCommand(User, r.Id, RecommendationVerdict.Confirm, null), CancellationToken.None);
-
-        _journal.Events.Should().Contain(e => e.SubjectId == thesis.Id && e.EventType == ThesisEventType.Trimmed);
-    }
-
-    [Fact]
-    public async Task Reject_keeps_the_reason_as_the_counterfactual_and_never_touches_the_thesis()
+    public async Task Reject_keeps_the_reason_as_the_counterfactual()
     {
         var r = Pending(RecommendationAction.Exit);
-        HasThesis(out _);
 
         var dto = await Handler().Handle(
             new DecideRecommendationCommand(User, r.Id, RecommendationVerdict.Reject, "DRAM cycle has a year to run"), CancellationToken.None);

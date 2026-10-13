@@ -18,7 +18,8 @@ public sealed record RecommendationPosition(
     string? LimitCurrency,
     string Venue,
     bool Fractional,
-    bool Held);
+    bool Held,
+    string? AssetClass);
 
 /// <summary>
 /// Reads the book and a quote for a proposal (#1069). The book is the holdings source of truth; the quote, when one
@@ -79,7 +80,8 @@ public sealed class RecommendationPositionReader(
             currency,
             position is null ? DefaultVenue : RecommendationOrderText.VenueLabel(position.Provider),
             fractional,
-            held);
+            held,
+            position is null ? null : AssetClassNormalizer.Normalize(position.AssetClass));
     }
 
     private async Task<(decimal? Price, string? Currency)> TryQuoteAsync(string ticker, CancellationToken ct)

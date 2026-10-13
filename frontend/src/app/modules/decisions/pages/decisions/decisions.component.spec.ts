@@ -119,12 +119,13 @@ describe('DecisionsComponent', () => {
     expect(open).toHaveBeenCalledWith(pending, 'confirm');
   });
 
-  it('shows decided outcomes with the excess return toned by sign', () => {
+  it('shows decided outcomes with the decision's value against the S&P 500 toned by sign', () => {
     const {host} = render({
       pending: [],
       decided: [
         mkRecommendation({
           id: 'a',
+          action: 'Add',
           status: 'Confirmed',
           execution: 'Executed',
           decidedAt: '2026-10-05T00:00:00Z',
@@ -133,10 +134,11 @@ describe('DecisionsComponent', () => {
         mkRecommendation({
           id: 'b',
           ticker: 'DRAM',
+          action: 'Exit',
           status: 'Rejected',
           decisionNote: 'Still a core holding.',
           decidedAt: '2026-10-04T00:00:00Z',
-          excessReturnPct: -1.5,
+          excessReturnPct: 1.5,
         }),
         mkRecommendation({id: 'c', ticker: 'NVDA', status: 'Expired', excessReturnPct: 0}),
         mkRecommendation({id: 'd', ticker: 'MSFT', status: 'Superseded'}),
@@ -152,9 +154,9 @@ describe('DecisionsComponent', () => {
     expect(rows[2].textContent).toContain('Oct 19, 2026');
     const excess = Array.from(host.querySelectorAll('[data-testid="decisions-excess"]'));
     expect(excess.map(e => e.textContent?.trim())).toEqual([
-      '+3.2 pts vs S&P 500',
-      '-1.5 pts vs S&P 500',
-      '0.0 pts vs S&P 500',
+      'decision +3.2 pts vs S&P 500',
+      'decision -1.5 pts vs S&P 500',
+      'decision 0.0 pts vs S&P 500',
     ]);
     expect(excess[0].className).toContain(GAIN_TEXT_CLASS);
     expect(excess[1].className).toContain(LOSS_TEXT_CLASS);

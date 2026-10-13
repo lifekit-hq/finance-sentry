@@ -176,22 +176,34 @@ describe('RecommendationUtils.excessLine', () => {
     expect(RecommendationUtils.excessLine(mkRecommendation())).toBe('');
   });
 
-  it('signs an outperformance', () => {
-    expect(RecommendationUtils.excessLine(mkRecommendation({excessReturnPct: 3.21}))).toBe(
-      '+3.2 pts vs S&P 500'
-    );
+  it('reads an add as the name return over the S&P 500', () => {
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({action: 'Add', excessReturnPct: 3.21}))
+    ).toBe('decision +3.2 pts vs S&P 500');
   });
 
-  it('keeps the minus on an underperformance', () => {
-    expect(RecommendationUtils.excessLine(mkRecommendation({excessReturnPct: -1.5}))).toBe(
-      '-1.5 pts vs S&P 500'
-    );
+  it('reads a hold as the name return over the S&P 500', () => {
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({action: 'Hold', excessReturnPct: -1.5}))
+    ).toBe('decision -1.5 pts vs S&P 500');
+  });
+
+  it('reads an exit as the S&P 500 over the name, so the name lagging is a plus', () => {
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({action: 'Exit', excessReturnPct: -5.3}))
+    ).toBe('decision +5.3 pts vs S&P 500');
+  });
+
+  it('reads a trim whose name kept outperforming as a cost', () => {
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({action: 'Trim', excessReturnPct: 2}))
+    ).toBe('decision -2.0 pts vs S&P 500');
   });
 
   it('reads par without a sign', () => {
-    expect(RecommendationUtils.excessLine(mkRecommendation({excessReturnPct: 0}))).toBe(
-      '0.0 pts vs S&P 500'
-    );
+    expect(
+      RecommendationUtils.excessLine(mkRecommendation({action: 'Trim', excessReturnPct: 0}))
+    ).toBe('decision 0.0 pts vs S&P 500');
   });
 });
 
@@ -204,12 +216,28 @@ describe('RecommendationUtils.excessTone', () => {
     expect(RecommendationUtils.excessTone(mkRecommendation({excessReturnPct: 0}))).toBeNull();
   });
 
-  it('is a gain when the name beat the S&P 500', () => {
-    expect(RecommendationUtils.excessTone(mkRecommendation({excessReturnPct: 2}))).toBe('gain');
+  it('is a gain when an add picked a name that beat the S&P 500', () => {
+    expect(RecommendationUtils.excessTone(mkRecommendation({action: 'Add', excessReturnPct: 2}))).toBe(
+      'gain'
+    );
   });
 
-  it('is a loss when it lagged', () => {
-    expect(RecommendationUtils.excessTone(mkRecommendation({excessReturnPct: -2}))).toBe('loss');
+  it('is a loss when an add picked a name that lagged', () => {
+    expect(
+      RecommendationUtils.excessTone(mkRecommendation({action: 'Add', excessReturnPct: -2}))
+    ).toBe('loss');
+  });
+
+  it('is a gain when an exit sold a name that then lagged', () => {
+    expect(
+      RecommendationUtils.excessTone(mkRecommendation({action: 'Exit', excessReturnPct: -2}))
+    ).toBe('gain');
+  });
+
+  it('is a loss when a trim sold a name that kept beating the S&P 500', () => {
+    expect(
+      RecommendationUtils.excessTone(mkRecommendation({action: 'Trim', excessReturnPct: 2}))
+    ).toBe('loss');
   });
 });
 

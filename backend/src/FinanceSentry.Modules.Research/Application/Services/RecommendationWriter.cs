@@ -6,7 +6,7 @@ using FinanceSentry.Modules.Research.Domain.Repositories;
 
 /// <summary>
 /// Puts a sized proposal in the queue (#1069) and keeps the journal whole: an older pending proposal on the same ticker
-/// is marked <see cref="RecommendationStatus.Superseded"/> with its own journal event before the new one goes in, and
+/// is marked <see cref="RecommendationStatus.Superseded"/> in the same save that inserts the new one (then journalled), and
 /// the new one gets its <see cref="ThesisEventType.Created"/> event. Shared by Ledger's proposals and the rule sweep,
 /// so every read here is job-safe.
 /// </summary>
@@ -19,18 +19,20 @@ public sealed class RecommendationWriter(IRecommendationRepository repo, IThesis
         var existing = await repo.FindPendingUnscopedAsync(recommendation.UserId, recommendation.Ticker, ct);
         if (existing is not null)
         {
-            // Supersede first: the partial unique index allows one Pending row per ticker.
             existing.Status = RecommendationStatus.Superseded;
             existing.DecidedAt = DateTimeOffset.UtcNow;
             existing.SupersededById = recommendation.Id;
             existing.Execution = RecommendationExecution.NotApplicable;
-            await repo.UpdateAsync(existing, ct);
+        }
+
+        await repo.AddPendingAsync(recommendation, existing, ct);
+        if (existing is not null)
+        {
             await recorder.RecordAsync(
                 existing.UserId, ThesisSubjectType.Recommendation, existing.Id, existing.Ticker,
                 ThesisEventType.Superseded, $"Superseded by a newer {recommendation.Action} proposal", ct);
         }
 
-        await repo.AddPendingAsync(recommendation, ct);
         await recorder.RecordAsync(
             recommendation.UserId, ThesisSubjectType.Recommendation, recommendation.Id, recommendation.Ticker,
             ThesisEventType.Created, CreatedNote(recommendation), ct);

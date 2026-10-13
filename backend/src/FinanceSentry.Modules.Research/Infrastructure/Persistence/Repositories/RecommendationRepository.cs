@@ -69,9 +69,18 @@ public sealed class RecommendationRepository(ResearchDbContext db) : IRecommenda
             .ToListAsync(ct);
 
     // Race-safe over the unique partial index on (UserId, Ticker) WHERE Status = 'Pending': the loser's SaveChanges
-    // fails on the index and surfaces as a conflict rather than a second pending proposal.
-    public async Task AddPendingAsync(Recommendation recommendation, CancellationToken ct = default)
+    // fails on the index and surfaces as a conflict rather than a second pending proposal. A superseded row is saved
+    // in the same transaction, so the ticker never ends up with no pending proposal.
+    public async Task AddPendingAsync(
+        Recommendation recommendation, Recommendation? supersedes = null, CancellationToken ct = default)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (supersedes is not null)
+        {
+            db.Recommendations.Update(supersedes);
+            await db.SaveChangesAsync(ct);
+        }
+
         db.Recommendations.Add(recommendation);
         try
         {
@@ -83,6 +92,8 @@ public sealed class RecommendationRepository(ResearchDbContext db) : IRecommenda
             db.Entry(recommendation).State = EntityState.Detached;
             throw new RecommendationConflictException(recommendation.Ticker);
         }
+
+        await transaction.CommitAsync(ct);
     }
 
     public async Task UpdateAsync(Recommendation recommendation, CancellationToken ct = default)

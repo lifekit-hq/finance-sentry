@@ -125,4 +125,26 @@ public sealed class RecommendationOwnerQueryFilterTests : IAsyncLifetime
         (await check.Recommendations.IgnoreQueryFilters().CountAsync()).Should().Be(3,
             "the unique index covers pending rows only, per person");
     }
+
+    [DockerRequiredFact]
+    public async Task A_newer_proposal_supersedes_the_pending_one_in_the_same_transaction()
+    {
+        var older = NewRecommendation(_userA);
+        await SeedAsync(older);
+        var newer = NewRecommendation(_userA);
+
+        await using (var asNoOne = CreateContext())
+        {
+            var repo = new RecommendationRepository(asNoOne);
+            var existing = (await repo.FindPendingUnscopedAsync(_userA, older.Ticker))!;
+            existing.Status = RecommendationStatus.Superseded;
+            existing.SupersededById = newer.Id;
+            await repo.AddPendingAsync(newer, existing);
+        }
+
+        await using var check = CreateContext();
+        var rows = await check.Recommendations.IgnoreQueryFilters().Where(r => r.UserId == _userA).ToListAsync();
+        rows.Single(r => r.Id == older.Id).Status.Should().Be(RecommendationStatus.Superseded);
+        rows.Single(r => r.Status == RecommendationStatus.Pending).Id.Should().Be(newer.Id);
+    }
 }
