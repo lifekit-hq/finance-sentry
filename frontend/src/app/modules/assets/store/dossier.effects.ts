@@ -72,7 +72,7 @@ export function dossierEffects(store: StoreMethods) {
       switchMap(symbol =>
         dossierService.getQuotes(symbol).pipe(
           tap(quotes => {
-            store.setQuote(quotes[0] ?? null);
+            store.setQuote(DossierQuoteUtils.toMajorUnits(quotes[0] ?? null));
             store.setQuoteSuccess();
           }),
           catchError(() => {

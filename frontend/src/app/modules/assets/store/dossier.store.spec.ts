@@ -13,6 +13,7 @@ import {
   type AssetLedgerReadDto,
   type DossierQuoteDto,
   type DossierUserTargetDto,
+  type ValuationSnapshotDto,
 } from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 import {DossierStore} from './dossier.store';
@@ -74,6 +75,40 @@ const TARGET: DossierUserTargetDto = {
   currency: 'USD',
   updatedAt: '2026-10-13T00:00:00Z',
 };
+
+const NO_METRIC = {
+  value: null,
+  fiveYearAvg: null,
+  historyWindowYears: null,
+  historyUnavailable: true,
+};
+
+function majorUnitValuation(currency: string): ValuationSnapshotDto {
+  return {
+    ticker: 'AAPL',
+    notApplicable: false,
+    price: 26.4,
+    isStale: false,
+    metrics: {
+      trailingPe: NO_METRIC,
+      forwardPe: NO_METRIC,
+      evToEbitda: NO_METRIC,
+      dividendYield: NO_METRIC,
+    },
+    consensusTarget: 30,
+    impliedUpsidePct: null,
+    peerSet: null,
+    sources: [],
+    retrievedAt: '2026-10-13T00:00:00Z',
+    name: null,
+    sector: null,
+    industry: null,
+    priceAsOf: null,
+    currency,
+    targetLow: 24,
+    targetHigh: 36,
+  };
+}
 
 function httpError(errorCode: string) {
   return throwError(() => new HttpErrorResponse({status: 500, error: {errorCode}}));
@@ -139,6 +174,34 @@ describe('DossierStore', () => {
     expect(store.ledgerRead()).toEqual(READ);
     expect(store.quoteHeader()?.priceText).toBe('$189.30');
   });
+
+  it.each([
+    ['GBp', 'GBP', '£26.50'],
+    ['ILA', 'ILS', 'ILS 26.50'],
+  ])(
+    'puts a %s quote in %s so the price, header and target band share the dossier unit',
+    (minor, major, priceText) => {
+      service.getDossier.mockReturnValue(
+        of({
+          ...DOSSIER,
+          valuation: majorUnitValuation(major),
+          userTarget: {targetPrice: 32, currency: major, updatedAt: '2026-10-13T00:00:00Z'},
+        })
+      );
+      service.getQuotes.mockReturnValue(
+        of([{...QUOTE, price: 2650, previousClose: 2600, currency: minor}])
+      );
+
+      const store = inject();
+
+      expect(store.quote()).toMatchObject({price: 26.5, previousClose: 26, currency: major});
+      expect(store.currentPrice()).toBe(26.5);
+      expect(store.quoteHeader()?.priceText).toBe(priceText);
+      const band = store.targetBand();
+      expect(band?.markers.find(m => m.key === 'price')?.value).toBe(26.5);
+      expect(band?.markers.every(m => m.leftPct >= 0 && m.leftPct <= 100)).toBe(true);
+    }
+  );
 
   it('keeps the quote and ledger read idle when they are not requested', () => {
     canUseAi = false;
