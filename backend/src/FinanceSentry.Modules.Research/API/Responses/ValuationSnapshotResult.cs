@@ -32,7 +32,9 @@ public record ValuationMetricsDto(
 /// <c>valuation_snapshots</c> row so the comparison window grows organically. <see cref="Name"/>,
 /// <see cref="Sector"/> and <see cref="Industry"/> are the company profile Yahoo already returns
 /// with the metrics; <see cref="PriceAsOf"/> is when <see cref="Price"/> was last seen by the quote
-/// path (null when unknown), so a stale price can say how old it is.
+/// path (null when unknown), so a stale price can say how old it is. <see cref="TargetLow"/>,
+/// <see cref="TargetHigh"/> and <see cref="AnalystCount"/> describe the analyst target range behind
+/// <see cref="ConsensusTarget"/> (the mean); <see cref="Currency"/> is the quote currency of every price.
 /// </summary>
 public record ValuationSnapshotResult(
     string Ticker,
@@ -48,7 +50,12 @@ public record ValuationSnapshotResult(
     string? Name = null,
     string? Sector = null,
     string? Industry = null,
-    DateTimeOffset? PriceAsOf = null)
+    DateTimeOffset? PriceAsOf = null,
+    decimal? TargetLow = null,
+    decimal? TargetHigh = null,
+    int? AnalystCount = null,
+    string? Currency = null,
+    decimal? MarketCap = null)
 {
     /// <summary>An explicit not-applicable result for a non-equity ticker (crypto) — no fabricated values.</summary>
     public static ValuationSnapshotResult ForNonEquity(string ticker) => new(

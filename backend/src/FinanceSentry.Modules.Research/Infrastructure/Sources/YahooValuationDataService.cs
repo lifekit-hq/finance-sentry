@@ -177,7 +177,12 @@ public sealed class YahooValuationDataService(
             NotApplicable: false,
             ReadString(assetProfile, "sector"),
             ReadString(assetProfile, "industry"),
-            ReadString(price, "longName") ?? ReadString(price, "shortName"));
+            ReadString(price, "longName") ?? ReadString(price, "shortName"),
+            TargetLow: ReadRaw(financialData, "targetLowPrice"),
+            TargetHigh: ReadRaw(financialData, "targetHighPrice"),
+            AnalystCount: ReadRaw(financialData, "numberOfAnalystOpinions") is { } count ? (int)count : null,
+            Currency: ReadString(price, "currency")?.ToUpperInvariant(),
+            MarketCap: ReadRaw(price, "marketCap") ?? ReadRaw(summaryDetail, "marketCap"));
     }
 
     private static IReadOnlyList<string> ParsePeers(string json, string self)

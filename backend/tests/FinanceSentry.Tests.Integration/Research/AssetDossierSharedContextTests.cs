@@ -2,7 +2,10 @@ namespace FinanceSentry.Tests.Integration.Research;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Modules.Research.API.Responses;
+using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -55,6 +58,7 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
             PublishedAt = DateTimeOffset.UtcNow,
             ContentHash = Guid.NewGuid().ToString("N"),
         });
+        setup.AssetPriceTargets.Add(new AssetPriceTarget { UserId = _user, Symbol = Symbol, TargetPrice = 150m });
         await setup.SaveChangesAsync();
     }
 
@@ -83,7 +87,12 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
                 new AnalystUniverseRepository(db),
                 new RecommendationTrendRepository(db)),
             new GetNewsForTickerQueryHandler(new NewsRepository(db)),
-            Mock.Of<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>());
+            Mock.Of<IQueryHandler<GetEarningsCalendarQuery, IReadOnlyList<EarningsEventDto>>>(),
+            Mock.Of<IPositionCapSource>(),
+            Mock.Of<IPriceHistoryService>(),
+            Mock.Of<IFundamentalsService>(),
+            new AssetPriceTargetRepository(db),
+            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
 
         for (var i = 0; i < Loads; i++)
         {
@@ -93,6 +102,7 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
             dossier.Analysts.Should().NotBeNull($"load {i}");
             dossier.Analysts!.RecentActions.Should().HaveCount(1, $"load {i}");
             dossier.RecentNews.Should().HaveCount(1, $"load {i}");
+            dossier.UserTarget!.TargetPrice.Should().Be(150m, $"load {i}");
         }
     }
 }

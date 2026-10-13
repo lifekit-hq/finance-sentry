@@ -49,6 +49,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
 
     public DbSet<AssetLedgerRead> AssetLedgerReads { get; set; } = null!;
 
+    public DbSet<AssetPriceTarget> AssetPriceTargets { get; set; } = null!;
+
     public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
 
     public DbSet<PolicyReview> PolicyReviews { get; set; } = null!;
@@ -463,6 +465,17 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         alr.Property(x => x.GeneratedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         alr.HasIndex(x => new { x.UserId, x.Symbol })
             .IsUnique().HasDatabaseName("idx_asset_ledger_reads_user_symbol");
+
+        var apt = modelBuilder.Entity<AssetPriceTarget>();
+        apt.ToTable("asset_price_targets");
+        apt.HasKey(x => x.Id);
+        apt.Property(x => x.UserId).IsRequired();
+        apt.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+        apt.Property(x => x.TargetPrice).HasPrecision(18, 4);
+        apt.Property(x => x.Currency).HasMaxLength(3);
+        apt.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        apt.HasIndex(x => new { x.UserId, x.Symbol })
+            .IsUnique().HasDatabaseName("idx_asset_price_targets_user_symbol");
     }
 
     private static readonly ValueComparer<float[]> FloatArrayComparer = new(

@@ -86,7 +86,12 @@ public class GetValuationSnapshotQueryHandler(
             current.Name,
             current.Sector,
             current.Industry,
-            current.PriceAsOf);
+            current.PriceAsOf,
+            current.TargetLow,
+            current.TargetHigh,
+            current.AnalystCount,
+            current.Currency,
+            current.MarketCap);
     }
 
     private async Task<ValuationPeerSet?> BuildPeerSetAsync(

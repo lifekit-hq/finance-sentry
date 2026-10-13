@@ -271,6 +271,32 @@ public sealed class ResearchUpsertTests : IAsyncLifetime
         (await read.AssetLedgerReads.AsNoTracking().CountAsync()).Should().Be(1);
     }
 
+    [DockerRequiredFact]
+    public async Task PriceTarget_set_again_keeps_one_row_with_the_new_price_and_delete_removes_it()
+    {
+        var first = new AssetPriceTarget { UserId = _user, Symbol = " aapl ", TargetPrice = 200m, Currency = "USD" };
+        await using (var ctx = CreateContext())
+            await new AssetPriceTargetRepository(ctx).UpsertAsync(first);
+
+        await using (var ctx = CreateContext())
+            await new AssetPriceTargetRepository(ctx).UpsertAsync(
+                new AssetPriceTarget { UserId = _user, Symbol = "AAPL", TargetPrice = 245.5m, Currency = "USD" });
+
+        await using (var read = CreateContext())
+        {
+            var row = await read.AssetPriceTargets.AsNoTracking().SingleAsync();
+            row.Id.Should().Be(first.Id, "the stored row is replaced in place");
+            row.Symbol.Should().Be("AAPL");
+            row.TargetPrice.Should().Be(245.5m);
+        }
+
+        await using (var ctx = CreateContext())
+            (await new AssetPriceTargetRepository(ctx).DeleteAsync(_user, "aapl")).Should().BeTrue();
+
+        await using var after = CreateContext();
+        (await after.AssetPriceTargets.AnyAsync()).Should().BeFalse();
+    }
+
     // --- recommendation trends ------------------------------------------------------------------------------
 
     private static RecommendationTrend Trend(string ticker, DateOnly period, int buy, string source) => new()

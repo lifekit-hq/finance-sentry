@@ -126,6 +126,9 @@ public interface IBrokerageTradeRepository
 
     /// <summary>The user's trades for the cross-module reader, which has no person in scope. Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<BrokerageTrade>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>The user's fills in one symbol for the cross-module reader, which has no person in scope. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<BrokerageTrade>> GetBySymbolUnscopedAsync(Guid userId, string symbol, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }
 
@@ -135,5 +138,8 @@ public interface IBrokerageCashTransactionRepository
     Task<BrokerageCashTransaction?> GetByIdempotencyKeyUnscopedAsync(Guid userId, string provider, string idempotencyKey, CancellationToken ct = default);
     Task AddAsync(BrokerageCashTransaction transaction, CancellationToken ct = default);
     Task<IReadOnlyList<BrokerageCashTransaction>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>The user's cash rows in one symbol for the cross-module reader, which has no person in scope. Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<BrokerageCashTransaction>> GetBySymbolUnscopedAsync(Guid userId, string symbol, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }

@@ -310,6 +310,15 @@ public sealed class BrokerageTradeRepository : IBrokerageTradeRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<BrokerageTrade>> GetBySymbolUnscopedAsync(
+        Guid userId, string symbol, CancellationToken ct = default)
+    {
+        var upper = symbol.ToUpperInvariant();
+        return await _context.BrokerageTrades.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(t => t.UserId == userId && t.Symbol.ToUpper() == upper)
+            .ToListAsync(ct);
+    }
+
     public async Task SaveChangesAsync(CancellationToken ct = default)
     {
         await _context.SaveChangesAsync(ct);
@@ -343,6 +352,15 @@ public sealed class BrokerageCashTransactionRepository : IBrokerageCashTransacti
     {
         return await _context.BrokerageCashTransactions
             .Where(c => c.UserId == userId)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<BrokerageCashTransaction>> GetBySymbolUnscopedAsync(
+        Guid userId, string symbol, CancellationToken ct = default)
+    {
+        var upper = symbol.ToUpperInvariant();
+        return await _context.BrokerageCashTransactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .Where(c => c.UserId == userId && c.Symbol != null && c.Symbol.ToUpper() == upper)
             .ToListAsync(ct);
     }
 
