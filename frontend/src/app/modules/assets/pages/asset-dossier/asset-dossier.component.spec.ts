@@ -1,6 +1,8 @@
 import {signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
 import {provideRouter} from '@angular/router';
+import {TagComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
@@ -398,6 +400,43 @@ describe('AssetDossierComponent', () => {
       fixture.detectChanges();
 
       expect(root().textContent).toContain('Tax lots (1)');
+    });
+  });
+
+  describe('radar signals', () => {
+    const signalAt = (day: number, severity: string) => ({
+      timestamp: `2026-09-0${day}T00:00:00Z`,
+      scanner: 'volume',
+      signalType: 'volume_spike',
+      severity,
+      payload: {},
+    });
+
+    beforeEach(() => {
+      mockStore.dossier.set({
+        ...DOSSIER,
+        radarSignals: [signalAt(1, 'info'), signalAt(2, 'notable'), signalAt(3, 'alerted')],
+      });
+      fixture.detectChanges();
+    });
+
+    it('tones each tag by the severity the API emits', () => {
+      const tags = fixture.debugElement
+        .queryAll(By.directive(TagComponent))
+        .filter(t => ['info', 'notable', 'alerted'].includes(t.nativeElement.textContent.trim()));
+      const toneOf = (label: string): string | undefined =>
+        tags.find(t => t.nativeElement.textContent.trim() === label)?.componentInstance.variant();
+
+      expect(tags).toHaveLength(3);
+      expect(toneOf('alerted')).toBe('error');
+      expect(toneOf('notable')).toBe('warning');
+      expect(toneOf('info')).toBe('success');
+    });
+
+    it('draws a trend that rises with severity instead of a flat line', () => {
+      const values = fixture.componentInstance.radarTrendPoints()?.map(p => p.value);
+
+      expect(values).toEqual([5, 15, 25]);
     });
   });
 });

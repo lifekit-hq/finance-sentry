@@ -39,7 +39,7 @@ import {MarkdownPipe} from '../../pipes/markdown.pipe';
 import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
 import {DossierStore} from '../../store/dossier.store';
 
-const SEVERITY_VALUE: Record<string, number> = {high: 25, medium: 15, low: 5};
+const SEVERITY_VALUE: Record<string, number> = {alerted: 25, notable: 15, info: 5};
 const SEVERITY_DEFAULT = 5;
 const TREND_MIN_POINTS = 2;
 const TREND_SCALE_MAX = 30;

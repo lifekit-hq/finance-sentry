@@ -546,9 +546,9 @@
                   }}</span>
                   <span class="text-text-secondary">{{ signal.scanner }}</span>
                   <span class="ml-auto">
-                    @if (signal.severity === 'high') {
+                    @if (signal.severity === 'alerted') {
                       <cmn-tag variant="error">{{ signal.severity }}</cmn-tag>
-                    } @else if (signal.severity === 'medium') {
+                    } @else if (signal.severity === 'notable') {
                       <cmn-tag variant="warning">{{ signal.severity }}</cmn-tag>
                     } @else {
                       <cmn-tag variant="success">{{ signal.severity }}</cmn-tag>
