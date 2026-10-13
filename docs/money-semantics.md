@@ -203,9 +203,10 @@ quote it falls back to the holding's own USD value per unit. Exit sells the whol
 the requested USD or, without one, the excess over the single-position cap, rounded **up** to whole
 shares so the trim reaches the cap; Add buys the requested USD after the risk gate (clamped to its
 `MaxCompliantSizeUsd`), rounded **down** so it never exceeds the request; crypto sizes to six decimals.
-`sizeUsd` is shares x the USD unit price (2 dp) and before/after shares of book are rounded to two
-decimals. The order text's limit is the quote in its own currency. These are proposals: Finance Sentry
-never places the order, and the book only moves when the owner's own fill is ingested.
+`sizeUsd` is the position's USD value for an Exit and shares x the USD unit price (2 dp) otherwise;
+before/after shares of book are rounded to two decimals. The order text's limit is the quote in its own
+currency. These are proposals: Finance Sentry never places the order, and the book only moves when the
+owner's own fill is ingested.
 
 **Return decomposition** (`DossierPositionSection.Returns`, `PositionReturnCalculator`, asset dossier
 hero). Where a holding's return came from, in USD, read from the fills and dividend rows ingested for
