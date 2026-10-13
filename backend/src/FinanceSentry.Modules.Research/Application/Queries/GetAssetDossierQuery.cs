@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 
 /// <summary>
@@ -44,7 +45,7 @@ public sealed class GetAssetDossierQueryHandler(
             new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
         var newsResult = await Safe(() => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
         var earningsResult = await Safe(() => earnings.Handle(
-            new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), null), ct));
+            new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), EarningsEventType.Earnings), ct));
         var signalResult = await Safe(() => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
 
         // Position section: find symbol in the book, then fetch tax lots for brokerage positions.
