@@ -10,7 +10,6 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
 import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {PushSessionService} from '../../settings/services/push-session.service';
-import {SettingsService} from '../../settings/services/settings.service';
 import {type SignInMethods} from '../models/auth/auth.model';
 import {AuthService} from '../services/auth.service';
 import {authEffects, authHooks} from './auth.effects';
@@ -23,12 +22,9 @@ function buildStore(overrides: {isAuthenticated?: boolean; returnUrl?: Nullable<
     clearSession: vi.fn(),
     setReturnUrl: vi.fn(),
     setFlashMessage: vi.fn((message: Nullable<FlashMessage>) => flashMessage.set(message)),
-    setProfileName: vi.fn(),
     setSignInMethods: vi.fn(),
     setSignInMethodsStatus: vi.fn(),
-    loadProfileName: vi.fn(),
     loadSignInMethods: vi.fn(),
-    firstName: signal<Nullable<string>>(null),
     isAuthenticated: signal(overrides.isAuthenticated ?? false),
     returnUrl: signal<Nullable<string>>(overrides.returnUrl ?? null),
     signInMethods: signal<Nullable<SignInMethods>>(null),
@@ -65,7 +61,6 @@ function configure(
   TestBed.configureTestingModule({
     providers: [
       {provide: AuthService, useValue: service},
-      {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
       {provide: PushSessionService, useValue: pushSession},
       {provide: AppPreferencesStore, useValue: preferences},
       {provide: Router, useValue: router},
@@ -260,41 +255,6 @@ describe('authEffects', () => {
       expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('loading');
       expect(store.setSignInMethodsStatus).toHaveBeenCalledWith('error');
       expect(store.setSignInMethods).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('loadProfileName', () => {
-    function configureWithProfile(profile$: Subject<{firstName: string; lastName: string}>) {
-      TestBed.configureTestingModule({
-        providers: [
-          {provide: AuthService, useValue: buildService()},
-          {provide: SettingsService, useValue: {getProfile: () => profile$}},
-          {provide: Router, useValue: buildRouter()},
-        ],
-      });
-    }
-
-    it('stores the profile name while authenticated', () => {
-      const store = buildStore({isAuthenticated: true});
-      const profile$ = new Subject<{firstName: string; lastName: string}>();
-      configureWithProfile(profile$);
-
-      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
-      profile$.next({firstName: 'Denys', lastName: 'Tester'});
-
-      expect(store.setProfileName).toHaveBeenCalledWith('Denys', 'Tester');
-    });
-
-    it('drops a late response after the session ended', () => {
-      const store = buildStore({isAuthenticated: true});
-      const profile$ = new Subject<{firstName: string; lastName: string}>();
-      configureWithProfile(profile$);
-
-      TestBed.runInInjectionContext(() => authEffects(store).loadProfileName());
-      store.isAuthenticated.set(false);
-      profile$.next({firstName: 'Denys', lastName: 'Tester'});
-
-      expect(store.setProfileName).not.toHaveBeenCalled();
     });
   });
 });
@@ -506,7 +466,7 @@ describe('authHooks', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
   });
 
-  it('falls back to /accounts when returnUrl is null', () => {
+  it('falls back to the dashboard, the root landing, when returnUrl is null', () => {
     const store = buildStore({isAuthenticated: false, returnUrl: null});
     const router = buildRouter('/login');
     configure(buildService(), router);
@@ -516,7 +476,7 @@ describe('authHooks', () => {
     store.isAuthenticated.set(true);
     TestBed.flushEffects();
 
-    expect(router.navigateByUrl).toHaveBeenCalledWith(AppRoute.Accounts);
+    expect(router.navigateByUrl).toHaveBeenCalledWith(AppRoute.Dashboard);
   });
 
   it('does not navigate when authenticated on a non-auth route', () => {
@@ -530,22 +490,5 @@ describe('authHooks', () => {
     TestBed.flushEffects();
 
     expect(router.navigateByUrl).not.toHaveBeenCalled();
-  });
-
-  it('loads the profile name once authenticated when it is not yet known', () => {
-    const store = buildStore();
-    TestBed.runInInjectionContext(() => authHooks(store));
-    store.isAuthenticated.set(true);
-    TestBed.flushEffects();
-    expect(store.loadProfileName).toHaveBeenCalledOnce();
-  });
-
-  it('skips the profile load when the name is already known', () => {
-    const store = buildStore();
-    store.firstName.set('Denys');
-    TestBed.runInInjectionContext(() => authHooks(store));
-    store.isAuthenticated.set(true);
-    TestBed.flushEffects();
-    expect(store.loadProfileName).not.toHaveBeenCalled();
   });
 });

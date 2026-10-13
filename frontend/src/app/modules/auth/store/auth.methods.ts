@@ -12,6 +12,8 @@ export function authMethods(store: WritableStateSource<AuthState>) {
         roles: res.user.roles,
         permissions: res.user.permissions,
         flashMessage: null,
+        // `/auth/me` carries the profile; a refresh does not, and must not blank a name already known.
+        ...(res.profile ? {firstName: res.profile.firstName, lastName: res.profile.lastName} : {}),
       });
     },
     clearSession(): void {

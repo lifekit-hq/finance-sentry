@@ -65,7 +65,8 @@ export async function mockGet(page: Page, path: string, body: unknown): Promise<
 // bell and its panel, the floating chat's conversation list, the watchlist and holdings the
 // sidebar reads.
 export async function mockShell(page: Page): Promise<void> {
-  await mockGet(page, 'auth/me', AUTH_RESPONSE);
+  // `/auth/me` carries the profile, which is where the shell reads the person's name.
+  await mockGet(page, 'auth/me', {...AUTH_RESPONSE, profile: PROFILE});
   await mockGet(page, 'auth/refresh', AUTH_RESPONSE);
   await mockGet(page, 'alerts/unread-count', {count: 0});
   await mockGet(page, 'alerts?**', {...EMPTY_PAGE, unreadCount: 0});

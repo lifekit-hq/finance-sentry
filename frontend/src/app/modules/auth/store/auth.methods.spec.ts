@@ -36,6 +36,32 @@ describe('authMethods', () => {
     });
   });
 
+  describe('applyAuthResponse profile', () => {
+    const ME_RESPONSE = {
+      ...SAMPLE_RESPONSE,
+      profile: {firstName: 'Ada', lastName: 'Lovelace'},
+    } as unknown as AuthResponse;
+
+    it('takes the name from the profile `/auth/me` carries', () => {
+      const {state, methods} = makeState();
+
+      methods.applyAuthResponse(ME_RESPONSE);
+
+      expect(state.firstName()).toBe('Ada');
+      expect(state.lastName()).toBe('Lovelace');
+    });
+
+    it('keeps a known name when a refresh response has no profile', () => {
+      const {state, methods} = makeState();
+      methods.applyAuthResponse(ME_RESPONSE);
+
+      methods.applyAuthResponse(SAMPLE_RESPONSE);
+
+      expect(state.firstName()).toBe('Ada');
+      expect(state.lastName()).toBe('Lovelace');
+    });
+  });
+
   describe('clearSession', () => {
     it('clears userId, email, roles and permissions but preserves flashMessage', () => {
       const {state, methods} = makeState();
