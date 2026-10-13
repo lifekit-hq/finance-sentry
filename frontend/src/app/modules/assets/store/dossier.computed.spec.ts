@@ -1,8 +1,10 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {describe, expect, it} from 'vitest';
 
 import {
+  type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
   type DossierAnalystsSection,
@@ -23,6 +25,10 @@ function buildSignals(overrides: Partial<DossierState> = {}) {
     ledgerRead: signal<Nullable<AssetLedgerReadDto>>(overrides.ledgerRead ?? null),
     isThesisExpanded: signal<boolean>(overrides.isThesisExpanded ?? false),
     quote: signal<Nullable<DossierQuoteDto>>(overrides.quote ?? null),
+    chart: signal<Nullable<AssetChartDto>>(overrides.chart ?? null),
+    chartStatus: signal<AsyncStatus>('idle'),
+    chartErrorMessage: signal<string>(''),
+    targetDraft: signal<string>(overrides.targetDraft ?? ''),
   };
 }
 
@@ -182,6 +188,16 @@ describe('dossierComputed', () => {
     });
   });
 
+  it('position and checks views are empty before a dossier has loaded', () => {
+    const store = buildSignals();
+    TestBed.runInInjectionContext(() => {
+      const computedSignals = dossierComputed(store);
+      expect(computedSignals.sizeCap()).toBeNull();
+      expect(computedSignals.wheel()).toBeNull();
+      expect(computedSignals.checkAxes()).toEqual([]);
+    });
+  });
+
   it('heroProfile names the company from the valuation', () => {
     const store = buildSignals({
       dossier: emptyDossier({
@@ -203,7 +219,7 @@ describe('dossierComputed', () => {
         dossierComputed(store)
           .sectionChips()
           .map(c => c.label)
-      ).toEqual(['Thesis', 'Signals']);
+      ).toEqual(['Plan', 'Signals', 'Data']);
     });
   });
 
@@ -338,6 +354,170 @@ describe('dossierComputed', () => {
       const store = buildSignals({quote: null});
       TestBed.runInInjectionContext(() => {
         expect(dossierComputed(store).quoteHeader()).toBeNull();
+      });
+    });
+  });
+
+  describe('stage 2', () => {
+    const CHECKS: AssetDossierDto['checks'] = {
+      axes: [
+        {
+          key: 'value',
+          label: 'Value',
+          passed: 1,
+          evaluated: 2,
+          rules: [
+            {
+              key: 'a',
+              label: 'A',
+              passed: true,
+              value: 1,
+              threshold: 2,
+              unit: 'multiple',
+              note: null,
+            },
+            {
+              key: 'b',
+              label: 'B',
+              passed: false,
+              value: null,
+              threshold: null,
+              unit: 'none',
+              note: null,
+            },
+          ],
+        },
+        {key: 'momentum', label: 'Momentum', passed: 1, evaluated: 1, rules: []},
+      ],
+    };
+    const PERFORMANCE: NonNullable<AssetDossierDto['performance']> = {
+      lastClose: 90,
+      yearChangePct: 5,
+      high52Week: 100,
+      low52Week: 80,
+      fromHighPct: -10,
+      benchmarkYearChangePct: 3,
+      currency: 'USD',
+      asOf: '2026-10-13',
+    };
+
+    function withChart(status: AsyncStatus, error = '') {
+      return {
+        ...buildSignals(),
+        chartStatus: signal<AsyncStatus>(status),
+        chartErrorMessage: signal<string>(error),
+      };
+    }
+
+    it('reads crypto from a not-applicable valuation', () => {
+      const store = buildSignals({dossier: emptyDossier({valuation: valuation(true)})});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).isCrypto()).toBe(true);
+      });
+    });
+
+    it('counts a dossier with only price history as having sections', () => {
+      const store = buildSignals({dossier: emptyDossier({performance: PERFORMANCE})});
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).hasDossierSections()).toBe(true);
+      });
+    });
+
+    it('totals the checks and hands each question-led section its axis', () => {
+      const store = buildSignals({dossier: emptyDossier({checks: CHECKS})});
+      TestBed.runInInjectionContext(() => {
+        const computed = dossierComputed(store);
+        expect(computed.checksPassed()).toBe(2);
+        // Counts named rules, including the one the data could not decide.
+        expect(computed.checksTotal()).toBe(2);
+        expect(computed.sectionChecks()['valuation']?.key).toBe('value');
+        expect(computed.sectionChecks()['chart']?.key).toBe('momentum');
+        expect(computed.sectionChecks()['analysts']).toBeNull();
+        expect(computed.wheel()).toBeNull();
+      });
+    });
+
+    it.each<[AsyncStatus, string, string]>([
+      ['error', 'Failed', 'error'],
+      ['error', '', 'success'],
+      ['loading', '', 'loading'],
+      ['idle', '', 'loading'],
+      ['success', '', 'success'],
+    ])('maps chart status %s (error "%s") to %s', (status, error, expected) => {
+      const store = withChart(status, error);
+      TestBed.runInInjectionContext(() => {
+        expect(dossierComputed(store).chartAsyncStatus()).toBe(expected);
+      });
+    });
+
+    it('prices "Is it cheap?" from the quote, then the valuation, then the last close', () => {
+      const quote: DossierQuoteDto = {
+        ticker: 'ZZZZ',
+        price: 95,
+        previousClose: 94,
+        changePct: 1,
+        currency: 'USD',
+      };
+      const priced = {...valuation(false), price: 92};
+      TestBed.runInInjectionContext(() => {
+        expect(
+          dossierComputed(
+            buildSignals({
+              dossier: emptyDossier({valuation: priced, performance: PERFORMANCE}),
+              quote,
+            })
+          ).currentPrice()
+        ).toBe(95);
+        expect(
+          dossierComputed(
+            buildSignals({dossier: emptyDossier({valuation: priced, performance: PERFORMANCE})})
+          ).currentPrice()
+        ).toBe(92);
+        expect(
+          dossierComputed(
+            buildSignals({dossier: emptyDossier({performance: PERFORMANCE})})
+          ).currentPrice()
+        ).toBe(90);
+        expect(dossierComputed(buildSignals()).currentPrice()).toBeNull();
+      });
+    });
+
+    it('builds the target band, the parsed draft, the fundamentals and the data status', () => {
+      const store = buildSignals({
+        dossier: emptyDossier({
+          valuation: {...valuation(false), consensusTarget: 120},
+          performance: PERFORMANCE,
+          userTarget: {targetPrice: 110, currency: 'USD', updatedAt: '2026-10-13T00:00:00Z'},
+          position: {...POSITION, shareOfBookPercent: 5, positionCapPercent: 10},
+        }),
+        targetDraft: '125.5',
+      });
+      TestBed.runInInjectionContext(() => {
+        const computed = dossierComputed(store);
+        expect(computed.targetBand()?.markers.map(m => m.key)).toEqual([
+          'price',
+          'analyst',
+          'mine',
+        ]);
+        expect(computed.parsedTargetDraft()).toBe(125.5);
+        expect(computed.fundamentals()).toHaveLength(10);
+        expect(computed.dataStatus().map(r => r.key)).toContain('valuation');
+        expect(computed.performanceStrip()).toHaveLength(3);
+        expect(computed.thesisHook()).toBe('Held · 5.0% of book');
+        expect(computed.sizeCap()?.overCap).toBe(false);
+        expect(computed.returnsView()).toBeNull();
+        expect(computed.chartView()).toBeNull();
+      });
+    });
+
+    it('has no band, fundamentals or data status before a dossier has loaded', () => {
+      TestBed.runInInjectionContext(() => {
+        const computed = dossierComputed(buildSignals());
+        expect(computed.targetBand()).toBeNull();
+        expect(computed.fundamentals()).toEqual([]);
+        expect(computed.dataStatus()).toEqual([]);
+        expect(computed.checkAxes()).toEqual([]);
+        expect(computed.isCrypto()).toBe(false);
       });
     });
   });

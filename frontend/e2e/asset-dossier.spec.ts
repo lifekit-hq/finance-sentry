@@ -49,6 +49,7 @@ test.describe('Asset Dossier', () => {
     const btcDossier = {
       ...DOSSIER_UNKNOWN,
       symbol: 'BTC',
+      performance: null,
       position: {
         provider: 'binance',
         assetClass: 'Crypto',
@@ -111,24 +112,25 @@ test.describe('Asset Dossier', () => {
   test('dossier page writes enums in words and renders yield and peers', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Target changed')).toBeVisible();
-    await expect(page.getByText('Yahoo Finance')).toBeVisible();
+    await expect(page.locator('#recent-news').getByText('Yahoo Finance')).toBeVisible();
     await expect(page.getByText('yahoo:AAPL')).toHaveCount(0);
-    await expect(page.getByText('Dividend Yield')).toBeVisible();
-    await expect(page.getByText('0.50%')).toBeVisible();
+    const dividend = page.getByTestId('fundamental-dividend-yield');
+    await expect(dividend).toContainText('Dividend yield');
+    await expect(dividend).toContainText('0.50%');
     await expect(page.getByTestId('valuation-peers')).toContainText('Versus Technology peers');
     await expect(page.getByTestId('valuation-peer')).toHaveCount(2);
   });
 
   test('dossier page renders thesis section', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByText('Investment Thesis')).toBeVisible();
+    await expect(page.getByRole('heading', {name: "What's the plan?"})).toBeVisible();
     await expect(page.getByText('Apple continues to expand its services revenue')).toBeVisible();
     await expect(page.getByText('Active', {exact: true})).toBeVisible();
   });
 
   test('dossier page renders analyst coverage', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByText('Analyst Coverage')).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'What do analysts say?'})).toBeVisible();
     await expect(page.getByText('Goldman Sachs')).toBeVisible();
   });
 
@@ -194,9 +196,114 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByTestId('dossier-no-data')).toContainText('Nothing on file for ZZZZ');
     // No section card is rendered at all — not even a hollow one.
     await expect(page.getByText('Position', {exact: true})).toHaveCount(0);
-    await expect(page.getByText('Investment Thesis')).toHaveCount(0);
+    await expect(page.getByRole('heading', {name: "What's the plan?"})).toHaveCount(0);
     await expect(page.getByText('Radar Signals')).toHaveCount(0);
     await expect(page.getByTestId('ledger-read-card')).toHaveCount(0);
+  });
+});
+
+test.describe('Asset Dossier - chart, checks and returns', () => {
+  test.beforeEach(async ({page}) => {
+    await mockApis(page);
+  });
+
+  test('hero carries the thesis hook, the performance strip and the size against the cap', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+    const hero = page.getByTestId('dossier-hero');
+    await expect(hero.getByTestId('dossier-hook')).toContainText('12.5% of book');
+    await expect(hero.getByTestId('performance-strip')).toContainText('+22.2%');
+    await expect(hero.getByTestId('performance-strip')).toContainText('from 52w high');
+    await expect(hero.getByTestId('size-cap-text')).toContainText('10');
+    await expect(hero.getByTestId('size-cap-mark')).toBeVisible();
+  });
+
+  test('checks sit next to the wheel and open to their rules and values', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    const checks = page.getByTestId('dossier-checks');
+    await expect(checks.getByTestId('checks-wheel')).toBeVisible();
+    await expect(checks).toContainText('6 of 10 pass');
+    const value = checks.getByTestId('check-axis-value');
+    await value.locator('summary').click();
+    await expect(value).toContainText('P/E below its own 5-year average');
+    await expect(value).toContainText('28.5x vs 25.3x');
+    await expect(value).toContainText('median of 2 peers');
+  });
+
+  test('chart draws the year with the S&P 500, trades and a range switch', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    const chart = page.getByTestId('price-chart');
+    await expect(chart.locator('canvas')).toBeVisible();
+    await expect(chart.getByTestId('chart-trade')).toHaveCount(3);
+    await expect(chart.getByTestId('chart-key')).toContainText('Your average cost $150.00');
+
+    const request = page.waitForRequest(req => req.url().includes('/chart?range=5Y'));
+    await chart.getByTestId('chart-ranges').getByText('5Y', {exact: true}).click();
+    await request;
+  });
+
+  test('return decomposition splits unrealized, realized, dividends and currency', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+    const returns = page.getByTestId('returns');
+    await expect(returns.getByTestId('returns-total')).toContainText('$3,067');
+    await expect(returns.getByTestId('returns-realized')).toContainText('$519');
+    await expect(returns.getByTestId('returns-dividends')).toContainText('$48');
+    await expect(returns.getByTestId('returns-currency')).toContainText('Not available');
+  });
+
+  test('"Is it cheap?" names the analyst source and saves a target of your own', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    const valuation = page.getByTestId('valuation');
+    await expect(valuation.getByTestId('target-range')).toBeVisible();
+    await expect(valuation.getByTestId('target-source')).toContainText('36 analysts');
+    await expect(valuation.getByTestId('target-marker-mine')).toHaveCount(0);
+
+    await valuation.getByTestId('my-target-edit').getByRole('button').click();
+    await valuation.getByTestId('my-target-input').locator('input').fill('230');
+    const saved = page.waitForRequest(
+      req => req.url().endsWith('/research/assets/AAPL/target') && req.method() === 'PUT'
+    );
+    await valuation.getByTestId('my-target-save').getByRole('button').click();
+    expect((await saved).postDataJSON()).toEqual({targetPrice: 230, currency: 'USD'});
+
+    await expect(valuation.getByTestId('my-target-value')).toHaveText('$230.00');
+    await expect(valuation.getByTestId('target-marker-mine')).toBeVisible();
+
+    await valuation.getByTestId('my-target-clear').getByRole('button').click();
+    await expect(valuation.getByTestId('my-target-value')).toHaveCount(0);
+  });
+
+  test('ownership is marked not available and the data status names each source', async ({
+    page,
+  }) => {
+    await page.goto('/assets/AAPL');
+    await expect(page.getByTestId('ownership')).toContainText('Not available');
+    await expect(page.getByTestId('data-status-chart')).toContainText('Yahoo Finance');
+    await expect(page.getByTestId('data-status-returns')).toContainText('3 fills');
+  });
+
+  test('a crypto holding keeps the price and your own target on the band, with analysts, fundamentals, peers and ownership hidden', async ({
+    page,
+  }) => {
+    await page.goto('/assets/BTC');
+    await expect(page.getByRole('heading', {name: 'BTC', level: 1})).toBeVisible();
+    await expect(page.getByTestId('price-chart').locator('canvas')).toBeVisible();
+    await expect(page.getByTestId('check-axis-momentum')).toBeVisible();
+    await expect(page.getByTestId('dossier-checks')).toContainText('3 of 4 pass');
+    await expect(page.getByTestId('check-axis-value')).toHaveCount(0);
+    await expect(page.getByTestId('checks-wheel')).toHaveCount(0);
+    await expect(page.getByTestId('valuation')).toContainText('Price & your target');
+    await expect(page.getByTestId('target-band')).toBeVisible();
+    await expect(page.getByTestId('my-target')).toBeVisible();
+    await expect(page.getByTestId('target-marker-analyst')).toHaveCount(0);
+    await expect(page.getByTestId('target-source')).toHaveCount(0);
+    await expect(page.getByTestId('fundamentals')).toHaveCount(0);
+    await expect(page.getByTestId('valuation-peers')).toHaveCount(0);
+    await expect(page.getByTestId('recommendation-verdict')).toHaveCount(0);
+    await expect(page.getByTestId('ownership')).toHaveCount(0);
   });
 });
 

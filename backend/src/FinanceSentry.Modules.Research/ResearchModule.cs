@@ -241,6 +241,7 @@ public static class ResearchModule
         services.AddScoped<IResearchDocumentRepository, ResearchDocumentRepository>();
         services.AddScoped<IResearchRetrievalRepository, ResearchRetrievalRepository>();
         services.AddScoped<IAssetLedgerReadRepository, AssetLedgerReadRepository>();
+        services.AddScoped<IAssetPriceTargetRepository, AssetPriceTargetRepository>();
         services.Configure<OpportunityOptions>(config.GetSection(OpportunityOptions.SectionName));
         services.Configure<ResearchRetrievalOptions>(config.GetSection(ResearchRetrievalOptions.SectionName));
         services.Configure<AnalystSourcesOptions>(config.GetSection(AnalystSourcesOptions.SectionName));
@@ -354,6 +355,8 @@ public static class ResearchModule
         .SetHandlerLifetime(TimeSpan.FromHours(2));
 
         services.AddScoped<IMarketDataService, YahooMarketDataService>();
+        services.AddSingleton<IPriceHistoryService, YahooPriceHistoryService>();
+        services.AddScoped<PositionReturnsReader>();
         services.AddScoped<IMarketNewsService, RssMarketNewsService>();
         services.AddScoped<IMacroCalendarService, MacroCalendarService>();
         services.AddScoped<IThesisEventRecorder, ThesisEventRecorder>();

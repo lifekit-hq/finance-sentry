@@ -70,6 +70,10 @@ public class IbkrFlexTradeSyncServiceTests
         public Task<IReadOnlyList<BrokerageTrade>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken ct = default) =>
             GetByUserIdAsync(userId, ct);
 
+        public Task<IReadOnlyList<BrokerageTrade>> GetBySymbolUnscopedAsync(Guid userId, string symbol, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<BrokerageTrade>>(Store
+                .Where(t => t.UserId == userId && t.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase)).ToList());
+
         public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
     }
 
@@ -90,6 +94,11 @@ public class IbkrFlexTradeSyncServiceTests
 
         public Task<IReadOnlyList<BrokerageCashTransaction>> GetByUserIdAsync(Guid userId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<BrokerageCashTransaction>>(Store.Where(c => c.UserId == userId).ToList());
+
+        public Task<IReadOnlyList<BrokerageCashTransaction>> GetBySymbolUnscopedAsync(
+            Guid userId, string symbol, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<BrokerageCashTransaction>>(Store
+                .Where(c => c.UserId == userId && string.Equals(c.Symbol, symbol, StringComparison.OrdinalIgnoreCase)).ToList());
 
         public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
     }

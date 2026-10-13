@@ -19,6 +19,42 @@ function quote(overrides: Partial<DossierQuoteDto> = {}): DossierQuoteDto {
   };
 }
 
+describe('DossierQuoteUtils.toMajorUnits', () => {
+  it.each([
+    ['GBp', 'GBP'],
+    ['GBX', 'GBP'],
+    ['ZAc', 'ZAR'],
+    ['ILA', 'ILS'],
+  ])('rescales a %s quote to %s', (minor, major) => {
+    expect(
+      DossierQuoteUtils.toMajorUnits(quote({price: 2650, previousClose: 2600, currency: minor}))
+    ).toEqual({
+      ticker: 'AAPL',
+      price: 26.5,
+      previousClose: 26,
+      changePct: 1.2299,
+      currency: major,
+    });
+  });
+
+  it('keeps a missing previous close missing', () => {
+    expect(
+      DossierQuoteUtils.toMajorUnits(quote({price: 2650, previousClose: null, currency: 'GBp'}))
+    ).toMatchObject({price: 26.5, previousClose: null, currency: 'GBP'});
+  });
+
+  it('leaves a major-currency quote untouched', () => {
+    const usd = quote();
+    expect(DossierQuoteUtils.toMajorUnits(usd)).toBe(usd);
+    const gbp = quote({currency: 'GBP', price: 26.5});
+    expect(DossierQuoteUtils.toMajorUnits(gbp)).toBe(gbp);
+  });
+
+  it('passes a missing quote through', () => {
+    expect(DossierQuoteUtils.toMajorUnits(null)).toBeNull();
+  });
+});
+
 describe('DossierQuoteUtils.toHeader', () => {
   it('formats price as money and a gain with a plus sign', () => {
     expect(DossierQuoteUtils.toHeader(quote())).toEqual({

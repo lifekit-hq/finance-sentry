@@ -3,9 +3,13 @@ namespace FinanceSentry.Modules.Research.Tests.Unit;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
+using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Modules.Research.Application.Queries;
+using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
+using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -56,7 +60,12 @@ public class GetAssetDossierNextEarningsTests
             Mock.Of<IQueryHandler<GetValuationSnapshotQuery, ValuationSnapshotResult>>(),
             Mock.Of<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>(),
             Mock.Of<IQueryHandler<GetNewsForTickerQuery, IReadOnlyList<NewsArticleDto>>>(),
-            calendar.Object);
+            calendar.Object,
+            Mock.Of<IPositionCapSource>(),
+            Mock.Of<IPriceHistoryService>(),
+            Mock.Of<IFundamentalsService>(),
+            Mock.Of<IAssetPriceTargetRepository>(),
+            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
 
         return handler.Handle(new GetAssetDossierQuery(Guid.NewGuid(), Symbol), CancellationToken.None);
     }

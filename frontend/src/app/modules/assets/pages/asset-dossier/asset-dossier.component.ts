@@ -1,8 +1,16 @@
-import {DatePipe, DecimalPipe, DOCUMENT, formatDate} from '@angular/common';
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {DatePipe, DecimalPipe, DOCUMENT, formatDate, NgTemplateOutlet} from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
+import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
 import {
   AlertComponent,
+  AreaChartComponent,
   AsyncStateComponent,
   type AsyncStateStatus,
   ButtonComponent,
@@ -11,12 +19,13 @@ import {
   type ChartPoint,
   ChipComponent,
   EmptyStateComponent,
+  FormFieldComponent,
+  InputComponent,
   InstitutionAvatarComponent,
   LineChartComponent,
   PageContainerComponent,
   RelativeTimePipe,
   SkeletonComponent,
-  StatCardComponent,
   TagComponent,
   type TagVariant,
 } from '@lifekit-hq/ui';
@@ -26,19 +35,24 @@ import {
   LOSS_TEXT_CLASS,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
+import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
+import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
+import {DOSSIER_SECTION_ID} from '../../constants/dossier/dossier-sections.constants';
 import {
+  type ChartRangeId,
   type DossierDeltaDirection,
   type DossierSignalItem,
 } from '../../models/dossier/dossier.model';
+import {type RuleState} from '../../models/dossier/dossier-view.model';
 import {
   AnalystActionLabelPipe,
   CoverageLabelPipe,
-  DividendYieldPipe,
   NewsSourceLabelPipe,
   PeerSetLabelPipe,
   SignalTypeLabelPipe,
@@ -64,6 +78,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     PageContainerComponent,
     AlertComponent,
     AnalystActionLabelPipe,
+    AreaChartComponent,
     AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
@@ -72,7 +87,6 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     CoverageLabelPipe,
     DatePipe,
     DecimalPipe,
-    DividendYieldPipe,
     InstitutionAvatarComponent,
     MarkdownPipe,
     MoneyPipe,
@@ -84,13 +98,19 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,
+    FormFieldComponent,
+    FormsModule,
+    InputComponent,
+    InputHintsDirective,
     LineChartComponent,
-    StatCardComponent,
+    NgTemplateOutlet,
     TagComponent,
     TriggerSentencePipe,
   ],
   templateUrl: './asset-dossier.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // lk-segmented (the chart's timeframe tabs) is a custom element from @lifekit-hq/elements.
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DossierStore],
 })
 export class AssetDossierComponent {
@@ -114,6 +134,26 @@ export class AssetDossierComponent {
     up: GAIN_TEXT_CLASS,
     down: LOSS_TEXT_CLASS,
     flat: 'text-text-secondary',
+  };
+
+  public readonly sectionId = DOSSIER_SECTION_ID;
+  public readonly chartRanges = CHART_RANGES;
+  public readonly chartSkeletonHeight = CHART_SKELETON_HEIGHT;
+  public readonly ownershipNote = OWNERSHIP_NOTE;
+  // A tick per rule: passed, failed, or not evaluable on the data on hand.
+  public readonly ruleTickClass: Record<RuleState, string> = {
+    pass: 'bg-gain',
+    fail: 'bg-loss',
+    unknown: 'bg-border-strong',
+  };
+  public readonly ruleStateLabel: Record<RuleState, string> = {
+    pass: 'Pass',
+    fail: 'Fail',
+    unknown: 'No data',
+  };
+  public readonly toneClass: Record<'gain' | 'loss', string> = {
+    gain: GAIN_TEXT_CLASS,
+    loss: LOSS_TEXT_CLASS,
   };
 
   public readonly trendDomain: ChartDomain = {min: 0, max: TREND_SCALE_MAX};
@@ -144,6 +184,16 @@ export class AssetDossierComponent {
 
   public scrollToSection(id: string): void {
     this.document.getElementById(id)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  // The tick-strip template's context is untyped; this keeps the lookup typed.
+  public tickClass(state: RuleState): string {
+    return this.ruleTickClass[state];
+  }
+
+  public onChartRangeChange(event: Event): void {
+    const {value} = (event as CustomEvent<{value: ChartRangeId}>).detail;
+    this.store.selectChartRange(value);
   }
 
   public generateLedgerRead(symbol: string, force: boolean): void {

@@ -9,6 +9,7 @@ using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Agent.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FinanceSentry.Modules.Research.Domain.Ports;
@@ -298,7 +299,12 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
     public Mock<IValuationHistoryService> ValuationHistoryMock { get; } = new(MockBehavior.Loose);
     public Mock<ILedgerNarrator> NarratorMock { get; } = new(MockBehavior.Loose);
     public Mock<IAgentConversationService> AgentConversationMock { get; } = new(MockBehavior.Loose);
+    public Mock<IPriceHistoryService> PriceHistoryMock { get; } = new(MockBehavior.Loose);
+    public Mock<IPositionLedgerSource> PositionLedgerMock { get; } = new(MockBehavior.Loose);
+    public Mock<IPositionCapSource> PositionCapMock { get; } = new(MockBehavior.Loose);
+    public Mock<IFundamentalsService> FundamentalsMock { get; } = new(MockBehavior.Loose);
     public InMemoryAssetLedgerReadRepository LedgerReads { get; } = new();
+    public InMemoryAssetPriceTargetRepository PriceTargets { get; } = new();
 
     public Guid TestUserId { get; } = Guid.NewGuid();
     public Guid NonOwnerUserId { get; } = Guid.NewGuid();
@@ -317,10 +323,15 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             ReplaceService(services, BrokerageHoldingsReaderMock.Object);
             ReplaceService(services, NarratorMock.Object);
             ReplaceService(services, AgentConversationMock.Object);
+            ReplaceService(services, PriceHistoryMock.Object);
+            ReplaceService(services, PositionLedgerMock.Object);
+            ReplaceService(services, PositionCapMock.Object);
+            ReplaceService(services, FundamentalsMock.Object);
 
             // The real upsert is one INSERT ... ON CONFLICT, which the in-memory provider cannot run
             // (ResearchUpsertTests covers it on Postgres).
             ReplaceService<IAssetLedgerReadRepository>(services, LedgerReads);
+            ReplaceService<IAssetPriceTargetRepository>(services, PriceTargets);
 
             // Default stubs: return empty/null so tests that don't set up mocks still get 200.
             BookFiguresMock
@@ -342,6 +353,12 @@ public class AssetDossierApiFactory : WebApplicationFactory<Program>
             BrokerageHoldingsReaderMock
                 .Setup(s => s.GetHoldingsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync([]);
+            PriceHistoryMock
+                .Setup(s => s.GetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(PriceHistory.Empty);
+            PositionLedgerMock
+                .Setup(s => s.ReadForSymbolAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(PositionLedger.Empty);
 
             // Replace all DbContexts with in-memory databases.
             ReplaceDbContextWithInMemory<FinanceSentry.Modules.BankSync.Infrastructure.Persistence.BankSyncDbContext>(
@@ -467,6 +484,25 @@ public sealed class InMemoryAssetLedgerReadRepository : IAssetLedgerReadReposito
             });
         return Task.CompletedTask;
     }
+
+    private static string Normalize(string symbol) => symbol.Trim().ToUpperInvariant();
+}
+
+public sealed class InMemoryAssetPriceTargetRepository : IAssetPriceTargetRepository
+{
+    private readonly ConcurrentDictionary<(Guid UserId, string Symbol), AssetPriceTarget> _targets = new();
+
+    public Task<AssetPriceTarget?> GetAsync(Guid userId, string symbol, CancellationToken ct = default)
+        => Task.FromResult(_targets.GetValueOrDefault((userId, Normalize(symbol))));
+
+    public Task UpsertAsync(AssetPriceTarget target, CancellationToken ct = default)
+    {
+        _targets[(target.UserId, Normalize(target.Symbol))] = target;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> DeleteAsync(Guid userId, string symbol, CancellationToken ct = default)
+        => Task.FromResult(_targets.TryRemove((userId, Normalize(symbol)), out _));
 
     private static string Normalize(string symbol) => symbol.Trim().ToUpperInvariant();
 }

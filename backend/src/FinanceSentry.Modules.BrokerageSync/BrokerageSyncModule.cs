@@ -106,6 +106,7 @@ public static class BrokerageSyncModule
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
         // #673: published read port - the Integration adapter reaches tax lots only through it.
         services.AddScoped<ITaxLotReader, TaxLotReader>();
+        services.AddScoped<IPositionLedgerReader, PositionLedgerReader>();
         // Shared with the Hangfire ConsecutiveFailureGaugeFilter (Program.cs) — same
         // durable, storage-backed streak state, keyed separately per job/credential.
         services.TryAddSingleton<IJobFailureStreakStore, HangfireJobFailureStreakStore>();

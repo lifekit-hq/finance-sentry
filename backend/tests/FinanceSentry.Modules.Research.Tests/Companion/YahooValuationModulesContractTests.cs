@@ -112,6 +112,41 @@ public sealed class YahooValuationModulesContractTests
     }
 
     [Fact]
+    public void Parse_pence_quote_keeps_the_quoted_unit_and_label()
+    {
+        const string london = """
+        {
+          "quoteSummary": {
+            "result": [
+              {
+                "price": {
+                  "quoteType": "EQUITY",
+                  "currency": "GBp",
+                  "regularMarketPrice": { "raw": 2650.0 }
+                },
+                "financialData": {
+                  "targetMeanPrice": { "raw": 3000.0 },
+                  "targetLowPrice": { "raw": 2400.0 },
+                  "targetHighPrice": { "raw": 3600.0 }
+                }
+              }
+            ],
+            "error": null
+          }
+        }
+        """;
+
+        var metrics = YahooValuationDataService.Parse(london, "SHEL.L");
+
+        metrics.Should().NotBeNull();
+        metrics!.Currency.Should().Be("GBp");
+        metrics.Price.Should().Be(2650m);
+        metrics.ConsensusTarget.Should().Be(3000m);
+        metrics.TargetLow.Should().Be(2400m);
+        metrics.TargetHigh.Should().Be(3600m);
+    }
+
+    [Fact]
     public void Parse_returns_null_when_result_block_absent()
     {
         const string empty = """{ "quoteSummary": { "result": [], "error": "Not Found" } }""";

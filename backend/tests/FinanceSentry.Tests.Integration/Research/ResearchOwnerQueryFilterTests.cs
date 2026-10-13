@@ -83,7 +83,7 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
 
         var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
 
-        perUser.Should().HaveCount(9);
+        perUser.Should().HaveCount(10);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -115,6 +115,30 @@ public sealed class ResearchOwnerQueryFilterTests : IAsyncLifetime
         (await asNoOne.Theses.AnyAsync()).Should().BeFalse("no person in scope matches no row");
         (await asNoOne.PolicyStatements.AnyAsync()).Should().BeFalse();
         (await asNoOne.WatchlistItems.AnyAsync()).Should().BeFalse();
+    }
+
+    [DockerRequiredFact]
+    public async Task Price_targets_are_readable_and_removable_only_by_their_owner()
+    {
+        await SeedAsync(
+            new AssetPriceTarget { UserId = _userA, Symbol = "AAPL", TargetPrice = 250m },
+            new AssetPriceTarget { UserId = _userB, Symbol = "AAPL", TargetPrice = 180m });
+
+        await using (var asA = CreateContext(_userA))
+            (await new AssetPriceTargetRepository(asA).GetAsync(_userA, "aapl"))!.TargetPrice.Should().Be(250m);
+
+        await using (var asB = CreateContext(_userB))
+        {
+            (await new AssetPriceTargetRepository(asB).GetAsync(_userA, "AAPL")).Should().BeNull(
+                "the filter holds even when a read names another person explicitly");
+            (await new AssetPriceTargetRepository(asB).DeleteAsync(_userA, "AAPL")).Should().BeFalse();
+        }
+
+        await using (var asNoOne = CreateContext())
+            (await asNoOne.AssetPriceTargets.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+
+        await using var asA2 = CreateContext(_userA);
+        (await asA2.AssetPriceTargets.Select(t => t.TargetPrice).ToListAsync()).Should().Equal(250m);
     }
 
     [DockerRequiredFact]

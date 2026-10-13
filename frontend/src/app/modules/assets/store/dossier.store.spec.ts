@@ -8,9 +8,12 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
 import {AuthStore} from '../../auth/store/auth.store';
 import {
+  type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
   type DossierQuoteDto,
+  type DossierUserTargetDto,
+  type ValuationSnapshotDto,
 } from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 import {DossierStore} from './dossier.store';
@@ -53,6 +56,60 @@ const QUOTE: DossierQuoteDto = {
   currency: 'USD',
 };
 
+const CHART: AssetChartDto = {
+  symbol: 'AAPL',
+  range: '1Y',
+  currency: 'USD',
+  points: [{date: '2026-10-13', close: 189.3, benchmark: 100}],
+  benchmarkLabel: 'S&P 500',
+  trades: [],
+  averageCost: null,
+  changePct: 1,
+  benchmarkChangePct: 1,
+  source: 'yahoo-chart',
+  retrievedAt: '2026-10-13T00:00:00Z',
+};
+
+const TARGET: DossierUserTargetDto = {
+  targetPrice: 250,
+  currency: 'USD',
+  updatedAt: '2026-10-13T00:00:00Z',
+};
+
+const NO_METRIC = {
+  value: null,
+  fiveYearAvg: null,
+  historyWindowYears: null,
+  historyUnavailable: true,
+};
+
+function majorUnitValuation(currency: string): ValuationSnapshotDto {
+  return {
+    ticker: 'AAPL',
+    notApplicable: false,
+    price: 26.4,
+    isStale: false,
+    metrics: {
+      trailingPe: NO_METRIC,
+      forwardPe: NO_METRIC,
+      evToEbitda: NO_METRIC,
+      dividendYield: NO_METRIC,
+    },
+    consensusTarget: 30,
+    impliedUpsidePct: null,
+    peerSet: null,
+    sources: [],
+    retrievedAt: '2026-10-13T00:00:00Z',
+    name: null,
+    sector: null,
+    industry: null,
+    priceAsOf: null,
+    currency,
+    targetLow: 24,
+    targetHigh: 36,
+  };
+}
+
 function httpError(errorCode: string) {
   return throwError(() => new HttpErrorResponse({status: 500, error: {errorCode}}));
 }
@@ -63,6 +120,9 @@ describe('DossierStore', () => {
     getQuotes: ReturnType<typeof vi.fn>;
     getLedgerRead: ReturnType<typeof vi.fn>;
     generateLedgerRead: ReturnType<typeof vi.fn>;
+    getChart: ReturnType<typeof vi.fn>;
+    setTarget: ReturnType<typeof vi.fn>;
+    clearTarget: ReturnType<typeof vi.fn>;
   };
   let canUseAi: boolean;
 
@@ -89,6 +149,9 @@ describe('DossierStore', () => {
       getQuotes: vi.fn().mockReturnValue(of([QUOTE])),
       getLedgerRead: vi.fn().mockReturnValue(of(READ)),
       generateLedgerRead: vi.fn().mockReturnValue(of(READ)),
+      getChart: vi.fn().mockImplementation((_: string, range: string) => of({...CHART, range})),
+      setTarget: vi.fn().mockReturnValue(of(TARGET)),
+      clearTarget: vi.fn().mockReturnValue(of(undefined)),
     };
   });
 
@@ -111,6 +174,34 @@ describe('DossierStore', () => {
     expect(store.ledgerRead()).toEqual(READ);
     expect(store.quoteHeader()?.priceText).toBe('$189.30');
   });
+
+  it.each([
+    ['GBp', 'GBP', '£26.50'],
+    ['ILA', 'ILS', 'ILS 26.50'],
+  ])(
+    'puts a %s quote in %s so the price, header and target band share the dossier unit',
+    (minor, major, priceText) => {
+      service.getDossier.mockReturnValue(
+        of({
+          ...DOSSIER,
+          valuation: majorUnitValuation(major),
+          userTarget: {targetPrice: 32, currency: major, updatedAt: '2026-10-13T00:00:00Z'},
+        })
+      );
+      service.getQuotes.mockReturnValue(
+        of([{...QUOTE, price: 2650, previousClose: 2600, currency: minor}])
+      );
+
+      const store = inject();
+
+      expect(store.quote()).toMatchObject({price: 26.5, previousClose: 26, currency: major});
+      expect(store.currentPrice()).toBe(26.5);
+      expect(store.quoteHeader()?.priceText).toBe(priceText);
+      const band = store.targetBand();
+      expect(band?.markers.find(m => m.key === 'price')?.value).toBe(26.5);
+      expect(band?.markers.every(m => m.leftPct >= 0 && m.leftPct <= 100)).toBe(true);
+    }
+  );
 
   it('keeps the quote and ledger read idle when they are not requested', () => {
     canUseAi = false;
@@ -172,5 +263,129 @@ describe('DossierStore', () => {
 
     expect(store.isLedgerReadLoading()).toBe(true);
     expect(store.ledgerRead()).toEqual(READ);
+  });
+
+  it('loads the one-year chart with the dossier and reloads on a new range only', () => {
+    const store = inject();
+
+    expect(service.getChart).toHaveBeenCalledWith('AAPL', '1Y');
+    expect(store.chartStatus()).toBe('success');
+    expect(store.chart()?.range).toBe('1Y');
+
+    store.selectChartRange('1Y');
+    expect(service.getChart).toHaveBeenCalledTimes(1);
+
+    store.selectChartRange('5Y');
+    expect(service.getChart).toHaveBeenLastCalledWith('AAPL', '5Y');
+    expect(store.chartRange()).toBe('5Y');
+    expect(store.chart()?.range).toBe('5Y');
+  });
+
+  it('keeps the page when the chart fails and resolves its message', () => {
+    service.getChart.mockReturnValue(httpError('INVALID_CHART_RANGE'));
+
+    const store = inject();
+
+    expect(store.dossierStatus()).toBe('success');
+    expect(store.chartStatus()).toBe('error');
+    expect(store.chartAsyncStatus()).toBe('error');
+  });
+
+  it('ignores a range change before the dossier has loaded', () => {
+    service.getDossier.mockReturnValue(NEVER);
+    const store = inject();
+
+    store.selectChartRange('5Y');
+
+    expect(service.getChart).not.toHaveBeenCalled();
+    expect(store.chartRange()).toBe('1Y');
+  });
+
+  it('saves a valid draft in the asset currency and writes it into the dossier', () => {
+    service.getDossier.mockReturnValue(
+      of({
+        ...DOSSIER,
+        performance: {
+          lastClose: 189,
+          yearChangePct: null,
+          high52Week: null,
+          low52Week: null,
+          fromHighPct: null,
+          benchmarkYearChangePct: null,
+          currency: 'EUR',
+          asOf: null,
+        },
+      })
+    );
+    const store = inject();
+
+    store.openTargetEditor();
+    store.setTargetDraft('250');
+    store.saveTarget();
+
+    expect(service.setTarget).toHaveBeenCalledWith('AAPL', {targetPrice: 250, currency: 'EUR'});
+    expect(store.dossier()?.userTarget).toEqual(TARGET);
+    expect(store.isEditingTarget()).toBe(false);
+    expect(store.targetStatus()).toBe('success');
+  });
+
+  it('sends no currency when the asset has none on record', () => {
+    const store = inject();
+
+    store.setTargetDraft('250');
+    store.saveTarget();
+
+    expect(service.setTarget).toHaveBeenCalledWith('AAPL', {targetPrice: 250, currency: null});
+  });
+
+  it('never sends an invalid draft', () => {
+    const store = inject();
+
+    store.setTargetDraft('-1');
+    store.saveTarget();
+
+    expect(service.setTarget).not.toHaveBeenCalled();
+  });
+
+  it('keeps the editor open and resolves the message when a save fails', () => {
+    service.setTarget.mockReturnValue(httpError('INVALID_PRICE_TARGET'));
+    const store = inject();
+
+    store.openTargetEditor();
+    store.setTargetDraft('250');
+    store.saveTarget();
+
+    expect(store.targetStatus()).toBe('error');
+    expect(store.targetErrorMessage()).not.toBe('');
+    expect(store.isEditingTarget()).toBe(true);
+  });
+
+  it('clears the target', () => {
+    service.getDossier.mockReturnValue(of({...DOSSIER, userTarget: TARGET}));
+    const store = inject();
+
+    store.clearTarget();
+
+    expect(service.clearTarget).toHaveBeenCalledWith('AAPL');
+    expect(store.dossier()?.userTarget).toBeNull();
+  });
+
+  it('flags a failed clear and does nothing before the dossier has loaded', () => {
+    service.clearTarget.mockReturnValue(httpError('NOPE'));
+    const store = inject();
+
+    store.clearTarget();
+    expect(store.targetErrorMessage()).toBe('Failed to save your target.');
+  });
+
+  it('does not clear before the dossier has loaded', () => {
+    service.getDossier.mockReturnValue(NEVER);
+    const store = inject();
+
+    store.clearTarget();
+    store.saveTarget();
+
+    expect(service.clearTarget).not.toHaveBeenCalled();
+    expect(service.setTarget).not.toHaveBeenCalled();
   });
 });

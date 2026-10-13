@@ -11,6 +11,8 @@ export const DossierStore = signalStore(
   withNamedAsyncStatus('dossier', {defaultErrorMessage: 'Failed to load asset dossier.'}),
   withNamedAsyncStatus('ledgerRead', {defaultErrorMessage: "Failed to load Ledger's read."}),
   withNamedAsyncStatus('quote'),
+  withNamedAsyncStatus('chart', {defaultErrorMessage: 'Failed to load the price chart.'}),
+  withNamedAsyncStatus('target', {defaultErrorMessage: 'Failed to save your target.'}),
   withMethods(dossierMethods),
   withComputed(dossierComputed),
   withMethods(dossierEffects),

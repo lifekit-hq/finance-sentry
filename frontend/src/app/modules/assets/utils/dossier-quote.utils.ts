@@ -1,5 +1,9 @@
 import {MoneyUtils} from '../../../shared/utils/money.utils';
-import {EQUITY_ASSET_CLASS} from '../constants/dossier/dossier-quote.constants';
+import {
+  EQUITY_ASSET_CLASS,
+  MINOR_UNIT_CURRENCIES,
+  MINOR_UNITS_PER_MAJOR,
+} from '../constants/dossier/dossier-quote.constants';
 import {
   type AssetDossierDto,
   type DossierDeltaDirection,
@@ -24,6 +28,26 @@ export class DossierQuoteUtils {
       !dossier.valuation.notApplicable &&
       dossier.valuation.price !== null
     );
+  }
+
+  /**
+   * The shared quote endpoint answers in the unit the exchange quotes (1250 GBp), while the dossier's
+   * valuation, performance and user target are in the major currency (12.50 GBP). A minor-unit quote is
+   * scaled and relabelled here so the price, the analyst band and the targets share one unit.
+   */
+  public static toMajorUnits(quote: Nullable<DossierQuoteDto>): Nullable<DossierQuoteDto> {
+    const major = quote ? MINOR_UNIT_CURRENCIES.get(quote.currency.trim()) : undefined;
+    if (!quote || major === undefined) {
+      return quote;
+    }
+    const scale = (value: Nullable<number>): Nullable<number> =>
+      value === null ? null : value / MINOR_UNITS_PER_MAJOR;
+    return {
+      ...quote,
+      price: quote.price / MINOR_UNITS_PER_MAJOR,
+      previousClose: scale(quote.previousClose),
+      currency: major,
+    };
   }
 
   /** "$189.30" with "+1.25%"; a quote without a usable price yields null so the slot stays empty. */

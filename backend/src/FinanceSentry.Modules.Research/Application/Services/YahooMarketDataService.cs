@@ -233,7 +233,7 @@ public class YahooMarketDataService(
         return bars.LastOrDefault(b => b.Date < sessionDate)?.Close;
     }
 
-    private static List<DailyClose> ReadDailyBars(JsonElement result)
+    internal static List<DailyClose> ReadDailyBars(JsonElement result)
     {
         var bars = new List<DailyClose>();
         if (!result.TryGetProperty("timestamp", out var timestamps) ||
@@ -297,7 +297,7 @@ public class YahooMarketDataService(
         };
     }
 
-    private static string ResolveYahooTicker(string ticker)
+    internal static string ResolveYahooTicker(string ticker)
     {
         return YahooTickerAliases.TryGetValue(ticker, out var alias)
             ? alias

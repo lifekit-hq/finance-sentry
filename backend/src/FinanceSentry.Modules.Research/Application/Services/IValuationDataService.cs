@@ -20,7 +20,9 @@ public interface IValuationDataService
 /// is <c>null</c>, never zero (FR-006). <see cref="NotApplicable"/> = non-equity quote type.
 /// <see cref="Name"/> is the company name from the already-fetched Yahoo <c>price</c> module;
 /// <see cref="PriceAsOf"/> is when the shared quote path last saw the price (null when only the
-/// quoteSummary price is known).
+/// quoteSummary price is known). <see cref="TargetLow"/> / <see cref="TargetHigh"/> bound the analysts'
+/// price targets around <see cref="ConsensusTarget"/> (their mean), from <see cref="AnalystCount"/>
+/// opinions; <see cref="Currency"/> is the quote currency every price is in.
 /// </summary>
 public sealed record ValuationCurrentMetrics(
     string Ticker,
@@ -35,4 +37,9 @@ public sealed record ValuationCurrentMetrics(
     string? Sector,
     string? Industry,
     string? Name = null,
-    DateTimeOffset? PriceAsOf = null);
+    DateTimeOffset? PriceAsOf = null,
+    decimal? TargetLow = null,
+    decimal? TargetHigh = null,
+    int? AnalystCount = null,
+    string? Currency = null,
+    decimal? MarketCap = null);

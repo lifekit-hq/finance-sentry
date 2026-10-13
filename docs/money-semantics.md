@@ -191,6 +191,53 @@ dossier: they link nowhere, and the command palette omits them.
 **Position share of book** (`DossierPositionSection.ShareOfBookPercent`, asset dossier hero): the
 position's USD value over the book's `TotalValueUsd`, cash included - the same denominator as a
 Holdings row's weight - rounded to two decimals; null when the book total is not positive.
+`PositionCapPercent` beside it is the IPS single-position cap (`MaxPositionWeight` x 100), the bar the
+size-vs-cap meter and the "within the cap" check compare the share with.
+
+**Return decomposition** (`DossierPositionSection.Returns`, `PositionReturnCalculator`, asset dossier
+hero). Where a holding's return came from, in USD, read from the fills and dividend rows ingested for
+the symbol (`IPositionLedgerSource`: IBKR Flex trades and cash transactions, Inzhur cabinet rows;
+crypto fills are not ingested):
+
+- **Average-cost walk.** Fills are replayed oldest first. A buy adds `quantity x price` plus the
+  commission paid to the open cost, converted at the historical FX rate of its trade date
+  (`IHistoricalExchangeRateService`). A sell releases its share of the open cost (matched units over
+  units held) and realizes `quantity x price x rate on the day - commission - released cost`. A disposal
+  with no price (an Inzhur gift) releases cost without realizing a gain.
+- **Unrealized** = the holding's USD value now minus the open cost re-priced at today's FX rate.
+  **Currency** = that open cost at today's rate minus the same cost at the rates of the buys - what the
+  trade currency's move against the dollar added. A USD holding's currency component is 0.
+  **Dividends** = dividend and distribution credits net of the tax withheld from them, each at its
+  pay-date rate. **Total** sums the non-null components.
+- **Coverage.** `complete` when the fills explain the whole holding (units after the walk equal the
+  quantity held, and no sell exceeds what was bought). `partial` when they do not (history before the
+  first ingested fill): only the holding's own cost-basis gain (value minus the provider's
+  `CostBasisUsd`) and the dividends stand, realized and currency are null; dividends are null too when
+  no income row was ingested. `unavailable` when nothing was ingested: unrealized is the cost-basis
+  gain, the rest null. Never filled with zero.
+- **Average cost** (`AverageCostNative`, `CostCurrency`): open native cost over units, set only for
+  complete coverage in a single trade currency. The chart's avg-cost line uses it when that currency
+  is the chart's quote currency; otherwise, on a USD-quoted chart only, `CostBasisUsd / quantity`;
+  otherwise no line.
+
+**Asset chart and performance strip** (`GET /research/assets/{symbol}/chart`, `AssetDossierResult.Performance`).
+Closes are the Yahoo chart series in the asset's own quote currency (crypto as `{SYM}-USD`), never converted
+across currencies; a minor-unit quote (`GBp`/`GBX`, `ZAc`, `ILA`) is divided by 100 and labelled `GBP`/`ZAR`/`ILS`
+(`MinorUnitCurrency`), as are the valuation price and analyst targets, so price, band and the user's target
+share one unit.
+The S&P 500 line is SPY's close on (or carried forward to) each of the asset's dates, rebased so it starts at
+the asset's close on the benchmark's first date: it compares the two paths, not prices. It covers the window
+only when that first benchmark close is within 5 calendar days of the asset's first close (a weekend or
+holiday start); otherwise its change % is null and the page draws no line (an asset older than SPY, as on the
+Max tab). Change % is first to last close of the
+window; the 52-week high and low are closing values, not intraday extremes; "from 52w high" is the last
+close over that high minus 1. Trade markers are the ingested fills inside the window, each at its own
+trade price and currency.
+
+**User target** (`PUT`/`DELETE /research/assets/{symbol}/target`, `AssetPriceTarget`). A per-person fair-value
+price for one symbol, stored as entered (above 0, at most 1e9) with the major currency of the price it was
+set against (optional ISO code). It is the user's own number, drawn beside the analyst mean and low/high (Yahoo `financialData`,
+source named); the app computes no fair value of its own.
 
 **Cash rows elsewhere.** The same cash definition (`AssetClassNormalizer.Cash` on a broker
 `InstrumentType`, `IsVenueFiat` on a venue balance) tags cash on three more surfaces; none of them

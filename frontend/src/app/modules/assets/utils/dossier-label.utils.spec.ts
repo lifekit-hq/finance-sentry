@@ -1,6 +1,19 @@
 import {DossierLabelUtils} from './dossier-label.utils';
 
 describe('DossierLabelUtils', () => {
+  it.each([
+    ['yahoo:chart', 'Yahoo Finance'],
+    ['yahoo-finance', 'Yahoo Finance'],
+    ['sec-edgar-us-gaap', 'SEC EDGAR'],
+    ['Finnhub', 'Finnhub'],
+  ])('names the data source %s', (code, label) => {
+    expect(DossierLabelUtils.dataSource(code)).toBe(label);
+  });
+
+  it('title-cases an unknown data source', () => {
+    expect(DossierLabelUtils.dataSource('some_feed')).toBe('Some Feed');
+  });
+
   it('maps known coverage codes', () => {
     expect(DossierLabelUtils.coverage('inUniverse')).toBe('In your research universe');
     expect(DossierLabelUtils.coverage('notInUniverse')).toBe('Outside your research universe');

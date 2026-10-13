@@ -163,6 +163,43 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("asset_ledger_reads", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.AssetPriceTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("TargetPrice")
+                        .HasPrecision(22, 12)
+                        .HasColumnType("numeric(22,12)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Symbol")
+                        .IsUnique()
+                        .HasDatabaseName("idx_asset_price_targets_user_symbol");
+
+                    b.ToTable("asset_price_targets", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.BenchmarkRelativeRecord", b =>
                 {
                     b.Property<Guid>("Id")

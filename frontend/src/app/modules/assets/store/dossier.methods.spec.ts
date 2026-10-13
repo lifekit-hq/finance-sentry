@@ -73,4 +73,77 @@ describe('dossierMethods', () => {
     methods.clearQuote();
     expect(state.quote()).toBeNull();
   });
+
+  it('setChart and setChartRange store the chart and its range', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+    const chart = {
+      symbol: 'AAPL',
+      range: '6M' as const,
+      currency: 'USD',
+      points: [],
+      benchmarkLabel: 'S&P 500',
+      trades: [],
+      averageCost: null,
+      changePct: null,
+      benchmarkChangePct: null,
+      source: 'yahoo-chart',
+      retrievedAt: '2026-10-13T00:00:00Z',
+    };
+
+    methods.setChart(chart);
+    methods.setChartRange('6M');
+
+    expect(state.chart()).toEqual(chart);
+    expect(state.chartRange()).toBe('6M');
+  });
+
+  it('openTargetEditor starts from the saved target, or blank without one', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+
+    methods.openTargetEditor();
+    expect(state.isEditingTarget()).toBe(true);
+    expect(state.targetDraft()).toBe('');
+
+    methods.setDossier(
+      mkDossier({
+        userTarget: {targetPrice: 250.5, currency: 'USD', updatedAt: '2026-10-13T00:00:00Z'},
+      })
+    );
+    methods.openTargetEditor();
+    expect(state.targetDraft()).toBe('250.5');
+  });
+
+  it('setTargetDraft stores the text and closeTargetEditor drops it', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+
+    methods.openTargetEditor();
+    methods.setTargetDraft('99');
+    expect(state.targetDraft()).toBe('99');
+
+    methods.closeTargetEditor();
+    expect(state.isEditingTarget()).toBe(false);
+    expect(state.targetDraft()).toBe('');
+  });
+
+  it('setUserTarget writes the target into the dossier and closes the editor', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+    const target = {targetPrice: 300, currency: 'USD', updatedAt: '2026-10-13T00:00:00Z'};
+
+    methods.setUserTarget(target);
+    expect(state.dossier()).toBeNull();
+
+    methods.setDossier(mkDossier());
+    methods.openTargetEditor();
+    methods.setUserTarget(target);
+
+    expect(state.dossier()?.userTarget).toEqual(target);
+    expect(state.isEditingTarget()).toBe(false);
+
+    methods.setUserTarget(null);
+    expect(state.dossier()?.userTarget).toBeNull();
+  });
 });
