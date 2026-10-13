@@ -6,8 +6,8 @@ using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Domain.Ports;
 
 /// <summary>
-/// Aggregate dossier for one symbol: fans out to all per-ticker data sources in parallel and
-/// composes the result. Each section degrades to null / empty on failure — never throws (feature 421).
+/// Aggregate dossier for one symbol: reads all per-ticker data sources in turn (they share one
+/// scoped DbContext) and composes the result. Each section degrades to null / empty on failure — never throws (feature 421).
 /// </summary>
 public sealed record GetAssetDossierQuery(Guid UserId, string Symbol) : IQuery<AssetDossierResult>;
 
@@ -34,26 +34,18 @@ public sealed class GetAssetDossierQueryHandler(
         var userId = request.UserId;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // Fan-out all source reads in parallel; each is wrapped so one failure cannot 500 the rest.
-        var bookTask = Safe(() => bookFigures.ReadAsync(userId, ct));
-        var thesesTask = Safe(() => theses.Handle(new GetThesesQuery(userId), ct));
-        var valuationTask = Safe(() => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
-        var analystTask = Safe(() => analystActions.Handle(
+        // Read the sources one after another: the theses, valuation, analyst and news handlers share this
+        // request's one scoped ResearchDbContext, which allows a single operation at a time. Each read is wrapped
+        // so one failure cannot 500 the rest.
+        var book = await Safe(() => bookFigures.ReadAsync(userId, ct));
+        var allTheses = await Safe(() => theses.Handle(new GetThesesQuery(userId), ct));
+        var valuationResult = await Safe(() => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
+        var analystResult = await Safe(() => analystActions.Handle(
             new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
-        var newsTask = Safe(() => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
-        var earningsTask = Safe(() => earnings.Handle(
+        var newsResult = await Safe(() => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
+        var earningsResult = await Safe(() => earnings.Handle(
             new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), null), ct));
-        var signalsTask = Safe(() => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
-
-        await Task.WhenAll(bookTask, thesesTask, valuationTask, analystTask, newsTask, earningsTask, signalsTask);
-
-        var book = await bookTask;
-        var allTheses = await thesesTask;
-        var valuationResult = await valuationTask;
-        var analystResult = await analystTask;
-        var newsResult = await newsTask;
-        var earningsResult = await earningsTask;
-        var signalResult = await signalsTask;
+        var signalResult = await Safe(() => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
 
         // Position section: find symbol in the book, then fetch tax lots for brokerage positions.
         var position = await BuildPositionSectionAsync(userId, symbol, book, ct);
