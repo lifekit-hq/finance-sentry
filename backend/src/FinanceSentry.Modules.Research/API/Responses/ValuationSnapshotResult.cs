@@ -29,7 +29,10 @@ public record ValuationMetricsDto(
 /// A valuation snapshot for one ticker: current metrics vs the ticker's own history and a named peer
 /// set, plus consensus target and implied upside. <see cref="NotApplicable"/> = non-equity (crypto)
 /// — explicit, never fabricated (feature 030, FR-006). Every response also persists a
-/// <c>valuation_snapshots</c> row so the comparison window grows organically.
+/// <c>valuation_snapshots</c> row so the comparison window grows organically. <see cref="Name"/>,
+/// <see cref="Sector"/> and <see cref="Industry"/> are the company profile Yahoo already returns
+/// with the metrics; <see cref="PriceAsOf"/> is when <see cref="Price"/> was last seen by the quote
+/// path (null when unknown), so a stale price can say how old it is.
 /// </summary>
 public record ValuationSnapshotResult(
     string Ticker,
@@ -41,7 +44,11 @@ public record ValuationSnapshotResult(
     decimal? ImpliedUpsidePct,
     ValuationPeerSet? PeerSet,
     IReadOnlyList<string> Sources,
-    DateTimeOffset RetrievedAt)
+    DateTimeOffset RetrievedAt,
+    string? Name = null,
+    string? Sector = null,
+    string? Industry = null,
+    DateTimeOffset? PriceAsOf = null)
 {
     /// <summary>An explicit not-applicable result for a non-equity ticker (crypto) — no fabricated values.</summary>
     public static ValuationSnapshotResult ForNonEquity(string ticker) => new(

@@ -19,6 +19,8 @@ public sealed class YahooValuationModulesContractTests
           {
             "price": {
               "quoteType": "EQUITY",
+              "longName": "McDonald's Corporation",
+              "shortName": "McDonald's Corporation",
               "regularMarketPrice": { "raw": 265.1, "fmt": "265.10" }
             },
             "summaryDetail": {
@@ -61,6 +63,7 @@ public sealed class YahooValuationModulesContractTests
         metrics.EvToEbitda.Should().Be(16.6m, "249B enterprise value / 15B EBITDA rounds to 16.60");
         metrics.Sector.Should().Be("Consumer Cyclical");
         metrics.Industry.Should().Be("Restaurants");
+        metrics.Name.Should().Be("McDonald's Corporation");
     }
 
     [Fact]

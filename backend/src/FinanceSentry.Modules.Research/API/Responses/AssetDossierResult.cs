@@ -22,6 +22,8 @@ public sealed record AssetDossierResult(
 /// <summary>
 /// Position and tax-lot detail for a holding in the user's book. TaxLots: IBKR only; empty for crypto.
 /// AssetClass: the canonical bucket from <see cref="FinanceSentry.Core.Domain.AssetClassNormalizer"/>.
+/// ShareOfBookPercent: the position's share of the book's total value (cash included, the same
+/// denominator as the holdings weights); null when the book total is not positive.
 /// </summary>
 public sealed record DossierPositionSection(
     string Provider,
@@ -31,7 +33,8 @@ public sealed record DossierPositionSection(
     decimal? CostBasisUsd,
     decimal? UnrealizedPnlUsd,
     decimal? UnrealizedPnlPercent,
-    IReadOnlyList<DossierTaxLotEntry> TaxLots);
+    IReadOnlyList<DossierTaxLotEntry> TaxLots,
+    decimal? ShareOfBookPercent = null);
 
 /// <summary>Analyst actions + consensus trend for the ticker.</summary>
 public sealed record DossierAnalystsSection(

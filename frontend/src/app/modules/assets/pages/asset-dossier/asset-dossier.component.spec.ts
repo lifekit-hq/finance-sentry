@@ -1,4 +1,4 @@
-import {signal} from '@angular/core';
+import {computed, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {provideRouter} from '@angular/router';
@@ -8,10 +8,16 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {
   type AssetDossierDto,
+  type DossierAnalystsSection,
+  type DossierHeroProfile,
+  type DossierPositionSection,
   type DossierQuoteHeader,
+  type DossierSectionChip,
+  type RecommendationSummary,
   type ThesisDto,
 } from '../../models/dossier/dossier.model';
 import {DossierStore} from '../../store/dossier.store';
+import {DossierViewUtils} from '../../utils/dossier-view.utils';
 import {AssetDossierComponent} from './asset-dossier.component';
 
 const THESIS: ThesisDto = {
@@ -37,74 +43,79 @@ const THESIS: ThesisDto = {
   entryPrice: null,
 };
 
+const POSITION: DossierPositionSection = {
+  provider: 'ibkr',
+  assetClass: 'Equities',
+  quantity: 10,
+  currentValueUsd: 431.94,
+  costBasisUsd: 400,
+  unrealizedPnlUsd: 31.94,
+  unrealizedPnlPercent: 7.985,
+  shareOfBookPercent: null,
+  taxLots: [
+    {
+      quantity: 10,
+      currentValueUsd: 431.94,
+      averageCostUsd: 40,
+      costBasisUsd: 400,
+      unrealizedPnlUsd: 31.94,
+      unrealizedPnlPercent: 7.985,
+      acquiredAt: '2025-01-01T00:00:00Z',
+      isLongTerm: true,
+    },
+  ],
+};
+
+const DOSSIER_ANALYSTS: DossierAnalystsSection = {
+  recentActions: [
+    {
+      ticker: 'DRAM',
+      firm: 'Needham',
+      actionType: 'upgrade',
+      priorRating: null,
+      newRating: 'Buy',
+      priorTarget: null,
+      newTarget: 500,
+      actionDate: '2026-09-01',
+      source: 'finnhub',
+      sourceUrl: 'https://example.com/needham',
+      ingestedAt: '2026-09-01T00:00:00Z',
+    },
+    {
+      ticker: 'DRAM',
+      firm: 'Barclays',
+      actionType: 'reiterate',
+      priorRating: null,
+      newRating: null,
+      priorTarget: null,
+      newTarget: null,
+      actionDate: '2026-09-02',
+      source: 'finnhub',
+      sourceUrl: null,
+      ingestedAt: '2026-09-02T00:00:00Z',
+    },
+  ],
+  coverage: 'inUniverse',
+  trends: [
+    {
+      period: '2026-08-01',
+      strongBuy: 5,
+      buy: 12,
+      hold: 8,
+      sell: 1,
+      strongSell: 0,
+      source: 'x',
+      ingestedAt: '2026-09-01T00:00:00Z',
+    },
+  ],
+};
+
 const DOSSIER: AssetDossierDto = {
   symbol: 'DRAM',
-  position: {
-    provider: 'ibkr',
-    assetClass: 'Equities',
-    quantity: 10,
-    currentValueUsd: 431.94,
-    costBasisUsd: 400,
-    unrealizedPnlUsd: 31.94,
-    unrealizedPnlPercent: 7.985,
-    taxLots: [
-      {
-        quantity: 10,
-        currentValueUsd: 431.94,
-        averageCostUsd: 40,
-        costBasisUsd: 400,
-        unrealizedPnlUsd: 31.94,
-        unrealizedPnlPercent: 7.985,
-        acquiredAt: '2025-01-01T00:00:00Z',
-        isLongTerm: true,
-      },
-    ],
-  },
+  position: POSITION,
   thesis: THESIS,
   valuation: null,
-  analysts: {
-    recentActions: [
-      {
-        ticker: 'DRAM',
-        firm: 'Needham',
-        actionType: 'upgrade',
-        priorRating: null,
-        newRating: 'Buy',
-        priorTarget: null,
-        newTarget: 500,
-        actionDate: '2026-09-01',
-        source: 'finnhub',
-        sourceUrl: 'https://example.com/needham',
-        ingestedAt: '2026-09-01T00:00:00Z',
-      },
-      {
-        ticker: 'DRAM',
-        firm: 'Barclays',
-        actionType: 'reiterate',
-        priorRating: null,
-        newRating: null,
-        priorTarget: null,
-        newTarget: null,
-        actionDate: '2026-09-02',
-        source: 'finnhub',
-        sourceUrl: null,
-        ingestedAt: '2026-09-02T00:00:00Z',
-      },
-    ],
-    coverage: 'inUniverse',
-    trends: [
-      {
-        period: '2026-08-01',
-        strongBuy: 5,
-        buy: 12,
-        hold: 8,
-        sell: 1,
-        strongSell: 0,
-        source: 'x',
-        ingestedAt: '2026-09-01T00:00:00Z',
-      },
-    ],
-  },
+  analysts: DOSSIER_ANALYSTS,
   recentNews: [
     {
       id: 'n1',
@@ -130,6 +141,9 @@ describe('AssetDossierComponent', () => {
     dossierErrorMessage: ReturnType<typeof signal<string>>;
     dossier: ReturnType<typeof signal<AssetDossierDto | null>>;
     hasDossierSections: ReturnType<typeof signal<boolean>>;
+    heroProfile: ReturnType<typeof computed<DossierHeroProfile | null>>;
+    sectionChips: ReturnType<typeof computed<DossierSectionChip[]>>;
+    recommendationSummary: ReturnType<typeof computed<RecommendationSummary | null>>;
     ledgerRead: ReturnType<typeof signal<{generatedAt: string | null} | null>>;
     isLedgerReadLoading: ReturnType<typeof signal<boolean>>;
     isLedgerReadStale: ReturnType<typeof signal<boolean>>;
@@ -150,11 +164,20 @@ describe('AssetDossierComponent', () => {
 
   beforeEach(async () => {
     canUseAi = signal(true);
+    const dossier = signal<AssetDossierDto | null>(DOSSIER);
     mockStore = {
       isDossierLoading: signal(false),
       dossierErrorMessage: signal(''),
-      dossier: signal<AssetDossierDto | null>(DOSSIER),
+      dossier,
       hasDossierSections: signal(true),
+      heroProfile: computed(() => {
+        const current = dossier();
+        return current ? DossierViewUtils.heroProfile(current) : null;
+      }),
+      sectionChips: computed(() => DossierViewUtils.sectionChips(dossier())),
+      recommendationSummary: computed(() =>
+        DossierViewUtils.recommendationSummary(dossier()?.analysts?.trends ?? [])
+      ),
       ledgerRead: signal(null),
       isLedgerReadLoading: signal(false),
       isLedgerReadStale: signal(false),
@@ -319,12 +342,157 @@ describe('AssetDossierComponent', () => {
     expect(text).not.toContain('should not render');
   });
 
-  it('renders the recommendation trend as a list', () => {
+  it('renders the recommendation trend as one verdict over a stacked bar', () => {
     fixture.detectChanges();
 
+    expect(byTestId('recommendation-verdict')?.textContent).toContain('17 of 26 analysts');
+    expect(byTestId('recommendation-verdict')?.textContent).toContain('rate it Buy');
+    expect(byTestId('recommendation-bar')?.children).toHaveLength(4);
     const list = byTestId('trend-list');
     expect(list?.textContent).toContain('Strong buy');
     expect(list?.textContent).toContain('12');
+  });
+
+  describe('hero', () => {
+    it('opens the page with the position strip, not a position card', () => {
+      fixture.detectChanges();
+
+      const hero = byTestId('dossier-hero');
+      expect(hero).not.toBeNull();
+      expect(hero?.querySelector('[data-testid="position-strip"]')).not.toBeNull();
+      expect(byTestId('position-value')?.textContent).toContain('$431.94');
+      expect(byTestId('position-pnl')?.textContent).toContain('$31.94');
+      expect(byTestId('position-pnl')?.textContent).toContain('7.99%');
+      expect(byTestId('position-pnl')?.className).toContain('text-gain');
+      expect(root().textContent).not.toContain('Current Value');
+    });
+
+    it('shows the share of book only when the API reports it', () => {
+      fixture.detectChanges();
+      expect(byTestId('position-share')).toBeNull();
+
+      mockStore.dossier.set({
+        ...DOSSIER,
+        position: {...POSITION, shareOfBookPercent: 12.34},
+      });
+      fixture.detectChanges();
+      expect(byTestId('position-share')?.textContent).toContain('12.3%');
+    });
+
+    it('colours a loss with the loss token', () => {
+      mockStore.dossier.set({
+        ...DOSSIER,
+        position: {...POSITION, unrealizedPnlUsd: -20, unrealizedPnlPercent: -4.5},
+      });
+      fixture.detectChanges();
+
+      expect(byTestId('position-pnl')?.className).toContain('text-loss');
+    });
+
+    it('names the company with its sector and industry', () => {
+      mockStore.dossier.set({
+        ...DOSSIER,
+        valuation: {
+          ticker: 'DRAM',
+          notApplicable: false,
+          price: 43,
+          isStale: false,
+          metrics: {
+            trailingPe: {
+              value: null,
+              fiveYearAvg: null,
+              historyWindowYears: null,
+              historyUnavailable: true,
+            },
+            forwardPe: {
+              value: null,
+              fiveYearAvg: null,
+              historyWindowYears: null,
+              historyUnavailable: true,
+            },
+            evToEbitda: {
+              value: null,
+              fiveYearAvg: null,
+              historyWindowYears: null,
+              historyUnavailable: true,
+            },
+            dividendYield: {
+              value: 0.0295,
+              fiveYearAvg: 0.03,
+              historyWindowYears: 5,
+              historyUnavailable: false,
+            },
+          },
+          consensusTarget: null,
+          impliedUpsidePct: null,
+          peerSet: {
+            name: 'sector:Technology (default)',
+            peers: [{ticker: 'MU', forwardPe: 9.1, evToEbitda: null}],
+          },
+          sources: [],
+          retrievedAt: '2026-09-01T08:00:00Z',
+          name: 'Dram Memory Corp',
+          sector: 'Technology',
+          industry: 'Semiconductors',
+          priceAsOf: null,
+        },
+      });
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-name')?.textContent).toContain('Dram Memory Corp');
+      expect(byTestId('dossier-profile')?.textContent).toContain(
+        'DRAM · Technology · Semiconductors'
+      );
+      const text = root().textContent ?? '';
+      expect(text).toContain('2.95%');
+      expect(text).toContain('Versus Technology peers');
+      expect(byTestId('valuation-peer')?.textContent).toContain('MU');
+      expect(byTestId('valuation-peer-subject')?.textContent).toContain('DRAM');
+    });
+
+    it('falls back to the symbol when the source gave no company name', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-name')?.textContent).toContain('DRAM');
+      expect(byTestId('dossier-profile')?.textContent).toContain('Equities');
+    });
+  });
+
+  describe('section chips', () => {
+    it('lists only the sections that exist and scrolls to one on click', () => {
+      fixture.detectChanges();
+
+      const chips = Array.from(
+        byTestId('dossier-chips')?.querySelectorAll<HTMLElement>('cmn-chip') ?? []
+      );
+      expect(chips.map(c => c.textContent?.trim())).toEqual(['Thesis', 'Analysts', 'News']);
+
+      const target = root().ownerDocument.getElementById('analyst-coverage');
+      const scrollSpy = vi.fn();
+      if (target) {
+        target.scrollIntoView = scrollSpy;
+      }
+      chips[1].querySelector('button')?.click();
+      expect(scrollSpy).toHaveBeenCalled();
+    });
+  });
+
+  it('writes analyst actions and the news provider in words', () => {
+    mockStore.dossier.set({
+      ...DOSSIER,
+      analysts: {
+        ...DOSSIER_ANALYSTS,
+        recentActions: [{...DOSSIER_ANALYSTS.recentActions[0], actionType: 'TargetChange'}],
+      },
+      recentNews: [{...DOSSIER.recentNews[0], source: 'yahoo:DRAM'}],
+    });
+    fixture.detectChanges();
+
+    const text = root().textContent ?? '';
+    expect(text).toContain('Target changed');
+    expect(text).not.toContain('TargetChange');
+    expect(text).toContain('Yahoo Finance');
+    expect(text).not.toContain('yahoo:DRAM');
   });
 
   describe('Ledger read (Owner: ai.use)', () => {
@@ -430,7 +598,7 @@ describe('AssetDossierComponent', () => {
       expect(tags).toHaveLength(3);
       expect(toneOf('alerted')).toBe('error');
       expect(toneOf('notable')).toBe('warning');
-      expect(toneOf('info')).toBe('success');
+      expect(toneOf('info')).toBe('info');
     });
 
     it('draws a trend that rises with severity instead of a flat line', () => {

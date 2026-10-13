@@ -18,6 +18,9 @@ public interface IValuationDataService
 /// <summary>
 /// Point-in-time current valuation metrics for one ticker. Every ratio is nullable: a missing metric
 /// is <c>null</c>, never zero (FR-006). <see cref="NotApplicable"/> = non-equity quote type.
+/// <see cref="Name"/> is the company name from the already-fetched Yahoo <c>price</c> module;
+/// <see cref="PriceAsOf"/> is when the shared quote path last saw the price (null when only the
+/// quoteSummary price is known).
 /// </summary>
 public sealed record ValuationCurrentMetrics(
     string Ticker,
@@ -30,4 +33,6 @@ public sealed record ValuationCurrentMetrics(
     bool IsStale,
     bool NotApplicable,
     string? Sector,
-    string? Industry);
+    string? Industry,
+    string? Name = null,
+    DateTimeOffset? PriceAsOf = null);

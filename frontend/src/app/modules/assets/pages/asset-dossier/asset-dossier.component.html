@@ -12,37 +12,206 @@
     </div>
 
     @if (store.dossier(); as dossier) {
-      <!-- The top bar owns the symbol and the way back (route data); the quote sits right under it -->
-      <div class="flex items-start justify-between gap-cmn-3">
-        <p class="text-cmn-xs text-text-secondary">
+      <!-- Hero: who this is, today's quote and what the book holds, before anything else. The top bar owns the symbol and the way back (route data). -->
+      <cmn-card class="block" data-testid="dossier-hero">
+        <div class="flex flex-col gap-cmn-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex min-w-0 items-center gap-cmn-3">
+            <cmn-institution-avatar
+              [name]="dossier.symbol"
+              [logoUrl]="dossier.symbol | assetLogo: dossier.position?.provider"
+              size="lg"
+            />
+            <div class="min-w-0">
+              @if (store.heroProfile(); as profile) {
+                <h2
+                  class="break-words font-headline text-cmn-lg font-semibold leading-tight text-text-primary"
+                  data-testid="dossier-name"
+                >
+                  {{ profile.name ?? dossier.symbol }}
+                </h2>
+                @if (profile.detail) {
+                  <p class="text-cmn-sm text-text-secondary" data-testid="dossier-profile">
+                    {{ profile.name ? dossier.symbol + ' · ' : '' }}{{ profile.detail }}
+                  </p>
+                } @else if (profile.name) {
+                  <p class="text-cmn-sm text-text-secondary">{{ dossier.symbol }}</p>
+                }
+              }
+            </div>
+          </div>
+          <!-- Reserved slot: same height whether the quote is loading, present or missing, so the page never jumps. -->
+          <div
+            class="flex min-h-[3rem] min-w-[7rem] flex-col justify-center sm:items-end sm:text-right"
+            data-testid="dossier-quote"
+          >
+            @if (store.quoteHeader(); as quote) {
+              <span
+                class="font-headline text-cmn-2xl font-bold text-text-primary"
+                data-testid="dossier-price"
+              >
+                {{ quote.priceText }}
+              </span>
+              @if (quote.changeText) {
+                <span
+                  [class]="deltaClass[quote.direction]"
+                  class="text-cmn-sm font-medium"
+                  data-testid="dossier-day-change"
+                >
+                  {{ quote.changeText }}
+                </span>
+              }
+            } @else if (store.isQuoteLoading()) {
+              <cmn-skeleton height="1.75rem" width="6rem" />
+            }
+          </div>
+        </div>
+
+        @if (dossier.position; as position) {
+          <div
+            class="mt-cmn-4 border-t border-border-default pt-cmn-4"
+            data-testid="position-strip"
+          >
+            <dl class="grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-3 md:grid-cols-4">
+              <div>
+                <dt class="text-cmn-xs text-text-secondary">Value</dt>
+                <dd
+                  class="text-cmn-md font-semibold tabular-nums text-text-primary"
+                  data-testid="position-value"
+                >
+                  {{ position.currentValueUsd | money }}
+                </dd>
+              </div>
+              @if (position.unrealizedPnlPercent !== null || position.unrealizedPnlUsd !== null) {
+                <div>
+                  <dt class="text-cmn-xs text-text-secondary">Unrealized P&amp;L</dt>
+                  <dd
+                    [class]="
+                      (position.unrealizedPnlUsd ?? position.unrealizedPnlPercent ?? 0) >= 0
+                        ? pnlPositiveClass
+                        : pnlNegativeClass
+                    "
+                    class="text-cmn-md font-semibold tabular-nums"
+                    data-testid="position-pnl"
+                  >
+                    @if (position.unrealizedPnlUsd !== null) {
+                      {{ position.unrealizedPnlUsd | money }}
+                    }
+                    @if (position.unrealizedPnlPercent !== null) {
+                      <span class="text-cmn-sm font-medium">
+                        ({{ position.unrealizedPnlPercent | number: '1.2-2' }}%)
+                      </span>
+                    }
+                  </dd>
+                </div>
+              }
+              @if (position.shareOfBookPercent !== null) {
+                <div>
+                  <dt class="text-cmn-xs text-text-secondary">Share of book</dt>
+                  <dd
+                    class="text-cmn-md font-semibold tabular-nums text-text-primary"
+                    data-testid="position-share"
+                  >
+                    {{ position.shareOfBookPercent | number: '1.1-1' }}%
+                  </dd>
+                </div>
+              }
+              <div>
+                <dt class="text-cmn-xs text-text-secondary">Quantity</dt>
+                <dd class="text-cmn-md font-semibold tabular-nums text-text-primary">
+                  {{ (position.quantity | number: '1.0-8') ?? '—' }}
+                </dd>
+                @if (position.costBasisUsd !== null) {
+                  <dd class="text-cmn-xs tabular-nums text-text-secondary">
+                    Cost {{ position.costBasisUsd | money }}
+                  </dd>
+                }
+              </div>
+            </dl>
+            <p class="mt-cmn-3 text-cmn-xs text-text-secondary">
+              Held at
+              <a
+                [routerLink]="accountsRoute"
+                class="hover:underline"
+                data-testid="position-provider-link"
+                >{{ position.provider | providerLabel }}</a
+              >
+            </p>
+
+            @if (position.taxLots.length > 0) {
+              <details
+                class="group mt-cmn-3 border-t border-border-default pt-cmn-3"
+                data-testid="tax-lots"
+              >
+                <summary
+                  class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"
+                >
+                  Tax lots ({{ position.taxLots.length }})
+                  <span class="text-text-secondary group-open:hidden">· show</span>
+                  <span class="hidden text-text-secondary group-open:inline">· hide</span>
+                </summary>
+                <div class="mt-cmn-3 space-y-cmn-2">
+                  @for (lot of position.taxLots; track $index) {
+                    <div
+                      class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
+                    >
+                      <span class="tabular-nums text-text-primary">{{
+                        lot.quantity | number: '1.0-8'
+                      }}</span>
+                      <span class="tabular-nums text-text-primary">{{
+                        lot.currentValueUsd | money
+                      }}</span>
+                      @if (lot.unrealizedPnlPercent !== null) {
+                        <span
+                          [class]="
+                            lot.unrealizedPnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass
+                          "
+                          class="tabular-nums"
+                        >
+                          {{ lot.unrealizedPnlPercent | number: '1.2-2' }}%
+                        </span>
+                      }
+                      @if (lot.acquiredAt) {
+                        <span class="text-text-secondary">{{
+                          lot.acquiredAt | date: 'mediumDate'
+                        }}</span>
+                      }
+                      @if (lot.isLongTerm) {
+                        <cmn-tag variant="success">Long-term</cmn-tag>
+                      } @else {
+                        <cmn-tag variant="warning">Short-term</cmn-tag>
+                      }
+                    </div>
+                  }
+                </div>
+              </details>
+            }
+          </div>
+        }
+
+        <p class="mt-cmn-3 text-cmn-xs text-text-secondary">
           Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
         </p>
-        <!-- Reserved slot: same height whether the quote is loading, present or missing, so the page never jumps. -->
-        <div
-          class="flex min-h-[3rem] min-w-[7rem] flex-col items-end justify-center text-right"
-          data-testid="dossier-quote"
-        >
-          @if (store.quoteHeader(); as quote) {
-            <span
-              class="font-headline text-cmn-xl font-bold text-text-primary"
-              data-testid="dossier-price"
-            >
-              {{ quote.priceText }}
-            </span>
-            @if (quote.changeText) {
-              <span
-                [class]="deltaClass[quote.direction]"
-                class="text-cmn-sm font-medium"
-                data-testid="dossier-day-change"
-              >
-                {{ quote.changeText }}
-              </span>
-            }
-          } @else if (store.isQuoteLoading()) {
-            <cmn-skeleton height="1.75rem" width="6rem" />
-          }
-        </div>
-      </div>
+      </cmn-card>
+
+      <!-- Sticky section bar. On the phone the shell's top bar overlays the page, so it sticks below it. -->
+      @if (store.sectionChips(); as chips) {
+        @if (chips.length > 0) {
+          <!-- top-0: the shell's main carries the overlay bar's scroll-padding on a phone. -->
+          <nav
+            aria-label="Dossier sections"
+            class="sticky top-0 z-10 -mx-cmn-4 bg-surface-bg px-cmn-4 py-cmn-2 md:-mx-cmn-8 md:px-cmn-8"
+            data-testid="dossier-chips"
+          >
+            <div class="flex gap-cmn-2 overflow-x-auto [scrollbar-width:none]">
+              @for (chip of chips; track chip.id) {
+                <cmn-chip (clicked)="scrollToSection(chip.id)" class="shrink-0">{{
+                  chip.label
+                }}</cmn-chip>
+              }
+            </div>
+          </nav>
+        }
+      }
 
       @if (!store.hasDossierSections()) {
         <cmn-card class="block" data-testid="dossier-no-data">
@@ -139,94 +308,9 @@
           }
         }
 
-        <!-- Position & P&L -->
-        @if (dossier.position; as position) {
-          <cmn-card class="block">
-            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Position</h2>
-            <p class="text-cmn-xs text-text-secondary">
-              <a
-                [routerLink]="accountsRoute"
-                class="hover:underline"
-                data-testid="position-provider-link"
-                >{{ position.provider | providerLabel }}</a
-              >
-            </p>
-
-            <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
-              <cmn-stat-card
-                [value]="(position.quantity | number: '1.0-8') ?? '—'"
-                label="Quantity"
-              />
-              <cmn-stat-card [value]="position.currentValueUsd | money" label="Current Value" />
-              @if (position.costBasisUsd !== null) {
-                <cmn-stat-card [value]="position.costBasisUsd | money" label="Cost Basis" />
-              }
-              @if (position.unrealizedPnlPercent !== null) {
-                <cmn-stat-card
-                  [value]="(position.unrealizedPnlPercent | number: '1.2-2') + '%'"
-                  [delta]="position.unrealizedPnlPercent"
-                  [deltaLabel]="
-                    position.unrealizedPnlUsd !== null ? (position.unrealizedPnlUsd | money) : ''
-                  "
-                  label="Unrealized P&L"
-                />
-              }
-            </div>
-
-            @if (position.taxLots.length > 0) {
-              <details
-                class="group mt-cmn-5 border-t border-border-default pt-cmn-4"
-                data-testid="tax-lots"
-              >
-                <summary
-                  class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"
-                >
-                  Tax lots ({{ position.taxLots.length }})
-                  <span class="text-text-secondary group-open:hidden">· show</span>
-                  <span class="hidden text-text-secondary group-open:inline">· hide</span>
-                </summary>
-                <div class="mt-cmn-3 space-y-cmn-2">
-                  @for (lot of position.taxLots; track $index) {
-                    <div
-                      class="flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
-                    >
-                      <span class="tabular-nums text-text-primary">{{
-                        lot.quantity | number: '1.0-8'
-                      }}</span>
-                      <span class="tabular-nums text-text-primary">{{
-                        lot.currentValueUsd | money
-                      }}</span>
-                      @if (lot.unrealizedPnlPercent !== null) {
-                        <span
-                          [class]="
-                            lot.unrealizedPnlPercent >= 0 ? pnlPositiveClass : pnlNegativeClass
-                          "
-                          class="tabular-nums"
-                        >
-                          {{ lot.unrealizedPnlPercent | number: '1.2-2' }}%
-                        </span>
-                      }
-                      @if (lot.acquiredAt) {
-                        <span class="text-text-secondary">{{
-                          lot.acquiredAt | date: 'mediumDate'
-                        }}</span>
-                      }
-                      @if (lot.isLongTerm) {
-                        <cmn-tag variant="success">Long-term</cmn-tag>
-                      } @else {
-                        <cmn-tag variant="warning">Short-term</cmn-tag>
-                      }
-                    </div>
-                  }
-                </div>
-              </details>
-            }
-          </cmn-card>
-        }
-
         <!-- Investment Thesis -->
         @if (dossier.thesis; as thesis) {
-          <cmn-card class="block">
+          <cmn-card id="thesis" class="block scroll-mt-[4.5rem]">
             <div class="flex items-start justify-between gap-cmn-3">
               <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                 Investment Thesis
@@ -293,11 +377,14 @@
         <!-- Valuation -->
         @if (dossier.valuation; as valuation) {
           @if (!valuation.notApplicable) {
-            <cmn-card class="block">
+            <cmn-card id="valuation" class="block scroll-mt-[4.5rem]">
               <div class="flex items-center justify-between gap-cmn-3">
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Valuation</h2>
                 @if (valuation.isStale) {
-                  <cmn-tag variant="warning">Stale</cmn-tag>
+                  <cmn-tag variant="warning" data-testid="valuation-stale"
+                    >Stale · as of
+                    {{ valuation.priceAsOf ?? valuation.retrievedAt | date: 'mediumDate' }}</cmn-tag
+                  >
                 }
               </div>
 
@@ -334,6 +421,14 @@
                     label="EV/EBITDA"
                   />
                 }
+                @if (valuation.metrics.dividendYield.value | dividendYield; as dividendYield) {
+                  <div>
+                    <cmn-stat-card [value]="dividendYield" label="Dividend Yield" />
+                    @if (valuation.metrics.dividendYield.fiveYearAvg | dividendYield; as yieldAvg) {
+                      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">5Y avg {{ yieldAvg }}</p>
+                    }
+                  </div>
+                }
                 @if (valuation.consensusTarget !== null) {
                   <cmn-stat-card
                     [value]="valuation.consensusTarget | money"
@@ -347,13 +442,67 @@
                   />
                 }
               </div>
+
+              @if (valuation.peerSet; as peerSet) {
+                @if (peerSet.peers.length > 0) {
+                  <div
+                    class="mt-cmn-5 border-t border-border-default pt-cmn-4"
+                    data-testid="valuation-peers"
+                  >
+                    <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">
+                      Versus {{ peerSet.name | peerSetLabel }}
+                    </p>
+                    <ul class="text-cmn-sm">
+                      <li
+                        class="grid grid-cols-3 gap-cmn-3 pb-cmn-1 text-cmn-xs text-text-secondary"
+                      >
+                        <span>Company</span>
+                        <span class="text-right">Fwd P/E</span>
+                        <span class="text-right">EV/EBITDA</span>
+                      </li>
+                      <li
+                        class="grid grid-cols-3 gap-cmn-3 rounded-lg bg-surface-raised px-cmn-2 py-cmn-1 font-semibold text-text-primary"
+                        data-testid="valuation-peer-subject"
+                      >
+                        <span>{{ dossier.symbol }}</span>
+                        <span class="text-right tabular-nums">{{
+                          valuation.metrics.forwardPe.value !== null
+                            ? (valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'
+                            : '—'
+                        }}</span>
+                        <span class="text-right tabular-nums">{{
+                          valuation.metrics.evToEbitda.value !== null
+                            ? (valuation.metrics.evToEbitda.value | number: '1.1-1') + 'x'
+                            : '—'
+                        }}</span>
+                      </li>
+                      @for (peer of peerSet.peers; track peer.ticker) {
+                        <li
+                          class="grid grid-cols-3 gap-cmn-3 border-b border-border-default px-cmn-2 py-cmn-1 text-text-primary last:border-0"
+                          data-testid="valuation-peer"
+                        >
+                          <span>{{ peer.ticker }}</span>
+                          <span class="text-right tabular-nums">{{
+                            peer.forwardPe !== null ? (peer.forwardPe | number: '1.1-1') + 'x' : '—'
+                          }}</span>
+                          <span class="text-right tabular-nums">{{
+                            peer.evToEbitda !== null
+                              ? (peer.evToEbitda | number: '1.1-1') + 'x'
+                              : '—'
+                          }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+              }
             </cmn-card>
           }
         }
 
         <!-- Analyst Coverage -->
         @if (dossier.analysts; as analysts) {
-          <cmn-card id="analyst-coverage" class="block">
+          <cmn-card id="analyst-coverage" class="block scroll-mt-[4.5rem]">
             <div class="flex items-center justify-between gap-cmn-3">
               <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
                 Analyst Coverage
@@ -384,7 +533,7 @@
                     <span
                       class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
                     >
-                      {{ action.actionType }}
+                      {{ action.actionType | analystActionLabel }}
                     </span>
                     @if (action.newRating) {
                       <span class="text-text-primary">→ {{ action.newRating }}</span>
@@ -404,49 +553,45 @@
               <p class="mt-cmn-3 text-cmn-sm text-text-secondary">No recent analyst actions.</p>
             }
 
-            @if (analysts.trends.length > 0) {
+            @if (store.recommendationSummary(); as summary) {
               <div class="mt-cmn-5 border-t border-border-default pt-cmn-4">
-                <p class="mb-cmn-3 text-cmn-sm font-medium text-text-primary">
-                  Recommendation Trend
-                </p>
-                <div data-testid="trend-list">
-                  <cmn-data-table [rows]="analysts.trends" mode="list">
-                    <cmn-column key="period" listSlot="primary">
-                      <ng-template let-trend cmnCell>
-                        <span class="tabular-nums text-text-secondary">{{
-                          trend.period | date: 'MMM yyyy'
-                        }}</span>
-                      </ng-template>
-                    </cmn-column>
-                    <cmn-column key="strongBuy" listSlot="secondary">
-                      <ng-template let-trend cmnCell>
-                        Strong buy
-                        <span class="tabular-nums text-status-success">{{ trend.strongBuy }}</span>
-                      </ng-template>
-                    </cmn-column>
-                    <cmn-column key="buy" listSlot="secondary">
-                      <ng-template let-trend cmnCell>
-                        Buy <span class="tabular-nums text-status-success">{{ trend.buy }}</span>
-                      </ng-template>
-                    </cmn-column>
-                    <cmn-column key="hold" listSlot="secondary">
-                      <ng-template let-trend cmnCell>
-                        Hold <span class="tabular-nums">{{ trend.hold }}</span>
-                      </ng-template>
-                    </cmn-column>
-                    <cmn-column key="sell" listSlot="trailing-secondary">
-                      <ng-template let-trend cmnCell>
-                        Sell <span class="tabular-nums text-status-error">{{ trend.sell }}</span>
-                      </ng-template>
-                    </cmn-column>
-                    <cmn-column key="strongSell" listSlot="trailing-secondary">
-                      <ng-template let-trend cmnCell>
-                        Strong sell
-                        <span class="tabular-nums text-status-error">{{ trend.strongSell }}</span>
-                      </ng-template>
-                    </cmn-column>
-                  </cmn-data-table>
+                <div class="flex items-baseline justify-between gap-cmn-3">
+                  <p class="text-cmn-sm font-medium text-text-primary">Recommendation Trend</p>
+                  <p class="text-cmn-xs tabular-nums text-text-secondary">
+                    {{ summary.period | date: 'MMM yyyy' }}
+                  </p>
                 </div>
+                <p
+                  class="mt-cmn-2 font-headline text-cmn-lg font-semibold text-text-primary"
+                  data-testid="recommendation-verdict"
+                >
+                  {{ summary.verdictCount }} of {{ summary.total }} analysts rate it
+                  {{ summary.verdict }}
+                </p>
+                <div
+                  class="mt-cmn-3 flex h-3 overflow-hidden rounded-full bg-surface-raised"
+                  data-testid="recommendation-bar"
+                >
+                  @for (segment of summary.segments; track segment.bucket) {
+                    <span
+                      [class]="segment.barClass"
+                      [style.width.%]="segment.sharePct"
+                      [attr.data-testid]="'recommendation-' + segment.bucket"
+                    ></span>
+                  }
+                </div>
+                <ul
+                  class="mt-cmn-3 flex flex-wrap gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
+                  data-testid="trend-list"
+                >
+                  @for (segment of summary.segments; track segment.bucket) {
+                    <li class="flex items-center gap-cmn-1">
+                      <span [class]="segment.barClass" class="h-2 w-2 rounded-full"></span>
+                      {{ segment.label }}
+                      <span class="tabular-nums text-text-primary">{{ segment.count }}</span>
+                    </li>
+                  }
+                </ul>
               </div>
             }
           </cmn-card>
@@ -454,7 +599,7 @@
 
         <!-- Next Earnings -->
         @if (dossier.nextEarnings; as earnings) {
-          <cmn-card class="block">
+          <cmn-card id="next-earnings" class="block scroll-mt-[4.5rem]">
             <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Next Earnings</h2>
             <div class="mt-cmn-3 flex flex-wrap items-center gap-cmn-4">
               <span class="text-cmn-lg font-semibold tabular-nums text-text-primary">
@@ -470,7 +615,7 @@
 
         <!-- Recent News -->
         @if (dossier.recentNews.length > 0) {
-          <cmn-card class="block">
+          <cmn-card id="recent-news" class="block scroll-mt-[4.5rem]">
             <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Recent News</h2>
             <ul class="mt-cmn-4 space-y-cmn-4">
               @for (article of dossier.recentNews; track article.id) {
@@ -484,7 +629,8 @@
                     {{ article.title }}
                   </a>
                   <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                    {{ article.source }} · {{ article.publishedAt | cmnRelativeTime: 'Never' }}
+                    {{ article.source | newsSourceLabel }} ·
+                    {{ article.publishedAt | cmnRelativeTime: 'Never' }}
                   </p>
                 </li>
               }
@@ -494,7 +640,7 @@
 
         <!-- Radar Signals -->
         @if (dossier.radarSignals.length > 0) {
-          <cmn-card class="block">
+          <cmn-card id="radar-signals" class="block scroll-mt-[4.5rem]">
             <div class="flex items-start justify-between gap-cmn-3">
               <div>
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
@@ -546,13 +692,11 @@
                   }}</span>
                   <span class="text-text-secondary">{{ signal.scanner }}</span>
                   <span class="ml-auto">
-                    @if (signal.severity === 'alerted') {
-                      <cmn-tag variant="error">{{ signal.severity }}</cmn-tag>
-                    } @else if (signal.severity === 'notable') {
-                      <cmn-tag variant="warning">{{ signal.severity }}</cmn-tag>
-                    } @else {
-                      <cmn-tag variant="success">{{ signal.severity }}</cmn-tag>
-                    }
+                    <cmn-tag
+                      [variant]="severityVariant[signal.severity] ?? defaultSeverityVariant"
+                      class="capitalize"
+                      >{{ signal.severity }}</cmn-tag
+                    >
                   </span>
                 </li>
               }

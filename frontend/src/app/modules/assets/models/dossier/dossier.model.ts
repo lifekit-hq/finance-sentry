@@ -18,6 +18,8 @@ export interface DossierPositionSection {
   costBasisUsd: Nullable<number>;
   unrealizedPnlUsd: Nullable<number>;
   unrealizedPnlPercent: Nullable<number>;
+  /** Share of the whole book total (cash included, the holdings-weight denominator), in percent. */
+  shareOfBookPercent: Nullable<number>;
   taxLots: DossierTaxLotEntry[];
 }
 
@@ -92,6 +94,12 @@ export interface ValuationSnapshotDto {
   peerSet: Nullable<ValuationPeerSet>;
   sources: string[];
   retrievedAt: string;
+  /** Company profile the valuation source returns with the metrics; null when it gave none. */
+  name: Nullable<string>;
+  sector: Nullable<string>;
+  industry: Nullable<string>;
+  /** When the quote path last saw `price`; null when unknown. */
+  priceAsOf: Nullable<string>;
 }
 
 export interface AnalystActionDto {
@@ -193,4 +201,47 @@ export interface DossierQuoteHeader {
   /** Null when the quote has no previous close to measure the day against. */
   changeText: Nullable<string>;
   direction: DossierDeltaDirection;
+}
+
+export type RecommendationBucket = 'strongBuy' | 'buy' | 'hold' | 'sell' | 'strongSell';
+
+export interface RecommendationBucketStyle {
+  bucket: RecommendationBucket;
+  label: string;
+  /** Tailwind background of the bar segment. */
+  barClass: string;
+}
+
+/** One slice of the analyst recommendation bar. `sharePct` is of the month's analyst total. */
+export interface RecommendationSegment {
+  bucket: RecommendationBucket;
+  label: string;
+  count: number;
+  sharePct: number;
+  /** Tailwind background of the slice, carried so the template needs no lookup. */
+  barClass: string;
+}
+
+/**
+ * The latest month of the recommendation trend as one verdict: the winning side (Buy = strong buy
+ * + buy, Sell = sell + strong sell) and how many of the `total` analysts hold it.
+ */
+export interface RecommendationSummary {
+  period: string;
+  total: number;
+  verdict: string;
+  verdictCount: number;
+  segments: RecommendationSegment[];
+}
+
+/** A section of the dossier the sticky chip bar can jump to. */
+export interface DossierSectionChip {
+  id: string;
+  label: string;
+}
+
+/** The hero's identity lines: the company name when the source gave one, then what it is. */
+export interface DossierHeroProfile {
+  name: Nullable<string>;
+  detail: Nullable<string>;
 }

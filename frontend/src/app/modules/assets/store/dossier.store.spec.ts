@@ -25,6 +25,7 @@ const DOSSIER: AssetDossierDto = {
     costBasisUsd: null,
     unrealizedPnlUsd: null,
     unrealizedPnlPercent: null,
+    shareOfBookPercent: null,
     taxLots: [],
   },
   thesis: null,

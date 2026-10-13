@@ -1,4 +1,4 @@
-import {DatePipe, DecimalPipe, formatDate} from '@angular/common';
+import {DatePipe, DecimalPipe, DOCUMENT, formatDate} from '@angular/common';
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {RouterLink} from '@angular/router';
 import {
@@ -9,16 +9,16 @@ import {
   CardComponent,
   type ChartDomain,
   type ChartPoint,
-  CmnCellDirective,
-  CmnColumnComponent,
-  DataTableComponent,
+  ChipComponent,
   EmptyStateComponent,
+  InstitutionAvatarComponent,
   LineChartComponent,
   PageContainerComponent,
   RelativeTimePipe,
   SkeletonComponent,
   StatCardComponent,
   TagComponent,
+  type TagVariant,
 } from '@lifekit-hq/ui';
 
 import {
@@ -27,6 +27,7 @@ import {
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {APP_LOCALE} from '../../../../shared/constants/date/date.constants';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
+import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
@@ -34,11 +35,23 @@ import {
   type DossierDeltaDirection,
   type DossierSignalItem,
 } from '../../models/dossier/dossier.model';
-import {CoverageLabelPipe, SignalTypeLabelPipe} from '../../pipes/dossier-label.pipe';
+import {
+  AnalystActionLabelPipe,
+  CoverageLabelPipe,
+  DividendYieldPipe,
+  NewsSourceLabelPipe,
+  PeerSetLabelPipe,
+  SignalTypeLabelPipe,
+} from '../../pipes/dossier-label.pipe';
 import {MarkdownPipe} from '../../pipes/markdown.pipe';
 import {TriggerSentencePipe} from '../../pipes/trigger-sentence.pipe';
 import {DossierStore} from '../../store/dossier.store';
 
+const SIGNAL_SEVERITY_VARIANT: Record<string, TagVariant> = {
+  alerted: 'error',
+  notable: 'warning',
+  info: 'info',
+};
 const SEVERITY_VALUE: Record<string, number> = {alerted: 25, notable: 15, info: 5};
 const SEVERITY_DEFAULT = 5;
 const TREND_MIN_POINTS = 2;
@@ -50,17 +63,21 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   imports: [
     PageContainerComponent,
     AlertComponent,
+    AnalystActionLabelPipe,
+    AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
     CardComponent,
-    CmnCellDirective,
-    CmnColumnComponent,
+    ChipComponent,
     CoverageLabelPipe,
-    DataTableComponent,
     DatePipe,
     DecimalPipe,
+    DividendYieldPipe,
+    InstitutionAvatarComponent,
     MarkdownPipe,
     MoneyPipe,
+    NewsSourceLabelPipe,
+    PeerSetLabelPipe,
     ProviderLabelPipe,
     RelativeTimePipe,
     RouterLink,
@@ -77,6 +94,8 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   providers: [DossierStore],
 })
 export class AssetDossierComponent {
+  private readonly document = inject(DOCUMENT);
+
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
   public readonly accountsRoute = AppRoute.AccountsInvestments;
@@ -86,6 +105,8 @@ export class AssetDossierComponent {
     }
     return this.store.isDossierLoading() ? 'loading' : 'success';
   });
+  public readonly severityVariant = SIGNAL_SEVERITY_VARIANT;
+  public readonly defaultSeverityVariant: TagVariant = 'neutral';
   public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
   public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
   // Only the delta carries colour; the header itself stays neutral.
@@ -120,6 +141,10 @@ export class AssetDossierComponent {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     )[0];
   });
+
+  public scrollToSection(id: string): void {
+    this.document.getElementById(id)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
 
   public generateLedgerRead(symbol: string, force: boolean): void {
     this.store.generateLedgerRead({symbol, force});

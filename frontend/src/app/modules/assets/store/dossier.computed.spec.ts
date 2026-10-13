@@ -60,6 +60,7 @@ const POSITION: DossierPositionSection = {
   costBasisUsd: null,
   unrealizedPnlUsd: null,
   unrealizedPnlPercent: null,
+  shareOfBookPercent: null,
   taxLots: [],
 };
 
@@ -101,6 +102,10 @@ function valuation(notApplicable: boolean): ValuationSnapshotDto {
     peerSet: null,
     sources: [],
     retrievedAt: '2026-09-03T00:00:00Z',
+    name: null,
+    sector: null,
+    industry: null,
+    priceAsOf: null,
   };
 }
 
@@ -167,6 +172,74 @@ describe('dossierComputed', () => {
     const store = buildSignals({dossier: emptyDossier(overrides)});
     TestBed.runInInjectionContext(() => {
       expect(dossierComputed(store).hasDossierSections()).toBe(true);
+    });
+  });
+
+  it('heroProfile is null before a dossier has loaded', () => {
+    const store = buildSignals();
+    TestBed.runInInjectionContext(() => {
+      expect(dossierComputed(store).heroProfile()).toBeNull();
+    });
+  });
+
+  it('heroProfile names the company from the valuation', () => {
+    const store = buildSignals({
+      dossier: emptyDossier({
+        valuation: {...valuation(false), name: 'Grab Holdings Limited', sector: 'Technology'},
+      }),
+    });
+    TestBed.runInInjectionContext(() => {
+      expect(dossierComputed(store).heroProfile()).toEqual({
+        name: 'Grab Holdings Limited',
+        detail: 'Technology',
+      });
+    });
+  });
+
+  it('sectionChips lists only the sections that exist', () => {
+    const store = buildSignals({dossier: emptyDossier({thesis: THESIS, radarSignals: [SIGNAL]})});
+    TestBed.runInInjectionContext(() => {
+      expect(
+        dossierComputed(store)
+          .sectionChips()
+          .map(c => c.label)
+      ).toEqual(['Thesis', 'Signals']);
+    });
+  });
+
+  it('recommendationSummary is null without a trend', () => {
+    const store = buildSignals({dossier: emptyDossier({analysts: ANALYSTS})});
+    TestBed.runInInjectionContext(() => {
+      expect(dossierComputed(store).recommendationSummary()).toBeNull();
+    });
+  });
+
+  it('recommendationSummary reads the latest month as a verdict', () => {
+    const store = buildSignals({
+      dossier: emptyDossier({
+        analysts: {
+          ...ANALYSTS,
+          trends: [
+            {
+              period: '2026-08-01',
+              strongBuy: 9,
+              buy: 12,
+              hold: 4,
+              sell: 1,
+              strongSell: 0,
+              source: 'yahoo_finance',
+              ingestedAt: '2026-09-01T00:00:00Z',
+            },
+          ],
+        },
+      }),
+    });
+    TestBed.runInInjectionContext(() => {
+      expect(dossierComputed(store).recommendationSummary()).toMatchObject({
+        total: 26,
+        verdict: 'Buy',
+        verdictCount: 21,
+      });
     });
   });
 

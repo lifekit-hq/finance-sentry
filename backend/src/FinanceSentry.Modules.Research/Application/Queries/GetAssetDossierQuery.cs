@@ -98,6 +98,10 @@ public sealed class GetAssetDossierQueryHandler(
             ? Math.Round((pos.UsdValue - cb2) / cb2 * 100m, 2)
             : (decimal?)null;
 
+        var shareOfBook = book.TotalValueUsd > 0m
+            ? Math.Round(pos.UsdValue / book.TotalValueUsd * 100m, 2)
+            : (decimal?)null;
+
         // Tax lots are only available for brokerage (IBKR) positions.
         IReadOnlyList<DossierTaxLotEntry> taxLots = [];
         if (pos.Provider.Equals("ibkr", StringComparison.OrdinalIgnoreCase))
@@ -120,7 +124,8 @@ public sealed class GetAssetDossierQueryHandler(
             CostBasisUsd: pos.CostBasisUsd,
             UnrealizedPnlUsd: unrealizedPnl,
             UnrealizedPnlPercent: unrealizedPct,
-            TaxLots: taxLots);
+            TaxLots: taxLots,
+            ShareOfBookPercent: shareOfBook);
     }
 
     private static DossierAnalystsSection? BuildAnalystsSection(AnalystActionsResult? result)

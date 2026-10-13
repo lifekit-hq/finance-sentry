@@ -1,6 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
 import {API, LEDGER_READ_NARRATIVE, mockApis} from './support/dossier-mocks';
+import {PLACEHOLDER_IMAGE} from './support/visual-baseline';
 
 // Pixel baseline for the asset dossier: guards the page against unintended visual drift while its
 // markup moves between hand-rolled blocks and shared-library components. Scope is the dossier only
@@ -13,6 +14,8 @@ const DESKTOP = {width: 1280, height: 2800};
 const PHONE = {width: 375, height: 2400};
 // The library stat cards are bordered tiles, so the full dossier outgrows PHONE on a phone.
 const PHONE_FULL = {width: 375, height: 3000};
+// The hero's logo comes from a third party: a flat square keeps the baselines off the network.
+const LOGO_HOSTS = ['https://financialmodelingprep.com/**', 'https://assets.coincap.io/**'];
 const SCREENSHOT_OPTIONS = {
   animations: 'disabled',
   // Glyph anti-aliasing differs a little between the machines that render these baselines.
@@ -25,6 +28,11 @@ async function openDossier(
   overrideRoutes?: () => Promise<void>
 ): Promise<void> {
   await page.clock.setFixedTime(FROZEN_NOW);
+  for (const pattern of LOGO_HOSTS) {
+    await page.route(pattern, route =>
+      route.fulfill({status: 200, contentType: 'image/png', body: PLACEHOLDER_IMAGE})
+    );
+  }
   await mockApis(page);
   await overrideRoutes?.();
   await page.goto(`/assets/${symbol}`);

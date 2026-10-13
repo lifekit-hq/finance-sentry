@@ -90,6 +90,7 @@ function position(assetClass: string): DossierPositionSection {
     costBasisUsd: null,
     unrealizedPnlUsd: null,
     unrealizedPnlPercent: null,
+    shareOfBookPercent: null,
     taxLots: [],
   };
 }
@@ -112,6 +113,10 @@ function valuation(notApplicable: boolean, price: Nullable<number> = 189.3): Val
     peerSet: null,
     sources: [],
     retrievedAt: '2026-09-03T00:00:00Z',
+    name: null,
+    sector: null,
+    industry: null,
+    priceAsOf: null,
   };
 }
 
