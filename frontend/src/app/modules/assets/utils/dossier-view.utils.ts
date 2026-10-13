@@ -90,14 +90,26 @@ export class DossierViewUtils {
       return [];
     }
     const chips: DossierSectionChip[] = [];
-    if (dossier.thesis) {
-      chips.push(DOSSIER_SECTION_CHIPS.thesis);
+    const hasHistory = (dossier.performance ?? null) !== null;
+    const hasValuation = dossier.valuation !== null && !dossier.valuation.notApplicable;
+    if ((dossier.checks?.axes.length ?? 0) > 0) {
+      chips.push(DOSSIER_SECTION_CHIPS.checks);
     }
-    if (dossier.valuation && !dossier.valuation.notApplicable) {
+    if (hasHistory) {
+      chips.push(DOSSIER_SECTION_CHIPS.chart);
+    }
+    if (dossier.position?.returns) {
+      chips.push(DOSSIER_SECTION_CHIPS.returns);
+    }
+    // "Is it cheap?" also carries the user's own target, so a priced asset without a valuation keeps it.
+    if (hasValuation || hasHistory) {
       chips.push(DOSSIER_SECTION_CHIPS.valuation);
     }
     if (dossier.analysts) {
       chips.push(DOSSIER_SECTION_CHIPS.analysts);
+    }
+    if (dossier.thesis) {
+      chips.push(DOSSIER_SECTION_CHIPS.thesis);
     }
     if (dossier.nextEarnings) {
       chips.push(DOSSIER_SECTION_CHIPS.earnings);
@@ -108,6 +120,7 @@ export class DossierViewUtils {
     if (dossier.radarSignals.length > 0) {
       chips.push(DOSSIER_SECTION_CHIPS.signals);
     }
+    chips.push(DOSSIER_SECTION_CHIPS.dataStatus);
     return chips;
   }
 }

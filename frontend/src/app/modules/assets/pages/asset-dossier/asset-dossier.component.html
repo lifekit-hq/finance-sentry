@@ -11,6 +11,25 @@
       <cmn-skeleton height="12rem" width="100%" />
     </div>
 
+    <!-- n/k tick strip: one tick per named rule of the axis that answers a section's question. -->
+    <ng-template #tickStrip let-axis>
+      <div
+        [attr.aria-label]="axis.label + ': ' + axis.passed + ' of ' + axis.total + ' checks pass'"
+        class="flex shrink-0 items-center gap-cmn-2"
+        data-testid="tick-strip"
+        role="img"
+      >
+        <span class="flex gap-cmn-1">
+          @for (rule of axis.rules; track rule.key) {
+            <span [class]="tickClass(rule.state)" class="h-2 w-4 rounded-full"></span>
+          }
+        </span>
+        <span class="text-cmn-xs tabular-nums text-text-secondary"
+          >{{ axis.passed }}/{{ axis.total }}</span
+        >
+      </div>
+    </ng-template>
+
     @if (store.dossier(); as dossier) {
       <!-- Hero: who this is, today's quote and what the book holds, before anything else. The top bar owns the symbol and the way back (route data). -->
       <cmn-card class="block" data-testid="dossier-hero">
@@ -36,6 +55,14 @@
                 } @else if (profile.name) {
                   <p class="text-cmn-sm text-text-secondary">{{ dossier.symbol }}</p>
                 }
+              }
+              @if (store.thesisHook(); as hook) {
+                <p
+                  class="mt-cmn-1 text-cmn-xs font-medium text-text-secondary"
+                  data-testid="dossier-hook"
+                >
+                  {{ hook }}
+                </p>
               }
             </div>
           </div>
@@ -65,6 +92,26 @@
             }
           </div>
         </div>
+
+        @if (store.performanceStrip(); as strip) {
+          @if (strip.length > 0) {
+            <ul
+              class="mt-cmn-3 flex flex-wrap gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
+              data-testid="performance-strip"
+            >
+              @for (item of strip; track item.key) {
+                <li>
+                  {{ item.label }}
+                  <span
+                    [class]="item.tone ? toneClass[item.tone] : 'text-text-primary'"
+                    class="font-medium tabular-nums"
+                    >{{ item.value }}</span
+                  >
+                </li>
+              }
+            </ul>
+          }
+        }
 
         @if (dossier.position; as position) {
           <div
@@ -127,6 +174,42 @@
                 }
               </div>
             </dl>
+
+            <!-- Size against the IPS cap: the fill is the share of book, the mark is the cap. -->
+            @if (store.sizeCap(); as size) {
+              <div class="mt-cmn-4" data-testid="size-cap">
+                <div class="flex items-baseline justify-between gap-cmn-3 text-cmn-xs">
+                  <span class="text-text-secondary">Size against the IPS cap</span>
+                  <span
+                    [class]="size.overCap ? pnlNegativeClass : 'text-text-primary'"
+                    class="font-medium tabular-nums"
+                    data-testid="size-cap-text"
+                  >
+                    {{ size.sharePct | number: '1.1-1' }}%
+                    @if (size.capPct !== null) {
+                      of {{ size.capPct | number: '1.0-1' }}% cap
+                    } @else {
+                      · no cap set
+                    }
+                  </span>
+                </div>
+                <div class="relative mt-cmn-1 h-2 rounded-full bg-surface-raised">
+                  <span
+                    [class]="size.overCap ? 'bg-loss' : 'bg-accent-default'"
+                    [style.width.%]="size.fillPct"
+                    class="absolute inset-y-0 left-0 rounded-full"
+                  ></span>
+                  @if (size.capMarkPct !== null) {
+                    <span
+                      [style.left.%]="size.capMarkPct"
+                      class="absolute -inset-y-1 w-0.5 bg-text-primary"
+                      data-testid="size-cap-mark"
+                    ></span>
+                  }
+                </div>
+              </div>
+            }
+
             <p class="mt-cmn-3 text-cmn-xs text-text-secondary">
               Held at
               <a
@@ -192,26 +275,6 @@
           Updated {{ dossier.generatedAt | cmnRelativeTime: 'Never' }}
         </p>
       </cmn-card>
-
-      <!-- Sticky section bar. On the phone the shell's top bar overlays the page, so it sticks below it. -->
-      @if (store.sectionChips(); as chips) {
-        @if (chips.length > 0) {
-          <!-- top-0: the shell's main carries the overlay bar's scroll-padding on a phone. -->
-          <nav
-            aria-label="Dossier sections"
-            class="sticky top-0 z-10 -mx-cmn-4 bg-surface-bg px-cmn-4 py-cmn-2 md:-mx-cmn-8 md:px-cmn-8"
-            data-testid="dossier-chips"
-          >
-            <div class="flex gap-cmn-2 overflow-x-auto [scrollbar-width:none]">
-              @for (chip of chips; track chip.id) {
-                <cmn-chip (clicked)="scrollToSection(chip.id)" class="shrink-0">{{
-                  chip.label
-                }}</cmn-chip>
-              }
-            </div>
-          </nav>
-        }
-      }
 
       @if (!store.hasDossierSections()) {
         <cmn-card class="block" data-testid="dossier-no-data">
@@ -308,403 +371,913 @@
           }
         }
 
-        <!-- Investment Thesis -->
-        @if (dossier.thesis; as thesis) {
-          <cmn-card id="thesis" class="block scroll-mt-[4.5rem]">
-            <div class="flex items-start justify-between gap-cmn-3">
-              <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
-                Investment Thesis
-              </h2>
-              @if (thesis.brokenAt) {
-                <cmn-tag variant="error">Invalidated</cmn-tag>
-              } @else {
-                <cmn-tag variant="success">Active</cmn-tag>
-              }
-            </div>
-
-            <div class="mt-cmn-3 space-y-cmn-2" data-testid="thesis-text">
-              @for (paragraph of store.visibleThesisParagraphs(); track $index) {
-                <p class="text-cmn-sm leading-relaxed text-text-primary">{{ paragraph }}</p>
-              }
-            </div>
-            @if (store.thesisHasMore()) {
-              <cmn-button
-                (clicked)="store.toggleThesisExpanded()"
-                class="mt-cmn-2 block"
-                variant="secondary"
-                size="sm"
-                data-testid="thesis-toggle"
-              >
-                {{ store.isThesisExpanded() ? 'Show less' : 'Read more' }}
-              </cmn-button>
-            }
-
-            @if (thesis.brokenReason) {
-              <cmn-alert variant="error" class="mt-cmn-3">{{ thesis.brokenReason }}</cmn-alert>
-            }
-
-            @if (thesis.invalidationTriggers.length > 0) {
-              <div class="mt-cmn-4 border-t border-border-default pt-cmn-4">
-                <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">
-                  Invalidation Triggers
-                </p>
-                <ul class="space-y-cmn-1">
-                  @for (trigger of thesis.invalidationTriggers; track $index) {
-                    <li class="text-cmn-sm text-text-primary">{{ trigger | triggerSentence }}</li>
-                  }
-                </ul>
+        <!-- Sticky section bar. On the phone the shell's top bar overlays the page, so it sticks below it. -->
+        @if (store.sectionChips(); as chips) {
+          @if (chips.length > 0) {
+            <!-- top-0: the shell's main carries the overlay bar's scroll-padding on a phone. -->
+            <nav
+              aria-label="Dossier sections"
+              class="sticky top-0 z-10 -mx-cmn-4 bg-surface-bg px-cmn-4 py-cmn-2 md:-mx-cmn-8 md:px-cmn-8"
+              data-testid="dossier-chips"
+            >
+              <div class="flex gap-cmn-2 overflow-x-auto [scrollbar-width:none]">
+                @for (chip of chips; track chip.id) {
+                  <cmn-chip (clicked)="scrollToSection(chip.id)" class="shrink-0">{{
+                    chip.label
+                  }}</cmn-chip>
+                }
               </div>
+            </nav>
+          }
+        }
+
+        <!-- Desktop: question-led sections on the left two thirds, the checks beside them. Phone: checks first. -->
+        <div class="space-y-cmn-5 lg:grid lg:grid-cols-3 lg:items-start lg:gap-cmn-5 lg:space-y-0">
+          @if (store.checkAxes(); as axes) {
+            @if (axes.length > 0) {
+              <aside class="lg:sticky lg:top-[4.5rem] lg:order-last">
+                <cmn-card
+                  [id]="sectionId.checks"
+                  class="block scroll-mt-[4.5rem]"
+                  data-testid="dossier-checks"
+                >
+                  <div class="flex items-baseline justify-between gap-cmn-3">
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      Checks
+                    </h2>
+                    <span class="text-cmn-xs tabular-nums text-text-secondary">
+                      {{ store.checksPassed() }} of {{ store.checksTotal() }} pass
+                    </span>
+                  </div>
+                  <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                    Two named rules per axis; open one to see the fact and its bar.
+                  </p>
+
+                  @if (store.wheel(); as wheel) {
+                    <svg
+                      [attr.viewBox]="'0 0 ' + wheel.size + ' ' + wheel.size"
+                      aria-hidden="true"
+                      class="mx-auto mt-cmn-3 block w-full max-w-[16.25rem]"
+                      data-testid="checks-wheel"
+                    >
+                      @for (ring of wheel.rings; track $index) {
+                        <polygon [attr.points]="ring" class="fill-none stroke-border-default" />
+                      }
+                      @for (axis of wheel.axes; track axis.key) {
+                        <line
+                          [attr.x1]="wheel.centre"
+                          [attr.y1]="wheel.centre"
+                          [attr.x2]="axis.x"
+                          [attr.y2]="axis.y"
+                          class="stroke-border-default"
+                        />
+                        <text
+                          [attr.x]="axis.labelX"
+                          [attr.y]="axis.labelY"
+                          [attr.text-anchor]="axis.anchor"
+                          class="fill-text-secondary text-[11px]"
+                          dominant-baseline="middle"
+                        >
+                          {{ axis.label }}
+                        </text>
+                      }
+                      <polygon
+                        [attr.points]="wheel.shape"
+                        class="fill-accent-default stroke-accent-default"
+                        fill-opacity="0.25"
+                        stroke-width="1.5"
+                      />
+                    </svg>
+                  }
+
+                  <div class="mt-cmn-3 divide-y divide-border-default">
+                    @for (axis of axes; track axis.key) {
+                      <details [attr.data-testid]="'check-axis-' + axis.key" class="group py-cmn-2">
+                        <summary
+                          class="flex cursor-pointer list-none items-center justify-between gap-cmn-3 marker:hidden"
+                        >
+                          <span class="text-cmn-sm font-medium text-text-primary">{{
+                            axis.label
+                          }}</span>
+                          <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
+                        </summary>
+                        <ul class="mt-cmn-2 space-y-cmn-2">
+                          @for (rule of axis.rules; track rule.key) {
+                            <li class="flex items-start gap-cmn-2 text-cmn-sm">
+                              <span
+                                [class]="ruleTickClass[rule.state]"
+                                class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                              ></span>
+                              <div class="min-w-0">
+                                <p class="text-text-primary">
+                                  {{ rule.label }}
+                                  <span class="sr-only">: {{ ruleStateLabel[rule.state] }}</span>
+                                </p>
+                                @if (rule.detail || rule.note) {
+                                  <p class="text-cmn-xs text-text-secondary">
+                                    @if (rule.detail) {
+                                      <span class="tabular-nums">{{ rule.detail }}</span>
+                                    }
+                                    @if (rule.detail && rule.note) {
+                                      ·
+                                    }
+                                    {{ rule.note }}
+                                  </p>
+                                }
+                              </div>
+                            </li>
+                          }
+                        </ul>
+                      </details>
+                    }
+                  </div>
+                </cmn-card>
+              </aside>
+            }
+          }
+
+          <div class="space-y-cmn-5 lg:col-span-2">
+            <!-- How has it moved? 1Y by default, the S&P 500 rebased onto its first close, the user's fills and average cost. -->
+            @if (dossier.performance) {
+              <cmn-card
+                [id]="sectionId.chart"
+                class="block scroll-mt-[4.5rem]"
+                data-testid="price-chart"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-cmn-3">
+                  <div>
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      How has it moved?
+                    </h2>
+                    @if (store.chart(); as chart) {
+                      @if (chart.changePct !== null) {
+                        <p
+                          class="mt-cmn-1 text-cmn-xs text-text-secondary"
+                          data-testid="chart-change"
+                        >
+                          {{ chart.range === 'MAX' ? 'All history' : chart.range }}
+                          <span
+                            [class]="chart.changePct >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                            class="font-medium tabular-nums"
+                            >{{ chart.changePct > 0 ? '+' : ''
+                            }}{{ chart.changePct | number: '1.1-1' }}%</span
+                          >
+                          @if (chart.benchmarkChangePct !== null) {
+                            · S&amp;P 500
+                            <span class="tabular-nums"
+                              >{{ chart.benchmarkChangePct > 0 ? '+' : ''
+                              }}{{ chart.benchmarkChangePct | number: '1.1-1' }}%</span
+                            >
+                          }
+                        </p>
+                      }
+                    }
+                  </div>
+                  @if (store.sectionChecks()['chart']; as axis) {
+                    <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
+                  }
+                </div>
+
+                <lk-segmented
+                  [options]="chartRanges"
+                  [value]="store.chartRange()"
+                  (lk-segmented-change)="onChartRangeChange($event)"
+                  class="mt-cmn-3 block"
+                  data-testid="chart-ranges"
+                  label="Chart range"
+                />
+
+                <!-- Fixed height in every state, so switching range never moves the page: the
+                     skeleton matches the chart card, the floor also holds the key row under it. -->
+                <cmn-async-state
+                  [status]="store.chartAsyncStatus()"
+                  [errorMessage]="store.chartErrorMessage()"
+                  [isEmpty]="store.chartView() === null"
+                  [emptyMessage]="'No price history for ' + dossier.symbol + ' in this range.'"
+                  [skeletonHeight]="chartSkeletonHeight"
+                  [skeletonRows]="1"
+                  (retry)="store.loadChart({symbol: dossier.symbol, range: store.chartRange()})"
+                  class="mt-cmn-3 block min-h-[23rem]"
+                  retryable
+                >
+                  @if (store.chartView(); as view) {
+                    <cmn-area-chart
+                      [series]="view.series"
+                      [stacked]="false"
+                      [currency]="store.chart()?.currency ?? 'USD'"
+                      [label]="dossier.symbol + ' price'"
+                      class="block"
+                    />
+                    @if (view.ticks.length > 0) {
+                      <!-- Fills sit under the close they moved: green buys, red sells. -->
+                      <div
+                        aria-label="Your trades in this range"
+                        class="relative mx-cmn-4 mt-cmn-2 h-3"
+                        data-testid="chart-trades"
+                        role="list"
+                      >
+                        @for (tick of view.ticks; track $index) {
+                          <span
+                            [class]="tick.side === 'buy' ? 'bg-gain' : 'bg-loss'"
+                            [style.left.%]="tick.leftPct"
+                            [attr.title]="tick.title"
+                            [attr.aria-label]="tick.title"
+                            class="absolute top-0 h-3 w-1 -translate-x-1/2 rounded-full"
+                            data-testid="chart-trade"
+                            role="listitem"
+                          ></span>
+                        }
+                      </div>
+                    }
+                    @if (view.averageCostLabel || view.ticks.length > 0) {
+                      <p
+                        class="mt-cmn-2 flex flex-wrap items-center gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
+                        data-testid="chart-key"
+                      >
+                        @if (view.averageCostLabel) {
+                          <span>{{ view.averageCostLabel }}</span>
+                        }
+                        @if (view.ticks.length > 0) {
+                          <span class="flex items-center gap-cmn-1">
+                            <span class="h-2 w-1 rounded-full bg-gain"></span> Buy
+                            <span class="ml-cmn-1 h-2 w-1 rounded-full bg-loss"></span> Sell
+                          </span>
+                        }
+                      </p>
+                    }
+                  }
+                </cmn-async-state>
+              </cmn-card>
             }
 
-            @if (thesis.catalysts.length > 0) {
-              <div class="mt-cmn-4 border-t border-border-default pt-cmn-4">
-                <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">Catalysts</p>
-                <ul class="space-y-cmn-1">
-                  @for (catalyst of thesis.catalysts; track $index) {
-                    <li class="flex items-start gap-cmn-3 text-cmn-sm">
-                      <span class="shrink-0 tabular-nums text-text-secondary">{{
-                        catalyst.date
-                      }}</span>
-                      <span class="text-text-primary">{{ catalyst.event }}</span>
+            <!-- Where did the return come from? Held only; legs the ledger cannot state say so. -->
+            @if (store.returnsView(); as returns) {
+              <cmn-card
+                [id]="sectionId.returns"
+                class="block scroll-mt-[4.5rem]"
+                data-testid="returns"
+              >
+                <div class="flex items-baseline justify-between gap-cmn-3">
+                  <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                    Where did the return come from?
+                  </h2>
+                  @if (returns.total !== null) {
+                    <span
+                      [class]="returns.total >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                      class="text-cmn-md font-semibold tabular-nums"
+                      data-testid="returns-total"
+                      >{{ returns.total | money }}</span
+                    >
+                  }
+                </div>
+                <ul class="mt-cmn-3 space-y-cmn-2">
+                  @for (leg of returns.legs; track leg.key) {
+                    <li
+                      [attr.data-testid]="'returns-' + leg.key"
+                      class="grid grid-cols-[6rem_1fr_auto] items-center gap-cmn-3 text-cmn-sm"
+                    >
+                      <span class="text-text-secondary">{{ leg.label }}</span>
+                      <span class="h-2 rounded-full bg-surface-raised">
+                        @if (leg.value !== null) {
+                          <span
+                            [class]="leg.value >= 0 ? 'bg-gain' : 'bg-loss'"
+                            [style.width.%]="leg.barPct"
+                            class="block h-2 rounded-full"
+                          ></span>
+                        }
+                      </span>
+                      @if (leg.value !== null) {
+                        <span
+                          [class]="leg.value >= 0 ? pnlPositiveClass : pnlNegativeClass"
+                          class="text-right tabular-nums"
+                          >{{ leg.value | money }}</span
+                        >
+                      } @else {
+                        <span class="text-right text-text-secondary">Not available</span>
+                      }
                     </li>
                   }
                 </ul>
-              </div>
+                <p class="mt-cmn-3 text-cmn-xs text-text-secondary">{{ returns.note }}</p>
+              </cmn-card>
             }
-          </cmn-card>
-        }
 
-        <!-- Valuation -->
-        @if (dossier.valuation; as valuation) {
-          @if (!valuation.notApplicable) {
-            <cmn-card id="valuation" class="block scroll-mt-[4.5rem]">
-              <div class="flex items-center justify-between gap-cmn-3">
-                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Valuation</h2>
-                @if (valuation.isStale) {
-                  <cmn-tag variant="warning" data-testid="valuation-stale"
-                    >Stale
-                    @if (valuation.priceAsOf) {
-                      · as of {{ valuation.priceAsOf | date: 'mediumDate' }}
-                    }
-                  </cmn-tag>
-                }
-              </div>
-
-              <div class="mt-cmn-4 grid grid-cols-1 gap-cmn-4 sm:grid-cols-2 md:grid-cols-4">
-                @if (valuation.metrics.trailingPe.value !== null) {
+            <!-- Is it cheap? The analysts' range with its source named, their target and the user's own. -->
+            @if ((dossier.valuation && !dossier.valuation.notApplicable) || dossier.performance) {
+              <cmn-card
+                [id]="sectionId.valuation"
+                class="block scroll-mt-[4.5rem]"
+                data-testid="valuation"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
-                    <cmn-stat-card
-                      [value]="(valuation.metrics.trailingPe.value | number: '1.1-1') + 'x'"
-                      label="Trailing P/E"
-                    />
-                    @if (valuation.metrics.trailingPe.fiveYearAvg !== null) {
-                      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                        5Y avg {{ valuation.metrics.trailingPe.fiveYearAvg | number: '1.1-1' }}x
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      Is it cheap?
+                    </h2>
+                    @if (dossier.valuation?.isStale) {
+                      <cmn-tag variant="warning" class="mt-cmn-1" data-testid="valuation-stale"
+                        >Stale
+                        @if (dossier.valuation?.priceAsOf; as priceAsOf) {
+                          · as of {{ priceAsOf | date: 'mediumDate' }}
+                        }
+                      </cmn-tag>
+                    }
+                  </div>
+                  @if (store.sectionChecks()['valuation']; as axis) {
+                    <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
+                  }
+                </div>
+
+                @if (store.targetBand(); as band) {
+                  <div class="mt-cmn-4" data-testid="target-band">
+                    <!-- Three bands: below the analysts' low, inside their range, above their high. -->
+                    <div class="relative h-3 overflow-hidden rounded-full bg-surface-raised">
+                      @if (band.lowPct !== null && band.highPct !== null) {
+                        <span
+                          [style.width.%]="band.lowPct"
+                          class="absolute inset-y-0 left-0 bg-status-success-subtle"
+                        ></span>
+                        <span
+                          [style.left.%]="band.lowPct"
+                          [style.width.%]="band.highPct - band.lowPct"
+                          class="absolute inset-y-0 bg-accent-subtle"
+                          data-testid="target-range"
+                        ></span>
+                        <span
+                          [style.left.%]="band.highPct"
+                          class="absolute inset-y-0 right-0 bg-status-error-subtle"
+                        ></span>
+                      }
+                    </div>
+                    <div class="relative h-3">
+                      @for (marker of band.markers; track marker.key) {
+                        <span
+                          [class]="
+                            marker.key === 'price'
+                              ? 'bg-text-primary'
+                              : marker.key === 'mine'
+                                ? 'bg-accent-default'
+                                : 'bg-text-secondary'
+                          "
+                          [style.left.%]="marker.leftPct"
+                          [attr.data-testid]="'target-marker-' + marker.key"
+                          class="absolute -top-4 h-5 w-0.5 -translate-x-1/2"
+                        ></span>
+                      }
+                    </div>
+                    <dl class="grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-2 text-cmn-sm sm:grid-cols-4">
+                      @for (marker of band.markers; track marker.key) {
+                        <div>
+                          <dt class="text-cmn-xs text-text-secondary">{{ marker.label }}</dt>
+                          <dd class="font-medium tabular-nums text-text-primary">
+                            {{ marker.value | money: band.currency }}
+                          </dd>
+                        </div>
+                      }
+                      @if (band.low !== null && band.high !== null) {
+                        <div>
+                          <dt class="text-cmn-xs text-text-secondary">Analyst range</dt>
+                          <dd class="font-medium tabular-nums text-text-primary">
+                            {{ band.low | money: band.currency }} -
+                            {{ band.high | money: band.currency }}
+                          </dd>
+                        </div>
+                      }
+                    </dl>
+                    @if (band.source) {
+                      <p
+                        class="mt-cmn-2 text-cmn-xs text-text-secondary"
+                        data-testid="target-source"
+                      >
+                        Analyst figures from {{ band.source }}
                       </p>
                     }
                   </div>
                 }
-                @if (valuation.metrics.forwardPe.value !== null) {
-                  <div>
-                    <cmn-stat-card
-                      [value]="(valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'"
-                      label="Forward P/E"
-                    />
-                    @if (valuation.metrics.forwardPe.fiveYearAvg !== null) {
-                      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                        5Y avg {{ valuation.metrics.forwardPe.fiveYearAvg | number: '1.1-1' }}x
-                      </p>
-                    }
-                  </div>
-                }
-                @if (valuation.metrics.evToEbitda.value !== null) {
-                  <cmn-stat-card
-                    [value]="(valuation.metrics.evToEbitda.value | number: '1.1-1') + 'x'"
-                    label="EV/EBITDA"
-                  />
-                }
-                @if (valuation.metrics.dividendYield.value | dividendYield; as dividendYield) {
-                  <div>
-                    <cmn-stat-card [value]="dividendYield" label="Dividend Yield" />
-                    @if (valuation.metrics.dividendYield.fiveYearAvg | dividendYield; as yieldAvg) {
-                      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">5Y avg {{ yieldAvg }}</p>
-                    }
-                  </div>
-                }
-                @if (valuation.consensusTarget !== null) {
-                  <cmn-stat-card
-                    [value]="valuation.consensusTarget | money"
-                    [delta]="valuation.impliedUpsidePct"
-                    [deltaLabel]="
-                      valuation.impliedUpsidePct === null
-                        ? ''
-                        : (valuation.impliedUpsidePct | number: '1.1-1') + '% upside'
-                    "
-                    label="Consensus Target"
-                  />
-                }
-              </div>
 
-              @if (valuation.peerSet; as peerSet) {
-                @if (peerSet.peers.length > 0) {
-                  <div
-                    class="mt-cmn-5 border-t border-border-default pt-cmn-4"
-                    data-testid="valuation-peers"
-                  >
-                    <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">
-                      Versus {{ peerSet.name | peerSetLabel }}
-                    </p>
-                    <ul class="text-cmn-sm">
-                      <li
-                        class="grid grid-cols-3 gap-cmn-3 pb-cmn-1 text-cmn-xs text-text-secondary"
+                <!-- The user's own target: saved per person, in the price's currency. -->
+                <div
+                  class="mt-cmn-4 border-t border-border-default pt-cmn-4"
+                  data-testid="my-target"
+                >
+                  @if (store.isEditingTarget()) {
+                    <div class="flex flex-wrap items-end gap-cmn-2">
+                      <cmn-form-field
+                        [errorMessage]="
+                          store.targetDraft() !== '' && store.parsedTargetDraft() === null
+                            ? 'Enter a price above zero.'
+                            : ''
+                        "
+                        class="min-w-[10rem] flex-1"
+                        label="Your target price"
                       >
-                        <span>Company</span>
-                        <span class="text-right">Fwd P/E</span>
-                        <span class="text-right">EV/EBITDA</span>
-                      </li>
-                      <li
-                        class="grid grid-cols-3 gap-cmn-3 rounded-lg bg-surface-raised px-cmn-2 py-cmn-1 font-semibold text-text-primary"
-                        data-testid="valuation-peer-subject"
+                        <cmn-input
+                          [ngModel]="store.targetDraft()"
+                          (ngModelChange)="store.setTargetDraft($event)"
+                          data-testid="my-target-input"
+                          type="number"
+                          inputmode="decimal"
+                          enterkeyhint="done"
+                          placeholder="e.g. 250"
+                        />
+                      </cmn-form-field>
+                      <cmn-button
+                        [disabled]="store.parsedTargetDraft() === null || store.isTargetLoading()"
+                        (clicked)="store.saveTarget()"
+                        size="sm"
+                        variant="primary"
+                        data-testid="my-target-save"
                       >
-                        <span>{{ dossier.symbol }}</span>
-                        <span class="text-right tabular-nums">{{
-                          valuation.metrics.forwardPe.value !== null
-                            ? (valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'
-                            : '—'
-                        }}</span>
-                        <span class="text-right tabular-nums">{{
-                          valuation.metrics.evToEbitda.value !== null
-                            ? (valuation.metrics.evToEbitda.value | number: '1.1-1') + 'x'
-                            : '—'
-                        }}</span>
-                      </li>
-                      @for (peer of peerSet.peers; track peer.ticker) {
-                        <li
-                          class="grid grid-cols-3 gap-cmn-3 border-b border-border-default px-cmn-2 py-cmn-1 text-text-primary last:border-0"
-                          data-testid="valuation-peer"
+                        Save
+                      </cmn-button>
+                      <cmn-button
+                        [disabled]="store.isTargetLoading()"
+                        (clicked)="store.closeTargetEditor()"
+                        size="sm"
+                        variant="secondary"
+                        data-testid="my-target-cancel"
+                      >
+                        Cancel
+                      </cmn-button>
+                    </div>
+                  } @else {
+                    <div class="flex flex-wrap items-center justify-between gap-cmn-3">
+                      <p class="text-cmn-sm text-text-secondary">
+                        @if (dossier.userTarget; as target) {
+                          Your target
+                          <span
+                            class="font-medium tabular-nums text-text-primary"
+                            data-testid="my-target-value"
+                            >{{ target.targetPrice | money: target.currency }}</span
+                          >
+                        } @else {
+                          No target of your own yet.
+                        }
+                      </p>
+                      <div class="flex gap-cmn-2">
+                        @if (dossier.userTarget) {
+                          <cmn-button
+                            [disabled]="store.isTargetLoading()"
+                            (clicked)="store.clearTarget()"
+                            size="sm"
+                            variant="secondary"
+                            data-testid="my-target-clear"
+                          >
+                            Clear
+                          </cmn-button>
+                        }
+                        <cmn-button
+                          (clicked)="store.openTargetEditor()"
+                          size="sm"
+                          variant="secondary"
+                          data-testid="my-target-edit"
                         >
-                          <span>{{ peer.ticker }}</span>
+                          {{ dossier.userTarget ? 'Change' : 'Set your target' }}
+                        </cmn-button>
+                      </div>
+                    </div>
+                  }
+                  @if (store.targetErrorMessage(); as targetError) {
+                    <cmn-alert variant="error" class="mt-cmn-2 block" data-testid="my-target-error">
+                      {{ targetError }}
+                    </cmn-alert>
+                  }
+                </div>
+
+                @if (store.fundamentals(); as cells) {
+                  @if (cells.length > 0) {
+                    <dl
+                      class="mt-cmn-4 grid grid-cols-2 gap-x-cmn-4 gap-y-cmn-3 border-t border-border-default pt-cmn-4"
+                      data-testid="fundamentals"
+                    >
+                      @for (cell of cells; track cell.key) {
+                        <div [attr.data-testid]="'fundamental-' + cell.key">
+                          <dt class="text-cmn-xs text-text-secondary">{{ cell.label }}</dt>
+                          @if (cell.value !== null) {
+                            <dd
+                              [class]="cell.tone ? toneClass[cell.tone] : 'text-text-primary'"
+                              class="text-cmn-sm font-semibold tabular-nums"
+                            >
+                              {{ cell.value }}
+                            </dd>
+                          } @else {
+                            <dd class="text-cmn-xs text-text-secondary">{{ cell.reason }}</dd>
+                          }
+                        </div>
+                      }
+                    </dl>
+                  }
+                }
+
+                @if (dossier.valuation?.peerSet; as peerSet) {
+                  @if (peerSet.peers.length > 0 && dossier.valuation; as valuation) {
+                    <div
+                      class="mt-cmn-5 border-t border-border-default pt-cmn-4"
+                      data-testid="valuation-peers"
+                    >
+                      <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">
+                        Versus {{ peerSet.name | peerSetLabel }}
+                      </p>
+                      <ul class="text-cmn-sm">
+                        <li
+                          class="grid grid-cols-3 gap-cmn-3 pb-cmn-1 text-cmn-xs text-text-secondary"
+                        >
+                          <span>Company</span>
+                          <span class="text-right">Fwd P/E</span>
+                          <span class="text-right">EV/EBITDA</span>
+                        </li>
+                        <li
+                          class="grid grid-cols-3 gap-cmn-3 rounded-lg bg-surface-raised px-cmn-2 py-cmn-1 font-semibold text-text-primary"
+                          data-testid="valuation-peer-subject"
+                        >
+                          <span>{{ dossier.symbol }}</span>
                           <span class="text-right tabular-nums">{{
-                            peer.forwardPe !== null ? (peer.forwardPe | number: '1.1-1') + 'x' : '—'
-                          }}</span>
-                          <span class="text-right tabular-nums">{{
-                            peer.evToEbitda !== null
-                              ? (peer.evToEbitda | number: '1.1-1') + 'x'
+                            valuation.metrics.forwardPe.value !== null
+                              ? (valuation.metrics.forwardPe.value | number: '1.1-1') + 'x'
                               : '—'
                           }}</span>
+                          <span class="text-right tabular-nums">{{
+                            valuation.metrics.evToEbitda.value !== null
+                              ? (valuation.metrics.evToEbitda.value | number: '1.1-1') + 'x'
+                              : '—'
+                          }}</span>
+                        </li>
+                        @for (peer of peerSet.peers; track peer.ticker) {
+                          <li
+                            class="grid grid-cols-3 gap-cmn-3 border-b border-border-default px-cmn-2 py-cmn-1 text-text-primary last:border-0"
+                            data-testid="valuation-peer"
+                          >
+                            <span>{{ peer.ticker }}</span>
+                            <span class="text-right tabular-nums">{{
+                              peer.forwardPe !== null
+                                ? (peer.forwardPe | number: '1.1-1') + 'x'
+                                : '—'
+                            }}</span>
+                            <span class="text-right tabular-nums">{{
+                              peer.evToEbitda !== null
+                                ? (peer.evToEbitda | number: '1.1-1') + 'x'
+                                : '—'
+                            }}</span>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                }
+              </cmn-card>
+            }
+
+            <!-- What do analysts say? -->
+            @if (dossier.analysts; as analysts) {
+              <cmn-card [id]="sectionId.analysts" class="block scroll-mt-[4.5rem]">
+                <div class="flex flex-wrap items-start justify-between gap-cmn-3">
+                  <div>
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      What do analysts say?
+                    </h2>
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                      {{ analysts.coverage | coverageLabel }}
+                    </p>
+                  </div>
+                  @if (store.sectionChecks()['analysts']; as axis) {
+                    <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
+                  }
+                </div>
+
+                @if (store.recommendationSummary(); as summary) {
+                  <div class="mt-cmn-4">
+                    <div class="flex items-baseline justify-between gap-cmn-3">
+                      <p class="text-cmn-sm font-medium text-text-primary">Recommendation Trend</p>
+                      <p class="text-cmn-xs tabular-nums text-text-secondary">
+                        {{ summary.period | date: 'MMM yyyy' }}
+                      </p>
+                    </div>
+                    <p
+                      class="mt-cmn-2 font-headline text-cmn-lg font-semibold text-text-primary"
+                      data-testid="recommendation-verdict"
+                    >
+                      {{ summary.verdictCount }} of {{ summary.total }} analysts rate it
+                      {{ summary.verdict }}
+                    </p>
+                    <div
+                      class="mt-cmn-3 flex h-3 overflow-hidden rounded-full bg-surface-raised"
+                      data-testid="recommendation-bar"
+                    >
+                      @for (segment of summary.segments; track segment.bucket) {
+                        <span
+                          [class]="segment.barClass"
+                          [style.width.%]="segment.sharePct"
+                          [attr.data-testid]="'recommendation-' + segment.bucket"
+                        ></span>
+                      }
+                    </div>
+                    <ul
+                      class="mt-cmn-3 flex flex-wrap gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
+                      data-testid="trend-list"
+                    >
+                      @for (segment of summary.segments; track segment.bucket) {
+                        <li class="flex items-center gap-cmn-1">
+                          <span [class]="segment.barClass" class="h-2 w-2 rounded-full"></span>
+                          {{ segment.label }}
+                          <span class="tabular-nums text-text-primary">{{ segment.count }}</span>
                         </li>
                       }
                     </ul>
                   </div>
                 }
-              }
-            </cmn-card>
-          }
-        }
 
-        <!-- Analyst Coverage -->
-        @if (dossier.analysts; as analysts) {
-          <cmn-card id="analyst-coverage" class="block scroll-mt-[4.5rem]">
-            <div class="flex items-center justify-between gap-cmn-3">
-              <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
-                Analyst Coverage
-              </h2>
-              <span class="text-cmn-xs text-text-secondary">{{
-                analysts.coverage | coverageLabel
-              }}</span>
-            </div>
-
-            @if (analysts.recentActions.length > 0) {
-              <div class="mt-cmn-4 space-y-cmn-2">
-                @for (action of analysts.recentActions; track $index) {
-                  <div
-                    class="flex flex-wrap items-start gap-cmn-3 border-b border-border-default pb-cmn-2 text-cmn-sm last:border-0 last:pb-0"
-                  >
-                    @if (action.sourceUrl) {
-                      <a
-                        [href]="action.sourceUrl"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="shrink-0 font-medium text-text-primary underline-offset-2 hover:underline"
-                        data-testid="analyst-action-link"
-                        >{{ action.firm }}</a
-                      >
-                    } @else {
-                      <span class="shrink-0 font-medium text-text-primary">{{ action.firm }}</span>
-                    }
-                    <span
-                      class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
-                    >
-                      {{ action.actionType | analystActionLabel }}
-                    </span>
-                    @if (action.newRating) {
-                      <span class="text-text-primary">→ {{ action.newRating }}</span>
-                    }
-                    @if (action.newTarget !== null) {
-                      <span class="tabular-nums text-text-secondary"
-                        >PT {{ action.newTarget | money }}</span
-                      >
-                    }
-                    <span class="ml-auto shrink-0 text-text-secondary">{{
-                      action.actionDate
-                    }}</span>
-                  </div>
-                }
-              </div>
-            } @else {
-              <p class="mt-cmn-3 text-cmn-sm text-text-secondary">No recent analyst actions.</p>
-            }
-
-            @if (store.recommendationSummary(); as summary) {
-              <div class="mt-cmn-5 border-t border-border-default pt-cmn-4">
-                <div class="flex items-baseline justify-between gap-cmn-3">
-                  <p class="text-cmn-sm font-medium text-text-primary">Recommendation Trend</p>
-                  <p class="text-cmn-xs tabular-nums text-text-secondary">
-                    {{ summary.period | date: 'MMM yyyy' }}
-                  </p>
-                </div>
-                <p
-                  class="mt-cmn-2 font-headline text-cmn-lg font-semibold text-text-primary"
-                  data-testid="recommendation-verdict"
-                >
-                  {{ summary.verdictCount }} of {{ summary.total }} analysts rate it
-                  {{ summary.verdict }}
-                </p>
                 <div
-                  class="mt-cmn-3 flex h-3 overflow-hidden rounded-full bg-surface-raised"
-                  data-testid="recommendation-bar"
+                  [class.border-t]="store.recommendationSummary() !== null"
+                  [class.pt-cmn-4]="store.recommendationSummary() !== null"
+                  class="mt-cmn-4 border-border-default"
                 >
-                  @for (segment of summary.segments; track segment.bucket) {
-                    <span
-                      [class]="segment.barClass"
-                      [style.width.%]="segment.sharePct"
-                      [attr.data-testid]="'recommendation-' + segment.bucket"
-                    ></span>
+                  @if (analysts.recentActions.length > 0) {
+                    <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">Recent actions</p>
+                    <div class="space-y-cmn-2">
+                      @for (action of analysts.recentActions; track $index) {
+                        <div
+                          class="flex flex-wrap items-start gap-cmn-3 border-b border-border-default pb-cmn-2 text-cmn-sm last:border-0 last:pb-0"
+                        >
+                          @if (action.sourceUrl) {
+                            <a
+                              [href]="action.sourceUrl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="shrink-0 font-medium text-text-primary underline-offset-2 hover:underline"
+                              data-testid="analyst-action-link"
+                              >{{ action.firm }}</a
+                            >
+                          } @else {
+                            <span class="shrink-0 font-medium text-text-primary">{{
+                              action.firm
+                            }}</span>
+                          }
+                          <span
+                            class="rounded-md bg-surface-raised px-cmn-2 py-0.5 text-cmn-xs text-text-secondary"
+                          >
+                            {{ action.actionType | analystActionLabel }}
+                          </span>
+                          @if (action.newRating) {
+                            <span class="text-text-primary">→ {{ action.newRating }}</span>
+                          }
+                          @if (action.newTarget !== null) {
+                            <span class="tabular-nums text-text-secondary"
+                              >PT {{ action.newTarget | money }}</span
+                            >
+                          }
+                          <span class="ml-auto shrink-0 text-text-secondary">{{
+                            action.actionDate
+                          }}</span>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <p class="text-cmn-sm text-text-secondary">No recent analyst actions.</p>
                   }
                 </div>
-                <ul
-                  class="mt-cmn-3 flex flex-wrap gap-x-cmn-4 gap-y-cmn-1 text-cmn-xs text-text-secondary"
-                  data-testid="trend-list"
-                >
-                  @for (segment of summary.segments; track segment.bucket) {
-                    <li class="flex items-center gap-cmn-1">
-                      <span [class]="segment.barClass" class="h-2 w-2 rounded-full"></span>
-                      {{ segment.label }}
-                      <span class="tabular-nums text-text-primary">{{ segment.count }}</span>
+              </cmn-card>
+            }
+
+            <!-- What's the plan? The investment thesis. -->
+            @if (dossier.thesis; as thesis) {
+              <cmn-card [id]="sectionId.thesis" class="block scroll-mt-[4.5rem]">
+                <div class="flex flex-wrap items-start justify-between gap-cmn-3">
+                  <div>
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      What's the plan?
+                    </h2>
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">Investment thesis</p>
+                  </div>
+                  <div class="flex items-center gap-cmn-3">
+                    @if (store.sectionChecks()['thesis']; as axis) {
+                      <ng-container *ngTemplateOutlet="tickStrip; context: {$implicit: axis}" />
+                    }
+                    @if (thesis.brokenAt) {
+                      <cmn-tag variant="error">Invalidated</cmn-tag>
+                    } @else {
+                      <cmn-tag variant="success">Active</cmn-tag>
+                    }
+                  </div>
+                </div>
+
+                <div class="mt-cmn-3 space-y-cmn-2" data-testid="thesis-text">
+                  @for (paragraph of store.visibleThesisParagraphs(); track $index) {
+                    <p class="text-cmn-sm leading-relaxed text-text-primary">{{ paragraph }}</p>
+                  }
+                </div>
+                @if (store.thesisHasMore()) {
+                  <cmn-button
+                    (clicked)="store.toggleThesisExpanded()"
+                    class="mt-cmn-2 block"
+                    variant="secondary"
+                    size="sm"
+                    data-testid="thesis-toggle"
+                  >
+                    {{ store.isThesisExpanded() ? 'Show less' : 'Read more' }}
+                  </cmn-button>
+                }
+
+                @if (thesis.brokenReason) {
+                  <cmn-alert variant="error" class="mt-cmn-3">{{ thesis.brokenReason }}</cmn-alert>
+                }
+
+                @if (thesis.invalidationTriggers.length > 0) {
+                  <div class="mt-cmn-4 border-t border-border-default pt-cmn-4">
+                    <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">
+                      Invalidation Triggers
+                    </p>
+                    <ul class="space-y-cmn-1">
+                      @for (trigger of thesis.invalidationTriggers; track $index) {
+                        <li class="text-cmn-sm text-text-primary">
+                          {{ trigger | triggerSentence }}
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+
+                @if (thesis.catalysts.length > 0) {
+                  <div class="mt-cmn-4 border-t border-border-default pt-cmn-4">
+                    <p class="mb-cmn-2 text-cmn-sm font-medium text-text-primary">Catalysts</p>
+                    <ul class="space-y-cmn-1">
+                      @for (catalyst of thesis.catalysts; track $index) {
+                        <li class="flex items-start gap-cmn-3 text-cmn-sm">
+                          <span class="shrink-0 tabular-nums text-text-secondary">{{
+                            catalyst.date
+                          }}</span>
+                          <span class="text-text-primary">{{ catalyst.event }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+              </cmn-card>
+            }
+
+            <!-- What's next? -->
+            @if (dossier.nextEarnings; as earnings) {
+              <cmn-card [id]="sectionId.earnings" class="block scroll-mt-[4.5rem]">
+                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                  What's next?
+                </h2>
+                <div class="mt-cmn-3 flex flex-wrap items-center gap-cmn-4">
+                  <span class="text-cmn-lg font-semibold tabular-nums text-text-primary">
+                    {{ earnings.eventDate }}
+                  </span>
+                  <span class="text-cmn-sm text-text-secondary">{{ earnings.eventType }}</span>
+                  @if (earnings.isEstimate) {
+                    <cmn-tag variant="warning">Estimate</cmn-tag>
+                  }
+                </div>
+              </cmn-card>
+            }
+
+            <!-- Recent News -->
+            @if (dossier.recentNews.length > 0) {
+              <cmn-card [id]="sectionId.news" class="block scroll-mt-[4.5rem]">
+                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                  Recent News
+                </h2>
+                <ul class="mt-cmn-4 space-y-cmn-4">
+                  @for (article of dossier.recentNews; track article.id) {
+                    <li class="border-b border-border-default pb-cmn-3 last:border-0 last:pb-0">
+                      <a
+                        [href]="article.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-cmn-sm font-medium text-text-primary underline-offset-2 hover:underline"
+                      >
+                        {{ article.title }}
+                      </a>
+                      <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                        {{ article.source | newsSourceLabel }} ·
+                        {{ article.publishedAt | cmnRelativeTime: 'Never' }}
+                      </p>
                     </li>
                   }
                 </ul>
-              </div>
+              </cmn-card>
             }
-          </cmn-card>
-        }
 
-        <!-- Next Earnings -->
-        @if (dossier.nextEarnings; as earnings) {
-          <cmn-card id="next-earnings" class="block scroll-mt-[4.5rem]">
-            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Next Earnings</h2>
-            <div class="mt-cmn-3 flex flex-wrap items-center gap-cmn-4">
-              <span class="text-cmn-lg font-semibold tabular-nums text-text-primary">
-                {{ earnings.eventDate }}
-              </span>
-              <span class="text-cmn-sm text-text-secondary">{{ earnings.eventType }}</span>
-              @if (earnings.isEstimate) {
-                <cmn-tag variant="warning">Estimate</cmn-tag>
-              }
-            </div>
-          </cmn-card>
-        }
-
-        <!-- Recent News -->
-        @if (dossier.recentNews.length > 0) {
-          <cmn-card id="recent-news" class="block scroll-mt-[4.5rem]">
-            <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Recent News</h2>
-            <ul class="mt-cmn-4 space-y-cmn-4">
-              @for (article of dossier.recentNews; track article.id) {
-                <li class="border-b border-border-default pb-cmn-3 last:border-0 last:pb-0">
-                  <a
-                    [href]="article.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-cmn-sm font-medium text-text-primary underline-offset-2 hover:underline"
-                  >
-                    {{ article.title }}
-                  </a>
-                  <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                    {{ article.source | newsSourceLabel }} ·
-                    {{ article.publishedAt | cmnRelativeTime: 'Never' }}
-                  </p>
-                </li>
-              }
-            </ul>
-          </cmn-card>
-        }
-
-        <!-- Radar Signals -->
-        @if (dossier.radarSignals.length > 0) {
-          <cmn-card id="radar-signals" class="block scroll-mt-[4.5rem]">
-            <div class="flex items-start justify-between gap-cmn-3">
-              <div>
-                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
-                  Radar Signals
-                </h2>
-                <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
-                  {{ dossier.radarSignals.length }} signal{{
-                    dossier.radarSignals.length !== 1 ? 's' : ''
-                  }}
-                  in the last 30 days
-                </p>
-              </div>
-              @if (latestSignal(); as latest) {
-                <div class="text-right">
-                  <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Latest</p>
-                  <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">
-                    {{ latest.signalType | signalTypeLabel }}
-                  </p>
-                  <p class="text-cmn-xs text-text-secondary">
-                    {{ latest.timestamp | date: 'mediumDate' }}
-                  </p>
+            <!-- Radar Signals -->
+            @if (dossier.radarSignals.length > 0) {
+              <cmn-card [id]="sectionId.signals" class="block scroll-mt-[4.5rem]">
+                <div class="flex items-start justify-between gap-cmn-3">
+                  <div>
+                    <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                      Radar Signals
+                    </h2>
+                    <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+                      {{ dossier.radarSignals.length }} signal{{
+                        dossier.radarSignals.length !== 1 ? 's' : ''
+                      }}
+                      in the last 30 days
+                    </p>
+                  </div>
+                  @if (latestSignal(); as latest) {
+                    <div class="text-right">
+                      <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">Latest</p>
+                      <p class="mt-cmn-1 text-cmn-sm font-medium text-text-primary">
+                        {{ latest.signalType | signalTypeLabel }}
+                      </p>
+                      <p class="text-cmn-xs text-text-secondary">
+                        {{ latest.timestamp | date: 'mediumDate' }}
+                      </p>
+                    </div>
+                  }
                 </div>
-              }
-            </div>
 
-            @if (radarTrendPoints(); as points) {
-              <div class="mt-cmn-4">
-                <cmn-line-chart
-                  [data]="points"
-                  [compact]="true"
-                  [yDomain]="trendDomain"
-                  xSpacing="time"
-                  class="block h-10"
-                  valueFormat="number"
-                />
-              </div>
+                @if (radarTrendPoints(); as points) {
+                  <div class="mt-cmn-4">
+                    <cmn-line-chart
+                      [data]="points"
+                      [compact]="true"
+                      [yDomain]="trendDomain"
+                      xSpacing="time"
+                      class="block h-10"
+                      valueFormat="number"
+                    />
+                  </div>
+                }
+
+                <ul class="mt-cmn-4 space-y-cmn-2">
+                  @for (signal of dossier.radarSignals; track $index) {
+                    <li
+                      class="flex flex-wrap items-center gap-cmn-3 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
+                    >
+                      <span class="shrink-0 tabular-nums text-cmn-xs text-text-secondary">
+                        {{ signal.timestamp | date: 'mediumDate' }}
+                      </span>
+                      <span class="font-medium text-text-primary">{{
+                        signal.signalType | signalTypeLabel
+                      }}</span>
+                      <span class="text-text-secondary">{{ signal.scanner }}</span>
+                      <span class="ml-auto">
+                        <cmn-tag
+                          [variant]="severityVariant[signal.severity] ?? defaultSeverityVariant"
+                          class="capitalize"
+                          >{{ signal.severity }}</cmn-tag
+                        >
+                      </span>
+                    </li>
+                  }
+                </ul>
+              </cmn-card>
             }
 
-            <ul class="mt-cmn-4 space-y-cmn-2">
-              @for (signal of dossier.radarSignals; track $index) {
-                <li
-                  class="flex flex-wrap items-center gap-cmn-3 rounded-lg bg-surface-raised px-cmn-3 py-cmn-2 text-cmn-sm"
-                >
-                  <span class="shrink-0 tabular-nums text-cmn-xs text-text-secondary">
-                    {{ signal.timestamp | date: 'mediumDate' }}
-                  </span>
-                  <span class="font-medium text-text-primary">{{
-                    signal.signalType | signalTypeLabel
-                  }}</span>
-                  <span class="text-text-secondary">{{ signal.scanner }}</span>
-                  <span class="ml-auto">
-                    <cmn-tag
-                      [variant]="severityVariant[signal.severity] ?? defaultSeverityVariant"
-                      class="capitalize"
-                      >{{ signal.severity }}</cmn-tag
-                    >
-                  </span>
-                </li>
-              }
-            </ul>
-          </cmn-card>
-        }
+            <!-- Who owns it? No free source carries holder data: said plainly, never mocked. Crypto has no holders to show. -->
+            @if (!store.isCrypto()) {
+              <cmn-card
+                [id]="sectionId.ownership"
+                class="block scroll-mt-[4.5rem]"
+                data-testid="ownership"
+              >
+                <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+                  Who owns it?
+                </h2>
+                <p class="mt-cmn-2 text-cmn-sm text-text-secondary">{{ ownershipNote }}</p>
+              </cmn-card>
+            }
+
+            <!-- Data Status: where each section came from and when it was read. -->
+            <section
+              [id]="sectionId.dataStatus"
+              aria-labelledby="data-status-heading"
+              class="scroll-mt-[4.5rem] border-t border-border-default pt-cmn-4"
+              data-testid="data-status"
+            >
+              <h2
+                id="data-status-heading"
+                class="text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
+              >
+                Data status
+              </h2>
+              <dl class="mt-cmn-2 space-y-cmn-1 text-cmn-xs">
+                @for (row of store.dataStatus(); track row.key) {
+                  <div
+                    [attr.data-testid]="'data-status-' + row.key"
+                    class="flex flex-wrap justify-between gap-x-cmn-3"
+                  >
+                    <dt class="text-text-primary">{{ row.label }}</dt>
+                    <dd class="text-text-secondary">
+                      @if (row.source) {
+                        {{ row.source }}
+                        @if (row.note || row.at) {
+                          ·
+                        }
+                      }
+                      @if (row.note) {
+                        {{ row.note }}
+                      } @else if (row.at) {
+                        {{ row.at | cmnRelativeTime: 'Never' }}
+                      }
+                    </dd>
+                  </div>
+                }
+              </dl>
+            </section>
+          </div>
+        </div>
       }
     }
   </cmn-async-state>

@@ -3,9 +3,13 @@ import {ApiService} from '@lifekit-hq/core';
 import {type Observable} from 'rxjs';
 
 import {
+  type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
+  type ChartRangeId,
   type DossierQuoteDto,
+  type DossierUserTargetDto,
+  type SetPriceTargetRequest,
 } from '../models/dossier/dossier.model';
 
 @Injectable({providedIn: 'root'})
@@ -34,5 +38,25 @@ export class DossierService extends ApiService {
       `research/assets/${encodeURIComponent(symbol)}/narrative?force=${force}`,
       {}
     );
+  }
+
+  /** Daily closes for `range` with the S&P 500 rebased onto them, the user's fills and average cost. */
+  public getChart(symbol: string, range: ChartRangeId): Observable<AssetChartDto> {
+    return this.get<AssetChartDto>(`research/assets/${encodeURIComponent(symbol)}/chart`, {range});
+  }
+
+  /** Sets (or replaces) the user's own price target for the symbol. */
+  public setTarget(
+    symbol: string,
+    request: SetPriceTargetRequest
+  ): Observable<DossierUserTargetDto> {
+    return this.put<DossierUserTargetDto>(
+      `research/assets/${encodeURIComponent(symbol)}/target`,
+      request
+    );
+  }
+
+  public clearTarget(symbol: string): Observable<void> {
+    return this.delete<void>(`research/assets/${encodeURIComponent(symbol)}/target`);
   }
 }

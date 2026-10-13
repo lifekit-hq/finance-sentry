@@ -1,6 +1,7 @@
 import {
   ANALYST_ACTION_LABELS,
   COVERAGE_LABELS,
+  DATA_SOURCE_PREFIX_LABELS,
   NEWS_SOURCE_LABELS,
   NEWS_SOURCE_PREFIX_LABELS,
   PEER_SET_DEFAULT_SUFFIX,
@@ -38,6 +39,13 @@ export class DossierLabelUtils {
     }
     const prefix = Object.keys(NEWS_SOURCE_PREFIX_LABELS).find(p => trimmed.startsWith(p));
     return prefix ? NEWS_SOURCE_PREFIX_LABELS[prefix] : trimmed;
+  }
+
+  /** A provenance code as a provider name (`yahoo-finance` -> "Yahoo Finance"); an unknown code is title-cased. */
+  public static dataSource(code: string): string {
+    const trimmed = code.trim().toLowerCase();
+    const prefix = Object.keys(DATA_SOURCE_PREFIX_LABELS).find(p => trimmed.startsWith(p));
+    return prefix ? DATA_SOURCE_PREFIX_LABELS[prefix] : DossierLabelUtils.humanize(code);
   }
 
   /** `sector:Technology (default)` -> "Technology peers"; `default` -> "Similar companies". */

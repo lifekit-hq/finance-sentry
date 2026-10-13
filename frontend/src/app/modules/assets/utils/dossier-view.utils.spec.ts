@@ -222,8 +222,8 @@ describe('DossierViewUtils.sectionChips', () => {
     expect(DossierViewUtils.sectionChips(null)).toEqual([]);
   });
 
-  it('has no chip for a section that does not exist', () => {
-    expect(DossierViewUtils.sectionChips(dossier())).toEqual([]);
+  it('has no chip for a section that does not exist, only the data status', () => {
+    expect(DossierViewUtils.sectionChips(dossier()).map(c => c.label)).toEqual(['Data']);
   });
 
   it('skips the valuation of a not-applicable symbol', () => {
@@ -231,7 +231,27 @@ describe('DossierViewUtils.sectionChips', () => {
       dossier({valuation: valuation({notApplicable: true})})
     );
 
-    expect(chips).toEqual([]);
+    expect(chips.map(c => c.label)).toEqual(['Data']);
+  });
+
+  it('keeps "Is it cheap?" for a priced asset without a valuation (it carries the user target)', () => {
+    const chips = DossierViewUtils.sectionChips(
+      dossier({
+        valuation: valuation({notApplicable: true}),
+        performance: {
+          lastClose: 1,
+          yearChangePct: null,
+          high52Week: null,
+          low52Week: null,
+          fromHighPct: null,
+          benchmarkYearChangePct: null,
+          currency: 'USD',
+          asOf: null,
+        },
+      })
+    );
+
+    expect(chips.map(c => c.label)).toEqual(['Chart', 'Valuation', 'Data']);
   });
 
   it('lists the sections that exist in page order', () => {
@@ -239,6 +259,31 @@ describe('DossierViewUtils.sectionChips', () => {
       dossier({
         thesis: THESIS,
         valuation: valuation(),
+        checks: {
+          axes: [{key: 'fit', label: 'Fit', passed: 0, evaluated: 0, rules: []}],
+        },
+        position: {
+          provider: 'ibkr',
+          assetClass: 'Equities',
+          quantity: 1,
+          currentValueUsd: 1,
+          costBasisUsd: null,
+          unrealizedPnlUsd: null,
+          unrealizedPnlPercent: null,
+          shareOfBookPercent: null,
+          taxLots: [],
+          returns: {
+            unrealizedUsd: 0,
+            realizedUsd: null,
+            dividendsUsd: null,
+            currencyUsd: null,
+            totalUsd: null,
+            coverage: 'unavailable',
+            averageCostNative: null,
+            costCurrency: null,
+            fillCount: 0,
+          },
+        },
         analysts: {recentActions: [], trends: [], coverage: 'inUniverse'},
         nextEarnings: {
           ticker: 'GRAB',
@@ -272,12 +317,15 @@ describe('DossierViewUtils.sectionChips', () => {
     );
 
     expect(chips.map(c => c.label)).toEqual([
-      'Thesis',
+      'Checks',
+      'Returns',
       'Valuation',
       'Analysts',
+      'Plan',
       'Earnings',
       'News',
       'Signals',
+      'Data',
     ]);
   });
 });

@@ -72,6 +72,9 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   SUBSCRIPTION_NOT_FOUND: 'Subscription not found.',
   FORBIDDEN: 'This feature is not available for your account.',
   LEDGER_READ_UNAVAILABLE: 'Ledger could not produce a read right now. Try again shortly.',
+  INVALID_PRICE_TARGET:
+    'Enter a target price above zero (up to 1,000,000,000) and a three-letter currency code.',
+  INVALID_CHART_RANGE: 'That chart range is not available. Pick 1M, 6M, YTD, 1Y, 5Y or Max.',
   INVALID_DATE_RANGE: 'Invalid date range. Check the from/to dates and try again.',
   INVALID_AMOUNT_RANGE: 'Invalid amount range. Check the min/max amounts and try again.',
   INVALID_CATEGORY: 'One of the selected categories is not recognized.',

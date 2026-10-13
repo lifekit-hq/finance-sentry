@@ -2,22 +2,25 @@ import {computed, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {provideRouter} from '@angular/router';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {TagComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
 import {
+  type AssetChartDto,
   type AssetDossierDto,
+  type ChartRangeId,
   type DossierAnalystsSection,
-  type DossierHeroProfile,
+  type DossierCheckAxisKey,
   type DossierPositionSection,
+  type DossierQuoteDto,
   type DossierQuoteHeader,
-  type DossierSectionChip,
   type MetricValue,
-  type RecommendationSummary,
   type ThesisDto,
   type ValuationSnapshotDto,
 } from '../../models/dossier/dossier.model';
+import {dossierComputed} from '../../store/dossier.computed';
 import {DossierStore} from '../../store/dossier.store';
 import {DossierViewUtils} from '../../utils/dossier-view.utils';
 import {AssetDossierComponent} from './asset-dossier.component';
@@ -164,30 +167,86 @@ const DOSSIER: AssetDossierDto = {
   generatedAt: new Date().toISOString(),
 };
 
+function buildMockStore() {
+  const dossier = signal<AssetDossierDto | null>(DOSSIER);
+  const chart = signal<AssetChartDto | null>(null);
+  const chartStatus = signal<AsyncStatus>('success');
+  const chartErrorMessage = signal('');
+  const targetDraft = signal('');
+  const quote = signal<DossierQuoteDto | null>(null);
+  const derived = dossierComputed({
+    dossier,
+    ledgerRead: signal(null),
+    isThesisExpanded: signal(false),
+    quote,
+    chart,
+    chartStatus,
+    chartErrorMessage,
+    targetDraft,
+  });
+  return {
+    isDossierLoading: signal(false),
+    dossierErrorMessage: signal(''),
+    dossier,
+    hasDossierSections: signal(true),
+    heroProfile: computed(() => {
+      const current = dossier();
+      return current ? DossierViewUtils.heroProfile(current) : null;
+    }),
+    sectionChips: computed(() => DossierViewUtils.sectionChips(dossier())),
+    recommendationSummary: computed(() =>
+      DossierViewUtils.recommendationSummary(dossier()?.analysts?.trends ?? [])
+    ),
+    ledgerRead: signal<{generatedAt: string | null} | null>(null),
+    isLedgerReadLoading: signal(false),
+    isLedgerReadStale: signal(false),
+    ledgerReadNarrative: signal(''),
+    ledgerReadErrorMessage: signal(''),
+    visibleThesisParagraphs: signal(['Memory cycle is turning.']),
+    thesisHasMore: signal(false),
+    isThesisExpanded: signal(false),
+    quoteHeader: signal<DossierQuoteHeader | null>(null),
+    isQuoteLoading: signal(false),
+    chart,
+    chartStatus,
+    chartErrorMessage,
+    chartRange: signal<ChartRangeId>('1Y'),
+    targetDraft,
+    isEditingTarget: signal(false),
+    isTargetLoading: signal(false),
+    targetErrorMessage: signal(''),
+    isCrypto: derived.isCrypto,
+    performanceStrip: derived.performanceStrip,
+    thesisHook: derived.thesisHook,
+    sizeCap: derived.sizeCap,
+    returnsView: derived.returnsView,
+    wheel: derived.wheel,
+    checkAxes: derived.checkAxes,
+    checksPassed: derived.checksPassed,
+    checksTotal: derived.checksTotal,
+    sectionChecks: derived.sectionChecks,
+    chartView: derived.chartView,
+    chartAsyncStatus: derived.chartAsyncStatus,
+    targetBand: derived.targetBand,
+    parsedTargetDraft: derived.parsedTargetDraft,
+    fundamentals: derived.fundamentals,
+    dataStatus: derived.dataStatus,
+    toggleThesisExpanded: vi.fn(),
+    generateLedgerRead: vi.fn(),
+    loadChart: vi.fn(),
+    selectChartRange: vi.fn(),
+    openTargetEditor: vi.fn(),
+    closeTargetEditor: vi.fn(),
+    setTargetDraft: vi.fn(),
+    saveTarget: vi.fn(),
+    clearTarget: vi.fn(),
+  };
+}
+
 describe('AssetDossierComponent', () => {
   let fixture: ComponentFixture<AssetDossierComponent>;
   let canUseAi: ReturnType<typeof signal<boolean>>;
-  let mockStore: {
-    isDossierLoading: ReturnType<typeof signal<boolean>>;
-    dossierErrorMessage: ReturnType<typeof signal<string>>;
-    dossier: ReturnType<typeof signal<AssetDossierDto | null>>;
-    hasDossierSections: ReturnType<typeof signal<boolean>>;
-    heroProfile: ReturnType<typeof computed<DossierHeroProfile | null>>;
-    sectionChips: ReturnType<typeof computed<DossierSectionChip[]>>;
-    recommendationSummary: ReturnType<typeof computed<RecommendationSummary | null>>;
-    ledgerRead: ReturnType<typeof signal<{generatedAt: string | null} | null>>;
-    isLedgerReadLoading: ReturnType<typeof signal<boolean>>;
-    isLedgerReadStale: ReturnType<typeof signal<boolean>>;
-    ledgerReadNarrative: ReturnType<typeof signal<string>>;
-    ledgerReadErrorMessage: ReturnType<typeof signal<string>>;
-    visibleThesisParagraphs: ReturnType<typeof signal<string[]>>;
-    thesisHasMore: ReturnType<typeof signal<boolean>>;
-    isThesisExpanded: ReturnType<typeof signal<boolean>>;
-    quoteHeader: ReturnType<typeof signal<DossierQuoteHeader | null>>;
-    isQuoteLoading: ReturnType<typeof signal<boolean>>;
-    toggleThesisExpanded: ReturnType<typeof vi.fn>;
-    generateLedgerRead: ReturnType<typeof vi.fn>;
-  };
+  let mockStore: ReturnType<typeof buildMockStore>;
 
   const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const byTestId = (id: string): HTMLElement | null =>
@@ -195,33 +254,7 @@ describe('AssetDossierComponent', () => {
 
   beforeEach(async () => {
     canUseAi = signal(true);
-    const dossier = signal<AssetDossierDto | null>(DOSSIER);
-    mockStore = {
-      isDossierLoading: signal(false),
-      dossierErrorMessage: signal(''),
-      dossier,
-      hasDossierSections: signal(true),
-      heroProfile: computed(() => {
-        const current = dossier();
-        return current ? DossierViewUtils.heroProfile(current) : null;
-      }),
-      sectionChips: computed(() => DossierViewUtils.sectionChips(dossier())),
-      recommendationSummary: computed(() =>
-        DossierViewUtils.recommendationSummary(dossier()?.analysts?.trends ?? [])
-      ),
-      ledgerRead: signal(null),
-      isLedgerReadLoading: signal(false),
-      isLedgerReadStale: signal(false),
-      ledgerReadNarrative: signal(''),
-      ledgerReadErrorMessage: signal(''),
-      visibleThesisParagraphs: signal(['Memory cycle is turning.']),
-      thesisHasMore: signal(false),
-      isThesisExpanded: signal(false),
-      quoteHeader: signal<DossierQuoteHeader | null>(null),
-      isQuoteLoading: signal(false),
-      toggleThesisExpanded: vi.fn(),
-      generateLedgerRead: vi.fn(),
-    };
+    mockStore = buildMockStore();
 
     await TestBed.configureTestingModule({
       imports: [AssetDossierComponent],
@@ -513,14 +546,14 @@ describe('AssetDossierComponent', () => {
       const chips = Array.from(
         byTestId('dossier-chips')?.querySelectorAll<HTMLElement>('cmn-chip') ?? []
       );
-      expect(chips.map(c => c.textContent?.trim())).toEqual(['Thesis', 'Analysts', 'News']);
+      expect(chips.map(c => c.textContent?.trim())).toEqual(['Analysts', 'Plan', 'News', 'Data']);
 
       const target = root().ownerDocument.getElementById('analyst-coverage');
       const scrollSpy = vi.fn();
       if (target) {
         target.scrollIntoView = scrollSpy;
       }
-      chips[1].querySelector('button')?.click();
+      chips[0].querySelector('button')?.click();
       expect(scrollSpy).toHaveBeenCalled();
     });
   });
@@ -653,6 +686,233 @@ describe('AssetDossierComponent', () => {
       const values = fixture.componentInstance.radarTrendPoints()?.map(p => p.value);
 
       expect(values).toEqual([5, 15, 25]);
+    });
+  });
+
+  describe('stage 2 sections', () => {
+    const rule = (key: string, passed: boolean | null) => ({
+      key,
+      label: `Rule ${key}`,
+      passed,
+      value: passed === null ? null : 12.2,
+      threshold: 10,
+      unit: 'percent' as const,
+      note: key === 'fit_b' ? 'IPS cap' : null,
+    });
+    const axis = (key: DossierCheckAxisKey, a: boolean | null, b: boolean | null) => ({
+      key,
+      label: key,
+      passed: [a, b].filter(x => x === true).length,
+      evaluated: [a, b].filter(x => x !== null).length,
+      rules: [rule(`${key}_a`, a), rule(`${key}_b`, b)],
+    });
+    const STOCK: AssetDossierDto = {
+      ...DOSSIER,
+      position: {
+        ...POSITION,
+        shareOfBookPercent: 12.2,
+        positionCapPercent: 10,
+        returns: {
+          unrealizedUsd: -3690,
+          realizedUsd: 519,
+          dividendsUsd: 0,
+          currencyUsd: null,
+          totalUsd: -3171,
+          coverage: 'complete',
+          averageCostNative: 40,
+          costCurrency: 'USD',
+          fillCount: 4,
+        },
+      },
+      valuation: {
+        ...STALE_VALUATION,
+        isStale: false,
+        sources: ['yahoo-quote', 'sec-edgar'],
+        consensusTarget: 50,
+        impliedUpsidePct: 16.3,
+        targetLow: 35,
+        targetHigh: 60,
+        analystCount: 12,
+        currency: 'USD',
+        marketCap: 4.2e9,
+      },
+      performance: {
+        lastClose: 43,
+        yearChangePct: 22.2,
+        high52Week: 44,
+        low52Week: 30,
+        fromHighPct: -2.3,
+        benchmarkYearChangePct: 14,
+        currency: 'USD',
+        asOf: '2026-10-13',
+      },
+      checks: {
+        axes: [
+          axis('analysts', true, true),
+          axis('growth', true, false),
+          axis('value', false, null),
+          axis('momentum', true, true),
+          axis('fit', false, true),
+        ],
+      },
+      userTarget: {targetPrice: 55, currency: 'USD', updatedAt: '2026-10-13T00:00:00Z'},
+    };
+    const CHART: AssetChartDto = {
+      symbol: 'DRAM',
+      range: '1Y',
+      currency: 'USD',
+      points: [
+        {date: '2025-10-13', close: 35, benchmark: 100},
+        {date: '2026-04-13', close: 40, benchmark: 107},
+        {date: '2026-10-13', close: 43, benchmark: 114},
+      ],
+      benchmarkLabel: 'S&P 500',
+      trades: [{date: '2026-04-13', side: 'buy', quantity: 10, price: 40, currency: 'USD'}],
+      averageCost: 40,
+      changePct: 22.9,
+      benchmarkChangePct: 14,
+      source: 'yahoo-chart',
+      retrievedAt: '2026-10-13T00:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockStore.dossier.set(STOCK);
+      mockStore.chart.set(CHART);
+    });
+
+    it('puts the thesis hook, the performance strip and the size-vs-cap bar in the hero', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('dossier-hook')?.textContent).toContain('12.2% of book');
+      expect(byTestId('performance-strip')?.textContent).toContain('+22.2%');
+      expect(byTestId('size-cap-text')?.textContent).toContain('10');
+      expect(byTestId('size-cap-mark')).not.toBeNull();
+    });
+
+    it('shows the wheel next to the checks and opens an axis to its rules and values', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('checks-wheel')).not.toBeNull();
+      expect(byTestId('dossier-checks')?.textContent).toContain('6');
+      const fit = byTestId('check-axis-fit');
+      expect(fit?.textContent).toContain('Rule fit_b');
+      expect(fit?.textContent).toContain('IPS cap');
+      expect(root().querySelectorAll('[data-testid="tick-strip"]').length).toBeGreaterThan(0);
+    });
+
+    it('labels the tick strip by its count', () => {
+      fixture.detectChanges();
+
+      const labels = Array.from(root().querySelectorAll('[data-testid="tick-strip"]')).map(el =>
+        el.getAttribute('aria-label')
+      );
+      expect(labels).toContain('value: 0 of 2 checks pass');
+    });
+
+    it('draws the chart with its change, the trade markers and the key', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('chart-change')?.textContent).toContain('+22.9%');
+      expect(root().querySelectorAll('[data-testid="chart-trade"]')).toHaveLength(1);
+      expect(byTestId('chart-key')?.textContent).toContain('average cost');
+      expect(byTestId('chart-key')?.textContent).toContain('Buy');
+    });
+
+    it('asks the store for a new range when a tab is picked', () => {
+      fixture.detectChanges();
+
+      byTestId('chart-ranges')?.dispatchEvent(
+        new CustomEvent('lk-segmented-change', {detail: {value: '5Y'}})
+      );
+
+      expect(mockStore.selectChartRange).toHaveBeenCalledWith('5Y');
+    });
+
+    it('breaks the return down into its legs', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('returns-total')?.textContent).toContain('-$3,171');
+      expect(byTestId('returns-realized')?.textContent).toContain('$519');
+      expect(byTestId('returns-currency')?.textContent).toContain('Not available');
+    });
+
+    it('places the price, the analyst target and the user target on the band with the source', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('target-range')).not.toBeNull();
+      expect(byTestId('target-marker-price')).not.toBeNull();
+      expect(byTestId('target-marker-analyst')).not.toBeNull();
+      expect(byTestId('target-marker-mine')).not.toBeNull();
+      expect(byTestId('target-source')?.textContent).toContain('12 analysts');
+      expect(byTestId('my-target-value')?.textContent).toContain('$55.00');
+    });
+
+    it('shows each fundamental or the reason it is missing', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('fundamental-market-cap')?.textContent).toContain('$4.20B');
+      expect(byTestId('fundamental-ev-ebitda')?.textContent).toContain('not reported');
+    });
+
+    it('opens, clears and edits the user target through the store', () => {
+      fixture.detectChanges();
+
+      byTestId('my-target-clear')?.querySelector('button')?.click();
+      byTestId('my-target-edit')?.querySelector('button')?.click();
+
+      expect(mockStore.clearTarget).toHaveBeenCalled();
+      expect(mockStore.openTargetEditor).toHaveBeenCalled();
+    });
+
+    it('saves a valid draft and flags an invalid one', () => {
+      mockStore.isEditingTarget.set(true);
+      mockStore.targetDraft.set('abc');
+      fixture.detectChanges();
+
+      expect(byTestId('my-target')?.textContent).toContain('Enter a price above zero.');
+
+      mockStore.targetDraft.set('60');
+      fixture.detectChanges();
+      byTestId('my-target-save')?.querySelector('button')?.click();
+      byTestId('my-target-cancel')?.querySelector('button')?.click();
+
+      expect(mockStore.saveTarget).toHaveBeenCalled();
+      expect(mockStore.closeTargetEditor).toHaveBeenCalled();
+    });
+
+    it('shows a failed save under the editor', () => {
+      mockStore.targetErrorMessage.set('Failed to save your target.');
+      fixture.detectChanges();
+
+      expect(byTestId('my-target-error')?.textContent).toContain('Failed to save your target.');
+    });
+
+    it('marks ownership as not available and lists the data status', () => {
+      fixture.detectChanges();
+
+      expect(byTestId('ownership')?.textContent).toContain('Not available');
+      expect(byTestId('data-status-valuation')?.textContent).toContain('Yahoo');
+      expect(byTestId('data-status-chart')).not.toBeNull();
+      expect(byTestId('data-status-ownership')?.textContent?.trim()).toBe(
+        'Ownership Not available - no free source for holder data'
+      );
+    });
+
+    it('hides valuation, analysts and ownership for crypto', () => {
+      mockStore.dossier.set({
+        ...STOCK,
+        valuation: {...(STOCK.valuation as ValuationSnapshotDto), notApplicable: true},
+        analysts: null,
+        checks: {axes: [axis('momentum', true, false), axis('fit', true, true)]},
+      });
+      fixture.detectChanges();
+
+      expect(byTestId('fundamentals')).toBeNull();
+      expect(byTestId('ownership')).toBeNull();
+      expect(byTestId('checks-wheel')).toBeNull();
+      expect(byTestId('check-axis-momentum')).not.toBeNull();
+      expect(byTestId('target-source')).toBeNull();
+      expect(byTestId('valuation')).not.toBeNull();
     });
   });
 });

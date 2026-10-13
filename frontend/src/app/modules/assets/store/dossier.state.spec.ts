@@ -18,4 +18,11 @@ describe('initialDossierState', () => {
   it('starts with no quote', () => {
     expect(initialDossierState.quote).toBeNull();
   });
+
+  it('starts on the one-year chart with the target editor closed', () => {
+    expect(initialDossierState.chart).toBeNull();
+    expect(initialDossierState.chartRange).toBe('1Y');
+    expect(initialDossierState.isEditingTarget).toBe(false);
+    expect(initialDossierState.targetDraft).toBe('');
+  });
 });

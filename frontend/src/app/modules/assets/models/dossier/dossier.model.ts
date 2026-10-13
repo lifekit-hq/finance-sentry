@@ -21,6 +21,109 @@ export interface DossierPositionSection {
   /** Share of the whole book total (cash included, the holdings-weight denominator), in percent. */
   shareOfBookPercent: Nullable<number>;
   taxLots: DossierTaxLotEntry[];
+  /** The IPS single-position cap, in percent; null when the IPS sets none. */
+  positionCapPercent?: Nullable<number>;
+  /** Where the return came from (money-semantics §1); null when the ledger could not be read. */
+  returns?: Nullable<PositionReturnsDto>;
+}
+
+/** `complete` = the ingested fills explain the whole holding; `partial` / `unavailable` = they do not. */
+export type ReturnsCoverage = 'complete' | 'partial' | 'unavailable';
+
+/** Return decomposition in USD; a component is null when the ledger cannot support it, never zero-filled. */
+export interface PositionReturnsDto {
+  unrealizedUsd: Nullable<number>;
+  realizedUsd: Nullable<number>;
+  dividendsUsd: Nullable<number>;
+  currencyUsd: Nullable<number>;
+  totalUsd: Nullable<number>;
+  coverage: ReturnsCoverage;
+  averageCostNative: Nullable<number>;
+  costCurrency: Nullable<string>;
+  fillCount: number;
+}
+
+/** The #824 performance strip, read from daily closes in `currency`. */
+export interface DossierPerformanceDto {
+  lastClose: Nullable<number>;
+  yearChangePct: Nullable<number>;
+  high52Week: Nullable<number>;
+  low52Week: Nullable<number>;
+  fromHighPct: Nullable<number>;
+  benchmarkYearChangePct: Nullable<number>;
+  currency: Nullable<string>;
+  asOf: Nullable<string>;
+}
+
+export type DossierCheckUnit = 'percent' | 'multiple' | 'none';
+
+/** One named rule: `passed` null = not evaluated (`note` says why); never a black-box score. */
+export interface DossierCheckRuleDto {
+  key: string;
+  label: string;
+  passed: Nullable<boolean>;
+  value: Nullable<number>;
+  threshold: Nullable<number>;
+  unit: DossierCheckUnit;
+  note: Nullable<string>;
+}
+
+export type DossierCheckAxisKey = 'analysts' | 'growth' | 'value' | 'momentum' | 'fit';
+
+export interface DossierCheckAxisDto {
+  key: DossierCheckAxisKey;
+  label: string;
+  passed: number;
+  evaluated: number;
+  rules: DossierCheckRuleDto[];
+}
+
+export interface DossierChecksDto {
+  axes: DossierCheckAxisDto[];
+}
+
+/** The user's own fair-value target, in the quote currency it was set in. */
+export interface DossierUserTargetDto {
+  targetPrice: number;
+  currency: Nullable<string>;
+  updatedAt: string;
+}
+
+export type ChartRangeId = '1M' | '6M' | 'YTD' | '1Y' | '5Y' | 'MAX';
+
+export interface AssetChartPointDto {
+  date: string;
+  close: number;
+  /** The S&P 500 rebased onto the asset's first close; null where it has no close yet. */
+  benchmark: Nullable<number>;
+}
+
+export interface AssetChartTradeDto {
+  date: string;
+  side: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  currency: string;
+}
+
+/** GET /research/assets/{symbol}/chart: closes in `currency`, an empty `points` = no history. */
+export interface AssetChartDto {
+  symbol: string;
+  range: ChartRangeId;
+  currency: Nullable<string>;
+  points: AssetChartPointDto[];
+  benchmarkLabel: string;
+  trades: AssetChartTradeDto[];
+  averageCost: Nullable<number>;
+  changePct: Nullable<number>;
+  benchmarkChangePct: Nullable<number>;
+  source: string;
+  retrievedAt: string;
+}
+
+export interface SetPriceTargetRequest {
+  targetPrice: number;
+  currency: Nullable<string>;
 }
 
 export interface ThesisDataPoint {
@@ -100,6 +203,13 @@ export interface ValuationSnapshotDto {
   industry: Nullable<string>;
   /** When the quote path last saw `price`; null when unknown. */
   priceAsOf: Nullable<string>;
+  /** The analyst target range behind `consensusTarget` (the mean). */
+  targetLow?: Nullable<number>;
+  targetHigh?: Nullable<number>;
+  analystCount?: Nullable<number>;
+  /** Quote currency of every price in the snapshot. */
+  currency?: Nullable<string>;
+  marketCap?: Nullable<number>;
 }
 
 export interface AnalystActionDto {
@@ -170,6 +280,10 @@ export interface AssetDossierDto {
   nextEarnings: Nullable<EarningsEventDto>;
   radarSignals: DossierSignalItem[];
   generatedAt: string;
+  /** Null = no price history. */
+  performance?: Nullable<DossierPerformanceDto>;
+  checks?: Nullable<DossierChecksDto>;
+  userTarget?: Nullable<DossierUserTargetDto>;
 }
 
 /**

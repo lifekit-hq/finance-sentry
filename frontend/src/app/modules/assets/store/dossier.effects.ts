@@ -1,5 +1,5 @@
 import {DOCUMENT} from '@angular/common';
-import {afterNextRender, inject, Injector} from '@angular/core';
+import {afterNextRender, inject, Injector, type Signal} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
@@ -8,9 +8,12 @@ import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-ro
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
 import {
+  type AssetChartDto,
   type AssetDossierDto,
   type AssetLedgerReadDto,
+  type ChartRangeId,
   type DossierQuoteDto,
+  type DossierUserTargetDto,
 } from '../models/dossier/dossier.model';
 import {DossierService} from '../services/dossier.service';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
@@ -29,6 +32,18 @@ interface StoreMethods {
   setQuote(quote: Nullable<DossierQuoteDto>): void;
   setQuoteError(errorCode: Nullable<string>): void;
   clearQuote(): void;
+  setChartLoading(): void;
+  setChartSuccess(): void;
+  setChart(chart: AssetChartDto): void;
+  setChartError(errorCode: Nullable<string>): void;
+  setChartRange(range: ChartRangeId): void;
+  setTargetLoading(): void;
+  setTargetSuccess(): void;
+  setTargetError(errorCode: Nullable<string>): void;
+  setUserTarget(target: Nullable<DossierUserTargetDto>): void;
+  dossier: Signal<Nullable<AssetDossierDto>>;
+  chartRange: Signal<ChartRangeId>;
+  parsedTargetDraft: Signal<Nullable<number>>;
 }
 
 export function dossierEffects(store: StoreMethods) {
@@ -70,6 +85,85 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
+  // A failed chart keeps the rest of the page; switchMap drops a range the user already moved past.
+  const loadChart = rxMethod<{symbol: string; range: ChartRangeId}>(
+    pipe(
+      tap(() => store.setChartLoading()),
+      switchMap(({symbol, range}) =>
+        dossierService.getChart(symbol, range).pipe(
+          tap(chart => {
+            store.setChart(chart);
+            store.setChartSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setChartError(code),
+          })
+        )
+      )
+    )
+  );
+
+  const selectChartRange = (range: ChartRangeId): void => {
+    const symbol = store.dossier()?.symbol;
+    if (!symbol || range === store.chartRange()) {
+      return;
+    }
+    store.setChartRange(range);
+    loadChart({symbol, range});
+  };
+
+  const putTarget = rxMethod<{symbol: string; targetPrice: number; currency: Nullable<string>}>(
+    pipe(
+      tap(() => store.setTargetLoading()),
+      switchMap(({symbol, targetPrice, currency}) =>
+        dossierService.setTarget(symbol, {targetPrice, currency}).pipe(
+          tap(target => {
+            store.setUserTarget(target);
+            store.setTargetSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setTargetError(code),
+          })
+        )
+      )
+    )
+  );
+
+  // Saves the editor's draft in the price's own currency; an invalid draft never leaves the page.
+  const saveTarget = (): void => {
+    const dossier = store.dossier();
+    const targetPrice = store.parsedTargetDraft();
+    if (!dossier || targetPrice === null) {
+      return;
+    }
+    const currency = dossier.valuation?.currency ?? dossier.performance?.currency ?? null;
+    putTarget({symbol: dossier.symbol, targetPrice, currency});
+  };
+
+  const deleteTarget = rxMethod<string>(
+    pipe(
+      tap(() => store.setTargetLoading()),
+      switchMap(symbol =>
+        dossierService.clearTarget(symbol).pipe(
+          tap(() => {
+            store.setUserTarget(null);
+            store.setTargetSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setTargetError(code),
+          })
+        )
+      )
+    )
+  );
+
+  const clearTarget = (): void => {
+    const symbol = store.dossier()?.symbol;
+    if (symbol) {
+      deleteTarget(symbol);
+    }
+  };
+
   const loadDossier = rxMethod<string>(
     pipe(
       tap(() => store.setDossierLoading()),
@@ -81,6 +175,7 @@ export function dossierEffects(store: StoreMethods) {
             if (DossierQuoteUtils.isQuotable(dossier)) {
               loadQuote(dossier.symbol);
             }
+            loadChart({symbol: dossier.symbol, range: store.chartRange()});
             scrollToFragment();
           }),
           StoreErrorUtils.catchAndSetError({
@@ -126,7 +221,15 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
-  return {loadDossier, loadLedgerRead, generateLedgerRead};
+  return {
+    loadDossier,
+    loadLedgerRead,
+    generateLedgerRead,
+    loadChart,
+    selectChartRange,
+    saveTarget,
+    clearTarget,
+  };
 }
 
 export function dossierHooks(store: ReturnType<typeof dossierEffects>) {

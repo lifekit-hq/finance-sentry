@@ -42,3 +42,11 @@ export const PEER_SET_LABELS: Readonly<Record<string, string>> = {
   default: 'Similar companies',
   custom: 'Your peer set',
 };
+
+/** Provenance codes on valuation, analyst and price data, matched by prefix: `yahoo:chart` -> "Yahoo Finance". */
+export const DATA_SOURCE_PREFIX_LABELS: Readonly<Record<string, string>> = {
+  yahoo: 'Yahoo Finance',
+  'sec-edgar': 'SEC EDGAR',
+  finnhub: 'Finnhub',
+  marketbeat: 'MarketBeat',
+};

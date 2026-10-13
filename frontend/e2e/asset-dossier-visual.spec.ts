@@ -8,12 +8,15 @@ import {PLACEHOLDER_IMAGE} from './support/visual-baseline';
 // (not the wider app-surface rail). The clock is pinned so relative timestamps ("Updated 2h ago")
 // are stable, and animations are disabled by the screenshot options below.
 const FROZEN_NOW = new Date('2026-09-01T12:30:00Z');
+// Chart.js times its entry animation off Date.now, which the pinned clock holds still: stepping the
+// clock past the animation lets the price chart finish drawing before the capture.
+const CHART_SETTLE_MS = 5_000;
 // The app shell scrolls inside its own container, so a full-page capture only sees the viewport:
 // the viewports are tall enough to hold the whole dossier.
-const DESKTOP = {width: 1280, height: 2800};
+const DESKTOP = {width: 1280, height: 3800};
 const PHONE = {width: 375, height: 2400};
-// The library stat cards are bordered tiles, so the full dossier outgrows PHONE on a phone.
-const PHONE_FULL = {width: 375, height: 3000};
+// The chart, checks and returns stack in one column on a phone, so the full dossier outgrows PHONE.
+const PHONE_FULL = {width: 375, height: 4800};
 // The hero's logo comes from a third party: a flat square keeps the baselines off the network.
 const LOGO_HOSTS = ['https://financialmodelingprep.com/**', 'https://assets.coincap.io/**'];
 const SCREENSHOT_OPTIONS = {
@@ -38,6 +41,7 @@ async function openDossier(
   await page.goto(`/assets/${symbol}`);
   await expect(page.getByRole('heading', {name: symbol, level: 1})).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+  await page.clock.setFixedTime(new Date(FROZEN_NOW.getTime() + CHART_SETTLE_MS));
 }
 
 // The compact trend chart does not animate, so once its canvas has drawn pixels the capture shows
@@ -80,6 +84,13 @@ test.describe('Asset dossier visual baseline', () => {
     await expect(page.getByTestId('trend-list')).toBeVisible();
     await expectTrendDrawn(page);
     await expect(page).toHaveScreenshot('dossier-phone.png', SCREENSHOT_OPTIONS);
+  });
+
+  test('crypto dossier on a phone', async ({page}) => {
+    await page.setViewportSize(PHONE_FULL);
+    await openDossier(page, 'BTC');
+    await expect(page.getByTestId('price-chart').locator('canvas')).toBeVisible();
+    await expect(page).toHaveScreenshot('dossier-crypto-phone.png', SCREENSHOT_OPTIONS);
   });
 
   test("dossier with a generated Ledger's read", async ({page}) => {
