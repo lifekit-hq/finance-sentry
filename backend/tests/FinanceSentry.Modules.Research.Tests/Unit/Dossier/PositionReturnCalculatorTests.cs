@@ -86,6 +86,31 @@ public class PositionReturnCalculatorTests
     }
 
     [Fact]
+    public void PartialLedgerWithNoIncomeRows_HasNoDividendsAndNoZeroTotal()
+    {
+        var ledger = new PositionLedger([Fill(0, 5m, 100m)], []);
+
+        var returns = Compute(ledger, held: 20m, valueUsd: 8000m, costUsd: null);
+
+        returns.Coverage.Should().Be(PositionReturnCalculator.Partial);
+        returns.UnrealizedUsd.Should().BeNull();
+        returns.DividendsUsd.Should().BeNull();
+        returns.TotalUsd.Should().BeNull();
+    }
+
+    [Fact]
+    public void CompleteLedgerWithNoIncomeRows_HasZeroDividends()
+    {
+        var ledger = new PositionLedger([Fill(0, 5m, 100m)], []);
+
+        var returns = Compute(ledger, held: 5m, valueUsd: 600m, costUsd: null);
+
+        returns.Coverage.Should().Be(PositionReturnCalculator.Complete);
+        returns.DividendsUsd.Should().Be(0m);
+        returns.TotalUsd.Should().Be(100m);
+    }
+
+    [Fact]
     public void SellBeforeAnyBuy_IsPartial()
     {
         var ledger = new PositionLedger([Fill(0, -5m, 100m), Fill(1, 5m, 90m)], []);

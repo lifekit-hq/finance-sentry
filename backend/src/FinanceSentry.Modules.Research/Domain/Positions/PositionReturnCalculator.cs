@@ -11,7 +11,8 @@ using FinanceSentry.Modules.Research.Domain.Ports;
 /// ledger cannot support it; <see cref="TotalUsd"/> sums the non-null ones.
 /// <see cref="Coverage"/>: <c>complete</c> = the fills explain the whole holding; <c>partial</c> = they
 /// do not (history before the first ingested fill), so the unrealized figure is the holding's own
-/// cost-basis gain and the realized and currency components are null; <c>unavailable</c> = no fills or dividends were
+/// cost-basis gain and the realized and currency components are null (dividends too when no income row was
+/// ingested); <c>unavailable</c> = no fills or dividends were
 /// ingested for the symbol. <see cref="AverageCostNative"/> is the open average cost per unit in
 /// <see cref="CostCurrency"/>, set only for complete coverage in a single trade currency.
 /// </summary>
@@ -119,8 +120,9 @@ public static class PositionReturnCalculator
         if (!covers)
         {
             // Without the earlier fills the average cost of any sell is unknown, so only the holding's own gain and
-            // the dividend rows stand.
-            return Result(holdingGain, null, dividends, null, Partial, null, null, ledger.Fills.Count);
+            // the dividend rows stand. No income rows on an incomplete ledger is "not ingested", never a zero.
+            return Result(holdingGain, null, ledger.Income.Count == 0 ? null : dividends, null, Partial, null, null,
+                ledger.Fills.Count);
         }
 
         var unrealized = units > QuantityTolerance ? currentValueUsd - costUsdNow : 0m;
