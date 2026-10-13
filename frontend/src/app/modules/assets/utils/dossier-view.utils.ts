@@ -4,7 +4,11 @@ import {
   RECOMMENDATION_HOLD_LABEL,
   RECOMMENDATION_SELL_LABEL,
 } from '../constants/dossier/dossier-recommendation.constants';
-import {DOSSIER_SECTION_CHIPS} from '../constants/dossier/dossier-sections.constants';
+import {
+  CRYPTO_PRICE_CARD_TITLE,
+  DOSSIER_SECTION_CHIPS,
+  VALUATION_CARD_TITLE,
+} from '../constants/dossier/dossier-sections.constants';
 import {
   type AssetDossierDto,
   type DossierHeroProfile,
@@ -76,6 +80,30 @@ export class DossierViewUtils {
     );
   }
 
+  /** The analyst section: crypto has no coverage, so it is never shown for it. */
+  public static hasAnalysts(dossier: Nullable<AssetDossierDto>): boolean {
+    return !!dossier && !DossierViewUtils.isCrypto(dossier) && dossier.analysts !== null;
+  }
+
+  /**
+   * The valuation card exists for a priced asset or one with a valuation. Crypto never counts its
+   * valuation: the card then carries only the price range and the user's own target.
+   */
+  public static hasValuationCard(dossier: Nullable<AssetDossierDto>): boolean {
+    if (!dossier) {
+      return false;
+    }
+    const hasValuation =
+      !DossierViewUtils.isCrypto(dossier) &&
+      dossier.valuation !== null &&
+      !dossier.valuation.notApplicable;
+    return hasValuation || (dossier.performance ?? null) !== null;
+  }
+
+  public static valuationCardTitle(dossier: Nullable<AssetDossierDto>): string {
+    return DossierViewUtils.isCrypto(dossier) ? CRYPTO_PRICE_CARD_TITLE : VALUATION_CARD_TITLE;
+  }
+
   /** Company name and "Sector · Industry" from the valuation source; a holding falls back to its asset class. */
   public static heroProfile(dossier: AssetDossierDto): DossierHeroProfile {
     const valuation =
@@ -103,7 +131,6 @@ export class DossierViewUtils {
     }
     const chips: DossierSectionChip[] = [];
     const hasHistory = (dossier.performance ?? null) !== null;
-    const hasValuation = dossier.valuation !== null && !dossier.valuation.notApplicable;
     if ((dossier.checks?.axes.length ?? 0) > 0) {
       chips.push(DOSSIER_SECTION_CHIPS.checks);
     }
@@ -114,10 +141,14 @@ export class DossierViewUtils {
       chips.push(DOSSIER_SECTION_CHIPS.returns);
     }
     // "Is it cheap?" also carries the user's own target, so a priced asset without a valuation keeps it.
-    if (hasValuation || hasHistory) {
-      chips.push(DOSSIER_SECTION_CHIPS.valuation);
+    if (DossierViewUtils.hasValuationCard(dossier)) {
+      chips.push(
+        DossierViewUtils.isCrypto(dossier)
+          ? DOSSIER_SECTION_CHIPS.cryptoPrice
+          : DOSSIER_SECTION_CHIPS.valuation
+      );
     }
-    if (dossier.analysts) {
+    if (DossierViewUtils.hasAnalysts(dossier)) {
       chips.push(DOSSIER_SECTION_CHIPS.analysts);
     }
     if (dossier.thesis) {

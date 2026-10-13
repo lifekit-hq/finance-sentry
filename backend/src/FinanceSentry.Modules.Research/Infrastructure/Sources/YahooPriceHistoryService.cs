@@ -17,7 +17,6 @@ public sealed class YahooPriceHistoryService(
     ILogger<YahooPriceHistoryService> logger) : IPriceHistoryService, IDisposable
 {
     private const int MaxCachedSeries = 256;
-    private const decimal MinorUnitsPerMajor = 100m;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
 
     private readonly TtlCache<PriceHistory> cache = new(clock, CacheTtl, MaxCachedSeries);
@@ -83,12 +82,7 @@ public sealed class YahooPriceHistoryService(
         }
 
         var result = results[0];
-        var quoted = result.TryGetProperty("meta", out var meta)
-            && meta.TryGetProperty("currency", out var c)
-            && c.ValueKind is JsonValueKind.String
-                ? c.GetString()?.Trim()
-                : null;
-        var (currency, divisor) = NormalizeCurrency(quoted);
+        var (currency, divisor) = YahooMarketDataService.ReadCurrency(result);
 
         // A weekly or monthly series can carry the live day as a second bar in its last period; keep one per date.
         var closes = YahooMarketDataService.ReadDailyBars(result)
@@ -100,18 +94,4 @@ public sealed class YahooPriceHistoryService(
 
         return new PriceHistory(currency, closes);
     }
-
-    /// <summary>
-    /// Yahoo quotes some exchanges in a minor unit (LSE pence "GBp"/"GBX", Johannesburg cents "ZAc", Tel Aviv
-    /// agorot "ILA"); the series is returned in the major currency, with the divisor that converts the quoted values.
-    /// </summary>
-    private static (string? Currency, decimal Divisor) NormalizeCurrency(string? quoted)
-        => quoted switch
-        {
-            null or "" => (null, 1m),
-            "GBp" or "GBX" => ("GBP", MinorUnitsPerMajor),
-            "ZAc" => ("ZAR", MinorUnitsPerMajor),
-            "ILA" => ("ILS", MinorUnitsPerMajor),
-            _ => (quoted.ToUpperInvariant(), 1m),
-        };
 }

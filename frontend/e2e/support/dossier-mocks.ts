@@ -540,7 +540,7 @@ export const DOSSIER_BTC = {
       },
     ],
   },
-  userTarget: null,
+  userTarget: {targetPrice: 75000, currency: 'USD', updatedAt: '2026-09-01T09:00:00Z'},
   analysts: null,
   recentNews: [],
   nextEarnings: null,

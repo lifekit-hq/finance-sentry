@@ -285,7 +285,7 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await expect(page.getByTestId('data-status-returns')).toContainText('3 fills');
   });
 
-  test('a crypto holding keeps the same layout with the stock-only sections hidden', async ({
+  test('a crypto holding keeps the price and your own target on the band, with analysts, fundamentals, peers and ownership hidden', async ({
     page,
   }) => {
     await page.goto('/assets/BTC');
@@ -295,10 +295,15 @@ test.describe('Asset Dossier - chart, checks and returns', () => {
     await expect(page.getByTestId('dossier-checks')).toContainText('3 of 4 pass');
     await expect(page.getByTestId('check-axis-value')).toHaveCount(0);
     await expect(page.getByTestId('checks-wheel')).toHaveCount(0);
-    await expect(page.getByTestId('fundamentals')).toHaveCount(0);
-    await expect(page.getByTestId('target-source')).toHaveCount(0);
-    await expect(page.getByTestId('ownership')).toHaveCount(0);
+    await expect(page.getByTestId('valuation')).toContainText('Price & your target');
+    await expect(page.getByTestId('target-band')).toBeVisible();
     await expect(page.getByTestId('my-target')).toBeVisible();
+    await expect(page.getByTestId('target-marker-analyst')).toHaveCount(0);
+    await expect(page.getByTestId('target-source')).toHaveCount(0);
+    await expect(page.getByTestId('fundamentals')).toHaveCount(0);
+    await expect(page.getByTestId('valuation-peers')).toHaveCount(0);
+    await expect(page.getByTestId('recommendation-verdict')).toHaveCount(0);
+    await expect(page.getByTestId('ownership')).toHaveCount(0);
   });
 });
 

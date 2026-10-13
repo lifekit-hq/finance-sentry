@@ -15,11 +15,15 @@ export const DOSSIER_SECTION_ID = {
   dataStatus: 'data-status',
 } as const;
 
+export const VALUATION_CARD_TITLE = 'Is it cheap?';
+export const CRYPTO_PRICE_CARD_TITLE = 'Price & your target';
+
 export const DOSSIER_SECTION_CHIPS = {
   checks: {id: DOSSIER_SECTION_ID.checks, label: 'Checks'},
   chart: {id: DOSSIER_SECTION_ID.chart, label: 'Chart'},
   returns: {id: DOSSIER_SECTION_ID.returns, label: 'Returns'},
   valuation: {id: DOSSIER_SECTION_ID.valuation, label: 'Valuation'},
+  cryptoPrice: {id: DOSSIER_SECTION_ID.valuation, label: CRYPTO_PRICE_CARD_TITLE},
   analysts: {id: DOSSIER_SECTION_ID.analysts, label: 'Analysts'},
   thesis: {id: DOSSIER_SECTION_ID.thesis, label: 'Plan'},
   earnings: {id: DOSSIER_SECTION_ID.earnings, label: 'Earnings'},

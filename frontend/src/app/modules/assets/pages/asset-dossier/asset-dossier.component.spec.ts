@@ -216,6 +216,10 @@ function buildMockStore() {
     isTargetLoading: signal(false),
     targetErrorMessage: signal(''),
     isCrypto: derived.isCrypto,
+    usableValuation: derived.usableValuation,
+    hasValuationCard: derived.hasValuationCard,
+    valuationCardTitle: derived.valuationCardTitle,
+    hasAnalysts: derived.hasAnalysts,
     performanceStrip: derived.performanceStrip,
     thesisHook: derived.thesisHook,
     sizeCap: derived.sizeCap,
@@ -898,21 +902,43 @@ describe('AssetDossierComponent', () => {
       );
     });
 
-    it('hides valuation, analysts and ownership for crypto', () => {
+    it('keeps the price and your own target on the band for crypto and hides analysts, fundamentals, peers and ownership', () => {
+      const stockValuation = STOCK.valuation as ValuationSnapshotDto;
       mockStore.dossier.set({
         ...STOCK,
-        valuation: {...(STOCK.valuation as ValuationSnapshotDto), notApplicable: true},
-        analysts: null,
+        position: {...(STOCK.position as DossierPositionSection), assetClass: 'Crypto'},
+        valuation: {
+          ...stockValuation,
+          peerSet: {
+            name: 'sector:Technology (default)',
+            peers: [{ticker: 'MU', forwardPe: 9.1, evToEbitda: null}],
+          },
+        },
         checks: {axes: [axis('momentum', true, false), axis('fit', true, true)]},
       });
       fixture.detectChanges();
 
+      expect(byTestId('valuation')?.textContent).toContain('Price & your target');
+      expect(byTestId('valuation')?.textContent).not.toContain('Is it cheap?');
+      expect(byTestId('target-band')).not.toBeNull();
+      expect(byTestId('target-marker-price')).not.toBeNull();
+      expect(byTestId('target-marker-mine')).not.toBeNull();
+      expect(byTestId('my-target')).not.toBeNull();
+      expect(byTestId('target-marker-analyst')).toBeNull();
+      expect(byTestId('target-range')).toBeNull();
+      expect(byTestId('target-source')).toBeNull();
       expect(byTestId('fundamentals')).toBeNull();
+      expect(byTestId('valuation-peers')).toBeNull();
+      expect(byTestId('recommendation-verdict')).toBeNull();
       expect(byTestId('ownership')).toBeNull();
       expect(byTestId('checks-wheel')).toBeNull();
       expect(byTestId('check-axis-momentum')).not.toBeNull();
-      expect(byTestId('target-source')).toBeNull();
-      expect(byTestId('valuation')).not.toBeNull();
+      const chips = Array.from(
+        byTestId('dossier-chips')?.querySelectorAll<HTMLElement>('cmn-chip') ?? []
+      ).map(c => c.textContent?.trim());
+      expect(chips).toContain('Price & your target');
+      expect(chips).not.toContain('Valuation');
+      expect(chips).not.toContain('Analysts');
     });
   });
 });

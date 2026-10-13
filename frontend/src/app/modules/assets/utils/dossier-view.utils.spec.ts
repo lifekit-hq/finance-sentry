@@ -265,24 +265,55 @@ describe('DossierViewUtils.sectionChips', () => {
     expect(chips.map(c => c.label)).toEqual(['Data']);
   });
 
-  it('keeps "Is it cheap?" for a priced asset without a valuation (it carries the user target)', () => {
+  const PRICED = {
+    lastClose: 1,
+    yearChangePct: null,
+    high52Week: null,
+    low52Week: null,
+    fromHighPct: null,
+    benchmarkYearChangePct: null,
+    currency: 'USD',
+    asOf: null,
+  };
+
+  it('keeps "Valuation" for a priced asset without a valuation (it carries the user target)', () => {
+    const chips = DossierViewUtils.sectionChips(dossier({valuation: null, performance: PRICED}));
+
+    expect(chips.map(c => c.label)).toEqual(['Chart', 'Valuation', 'Data']);
+  });
+
+  it('labels the price card "Price & your target" for crypto and drops its analysts and valuation chips', () => {
     const chips = DossierViewUtils.sectionChips(
       dossier({
         valuation: valuation({notApplicable: true}),
-        performance: {
-          lastClose: 1,
-          yearChangePct: null,
-          high52Week: null,
-          low52Week: null,
-          fromHighPct: null,
-          benchmarkYearChangePct: null,
-          currency: 'USD',
-          asOf: null,
-        },
+        analysts: {recentActions: [], trends: [], coverage: 'inUniverse'},
+        performance: PRICED,
       })
     );
 
-    expect(chips.map(c => c.label)).toEqual(['Chart', 'Valuation', 'Data']);
+    expect(chips.map(c => c.label)).toEqual(['Chart', 'Price & your target', 'Data']);
+  });
+
+  it('keeps a crypto holding off the analysts chip even when its valuation looks applicable', () => {
+    const chips = DossierViewUtils.sectionChips(
+      dossier({
+        position: {
+          provider: 'binance',
+          assetClass: 'Crypto',
+          quantity: 1,
+          currentValueUsd: 100,
+          costBasisUsd: null,
+          unrealizedPnlUsd: null,
+          unrealizedPnlPercent: null,
+          shareOfBookPercent: null,
+          taxLots: [],
+        },
+        valuation: valuation(),
+        analysts: {recentActions: [], trends: [], coverage: 'inUniverse'},
+      })
+    );
+
+    expect(chips.map(c => c.label)).toEqual(['Data']);
   });
 
   it('lists the sections that exist in page order', () => {

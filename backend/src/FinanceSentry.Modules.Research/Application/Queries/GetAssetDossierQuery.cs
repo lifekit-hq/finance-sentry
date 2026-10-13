@@ -55,8 +55,6 @@ public sealed class GetAssetDossierQueryHandler(
         var book = await Safe(() => bookFigures.ReadAsync(userId, ct));
         var allTheses = await Safe(() => theses.Handle(new GetThesesQuery(userId), ct));
         var valuationResult = await Safe(() => valuation.Handle(new GetValuationSnapshotQuery(symbol, null), ct));
-        var analystResult = await Safe(() => analystActions.Handle(
-            new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
         var newsResult = await Safe(() => news.Handle(new GetNewsForTickerQuery(symbol, null, NewsLimit), ct));
         var earningsResult = await Safe(() => earnings.Handle(
             new GetEarningsCalendarQuery([symbol], null, today, today.AddDays(EarningsDays), EarningsEventType.Earnings), ct));
@@ -67,6 +65,18 @@ public sealed class GetAssetDossierQueryHandler(
         var bookPosition = book?.Positions.FirstOrDefault(
             p => p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
         var isCrypto = DossierTickers.IsCrypto(bookPosition?.AssetClass) || valuationResult?.NotApplicable == true;
+
+        // Crypto has no analyst coverage or company fundamentals: its valuation is reduced to the not-applicable
+        // marker the page keys its crypto layout on, and the analyst source is not read.
+        if (isCrypto && valuationResult is { NotApplicable: false })
+        {
+            valuationResult = null;
+        }
+
+        var analystResult = isCrypto
+            ? null
+            : await Safe(() => analystActions.Handle(
+                new GetAnalystActionsQuery(symbol, today.AddDays(-AnalystActionDays), null, AnalystActionLimit), ct));
 
         var yearHistory = await Safe(() => priceHistory.GetAsync(
             DossierTickers.ToChartTicker(symbol, bookPosition?.AssetClass), ChartRange.OneYear, ct)) ?? PriceHistory.Empty;

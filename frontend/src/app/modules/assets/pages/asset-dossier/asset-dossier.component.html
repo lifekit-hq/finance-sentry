@@ -663,7 +663,7 @@
             }
 
             <!-- Is it cheap? The analysts' range with its source named, their target and the user's own. -->
-            @if ((dossier.valuation && !dossier.valuation.notApplicable) || dossier.performance) {
+            @if (store.hasValuationCard()) {
               <cmn-card
                 [id]="sectionId.valuation"
                 class="block scroll-mt-[4.5rem]"
@@ -672,12 +672,12 @@
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>
                     <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
-                      Is it cheap?
+                      {{ store.valuationCardTitle() }}
                     </h2>
-                    @if (dossier.valuation?.isStale) {
+                    @if (store.usableValuation()?.isStale) {
                       <cmn-tag variant="warning" class="mt-cmn-1" data-testid="valuation-stale"
                         >Stale
-                        @if (dossier.valuation?.priceAsOf; as priceAsOf) {
+                        @if (store.usableValuation()?.priceAsOf; as priceAsOf) {
                           · as of {{ priceAsOf | date: 'mediumDate' }}
                         }
                       </cmn-tag>
@@ -869,8 +869,8 @@
                   }
                 }
 
-                @if (dossier.valuation?.peerSet; as peerSet) {
-                  @if (peerSet.peers.length > 0 && dossier.valuation; as valuation) {
+                @if (store.usableValuation()?.peerSet; as peerSet) {
+                  @if (peerSet.peers.length > 0 && store.usableValuation(); as valuation) {
                     <div
                       class="mt-cmn-5 border-t border-border-default pt-cmn-4"
                       data-testid="valuation-peers"
@@ -928,7 +928,7 @@
             }
 
             <!-- What do analysts say? -->
-            @if (dossier.analysts; as analysts) {
+            @if (store.hasAnalysts() && dossier.analysts; as analysts) {
               <cmn-card [id]="sectionId.analysts" class="block scroll-mt-[4.5rem]">
                 <div class="flex flex-wrap items-start justify-between gap-cmn-3">
                   <div>

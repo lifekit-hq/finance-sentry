@@ -70,6 +70,43 @@ public sealed class YahooMarketDataServiceTests
     }
 
     [Fact]
+    public async Task GetQuotesAsync_PenceQuote_IsReturnedInPoundsWithTheMajorCurrency()
+    {
+        // 1783958400 = 2026-07-13 16:00 UTC; the prior session's bar closed at 1240 pence.
+        var handler = new StubHttpMessageHandler(_ => QuoteJson(
+            symbol: "SHEL.L",
+            marketState: "REGULAR",
+            regularMarketPrice: 1250m,
+            chartPreviousClose: 1200m,
+            bars: [(1783690200, 1240m), (1783949400, 1250m)],
+            currency: "GBp"));
+        var sut = CreateSut(handler);
+
+        var result = await sut.GetQuotesAsync(["SHEL.L"]);
+
+        result["SHEL.L"].Price.Should().Be(12.5m);
+        result["SHEL.L"].PreviousClose.Should().Be(12.4m);
+        result["SHEL.L"].Currency.Should().Be("GBP");
+    }
+
+    [Fact]
+    public async Task GetDailyClosesAsync_PenceQuote_IsReturnedInPounds()
+    {
+        var handler = new StubHttpMessageHandler(_ => QuoteJson(
+            symbol: "SHEL.L",
+            marketState: "REGULAR",
+            regularMarketPrice: 1250m,
+            chartPreviousClose: 1200m,
+            bars: [(1783690200, 1240m), (1783949400, 1250m)],
+            currency: "GBp"));
+        var sut = CreateSut(handler);
+
+        var closes = await sut.GetDailyClosesAsync("SHEL.L", new DateOnly(2026, 7, 1));
+
+        closes.Select(c => c.Close).Should().Equal(12.4m, 12.5m);
+    }
+
+    [Fact]
     public async Task GetQuotesAsync_RefusesUnexpectedYahooSymbol()
     {
         var handler = new StubHttpMessageHandler(_ => QuoteJson(
@@ -116,7 +153,8 @@ public sealed class YahooMarketDataServiceTests
         decimal chartPreviousClose,
         decimal? preMarketPrice = null,
         decimal? postMarketPrice = null,
-        (long Timestamp, decimal Close)[]? bars = null)
+        (long Timestamp, decimal Close)[]? bars = null,
+        string currency = "USD")
     {
         var preMarket = preMarketPrice is null ? string.Empty : $@",""preMarketPrice"":{preMarketPrice}";
         var postMarket = postMarketPrice is null ? string.Empty : $@",""postMarketPrice"":{postMarketPrice}";
@@ -131,7 +169,7 @@ public sealed class YahooMarketDataServiceTests
               {
                 "meta": {
                   "symbol": "{{symbol}}",
-                  "currency": "USD",
+                  "currency": "{{currency}}",
                   "marketState": "{{marketState}}",
                   "regularMarketPrice": {{regularMarketPrice}},
                   "chartPreviousClose": {{chartPreviousClose}},

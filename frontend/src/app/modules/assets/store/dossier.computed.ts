@@ -46,6 +46,12 @@ export function dossierComputed(store: StateSignals) {
     );
   });
 
+  // Crypto has no analyst consensus or company fundamentals, so none of the valuation's figures reach the page.
+  const usableValuation = computed(() => {
+    const dossier = store.dossier();
+    return DossierViewUtils.isCrypto(dossier) ? null : (dossier?.valuation ?? null);
+  });
+
   return {
     // Mirrors the render conditions in the template: a dossier whose every section is
     // null/empty renders a "no data" state instead of a page of hidden cards.
@@ -57,16 +63,19 @@ export function dossierComputed(store: StateSignals) {
       return (
         dossier.position !== null ||
         dossier.thesis !== null ||
-        (dossier.valuation !== null && !dossier.valuation.notApplicable) ||
-        dossier.analysts !== null ||
+        DossierViewUtils.hasValuationCard(dossier) ||
+        DossierViewUtils.hasAnalysts(dossier) ||
         dossier.nextEarnings !== null ||
         dossier.recentNews.length > 0 ||
-        dossier.radarSignals.length > 0 ||
-        (dossier.performance ?? null) !== null
+        dossier.radarSignals.length > 0
       );
     }),
     // Crypto carries no valuation, analyst or ownership data: those sections are hidden, not mocked.
     isCrypto: computed(() => DossierViewUtils.isCrypto(store.dossier())),
+    usableValuation,
+    hasValuationCard: computed(() => DossierViewUtils.hasValuationCard(store.dossier())),
+    valuationCardTitle: computed(() => DossierViewUtils.valuationCardTitle(store.dossier())),
+    hasAnalysts: computed(() => DossierViewUtils.hasAnalysts(store.dossier())),
     // The thesis is a wall of text on a phone: show the first paragraph, the rest behind "Read more".
     thesisParagraphs,
     thesisHasMore: computed(() => thesisParagraphs().length > 1),
@@ -127,15 +136,14 @@ export function dossierComputed(store: StateSignals) {
     targetBand: computed(() => {
       const dossier = store.dossier();
       return DossierPositionUtils.targetBand(
-        dossier?.valuation ?? null,
+        usableValuation(),
         dossier?.userTarget,
         currentPrice()
       );
     }),
     parsedTargetDraft: computed(() => DossierPositionUtils.parseTarget(store.targetDraft())),
     fundamentals: computed(() => {
-      const dossier = store.dossier();
-      return DossierFactsUtils.fundamentals(dossier?.valuation ?? null, dossier?.performance);
+      return DossierFactsUtils.fundamentals(usableValuation(), store.dossier()?.performance);
     }),
     dataStatus: computed(() => DossierFactsUtils.dataStatus(store.dossier(), store.chart())),
   };
