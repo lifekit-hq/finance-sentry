@@ -135,10 +135,27 @@ export const APP_ROUTES: Routes = [
         path: AppRoute.Ledger.slice(1),
         canMatch: [permissionGuard(Permission.AiUse)],
         loadComponent: () =>
-          import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
-            m => m.LedgerChatComponent
+          import('./modules/agent/pages/ledger-shell/ledger-shell.component').then(
+            m => m.LedgerShellComponent
           ),
-        ...RouteTitleUtils.of('Ledger'),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./modules/agent/pages/ledger-chat/ledger-chat.component').then(
+                m => m.LedgerChatComponent
+              ),
+            ...RouteTitleUtils.of('Ledger'),
+          },
+          {
+            path: AppRoute.LedgerDecisions.slice(AppRoute.Ledger.length + 1),
+            loadComponent: () =>
+              import('./modules/decisions/pages/decisions/decisions.component').then(
+                m => m.DecisionsComponent
+              ),
+            ...RouteTitleUtils.of('Ledger'),
+          },
+        ],
       },
       {
         path: AppRoute.SettingsPeople.slice(1),

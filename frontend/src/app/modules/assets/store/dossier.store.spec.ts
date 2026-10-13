@@ -6,7 +6,9 @@ import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../core/errors/error-messages.registry';
+import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {AuthStore} from '../../auth/store/auth.store';
+import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -110,6 +112,42 @@ function majorUnitValuation(currency: string): ValuationSnapshotDto {
   };
 }
 
+function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
+  return {
+    id: 'rec-1',
+    ticker: 'AAPL',
+    action: 'Trim',
+    status: 'Pending',
+    createdBy: 'Ledger',
+    origin: 'Ledger',
+    triggerKind: 'RiskRule',
+    triggerRef: 'concentration',
+    rationale: 'Above the single-name cap.',
+    confidence: 'Medium',
+    invalidationTrigger: 'Back under the cap.',
+    evidence: [],
+    sizeUsd: 2080,
+    sizeShares: 11,
+    shareOfBookBeforePct: 12.2,
+    shareOfBookAfterPct: 9.5,
+    limitPrice: 189.3,
+    limitCurrency: 'USD',
+    venue: 'IBKR',
+    orderText: 'SELL 11 AAPL / LIMIT 189.30 USD DAY / IBKR',
+    createdAt: '2026-10-12T09:00:00Z',
+    expiresAt: '2026-10-19T09:00:00Z',
+    decidedAt: null,
+    decisionNote: null,
+    execution: 'Pending',
+    executedAt: null,
+    subjectReturnPct: null,
+    benchmarkReturnPct: null,
+    excessReturnPct: null,
+    outcomeScoredAt: null,
+    ...overrides,
+  };
+}
+
 function httpError(errorCode: string) {
   return throwError(() => new HttpErrorResponse({status: 500, error: {errorCode}}));
 }
@@ -125,6 +163,7 @@ describe('DossierStore', () => {
     clearTarget: ReturnType<typeof vi.fn>;
   };
   let canUseAi: boolean;
+  let sheet: {open: ReturnType<typeof vi.fn>};
 
   function inject(): InstanceType<typeof DossierStore> {
     TestBed.configureTestingModule({
@@ -137,6 +176,7 @@ describe('DossierStore', () => {
           useValue: {snapshot: {paramMap: convertToParamMap({symbol: 'AAPL'}), fragment: null}},
         },
         {provide: AuthStore, useValue: {canUseAi: () => canUseAi}},
+        {provide: DecisionSheetService, useValue: sheet},
       ],
     });
     return TestBed.inject(DossierStore);
@@ -144,6 +184,7 @@ describe('DossierStore', () => {
 
   beforeEach(() => {
     canUseAi = true;
+    sheet = {open: vi.fn().mockReturnValue(of(undefined))};
     service = {
       getDossier: vi.fn().mockReturnValue(of(DOSSIER)),
       getQuotes: vi.fn().mockReturnValue(of([QUOTE])),
@@ -387,5 +428,30 @@ describe('DossierStore', () => {
 
     expect(service.clearTarget).not.toHaveBeenCalled();
     expect(service.setTarget).not.toHaveBeenCalled();
+  });
+
+  it('records a verdict from the sheet in place of the pending proposal', () => {
+    const pending = mkRecommendation();
+    const decided = mkRecommendation({status: 'Rejected', decisionNote: 'Still a core holding.'});
+    service.getDossier.mockReturnValue(of({...DOSSIER, pendingRecommendation: pending}));
+    sheet.open.mockReturnValue(of(decided));
+    const store = inject();
+
+    store.decideRecommendation({recommendation: pending, verdict: 'reject'});
+
+    expect(sheet.open).toHaveBeenCalledWith(pending, 'reject');
+    expect(store.dossier()?.pendingRecommendation).toBeNull();
+    expect(store.decidedRecommendation()).toEqual(decided);
+  });
+
+  it('keeps the pending proposal when the sheet is dismissed', () => {
+    const pending = mkRecommendation();
+    service.getDossier.mockReturnValue(of({...DOSSIER, pendingRecommendation: pending}));
+    const store = inject();
+
+    store.decideRecommendation({recommendation: pending, verdict: 'confirm'});
+
+    expect(store.dossier()?.pendingRecommendation).toEqual(pending);
+    expect(store.decidedRecommendation()).toBeNull();
   });
 });

@@ -75,6 +75,13 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   LEDGER_READ_UNAVAILABLE: 'Ledger could not produce a read right now. Try again shortly.',
   INVALID_PRICE_TARGET:
     'Enter a target price above zero (up to 1,000,000,000) and a three-letter currency code.',
+  INVALID_RECOMMENDATION:
+    'That decision could not be recorded. A rejection needs a reason, and notes are capped at 2,000 characters.',
+  RECOMMENDATION_NOT_PENDING:
+    'This proposal was already decided, expired or replaced. Reload to see it.',
+  RECOMMENDATION_CONFLICT:
+    'Another proposal on this ticker arrived at the same time. Reload and try again.',
+  RECOMMENDATION_NOT_FOUND: 'That proposal no longer exists.',
   INVALID_CHART_RANGE: 'That chart range is not available. Pick 1M, 6M, YTD, 1Y, 5Y or Max.',
   INVALID_DATE_RANGE: 'Invalid date range. Check the from/to dates and try again.',
   INVALID_AMOUNT_RANGE: 'Invalid amount range. Check the min/max amounts and try again.',

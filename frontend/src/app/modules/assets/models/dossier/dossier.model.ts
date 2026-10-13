@@ -1,3 +1,5 @@
+import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+
 export interface DossierTaxLotEntry {
   quantity: number;
   currentValueUsd: number;
@@ -284,6 +286,8 @@ export interface AssetDossierDto {
   performance?: Nullable<DossierPerformanceDto>;
   checks?: Nullable<DossierChecksDto>;
   userTarget?: Nullable<DossierUserTargetDto>;
+  /** Ledger's pending proposal on this ticker (#1069), awaiting the owner's Confirm or Reject. */
+  pendingRecommendation?: Nullable<RecommendationDto>;
 }
 
 /**

@@ -276,6 +276,29 @@
         </p>
       </cmn-card>
 
+      <!-- Ledger's pending proposal on this ticker (#1069): the owner decides; Finance Sentry never trades. -->
+      @if (dossier.pendingRecommendation; as recommendation) {
+        <fns-recommendation-card
+          [recommendation]="recommendation"
+          (decide)="store.decideRecommendation({recommendation, verdict: $event})"
+        />
+      } @else if (store.decidedRecommendation(); as decided) {
+        <cmn-alert
+          [title]="decisionRecordedTitle[decided.status]"
+          variant="info"
+          data-testid="dossier-decision-recorded"
+        >
+          {{ decided | recommendationOutcome }}
+          @if (canUseAi()) {
+            <a
+              [routerLink]="decisionsRoute"
+              class="mt-cmn-1 block w-fit font-medium underline underline-offset-2"
+              >See all decisions</a
+            >
+          }
+        </cmn-alert>
+      }
+
       @if (!store.hasDossierSections()) {
         <cmn-card class="block" data-testid="dossier-no-data">
           <cmn-empty-state

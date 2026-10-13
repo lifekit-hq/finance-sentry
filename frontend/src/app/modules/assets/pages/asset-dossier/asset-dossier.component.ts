@@ -41,6 +41,9 @@ import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ProviderLabelPipe} from '../../../../shared/pipes/provider-label.pipe';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {RecommendationCardComponent} from '../../../decisions/components/recommendation-card/recommendation-card.component';
+import {DECISION_RECORDED_TITLE} from '../../../decisions/constants/recommendation/recommendation.constants';
+import {RecommendationOutcomePipe} from '../../../decisions/pipes/recommendation.pipe';
 import {CHART_RANGES, CHART_SKELETON_HEIGHT} from '../../constants/dossier/dossier-chart.constants';
 import {OWNERSHIP_NOTE} from '../../constants/dossier/dossier-facts.constants';
 import {DOSSIER_SECTION_ID} from '../../constants/dossier/dossier-sections.constants';
@@ -75,6 +78,8 @@ const TREND_LABEL_FORMAT = 'mediumDate';
 @Component({
   selector: 'fns-asset-dossier',
   imports: [
+    RecommendationCardComponent,
+    RecommendationOutcomePipe,
     PageContainerComponent,
     AlertComponent,
     AnalystActionLabelPipe,
@@ -119,6 +124,8 @@ export class AssetDossierComponent {
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly store = inject(DossierStore);
   public readonly accountsRoute = AppRoute.AccountsInvestments;
+  public readonly decisionsRoute = AppRoute.LedgerDecisions;
+  public readonly decisionRecordedTitle = DECISION_RECORDED_TITLE;
   public readonly dossierStatus = computed<AsyncStateStatus>(() => {
     if (this.store.dossierErrorMessage()) {
       return 'error';
