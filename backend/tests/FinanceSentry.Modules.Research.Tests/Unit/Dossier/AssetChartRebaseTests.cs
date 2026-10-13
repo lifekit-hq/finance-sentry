@@ -42,7 +42,34 @@ public class AssetChartRebaseTests
         var points = GetAssetChartQueryHandler.Rebase(asset, benchmark);
 
         points[0].Benchmark.Should().BeNull();
-        points[1].Benchmark.Should().Be(100m, "the first benchmark close is rebased to the asset's first close");
+        points[1].Benchmark.Should().Be(110m, "the first benchmark close is rebased to the asset's close on that date");
+    }
+
+    [Fact]
+    public void Rebase_BenchmarkStartingLater_TracksTheAssetFromItsFirstDate()
+    {
+        var asset = History((0, 10m), (1, 100m), (2, 120m));
+        var benchmark = History((1, 400m), (2, 440m));
+
+        var points = GetAssetChartQueryHandler.Rebase(asset, benchmark);
+
+        points.Select(p => p.Benchmark).Should().Equal(null, 100m, 110m);
+    }
+
+    [Fact]
+    public void BenchmarkChangePct_BenchmarkCoversTheWindow_IsItsChange()
+    {
+        var points = GetAssetChartQueryHandler.Rebase(History((0, 50m), (3, 60m)), History((0, 400m), (3, 440m)));
+
+        GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().Be(10m);
+    }
+
+    [Fact]
+    public void BenchmarkChangePct_BenchmarkStartingLater_IsNullRatherThanAShorterWindow()
+    {
+        var points = GetAssetChartQueryHandler.Rebase(History((0, 10m), (1, 100m), (2, 120m)), History((1, 400m), (2, 440m)));
+
+        GetAssetChartQueryHandler.BenchmarkChangePct(points).Should().BeNull();
     }
 
     [Fact]

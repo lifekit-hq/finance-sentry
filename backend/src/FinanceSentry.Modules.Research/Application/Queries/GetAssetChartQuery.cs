@@ -54,7 +54,6 @@ public sealed class GetAssetChartQueryHandler(
         }
 
         var closes = points.Select(p => p.Close).ToList();
-        var benchmarkCloses = points.Where(p => p.Benchmark is not null).Select(p => p.Benchmark!.Value).ToList();
 
         return new AssetChartResult(
             symbol,
@@ -65,14 +64,24 @@ public sealed class GetAssetChartQueryHandler(
             trades,
             averageCost,
             PerformanceMath.ChangePct(closes),
-            PerformanceMath.ChangePct(benchmarkCloses),
+            BenchmarkChangePct(points),
             Source,
             DateTimeOffset.UtcNow);
     }
 
     /// <summary>
+    /// The benchmark's change over the whole chart window, or null when the benchmark starts after the asset's
+    /// first point: its line then covers a shorter window than <see cref="AssetChartResult.ChangePct"/>.
+    /// </summary>
+    public static decimal? BenchmarkChangePct(IReadOnlyList<AssetChartPoint> points)
+        => points.Count > 0 && points[0].Benchmark is not null
+            ? PerformanceMath.ChangePct(points.Select(p => p.Benchmark!.Value).ToList())
+            : null;
+
+    /// <summary>
     /// The asset's closes with the benchmark's close on (or carried forward to) each date, rebased so the
-    /// benchmark starts at the asset's first close. A crypto series trades on weekends; the benchmark does not.
+    /// benchmark starts at the asset's close on the first date the benchmark exists. A crypto series trades on
+    /// weekends; the benchmark does not, and an asset older than the benchmark has no line before its start.
     /// </summary>
     public static IReadOnlyList<AssetChartPoint> Rebase(PriceHistory asset, PriceHistory benchmark)
     {
@@ -84,7 +93,7 @@ public sealed class GetAssetChartQueryHandler(
         var benchmarkByDate = benchmark.Closes.OrderBy(c => c.Date).ToList();
         var points = new List<AssetChartPoint>(asset.Closes.Count);
         decimal? baseBenchmark = null;
-        var firstClose = asset.Closes[0].Close;
+        var baseAsset = 0m;
         var cursor = -1;
 
         foreach (var close in asset.Closes)
@@ -98,8 +107,13 @@ public sealed class GetAssetChartQueryHandler(
             if (cursor >= 0)
             {
                 var raw = benchmarkByDate[cursor].Close;
-                baseBenchmark ??= raw;
-                rebased = baseBenchmark > 0m ? PriceRounding.Round(firstClose * raw / baseBenchmark.Value) : null;
+                if (baseBenchmark is null)
+                {
+                    baseBenchmark = raw;
+                    baseAsset = close.Close;
+                }
+
+                rebased = baseBenchmark > 0m ? PriceRounding.Round(baseAsset * raw / baseBenchmark.Value) : null;
             }
 
             points.Add(new AssetChartPoint(close.Date, close.Close, rebased));
