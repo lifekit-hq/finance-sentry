@@ -24,7 +24,11 @@ public class UpdateProfileCommandHandler(UserManager<ApplicationUser> userManage
         user.SafeWithdrawalRate = command.SafeWithdrawalRate;
         user.RealAnnualReturn = command.RealAnnualReturn;
 
-        await userManager.UpdateAsync(user);
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new AccountUpdateConflictException();
+        }
 
         return GetProfileQueryHandler.ToDto(user);
     }

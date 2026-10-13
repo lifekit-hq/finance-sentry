@@ -19,7 +19,11 @@ public class UpdatePreferencesCommandHandler(UserManager<ApplicationUser> userMa
             user.Theme = appearance.Theme;
             user.ThemeSeed = appearance.Seed?.ToLowerInvariant();
             user.ThemeIntensity = appearance.Intensity;
-            await userManager.UpdateAsync(user);
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                throw new AccountUpdateConflictException();
+            }
         }
 
         return GetPreferencesQueryHandler.ToDto(user);

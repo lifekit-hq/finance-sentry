@@ -35,6 +35,9 @@ public sealed class DuplicateEmailException()
 public sealed class UserNotFoundException()
     : ApiException(404, "USER_NOT_FOUND", "User not found.");
 
+public sealed class AccountUpdateConflictException()
+    : ApiException(409, "ACCOUNT_UPDATE_CONFLICT", "Your account was changed elsewhere. Reload and try again.");
+
 public sealed class AccountNotInvitedException()
     : ApiException(403, "ACCOUNT_NOT_INVITED", "No account exists for this email. Ask the owner for an invite.");
 
