@@ -2,6 +2,8 @@ import {createHash} from 'node:crypto';
 
 import {expect, type Page, test} from '@playwright/test';
 
+import {mockPreferences} from './support/preferences-mocks';
+
 // The pre-paint script and ThemeService come from @lifekit-hq (tokens / ui); this spec pins the
 // behaviour the app keeps: no flash of the wrong theme on cold load, the stored choice wins, system
 // follows the OS live, and the theme-color metas track the active surface. Runs against the
@@ -22,7 +24,6 @@ const PROFILE = {
   lastName: 'User',
   email: 'test@gmail.com',
   baseCurrency: 'USD',
-  theme: 'system',
   emailAlerts: false,
   lowBalanceAlerts: false,
   lowBalanceThreshold: 100,
@@ -43,20 +44,12 @@ async function stubGuestApi(page: Page): Promise<void> {
   await page.route(`${API}/auth/methods`, route => route.fulfill(json({oidc: false})));
 }
 
-async function stubSignedInApi(page: Page): Promise<{putBodies: unknown[]}> {
-  const putBodies: unknown[] = [];
+async function stubSignedInApi(page: Page): Promise<{patches: unknown[]}> {
   await page.route(`${API}/**`, route => route.fulfill(json({})));
   await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
   await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
-  await page.route(`${API}/profile`, route => {
-    if (route.request().method() === 'PUT') {
-      const body = route.request().postDataJSON();
-      putBodies.push(body);
-      return route.fulfill(json({...PROFILE, ...body}));
-    }
-    return route.fulfill(json(PROFILE));
-  });
-  return {putBodies};
+  await page.route(`${API}/profile`, route => route.fulfill(json(PROFILE)));
+  return mockPreferences(page);
 }
 
 /** Records every data-theme value the root element ever holds, from before the first script runs. */
@@ -168,14 +161,11 @@ test.describe('Theme bootstrap', () => {
 
   test('the settings theme choice applies live, persists, and system clears it', async ({page}) => {
     await page.emulateMedia({colorScheme: 'light'});
-    const {putBodies} = await stubSignedInApi(page);
+    const {patches} = await stubSignedInApi(page);
     await page.goto('/settings');
-    const select = page.locator('#s-theme');
-    await expect(select).toBeVisible();
-    const choose = async (label: string): Promise<void> => {
-      await select.getByRole('combobox').selectOption({label});
-      await page.getByRole('button', {name: 'Save Profile'}).click();
-    };
+    const mode = page.getByRole('radiogroup', {name: 'Theme'});
+    await expect(mode).toBeVisible();
+    const choose = (label: string) => mode.getByRole('radio', {name: label}).click();
 
     await choose('Dark');
     await expect.poll(() => theme(page)).toBe('dark');
@@ -183,9 +173,29 @@ test.describe('Theme bootstrap', () => {
     await page.reload();
     await expect.poll(() => theme(page)).toBe('dark');
 
-    await choose('System default');
+    await choose('System');
     await expect.poll(() => theme(page)).toBe('light');
     expect(await storedTheme(page)).toBeNull();
-    expect(putBodies.length).toBe(2);
+    expect(patches).toEqual([
+      {appearance: expect.objectContaining({theme: 'dark'})},
+      {appearance: expect.objectContaining({theme: 'system'})},
+    ]);
+  });
+
+  test('the account choice wins over this device on load and is cached for the next paint', async ({
+    page,
+  }) => {
+    await page.emulateMedia({colorScheme: 'light'});
+    await seedStoredTheme(page, 'light');
+    await page.route(`${API}/**`, route => route.fulfill(json({})));
+    await page.route(`${API}/auth/me`, route => route.fulfill(json(AUTH_RESPONSE)));
+    await page.route(`${API}/auth/refresh`, route => route.fulfill(json(AUTH_RESPONSE)));
+    await page.route(`${API}/profile`, route => route.fulfill(json(PROFILE)));
+    await mockPreferences(page, {theme: 'dark', seed: null, intensity: null});
+
+    await page.goto('/dashboard');
+
+    await expect.poll(() => theme(page)).toBe('dark');
+    expect(await storedTheme(page)).toBe('dark');
   });
 });

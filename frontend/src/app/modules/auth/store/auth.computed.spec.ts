@@ -23,6 +23,20 @@ function build(
 }
 
 describe('authComputed', () => {
+  describe('fullName', () => {
+    it.each([
+      ['both names', 'Ada', 'Lovelace', 'Ada Lovelace'],
+      ['first name only', 'Ada', null, 'Ada'],
+      ['last name only', null, 'Lovelace', 'Lovelace'],
+      ['no names', null, null, ''],
+    ])('joins %s', (_label, firstName, lastName, expected) => {
+      const store = build({firstName, lastName});
+      TestBed.runInInjectionContext(() => {
+        expect(authComputed(store).fullName()).toBe(expected);
+      });
+    });
+  });
+
   describe('isAuthenticated', () => {
     it('returns true when userId is set', () => {
       const store = build({userId: 'u-1'});

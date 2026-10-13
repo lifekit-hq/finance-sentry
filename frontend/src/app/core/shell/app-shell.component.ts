@@ -1,17 +1,16 @@
 import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
 import {Router, RouterOutlet} from '@angular/router';
 import {
-  AppLayoutAccount,
+  ACCOUNT_SIGN_OUT_ID,
+  APPEARANCE_PALETTE_ITEMS,
   AppLayoutComponent,
   CmnShellService,
   CommandPaletteItem,
   type MenuItem,
   type NavItem,
-  PALETTE_THEME_ACTION,
 } from '@lifekit-hq/ui';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
-import {AlertsStore} from '../../modules/alerts/store/alerts/alerts.store';
 import {AuthStore} from '../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../shared/constants/version/version.constants';
 import {AppRoute} from '../../shared/enums/app-route/app-route.enum';
@@ -19,13 +18,11 @@ import {
   REPORT_PROBLEM_ACTION_ID,
   REPORT_PROBLEM_LABEL,
 } from '../report-problem/constants/report-problem.constants';
-import {ReportProblemPanelService} from '../report-problem/services/report-problem-panel.service';
 import {WHATS_NEW_ACTION_ID, WHATS_NEW_LABEL} from '../whats-new/constants/whats-new.constants';
-import {WhatsNewPanelService} from '../whats-new/services/whats-new-panel.service';
 import {WhatsNewStore} from '../whats-new/store/whats-new.store';
-import {CONNECT_ACTION_ID, NAV_ITEMS, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {CONNECT_ACTION_ID, PHONE_TAB_ROUTES} from './app-shell.constants';
+import {ShellChromeService} from './services/shell-chrome.service';
 import {PaletteEntitiesStore} from './store/palette-entities.store';
-import {NavUtils} from './utils/nav.utils';
 
 const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Dashboard, label: 'Dashboard', icon: 'LayoutDashboard', group: 'Pages'},
@@ -52,15 +49,8 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
     icon: 'MessageSquareWarning',
     group: 'Actions',
   },
-  {id: PALETTE_THEME_ACTION, label: 'Toggle Dark Mode', icon: 'Moon', group: 'Actions'},
-  {id: '_logout', label: 'Sign Out', icon: 'LogOut', group: 'Actions'},
-];
-
-const AVATAR_MENU_ITEMS: MenuItem[] = [
-  {id: '/settings', label: 'Settings', icon: 'Settings2'},
-  {id: WHATS_NEW_ACTION_ID, label: WHATS_NEW_LABEL, icon: 'Megaphone'},
-  {id: REPORT_PROBLEM_ACTION_ID, label: REPORT_PROBLEM_LABEL, icon: 'MessageSquareWarning'},
-  {id: '_logout', label: 'Log out', icon: 'LogOut', destructive: true},
+  ...APPEARANCE_PALETTE_ITEMS,
+  {id: ACCOUNT_SIGN_OUT_ID, label: 'Sign out', icon: 'LogOut', group: 'Actions'},
 ];
 
 @Component({
@@ -73,7 +63,6 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
       [navItems]="navItems()"
       [paletteItems]="paletteItems()"
       [account]="account()"
-      [showThemeToggle]="false"
       [versionLabel]="versionLabel"
       [versionDot]="hasUnreadNotes()"
       [tabRoutes]="tabRoutes"
@@ -95,32 +84,21 @@ const AVATAR_MENU_ITEMS: MenuItem[] = [
 export class AppShellComponent {
   private readonly router = inject(Router);
   private readonly shell = inject(CmnShellService);
-  private readonly authStore = inject(AuthStore);
-  private readonly alertsStore = inject(AlertsStore);
-  private readonly whatsNewPanel = inject(WhatsNewPanelService);
-  private readonly reportProblemPanel = inject(ReportProblemPanelService);
+  private readonly chrome = inject(ShellChromeService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
-  private readonly allNavItems: NavItem[] = NAV_ITEMS.map(item =>
-    (item.route as AppRoute) === AppRoute.Alerts
-      ? {...item, badge: (): number => this.alertsStore.unreadCount()}
-      : item
-  );
 
-  public readonly canUseAi = this.authStore.canUseAi;
+  public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly versionLabel = `v${APP_VERSION} · ${WHATS_NEW_LABEL}`;
   public readonly hasUnreadNotes = inject(WhatsNewStore).hasUnread;
   public readonly tabRoutes = [...PHONE_TAB_ROUTES];
   public readonly moreRoute = AppRoute.More;
-  public readonly navItems = computed(() =>
-    this.allNavItems.filter(item => this.isPermitted(item.route))
-  );
+  public readonly navItems = this.chrome.navItems;
+  public readonly account = this.chrome.account;
   public readonly paletteItems = computed(() =>
-    [...PALETTE_ITEMS, ...this.paletteEntities.items()].filter(item => this.isPermitted(item.id))
+    [...PALETTE_ITEMS, ...this.paletteEntities.items()].filter(item =>
+      this.chrome.isPermitted(item.id)
+    )
   );
-  public readonly account = computed<AppLayoutAccount>(() => ({
-    label: this.authStore.avatarInitials(),
-    menuItems: AVATAR_MENU_ITEMS,
-  }));
 
   /** The rail and the sidebar leave navigating to the app; the phone tab bar navigates itself. */
   public navigate(item: NavItem): void {
@@ -130,40 +108,18 @@ export class AppShellComponent {
   }
 
   public openWhatsNew(): void {
-    this.whatsNewPanel.open();
+    this.chrome.openWhatsNew();
   }
 
+  /** The layout navigates to Settings itself; the app handles Sign out and its own extras. */
   public handleAvatarMenuSelect(item: MenuItem): void {
-    if (item.id === '/settings') {
-      void this.router.navigateByUrl(AppRoute.Settings);
-      return;
-    }
-    if (item.id === WHATS_NEW_ACTION_ID) {
-      this.openWhatsNew();
-      return;
-    }
-    if (item.id === REPORT_PROBLEM_ACTION_ID) {
-      this.reportProblemPanel.open();
-      return;
-    }
-    if (item.id === '_logout') {
-      this.authStore.logout();
-    }
+    this.chrome.handle(item.id);
   }
 
+  /** The layout navigates to pages and applies the appearance entries itself. */
   public handlePaletteAction(id: string): void {
-    if (id === '_logout') {
-      this.authStore.logout();
-    } else if (id === CONNECT_ACTION_ID) {
+    if (!this.chrome.handle(id) && id === CONNECT_ACTION_ID) {
       void this.router.navigateByUrl(AppRoute.AccountsList);
-    } else if (id === WHATS_NEW_ACTION_ID) {
-      this.openWhatsNew();
-    } else if (id === REPORT_PROBLEM_ACTION_ID) {
-      this.reportProblemPanel.open();
     }
-  }
-
-  private isPermitted(entry: string): boolean {
-    return NavUtils.isPermitted(entry, this.authStore.permissions());
   }
 }

@@ -22,7 +22,6 @@ public class GetProfileQueryHandler(UserManager<ApplicationUser> userManager)
             user.LastName ?? string.Empty,
             user.Email ?? string.Empty,
             user.BaseCurrency,
-            user.Theme,
             user.EmailAlerts,
             user.LowBalanceAlerts,
             user.LowBalanceThreshold,

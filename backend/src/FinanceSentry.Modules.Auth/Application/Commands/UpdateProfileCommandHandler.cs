@@ -16,7 +16,6 @@ public class UpdateProfileCommandHandler(UserManager<ApplicationUser> userManage
         user.FirstName = command.FirstName;
         user.LastName = command.LastName;
         user.BaseCurrency = command.BaseCurrency;
-        user.Theme = command.Theme;
         user.EmailAlerts = command.EmailAlerts;
         user.LowBalanceAlerts = command.LowBalanceAlerts;
         user.LowBalanceThreshold = command.LowBalanceThreshold;

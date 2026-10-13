@@ -28,7 +28,6 @@ public class ProfileController(
             request.FirstName,
             request.LastName,
             request.BaseCurrency,
-            request.Theme,
             request.EmailAlerts,
             request.LowBalanceAlerts,
             request.LowBalanceThreshold,

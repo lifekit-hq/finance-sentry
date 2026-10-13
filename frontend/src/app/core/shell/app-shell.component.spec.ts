@@ -1,7 +1,12 @@
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
-import {CmnShellService, type MenuItem} from '@lifekit-hq/ui';
+import {
+  ACCOUNT_SIGN_OUT_ID,
+  APPEARANCE_PALETTE_ITEMS,
+  CmnShellService,
+  type MenuItem,
+} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
 import {ChatWidgetComponent} from '../../modules/agent/components/chat-widget/chat-widget.component';
@@ -25,11 +30,13 @@ class ChatWidgetStubComponent {}
 describe('AppShellComponent FAB clearance', () => {
   const openWhatsNew = vi.fn();
   const openReport = vi.fn();
+  const logout = vi.fn();
   const hasUnread = signal(false);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
     openReport.mockClear();
+    logout.mockClear();
     hasUnread.set(false);
   });
   const canUseAi = signal(true);
@@ -48,7 +55,9 @@ describe('AppShellComponent FAB clearance', () => {
             canUseAi,
             permissions: signal([]),
             avatarInitials: signal('DT'),
-            logout: () => undefined,
+            fullName: signal('Denys Tester'),
+            email: signal('denys@test.dev'),
+            logout,
           },
         },
         {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
@@ -89,6 +98,62 @@ describe('AppShellComponent FAB clearance', () => {
   it('shows the store avatar initials in the top bar', async () => {
     const fixture = await setup(AppRoute.Settings);
     expect(fixture.componentInstance.account().label).toBe('DT');
+  });
+
+  it('names the person in the account header', async () => {
+    const account = (await setup(AppRoute.Settings)).componentInstance.account();
+
+    expect(account.name).toBe('Denys Tester');
+    expect(account.email).toBe('denys@test.dev');
+  });
+
+  it('builds the account menu as the standard has it: Settings, extras, Sign out', async () => {
+    const menu = (await setup(AppRoute.Settings)).componentInstance.account().menuItems;
+
+    expect(menu.map(item => item.label)).toEqual([
+      'Settings',
+      "What's new",
+      'Report a problem',
+      'Sign out',
+    ]);
+    expect(menu[0].id).toBe(AppRoute.Settings);
+    expect(menu[3].id).toBe(ACCOUNT_SIGN_OUT_ID);
+  });
+
+  it('reaches Settings from the account menu, not the nav', async () => {
+    const fixture = await setup(AppRoute.Dashboard, true);
+
+    expect(fixture.componentInstance.navItems().map(item => item.route)).not.toContain(
+      AppRoute.Settings
+    );
+  });
+
+  it('offers System, Light and Dark in the palette instead of a toggle', async () => {
+    const ids = (await setup(AppRoute.Dashboard, true)).componentInstance
+      .paletteItems()
+      .map(item => item.id);
+
+    expect(ids).toEqual(expect.arrayContaining(APPEARANCE_PALETTE_ITEMS.map(item => item.id)));
+    expect(ids).not.toContain('_theme');
+  });
+
+  it('signs out from the avatar menu', async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    fixture.componentInstance.handleAvatarMenuSelect({
+      id: ACCOUNT_SIGN_OUT_ID,
+      label: 'Sign out',
+    });
+
+    expect(logout).toHaveBeenCalledOnce();
+  });
+
+  it('signs out from the command palette', async () => {
+    const fixture = await setup(AppRoute.Settings, true);
+    const entry = fixture.componentInstance.paletteItems().find(item => item.label === 'Sign out');
+
+    expect(entry?.id).toBe(ACCOUNT_SIGN_OUT_ID);
+    fixture.componentInstance.handlePaletteAction(entry?.id ?? '');
+    expect(logout).toHaveBeenCalledOnce();
   });
 
   it('navigates on a sidebar nav click', async () => {

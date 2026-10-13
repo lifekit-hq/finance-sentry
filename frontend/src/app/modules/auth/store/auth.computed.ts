@@ -16,6 +16,9 @@ export function authComputed(store: StateSignals) {
     avatarInitials: computed(() =>
       InitialsUtils.fromProfile(store.firstName(), store.lastName(), store.email())
     ),
+    fullName: computed(() =>
+      [store.firstName(), store.lastName()].filter((part): part is string => !!part).join(' ')
+    ),
     isAuthenticated: computed(() => store.userId() !== null),
     canUseAi: computed(() => store.permissions().includes(Permission.AiUse)),
     canManageUsers: computed(() => store.permissions().includes(Permission.UsersManage)),

@@ -9,7 +9,6 @@ public record UserProfileDto(
     string LastName,
     string Email,
     string BaseCurrency,
-    string Theme,
     bool EmailAlerts,
     bool LowBalanceAlerts,
     decimal LowBalanceThreshold,

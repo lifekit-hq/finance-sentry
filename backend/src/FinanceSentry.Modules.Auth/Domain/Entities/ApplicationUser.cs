@@ -12,7 +12,16 @@ public class ApplicationUser : IdentityUser
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public string BaseCurrency { get; set; } = "USD";
+
+    /// <summary>Light/dark choice: <c>system</c> (follow the OS), <c>light</c> or <c>dark</c>.</summary>
     public string Theme { get; set; } = "system";
+
+    /// <summary>The person's brand colour as <c>#rrggbb</c>; null means the app's own seed.</summary>
+    public string? ThemeSeed { get; set; }
+
+    /// <summary>How far the seed tints surfaces, 0-1; null means the tokens engine's default.</summary>
+    public double? ThemeIntensity { get; set; }
+
     public bool EmailAlerts { get; set; } = true;
     public bool LowBalanceAlerts { get; set; } = true;
     public decimal LowBalanceThreshold { get; set; } = 500m;

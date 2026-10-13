@@ -8,6 +8,7 @@ import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {type SignInMethods} from '../models/auth/auth.model';
@@ -55,6 +56,7 @@ function buildRouter(url = '/login') {
 }
 
 const pushSession = {release: vi.fn().mockReturnValue(EMPTY)};
+const preferences = {load: vi.fn().mockResolvedValue(undefined), clear: vi.fn()};
 
 function configure(
   service: ReturnType<typeof buildService>,
@@ -65,6 +67,7 @@ function configure(
       {provide: AuthService, useValue: service},
       {provide: SettingsService, useValue: {getProfile: () => EMPTY}},
       {provide: PushSessionService, useValue: pushSession},
+      {provide: AppPreferencesStore, useValue: preferences},
       {provide: Router, useValue: router},
       {
         provide: ErrorMessageService,
@@ -333,6 +336,36 @@ describe('authHooks', () => {
     });
   });
 
+  describe('account preferences', () => {
+    beforeEach(() => {
+      preferences.load.mockClear();
+      preferences.clear.mockClear();
+    });
+
+    it('loads them once the session is signed in', () => {
+      const store = buildStore({isAuthenticated: true});
+      configure(buildService(), buildRouter('/accounts'));
+
+      TestBed.runInInjectionContext(() => authHooks(store));
+      TestBed.flushEffects();
+
+      expect(preferences.load).toHaveBeenCalledOnce();
+      expect(preferences.clear).not.toHaveBeenCalled();
+    });
+
+    it('forgets them when the session ends', () => {
+      const store = buildStore({isAuthenticated: true});
+      configure(buildService(), buildRouter('/accounts'));
+
+      TestBed.runInInjectionContext(() => authHooks(store));
+      TestBed.flushEffects();
+      store.isAuthenticated.set(false);
+      TestBed.flushEffects();
+
+      expect(preferences.clear).toHaveBeenCalledOnce();
+    });
+  });
+
   it('loads the sign-in methods on init', () => {
     const store = buildStore();
     configure(buildService(), buildRouter('/login'));
@@ -503,7 +536,7 @@ describe('authHooks', () => {
     const store = buildStore();
     TestBed.runInInjectionContext(() => authHooks(store));
     store.isAuthenticated.set(true);
-    TestBed.tick();
+    TestBed.flushEffects();
     expect(store.loadProfileName).toHaveBeenCalledOnce();
   });
 
@@ -512,7 +545,7 @@ describe('authHooks', () => {
     store.firstName.set('Denys');
     TestBed.runInInjectionContext(() => authHooks(store));
     store.isAuthenticated.set(true);
-    TestBed.tick();
+    TestBed.flushEffects();
     expect(store.loadProfileName).not.toHaveBeenCalled();
   });
 });

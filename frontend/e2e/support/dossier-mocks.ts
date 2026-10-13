@@ -1,5 +1,7 @@
 import type {Page} from '@playwright/test';
 
+import {mockPreferences} from './preferences-mocks';
+
 export const API = '**/api/v1';
 export const WEALTH_SUMMARY = {
   totalNetWorth: 38500,
@@ -305,6 +307,7 @@ export const LEDGER_READ_NARRATIVE =
   'You hold 50 AAPL at a 25% unrealised gain; the services thesis is intact.';
 
 export async function mockApis(page: Page): Promise<void> {
+  await mockPreferences(page);
   await page.route(`${API}/auth/me`, route =>
     route.fulfill({
       status: 200,

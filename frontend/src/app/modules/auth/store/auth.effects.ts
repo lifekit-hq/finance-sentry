@@ -7,6 +7,7 @@ import {catchError, EMPTY, filter, of, pipe, startWith, switchMap, tap} from 'rx
 
 import {environment} from '../../../../environments/environment';
 import {AppRoute} from '../../../shared/enums/app-route/app-route.enum';
+import {AppPreferencesStore} from '../../../shared/store/preferences/app-preferences.store';
 import {PushSessionService} from '../../settings/services/push-session.service';
 import {SettingsService} from '../../settings/services/settings.service';
 import {SIGNED_OUT_INFO} from '../constants/auth/auth.constants';
@@ -142,6 +143,7 @@ export function authHooks(store: HookStore): void {
   const loginRoute: string = AppRoute.Login;
   const router = inject(Router);
   const errorMessages = inject(ErrorMessageService);
+  const preferences = inject(AppPreferencesStore);
 
   store.loadSignInMethods();
 
@@ -174,6 +176,19 @@ export function authHooks(store: HookStore): void {
     untracked(() => {
       if (!store.isAuthenticated()) {
         store.startOidcSignIn();
+      }
+    });
+  });
+
+  // The account's preferences (appearance) follow the session: read once it is signed in, forgotten when it
+  // ends so the next person starts clean.
+  effect(() => {
+    const authenticated = store.isAuthenticated();
+    untracked(() => {
+      if (authenticated) {
+        void preferences.load();
+      } else {
+        preferences.clear();
       }
     });
   });

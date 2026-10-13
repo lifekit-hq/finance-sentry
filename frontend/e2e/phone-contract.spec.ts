@@ -78,28 +78,27 @@ for (const [name, viewport] of Object.entries(PHONES)) {
     }) => {
       await openPage(page, '/more');
 
-      const links = page.locator('fns-more-page nav a');
-      await expect(links).toHaveText([/Budgets/, /Subscriptions/, /Events/, /Ledger/, /Settings/]);
-      const logout = page.getByTestId('more-logout');
-      await expect(logout).toContainText('Log out');
-      await expect(logout).toContainText(SIGNED_IN_EMAIL);
+      const links = page.locator('fns-more-page [data-more-section="nav"] a');
+      await expect(links).toHaveText([/Budgets/, /Subscriptions/, /Events/, /Ledger/]);
+      const identity = page.locator('fns-more-page [data-more-identity]');
+      await expect(identity).toContainText(SIGNED_IN_EMAIL);
+      const account = page.locator('fns-more-page [data-more-section="account"]');
+      await expect(account.getByRole('link', {name: 'Settings'})).toBeVisible();
+      await expect(account.getByRole('button', {name: 'Sign out'})).toBeVisible();
+      await expect(page.getByText('Log out')).toHaveCount(0);
       await expect(page.getByRole('button', {name: 'Account menu'})).toBeHidden();
       await expectNoHorizontalScroll(page);
     });
 
-    test("More marks What's new until it is opened, and shows the version", async ({page}) => {
+    test("More opens What's new and shows the version", async ({page}) => {
       await openWithStaleSeen(page, '/more');
 
-      const row = page.getByTestId('more-whats-new');
-      await expect(row.locator('.cmn-badge-indicator')).toBeVisible();
-      await expect(page.getByTestId('more-version')).toContainText('Version ');
+      await expect(page.locator('[data-more-version]')).toContainText(/v\d/);
 
-      await row.click();
+      await page.getByRole('button', {name: "What's new"}).click();
       const panel = page.getByTestId('whats-new-list');
       await expect(panel).toContainText('You can show only money in or only money out.');
       await expect(panel.getByText('Every change in this version').first()).toBeVisible();
-      await page.keyboard.press('Escape');
-      await expect(row.locator('.cmn-badge-indicator')).toHaveCount(0);
     });
 
     test('Ledger is reached through More and the chat button stays off the phone', async ({
@@ -109,7 +108,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(page.getByRole('button', {name: 'Open Ledger chat'})).toHaveCount(0);
 
       await page.goto('/more');
-      await page.locator('fns-more-page nav a', {hasText: 'Ledger'}).click();
+      await page.locator('fns-more-page [data-more-section="nav"] a', {hasText: 'Ledger'}).click();
       await expect(page).toHaveURL(/\/ledger/);
       await expect(page.getByRole('button', {name: 'Open Ledger chat'})).toHaveCount(0);
     });

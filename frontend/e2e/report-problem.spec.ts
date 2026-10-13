@@ -51,9 +51,9 @@ test.describe('report a problem (phone)', () => {
 
   test('More opens the sheet and the report carries only the route pattern', async ({page}) => {
     const {requests} = await open(page, '/more');
-    await expect(page.getByTestId('more-report-problem')).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Report a problem'})).toBeVisible();
 
-    await page.getByTestId('more-report-problem').click();
+    await page.getByRole('button', {name: 'Report a problem'}).click();
     await expect(page.getByTestId('report-send')).toBeVisible();
     await expect(
       page.getByText("Don't include account numbers, amounts or passwords")
@@ -79,7 +79,7 @@ test.describe('report a problem (phone)', () => {
     await open(page, '/more');
     await page.route(`${API}/feedback`, route => route.fulfill({status: 429, body: ''}));
 
-    await page.getByTestId('more-report-problem').click();
+    await page.getByRole('button', {name: 'Report a problem'}).click();
     await fillAndSend(page);
 
     await expect(page.getByTestId('report-error')).toContainText('several reports recently');

@@ -72,6 +72,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
 
         builder.Entity<ApplicationUser>(entity =>
         {
+            entity.Property(u => u.ThemeSeed).HasMaxLength(7);
             entity.Property(u => u.SafeWithdrawalRate).HasDefaultValue(0.04m);
             entity.Property(u => u.RealAnnualReturn).HasDefaultValue(0.05m);
         });

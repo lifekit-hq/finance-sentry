@@ -1,7 +1,7 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {ThemeService, ToastService} from '@lifekit-hq/ui';
+import {ToastService} from '@lifekit-hq/ui';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -11,7 +11,11 @@ import {type UpdateProfileRequest, type UserProfile} from '../../models/settings
 import {SettingsService} from '../../services/settings.service';
 import {SettingsStore} from './settings.store';
 
-const PROFILE = {firstName: 'Ada', lastName: 'Lovelace', theme: 'dark'} as unknown as UserProfile;
+const PROFILE = {
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  baseCurrency: 'USD',
+} as unknown as UserProfile;
 const REQUEST = {safeWithdrawalRate: 0.04} as unknown as UpdateProfileRequest;
 
 describe('SettingsStore', () => {
@@ -24,7 +28,6 @@ describe('SettingsStore', () => {
         SettingsStore,
         {provide: SettingsService, useValue: service},
         {provide: AuthStore, useValue: {setProfileName: vi.fn()}},
-        {provide: ThemeService, useValue: {setPreference: vi.fn()}},
         {provide: ToastService, useValue: {show: vi.fn()}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],

@@ -51,6 +51,8 @@ describe('AppTitleStrategy', () => {
             canUseAi: signal(false),
             permissions: signal([]),
             avatarInitials: signal('DT'),
+            fullName: signal(''),
+            email: signal(''),
             logout: () => undefined,
           },
         },

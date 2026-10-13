@@ -18,7 +18,8 @@ export const PERMISSION_BY_ENTRY: Readonly<Record<string, Permission>> = {
 
 /**
  * The app's nav destinations, in sidebar order. The shell adds the Alerts badge; the More page lists
- * the ones past the phone tabs.
+ * the ones past the phone tabs. Settings is not one of them: it is reached from the account menu
+ * (and the More page's account card), as the app-shell standard has it.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {label: 'Home', icon: 'LayoutDashboard', route: AppRoute.Dashboard},
@@ -29,7 +30,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {label: 'Alerts', icon: 'Bell', route: AppRoute.Alerts},
   {label: 'Events', icon: 'CalendarDays', route: AppRoute.Events},
   {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
-  {label: 'Settings', icon: 'Settings2', route: AppRoute.Settings},
 ];
 
 /** Nav routes shown as bottom tabs below the md breakpoint; every other nav item is on the More page. */
