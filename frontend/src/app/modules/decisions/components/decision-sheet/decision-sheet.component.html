@@ -1,0 +1,91 @@
+<form
+  [formGroup]="form"
+  (ngSubmit)="send()"
+  class="flex flex-col gap-cmn-5 p-cmn-4 md:p-cmn-6"
+  data-testid="decision-sheet"
+>
+  <div class="flex flex-col gap-cmn-1">
+    <div class="flex items-center gap-cmn-2">
+      <cmn-tag [variant]="actionVariant[recommendation.action]">
+        {{ actionLabel[recommendation.action] }}
+      </cmn-tag>
+      <span class="text-cmn-lg font-semibold text-text-primary">{{ recommendation.ticker }}</span>
+    </div>
+    <p class="text-cmn-sm text-text-secondary">{{ recommendation | recommendationSize }}</p>
+  </div>
+
+  @if (isConfirm) {
+    @if (recommendation.orderText | orderLines; as lines) {
+      @if (lines.length > 0) {
+        <section class="flex flex-col gap-cmn-2" aria-labelledby="decision-order-heading">
+          <h3
+            id="decision-order-heading"
+            class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+          >
+            Order to place at IBKR
+          </h3>
+          <div
+            class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-3 py-cmn-2 font-mono text-cmn-sm text-text-primary"
+            data-testid="decision-order-text"
+          >
+            @for (line of lines; track $index) {
+              <div>{{ line }}</div>
+            }
+          </div>
+          <div>
+            <cmn-button
+              [icon]="copyIcon"
+              (clicked)="store.copyOrder()"
+              variant="secondary"
+              size="sm"
+              data-testid="decision-copy-order"
+            >
+              Copy order
+            </cmn-button>
+          </div>
+        </section>
+      } @else {
+        <p class="text-cmn-sm text-text-secondary">{{ holdNoOrder }}</p>
+      }
+    }
+
+    <cmn-alert [title]="wallTitle" variant="error" data-testid="decision-no-trade-wall">
+      {{ wallText }}
+    </cmn-alert>
+
+    <cmn-form-field label="Note (optional)">
+      <cmn-textarea
+        [maxlength]="maxLength"
+        [rows]="rows"
+        formControlName="text"
+        data-testid="decision-note"
+      />
+    </cmn-form-field>
+  } @else {
+    <cmn-form-field
+      hint="Kept with the decision so the outcome can be checked against it later."
+      label="Why are you rejecting it?"
+    >
+      <cmn-textarea
+        [maxlength]="maxLength"
+        [rows]="rows"
+        formControlName="text"
+        data-testid="decision-reason"
+      />
+    </cmn-form-field>
+  }
+
+  @if (store.errorMessage(); as message) {
+    <cmn-alert variant="error" data-testid="decision-error">{{ message }}</cmn-alert>
+  }
+
+  <cmn-button
+    [disabled]="!canSend()"
+    [loading]="store.isSubmitting()"
+    [variant]="isConfirm ? 'primary' : 'destructive'"
+    type="submit"
+    data-testid="decision-submit"
+  >
+    {{ isConfirm ? 'Confirm decision' : 'Reject proposal' }}
+  </cmn-button>
+</form>

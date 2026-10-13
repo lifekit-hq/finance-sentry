@@ -33,8 +33,10 @@ public class GetPostmortemPacketQueryHandler(
 
     public async Task<PostmortemPacketDto> Handle(GetPostmortemPacketQuery query, CancellationToken ct)
     {
-        var periodEvents = await eventRepo.ListForPeriodAsync(
-            query.UserId, query.PeriodStart, query.PeriodEnd, ct);
+        var periodEvents = (await eventRepo.ListForPeriodAsync(
+                query.UserId, query.PeriodStart, query.PeriodEnd, ct))
+            .Where(e => e.SubjectType != ThesisSubjectType.Recommendation)
+            .ToList();
 
         var terminal = periodEvents
             .Where(e => TerminalNonCounterfactualTypes.Contains(e.EventType))

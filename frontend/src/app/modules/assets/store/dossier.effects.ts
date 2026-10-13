@@ -2,11 +2,16 @@ import {DOCUMENT} from '@angular/common';
 import {afterNextRender, inject, Injector, type Signal} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, exhaustMap, filter, pipe, switchMap, tap} from 'rxjs';
 
 import {ASSET_DOSSIER_SYMBOL_PARAM} from '../../../shared/enums/app-route/app-route.enum';
+import {
+  type RecommendationDto,
+  type RecommendationVerdict,
+} from '../../../shared/models/recommendation/recommendation.model';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {AuthStore} from '../../auth/store/auth.store';
+import {DecisionSheetService} from '../../decisions/services/decision-sheet.service';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -41,6 +46,7 @@ interface StoreMethods {
   setTargetSuccess(): void;
   setTargetError(errorCode: Nullable<string>): void;
   setUserTarget(target: Nullable<DossierUserTargetDto>): void;
+  applyRecommendationDecision(decided: RecommendationDto): void;
   dossier: Signal<Nullable<AssetDossierDto>>;
   chartRange: Signal<ChartRangeId>;
   parsedTargetDraft: Signal<Nullable<number>>;
@@ -51,6 +57,7 @@ export function dossierEffects(store: StoreMethods) {
   const route = inject(ActivatedRoute);
   const document = inject(DOCUMENT);
   const injector = inject(Injector);
+  const decisionSheet = inject(DecisionSheetService);
 
   // An alert deep-links to a card (`/assets/NVDA#analyst-coverage`); the card only exists once the
   // dossier has loaded, so the router's own fragment handling has nothing to land on. Scroll after
@@ -221,8 +228,21 @@ export function dossierEffects(store: StoreMethods) {
     )
   );
 
+  /** Opens the Confirm or Reject sheet for the pending proposal; a recorded verdict replaces the card. */
+  const decideRecommendation = rxMethod<{
+    recommendation: RecommendationDto;
+    verdict: RecommendationVerdict;
+  }>(
+    pipe(
+      exhaustMap(({recommendation, verdict}) => decisionSheet.open(recommendation, verdict)),
+      filter((decided): decided is RecommendationDto => decided !== undefined),
+      tap(decided => store.applyRecommendationDecision(decided))
+    )
+  );
+
   return {
     loadDossier,
+    decideRecommendation,
     loadLedgerRead,
     generateLedgerRead,
     loadChart,

@@ -1,3 +1,4 @@
+import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {DEFAULT_CHART_RANGE} from '../constants/dossier/dossier-chart.constants';
 import {
   type AssetChartDto,
@@ -17,6 +18,8 @@ export interface DossierState {
   /** The target editor's text; parsed and validated in the computeds. */
   targetDraft: string;
   isEditingTarget: boolean;
+  /** The proposal decided on this page, kept so the card's place shows the verdict rather than going blank. */
+  decidedRecommendation: Nullable<RecommendationDto>;
 }
 
 export const initialDossierState: DossierState = {
@@ -28,4 +31,5 @@ export const initialDossierState: DossierState = {
   chartRange: DEFAULT_CHART_RANGE,
   targetDraft: '',
   isEditingTarget: false,
+  decidedRecommendation: null,
 };

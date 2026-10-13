@@ -1034,6 +1034,161 @@ namespace FinanceSentry.Modules.Research.Migrations
                     b.ToTable("recommendation_trends", "research");
                 });
 
+            modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.Recommendations.Recommendation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("BenchmarkReturnPct")
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("ExecutedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Execution")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvalidationTrigger")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("LimitCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal?>("LimitPrice")
+                        .HasPrecision(22, 12)
+                        .HasColumnType("numeric(22,12)");
+
+                    b.Property<string>("OrderText")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("OutcomeScoredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal?>("ShareOfBookAfterPct")
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal?>("ShareOfBookBeforePct")
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal?>("SizeShares")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)");
+
+                    b.Property<decimal?>("SizeUsd")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("SubjectReturnPct")
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<Guid?>("SupersededById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TriggerKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TriggerRef")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Venue")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Evidence", "FinanceSentry.Modules.Research.Domain.Recommendations.Recommendation.Evidence#RecommendationEvidence", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Kind")
+                                .IsRequired()
+                                .HasJsonPropertyName("kind");
+
+                            b1.Property<string>("Label")
+                                .IsRequired()
+                                .HasJsonPropertyName("label");
+
+                            b1.Property<string>("RefId")
+                                .HasJsonPropertyName("refId");
+
+                            b1
+                                .ToJson("Evidence")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Ticker")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recommendations_user_ticker_pending")
+                        .HasFilter("\"Status\" = 'Pending'");
+
+                    b.HasIndex("UserId", "Status", "CreatedAt")
+                        .HasDatabaseName("idx_recommendations_user_status_created");
+
+                    b.HasIndex("UserId", "Ticker", "TriggerKind")
+                        .HasDatabaseName("idx_recommendations_user_ticker_trigger");
+
+                    b.ToTable("recommendations", "research");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Research.Domain.ResearchChunk", b =>
                 {
                     b.Property<Guid>("Id")

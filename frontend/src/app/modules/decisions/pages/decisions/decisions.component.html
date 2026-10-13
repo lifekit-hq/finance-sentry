@@ -1,0 +1,97 @@
+<cmn-page-container spacing="none">
+  <div class="flex flex-col gap-cmn-5" data-testid="decisions-page">
+    <p class="text-cmn-sm text-text-secondary">
+      Ledger proposes, you decide. Finance Sentry never trades: confirming records your decision and
+      shows the order for you to place at IBKR yourself.
+    </p>
+
+    <cmn-async-state
+      [status]="store.view().status"
+      [errorMessage]="store.view().errorMessage"
+      [isEmpty]="!store.hasData()"
+      [emptyMessage]="emptyCopy.message"
+      [emptySubMessage]="emptyCopy.subMessage"
+      [emptyIcon]="emptyCopy.icon"
+      [skeletonRows]="skeletonRows"
+      [skeletonHeight]="skeletonHeight"
+      (retry)="store.load()"
+      class="block space-y-cmn-6"
+      errorPlacement="above"
+      retryable
+    >
+      <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-pending-heading">
+        <h2
+          id="decisions-pending-heading"
+          class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+        >
+          Pending ({{ store.pending().length }})
+        </h2>
+        @for (rec of store.pending(); track rec.id) {
+          <fns-recommendation-card
+            [recommendation]="rec"
+            [linkTicker]="true"
+            (decide)="store.decide({recommendation: rec, verdict: $event})"
+          />
+        } @empty {
+          <p class="text-cmn-sm text-text-secondary" data-testid="decisions-pending-empty">
+            Nothing is waiting on you.
+          </p>
+        }
+      </section>
+
+      <section class="flex flex-col gap-cmn-3" aria-labelledby="decisions-decided-heading">
+        <h2
+          id="decisions-decided-heading"
+          class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+        >
+          Decided (30 d)
+        </h2>
+        @if (store.decided().length > 0) {
+          <ul
+            class="divide-y divide-border-default rounded-cmn-lg border border-border-default bg-surface-card"
+            data-testid="decisions-decided"
+          >
+            @for (rec of store.decided(); track rec.id) {
+              <li class="flex flex-col gap-cmn-1 px-cmn-4 py-cmn-3">
+                <div class="flex flex-wrap items-center justify-between gap-cmn-2">
+                  <div class="flex min-w-0 items-center gap-cmn-2">
+                    <cmn-tag [variant]="actionVariant[rec.action]">
+                      {{ actionLabel[rec.action] }}
+                    </cmn-tag>
+                    <a
+                      [routerLink]="[dossierRoute, rec.ticker]"
+                      class="font-semibold text-text-primary underline-offset-2 hover:underline"
+                    >
+                      {{ rec.ticker }}
+                    </a>
+                    <cmn-tag [variant]="statusVariant[rec.status]">
+                      {{ statusLabel[rec.status] }}
+                    </cmn-tag>
+                  </div>
+                  <span class="text-cmn-xs text-text-secondary">
+                    {{ rec.decidedAt ?? rec.expiresAt | date: 'mediumDate' }}
+                  </span>
+                </div>
+                <p class="break-words text-cmn-sm text-text-secondary">
+                  {{ rec | recommendationOutcome }}
+                </p>
+                @if (rec | recommendationExcess; as excess) {
+                  @let tone = rec | recommendationExcessTone;
+                  <p
+                    [class]="tone ? toneClass[tone] : 'text-text-secondary'"
+                    class="text-cmn-sm font-medium tabular-nums"
+                    data-testid="decisions-excess"
+                  >
+                    {{ excess }}
+                  </p>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-cmn-sm text-text-secondary">No decisions in the last 30 days.</p>
+        }
+      </section>
+    </cmn-async-state>
+  </div>
+</cmn-page-container>

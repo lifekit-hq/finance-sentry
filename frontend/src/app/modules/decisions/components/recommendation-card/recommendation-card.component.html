@@ -1,0 +1,83 @@
+@let rec = recommendation();
+<cmn-card [attr.data-testid]="'recommendation-card-' + rec.ticker">
+  <article
+    [attr.aria-label]="actionLabel[rec.action] + ' ' + rec.ticker"
+    class="flex flex-col gap-cmn-4"
+  >
+    <header class="flex flex-wrap items-center justify-between gap-cmn-2">
+      <div class="flex min-w-0 flex-wrap items-center gap-cmn-2">
+        <cmn-tag [variant]="actionVariant[rec.action]">{{ actionLabel[rec.action] }}</cmn-tag>
+        @if (linkTicker()) {
+          <a
+            [routerLink]="[dossierRoute, rec.ticker]"
+            class="font-semibold text-text-primary underline-offset-2 hover:underline"
+          >
+            {{ rec.ticker }}
+          </a>
+        } @else {
+          <span class="font-semibold text-text-primary">{{ rec.ticker }}</span>
+        }
+        <span class="text-cmn-xs text-text-secondary">
+          {{ rec.origin === 'Rules' ? 'Rule check' : 'Ledger' }} ·
+          {{ triggerLabel[rec.triggerKind] }}
+        </span>
+      </div>
+      <span class="text-cmn-xs text-text-secondary" data-testid="recommendation-confidence">
+        {{ confidenceLabel[rec.confidence] }}
+      </span>
+    </header>
+
+    <p class="text-cmn-base font-medium text-text-primary" data-testid="recommendation-size">
+      {{ rec | recommendationSize }}
+    </p>
+
+    <section class="flex flex-col gap-cmn-1">
+      <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">Why</h3>
+      <p class="whitespace-pre-line text-cmn-sm text-text-primary">{{ rec.rationale }}</p>
+    </section>
+
+    <dl class="grid gap-cmn-3 text-cmn-sm sm:grid-cols-2">
+      <div class="flex flex-col gap-cmn-1">
+        <dt class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          Invalidated if
+        </dt>
+        <dd class="text-text-primary">{{ rec.invalidationTrigger }}</dd>
+      </div>
+      <div class="flex flex-col gap-cmn-1">
+        <dt class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          Expires
+        </dt>
+        <dd class="text-text-primary">{{ rec.expiresAt | date: 'mediumDate' }}</dd>
+      </div>
+    </dl>
+
+    @if (rec.evidence.length > 0) {
+      <section class="flex flex-col gap-cmn-2">
+        <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          Evidence
+        </h3>
+        <ul class="flex flex-col gap-cmn-2" data-testid="recommendation-evidence">
+          @for (item of rec.evidence; track $index) {
+            <li class="flex items-start gap-cmn-2 text-cmn-sm">
+              <cmn-tag class="shrink-0" variant="neutral">{{ evidenceLabel[item.kind] }}</cmn-tag>
+              <span class="min-w-0 break-words text-text-primary">{{ item.label }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <footer class="flex flex-wrap justify-end gap-cmn-2">
+      <cmn-button
+        (clicked)="decide.emit('reject')"
+        variant="secondary"
+        data-testid="recommendation-reject"
+      >
+        Reject
+      </cmn-button>
+      <cmn-button (clicked)="decide.emit('confirm')" data-testid="recommendation-confirm">
+        Confirm…
+      </cmn-button>
+    </footer>
+  </article>
+</cmn-card>

@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Research.Domain.Positions;
 /// Analysts: null = no coverage. NextEarnings: null = none in the next 90 days.
 /// Performance: the one-year strip, null = no price history. Checks: the summary wheel's traceable
 /// rules (always present; an axis that does not apply is absent). UserTarget: null = none set.
+/// PendingRecommendation: Ledger's pending proposal on the name (#1069), null = none.
 /// </summary>
 public sealed record AssetDossierResult(
     string Symbol,
@@ -24,7 +25,8 @@ public sealed record AssetDossierResult(
     DateTimeOffset GeneratedAt,
     DossierPerformance? Performance = null,
     DossierChecks? Checks = null,
-    DossierUserTarget? UserTarget = null);
+    DossierUserTarget? UserTarget = null,
+    RecommendationDto? PendingRecommendation = null);
 
 /// <summary>The user's own fair-value target, in <see cref="Currency"/> (the quote currency it was set in).</summary>
 public sealed record DossierUserTarget(decimal TargetPrice, string? Currency, DateTimeOffset UpdatedAt);

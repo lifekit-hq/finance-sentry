@@ -1,9 +1,46 @@
 import {signalState} from '@ngrx/signals';
 import {describe, expect, it} from 'vitest';
 
+import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {type AssetDossierDto} from '../models/dossier/dossier.model';
 import {dossierMethods} from './dossier.methods';
 import {initialDossierState} from './dossier.state';
+
+function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
+  return {
+    id: 'rec-1',
+    ticker: 'AAPL',
+    action: 'Trim',
+    status: 'Pending',
+    createdBy: 'Ledger',
+    origin: 'Ledger',
+    triggerKind: 'RiskRule',
+    triggerRef: 'concentration',
+    rationale: 'Above the single-name cap.',
+    confidence: 'Medium',
+    invalidationTrigger: 'Back under the cap.',
+    evidence: [],
+    sizeUsd: 2080,
+    sizeShares: 11,
+    shareOfBookBeforePct: 12.2,
+    shareOfBookAfterPct: 9.5,
+    limitPrice: 189.3,
+    limitCurrency: 'USD',
+    venue: 'IBKR',
+    orderText: 'SELL 11 AAPL / LIMIT 189.30 USD DAY / IBKR',
+    createdAt: '2026-10-12T09:00:00Z',
+    expiresAt: '2026-10-19T09:00:00Z',
+    decidedAt: null,
+    decisionNote: null,
+    execution: 'Pending',
+    executedAt: null,
+    subjectReturnPct: null,
+    benchmarkReturnPct: null,
+    excessReturnPct: null,
+    outcomeScoredAt: null,
+    ...overrides,
+  };
+}
 
 function mkDossier(overrides: Partial<AssetDossierDto> = {}): AssetDossierDto {
   return {
@@ -145,5 +182,21 @@ describe('dossierMethods', () => {
 
     methods.setUserTarget(null);
     expect(state.dossier()?.userTarget).toBeNull();
+  });
+
+  it('applyRecommendationDecision takes the proposal off the dossier and keeps the decided one', () => {
+    const state = signalState(initialDossierState);
+    const methods = dossierMethods(state);
+    const decided = mkRecommendation({status: 'Confirmed', decidedAt: '2026-10-13T09:00:00Z'});
+
+    methods.applyRecommendationDecision(decided);
+    expect(state.dossier()).toBeNull();
+    expect(state.decidedRecommendation()).toEqual(decided);
+
+    methods.setDossier(mkDossier({pendingRecommendation: mkRecommendation()}));
+    methods.applyRecommendationDecision(decided);
+
+    expect(state.dossier()?.pendingRecommendation).toBeNull();
+    expect(state.decidedRecommendation()).toEqual(decided);
   });
 });

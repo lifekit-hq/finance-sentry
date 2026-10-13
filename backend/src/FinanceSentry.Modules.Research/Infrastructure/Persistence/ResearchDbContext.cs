@@ -6,6 +6,7 @@ using FinanceSentry.Infrastructure.Persistence;
 using FinanceSentry.Infrastructure.Persistence.Conventions;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.PolicyReviews;
+using FinanceSentry.Modules.Research.Domain.Recommendations;
 using FinanceSentry.Modules.Research.Domain.Scoring;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -50,6 +51,8 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
     public DbSet<AssetLedgerRead> AssetLedgerReads { get; set; } = null!;
 
     public DbSet<AssetPriceTarget> AssetPriceTargets { get; set; } = null!;
+
+    public DbSet<Recommendation> Recommendations { get; set; } = null!;
 
     public DbSet<MaterialityTerm> MaterialityTerms { get; set; } = null!;
 
@@ -476,6 +479,48 @@ public class ResearchDbContext(DbContextOptions<ResearchDbContext> options, ICur
         apt.Property(x => x.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         apt.HasIndex(x => new { x.UserId, x.Symbol })
             .IsUnique().HasDatabaseName("idx_asset_price_targets_user_symbol");
+
+        var rec = modelBuilder.Entity<Recommendation>();
+        rec.ToTable("recommendations");
+        rec.HasKey(x => x.Id);
+        rec.Property(x => x.UserId).IsRequired();
+        rec.Property(x => x.Ticker).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.Action).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.Status).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.Origin).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.TriggerKind).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.TriggerRef).IsRequired().HasMaxLength(Recommendation.MaxTriggerRefLength);
+        rec.Property(x => x.Rationale).IsRequired().HasMaxLength(Recommendation.MaxRationaleLength);
+        rec.Property(x => x.Confidence).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.InvalidationTrigger).IsRequired().HasMaxLength(Recommendation.MaxInvalidationLength);
+        rec.ComplexCollection(x => x.Evidence, c =>
+        {
+            c.ToJson("Evidence");
+            c.Property(p => p.Kind).HasJsonPropertyName("kind");
+            c.Property(p => p.Label).HasJsonPropertyName("label");
+            c.Property(p => p.RefId).HasJsonPropertyName("refId");
+        });
+        rec.Property(x => x.SizeUsd).HasColumnType("numeric(18,2)");
+        rec.Property(x => x.SizeShares).HasPrecision(22, 8);
+        rec.Property(x => x.ShareOfBookBeforePct).HasColumnType("numeric(8,2)");
+        rec.Property(x => x.ShareOfBookAfterPct).HasColumnType("numeric(8,2)");
+        rec.Property(x => x.LimitPrice).HasPrecision(22, 12);
+        rec.Property(x => x.LimitCurrency).HasMaxLength(3);
+        rec.Property(x => x.Venue).HasMaxLength(40);
+        rec.Property(x => x.OrderText).HasMaxLength(Recommendation.MaxOrderTextLength);
+        rec.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        rec.Property(x => x.ExpiresAt).IsRequired();
+        rec.Property(x => x.DecisionNote).HasMaxLength(Recommendation.MaxDecisionNoteLength);
+        rec.Property(x => x.Execution).IsRequired().HasMaxLength(20);
+        rec.Property(x => x.SubjectReturnPct).HasColumnType("numeric(12,4)");
+        rec.Property(x => x.BenchmarkReturnPct).HasColumnType("numeric(12,4)");
+        rec.HasIndex(x => new { x.UserId, x.Status, x.CreatedAt }).HasDatabaseName("idx_recommendations_user_status_created");
+        rec.HasIndex(x => new { x.UserId, x.Ticker, x.TriggerKind }).HasDatabaseName("idx_recommendations_user_ticker_trigger");
+        // One Pending proposal per (UserId, Ticker): a newer one supersedes it. Partial, so decided rows stay.
+        rec.HasIndex(x => new { x.UserId, x.Ticker })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Pending'")
+            .HasDatabaseName("ux_recommendations_user_ticker_pending");
     }
 
     private static readonly ValueComparer<float[]> FloatArrayComparer = new(

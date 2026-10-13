@@ -15,6 +15,7 @@ export enum AppRoute {
   Alerts = '/alerts',
   Events = '/events',
   Ledger = '/ledger',
+  LedgerDecisions = '/ledger/decisions',
   Settings = '/settings',
   SettingsPeople = '/settings/people',
   More = '/more',

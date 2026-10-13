@@ -25,4 +25,8 @@ describe('initialDossierState', () => {
     expect(initialDossierState.isEditingTarget).toBe(false);
     expect(initialDossierState.targetDraft).toBe('');
   });
+
+  it('starts with no decided proposal', () => {
+    expect(initialDossierState.decidedRecommendation).toBeNull();
+  });
 });

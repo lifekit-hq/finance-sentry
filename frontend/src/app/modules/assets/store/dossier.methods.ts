@@ -1,5 +1,6 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {type RecommendationDto} from '../../../shared/models/recommendation/recommendation.model';
 import {
   type AssetChartDto,
   type AssetDossierDto,
@@ -53,6 +54,13 @@ export function dossierMethods(store: WritableStateSource<DossierState>) {
         dossier: state.dossier ? {...state.dossier, userTarget} : null,
         isEditingTarget: false,
         targetDraft: '',
+      }));
+    },
+    // A recorded verdict takes the pending proposal off the page; the decided one stays to say what was recorded.
+    applyRecommendationDecision(decided: RecommendationDto): void {
+      patchState(store, state => ({
+        dossier: state.dossier ? {...state.dossier, pendingRecommendation: null} : null,
+        decidedRecommendation: decided,
       }));
     },
   };

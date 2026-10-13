@@ -6,6 +6,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {TagComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {
   type AssetChartDto,
@@ -167,6 +168,42 @@ const DOSSIER: AssetDossierDto = {
   generatedAt: new Date().toISOString(),
 };
 
+function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
+  return {
+    id: 'rec-1',
+    ticker: 'DRAM',
+    action: 'Trim',
+    status: 'Pending',
+    createdBy: 'Ledger',
+    origin: 'Ledger',
+    triggerKind: 'RiskRule',
+    triggerRef: 'concentration',
+    rationale: 'Above the single-name cap.',
+    confidence: 'Medium',
+    invalidationTrigger: 'Back under the cap.',
+    evidence: [],
+    sizeUsd: 2080,
+    sizeShares: 660,
+    shareOfBookBeforePct: 12.2,
+    shareOfBookAfterPct: 9.5,
+    limitPrice: 3.13,
+    limitCurrency: 'USD',
+    venue: 'IBKR',
+    orderText: 'SELL 660 DRAM / LIMIT 3.13 USD DAY / IBKR',
+    createdAt: '2026-10-12T09:00:00Z',
+    expiresAt: '2026-10-19T09:00:00Z',
+    decidedAt: null,
+    decisionNote: null,
+    execution: 'Pending',
+    executedAt: null,
+    subjectReturnPct: null,
+    benchmarkReturnPct: null,
+    excessReturnPct: null,
+    outcomeScoredAt: null,
+    ...overrides,
+  };
+}
+
 function buildMockStore() {
   const dossier = signal<AssetDossierDto | null>(DOSSIER);
   const chart = signal<AssetChartDto | null>(null);
@@ -244,6 +281,8 @@ function buildMockStore() {
     setTargetDraft: vi.fn(),
     saveTarget: vi.fn(),
     clearTarget: vi.fn(),
+    decidedRecommendation: signal<RecommendationDto | null>(null),
+    decideRecommendation: vi.fn(),
   };
 }
 
@@ -339,6 +378,45 @@ describe('AssetDossierComponent', () => {
 
     expect(byTestId('dossier-skeleton')).toBeNull();
     expect(root().textContent).toContain('Updated');
+  });
+
+  it("puts Ledger's pending proposal under the hero and hands the verdict to the store", () => {
+    const recommendation = mkRecommendation();
+    mockStore.dossier.set({...DOSSIER, pendingRecommendation: recommendation});
+    fixture.detectChanges();
+
+    const hero = byTestId('dossier-hero');
+    const card = byTestId('recommendation-card-DRAM');
+    expect(card).not.toBeNull();
+    expect(hero?.nextElementSibling?.tagName.toLowerCase()).toBe('fns-recommendation-card');
+    expect(card?.querySelector('a')).toBeNull();
+
+    root().querySelector<HTMLElement>('[data-testid="recommendation-reject"] button')?.click();
+    expect(mockStore.decideRecommendation).toHaveBeenCalledWith({
+      recommendation,
+      verdict: 'reject',
+    });
+    expect(byTestId('dossier-decision-recorded')).toBeNull();
+  });
+
+  it('says what was recorded once the proposal is decided', () => {
+    mockStore.decidedRecommendation.set(
+      mkRecommendation({status: 'Rejected', decisionNote: 'Still a core holding.'})
+    );
+    fixture.detectChanges();
+
+    const note = byTestId('dossier-decision-recorded');
+    expect(note?.textContent).toContain('Decision recorded: rejected');
+    expect(note?.textContent).toContain('Rejected: Still a core holding.');
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('/ledger/decisions');
+  });
+
+  it('keeps the decisions link from someone without Ledger', () => {
+    canUseAi.set(false);
+    mockStore.decidedRecommendation.set(mkRecommendation({status: 'Confirmed'}));
+    fixture.detectChanges();
+
+    expect(byTestId('dossier-decision-recorded')?.querySelector('a')).toBeNull();
   });
 
   it('leaves the symbol and the way back to the top bar', () => {

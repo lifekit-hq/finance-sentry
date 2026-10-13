@@ -1,8 +1,9 @@
 namespace FinanceSentry.Modules.Research.Domain;
 
 /// <summary>
-/// Lifecycle event type recorded for a thesis or candidate (FR-001). <c>Promoted</c>/<c>Rejected</c>/
-/// <c>Expired</c> are 019 (Candidate) events, modeled now but only reachable once 019 ships.
+/// Lifecycle event type recorded for a thesis, candidate or recommendation (FR-001). <c>Promoted</c>/<c>Rejected</c>/
+/// <c>Expired</c> are 019 (Candidate) events; a recommendation (#1069) records <c>Created</c>, then one of
+/// <c>Confirmed</c>/<c>Rejected</c>/<c>Expired</c>/<c>Superseded</c>, all on the recommendation itself.
 /// </summary>
 public enum ThesisEventType
 {
@@ -14,4 +15,6 @@ public enum ThesisEventType
     Rejected,
     Expired,
     Snapshot,
+    Confirmed,
+    Superseded,
 }

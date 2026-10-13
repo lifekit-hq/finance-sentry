@@ -16,4 +16,7 @@ public sealed class RiskPositionCapSource(IRiskLimitsReader riskLimits)
         var limits = await riskLimits.GetCurrentAsync(userId, ct);
         return limits?.MaxPositionWeightPct;
     }
+
+    public Task<IReadOnlyList<Guid>> ListUserIdsAsync(CancellationToken ct)
+        => riskLimits.ListUserIdsWithRuleSetsAsync(ct);
 }
