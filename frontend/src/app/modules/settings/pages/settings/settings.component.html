@@ -1,17 +1,17 @@
 <cmn-page-container spacing="none">
-  <div class="max-w-[900px] space-y-cmn-10">
-    <p class="text-cmn-sm text-text-secondary">Manage your profile, preferences, and security.</p>
+  <div class="max-w-[900px]">
+    <p class="pb-cmn-8 text-cmn-sm text-text-secondary">
+      Manage your profile, preferences, and security.
+    </p>
     @if (store.profile(); as profile) {
-      <!-- ── Profile ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      <cmn-settings-section
+        [saveDisabled]="false"
+        [saving]="store.isProfileSaveLoading()"
+        (save)="saveName()"
+        heading="Profile"
+        description="Your name and contact information shown throughout Finance Sentry."
+        saveLabel="Save profile"
       >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Profile</h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Your name and contact information shown throughout Finance Sentry.
-          </p>
-        </div>
         <div class="space-y-cmn-4">
           <div class="flex items-center gap-cmn-4">
             <div
@@ -26,24 +26,24 @@
               <div class="text-cmn-xs text-text-secondary">{{ profile.email }}</div>
             </div>
           </div>
-          <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
-            <cmn-form-field label="First Name" fieldId="s-first">
-              <cmn-input
-                [ngModel]="profile.firstName"
-                (ngModelChange)="store.updateProfile({firstName: $event})"
-                id="s-first"
-                autocomplete="given-name"
-              />
-            </cmn-form-field>
-            <cmn-form-field label="Last Name" fieldId="s-last">
-              <cmn-input
-                [ngModel]="profile.lastName"
-                (ngModelChange)="store.updateProfile({lastName: $event})"
-                id="s-last"
-                autocomplete="family-name"
-              />
-            </cmn-form-field>
-          </div>
+          @if (nameForm(); as form) {
+            <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
+              <cmn-form-field label="First Name" fieldId="s-first">
+                <cmn-input
+                  [formControl]="form.controls.firstName"
+                  id="s-first"
+                  autocomplete="given-name"
+                />
+              </cmn-form-field>
+              <cmn-form-field label="Last Name" fieldId="s-last">
+                <cmn-input
+                  [formControl]="form.controls.lastName"
+                  id="s-last"
+                  autocomplete="family-name"
+                />
+              </cmn-form-field>
+            </div>
+          }
           <cmn-form-field label="Email Address" fieldId="s-email">
             <cmn-input
               [ngModel]="profile.email"
@@ -53,172 +53,86 @@
               autocomplete="email"
             />
           </cmn-form-field>
-          <div class="flex justify-end pb-cmn-4">
-            <cmn-button
-              [disabled]="assumptionsForm()?.invalid ?? false"
-              [loading]="store.isProfileSaveLoading()"
-              (clicked)="saveProfile()"
-              >Save Profile</cmn-button
-            >
-          </div>
         </div>
-      </div>
+      </cmn-settings-section>
 
-      <!-- ── Preferences ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      <cmn-settings-section
+        heading="Appearance"
+        description="Light or dark, and the colour Finance Sentry takes."
       >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Preferences</h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Display settings and regional configuration.
-          </p>
-        </div>
-        <div class="space-y-cmn-4">
-          <cmn-form-field label="Base Currency" fieldId="s-currency">
-            <cmn-select
-              [ngModel]="profile.baseCurrency"
-              [options]="currencyOptions"
-              (ngModelChange)="store.updateProfile({baseCurrency: $event})"
-              id="s-currency"
-            />
-          </cmn-form-field>
-        </div>
-      </div>
+        <cmn-appearance-settings [appSeed]="appSeed" />
+      </cmn-settings-section>
 
-      <!-- ── Appearance ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      <cmn-settings-section
+        heading="Notifications"
+        description="Control when and how Finance Sentry alerts you."
       >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Appearance</h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Light or dark, and the colour Finance Sentry takes. The colour is kept on this device.
-          </p>
-        </div>
-        <div class="space-y-cmn-4">
-          <cmn-form-field label="Theme" fieldId="s-theme">
-            <cmn-select
-              [ngModel]="profile.theme"
-              [options]="themeOptions"
-              (ngModelChange)="store.updateProfile({theme: $event})"
-              id="s-theme"
-            />
-          </cmn-form-field>
-          <lk-theme-picker
-            [appSeed]="appSeed"
-            [seed]="appearance.seed() ?? ''"
-            [intensity]="appearance.intensity()"
-            (lk-theme-picker-change)="onThemeChoice($event)"
-          />
-        </div>
-      </div>
-
-      <!-- ── Notifications ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
-      >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Notifications</h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Control when and how Finance Sentry alerts you.
-          </p>
-        </div>
         <div class="space-y-cmn-5">
-          <div class="flex items-start justify-between gap-cmn-4">
-            <div>
-              <div class="font-label text-cmn-sm font-medium text-text-primary">Email alerts</div>
-              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                Receive weekly digest and important account notifications.
-              </div>
-            </div>
+          <cmn-setting-row
+            label="Email alerts"
+            description="Receive weekly digest and important account notifications."
+          >
             <cmn-toggle
               [checked]="profile.emailAlerts"
-              (toggled)="store.updateProfile({emailAlerts: $event})"
+              (toggled)="store.applyChange({emailAlerts: $event})"
               label="Email alerts"
             />
-          </div>
-          <div class="flex items-start justify-between gap-cmn-4">
-            <div>
-              <div class="font-label text-cmn-sm font-medium text-text-primary">
-                Low balance warnings
-              </div>
-              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                Get notified when an account drops below your threshold.
-              </div>
-            </div>
+          </cmn-setting-row>
+          <cmn-setting-row
+            label="Low balance warnings"
+            description="Get notified when an account drops below your threshold."
+          >
             <cmn-toggle
               [checked]="profile.lowBalanceAlerts"
-              (toggled)="store.updateProfile({lowBalanceAlerts: $event})"
+              (toggled)="store.applyChange({lowBalanceAlerts: $event})"
               label="Low balance warnings"
             />
-          </div>
-          @if (profile.lowBalanceAlerts) {
+          </cmn-setting-row>
+          @if (profile.lowBalanceAlerts && thresholdControl(); as threshold) {
             <cmn-form-field
-              class="block pt-cmn-2"
+              (focusout)="commitThreshold()"
+              (keydown.enter)="commitThreshold()"
               label="Low balance threshold (USD)"
+              class="block"
               fieldId="s-thresh"
             >
-              <cmn-input
-                [ngModel]="profile.lowBalanceThreshold.toString()"
-                (ngModelChange)="store.updateProfile({lowBalanceThreshold: +$event || 0})"
-                id="s-thresh"
-                type="text"
-                inputmode="decimal"
-              />
+              <cmn-input [formControl]="threshold" id="s-thresh" type="text" inputmode="decimal" />
             </cmn-form-field>
           }
-          <div class="flex items-start justify-between gap-cmn-4">
-            <div>
-              <div class="font-label text-cmn-sm font-medium text-text-primary">
-                Sync failure alerts
-              </div>
-              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                Notify when a provider fails to sync for more than 24 hours.
-              </div>
-            </div>
+          <cmn-setting-row
+            label="Sync failure alerts"
+            description="Notify when a provider fails to sync for more than 24 hours."
+          >
             <cmn-toggle
               [checked]="profile.syncFailureAlerts"
-              (toggled)="store.updateProfile({syncFailureAlerts: $event})"
+              (toggled)="store.applyChange({syncFailureAlerts: $event})"
               label="Sync failure alerts"
             />
-          </div>
-          <div class="flex items-start justify-between gap-cmn-4">
-            <div>
-              <div class="font-label text-cmn-sm font-medium text-text-primary">
-                Watchlist analyst alerts
-              </div>
-              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                Also alert on analyst upgrades and downgrades for watchlist names. Held names always
-                alert.
-              </div>
-            </div>
+          </cmn-setting-row>
+          <cmn-setting-row
+            label="Watchlist analyst alerts"
+            description="Also alert on analyst upgrades and downgrades for watchlist names. Held names always alert."
+          >
             <cmn-toggle
               [checked]="profile.watchlistAnalystAlerts"
-              (toggled)="store.updateProfile({watchlistAnalystAlerts: $event})"
+              (toggled)="store.applyChange({watchlistAnalystAlerts: $event})"
               label="Watchlist analyst alerts"
             />
-          </div>
+          </cmn-setting-row>
 
           <!-- Push notifications -->
           <div class="space-y-cmn-4 border-t border-border-default pt-cmn-4">
-            <div class="flex items-start justify-between gap-cmn-4">
-              <div>
-                <div class="font-label text-cmn-sm font-medium text-text-primary">
-                  Push notifications
-                </div>
-                <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                  Get a headline on your device when something needs attention. Details stay in the
-                  app.
-                </div>
-              </div>
+            <cmn-setting-row
+              label="Push notifications"
+              description="Get a headline on your device when something needs attention. Details stay in the app."
+            >
               <cmn-toggle
                 [checked]="push.pushEnabled()"
                 [disabled]="!push.canToggle()"
                 (toggled)="push.togglePush($event)"
                 label="Push notifications"
               />
-            </div>
+            </cmn-setting-row>
             @if (push.serverNotice() || push.browserNotice()) {
               <p class="text-cmn-xs text-text-secondary leading-relaxed">
                 {{ push.serverNotice() || push.browserNotice() }}
@@ -266,23 +180,32 @@
             }
           </div>
         </div>
-      </div>
+      </cmn-settings-section>
 
-      <!-- ── Financial independence ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+      <cmn-settings-section
+        heading="Preferences"
+        description="Display settings and regional configuration."
       >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">
-            Financial independence
-          </h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            The two assumptions behind the dashboard's financial independence date. Save the profile
-            to apply them.
-          </p>
-        </div>
-        <div class="space-y-cmn-4">
-          @if (assumptionsForm(); as form) {
+        <cmn-form-field label="Base Currency" fieldId="s-currency">
+          <cmn-select
+            [ngModel]="profile.baseCurrency"
+            [options]="currencyOptions"
+            (ngModelChange)="store.applyChange({baseCurrency: $event})"
+            id="s-currency"
+          />
+        </cmn-form-field>
+      </cmn-settings-section>
+
+      <cmn-settings-section
+        [saveDisabled]="assumptionsForm()?.invalid ?? false"
+        [saving]="store.isProfileSaveLoading()"
+        (save)="saveAssumptions()"
+        heading="Financial independence"
+        description="The two assumptions behind the dashboard's financial independence date."
+        saveLabel="Save assumptions"
+      >
+        @if (assumptionsForm(); as form) {
+          <div class="space-y-cmn-4">
             <cmn-form-field
               [control]="form.controls.safeWithdrawalRate"
               [errorMessage]="form.controls.safeWithdrawalRate.invalid ? withdrawalRateError : ''"
@@ -311,75 +234,44 @@
                 inputmode="decimal"
               />
             </cmn-form-field>
-          }
-        </div>
-      </div>
-
-      <!-- ── Security ── -->
-      <div
-        class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
-      >
-        <div>
-          <h2 class="font-label text-cmn-sm font-semibold text-text-primary">Security</h2>
-          <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Manage two-factor authentication.
-          </p>
-        </div>
-        <div class="space-y-cmn-5">
-          <div class="flex items-start justify-between gap-cmn-4">
-            <div>
-              <div class="font-label text-cmn-sm font-medium text-text-primary">
-                Two-factor authentication
-              </div>
-              <div class="text-cmn-xs text-text-secondary mt-0.5 leading-relaxed">
-                Add an extra layer of security with an authenticator app.
-              </div>
-            </div>
-            <cmn-toggle
-              [checked]="profile.twoFactor"
-              (toggled)="store.updateProfile({twoFactor: $event})"
-              label="Two-factor authentication"
-            />
           </div>
-        </div>
-      </div>
+        }
+      </cmn-settings-section>
+
+      <cmn-settings-section heading="Security" description="Manage two-factor authentication.">
+        <cmn-setting-row
+          label="Two-factor authentication"
+          description="Add an extra layer of security with an authenticator app."
+        >
+          <cmn-toggle
+            [checked]="profile.twoFactor"
+            (toggled)="store.updateProfile({twoFactor: $event})"
+            label="Two-factor authentication"
+          />
+        </cmn-setting-row>
+      </cmn-settings-section>
 
       @if (canManageUsers()) {
-        <!-- ── People ── -->
-        <div
-          class="grid grid-cols-1 gap-cmn-10 border-b border-border-default pb-cmn-9 md:grid-cols-[280px_1fr]"
+        <cmn-settings-section
+          heading="People"
+          description="Invite people to this account and revoke access."
         >
-          <div>
-            <h2 class="font-label text-cmn-sm font-semibold text-text-primary">People</h2>
-            <p class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-              Invite people to this account and revoke access.
-            </p>
-          </div>
-          <div>
-            <cmn-button (clicked)="openPeople()" variant="secondary" icon="Users"
-              >Manage people</cmn-button
-            >
-          </div>
-        </div>
+          <cmn-button (clicked)="openPeople()" variant="secondary" icon="Users"
+            >Manage people</cmn-button
+          >
+        </cmn-settings-section>
       }
 
-      <!-- ── Danger zone ── -->
-      <div
-        class="flex items-center justify-between gap-cmn-4 rounded-cmn-lg border border-status-error/30 bg-status-error/[0.04] p-cmn-5"
-      >
-        <div>
-          <div class="font-label text-cmn-sm font-semibold text-status-error">Danger Zone</div>
-          <div class="mt-1 text-cmn-xs text-text-secondary leading-relaxed">
-            Permanently delete your account and all associated data. This cannot be undone.
-          </div>
-        </div>
-        <cmn-button (clicked)="requestDeleteAccount()" variant="destructive" size="sm">
-          Delete Account
-        </cmn-button>
-      </div>
+      <cmn-danger-zone
+        (confirmed)="deleteAccount()"
+        heading="Danger zone"
+        description="Permanently delete your account and all associated data. This cannot be undone."
+        actionLabel="Delete account"
+        confirmTitle="Delete your account?"
+        confirmMessage="All your connected accounts, transactions, and settings will be permanently erased. This action cannot be reversed."
+      />
 
-      <!-- Sign out -->
-      <div class="flex justify-end pb-cmn-6">
+      <div class="flex justify-end pt-cmn-6 pb-cmn-6">
         <cmn-button (clicked)="signOut()" variant="secondary" icon="LogOut">Sign out</cmn-button>
       </div>
     }

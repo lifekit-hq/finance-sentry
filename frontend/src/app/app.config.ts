@@ -11,6 +11,7 @@ import {provideDecimalPipe} from './core/providers/decimal-pipe.provider';
 import {provideErrorHandler} from './core/providers/error-handler.provider';
 import {provideErrorMessages} from './core/providers/error-messages.provider';
 import {provideAppLocale} from './core/providers/locale.provider';
+import {provideAppPreferences} from './core/providers/preferences.provider';
 import {provideAppServiceWorker} from './core/providers/service-worker.provider';
 import {provideTitleStrategy} from './core/providers/title-strategy.provider';
 import {authInterceptor} from './modules/auth/interceptors/auth.interceptor';
@@ -24,6 +25,7 @@ export const appConfig: ApplicationConfig = {
     provideErrorMessages(),
     provideAppLocale(),
     provideAppIcons(),
+    provideAppPreferences(),
     provideAppInit(),
     provideDecimalPipe(),
     provideAppServiceWorker(),

@@ -11,6 +11,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   CANNOT_REVOKE_SELF: 'You cannot revoke your own access.',
   CANNOT_REVOKE_OWNER: "The owner's access cannot be revoked.",
   USER_NOT_FOUND: 'That person no longer exists.',
+  ACCOUNT_UPDATE_CONFLICT: 'Your account was changed elsewhere. Reload and try again.',
   MONOBANK_TOKEN_INVALID: 'Invalid Monobank token. Please check and try again.',
   MONOBANK_TOKEN_DUPLICATE: 'This Monobank token is already connected.',
   MONOBANK_RATE_LIMITED: 'Monobank rate limit reached. Please wait 60 seconds and try again.',

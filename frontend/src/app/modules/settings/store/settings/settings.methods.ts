@@ -13,6 +13,12 @@ export function settingsMethods(store: WritableStateSource<SettingsState>) {
         profile: s.profile ? {...s.profile, ...partial} : s.profile,
       }));
     },
+    revertProfile(previous: Partial<UserProfile>): void {
+      patchState(store, (s: SettingsState) => ({
+        profile: s.profile ? {...s.profile, ...previous} : s.profile,
+        profileRevision: s.profileRevision + 1,
+      }));
+    },
     setShowDeleteConfirm(show: boolean): void {
       patchState(store, {showDeleteConfirm: show});
     },

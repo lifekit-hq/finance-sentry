@@ -60,7 +60,6 @@ public class ProfileFireBoundsTests(AuthApiFactory factory) : IClassFixture<Auth
         firstName = "Fire",
         lastName = "Bounds",
         baseCurrency = "USD",
-        theme = "dark",
         emailAlerts = true,
         lowBalanceAlerts = false,
         lowBalanceThreshold = 100m,

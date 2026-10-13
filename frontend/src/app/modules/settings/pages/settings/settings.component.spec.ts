@@ -6,7 +6,6 @@ import {describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UserProfile} from '../../models/settings/settings.model';
-import {AppearanceStore} from '../../store/appearance/appearance.store';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {SettingsComponent} from './settings.component';
@@ -15,7 +14,6 @@ const profile = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   baseCurrency: 'USD',
-  theme: 'system',
   emailAlerts: true,
   lowBalanceAlerts: true,
   lowBalanceThreshold: 100,
@@ -29,9 +27,10 @@ function create() {
   const toast = {show: vi.fn()};
   const store = {
     profile: signal<UserProfile | null>(profile),
+    profileRevision: signal(0),
     saveProfile: vi.fn(),
+    applyChange: vi.fn(),
   };
-  const appearance = {seed: signal<string | null>(null), intensity: signal(0.12), choose: vi.fn()};
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -44,13 +43,12 @@ function create() {
       providers: [
         {provide: SettingsStore, useValue: store},
         {provide: PushStore, useValue: {}},
-        {provide: AppearanceStore, useValue: appearance},
       ],
       template: '',
     },
   });
   const fixture = TestBed.createComponent(SettingsComponent);
-  return {store, toast, appearance, fixture, component: fixture.componentInstance};
+  return {store, toast, fixture, component: fixture.componentInstance};
 }
 
 function setup() {
@@ -80,7 +78,7 @@ describe('SettingsComponent financial independence assumptions', () => {
     form.controls.safeWithdrawalRate.markAsDirty();
     form.controls.realAnnualReturn.setValue('6');
     form.controls.realAnnualReturn.markAsDirty();
-    component.saveProfile();
+    component.saveAssumptions();
     expect(store.saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({safeWithdrawalRate: 0.035, realAnnualReturn: 0.06})
     );
@@ -90,7 +88,7 @@ describe('SettingsComponent financial independence assumptions', () => {
     const {store, component} = create();
     const stored = {...profile, safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456};
     store.profile.set(stored as unknown as UserProfile);
-    component.saveProfile();
+    component.saveAssumptions();
     expect(store.saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({safeWithdrawalRate: 0.03333, realAnnualReturn: 0.0456})
     );
@@ -127,17 +125,17 @@ describe('SettingsComponent financial independence assumptions', () => {
   it('blocks Save and reveals the errors until the value is corrected', () => {
     const {store, component, form} = setup();
     form.controls.safeWithdrawalRate.setValue('12');
-    component.saveProfile();
+    component.saveAssumptions();
     expect(store.saveProfile).not.toHaveBeenCalled();
     expect(form.controls.safeWithdrawalRate.touched).toBe(true);
     form.controls.safeWithdrawalRate.setValue('4');
-    component.saveProfile();
+    component.saveAssumptions();
     expect(store.saveProfile).toHaveBeenCalledTimes(1);
   });
 
   it('does not toast from the component on dispatch', () => {
     const {component, toast} = setup();
-    component.saveProfile();
+    component.saveAssumptions();
     expect(toast.show).not.toHaveBeenCalled();
   });
 
@@ -150,15 +148,17 @@ describe('SettingsComponent financial independence assumptions', () => {
   });
 });
 
-describe('SettingsComponent Save Profile button', () => {
+describe('SettingsComponent Save assumptions button', () => {
   function render() {
     const store = {
       profile: signal<UserProfile | null>(profile),
+      profileRevision: signal(0),
       avatarInitials: signal('AL'),
       fullName: signal('Ada Lovelace'),
       isProfileSaveLoading: signal(false),
       updateProfile: vi.fn(),
       saveProfile: vi.fn(),
+      applyChange: vi.fn(),
     };
     const push = {
       pushEnabled: signal(false),
@@ -173,11 +173,6 @@ describe('SettingsComponent Save Profile button', () => {
       togglePush: vi.fn(),
       remove: vi.fn(),
     };
-    const appearance = {
-      seed: signal<string | null>(null),
-      intensity: signal(0.12),
-      choose: vi.fn(),
-    };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -190,7 +185,6 @@ describe('SettingsComponent Save Profile button', () => {
         providers: [
           {provide: SettingsStore, useValue: store},
           {provide: PushStore, useValue: push},
-          {provide: AppearanceStore, useValue: appearance},
         ],
       },
     });
@@ -199,10 +193,10 @@ describe('SettingsComponent Save Profile button', () => {
     const el = fixture.nativeElement as HTMLElement;
     const saveButton = (): HTMLButtonElement => {
       const button = Array.from(el.querySelectorAll('button')).find(b =>
-        b.textContent?.includes('Save Profile')
+        b.textContent?.includes('Save assumptions')
       );
       if (!button) {
-        throw new Error('Save Profile button missing');
+        throw new Error('Save assumptions button missing');
       }
       return button;
     };
@@ -249,21 +243,64 @@ describe('SettingsComponent Save Profile button', () => {
   });
 });
 
+describe('SettingsComponent name form', () => {
+  it('seeds the name controls from the stored profile', () => {
+    const {component} = create();
+    expect(component.nameForm()?.getRawValue()).toEqual({firstName: 'Ada', lastName: 'Lovelace'});
+  });
+
+  it('saves only the typed, trimmed names', () => {
+    const {store, component} = create();
+    const form = component.nameForm();
+    form?.controls.firstName.setValue('  Grace ');
+    form?.controls.lastName.setValue('Hopper');
+    component.saveName();
+    expect(store.saveProfile).toHaveBeenCalledWith({firstName: 'Grace', lastName: 'Hopper'});
+  });
+
+  it('does not send the typed names until Save is pressed', () => {
+    const {store, component} = create();
+    component.nameForm()?.controls.firstName.setValue('Grace');
+    expect(store.saveProfile).not.toHaveBeenCalled();
+    expect(store.applyChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('SettingsComponent low balance threshold', () => {
+  it('applies a changed number when the field is left', () => {
+    const {store, component} = create();
+    component.thresholdControl()?.setValue('250.5');
+    component.commitThreshold();
+    expect(store.applyChange).toHaveBeenCalledWith({lowBalanceThreshold: 250.5});
+  });
+
+  it('sends nothing when the number is unchanged', () => {
+    const {store, component} = create();
+    component.commitThreshold();
+    expect(store.applyChange).not.toHaveBeenCalled();
+  });
+
+  it.each([['abc'], [''], ['-5']])('puts the stored value back for %j', text => {
+    const {store, component} = create();
+    const control = component.thresholdControl();
+    control?.setValue(text);
+    component.commitThreshold();
+    expect(store.applyChange).not.toHaveBeenCalled();
+    expect(control?.value).toBe('100');
+  });
+
+  it('shows the kept value again after the store rolls a rejected number back', () => {
+    const {store, component} = create();
+    component.thresholdControl()?.setValue('250.5');
+    component.commitThreshold();
+
+    store.profileRevision.update(revision => revision + 1);
+
+    expect(component.thresholdControl()?.value).toBe('100');
+  });
+});
+
 describe('SettingsComponent appearance', () => {
-  it('hands a picked colour to the appearance store', () => {
-    const {appearance, component} = create();
-    const detail = {seed: '#4f46e5', intensity: 0.3};
-    component.onThemeChoice(new CustomEvent('lk-theme-picker-change', {detail}));
-    expect(appearance.choose).toHaveBeenCalledWith(detail);
-  });
-
-  it('hands a reset to the appearance store as a null seed', () => {
-    const {appearance, component} = create();
-    const detail = {seed: null, intensity: 0.12};
-    component.onThemeChoice(new CustomEvent('lk-theme-picker-change', {detail}));
-    expect(appearance.choose).toHaveBeenCalledWith(detail);
-  });
-
   it('offers Petrol as the app default', () => {
     expect(create().component.appSeed).toBe('#175a6d');
   });

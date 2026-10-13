@@ -8,6 +8,6 @@ describeVisualBaseline({
   path: '/more',
   mocks: () => Promise.resolve(),
   ready: async page => {
-    await expect(page.getByTestId('more-version')).toBeVisible();
+    await expect(page.locator('[data-more-version]')).toBeVisible();
   },
 });

@@ -5,24 +5,24 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   inject,
   untracked,
-  ViewContainerRef,
 } from '@angular/core';
 import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
+  AppearanceSettingsComponent,
   ButtonComponent,
-  CmnDialogService,
-  ConfirmDialogComponent,
+  DangerZoneComponent,
   FormFieldComponent,
   InputComponent,
   PageContainerComponent,
   RelativeTimePipe,
   SelectComponent,
+  SettingRowComponent,
+  SettingsSectionComponent,
   TagComponent,
   ToastService,
   ToggleComponent,
 } from '@lifekit-hq/ui';
-import {take} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
@@ -35,9 +35,7 @@ import {
   SAFE_WITHDRAWAL_RATE_MAX_PERCENT,
   SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
 } from '../../constants/fire/fire-assumptions.constants';
-import {type ThemeChoice} from '../../models/appearance/appearance.model';
-import {type BaseCurrency, type ThemePreference} from '../../models/settings/settings.model';
-import {AppearanceStore} from '../../store/appearance/appearance.store';
+import {type BaseCurrency} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
 import {percentRange} from '../../validators/percent-range.validator';
@@ -50,45 +48,39 @@ const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
   {value: 'BTC', label: 'BTC — Bitcoin'},
 ];
 
-const THEME_OPTIONS: {value: ThemePreference; label: string}[] = [
-  {value: 'system', label: 'System default'},
-  {value: 'light', label: 'Light'},
-  {value: 'dark', label: 'Dark'},
-];
-
 @Component({
   selector: 'fns-settings',
   imports: [
-    PageContainerComponent,
-    InputHintsDirective,
+    AppearanceSettingsComponent,
     ButtonComponent,
+    DangerZoneComponent,
     FormFieldComponent,
     FormsModule,
     InputComponent,
+    InputHintsDirective,
+    PageContainerComponent,
     ReactiveFormsModule,
     RelativeTimePipe,
     SelectComponent,
+    SettingRowComponent,
+    SettingsSectionComponent,
     TagComponent,
     ToggleComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [SettingsStore, PushStore, AppearanceStore],
+  providers: [SettingsStore, PushStore],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './settings.component.html',
 })
 export class SettingsComponent {
   private readonly authStore = inject(AuthStore);
-  private readonly dialog = inject(CmnDialogService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
-  private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(SettingsStore);
   public readonly push = inject(PushStore);
-  public readonly appearance = inject(AppearanceStore);
   public readonly appSeed = APP_SEED;
   public readonly currencyOptions = CURRENCY_OPTIONS;
-  public readonly themeOptions = THEME_OPTIONS;
   public readonly canManageUsers = this.authStore.canManageUsers;
   public readonly withdrawalRateHint = `Between ${SAFE_WITHDRAWAL_RATE_MIN_PERCENT}% and ${SAFE_WITHDRAWAL_RATE_MAX_PERCENT}%. The classic rule is 4%.`;
   public readonly realReturnHint = `Between ${REAL_ANNUAL_RETURN_MIN_PERCENT}% and ${REAL_ANNUAL_RETURN_MAX_PERCENT}%, after inflation.`;
@@ -98,6 +90,27 @@ export class SettingsComponent {
   public readonly profileLoaded = computed(() => this.store.profile() !== null);
 
   // Built once the profile has loaded (not on every profile edit, which would reset the typed text).
+  public readonly nameForm = computed(() => {
+    if (!this.profileLoaded()) {
+      return null;
+    }
+    const profile = untracked(() => this.store.profile());
+    return new FormGroup({
+      firstName: new FormControl(profile?.firstName ?? '', {nonNullable: true}),
+      lastName: new FormControl(profile?.lastName ?? '', {nonNullable: true}),
+    });
+  });
+
+  // Rebuilt when a rejected change is rolled back, so the field shows the value that was kept.
+  public readonly thresholdControl = computed(() => {
+    this.store.profileRevision();
+    if (!this.profileLoaded()) {
+      return null;
+    }
+    const profile = untracked(() => this.store.profile());
+    return new FormControl((profile?.lowBalanceThreshold ?? 0).toString(), {nonNullable: true});
+  });
+
   // The controls hold percent text as typed; the fraction conversion happens only when saving.
   public readonly assumptionsForm = computed(() => {
     if (!this.profileLoaded()) {
@@ -121,7 +134,16 @@ export class SettingsComponent {
     });
   });
 
-  public saveProfile(): void {
+  public saveName(): void {
+    const form = this.nameForm();
+    if (!form) {
+      return;
+    }
+    const {firstName, lastName} = form.getRawValue();
+    this.store.saveProfile({firstName: firstName.trim(), lastName: lastName.trim()});
+  }
+
+  public saveAssumptions(): void {
     const p = this.store.profile();
     const form = this.assumptionsForm();
     if (!p || !form) {
@@ -133,15 +155,6 @@ export class SettingsComponent {
     }
     const {safeWithdrawalRate, realAnnualReturn} = form.controls;
     this.store.saveProfile({
-      firstName: p.firstName,
-      lastName: p.lastName,
-      baseCurrency: p.baseCurrency,
-      theme: p.theme,
-      emailAlerts: p.emailAlerts,
-      lowBalanceAlerts: p.lowBalanceAlerts,
-      lowBalanceThreshold: p.lowBalanceThreshold,
-      syncFailureAlerts: p.syncFailureAlerts,
-      watchlistAnalystAlerts: p.watchlistAnalystAlerts,
       safeWithdrawalRate: safeWithdrawalRate.dirty
         ? (PercentUtils.toFraction(
             safeWithdrawalRate.value,
@@ -159,8 +172,21 @@ export class SettingsComponent {
     });
   }
 
-  public onThemeChoice(event: Event): void {
-    this.appearance.choose((event as CustomEvent<ThemeChoice>).detail);
+  // A lone number field applies when the user leaves it or presses Enter, not on every keystroke.
+  public commitThreshold(): void {
+    const p = this.store.profile();
+    const control = this.thresholdControl();
+    if (!p || !control) {
+      return;
+    }
+    const value = Number(control.value.trim());
+    if (control.value.trim() === '' || !Number.isFinite(value) || value < 0) {
+      control.setValue(p.lowBalanceThreshold.toString());
+      return;
+    }
+    if (value !== p.lowBalanceThreshold) {
+      this.store.applyChange({lowBalanceThreshold: value});
+    }
   }
 
   public openPeople(): void {
@@ -171,27 +197,7 @@ export class SettingsComponent {
     this.authStore.logout();
   }
 
-  public requestDeleteAccount(): void {
-    const ref = this.dialog.open<boolean>(ConfirmDialogComponent, {
-      data: {
-        title: 'Delete your account?',
-        message:
-          'All your connected accounts, transactions, and settings will be permanently erased. This action cannot be reversed.',
-        confirmLabel: 'Delete Forever',
-        cancelLabel: 'Cancel',
-        confirmVariant: 'destructive',
-      },
-      size: 'sm',
-      viewContainerRef: this.viewContainerRef,
-    });
-    ref
-      .afterClosed()
-      .pipe(take(1))
-      .subscribe(confirmed => {
-        if (confirmed !== true) {
-          return;
-        }
-        this.toast.show('Account deletion requested', 'warning');
-      });
+  public deleteAccount(): void {
+    this.toast.show('Account deletion requested', 'warning');
   }
 }

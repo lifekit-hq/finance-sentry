@@ -1,6 +1,7 @@
 import {expect, type Locator, type Page, test} from '@playwright/test';
 
 import {API, AUTH_RESPONSE} from './dossier-mocks';
+import {mockPreferences} from './preferences-mocks';
 
 // Shared harness for the per-screen pixel baselines (the same pattern as dashboard-visual.spec.ts):
 // route-mocked fixtures, a clock pinned to FROZEN_NOW so month keys and relative timestamps are
@@ -43,7 +44,6 @@ export const PROFILE = {
   lastName: 'User',
   email: 'test@gmail.com',
   baseCurrency: 'USD',
-  theme: 'system',
   emailAlerts: true,
   lowBalanceAlerts: true,
   lowBalanceThreshold: 500,
@@ -87,6 +87,7 @@ export async function mockShell(page: Page): Promise<void> {
   });
   await mockGet(page, 'accounts', {accounts: []});
   await mockGet(page, 'profile', PROFILE);
+  await mockPreferences(page);
 }
 
 export interface VisualScreen {
@@ -127,7 +128,7 @@ async function openScreen(page: Page, screen: VisualScreen): Promise<void> {
 export function versionMasks(page: Page): Locator[] {
   return [
     page.getByText(/^\s*v\d+\.\d+\.\d+ · What's new\s*$/),
-    page.getByTestId('more-version'),
+    page.locator('[data-more-version]'),
   ];
 }
 

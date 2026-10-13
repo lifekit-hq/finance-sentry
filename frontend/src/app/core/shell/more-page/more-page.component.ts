@@ -1,63 +1,39 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
-import {RouterLink} from '@angular/router';
-import {
-  BadgeComponent,
-  CardComponent,
-  IconComponent,
-  ListItemRowComponent,
-  PageContainerComponent,
-} from '@lifekit-hq/ui';
+import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {type MenuItem, MorePageComponent as MorePageKitComponent} from '@lifekit-hq/ui';
 
-import {AuthStore} from '../../../modules/auth/store/auth.store';
 import {APP_VERSION} from '../../../shared/constants/version/version.constants';
-import {REPORT_PROBLEM_LABEL} from '../../report-problem/constants/report-problem.constants';
-import {ReportProblemPanelService} from '../../report-problem/services/report-problem-panel.service';
-import {WHATS_NEW_LABEL} from '../../whats-new/constants/whats-new.constants';
-import {WhatsNewPanelService} from '../../whats-new/services/whats-new-panel.service';
-import {WhatsNewStore} from '../../whats-new/store/whats-new.store';
-import {NAV_ITEMS} from '../app-shell.constants';
-import {NavUtils} from '../utils/nav.utils';
+import {PHONE_TAB_ROUTES} from '../app-shell.constants';
+import {ShellChromeService} from '../services/shell-chrome.service';
 
-/** The phone More tab: the nav items past the four tabs, as the 1.x tab bar's More sheet listed them. */
+/**
+ * The phone More tab: the nav items past the tabs, then the account (Settings, What's new, Report a
+ * problem, Sign out) and the version. The layout is `cmn-more-page`; this binds it to the same nav and
+ * account the shell shows and handles the items the app owns.
+ */
 @Component({
   selector: 'fns-more-page',
-  imports: [
-    PageContainerComponent,
-    BadgeComponent,
-    CardComponent,
-    IconComponent,
-    ListItemRowComponent,
-    RouterLink,
-  ],
+  imports: [MorePageKitComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './more-page.component.html',
+  template: `
+    <cmn-more-page
+      [items]="navItems()"
+      [tabRoutes]="tabRoutes"
+      [account]="account()"
+      [versionLabel]="versionLabel"
+      (itemSelect)="select($event)"
+    />
+  `,
 })
 export class MorePageComponent {
-  private readonly authStore = inject(AuthStore);
-  private readonly whatsNewPanel = inject(WhatsNewPanelService);
-  private readonly reportProblemPanel = inject(ReportProblemPanelService);
+  private readonly chrome = inject(ShellChromeService);
 
-  public readonly email = this.authStore.email;
-  public readonly hasUnread = inject(WhatsNewStore).hasUnread;
-  public readonly whatsNewLabel = WHATS_NEW_LABEL;
-  public readonly reportProblemLabel = REPORT_PROBLEM_LABEL;
-  public readonly versionLabel = `Version ${APP_VERSION}`;
+  public readonly navItems = this.chrome.navItems;
+  public readonly account = this.chrome.account;
+  public readonly tabRoutes = [...PHONE_TAB_ROUTES];
+  public readonly versionLabel = `v${APP_VERSION}`;
 
-  public readonly items = computed(() =>
-    NavUtils.moreItems(NAV_ITEMS).filter(item =>
-      NavUtils.isPermitted(item.route, this.authStore.permissions())
-    )
-  );
-
-  public openWhatsNew(): void {
-    this.whatsNewPanel.open();
-  }
-
-  public openReportProblem(): void {
-    this.reportProblemPanel.open();
-  }
-
-  public logout(): void {
-    this.authStore.logout();
+  /** A route item (Settings) is a link the kit follows; Sign out and the extras are the app's. */
+  public select(item: MenuItem): void {
+    this.chrome.handle(item.id);
   }
 }

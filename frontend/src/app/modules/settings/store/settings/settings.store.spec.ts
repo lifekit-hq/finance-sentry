@@ -1,7 +1,7 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {ThemeService, ToastService} from '@lifekit-hq/ui';
+import {ToastService} from '@lifekit-hq/ui';
 import {NEVER, of, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -11,7 +11,11 @@ import {type UpdateProfileRequest, type UserProfile} from '../../models/settings
 import {SettingsService} from '../../services/settings.service';
 import {SettingsStore} from './settings.store';
 
-const PROFILE = {firstName: 'Ada', lastName: 'Lovelace', theme: 'dark'} as unknown as UserProfile;
+const PROFILE = {
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  baseCurrency: 'USD',
+} as unknown as UserProfile;
 const REQUEST = {safeWithdrawalRate: 0.04} as unknown as UpdateProfileRequest;
 
 describe('SettingsStore', () => {
@@ -24,7 +28,6 @@ describe('SettingsStore', () => {
         SettingsStore,
         {provide: SettingsService, useValue: service},
         {provide: AuthStore, useValue: {setProfileName: vi.fn()}},
-        {provide: ThemeService, useValue: {setPreference: vi.fn()}},
         {provide: ToastService, useValue: {show: vi.fn()}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
@@ -95,6 +98,17 @@ describe('SettingsStore', () => {
     expect(store.hasProfileSaveError()).toBe(true);
     expect(store.profileSaveErrorMessage()).toBe(ERROR_MESSAGES_REGISTRY['FORBIDDEN']);
     expect(store.status()).toBe('success');
+  });
+
+  it('rolls a rejected change back and bumps the revision, leaving the rest as it was', () => {
+    service.getProfile.mockReturnValue(of(PROFILE));
+    service.updateProfile.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));
+    const store = TestBed.inject(SettingsStore);
+
+    store.applyChange({baseCurrency: 'EUR'});
+
+    expect(store.profile()?.baseCurrency).toBe('USD');
+    expect(store.profileRevision()).toBe(1);
   });
 
   it('falls back to the save default for an unknown save error', () => {

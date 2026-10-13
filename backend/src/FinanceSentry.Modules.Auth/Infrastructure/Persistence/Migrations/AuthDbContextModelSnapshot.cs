@@ -107,6 +107,13 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<double?>("ThemeIntensity")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ThemeSeed")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
