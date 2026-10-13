@@ -31,6 +31,7 @@ public sealed class GetAssetDossierQueryHandler(
     IPriceHistoryService priceHistory,
     IFundamentalsService fundamentals,
     IAssetPriceTargetRepository priceTargets,
+    IRecommendationRepository recommendations,
     PositionReturnsReader returnsReader)
     : IQueryHandler<GetAssetDossierQuery, AssetDossierResult>
 {
@@ -61,6 +62,7 @@ public sealed class GetAssetDossierQueryHandler(
         var signalResult = await Safe(() => signalReader.GetRecentAsync(symbol, SignalLimit, ct));
         var capFraction = await Safe(() => positionCap.GetMaxPositionWeightAsync(userId, ct));
         var userTarget = await Safe(() => priceTargets.GetAsync(userId, symbol, ct));
+        var pending = await Safe(() => recommendations.FindPendingAsync(userId, symbol, ct));
 
         var bookPosition = book?.Positions.FirstOrDefault(
             p => p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
@@ -129,7 +131,8 @@ public sealed class GetAssetDossierQueryHandler(
             Checks: checks,
             UserTarget: userTarget is null
                 ? null
-                : new DossierUserTarget(userTarget.TargetPrice, userTarget.Currency, userTarget.UpdatedAt));
+                : new DossierUserTarget(userTarget.TargetPrice, userTarget.Currency, userTarget.UpdatedAt),
+            PendingRecommendation: pending is null ? null : RecommendationDto.From(pending));
     }
 
     private async Task<DossierPositionSection?> BuildPositionSectionAsync(

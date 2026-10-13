@@ -65,6 +65,7 @@ public class GetAssetDossierNextEarningsTests
             Mock.Of<IPriceHistoryService>(),
             Mock.Of<IFundamentalsService>(),
             Mock.Of<IAssetPriceTargetRepository>(),
+            Mock.Of<IRecommendationRepository>(),
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
 
         return handler.Handle(new GetAssetDossierQuery(Guid.NewGuid(), Symbol), CancellationToken.None);

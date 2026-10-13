@@ -92,6 +92,7 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
             Mock.Of<IPriceHistoryService>(),
             Mock.Of<IFundamentalsService>(),
             new AssetPriceTargetRepository(db),
+            new RecommendationRepository(db),
             new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
 
         for (var i = 0; i < Loads; i++)

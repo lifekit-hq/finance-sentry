@@ -109,6 +109,23 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(4));
 
+            // Decision loop (#1069): the rule sweep runs after the policy review (05:00) so it reads the same book;
+            // expiry and outcome scoring follow. All three are silent - they only fill or settle the Decisions queue.
+            mgr.AddOrUpdate<RecommendationTriggerJob>(
+                "recommendation-triggers",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(5, 30));
+
+            mgr.AddOrUpdate<RecommendationExpiryJob>(
+                "recommendation-expiry",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(5, 15));
+
+            mgr.AddOrUpdate<RecommendationOutcomeJob>(
+                "recommendation-outcomes",
+                job => job.ExecuteAsync(CancellationToken.None),
+                Cron.Daily(22));
+
             // Scheduled policy review (#696): a daily sweep after the action tickets (04:00); each
             // user's review opens only when their policy statement's recorded cadence makes it due.
             mgr.AddOrUpdate<PolicyReviewJob>(
@@ -231,6 +248,9 @@ public static class ResearchModule
         services.AddScoped<IThesisEventRepository, ThesisEventRepository>();
         services.AddScoped<IBenchmarkRelativeRecordRepository, BenchmarkRelativeRecordRepository>();
         services.AddScoped<ICandidateRepository, CandidateRepository>();
+        services.AddScoped<IRecommendationRepository, RecommendationRepository>();
+        services.AddScoped<RecommendationPositionReader>();
+        services.AddScoped<RecommendationWriter>();
         services.AddScoped<ICandidateScoreRepository, CandidateScoreRepository>();
         services.AddScoped<IAnalystActionRepository, AnalystActionRepository>();
         services.AddScoped<IAnalystUniverseRepository, AnalystUniverseRepository>();
@@ -445,6 +465,9 @@ public static class ResearchModule
         services.AddScoped<ThesisMonitorJob>();
         services.AddScoped<ThesisTrackRecordSnapshotJob>();
         services.AddScoped<CandidateExpiryJob>();
+        services.AddScoped<RecommendationTriggerJob>();
+        services.AddScoped<RecommendationExpiryJob>();
+        services.AddScoped<RecommendationOutcomeJob>();
         services.AddScoped<OpportunityScanJob>();
         services.AddScoped<ResearchIndexingJob>();
         services.AddScoped<ActionTicketsGeneratorJob>();
