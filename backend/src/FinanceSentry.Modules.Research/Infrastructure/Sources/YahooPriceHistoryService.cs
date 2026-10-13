@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Sources;
 
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Application.Services;
+using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Infrastructure.Caching;
 using Microsoft.Extensions.Logging;
 
@@ -82,7 +83,12 @@ public sealed class YahooPriceHistoryService(
         }
 
         var result = results[0];
-        var (currency, divisor) = YahooMarketDataService.ReadCurrency(result);
+        var (currency, divisor) = MinorUnitCurrency.Normalize(
+            result.TryGetProperty("meta", out var meta)
+            && meta.TryGetProperty("currency", out var quoted)
+            && quoted.ValueKind is JsonValueKind.String
+                ? quoted.GetString()
+                : null);
 
         // A weekly or monthly series can carry the live day as a second bar in its last period; keep one per date.
         var closes = YahooMarketDataService.ReadDailyBars(result)

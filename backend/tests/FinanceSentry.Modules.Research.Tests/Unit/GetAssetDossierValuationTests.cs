@@ -14,7 +14,7 @@ using FluentAssertions;
 using Moq;
 using Xunit;
 
-public class GetAssetDossierCryptoTests
+public class GetAssetDossierValuationTests
 {
     private const string Symbol = "BTC";
 
@@ -66,6 +66,45 @@ public class GetAssetDossierCryptoTests
         dossier.Valuation.Should().NotBeNull();
         dossier.Valuation!.NotApplicable.Should().BeFalse();
         dossier.Analysts.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("GBp", "GBP")]
+    [InlineData("GBX", "GBP")]
+    [InlineData("ZAc", "ZAR")]
+    [InlineData("ILA", "ILS")]
+    public async Task MinorUnitQuotedEquity_ShowsTheValuationInMajorUnits(string quoted, string major)
+    {
+        var raw = Valuation(notApplicable: false) with
+        {
+            Price = 1000m,
+            ConsensusTarget = 1200m,
+            ImpliedUpsidePct = 20m,
+            TargetLow = 900m,
+            TargetHigh = 1500m,
+            Currency = quoted,
+        };
+
+        var dossier = await HandleAsync(Held("Equities"), raw, new Mock<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>());
+
+        dossier.Valuation.Should().NotBeNull();
+        dossier.Valuation!.Currency.Should().Be(major);
+        dossier.Valuation.Price.Should().Be(10m);
+        dossier.Valuation.ConsensusTarget.Should().Be(12m);
+        dossier.Valuation.TargetLow.Should().Be(9m);
+        dossier.Valuation.TargetHigh.Should().Be(15m);
+        dossier.Valuation.ImpliedUpsidePct.Should().Be(20m);
+    }
+
+    [Fact]
+    public async Task MajorCurrencyEquity_KeepsTheValuationFiguresUnscaled()
+    {
+        var dossier = await HandleAsync(
+            Held("Equities"), Valuation(notApplicable: false), new Mock<IQueryHandler<GetAnalystActionsQuery, AnalystActionsResult>>());
+
+        dossier.Valuation!.Currency.Should().Be("USD");
+        dossier.Valuation.Price.Should().Be(150m);
+        dossier.Valuation.ConsensusTarget.Should().Be(180m);
     }
 
     private static BookFigurePosition Held(string assetClass) =>

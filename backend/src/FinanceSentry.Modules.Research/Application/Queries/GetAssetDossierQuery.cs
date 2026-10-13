@@ -73,6 +73,8 @@ public sealed class GetAssetDossierQueryHandler(
             valuationResult = null;
         }
 
+        valuationResult = InMajorUnits(valuationResult);
+
         var analystResult = isCrypto
             ? null
             : await Safe(() => analystActions.Handle(
@@ -226,6 +228,24 @@ public sealed class GetAssetDossierQueryHandler(
             PositionCapPercent: capPercent,
             HasThesis: thesis is not null,
             ThesisBroken: thesis?.BrokenAt is not null);
+    }
+
+    private static ValuationSnapshotResult? InMajorUnits(ValuationSnapshotResult? valuation)
+    {
+        if (valuation is null)
+        {
+            return null;
+        }
+
+        var (currency, divisor) = MinorUnitCurrency.Normalize(valuation.Currency);
+        return valuation with
+        {
+            Price = valuation.Price / divisor,
+            ConsensusTarget = valuation.ConsensusTarget / divisor,
+            TargetLow = valuation.TargetLow / divisor,
+            TargetHigh = valuation.TargetHigh / divisor,
+            Currency = currency,
+        };
     }
 
     private static decimal? AsPercent(decimal? fraction)

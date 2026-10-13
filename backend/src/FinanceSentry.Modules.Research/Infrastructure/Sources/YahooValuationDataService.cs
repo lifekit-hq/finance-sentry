@@ -2,7 +2,6 @@ namespace FinanceSentry.Modules.Research.Infrastructure.Sources;
 
 using System.Text.Json;
 using FinanceSentry.Modules.Research.Application.Services;
-using FinanceSentry.Modules.Research.Domain;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -159,9 +158,8 @@ public sealed class YahooValuationDataService(
         var dividendYield = ReadRaw(summaryDetail, "dividendYield");
         var enterpriseValue = ReadRaw(keyStats, "enterpriseValue");
         var ebitda = ReadRaw(financialData, "ebitda");
-        var (currency, divisor) = MinorUnitCurrency.Normalize(ReadString(price, "currency"));
-        var consensusTarget = ReadRaw(financialData, "targetMeanPrice") / divisor;
-        var marketPrice = ReadRaw(price, "regularMarketPrice") / divisor;
+        var consensusTarget = ReadRaw(financialData, "targetMeanPrice");
+        var marketPrice = ReadRaw(price, "regularMarketPrice");
 
         decimal? evToEbitda = enterpriseValue is { } ev && ebitda is { } eb && eb != 0m
             ? decimal.Round(ev / eb, 2)
@@ -180,10 +178,10 @@ public sealed class YahooValuationDataService(
             ReadString(assetProfile, "sector"),
             ReadString(assetProfile, "industry"),
             ReadString(price, "longName") ?? ReadString(price, "shortName"),
-            TargetLow: ReadRaw(financialData, "targetLowPrice") / divisor,
-            TargetHigh: ReadRaw(financialData, "targetHighPrice") / divisor,
+            TargetLow: ReadRaw(financialData, "targetLowPrice"),
+            TargetHigh: ReadRaw(financialData, "targetHighPrice"),
             AnalystCount: ReadRaw(financialData, "numberOfAnalystOpinions") is { } count ? (int)count : null,
-            Currency: currency,
+            Currency: ReadString(price, "currency"),
             MarketCap: ReadRaw(price, "marketCap") ?? ReadRaw(summaryDetail, "marketCap"));
     }
 

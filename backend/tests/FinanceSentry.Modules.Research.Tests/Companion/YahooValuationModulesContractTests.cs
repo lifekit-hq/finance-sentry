@@ -112,7 +112,7 @@ public sealed class YahooValuationModulesContractTests
     }
 
     [Fact]
-    public void Parse_pence_quote_is_returned_in_pounds_with_the_major_currency()
+    public void Parse_pence_quote_keeps_the_quoted_unit_and_label()
     {
         const string london = """
         {
@@ -139,11 +139,11 @@ public sealed class YahooValuationModulesContractTests
         var metrics = YahooValuationDataService.Parse(london, "SHEL.L");
 
         metrics.Should().NotBeNull();
-        metrics!.Currency.Should().Be("GBP");
-        metrics.Price.Should().Be(26.5m);
-        metrics.ConsensusTarget.Should().Be(30m);
-        metrics.TargetLow.Should().Be(24m);
-        metrics.TargetHigh.Should().Be(36m);
+        metrics!.Currency.Should().Be("GBp");
+        metrics.Price.Should().Be(2650m);
+        metrics.ConsensusTarget.Should().Be(3000m);
+        metrics.TargetLow.Should().Be(2400m);
+        metrics.TargetHigh.Should().Be(3600m);
     }
 
     [Fact]

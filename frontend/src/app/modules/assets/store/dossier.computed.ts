@@ -142,9 +142,9 @@ export function dossierComputed(store: StateSignals) {
       );
     }),
     parsedTargetDraft: computed(() => DossierPositionUtils.parseTarget(store.targetDraft())),
-    fundamentals: computed(() => {
-      return DossierFactsUtils.fundamentals(usableValuation(), store.dossier()?.performance);
-    }),
+    fundamentals: computed(() =>
+      DossierFactsUtils.fundamentals(usableValuation(), store.dossier()?.performance)
+    ),
     dataStatus: computed(() => DossierFactsUtils.dataStatus(store.dossier(), store.chart())),
   };
 }

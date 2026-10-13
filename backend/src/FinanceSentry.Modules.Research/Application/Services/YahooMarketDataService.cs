@@ -141,7 +141,9 @@ public class YahooMarketDataService(
                 return null;
             }
 
-            var (quotedCurrency, divisor) = ReadCurrency(first);
+            var currency = meta.TryGetProperty("currency", out var currencyProp)
+                ? currencyProp.GetString() ?? "USD"
+                : "USD";
             var regularMarketTime = ReadUnixTime(meta, "regularMarketTime");
             var prev = PriorSessionClose(first, regularMarketTime) ?? ReadDecimal(meta, "previousClose");
             var sourcePriceTime = selected.Session switch
@@ -155,9 +157,9 @@ public class YahooMarketDataService(
             {
                 Ticker = ticker.ToUpperInvariant(),
                 ResolvedTicker = symbol.ToUpperInvariant(),
-                Price = selected.Price.Value / divisor,
-                PreviousClose = prev / divisor,
-                Currency = quotedCurrency ?? "USD",
+                Price = selected.Price.Value,
+                PreviousClose = prev,
+                Currency = currency,
                 FetchedAt = DateTimeOffset.UtcNow,
                 MarketState = marketState,
                 Session = selected.Session,
@@ -201,11 +203,7 @@ public class YahooMarketDataService(
                 return [];
             }
 
-            var (_, divisor) = ReadCurrency(resultArray[0]);
-            return ReadDailyBars(resultArray[0])
-                .Where(c => c.Date >= since)
-                .Select(c => divisor == 1m ? c : c with { Close = c.Close / divisor })
-                .ToList();
+            return ReadDailyBars(resultArray[0]).Where(c => c.Date >= since).ToList();
         }
         catch (Exception ex)
         {
@@ -234,14 +232,6 @@ public class YahooMarketDataService(
 
         return bars.LastOrDefault(b => b.Date < sessionDate)?.Close;
     }
-
-    internal static (string? Currency, decimal Divisor) ReadCurrency(JsonElement result)
-        => MinorUnitCurrency.Normalize(
-            result.TryGetProperty("meta", out var meta)
-            && meta.TryGetProperty("currency", out var currency)
-            && currency.ValueKind is JsonValueKind.String
-                ? currency.GetString()
-                : null);
 
     internal static List<DailyClose> ReadDailyBars(JsonElement result)
     {

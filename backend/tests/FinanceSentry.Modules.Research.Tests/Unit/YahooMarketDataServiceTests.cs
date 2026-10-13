@@ -69,28 +69,30 @@ public sealed class YahooMarketDataServiceTests
         result["PSX"].PreviousClose.Should().Be(271.5m);
     }
 
-    [Fact]
-    public async Task GetQuotesAsync_PenceQuote_IsReturnedInPoundsWithTheMajorCurrency()
+    [Theory]
+    [InlineData("SHEL.L", "GBp")]
+    [InlineData("MHPC.TA", "ILA")]
+    public async Task GetQuotesAsync_MinorUnitQuote_StaysInTheQuotedUnitAndLabel(string symbol, string currency)
     {
-        // 1783958400 = 2026-07-13 16:00 UTC; the prior session's bar closed at 1240 pence.
+        // 1783958400 = 2026-07-13 16:00 UTC; the prior session's bar closed at 1240 minor units.
         var handler = new StubHttpMessageHandler(_ => QuoteJson(
-            symbol: "SHEL.L",
+            symbol: symbol,
             marketState: "REGULAR",
             regularMarketPrice: 1250m,
             chartPreviousClose: 1200m,
             bars: [(1783690200, 1240m), (1783949400, 1250m)],
-            currency: "GBp"));
+            currency: currency));
         var sut = CreateSut(handler);
 
-        var result = await sut.GetQuotesAsync(["SHEL.L"]);
+        var result = await sut.GetQuotesAsync([symbol]);
 
-        result["SHEL.L"].Price.Should().Be(12.5m);
-        result["SHEL.L"].PreviousClose.Should().Be(12.4m);
-        result["SHEL.L"].Currency.Should().Be("GBP");
+        result[symbol].Price.Should().Be(1250m);
+        result[symbol].PreviousClose.Should().Be(1240m);
+        result[symbol].Currency.Should().Be(currency);
     }
 
     [Fact]
-    public async Task GetDailyClosesAsync_PenceQuote_IsReturnedInPounds()
+    public async Task GetDailyClosesAsync_MinorUnitQuote_StaysInTheQuotedUnit()
     {
         var handler = new StubHttpMessageHandler(_ => QuoteJson(
             symbol: "SHEL.L",
@@ -103,7 +105,7 @@ public sealed class YahooMarketDataServiceTests
 
         var closes = await sut.GetDailyClosesAsync("SHEL.L", new DateOnly(2026, 7, 1));
 
-        closes.Select(c => c.Close).Should().Equal(12.4m, 12.5m);
+        closes.Select(c => c.Close).Should().Equal(1240m, 1250m);
     }
 
     [Fact]
