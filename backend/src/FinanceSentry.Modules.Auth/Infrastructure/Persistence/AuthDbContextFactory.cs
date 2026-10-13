@@ -1,15 +1,11 @@
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
 
 namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 
-public class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
+public class AuthDbContextFactory() : DesignTimeDbContextFactoryBase<AuthDbContext>("__EFMigrationsHistory")
 {
-    public AuthDbContext CreateDbContext(string[] args)
-    {
-        var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Database=finance_sentry;Username=finance_user;Password=finance_password");
-        return new AuthDbContext(optionsBuilder.Options, NoCurrentUser.Instance);
-    }
+    protected override AuthDbContext Create(DbContextOptions<AuthDbContext> options, ICurrentUser currentUser)
+        => new(options, currentUser);
 }
