@@ -382,10 +382,11 @@
                 <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Valuation</h2>
                 @if (valuation.isStale) {
                   <cmn-tag variant="warning" data-testid="valuation-stale"
-                    >Stale@if (valuation.priceAsOf) {
+                    >Stale
+                    @if (valuation.priceAsOf) {
                       · as of {{ valuation.priceAsOf | date: 'mediumDate' }}
-                    }</cmn-tag
-                  >
+                    }
+                  </cmn-tag>
                 }
               </div>
 
