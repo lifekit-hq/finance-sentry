@@ -102,6 +102,7 @@ export const DOSSIER_AAPL = {
     costBasisUsd: 15000,
     unrealizedPnlUsd: 2500,
     unrealizedPnlPercent: 16.67,
+    shareOfBookPercent: 12.5,
     taxLots: [
       {
         quantity: 10,
@@ -157,24 +158,34 @@ export const DOSSIER_AAPL = {
         historyUnavailable: true,
       },
       dividendYield: {
-        value: 0.5,
-        fiveYearAvg: 0.6,
+        value: 0.005,
+        fiveYearAvg: 0.006,
         historyWindowYears: 5,
         historyUnavailable: false,
       },
     },
     consensusTarget: 210.0,
     impliedUpsidePct: 20.0,
-    peerSet: null,
+    peerSet: {
+      name: 'sector:Technology (default)',
+      peers: [
+        {ticker: 'MSFT', forwardPe: 31.4, evToEbitda: 22.8},
+        {ticker: 'GOOGL', forwardPe: 21.7, evToEbitda: 14.2},
+      ],
+    },
     sources: ['yahoo_finance'],
     retrievedAt: '2026-09-01T08:00:00Z',
+    name: 'Apple Inc.',
+    sector: 'Technology',
+    industry: 'Consumer Electronics',
+    priceAsOf: '2026-09-01T07:55:00Z',
   },
   analysts: {
     recentActions: [
       {
         ticker: 'AAPL',
         firm: 'Goldman Sachs',
-        actionType: 'Upgraded',
+        actionType: 'TargetChange',
         priorRating: 'Neutral',
         newRating: 'Buy',
         priorTarget: 185.0,
@@ -209,6 +220,16 @@ export const DOSSIER_AAPL = {
       tickers: ['AAPL'],
       categories: ['earnings'],
       publishedAt: '2026-08-15T12:00:00Z',
+    },
+    {
+      id: 'news-2',
+      source: 'yahoo:AAPL',
+      title: 'Apple supplier raises capacity for the next iPhone cycle',
+      url: 'https://finance.yahoo.com/news/apple-supplier',
+      summary: null,
+      tickers: ['AAPL'],
+      categories: [],
+      publishedAt: '2026-08-14T09:30:00Z',
     },
   ],
   nextEarnings: {

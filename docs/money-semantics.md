@@ -188,6 +188,10 @@ non-fiat crypto is Crypto. A row's weight is its share of the whole page total, 
 so Cash is a slice and cash never inflates the Equities rows. Cash rows are not holdings with a
 dossier: they link nowhere, and the command palette omits them.
 
+**Position share of book** (`DossierPositionSection.ShareOfBookPercent`, asset dossier hero): the
+position's USD value over the book's `TotalValueUsd`, cash included - the same denominator as a
+Holdings row's weight - rounded to two decimals; null when the book total is not positive.
+
 **Cash rows elsewhere.** The same cash definition (`AssetClassNormalizer.Cash` on a broker
 `InstrumentType`, `IsVenueFiat` on a venue balance) tags cash on three more surfaces; none of them
 changes a number:

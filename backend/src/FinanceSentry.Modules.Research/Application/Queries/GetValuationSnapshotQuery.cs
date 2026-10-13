@@ -82,7 +82,11 @@ public class GetValuationSnapshotQueryHandler(
             impliedUpside,
             peerSet,
             sources,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            current.Name,
+            current.Sector,
+            current.Industry,
+            current.PriceAsOf);
     }
 
     private async Task<ValuationPeerSet?> BuildPeerSetAsync(

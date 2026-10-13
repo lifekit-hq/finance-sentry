@@ -66,9 +66,9 @@ public class AssetDossierContractTests(AssetDossierApiFactory factory)
     [Fact]
     public async Task GetDossier_WithPosition_Returns200WithPositionSection()
     {
-        // Simulate a single AAPL holding at $1500 with cost basis $1200.
+        // Simulate a single AAPL holding at $1500 with cost basis $1200, in a $6000 book ($4500 cash).
         var pos = new BookFigurePosition("AAPL", "equity", 10m, 1200m, 1500m, "ibkr");
-        var book = new BookFigures(0m, 0m, 0m, 1500m, 1500m, [pos], false, []);
+        var book = new BookFigures(4500m, 0m, 4500m, 1500m, 6000m, [pos], false, []);
 
         _factory.BookFiguresMock
             .Setup(s => s.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -91,6 +91,7 @@ public class AssetDossierContractTests(AssetDossierApiFactory factory)
         body.Position.CurrentValueUsd.Should().Be(1500m);
         body.Position.CostBasisUsd.Should().Be(1200m);
         body.Position.UnrealizedPnlUsd.Should().Be(300m);
+        body.Position.ShareOfBookPercent.Should().Be(25m, "share of the whole book total, cash included");
         body.Position.TaxLots.Should().BeEmpty();
     }
 
@@ -270,7 +271,8 @@ public record DossierPositionShape(
     decimal? CostBasisUsd,
     decimal? UnrealizedPnlUsd,
     decimal? UnrealizedPnlPercent,
-    List<object> TaxLots);
+    List<object> TaxLots,
+    decimal? ShareOfBookPercent = null);
 
 public record DossierShape(
     string Symbol,

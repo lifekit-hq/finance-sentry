@@ -6,6 +6,7 @@ import {
   type DossierQuoteDto,
 } from '../models/dossier/dossier.model';
 import {DossierQuoteUtils} from '../utils/dossier-quote.utils';
+import {DossierViewUtils} from '../utils/dossier-view.utils';
 
 interface StateSignals {
   dossier: Signal<Nullable<AssetDossierDto>>;
@@ -47,6 +48,15 @@ export function dossierComputed(store: StateSignals) {
       store.isThesisExpanded() ? thesisParagraphs() : thesisParagraphs().slice(0, 1)
     ),
     quoteHeader: computed(() => DossierQuoteUtils.toHeader(store.quote())),
+    heroProfile: computed(() => {
+      const dossier = store.dossier();
+      return dossier ? DossierViewUtils.heroProfile(dossier) : null;
+    }),
+    sectionChips: computed(() => DossierViewUtils.sectionChips(store.dossier())),
+    // The latest month of the street's ratings as one bar and one verdict ("21 of 26 Buy").
+    recommendationSummary: computed(() =>
+      DossierViewUtils.recommendationSummary(store.dossier()?.analysts?.trends ?? [])
+    ),
     ledgerReadNarrative: computed(() => store.ledgerRead()?.narrative ?? ''),
     // The backend reports a missing cache as stale; only an actual narrative can be out of date.
     isLedgerReadStale: computed(() => {

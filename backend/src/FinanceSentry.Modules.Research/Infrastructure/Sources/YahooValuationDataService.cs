@@ -76,7 +76,12 @@ public sealed class YahooValuationDataService(
             var quotes = await marketData.GetQuotesAsync([upper], ct);
             if (quotes.TryGetValue(upper, out var quote))
             {
-                return parsed with { Price = quote.Price, IsStale = quote.IsStale };
+                return parsed with
+                {
+                    Price = quote.Price,
+                    IsStale = quote.IsStale,
+                    PriceAsOf = quote.SourcePriceTime ?? quote.FetchedAt,
+                };
             }
 
             return parsed;
@@ -171,7 +176,8 @@ public sealed class YahooValuationDataService(
             IsStale: true,
             NotApplicable: false,
             ReadString(assetProfile, "sector"),
-            ReadString(assetProfile, "industry"));
+            ReadString(assetProfile, "industry"),
+            ReadString(price, "longName") ?? ReadString(price, "shortName"));
     }
 
     private static IReadOnlyList<string> ParsePeers(string json, string self)

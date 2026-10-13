@@ -57,6 +57,7 @@ test.describe('Asset Dossier', () => {
         costBasisUsd: null,
         unrealizedPnlUsd: null,
         unrealizedPnlPercent: null,
+        shareOfBookPercent: null,
         taxLots: [],
       },
     };
@@ -82,12 +83,40 @@ test.describe('Asset Dossier', () => {
     expect(quoteRequests).toEqual([]);
   });
 
-  test('dossier page renders position section', async ({page}) => {
+  test('dossier hero opens with the company, quote slot and position strip', async ({page}) => {
     await page.goto('/assets/AAPL');
-    await expect(page.getByText('Position')).toBeVisible();
-    await expect(page.getByText('Current Value')).toBeVisible();
-    // Unrealized P&L section
-    await expect(page.getByText('Unrealized P&L')).toBeVisible();
+    const hero = page.getByTestId('dossier-hero');
+    await expect(hero.getByTestId('dossier-name')).toHaveText('Apple Inc.');
+    await expect(hero.getByTestId('dossier-profile')).toContainText(
+      'AAPL · Technology · Consumer Electronics'
+    );
+    const strip = hero.getByTestId('position-strip');
+    await expect(strip.getByTestId('position-value')).toContainText('$17,500.00');
+    await expect(strip.getByTestId('position-pnl')).toContainText('$2,500.00');
+    await expect(strip.getByTestId('position-pnl')).toContainText('16.67%');
+    await expect(strip.getByTestId('position-share')).toContainText('12.5%');
+    await expect(strip.getByTestId('position-provider-link')).toBeVisible();
+  });
+
+  test('section chips jump to their section', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    const chips = page.getByTestId('dossier-chips');
+    await expect(chips).toBeVisible();
+
+    await chips.getByRole('button', {name: 'News'}).click();
+
+    await expect(page.locator('#recent-news')).toBeInViewport();
+  });
+
+  test('dossier page writes enums in words and renders yield and peers', async ({page}) => {
+    await page.goto('/assets/AAPL');
+    await expect(page.getByText('Target changed')).toBeVisible();
+    await expect(page.getByText('Yahoo Finance')).toBeVisible();
+    await expect(page.getByText('yahoo:AAPL')).toHaveCount(0);
+    await expect(page.getByText('Dividend Yield')).toBeVisible();
+    await expect(page.getByText('0.50%')).toBeVisible();
+    await expect(page.getByTestId('valuation-peers')).toContainText('Versus Technology peers');
+    await expect(page.getByTestId('valuation-peer')).toHaveCount(2);
   });
 
   test('dossier page renders thesis section', async ({page}) => {
@@ -136,13 +165,15 @@ test.describe('Asset Dossier', () => {
     await expect(page.getByText('Revenue growth (YoY) falls below 5.0%')).toBeVisible();
   });
 
-  test('dossier page renders recommendation trend list', async ({page}) => {
+  test('dossier page renders the recommendation trend as one verdict and bar', async ({page}) => {
     await page.goto('/assets/AAPL');
     await expect(page.getByText('Recommendation Trend')).toBeVisible();
-    const trends = page.getByTestId('trend-list');
-    await expect(trends.getByTestId('list-row').first()).toContainText('Strong buy');
-    // Verify a trend row is rendered
-    await expect(trends.getByTestId('list-row').first()).toContainText('18');
+    await expect(page.getByTestId('recommendation-verdict')).toContainText(
+      '30 of 36 analysts rate it Buy'
+    );
+    await expect(page.getByTestId('recommendation-bar')).toBeVisible();
+    await expect(page.getByTestId('trend-list')).toContainText('Strong buy');
+    await expect(page.getByTestId('trend-list')).toContainText('18');
   });
 
   test('dossier page renders the radar trend sparkline for multiple signals', async ({page}) => {

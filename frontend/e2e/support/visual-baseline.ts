@@ -26,7 +26,7 @@ const SCREENSHOT_OPTIONS = {
 
 // A flat grey square stands in for every image the app loads from a third party (coin icons, bank
 // favicons): the baselines must not depend on the network or on someone else's artwork.
-const PLACEHOLDER_IMAGE = Buffer.from(
+export const PLACEHOLDER_IMAGE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO89OTJfwAIsAN+3gv9WAAAAABJRU5ErkJggg==',
   'base64'
 );
