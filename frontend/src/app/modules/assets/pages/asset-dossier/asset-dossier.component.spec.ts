@@ -13,8 +13,10 @@ import {
   type DossierPositionSection,
   type DossierQuoteHeader,
   type DossierSectionChip,
+  type MetricValue,
   type RecommendationSummary,
   type ThesisDto,
+  type ValuationSnapshotDto,
 } from '../../models/dossier/dossier.model';
 import {DossierStore} from '../../store/dossier.store';
 import {DossierViewUtils} from '../../utils/dossier-view.utils';
@@ -108,6 +110,35 @@ const DOSSIER_ANALYSTS: DossierAnalystsSection = {
       ingestedAt: '2026-09-01T00:00:00Z',
     },
   ],
+};
+
+const NO_METRIC: MetricValue = {
+  value: null,
+  fiveYearAvg: null,
+  historyWindowYears: null,
+  historyUnavailable: true,
+};
+
+const STALE_VALUATION: ValuationSnapshotDto = {
+  ticker: 'DRAM',
+  notApplicable: false,
+  price: 43,
+  isStale: true,
+  metrics: {
+    trailingPe: NO_METRIC,
+    forwardPe: NO_METRIC,
+    evToEbitda: NO_METRIC,
+    dividendYield: NO_METRIC,
+  },
+  consensusTarget: null,
+  impliedUpsidePct: null,
+  peerSet: null,
+  sources: [],
+  retrievedAt: '2026-09-01T08:00:00Z',
+  name: null,
+  sector: null,
+  industry: null,
+  priceAsOf: null,
 };
 
 const DOSSIER: AssetDossierDto = {
@@ -448,6 +479,23 @@ describe('AssetDossierComponent', () => {
       expect(text).toContain('Versus Technology peers');
       expect(byTestId('valuation-peer')?.textContent).toContain('MU');
       expect(byTestId('valuation-peer-subject')?.textContent).toContain('DRAM');
+    });
+
+    it('dates the stale valuation tag by the price it was quoted at', () => {
+      mockStore.dossier.set({
+        ...DOSSIER,
+        valuation: {...STALE_VALUATION, priceAsOf: '2026-08-28T20:00:00Z'},
+      });
+      fixture.detectChanges();
+
+      expect(byTestId('valuation-stale')?.textContent).toMatch(/Stale\s*·\s*as of\s+Aug 28, 2026/);
+    });
+
+    it('leaves the stale valuation tag undated when the price date is unknown', () => {
+      mockStore.dossier.set({...DOSSIER, valuation: STALE_VALUATION});
+      fixture.detectChanges();
+
+      expect(byTestId('valuation-stale')?.textContent?.trim()).toBe('Stale');
     });
 
     it('falls back to the symbol when the source gave no company name', () => {
