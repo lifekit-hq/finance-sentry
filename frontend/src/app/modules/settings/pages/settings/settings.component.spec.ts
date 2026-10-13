@@ -27,6 +27,7 @@ function create() {
   const toast = {show: vi.fn()};
   const store = {
     profile: signal<UserProfile | null>(profile),
+    profileRevision: signal(0),
     saveProfile: vi.fn(),
     applyChange: vi.fn(),
   };
@@ -151,6 +152,7 @@ describe('SettingsComponent Save assumptions button', () => {
   function render() {
     const store = {
       profile: signal<UserProfile | null>(profile),
+      profileRevision: signal(0),
       avatarInitials: signal('AL'),
       fullName: signal('Ada Lovelace'),
       isProfileSaveLoading: signal(false),
@@ -247,15 +249,13 @@ describe('SettingsComponent name form', () => {
     expect(component.nameForm()?.getRawValue()).toEqual({firstName: 'Ada', lastName: 'Lovelace'});
   });
 
-  it('saves the typed names with the rest of the stored profile', () => {
+  it('saves only the typed, trimmed names', () => {
     const {store, component} = create();
     const form = component.nameForm();
     form?.controls.firstName.setValue('  Grace ');
     form?.controls.lastName.setValue('Hopper');
     component.saveName();
-    expect(store.saveProfile).toHaveBeenCalledWith(
-      expect.objectContaining({firstName: 'Grace', lastName: 'Hopper', baseCurrency: 'USD'})
-    );
+    expect(store.saveProfile).toHaveBeenCalledWith({firstName: 'Grace', lastName: 'Hopper'});
   });
 
   it('does not send the typed names until Save is pressed', () => {
@@ -287,6 +287,16 @@ describe('SettingsComponent low balance threshold', () => {
     component.commitThreshold();
     expect(store.applyChange).not.toHaveBeenCalled();
     expect(control?.value).toBe('100');
+  });
+
+  it('shows the kept value again after the store rolls a rejected number back', () => {
+    const {store, component} = create();
+    component.thresholdControl()?.setValue('250.5');
+    component.commitThreshold();
+
+    store.profileRevision.update(revision => revision + 1);
+
+    expect(component.thresholdControl()?.value).toBe('100');
   });
 });
 

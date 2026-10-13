@@ -6,7 +6,7 @@ import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
-import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
+import {type UserProfile} from '../../models/settings/settings.model';
 import {SettingsService} from '../../services/settings.service';
 import {settingsEffects} from './settings.effects';
 
@@ -16,7 +16,6 @@ const PROFILE = {
   safeWithdrawalRate: 0.04,
   realAnnualReturn: 0.05,
 } as unknown as UserProfile;
-const REQUEST = {safeWithdrawalRate: 0.04} as unknown as UpdateProfileRequest;
 const SAVE_FAILED = 'Failed to save profile.';
 
 function buildStore() {
@@ -28,6 +27,9 @@ function buildStore() {
       profile.update(p => (p ? {...p, ...partial} : p))
     ),
     setProfile: vi.fn(),
+    revertProfile: vi.fn((previous: Partial<UserProfile>) =>
+      profile.update(p => (p ? {...p, ...previous} : p))
+    ),
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
     setError: vi.fn(),
@@ -83,28 +85,57 @@ describe('settingsEffects', () => {
     });
   });
 
-  it('toasts success only once the server has answered', () => {
-    const store = buildStore();
-    service.updateProfile.mockReturnValue(of(PROFILE));
+  describe('saveProfile', () => {
+    it('takes the section at once and toasts success only once the server has answered', () => {
+      const store = buildStore();
+      const answer = new Subject<UserProfile>();
+      service.updateProfile.mockReturnValue(answer);
 
-    effects(store).saveProfile(REQUEST);
+      effects(store).saveProfile({firstName: 'Grace'});
 
-    expect(store.setProfile).toHaveBeenCalledWith(PROFILE);
-    expect(toast.show).toHaveBeenCalledTimes(1);
-    expect(toast.show).toHaveBeenCalledWith('Profile saved successfully', 'success');
-  });
+      expect(store.updateProfile).toHaveBeenCalledWith({firstName: 'Grace'});
+      expect(service.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({firstName: 'Grace', lastName: 'Lovelace'})
+      );
+      expect(toast.show).not.toHaveBeenCalled();
+      answer.next({...PROFILE, firstName: 'Grace'});
+      answer.complete();
+      expect(store.setProfileSaveSuccess).toHaveBeenCalled();
+      expect(toast.show).toHaveBeenCalledTimes(1);
+      expect(toast.show).toHaveBeenCalledWith('Profile saved successfully', 'success');
+    });
 
-  it('toasts the failure and never a success when the save is rejected', () => {
-    const store = buildStore();
-    service.updateProfile.mockReturnValue(
-      throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'X'}}))
-    );
+    it('toasts the failure, never a success, and puts the section back when rejected', () => {
+      const store = buildStore();
+      service.updateProfile.mockReturnValue(
+        throwError(() => new HttpErrorResponse({status: 400, error: {errorCode: 'X'}}))
+      );
 
-    effects(store).saveProfile(REQUEST);
+      effects(store).saveProfile({firstName: 'Grace'});
 
-    expect(store.setProfileSaveError).toHaveBeenCalledWith('X');
-    expect(toast.show).toHaveBeenCalledTimes(1);
-    expect(toast.show).toHaveBeenCalledWith(SAVE_FAILED, 'error');
+      expect(store.setProfileSaveError).toHaveBeenCalledWith('X');
+      expect(store.revertProfile).toHaveBeenCalledWith({firstName: 'Ada'});
+      expect(store.profile()?.firstName).toBe('Ada');
+      expect(toast.show).toHaveBeenCalledTimes(1);
+      expect(toast.show).toHaveBeenCalledWith(SAVE_FAILED, 'error');
+    });
+
+    it('does not send a toggle made while a save is in flight with the old section', () => {
+      const store = buildStore();
+      const save = new Subject<UserProfile>();
+      service.updateProfile.mockReturnValueOnce(save).mockReturnValue(of(PROFILE));
+      const fx = effects(store);
+
+      fx.saveProfile({firstName: 'Grace'});
+      fx.applyChange({emailAlerts: false});
+
+      expect(service.updateProfile).toHaveBeenCalledTimes(1);
+      save.next(PROFILE);
+      save.complete();
+      expect(service.updateProfile).toHaveBeenLastCalledWith(
+        expect.objectContaining({firstName: 'Grace', emailAlerts: false})
+      );
+    });
   });
 
   describe('applyChange', () => {
@@ -121,19 +152,18 @@ describe('settingsEffects', () => {
       expect(toast.show).not.toHaveBeenCalled();
     });
 
-    it('toasts the failure and reloads the profile when the change is rejected', () => {
+    it('toasts the failure and rolls back only the rejected change', () => {
       const store = buildStore();
       service.updateProfile.mockReturnValue(
         throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'X'}}))
       );
-      service.getProfile.mockReturnValue(of(PROFILE));
 
       effects(store).applyChange({baseCurrency: 'EUR'});
 
       expect(store.setProfileSaveError).toHaveBeenCalledWith('X');
       expect(toast.show).toHaveBeenCalledWith(SAVE_FAILED, 'error');
-      expect(service.getProfile).toHaveBeenCalledTimes(1);
-      expect(store.setProfile).toHaveBeenCalledWith(PROFILE);
+      expect(store.revertProfile).toHaveBeenCalledWith({baseCurrency: undefined});
+      expect(service.getProfile).not.toHaveBeenCalled();
     });
 
     it('sends a quick second change after the first, carrying both', () => {

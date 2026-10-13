@@ -100,6 +100,17 @@ describe('SettingsStore', () => {
     expect(store.status()).toBe('success');
   });
 
+  it('rolls a rejected change back and bumps the revision, leaving the rest as it was', () => {
+    service.getProfile.mockReturnValue(of(PROFILE));
+    service.updateProfile.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));
+    const store = TestBed.inject(SettingsStore);
+
+    store.applyChange({baseCurrency: 'EUR'});
+
+    expect(store.profile()?.baseCurrency).toBe('USD');
+    expect(store.profileRevision()).toBe(1);
+  });
+
   it('falls back to the save default for an unknown save error', () => {
     service.getProfile.mockReturnValue(of(PROFILE));
     service.updateProfile.mockReturnValue(throwError(() => new HttpErrorResponse({status: 500})));

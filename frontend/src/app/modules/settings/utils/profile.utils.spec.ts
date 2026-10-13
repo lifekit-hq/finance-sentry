@@ -40,4 +40,11 @@ describe('ProfileUtils', () => {
     expect(request).not.toHaveProperty('email');
     expect(request).not.toHaveProperty('twoFactor');
   });
+
+  it('picks the current values of the fields a change names', () => {
+    expect(ProfileUtils.pick(PROFILE, {firstName: 'Grace', emailAlerts: false})).toEqual({
+      firstName: 'Ada',
+      emailAlerts: true,
+    });
+  });
 });

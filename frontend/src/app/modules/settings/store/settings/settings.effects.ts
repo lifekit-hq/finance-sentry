@@ -12,6 +12,7 @@ import {ProfileUtils} from '../../utils/profile.utils';
 interface EffectsStore {
   profile: () => Nullable<UserProfile>;
   updateProfile: (partial: Partial<UserProfile>) => void;
+  revertProfile: (previous: Partial<UserProfile>) => void;
   setProfile: (profile: UserProfile) => void;
   setLoading: () => void;
   setSuccess: () => void;
@@ -20,6 +21,11 @@ interface EffectsStore {
   setProfileSaveSuccess: () => void;
   setProfileSaveError: (errorCode: Nullable<string>) => void;
   profileSaveErrorMessage: () => string;
+}
+
+interface ProfileWrite {
+  change: Partial<UpdateProfileRequest>;
+  confirm: boolean;
 }
 
 export function settingsEffects(store: EffectsStore) {
@@ -46,50 +52,50 @@ export function settingsEffects(store: EffectsStore) {
     )
   );
 
-  return {
-    load,
-    // A toggle or select applies at once: the store takes the change now and the full profile goes
-    // out in order (concatMap), each request built from the store at send time so a quick second
-    // change never overwrites the first. A failure reloads the profile and says so in a toast.
-    applyChange: rxMethod<Partial<UpdateProfileRequest>>(
-      pipe(
-        tap(change => store.updateProfile(change)),
-        concatMap(() => {
-          const profile = store.profile();
-          if (!profile) {
-            return EMPTY;
-          }
-          return service.updateProfile(ProfileUtils.toRequest(profile)).pipe(
-            catchError(err => {
-              store.setProfileSaveError(extractErrorCode(err));
-              toast.show(store.profileSaveErrorMessage(), 'error');
-              load();
-              return EMPTY;
-            })
-          );
-        })
-      )
-    ),
-    saveProfile: rxMethod<UpdateProfileRequest>(
-      pipe(
-        tap(() => store.setProfileSaveLoading()),
-        switchMap(request =>
-          service.updateProfile(request).pipe(
-            tap(profile => {
-              store.setProfile(profile);
-              authStore.setProfileName(profile.firstName, profile.lastName);
+  // One queue for every write of the profile: a toggle or select applies at once, a section Save
+  // does the same and then confirms with a toast. Both take their change into the store now and
+  // send the whole profile in order (concatMap), each request built from the store at send time so
+  // no write carries a stale copy of another. A rejected change is rolled back alone, so a later
+  // queued change is not lost with it.
+  const write = rxMethod<ProfileWrite>(
+    pipe(
+      concatMap(({change, confirm}) => {
+        const current = store.profile();
+        if (!current) {
+          return EMPTY;
+        }
+        const previous = ProfileUtils.pick(current, change);
+        store.updateProfile(change);
+        if (confirm) {
+          store.setProfileSaveLoading();
+        }
+        return service.updateProfile(ProfileUtils.toRequest(store.profile() ?? current)).pipe(
+          tap(saved => {
+            if (confirm) {
+              authStore.setProfileName(saved.firstName, saved.lastName);
               store.setProfileSaveSuccess();
               toast.show('Profile saved successfully', 'success');
-            }),
-            catchError(err => {
-              store.setProfileSaveError(extractErrorCode(err));
-              toast.show(store.profileSaveErrorMessage(), 'error');
-              return EMPTY;
-            })
-          )
-        )
-      )
-    ),
+            }
+          }),
+          catchError(err => {
+            store.revertProfile(previous);
+            store.setProfileSaveError(extractErrorCode(err));
+            toast.show(store.profileSaveErrorMessage(), 'error');
+            return EMPTY;
+          })
+        );
+      })
+    )
+  );
+
+  return {
+    load,
+    applyChange(change: Partial<UpdateProfileRequest>): void {
+      write({change, confirm: false});
+    },
+    saveProfile(change: Partial<UpdateProfileRequest>): void {
+      write({change, confirm: true});
+    },
   };
 }
 

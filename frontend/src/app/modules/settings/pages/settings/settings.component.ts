@@ -38,7 +38,6 @@ import {
 import {type BaseCurrency} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
-import {ProfileUtils} from '../../utils/profile.utils';
 import {percentRange} from '../../validators/percent-range.validator';
 
 const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
@@ -102,7 +101,9 @@ export class SettingsComponent {
     });
   });
 
+  // Rebuilt when a rejected change is rolled back, so the field shows the value that was kept.
   public readonly thresholdControl = computed(() => {
+    this.store.profileRevision();
     if (!this.profileLoaded()) {
       return null;
     }
@@ -134,17 +135,12 @@ export class SettingsComponent {
   });
 
   public saveName(): void {
-    const p = this.store.profile();
     const form = this.nameForm();
-    if (!p || !form) {
+    if (!form) {
       return;
     }
     const {firstName, lastName} = form.getRawValue();
-    this.store.saveProfile({
-      ...ProfileUtils.toRequest(p),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-    });
+    this.store.saveProfile({firstName: firstName.trim(), lastName: lastName.trim()});
   }
 
   public saveAssumptions(): void {
@@ -159,7 +155,6 @@ export class SettingsComponent {
     }
     const {safeWithdrawalRate, realAnnualReturn} = form.controls;
     this.store.saveProfile({
-      ...ProfileUtils.toRequest(p),
       safeWithdrawalRate: safeWithdrawalRate.dirty
         ? (PercentUtils.toFraction(
             safeWithdrawalRate.value,

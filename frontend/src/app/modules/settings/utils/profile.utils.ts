@@ -16,4 +16,13 @@ export class ProfileUtils {
       realAnnualReturn: profile.realAnnualReturn,
     };
   }
+
+  /** The current values of the fields `change` names, to put back if the change is rejected. */
+  public static pick(
+    profile: UserProfile,
+    change: Partial<UpdateProfileRequest>
+  ): Partial<UserProfile> {
+    const keys = Object.keys(change) as (keyof UpdateProfileRequest)[];
+    return Object.fromEntries(keys.map(key => [key, profile[key]])) as Partial<UserProfile>;
+  }
 }
