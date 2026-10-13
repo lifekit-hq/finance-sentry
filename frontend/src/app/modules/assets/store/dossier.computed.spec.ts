@@ -129,7 +129,7 @@ const SIGNAL: DossierSignalItem = {
   timestamp: '2026-09-01T00:00:00Z',
   scanner: 'radar',
   signalType: 'VOLUME_SPIKE',
-  severity: 'high',
+  severity: 'alerted',
   payload: {},
 };
 
