@@ -1,9 +1,28 @@
-import {expect, type Page, test} from '@playwright/test';
+import {expect, type Locator, type Page, test} from '@playwright/test';
 
 const LOWER_PLOT_FRACTION = 0.7;
 // The category donut's ring starts at twelve o'clock and runs clockwise, and its legend sits
 // under the ring, so the first slice is hit just right of the top edge, inside the ring's width.
 const RING_TOP_OFFSET_PX = 20;
+const CHART_SETTLE_TIMEOUT_MS = 10_000;
+
+// Chart.js grows a band up from the baseline on first paint, and a click resolves against the
+// band's current top edge, so a click on a half-grown chart lands on the wrong band. Resolves once
+// two successive frames of the canvas are identical.
+async function waitForChartToSettle(canvas: Locator): Promise<void> {
+  let previous: Buffer | null = null;
+  await expect
+    .poll(
+      async () => {
+        const frame = await canvas.screenshot();
+        const settled = previous !== null && frame.equals(previous);
+        previous = frame;
+        return settled;
+      },
+      {timeout: CHART_SETTLE_TIMEOUT_MS}
+    )
+    .toBe(true);
+}
 
 // Parse compact ($2.9K) or full-precision ($2,900.00) currency strings to a number.
 // Both formats are used: dashboard uses compact notation, ledger uses decimal pipe.
@@ -602,6 +621,7 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await expect(page.getByTestId('net-worth-value')).toContainText('$50,000.00');
     const canvas = page.locator('cmn-area-chart canvas');
     await expect(canvas).toBeVisible();
+    await waitForChartToSettle(canvas);
     const box = await canvas.boundingBox();
     if (!box) {
       throw new Error('chart canvas has no box');
