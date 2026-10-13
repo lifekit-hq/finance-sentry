@@ -103,7 +103,8 @@ Second click returns the cached version instantly without re-running the agent.
 
 - **FR-001**: `GET /api/v1/research/assets/{symbol}/dossier` MUST return 200 with the full
   `AssetDossierResult` shape for any authenticated user.
-- **FR-002**: Dossier endpoint MUST fan-out all sub-queries in parallel (Task.WhenAll).
+- **FR-002**: Dossier endpoint MUST read all sub-queries one after another: the handlers share the request's
+  scoped `ResearchDbContext`, which allows one operation at a time, so a `Task.WhenAll` fan-out silently dropped sections.
 - **FR-003**: Each dossier section MUST degrade gracefully: null/empty when source has no data,
   never a 500.
 - **FR-004**: Position section MUST include tax lot detail for brokerage holdings (IBKR); for

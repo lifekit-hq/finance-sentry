@@ -99,8 +99,8 @@ Key design decisions:
   already depends on Core.
 - `IHoldingTaxLotsReader` (new port) gives IBKR tax lot detail; Radar module needs no port for
   signals because `IAssetSignalReader` (new port) wraps `ListSignalsQuery`.
-- All 7 sub-queries fan out via `Task.WhenAll`; each wrapped in try/catch so one failing source
-  never 500s the whole response.
+- All 7 sub-queries are awaited sequentially (they share one scoped `ResearchDbContext`; see FR-002);
+  each wrapped in try/catch so one failing source never 500s the whole response.
 - Thesis lookup: filter `GetThesesQuery` result by ticker client-side (small list, user-scoped).
 - Analyst actions: `GetAnalystActionsQuery` with Ticker filter, last 90 days, limit 20.
 - Earnings: `GetEarningsCalendarQuery` with Tickers=[symbol], next 90 days, pick nearest.
