@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -16,6 +17,11 @@ using Microsoft.Extensions.Logging;
 /// per-account sync jobs, so a newly discovered account is synced on the same scheduled run
 /// without the user reconnecting. A listing failure on one connection is logged and skipped —
 /// it never aborts discovery for the other connections.
+///
+/// Each connection's listing is one attempt on that connection's health (connection health, Option B, S2): a
+/// listing that works records a success, a failed one is classified and recorded through
+/// <see cref="IBankConnectionHealth"/>, which raises the alert the policy decides once the provider is listed in
+/// <c>ConnectionHealth:ActiveProviders</c> (in shadow mode it only records).
 ///
 /// Existing accounts are never touched here: this only adds rows. On SCA-strict banks (e.g. AIB)
 /// a discovered account stays balance-only until a user-present reconnect re-establishes the SCA
@@ -38,8 +44,12 @@ public class AccountDiscoveryService(
     ICredentialEncryptionService encryption,
     IBankAccountRepository accounts,
     IBackgroundJobClient backgroundJobs,
+    IBankConnectionHealth connectionHealth,
     ILogger<AccountDiscoveryService> logger) : IAccountDiscoveryService
 {
+    /// <summary>What a Monobank connection is called in its alert: the bank name its accounts carry.</summary>
+    private const string MonobankBankName = "Monobank";
+
     public async Task<int> DiscoverNewAccountsAsync(CancellationToken ct = default)
     {
         var created = await DiscoverTrueLayerAsync(ct);
@@ -54,13 +64,18 @@ public class AccountDiscoveryService(
 
         foreach (var connection in linkedConnections)
         {
+            var health = new BankConnectionRef(
+                TrueLayerFailureClassifier.ProviderName, connection.Id, connection.UserId, connection.ProviderDisplayName);
             try
             {
                 var accessToken = await trueLayerTokenRefresh.AcquireAccessTokenAsync(connection.Id, ct);
                 created += await DiscoverTrueLayerConnectionAsync(connection, accessToken, ct);
+                await connectionHealth.RecordConnectionSuccessAsync(health, ct);
             }
             catch (TrueLayerException ex) when (IsRefreshRejected(ex))
             {
+                // Recorded first: the expiry below saves the tracked row, which then carries the new health too.
+                await connectionHealth.RecordConnectionFailureAsync(health, ex, ct);
                 await ExpireConnectionAsync(connection.Id, ct);
             }
             catch (Exception ex)
@@ -68,14 +83,15 @@ public class AccountDiscoveryService(
                 logger.LogWarning(ex,
                     "TrueLayer account discovery failed for connection {ConnectionId}; skipping this connection.",
                     connection.Id);
+                await connectionHealth.RecordConnectionFailureAsync(health, ex, ct);
             }
         }
 
         return created;
     }
 
-    // Same test the sync path uses (ScheduledSyncService.ExtractErrorCode): a rejected refresh means
-    // the consent is gone and only a user-present reconnect can restore it.
+    // A rejected refresh means the consent is gone and only a user-present reconnect can restore it;
+    // TrueLayerFailureClassifier reads the same body as a definitive credential loss.
     private static bool IsRefreshRejected(TrueLayerException ex)
         => ex.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase);
 
@@ -186,10 +202,12 @@ public class AccountDiscoveryService(
 
         foreach (var credential in credentials)
         {
+            var health = new BankConnectionRef(
+                MonobankFailureClassifier.ProviderName, credential.Id, credential.UserId, MonobankBankName);
             try
             {
-                var token = encryption.Decrypt(
-                    credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion);
+                var token = CredentialUnreadableException.Decrypt(
+                    encryption, credential.EncryptedToken, credential.Iv, credential.AuthTag, credential.KeyVersion);
                 if (monobankBalanceCache.HasFreshEntries(token))
                 {
                     logger.LogInformation(
@@ -199,6 +217,7 @@ public class AccountDiscoveryService(
                 }
 
                 var clientInfo = await monobankAdapter.GetClientInfoAsync(token, ct);
+                await connectionHealth.RecordConnectionSuccessAsync(health, ct);
 
                 foreach (var pa in clientInfo.Accounts)
                 {
@@ -218,6 +237,7 @@ public class AccountDiscoveryService(
                 logger.LogWarning(ex,
                     "Monobank account discovery failed for credential {CredentialId}; skipping this connection.",
                     credential.Id);
+                await connectionHealth.RecordConnectionFailureAsync(health, ex, ct);
             }
         }
 

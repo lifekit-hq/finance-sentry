@@ -36,6 +36,8 @@ public class StaleSyncReaperJob(
 
         // An orphaned sync says nothing about the provider, so the account goes back to "active"
         // with no error (MarkTransientRetry) instead of "failed", which would read as a provider failure.
+        // For the same reason it records no connection-health attempt: the failure is ours (internal), so
+        // the streak neither grows nor resets and no alert can follow (connection health, Option B, S2).
         var resetAccounts = 0;
         foreach (var account in await _accounts.GetBySyncStatusUnscopedAsync("syncing", cancellationToken))
         {

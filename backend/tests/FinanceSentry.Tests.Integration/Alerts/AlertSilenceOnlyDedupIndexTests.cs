@@ -85,6 +85,37 @@ public sealed class AlertSilenceOnlyDedupIndexTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task EscalateSyncFailure_WithAFailingAlertOpenAndInsideTheSilenceWindow_ReplacesItWithTheReconnectAlert()
+    {
+        await using (var setup = CreateContext())
+        {
+            await setup.Database.EnsureCreatedAsync();
+        }
+
+        foreach (var openClass in new[] { SyncFailureClass.Outage, SyncFailureClass.Unknown })
+        {
+            var userId = Guid.NewGuid();
+            await using (var ctx = CreateContext())
+            {
+                var generator = new AlertGeneratorService(new AlertRepository(ctx), new Mock<IPolicyAckReader>().Object);
+                await generator.GenerateSyncFailureAlertAsync(userId, "ibkr", null, null, "HTTP_503", openClass);
+                await generator.EscalateSyncFailureAlertAsync(userId, "ibkr", null, null, "HTTP_401");
+            }
+
+            await using var read = CreateContext(userId);
+            var alerts = await read.Alerts.AsNoTracking()
+                .Where(a => a.UserId == userId && a.Type == AlertType.SyncFailure)
+                .ToListAsync();
+
+            alerts.Should().HaveCount(2);
+            alerts.Single(a => !a.Message.Contains("reconnect", StringComparison.OrdinalIgnoreCase))
+                .IsResolved.Should().BeTrue("the confirmed credential loss supersedes the {0} alert", openClass);
+            alerts.Single(a => a.Message.Contains("reconnect", StringComparison.OrdinalIgnoreCase))
+                .Should().Match<Alert>(a => !a.IsResolved && !a.IsDismissed);
+        }
+    }
+
+    [DockerRequiredFact]
     public async Task AddAsync_FailedInsert_DoesNotPoisonLaterSavesOnTheSameContext()
     {
         await using (var setup = CreateContext())

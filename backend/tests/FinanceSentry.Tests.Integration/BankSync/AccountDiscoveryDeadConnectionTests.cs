@@ -1,6 +1,8 @@
 namespace FinanceSentry.Tests.Integration.BankSync;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
@@ -69,7 +71,8 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
         return account;
     }
 
-    private (AccountDiscoveryService Sut, Mock<ITrueLayerClient> Client) BuildSut(BankSyncDbContext context)
+    private (AccountDiscoveryService Sut, Mock<ITrueLayerClient> Client, Mock<IAlertGeneratorService> Alerts) BuildSut(
+        BankSyncDbContext context, bool policyDriven = true)
     {
         var connections = new TrueLayerConnectionRepository(context);
         var accounts = new BankAccountRepository(context);
@@ -89,11 +92,19 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
         var monobankCredentials = new Mock<IMonobankCredentialRepository>();
         monobankCredentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
+        var alerts = new Mock<IAlertGeneratorService>();
+        var preferences = new Mock<IUserAlertPreferencesReader>();
+        preferences.Setup(p => p.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserAlertPreferences(false, 0m, true));
+        var connectionHealth = BankConnectionHealthFactory.Create(
+            accounts, monobankCredentials.Object, connections, alerts.Object, preferences.Object, TimeProvider.System,
+            policyDriven ? ["truelayer"] : []);
+
         var sut = new AccountDiscoveryService(
             connections, client.Object, refresh, monobankCredentials.Object, new Mock<IMonobankAdapter>().Object,
             new MonobankBalanceCache(TimeProvider.System), encryption.Object, accounts, jobs.Object,
-            NullLogger<AccountDiscoveryService>.Instance);
-        return (sut, client);
+            connectionHealth, NullLogger<AccountDiscoveryService>.Instance);
+        return (sut, client, alerts);
     }
 
     private static void StubProvider(Mock<ITrueLayerClient> client)
@@ -125,7 +136,7 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
 
         // One scoped context for the whole pass, like the DI container gives the real services.
         await using var context = CreateContext();
-        var (sut, client) = BuildSut(context);
+        var (sut, client, alerts) = BuildSut(context);
         StubProvider(client);
 
         var created = await sut.DiscoverNewAccountsAsync();
@@ -138,6 +149,19 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
         connections[healthy.Id].Status.Should().Be("LINKED");
         connections[dead.Id].EncryptedRefreshToken.Should().Equal(new[] { DeadMarker }, "expiry must not rewrite the credential columns");
 
+        // The rejected refresh is a confirmed credential loss: ActionRequired survives the expiry's tracked save, and the
+        // user is told at once on the connection's own alert id. The healthy listing records a success.
+        connections[dead.Id].Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        connections[dead.Id].Health.LastFailureCode.Should().Be("ITEM_LOGIN_REQUIRED");
+        connections[healthy.Id].Health.State.Should().Be(ConnectionHealthState.Healthy);
+        connections[healthy.Id].Health.LastSuccessAt.Should().NotBeNull();
+        alerts.Verify(a => a.EscalateSyncFailureAlertAsync(
+            _userId, "truelayer", dead.Id, dead.ProviderDisplayName, "ITEM_LOGIN_REQUIRED",
+            It.IsAny<CancellationToken>()), Times.Once);
+        alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), healthy.Id, It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Never);
+
         var accounts = await verify.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .ToDictionaryAsync(a => a.Id);
         accounts[deadAccount.Id].SyncStatus.Should().Be("reauth_required");
@@ -146,10 +170,37 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
 
         // The next scheduled pass no longer revisits the expired connection.
         await using var secondPassContext = CreateContext();
-        var (secondPass, secondClient) = BuildSut(secondPassContext);
+        var (secondPass, secondClient, _) = BuildSut(secondPassContext);
         StubProvider(secondClient);
         await secondPass.DiscoverNewAccountsAsync();
         secondClient.Verify(c => c.RefreshAccessTokenAsync("dead-token", It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [DockerRequiredFact]
+    public async Task Shadow_mode_expires_and_flags_as_before_records_the_loss_and_raises_no_alert()
+    {
+        var dead = LinkedConnection(_userId, "dead", DeadMarker);
+        var deadAccount = AccountOn(_userId, dead);
+        await using (var seed = CreateContext())
+        {
+            seed.AddRange(dead, deadAccount);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        var (sut, client, alerts) = BuildSut(context, policyDriven: false);
+        StubProvider(client);
+
+        await sut.DiscoverNewAccountsAsync();
+
+        await using var verify = CreateContext();
+        var connection = await verify.TrueLayerConnections.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .SingleAsync(c => c.Id == dead.Id);
+        connection.Status.Should().Be("EXPIRED");
+        connection.Health.State.Should().Be(ConnectionHealthState.ActionRequired, "the would-be decision is recorded");
+        (await verify.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .SingleAsync(a => a.Id == deadAccount.Id)).SyncStatus.Should().Be("reauth_required");
+        alerts.VerifyNoOtherCalls();
     }
 
     [DockerRequiredFact]
@@ -164,7 +215,7 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
         }
 
         await using var context = CreateContext();
-        var (sut, client) = BuildSut(context);
+        var (sut, client, alerts) = BuildSut(context);
         client.Setup(c => c.RefreshAccessTokenAsync("healthy-token", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new TrueLayerException("TRUELAYER_TOKEN_ERROR", "TrueLayer token endpoint error (503): unavailable", 503));
 
@@ -176,5 +227,15 @@ public sealed class AccountDiscoveryDeadConnectionTests : IAsyncLifetime
             .SingleAsync(c => c.Id == flaky.Id)).Status.Should().Be("LINKED");
         (await verify.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
             .SingleAsync(a => a.Id == account.Id)).SyncStatus.Should().NotBe("reauth_required");
+
+        // One transient failure is counted, silently.
+        var health = (await verify.TrueLayerConnections.IgnoreQueryFilters([OwnerQueryFilter.Name]).AsNoTracking()
+            .SingleAsync(c => c.Id == flaky.Id)).Health;
+        health.State.Should().Be(ConnectionHealthState.Degraded);
+        health.ConsecutiveFailures.Should().Be(1);
+        health.LastFailureClass.Should().Be(FailureClass.Transient);
+        alerts.Verify(a => a.GenerateSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<SyncFailureClass>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

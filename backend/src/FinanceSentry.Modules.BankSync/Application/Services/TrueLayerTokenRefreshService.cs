@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Services;
 
 using System.Collections.Concurrent;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
 
@@ -38,8 +39,8 @@ public class TrueLayerTokenRefreshService(
             var connection = await connections.GetByIdUnscopedAsync(connectionId, ct)
                 ?? throw new InvalidOperationException($"TrueLayer connection {connectionId} not found.");
 
-            var refreshToken = encryption.Decrypt(
-                connection.EncryptedRefreshToken, connection.Iv, connection.AuthTag, connection.KeyVersion);
+            var refreshToken = CredentialUnreadableException.Decrypt(
+                encryption, connection.EncryptedRefreshToken, connection.Iv, connection.AuthTag, connection.KeyVersion);
 
             var tokenSet = await client.RefreshAccessTokenAsync(refreshToken, ct);
 

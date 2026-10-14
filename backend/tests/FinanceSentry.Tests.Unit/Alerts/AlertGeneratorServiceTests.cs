@@ -130,6 +130,27 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task EscalateSyncFailure_OpenAlertInsideTheSilenceWindow_SupersedesItAndAddsTheReconnectAlert()
+    {
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync(open);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.SyncFailure, It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(true);
+
+        await _service.EscalateSyncFailureAlertAsync(_userId, "ibkr", null, null, "HTTP_401");
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.SyncFailure &&
+            a.Severity == AlertSeverity.Error &&
+            a.Message.Contains("reconnect", StringComparison.OrdinalIgnoreCase) &&
+            a.Message.Contains("HTTP_401")), default), Times.Once);
+    }
+
+    [Fact]
     public async Task ResolveSyncFailure_ExistingActive_CallsResolve()
     {
         var existing = new Alert { Id = Guid.NewGuid() };

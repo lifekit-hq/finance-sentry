@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync;
 
 using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Logging;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Application.Services.CategoryMapping;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
@@ -190,6 +191,9 @@ public static class BankSyncModule
         services.AddScoped<IBankProviderFactory, BankProviderFactory>();
 
         services.AddScoped<IBankSyncLogger, BankSyncLogger>();
+        services.AddSingleton<MonobankFailureClassifier>();
+        services.AddSingleton<TrueLayerFailureClassifier>();
+        services.AddScoped<IBankConnectionHealth, BankConnectionHealth>();
         services.AddScoped<IScheduledSyncService, ScheduledSyncService>();
         services.AddScoped<ITransactionSyncCoordinator, TransactionSyncCoordinator>();
         services.AddScoped<ITrueLayerTokenRefreshService, TrueLayerTokenRefreshService>();

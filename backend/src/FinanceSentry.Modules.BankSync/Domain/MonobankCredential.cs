@@ -47,8 +47,8 @@ public class MonobankCredential : Entity, IUserOwned
     }
 
     /// <summary>
-    /// Health of this connection by the connection-health policy. Shadow mode (Option B, S1): recorded on
-    /// each sync, read by nothing that alerts yet.
+    /// Health of this token by the connection-health policy, recorded on each of its cards' syncs and on
+    /// discovery's listing; it drives the connection's sync-failure alert (<c>BankConnectionHealth</c>, Option B, S2).
     /// </summary>
     public ConnectionHealth Health { get; private set; } = new();
 
