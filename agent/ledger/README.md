@@ -36,7 +36,10 @@ Both surfaces are the **same brain** — same identity, same finance discipline,
 
 The OpenClaw Ledger and the browser Ledger **coexist** and share this core. OpenClaw keeps owning Telegram and proactive/scheduled work; the browser agent is the interactive surface. Neither replaces the other.
 
-## Deploy (today vs. later)
+## Deploy
 
-- **Today:** the live OpenClaw persona is still authored on the VPS (auto-synced back to a separate config-backup repo). This directory is the *new* canonical home; the OpenClaw adapter above mirrors that live persona.
-- **Later (deferred, 032 agent-as-code):** OpenClaw is deployed *from* this directory (core + openclaw adapter), closing the hand-edit loop so this repo becomes the only place the persona is edited. Tracked as a follow-on, not required for feature 040.
+The live OpenClaw Ledger persona is now composed and deployed *from* this directory:
+- **Source:** `persona.core.md` + `adapters/openclaw.md`, pinned in lifekit-stack's [`scripts/ledger-persona/PIN`](https://github.com/lifekit-hq/lifekit-stack/blob/main/scripts/ledger-persona/PIN).
+- **Installation:** lifekit-stack's `ledger-persona.py install` reads the pin, clones/pulls this repo at that commit, composes the persona, and deploys it to the live OpenClaw environment.
+- **Drift detection:** A daily check (enabled by lifekit-stack PR #326) alerts if the live persona diverges from the pinned repo version.
+- **Update workflow:** Persona changes land as PRs here, merge, then the pin is bumped in lifekit-stack (closing the hand-edit loop; feature #040 / #416).
