@@ -114,6 +114,7 @@ public sealed class IBKRCredential : IUserOwned
         int keyVersion)
     {
         IsActive = true;
+        CreatedAt = DateTime.UtcNow;
         AccountId = null;
         LastSyncAt = null;
         LastSyncError = null;

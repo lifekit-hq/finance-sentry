@@ -173,26 +173,26 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 } @else if (store.netWorthChangeFormatted()) {
                   <p
                     [class]="changeClass()"
-                    class="font-label text-cmn-sm font-medium leading-5"
+                    class="block truncate font-label text-cmn-sm font-medium leading-5"
                     data-testid="net-worth-change"
                   >
                     <span class="font-normal text-text-secondary">Change</span>
                     {{ store.netWorthChangeFormatted() }}
                     @if (store.netWorthChangePercentFormatted()) {
                       ({{ store.netWorthChangePercentFormatted() }})
+                    } @else if (store.netWorthScopeNote()) {
+                      <span
+                        class="font-normal text-text-secondary"
+                        data-testid="net-worth-scope-note"
+                        [attr.title]="store.netWorthScopeNote()"
+                        [attr.aria-label]="store.netWorthScopeNote()"
+                        >· {{ store.netWorthScopeNote() }}</span
+                      >
                     }
                     <span class="font-normal text-text-secondary"
                       >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
                     >
                   </p>
-                  @if (store.netWorthScopeNote()) {
-                    <p
-                      class="font-label text-cmn-xs text-text-secondary"
-                      data-testid="net-worth-scope-note"
-                    >
-                      {{ store.netWorthScopeNote() }}
-                    </p>
-                  }
                 }
               </div>
               <!--

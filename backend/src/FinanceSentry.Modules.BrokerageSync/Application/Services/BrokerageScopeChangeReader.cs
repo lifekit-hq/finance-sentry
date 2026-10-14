@@ -7,16 +7,17 @@ using Microsoft.EntityFrameworkCore;
 
 public class BrokerageScopeChangeReader(BrokerageSyncDbContext db) : IAccountScopeChangeReader
 {
-    // A credential records when it was linked but not when it was deactivated; removal is only
-    // approximated for bank accounts (BankAccountScopeChangeReader) until per-source rows exist (R8).
+    // CreatedAt is re-stamped when a deactivated credential is relinked, so a relink counts as newly linked.
+    // A credential records no deactivation time: removal is detected for bank accounts only
+    // (BankAccountScopeChangeReader), and per-source rows (R8) resolve it for the rest.
     public async Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(
         Guid userId, DateTime sinceUtc, CancellationToken ct = default)
     {
         var ibkr = await db.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .Where(c => c.UserId == userId && c.CreatedAt >= sinceUtc)
+            .Where(c => c.UserId == userId && c.IsActive && c.CreatedAt >= sinceUtc)
             .Select(c => c.CreatedAt).ToListAsync(ct);
         var flex = await db.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
-            .Where(c => c.UserId == userId && c.CreatedAt >= sinceUtc)
+            .Where(c => c.UserId == userId && c.IsActive && c.CreatedAt >= sinceUtc)
             .Select(c => c.CreatedAt).ToListAsync(ct);
         var inzhur = await db.InzhurCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .Where(c => c.UserId == userId && c.CreatedAt >= sinceUtc)
