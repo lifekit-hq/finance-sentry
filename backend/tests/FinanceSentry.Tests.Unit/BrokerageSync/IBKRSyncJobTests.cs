@@ -586,4 +586,21 @@ public class IBKRSyncJobTests
         await CreatePolicyJob().ExecuteAsync();
         VerifySyncCalls(Times.Exactly(2));
     }
+
+    [Fact]
+    public async Task ActionRequired_AfterReactivate_TheNextScheduledRunSyncs()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-1)));
+        credential.Reactivate(
+            "FINSENTRY", "access-token", "dh-pem", [1], [2], [3], [4], [5], [6], [7], [8], [9], keyVersion: 1);
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        credential.Health.LastSuccessAt.Should().Be(Start);
+    }
 }

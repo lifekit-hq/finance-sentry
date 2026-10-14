@@ -94,6 +94,7 @@ public sealed class ExchangeCredential : IUserOwned
         LastSyncAt = null;
         LastSyncError = null;
         CreatedAt = DateTime.UtcNow;
+        Health = new ConnectionHealth();
     }
 
     /// <summary>

@@ -117,6 +117,7 @@ public sealed class IBKRCredential : IUserOwned
         AccountId = null;
         LastSyncAt = null;
         LastSyncError = null;
+        Health = new ConnectionHealth();
         ConsumerKey = consumerKey;
         AccessToken = accessToken;
         DhParam = dhParam;

@@ -760,4 +760,24 @@ public class CryptoExchangeSyncJobTests
         await RunJobAsync(provider);
         VerifySyncCalls(lost.UserId, Times.Exactly(3));
     }
+
+    [Theory]
+    [InlineData(CryptoExchangeProvider.Binance)]
+    [InlineData(CryptoExchangeProvider.RevolutX)]
+    public async Task ActionRequired_AfterReconnect_TheNextScheduledRunSyncs(string provider)
+    {
+        _options.ActiveProviders.Add(provider);
+        var credential = MakeLostCredential(provider, Start.AddHours(-1));
+        credential.Reconnect([7], [8], [9], [10], [11], [12], 1);
+        GivenActive(provider, credential);
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow));
+
+        await RunJobAsync(provider);
+
+        VerifySyncCalls(credential.UserId, Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        credential.Health.LastSuccessAt.Should().Be(Start);
+    }
 }
