@@ -9,7 +9,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// <summary>
 /// One-shot historical backfill of IBKR trade/cash-transaction activity via the Flex Web
 /// Service (fs-435 S5), walking year-by-year windows from <see cref="BackfillStartYear"/> to
-/// today — IBKR caps a single Flex pull at 365 days, so a multi-year range must be split.
+/// yesterday — IBKR caps a single Flex pull at 365 days, so a multi-year range must be split.
 /// Registered with <c>Cron.Never()</c> (dashboard-trigger only): this is a manual, one-time
 /// operation, not a recurring job. A clean no-op, logged and returned from, when no user has
 /// an active Flex credential — supplying one is a manual step in IBKR's account management.
@@ -63,16 +63,20 @@ public sealed class IbkrFlexBackfillJob(
         }
     }
 
-    /// <summary>Splits [<see cref="BackfillStartYear"/>-01-01, today] into ≤365-day, calendar-year-aligned windows.</summary>
+    /// <summary>
+    /// Splits [<see cref="BackfillStartYear"/>-01-01, yesterday] into ≤365-day, calendar-year-aligned windows.
+    /// Today is left out: IBKR answers a window ending on a day it has not closed yet with "statement is not
+    /// available" (1003).
+    /// </summary>
     public static IReadOnlyList<FlexStatementWindow> BuildYearlyWindows(DateOnly? asOf = null)
     {
-        var today = asOf ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var lastClosedDay = (asOf ?? DateOnly.FromDateTime(DateTime.UtcNow)).AddDays(-1);
         var windows = new List<FlexStatementWindow>();
 
-        for (var year = BackfillStartYear; year <= today.Year; year++)
+        for (var year = BackfillStartYear; year <= lastClosedDay.Year; year++)
         {
             var from = new DateOnly(year, 1, 1);
-            var to = year == today.Year ? today : new DateOnly(year, 12, 31);
+            var to = year == lastClosedDay.Year ? lastClosedDay : new DateOnly(year, 12, 31);
             windows.Add(new FlexStatementWindow(from, to));
         }
 

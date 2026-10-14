@@ -15,6 +15,9 @@ public class IbkrFlexClientTests
     private const string NotYetGenerated =
         """<FlexStatementResponse><Status>Warn</Status><ErrorCode>1019</ErrorCode><ErrorMessage>Statement generation in progress. Please try again shortly.</ErrorMessage></FlexStatementResponse>""";
 
+    private const string StatementNotAvailable =
+        """<FlexStatementResponse><Status>Fail</Status><ErrorCode>1003</ErrorCode><ErrorMessage>Statement is not available.</ErrorMessage></FlexStatementResponse>""";
+
     private static readonly IbkrFlexCredentials Credentials = new(Guid.NewGuid(), "synthetic-token", "999999");
 
     private static string LoadSampleStatementXml()
@@ -30,7 +33,11 @@ public class IbkrFlexClientTests
     private static IbkrFlexClient CreateClient(SequencedHttpStubHandler handler, IbkrFlexOptions? options = null)
     {
         var httpClient = new HttpClient(handler);
-        var opts = options ?? new IbkrFlexOptions { PollInterval = TimeSpan.FromMilliseconds(10) };
+        var opts = options ?? new IbkrFlexOptions
+        {
+            PollInterval = TimeSpan.FromMilliseconds(10),
+            SendRequestRetryDelay = TimeSpan.FromMilliseconds(1),
+        };
         return new IbkrFlexClient(
             httpClient,
             Microsoft.Extensions.Options.Options.Create(opts),
@@ -90,17 +97,57 @@ public class IbkrFlexClientTests
     }
 
     [Fact]
-    public async Task FetchStatementAsync_SendRequestError_ThrowsWithFlexErrorCode()
+    public async Task FetchStatementAsync_SendRequestError_ThrowsWithFlexErrorCode_WithoutRetrying()
     {
         const string error =
-            """<FlexStatementResponse><Status>Fail</Status><ErrorCode>1003</ErrorCode><ErrorMessage>Invalid token or query ID.</ErrorMessage></FlexStatementResponse>""";
+            """<FlexStatementResponse><Status>Fail</Status><ErrorCode>1015</ErrorCode><ErrorMessage>Token is invalid.</ErrorMessage></FlexStatementResponse>""";
         var handler = new SequencedHttpStubHandler().Enqueue("/AccountManagement/FlexWebService/SendRequest", error);
         var client = CreateClient(handler);
 
         var act = () => client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
 
         var thrown = await act.Should().ThrowAsync<IbkrFlexException>();
-        thrown.Which.FlexErrorCode.Should().Be("1003");
+        thrown.Which.FlexErrorCode.Should().Be("1015");
+        handler.RequestUris.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData(StatementNotAvailable)]
+    [InlineData(NotYetGenerated)]
+    public async Task FetchStatementAsync_SendRequestNotAvailableOrInProgress_IsRetried_ThenSucceeds(string firstAnswer)
+    {
+        var handler = new SequencedHttpStubHandler()
+            .Enqueue("/AccountManagement/FlexWebService/SendRequest", firstAnswer)
+            .Enqueue("/AccountManagement/FlexWebService/SendRequest", SendRequestSuccess)
+            .Enqueue("/AccountManagement/FlexWebService/GetStatement", LoadSampleStatementXml());
+        var client = CreateClient(handler);
+
+        var statement = await client.FetchStatementAsync(Credentials, ct: CancellationToken.None);
+
+        statement.AccountId.Should().Be("U0000001");
+        handler.RequestUris.Select(u => u.AbsolutePath).Should().Equal(
+            "/AccountManagement/FlexWebService/SendRequest",
+            "/AccountManagement/FlexWebService/SendRequest",
+            "/AccountManagement/FlexWebService/GetStatement");
+    }
+
+    [Fact]
+    public async Task FetchStatementAsync_SendRequestNeverAvailable_ThrowsTheFlexCode_AfterMaxAttempts()
+    {
+        var handler = new SequencedHttpStubHandler().Enqueue("/AccountManagement/FlexWebService/SendRequest", StatementNotAvailable);
+        var client = CreateClient(handler, new IbkrFlexOptions
+        {
+            SendRequestMaxAttempts = 3,
+            SendRequestRetryDelay = TimeSpan.FromMilliseconds(1),
+        });
+
+        var act = () => client.FetchStatementAsync(
+            Credentials, new FlexStatementWindow(new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 13)), CancellationToken.None);
+
+        var thrown = await act.Should().ThrowAsync<IbkrFlexException>();
+        thrown.Which.IsStatementNotAvailable.Should().BeTrue();
+        handler.RequestUris.Should().HaveCount(3);
+        handler.RequestUris.Should().OnlyContain(u => u.Query.Contains("fd=20261007") && u.Query.Contains("td=20261013"));
     }
 
     [Theory]

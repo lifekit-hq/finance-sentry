@@ -32,7 +32,7 @@ public class IbkrFlexFailureClassifierTests
         { new IbkrFlexException("1019", "Statement for reference 123 was not ready after 5 polls."), FailureClass.Transient, FailureStrength.Definitive, "1019" },
         { new HttpRequestException("Service Unavailable", null, HttpStatusCode.ServiceUnavailable), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
         { new HttpRequestException("Connection refused", new SocketException()), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
-        // "Statement is not available": the scheduled job treats it as no failure at all; any other caller reads it as unknown.
+        // "Statement is not available", once the client's retries and the job's step-back are spent: unknown.
         { new IbkrFlexException("1003", "Statement is not available."), FailureClass.Unknown, FailureStrength.Definitive, "1003" },
         // A stored token we cannot read: only entering it again fixes it.
         { new BrokerCredentialUnreadableException("IBKR Flex", new CryptographicException("tag mismatch")), FailureClass.Credential, FailureStrength.Definitive, nameof(BrokerCredentialUnreadableException) },

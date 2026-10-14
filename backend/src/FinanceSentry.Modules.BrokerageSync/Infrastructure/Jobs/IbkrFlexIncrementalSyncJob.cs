@@ -19,13 +19,18 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// covers full history. A clean no-op, logged and returned from, when no user has an active
 /// Flex credential — supplying one is a manual step in IBKR's account management.
 ///
+/// The window ends yesterday, never today: IBKR answers a window ending on a day it has not closed
+/// yet with "statement is not available" (1003), which is what failed every weekday run while the
+/// window ended today. Should yesterday not be published yet either, the run asks once more through
+/// the day before; the overlapping window picks the missing day up on the next run.
+///
 /// Each attempt is recorded with the connection-health policy (Option B), read by
 /// <see cref="IbkrFlexFailureClassifier"/>. With <c>ibkr-flex</c> in
 /// <see cref="ConnectionHealthOptions.ActiveProviders"/> the policy's verdict raises and resolves the in-app
 /// sync-failure alert (a rejected or expired token at once, anything else once it has persisted: by default
 /// 3 failures and 2 h without a success, three daily runs); otherwise (shadow mode) this job raises none,
-/// as before the policy existed. IBKR answering that no statement is available yet is no failure at all:
-/// it is logged and leaves the credential's error and health as they were.
+/// as before the policy existed. A "statement is not available" answer that survives the step-back is
+/// recorded like any other failure.
 /// </summary>
 public sealed class IbkrFlexIncrementalSyncJob(
     IIBKRFlexCredentialRepository credentialRepository,
@@ -39,6 +44,9 @@ public sealed class IbkrFlexIncrementalSyncJob(
     ILogger<IbkrFlexIncrementalSyncJob> logger)
 {
     private const int LookbackDays = 7;
+
+    // How many days further back than yesterday the window's end may move when IBKR has no statement yet.
+    private const int MaxEndDateStepBacks = 1;
     private const string Provider = IbkrFlexFailureClassifier.ProviderName;
 
     public async Task ExecuteAsync()
@@ -52,13 +60,12 @@ public sealed class IbkrFlexIncrementalSyncJob(
 
         var policyDrivesAlerts = healthOptions.CurrentValue.IsActive(Provider);
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
-        var window = new FlexStatementWindow(today.AddDays(-LookbackDays), today);
 
         foreach (var credential in activeCredentials)
         {
             try
             {
-                await syncService.SyncAsync(credential.UserId, window, CancellationToken.None, statementNotAvailableIsExpected: true);
+                await SyncThroughLastClosedDayAsync(credential.UserId, today);
                 var evaluation = await connectionHealth.RecordSuccessAsync(
                     HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
                 if (policyDrivesAlerts)
@@ -67,16 +74,13 @@ public sealed class IbkrFlexIncrementalSyncJob(
                         alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
                 }
             }
-            catch (IbkrFlexException ex) when (ex.IsStatementNotAvailable)
-            {
-                logger.LogInformation(
-                    "IBKR Flex has no statement available yet for user {UserId} ({FlexMessage}); trying again next run",
-                    credential.UserId,
-                    ex.Message);
-            }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to sync IBKR Flex trades for user {UserId}", credential.UserId);
+                logger.LogError(
+                    ex,
+                    "Failed to sync IBKR Flex trades for user {UserId} (Flex error code {FlexErrorCode})",
+                    credential.UserId,
+                    (ex as IbkrFlexException)?.FlexErrorCode);
                 await RecordFailureAsync(credential, ex);
                 var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
                 var evaluation = await connectionHealth.RecordFailureAsync(
@@ -89,6 +93,28 @@ public sealed class IbkrFlexIncrementalSyncJob(
                     await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
                         alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
                 }
+            }
+        }
+    }
+
+    private async Task SyncThroughLastClosedDayAsync(Guid userId, DateOnly today)
+    {
+        var from = today.AddDays(-LookbackDays);
+        for (var stepBack = 0; ; stepBack++)
+        {
+            var window = new FlexStatementWindow(from, today.AddDays(-1 - stepBack));
+            try
+            {
+                await syncService.SyncAsync(userId, window, CancellationToken.None);
+                return;
+            }
+            catch (IbkrFlexException ex) when (ex.IsStatementNotAvailable && stepBack < MaxEndDateStepBacks)
+            {
+                logger.LogWarning(
+                    "IBKR Flex has no statement through {ToDate} for user {UserId} (code {FlexErrorCode}); asking through the day before",
+                    window.ToDateWire,
+                    userId,
+                    ex.FlexErrorCode);
             }
         }
     }

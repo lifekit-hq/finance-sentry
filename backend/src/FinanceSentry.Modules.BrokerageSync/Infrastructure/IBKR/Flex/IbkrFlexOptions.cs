@@ -21,4 +21,12 @@ public sealed class IbkrFlexOptions
     public int MaxPollAttempts { get; set; } = 10;
 
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// How many times <c>SendRequest</c> is tried when IBKR answers "statement is not available" (1003) or
+    /// "generation in progress" (1019), and the wait before the first retry, doubled for each one after.
+    /// </summary>
+    public int SendRequestMaxAttempts { get; set; } = 3;
+
+    public TimeSpan SendRequestRetryDelay { get; set; } = TimeSpan.FromSeconds(5);
 }
