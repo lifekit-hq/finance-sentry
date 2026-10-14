@@ -52,7 +52,7 @@ public static class RadarModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(options.ComputeHourUtc));
 
-            // 412: weekly book-vs-SPY TWR brief; Monday 08:00 UTC.
+            // 412: weekly book-vs-SPY brief (change in invested value, includes deposits); Monday 08:00 UTC.
             mgr.AddOrUpdate<BookPerformanceBriefJob>(
                 "book-performance-brief",
                 job => job.ExecuteAsync(CancellationToken.None),

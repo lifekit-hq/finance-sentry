@@ -185,7 +185,7 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Raises a weekly performance-brief Info alert (412) summarising the book's TWR versus SPY.
+    /// Raises a weekly performance-brief Info alert (412) summarising the book's change in invested value (includes deposits) versus SPY.
     /// Silenced for 6 days so the weekly cron doesn't repeat on a re-run.
     /// </summary>
     Task GeneratePerformanceBriefAlertAsync(

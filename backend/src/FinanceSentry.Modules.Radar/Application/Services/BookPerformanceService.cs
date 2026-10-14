@@ -5,10 +5,12 @@ using FinanceSentry.Modules.Radar.Domain.Repositories;
 namespace FinanceSentry.Modules.Radar.Application.Services;
 
 /// <summary>
-/// Computes time-weighted return (HPR approximation) for the invested brokerage book versus SPY over
-/// configurable lookback windows. Uses adjusted close from daily bars for SPY and the invested brokerage
-/// value (idle broker cash excluded) from net-worth snapshots for the portfolio. Deposits and withdrawals
-/// are not adjusted for, so a contribution reads as a gain.
+/// Computes the change in invested value (includes deposits) for the invested brokerage book versus SPY's
+/// adjusted-close change over configurable lookback windows. The book side is last / first - 1 over the
+/// invested brokerage value (idle broker cash excluded) from net-worth snapshots. It is not a time-weighted
+/// return: deposits and withdrawals are not adjusted for, so a contribution reads as a gain, and a purchase
+/// made from idle broker cash reads as a gain too. The <c>PeriodTwr</c> / <c>BookTwr</c> / <c>SpyTwr</c> names
+/// are kept for contract stability and are misleading; see docs/finance-framework.md (known gaps).
 /// </summary>
 public sealed class BookPerformanceService(
     IDailyBarRepository bars,
