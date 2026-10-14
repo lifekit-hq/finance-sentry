@@ -96,11 +96,13 @@ describe('AppShellComponent FAB clearance', () => {
   it('renders the offline, update and install prompts in the layout notice slot', async () => {
     const fixture = await setup('/');
     const host = fixture.nativeElement as HTMLElement;
-    const notice = host.querySelector('[cmnAppLayoutNotice]');
+    // The slot's container is `empty:hidden`: a wrapper element with a flex gap would keep it
+    // visible and push every page down, so the prompts must be its direct children.
+    const notice = host.querySelector('lk-offline-banner')?.parentElement;
 
-    expect(notice?.querySelector('lk-offline-banner')).not.toBeNull();
-    expect(notice?.querySelector('lk-update-prompt')).not.toBeNull();
-    expect(notice?.querySelector('lk-install-hint')).not.toBeNull();
+    expect(notice?.querySelector(':scope > lk-offline-banner')).not.toBeNull();
+    expect(notice?.querySelector(':scope > lk-update-prompt')).not.toBeNull();
+    expect(notice?.querySelector(':scope > lk-install-hint')).not.toBeNull();
   });
 
   it('shows the update prompt once a version is downloaded and reloads on request', async () => {

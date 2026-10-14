@@ -83,14 +83,13 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
       brand="Finance Sentry"
     >
-      <div cmnAppLayoutNotice class="flex flex-col gap-cmn-2">
-        <lk-offline-banner />
-        <lk-update-prompt
-          [ready]="appUpdate.updateReady()"
-          (lk-update-prompt-reload)="appUpdate.reload()"
-        />
-        <lk-install-hint />
-      </div>
+      <lk-offline-banner cmnAppLayoutNotice />
+      <lk-update-prompt
+        [ready]="appUpdate.updateReady()"
+        (lk-update-prompt-reload)="appUpdate.reload()"
+        cmnAppLayoutNotice
+      />
+      <lk-install-hint cmnAppLayoutNotice />
       <router-outlet />
       @if (canUseAi()) {
         <fns-chat-widget cmnAppLayoutFab />
