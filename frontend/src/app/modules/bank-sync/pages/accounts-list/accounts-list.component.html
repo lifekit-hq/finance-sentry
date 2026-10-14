@@ -179,7 +179,7 @@
                 } @else {
                   @for (
                     account of inst.accounts;
-                    track account.accountId + account.accountNumberLast4
+                    track account.accountId + (account.symbol ?? account.accountNumberLast4)
                   ) {
                     @if (account.accountType === 'cash') {
                       <li
