@@ -40,6 +40,6 @@ The OpenClaw Ledger and the browser Ledger **coexist** and share this core. Open
 
 The live OpenClaw Ledger persona is now composed and deployed *from* this directory:
 - **Source:** `persona.core.md` + `adapters/openclaw.md`, pinned in lifekit-stack's [`scripts/ledger-persona/PIN`](https://github.com/lifekit-hq/lifekit-stack/blob/main/scripts/ledger-persona/PIN).
-- **Installation:** lifekit-stack's `ledger-persona.py install` reads the pin, clones/pulls this repo at that commit, composes the persona, and deploys it to the live OpenClaw environment.
+- **Installation:** an operator runs lifekit-stack's `ledger-persona.py install` (no deploy script runs it). It reads the pin, fetches `persona.core.md` and `adapters/openclaw.md` at that commit through the GitHub contents API (`gh`'s existing login, no checkout), joins them, and writes the result to the live workspace's `AGENTS.md`, keeping the previous file as `AGENTS.md.pre-persona-install`. It refuses a composed persona over 20,000 characters (invariant 4).
 - **Drift detection:** A daily check (enabled by lifekit-stack PR #326) alerts if the live persona diverges from the pinned repo version.
 - **Update workflow:** Persona changes land as PRs here, merge, then the pin is bumped in lifekit-stack (closing the hand-edit loop; feature #040 / #416).
