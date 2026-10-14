@@ -476,4 +476,114 @@ public class IBKRSyncJobTests
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
         _failureStreaks.Get("ibkr-sync:" + userId).Should().Be(JobFailureStreak.Empty);
     }
+
+    // ── A confirmed-lost credential is not re-hit every tick ─────────────────
+
+    private static ConnectionHealth ActionRequiredSince(DateTimeOffset lastFailureAt) =>
+        new()
+        {
+            State = ConnectionHealthState.ActionRequired,
+            ConsecutiveFailures = 3,
+            FirstFailureAt = lastFailureAt.AddHours(-1),
+            LastFailureAt = lastFailureAt,
+            LastFailureClass = FailureClass.Credential,
+            LastFailureCode = "HTTP_401",
+        };
+
+    private void VerifySyncCalls(Times times) =>
+        _syncHandler.Verify(
+            h => h.Handle(It.IsAny<SyncIBKRHoldingsCommand>(), It.IsAny<CancellationToken>()), times);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ActionRequired_ScheduledRun_SkipsTheCredential_InBothModes(bool policyDrivesAlerts)
+    {
+        if (!policyDrivesAlerts) GivenShadowMode();
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-1)));
+        GivenSyncFails(Ibkr401());
+
+        await RunTicksAsync(8);
+
+        VerifySyncCalls(Times.Never());
+        VerifyNoAlert();
+        _credentialRepo.Verify(
+            r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ActionRequired_SkipsOnlyTheLostCredential_NotTheOthers()
+    {
+        var lost = MakeCredential(Guid.NewGuid());
+        lost.ApplyHealth(ActionRequiredSince(Start.AddHours(-1)));
+        var healthy = MakeCredential(Guid.NewGuid());
+        _credentialRepo
+            .Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([lost, healthy]);
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        _syncHandler.Verify(
+            h => h.Handle(It.Is<SyncIBKRHoldingsCommand>(c => c.UserId == lost.UserId), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _syncHandler.Verify(
+            h => h.Handle(It.Is<SyncIBKRHoldingsCommand>(c => c.UserId == healthy.UserId), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ActionRequired_ProbesOncePerDay_TimedFromTheLastFailure()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(ActionRequiredSince(Start.AddDays(-1)));
+        GivenSyncFails(Ibkr401());
+
+        // The day has passed since the last failure: the first tick probes, and the failed probe renews the pause.
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        credential.Health.LastFailureAt.Should().Be(Start);
+
+        // 95 more 15-minute ticks, all inside the day.
+        for (var i = 0; i < 95; i++)
+        {
+            _time.Advance(Tick);
+            await CreatePolicyJob().ExecuteAsync();
+        }
+        VerifySyncCalls(Times.Once());
+
+        // The tick a day after the probe is the next one.
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Exactly(2));
+        VerifyEscalated(userId, Times.Never());
+    }
+
+    [Fact]
+    public async Task ActionRequired_SuccessfulProbe_ClearsItThroughThePolicy_AndResolvesTheReconnectAlert()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(ActionRequiredSince(Start.AddDays(-1)));
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        credential.Health.LastSuccessAt.Should().Be(Start);
+        _credentialRepo.Verify(
+            r => r.SaveHealthUnscopedAsync(credential.Id, It.Is<ConnectionHealth>(h => h.State == ConnectionHealthState.Healthy), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Healthy again: the next tick syncs as usual.
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Exactly(2));
+    }
 }

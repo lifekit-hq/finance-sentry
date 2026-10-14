@@ -622,12 +622,142 @@ public class CryptoExchangeSyncJobTests
             .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow))
             .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow));
 
+        // The rejected key is a definitive loss: the alert goes out, and the following ticks leave the key alone.
         await RunPolicyTicksAsync(CryptoExchangeProvider.Binance, 3);
-
         VerifyEscalated(userId, CryptoExchangeProvider.Binance, Times.Once());
+        VerifySyncCalls(userId, Times.Once());
+
+        // The daily probe succeeds and resolves the alert.
+        _time.Advance(TimeSpan.FromDays(1));
+        await RunPolicyTicksAsync(CryptoExchangeProvider.Binance, 1);
+
         _alerts.Verify(
             a => a.ResolveSyncFailureAlertAsync(userId, CryptoExchangeProvider.Binance, null, It.IsAny<CancellationToken>()),
             Times.Once);
         credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+    }
+
+    // ── A confirmed-lost credential is not re-hit every tick ─────────────────
+
+    private static ConnectionHealth ActionRequiredSince(DateTimeOffset lastFailureAt) =>
+        new()
+        {
+            State = ConnectionHealthState.ActionRequired,
+            ConsecutiveFailures = 3,
+            FirstFailureAt = lastFailureAt.AddHours(-1),
+            LastFailureAt = lastFailureAt,
+            LastFailureClass = FailureClass.Credential,
+            LastFailureCode = "HTTP_401",
+        };
+
+    private static ExchangeCredential MakeLostCredential(string provider, DateTimeOffset lastFailureAt)
+    {
+        var credential = MakeCredential(Guid.NewGuid(), provider);
+        credential.ApplyHealth(ActionRequiredSince(lastFailureAt));
+        return credential;
+    }
+
+    private async Task RunJobAsync(string provider)
+    {
+        var shadow = ShadowRecorders.Create(_time, _options);
+        if (provider == CryptoExchangeProvider.Binance)
+            await CreateBinanceJob(shadow).ExecuteAsync();
+        else
+            await CreateRevolutXJob(shadow).ExecuteAsync();
+    }
+
+    private void VerifySyncCalls(Guid userId, Times times) =>
+        _syncHandler.Verify(
+            h => h.Handle(It.Is<SyncExchangeHoldingsCommand>(c => c.UserId == userId), It.IsAny<CancellationToken>()), times);
+
+    [Theory]
+    [InlineData(CryptoExchangeProvider.Binance, false)]
+    [InlineData(CryptoExchangeProvider.Binance, true)]
+    [InlineData(CryptoExchangeProvider.RevolutX, false)]
+    [InlineData(CryptoExchangeProvider.RevolutX, true)]
+    public async Task ActionRequired_ScheduledRun_SkipsTheCredential_InBothModes(string provider, bool active)
+    {
+        if (active) _options.ActiveProviders.Add(provider);
+        var lost = MakeLostCredential(provider, Start.AddHours(-1));
+        GivenActive(provider, lost);
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("must not be called"));
+
+        await RunJobAsync(provider);
+
+        VerifySyncCalls(lost.UserId, Times.Never());
+        _credentialRepo.Verify(
+            r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ActionRequired_ASkippedCredential_NeitherFailsNorExcusesTheRun()
+    {
+        var lost = MakeLostCredential(CryptoExchangeProvider.Binance, Start.AddHours(-1));
+        var failing = MakeCredential(Guid.NewGuid());
+        GivenActive(CryptoExchangeProvider.Binance, lost, failing);
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Simulated sync failure"));
+
+        // The one credential the job did try failed: that is every attempt of the run, so the run fails.
+        var thrown = await CreateBinanceJob().Invoking(j => j.ExecuteAsync()).Should().ThrowAsync<AggregateException>();
+        thrown.Which.InnerExceptions.Should().ContainSingle();
+        VerifySyncCalls(lost.UserId, Times.Never());
+    }
+
+    [Fact]
+    public async Task ActionRequired_EveryCredentialSkipped_TheRunSucceeds()
+    {
+        var lost = MakeLostCredential(CryptoExchangeProvider.RevolutX, Start.AddHours(-1));
+        GivenActive(CryptoExchangeProvider.RevolutX, lost);
+
+        await CreateRevolutXJob().Invoking(j => j.ExecuteAsync()).Should().NotThrowAsync();
+    }
+
+    [Theory]
+    [InlineData(CryptoExchangeProvider.Binance)]
+    [InlineData(CryptoExchangeProvider.RevolutX)]
+    public async Task ActionRequired_ProbesOncePerDay_AndASuccessfulProbeClearsItThroughThePolicy(string provider)
+    {
+        _options.ActiveProviders.Add(provider);
+        var lost = MakeLostCredential(provider, Start.AddDays(-1));
+        GivenActive(provider, lost);
+        _userPrefs
+            .Setup(p => p.GetAsync(lost.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserAlertPreferences(true, 0m, true));
+        var rejected = new HttpRequestException("Unauthorized", null, HttpStatusCode.Unauthorized);
+        _syncHandler
+            .SetupSequence(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(rejected)
+            .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow));
+
+        // Due: the probe runs, fails, and renews the pause from its own time.
+        await RunJobAsync(provider);
+        VerifySyncCalls(lost.UserId, Times.Once());
+        lost.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        lost.Health.LastFailureAt.Should().Be(Start);
+
+        // The rest of that day: nothing.
+        for (var i = 0; i < 95; i++)
+        {
+            _time.Advance(Tick);
+            await RunJobAsync(provider);
+        }
+        VerifySyncCalls(lost.UserId, Times.Once());
+
+        // A day after the probe: it runs again, succeeds and clears ActionRequired.
+        _time.Advance(Tick);
+        await RunJobAsync(provider);
+        VerifySyncCalls(lost.UserId, Times.Exactly(2));
+        lost.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(lost.UserId, provider, null, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Healthy: back to every tick.
+        _time.Advance(Tick);
+        await RunJobAsync(provider);
+        VerifySyncCalls(lost.UserId, Times.Exactly(3));
     }
 }

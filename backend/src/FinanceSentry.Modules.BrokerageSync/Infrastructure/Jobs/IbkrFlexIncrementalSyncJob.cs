@@ -56,6 +56,10 @@ public sealed class IbkrFlexIncrementalSyncJob(
 
         foreach (var credential in activeCredentials)
         {
+            if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                    logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+                continue;
+
             try
             {
                 await syncService.SyncAsync(credential.UserId, window, CancellationToken.None, statementNotAvailableIsExpected: true);

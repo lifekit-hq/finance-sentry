@@ -22,6 +22,12 @@ public sealed class ConnectionHealthOptions
     public TimeSpan SuspectConfirmationWindow { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
+    /// While a connection is ActionRequired its scheduled runs pause; one run in this interval, timed from the
+    /// last failure, probes it so a loss fixed on the provider's side recovers without a reconnect.
+    /// </summary>
+    public TimeSpan ActionRequiredProbeInterval { get; set; } = TimeSpan.FromDays(1);
+
+    /// <summary>
     /// The providers whose alerts the policy drives, by the keys the shadow log uses (<c>monobank</c>, <c>truelayer</c>,
     /// <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other provider stays in shadow mode: its
     /// evaluation is recorded and logged, and its own alerting and account status stay exactly as they were. Empty by

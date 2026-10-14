@@ -98,7 +98,8 @@ public class IbkrFlexJobsTests
             .ThrowsAsync(new InvalidOperationException("window blew up"));
 
         var job = new IbkrFlexBackfillJob(
-            credentialRepo.Object, syncService.Object, NullLogger<IbkrFlexBackfillJob>.Instance);
+            credentialRepo.Object, syncService.Object, HealthOptions.Monitor(new ConnectionHealthOptions()), TimeProvider.System,
+            NullLogger<IbkrFlexBackfillJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -118,7 +119,8 @@ public class IbkrFlexJobsTests
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
 
         var job = new IbkrFlexBackfillJob(
-            credentialRepo.Object, syncService.Object, NullLogger<IbkrFlexBackfillJob>.Instance);
+            credentialRepo.Object, syncService.Object, HealthOptions.Monitor(new ConnectionHealthOptions()), TimeProvider.System,
+            NullLogger<IbkrFlexBackfillJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -356,5 +358,120 @@ public class IbkrFlexJobsTests
         harness.CredentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(It.IsAny<IBKRFlexCredential>(), It.IsAny<CancellationToken>()), Times.Never);
         harness.CredentialRepo.Verify(r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
         harness.VerifyNoAlertCalls();
+    }
+
+    // ── A confirmed-lost credential is not re-hit every run ──────────────────
+
+    private static ConnectionHealth ActionRequiredSince(DateTimeOffset lastFailureAt) =>
+        new()
+        {
+            State = ConnectionHealthState.ActionRequired,
+            ConsecutiveFailures = 1,
+            FirstFailureAt = lastFailureAt,
+            LastFailureAt = lastFailureAt,
+            LastFailureClass = FailureClass.Credential,
+            LastFailureCode = "FLEX_1015",
+        };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IncrementalSyncJob_ActionRequired_SkipsTheCredentialInsideTheDay(bool active)
+    {
+        var harness = new PolicyHarness();
+        if (active) harness.Active();
+        harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
+        harness.GivenSyncFails(new IbkrFlexException("1015", "Token is invalid."));
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Never);
+        harness.VerifyNoAlertCalls();
+        harness.CredentialRepo.Verify(r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_ProbesOnEveryDailyRun_NotOnlyEveryOtherDay()
+    {
+        // Each run stamps its failure a few seconds after its cron time, so a strict "24 h since the last
+        // failure" would let the next daily run start just short of it and skip.
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1015", "Token is invalid."));
+        await harness.RunAsync();
+        harness.Time.Advance(TimeSpan.FromSeconds(20));
+        harness.Credential.ApplyHealth(harness.Credential.Health with { LastFailureAt = harness.Time.GetUtcNow() });
+
+        harness.Time.Advance(TimeSpan.FromDays(1) - TimeSpan.FromSeconds(20) - TimeSpan.FromSeconds(8));
+        await harness.RunAsync();
+        harness.Time.Advance(TimeSpan.FromDays(1));
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Exactly(3));
+        harness.VerifyEscalated(Times.Once());
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_ASixHourReRunDoesNotProbeAgain()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1013", "Invalid IP address."));
+        await harness.RunAsync();
+
+        harness.Time.Advance(TimeSpan.FromHours(6));
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_SuccessfulProbeRecoversWithoutAReconnect()
+    {
+        // A definitive loss fixed on IBKR's side (an IP restriction lifted) heals on the daily probe.
+        var harness = new PolicyHarness().Active();
+        harness.SyncService
+            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ThrowsAsync(new IbkrFlexException("1013", "Invalid IP address."))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+
+        await harness.RunDailyAsync(2);
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        harness.Alerts.Verify(a => a.ResolveSyncFailureAlertAsync(harness.UserId, "ibkr-flex", null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BackfillJob_ActionRequired_SkipsTheCredential_UntilItsProbeIsDue()
+    {
+        var time = new FakeTimeProvider(Start);
+        var userId = Guid.NewGuid();
+        var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
+        credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
+        var credentialRepo = new Mock<IIBKRFlexCredentialRepository>();
+        credentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[credential]);
+        var syncService = new Mock<IIbkrFlexTradeSyncService>();
+        syncService
+            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+        var job = new IbkrFlexBackfillJob(
+            credentialRepo.Object, syncService.Object, HealthOptions.Monitor(new ConnectionHealthOptions()), time,
+            NullLogger<IbkrFlexBackfillJob>.Instance);
+
+        await job.ExecuteAsync();
+        syncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Never);
+
+        time.Advance(TimeSpan.FromDays(1));
+        await job.ExecuteAsync();
+        syncService.Verify(
+            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Exactly(IbkrFlexBackfillJob.BuildYearlyWindows().Count));
     }
 }

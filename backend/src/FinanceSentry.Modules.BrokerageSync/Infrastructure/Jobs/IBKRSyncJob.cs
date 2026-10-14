@@ -25,6 +25,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// <item>Otherwise (shadow mode) this job's own streak does, as before the policy existed: a non-transient
 /// failure at once, a transient one after <see cref="TransientFailureAlertThreshold"/> consecutive ticks.</item>
 /// </list>
+/// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
+/// mode, except for one probe a day.
 /// </summary>
 public sealed class IBKRSyncJob(
     IIBKRCredentialRepository credentialRepository,
@@ -57,6 +59,10 @@ public sealed class IBKRSyncJob(
 
         foreach (var credential in activeCredentials)
         {
+            if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                    logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+                continue;
+
             try
             {
                 await syncHandler.Handle(new SyncIBKRHoldingsCommand(credential.UserId), CancellationToken.None);

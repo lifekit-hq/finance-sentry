@@ -1,8 +1,11 @@
+using FinanceSentry.Core.Connections;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 
@@ -13,13 +16,18 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// Registered with <c>Cron.Never()</c> (dashboard-trigger only): this is a manual, one-time
 /// operation, not a recurring job. A clean no-op, logged and returned from, when no user has
 /// an active Flex credential — supplying one is a manual step in IBKR's account management.
+/// A credential whose connection health is ActionRequired is skipped, except for its daily probe
+/// (<see cref="ConnectionHealthScheduledRunGate"/>), so a lost token is not tried once per year window.
 /// </summary>
 public sealed class IbkrFlexBackfillJob(
     IIBKRFlexCredentialRepository credentialRepository,
     IIbkrFlexTradeSyncService syncService,
+    IOptionsMonitor<ConnectionHealthOptions> healthOptions,
+    TimeProvider time,
     ILogger<IbkrFlexBackfillJob> logger)
 {
     private const int BackfillStartYear = 2022;
+    private const string Provider = IbkrFlexFailureClassifier.ProviderName;
 
     public async Task ExecuteAsync()
     {
@@ -32,6 +40,10 @@ public sealed class IbkrFlexBackfillJob(
 
         foreach (var credential in activeCredentials)
         {
+            if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                    logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+                continue;
+
             foreach (var window in BuildYearlyWindows())
             {
                 try
