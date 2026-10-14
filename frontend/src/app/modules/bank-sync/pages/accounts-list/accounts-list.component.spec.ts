@@ -166,6 +166,7 @@ describe('AccountsListComponent cash rows', () => {
       accountType,
       accountNumberLast4: symbol.slice(0, 4),
       currency: symbol,
+      symbol: accountType === 'cash' ? null : symbol,
       provider: 'ibkr',
       category: 'brokerage',
       currentBalance: 400,
@@ -199,6 +200,40 @@ describe('AccountsListComponent cash rows', () => {
 
     expect(element.querySelector('[data-testid="cash-row"] button')).toBeNull();
     expect(element.textContent).toContain('AAPL');
+  });
+});
+
+describe('AccountsListComponent position symbols', () => {
+  it.each(['GOOGL', 'BRK.B'])('shows %s in full and opens its dossier', symbol => {
+    const fixture = setupFixture(false, {
+      provider: 'ibkr',
+      category: 'brokerage',
+      syncStatus: 'synced',
+      accounts: [
+        {
+          accountId: 'p1',
+          bankName: 'Interactive Brokers',
+          accountType: 'brokerage',
+          accountNumberLast4: symbol.slice(0, 4),
+          currency: symbol,
+          symbol,
+          provider: 'ibkr',
+          category: 'brokerage',
+          currentBalance: 10,
+          balanceInBaseCurrency: 10,
+          syncStatus: 'synced',
+          lastSyncTimestamp: null,
+        },
+      ],
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const element = fixture.nativeElement as HTMLElement;
+
+    const row = element.querySelector<HTMLButtonElement>('li button');
+    expect(row?.textContent).toContain(symbol);
+    row?.click();
+
+    expect(navigate).toHaveBeenCalledWith(['/assets', symbol]);
   });
 });
 

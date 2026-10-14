@@ -202,7 +202,7 @@
                     } @else {
                       <li class="border-t border-border-default">
                         <button
-                          (click)="navigateToDossier(account.accountNumberLast4)"
+                          (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
                           class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
                           type="button"
                         >
@@ -210,11 +210,16 @@
                             class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary"
                           >
                             <cmn-institution-avatar
-                              [name]="account.accountNumberLast4"
-                              [logoUrl]="account.accountNumberLast4 | assetLogo: account.provider"
+                              [name]="account.symbol ?? account.accountNumberLast4"
+                              [logoUrl]="
+                                account.symbol ?? account.accountNumberLast4
+                                  | assetLogo: account.provider
+                              "
                               size="sm"
                             />
-                            <span class="truncate">{{ account.accountNumberLast4 }}</span>
+                            <span class="truncate">{{
+                              account.symbol ?? account.accountNumberLast4
+                            }}</span>
                           </span>
                           <ng-container
                             *ngTemplateOutlet="amountCell; context: {$implicit: account}"

@@ -15,6 +15,8 @@ export interface AccountBalanceItem extends AccountIdentity {
   /** A position's value as its provider reported it (an Inzhur fund in UAH); absent when `currentBalance` is already native. */
   nativeCurrency?: Nullable<string>;
   nativeValue?: Nullable<number>;
+  /** A position's full ticker (`GOOGL`, `BRK.B`); `accountNumberLast4` is cut to four characters. Absent on bank accounts. */
+  symbol?: Nullable<string>;
 }
 
 /**

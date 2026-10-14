@@ -62,6 +62,19 @@ public class WealthBrokerageProvidersTests
         brokerage.TotalInBaseCurrency.Should().Be(1_029m, "totals still sum the USD figure only");
     }
 
+    [Theory]
+    [InlineData("GOOGL")]
+    [InlineData("BRK.B")]
+    public async Task A_position_carries_its_full_symbol_beyond_the_four_character_cut(string symbol)
+    {
+        var result = await Service([Holding("ibkr", symbol, 100m, TimeSpan.FromMinutes(5))])
+            .GetWealthSummaryAsync(UserId, null, null);
+
+        var row = result.Categories.Single(c => c.Category == "brokerage").Institutions.Single().Accounts.Single();
+        row.Symbol.Should().Be(symbol);
+        row.Currency.Should().Be(symbol);
+    }
+
     [Fact]
     public async Task Broker_cash_rows_are_typed_cash_without_moving_the_brokerage_totals()
     {
