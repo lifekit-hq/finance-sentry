@@ -83,10 +83,12 @@ public class IbkrFlexStatementFetcherTests
     }
 
     [Theory]
-    [InlineData("1003", "Statement is not available.", null)]
-    [InlineData("1015", "Token is invalid.", "Token is invalid.")]
-    public async Task FetchAsync_FlexError_IsRethrown_AndRecordedAsTheLastErrorUnlessNoStatementIsAvailableYet(
-        string flexCode, string message, string? expectedLastError)
+    [InlineData("1003", "Statement is not available.", false, "Statement is not available.")]
+    [InlineData("1003", "Statement is not available.", true, null)]
+    [InlineData("1015", "Token is invalid.", false, "Token is invalid.")]
+    [InlineData("1015", "Token is invalid.", true, "Token is invalid.")]
+    public async Task FetchAsync_FlexError_IsRethrown_AndRecordedAsTheLastErrorUnlessNoStatementIsExpected(
+        string flexCode, string message, bool statementNotAvailableIsExpected, string? expectedLastError)
     {
         var userId = Guid.NewGuid();
         var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
@@ -100,7 +102,8 @@ public class IbkrFlexStatementFetcherTests
             .ThrowsAsync(new IbkrFlexException(flexCode, message));
         _credentialRepo.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        await FluentActions.Invoking(() => CreateFetcher().FetchAsync(userId, ct: CancellationToken.None))
+        await FluentActions.Invoking(() => CreateFetcher().FetchAsync(
+                userId, ct: CancellationToken.None, statementNotAvailableIsExpected: statementNotAvailableIsExpected))
             .Should().ThrowAsync<IbkrFlexException>();
 
         credential.LastError.Should().Be(expectedLastError);

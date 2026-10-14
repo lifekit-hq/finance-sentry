@@ -20,7 +20,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 /// <item>Anything else is unknown, and counts like any other non-credential failure.</item>
 /// </list>
 /// IBKR's "statement is not available" answer (<see cref="IbkrFlexException.IsStatementNotAvailable"/>) is no
-/// failure at all: the job never hands it here. Read here anyway, it is transient.
+/// failure on the scheduled run, which never hands it here; any other caller that does gets it as unknown.
 /// </summary>
 public sealed class IbkrFlexFailureClassifier : IProviderFailureClassifier
 {
@@ -32,11 +32,11 @@ public sealed class IbkrFlexFailureClassifier : IProviderFailureClassifier
     // 1020 invalid request or unable to validate request.
     private static readonly HashSet<string> SuspectCredentialErrorCodes = ["1020"];
 
-    // 1001 could not be generated at this time, 1003 not available (see IsStatementNotAvailable),
-    // 1004–1008 incomplete / not ready yet, 1009 heavy load, 1018 too many requests,
-    // 1019 generation in progress, 1021 could not be retrieved at this time.
+    // 1001 could not be generated at this time, 1004–1008 incomplete / not ready yet,
+    // 1009 heavy load, 1018 too many requests, 1019 generation in progress,
+    // 1021 could not be retrieved at this time.
     private static readonly HashSet<string> TransientErrorCodes =
-        ["1001", IbkrFlexException.StatementNotAvailableCode, "1004", "1005", "1006", "1007", "1008", "1009", "1018", "1019", "1021"];
+        ["1001", "1004", "1005", "1006", "1007", "1008", "1009", "1018", "1019", "1021"];
 
     public string Provider => ProviderName;
 

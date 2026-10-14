@@ -40,7 +40,7 @@ public class IbkrFlexJobsTests
         await job.ExecuteAsync();
 
         syncService.Verify(
-            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -56,11 +56,11 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[failing, ok]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ThrowsAsync(new DbUpdateException("An error occurred while saving the entity changes.",
                 new InvalidOperationException("persist blew up")));
         syncService
-            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
@@ -76,7 +76,7 @@ public class IbkrFlexJobsTests
         credentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(failing, It.IsAny<CancellationToken>()), Times.Once);
         credentialRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         syncService.Verify(
-            s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Once);
     }
 
@@ -91,10 +91,10 @@ public class IbkrFlexJobsTests
         var windows = IbkrFlexBackfillJob.BuildYearlyWindows();
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
         syncService
-            .Setup(s => s.SyncAsync(userId, windows[0], It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(userId, windows[0], It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ThrowsAsync(new InvalidOperationException("window blew up"));
 
         var job = new IbkrFlexBackfillJob(
@@ -105,7 +105,7 @@ public class IbkrFlexJobsTests
         credential.LastError.Should().Be("window blew up");
         credentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(credential, It.IsAny<CancellationToken>()), Times.Once);
         syncService.Verify(
-            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Exactly(windows.Count));
     }
 
@@ -123,7 +123,7 @@ public class IbkrFlexJobsTests
         await job.ExecuteAsync();
 
         syncService.Verify(
-            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -137,7 +137,7 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[credential]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
         syncService
-            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
@@ -149,7 +149,7 @@ public class IbkrFlexJobsTests
         await job.ExecuteAsync();
 
         syncService.Verify(
-            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), true),
             Times.Once);
     }
 
@@ -189,10 +189,10 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[failing, ok]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ThrowsAsync(new IbkrFlexException("1015", "Token is invalid."));
         syncService
-            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
         var shadow = new Mock<IConnectionHealthShadow>();
 
@@ -253,7 +253,7 @@ public class IbkrFlexJobsTests
 
         public void GivenSyncFails(Exception ex) =>
             SyncService
-                .Setup(s => s.SyncAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+                .Setup(s => s.SyncAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ThrowsAsync(ex);
 
         public Task RunAsync() =>
@@ -329,7 +329,7 @@ public class IbkrFlexJobsTests
     {
         var harness = new PolicyHarness().Active();
         harness.SyncService
-            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ThrowsAsync(new IbkrFlexException("1012", "Token has expired."))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 

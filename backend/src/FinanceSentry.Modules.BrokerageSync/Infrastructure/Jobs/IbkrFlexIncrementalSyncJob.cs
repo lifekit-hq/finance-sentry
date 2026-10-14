@@ -58,7 +58,7 @@ public sealed class IbkrFlexIncrementalSyncJob(
         {
             try
             {
-                await syncService.SyncAsync(credential.UserId, window, CancellationToken.None);
+                await syncService.SyncAsync(credential.UserId, window, CancellationToken.None, statementNotAvailableIsExpected: true);
                 var evaluation = await connectionHealth.RecordSuccessAsync(
                     HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
                 if (policyDrivesAlerts)

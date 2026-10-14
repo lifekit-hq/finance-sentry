@@ -23,7 +23,7 @@ public sealed class BinanceFailureClassifier : IProviderFailureClassifier
 {
     // -1002 unauthorized, -1022 bad signature, -2008 unknown key id, -2014 malformed key,
     // -2015 rejected key / IP / permissions.
-    private static readonly HashSet<int> CredentialErrorCodes = [-1002, -1022, -2008, -2014, -2015];
+    public static readonly IReadOnlySet<int> CredentialErrorCodes = new HashSet<int> { -1002, -1022, -2008, -2014, -2015 };
 
     public string Provider => CryptoExchangeProvider.Binance;
 

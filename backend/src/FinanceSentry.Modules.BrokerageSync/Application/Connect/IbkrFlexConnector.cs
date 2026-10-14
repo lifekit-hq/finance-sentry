@@ -40,7 +40,7 @@ public sealed class IbkrFlexConnector(
 
         await credentialRepository.SaveChangesAsync(ct);
         backgroundJobs.Enqueue<IIbkrFlexTradeSyncService>(
-            sync => sync.SyncAsync(userId, null, CancellationToken.None));
+            sync => sync.SyncAsync(userId, null, CancellationToken.None, false));
         logger.LogInformation("IBKR Flex credential persisted for user {UserId}", userId);
     }
 
