@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
@@ -33,6 +34,7 @@ public class AccountDiscoveryServiceTests
         Mock<ICredentialEncryptionService> Encryption,
         Mock<IBankAccountRepository> Accounts,
         Mock<IBackgroundJobClient> BackgroundJobs,
+        Mock<IBankConnectionHealth> ConnectionHealth,
         MonobankBalanceCache MonobankBalanceCache,
         List<BankAccount> StoredAccounts,
         List<BankAccount> AddedAccounts);
@@ -48,6 +50,7 @@ public class AccountDiscoveryServiceTests
         var accounts = new Mock<IBankAccountRepository>();
         var backgroundJobs = new Mock<IBackgroundJobClient>();
         var logger = new Mock<ILogger<AccountDiscoveryService>>();
+        var connectionHealth = new Mock<IBankConnectionHealth>();
 
         var monobankBalanceCache = new MonobankBalanceCache(TimeProvider.System);
 
@@ -86,10 +89,11 @@ public class AccountDiscoveryServiceTests
             encryption.Object,
             accounts.Object,
             backgroundJobs.Object,
+            connectionHealth.Object,
             logger.Object);
 
         return new Harness(sut, trueLayerConnections, trueLayerClient, trueLayerTokenRefresh,
-            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, monobankBalanceCache,
+            monobankCredentials, monobankAdapter, encryption, accounts, backgroundJobs, connectionHealth, monobankBalanceCache,
             storedAccounts, addedAccounts);
     }
 
@@ -122,7 +126,7 @@ public class AccountDiscoveryServiceTests
         return connection;
     }
 
-    private static void SetupMonobank(Harness h, params MonobankAccountInfo[] accounts)
+    private static MonobankCredential SetupMonobank(Harness h, params MonobankAccountInfo[] accounts)
     {
         var credential = new MonobankCredential(UserId, [1], [2], [3], 1);
         h.MonobankCredentials.Setup(r => r.GetAllUnscopedAsync(It.IsAny<CancellationToken>()))
@@ -132,6 +136,7 @@ public class AccountDiscoveryServiceTests
             .Returns("mono-token");
         h.MonobankAdapter.Setup(a => a.GetClientInfoAsync("mono-token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankClientInfo("client", "Owner", accounts));
+        return credential;
     }
 
     // ── TrueLayer: one known + one new → first run creates exactly one row; second run creates none ──
@@ -276,6 +281,62 @@ public class AccountDiscoveryServiceTests
         otherAccount.SyncStatus.Should().NotBe("reauth_required");
         h.TrueLayerConnections.Verify(r => r.UpdateAsync(deadConnection, It.IsAny<CancellationToken>()), Times.Once);
         h.TrueLayerConnections.Verify(r => r.UpdateAsync(healthyConnection, It.IsAny<CancellationToken>()), Times.Never);
+
+        // The rejected refresh is one failed attempt on the dead consent's health; the healthy listing is a success.
+        h.ConnectionHealth.Verify(c => c.RecordConnectionFailureAsync(
+            It.Is<BankConnectionRef>(r => r.Id == deadConnection.Id && r.Provider == "truelayer" && r.UserId == UserId),
+            It.Is<TrueLayerException>(ex => ex.Message.Contains("invalid_grant")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        h.ConnectionHealth.Verify(c => c.RecordConnectionSuccessAsync(
+            It.Is<BankConnectionRef>(r => r.Id == healthyConnection.Id), It.IsAny<CancellationToken>()), Times.Once);
+        h.ConnectionHealth.Verify(c => c.RecordConnectionSuccessAsync(
+            It.Is<BankConnectionRef>(r => r.Id == deadConnection.Id), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_TrueLayerListingFails_RecordsAFailedAttemptWithoutExpiring()
+    {
+        var h = BuildSut();
+        var connection = SetupTrueLayer(h);
+        var outage = new TrueLayerException("TRUELAYER_ERROR", "TrueLayer API error (503) on /accounts", 503);
+        h.TrueLayerClient.Setup(c => c.ListAccountsAsync("access-token", It.IsAny<CancellationToken>())).ThrowsAsync(outage);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        connection.Status.Should().NotBe("EXPIRED");
+        h.ConnectionHealth.Verify(c => c.RecordConnectionFailureAsync(
+            It.Is<BankConnectionRef>(r => r.Id == connection.Id && r.Label == connection.ProviderDisplayName),
+            outage, It.IsAny<CancellationToken>()), Times.Once);
+        h.ConnectionHealth.Verify(c => c.RecordConnectionSuccessAsync(
+            It.IsAny<BankConnectionRef>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_Monobank_ListingRecordsASuccessOnTheCredential()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h, new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        h.ConnectionHealth.Verify(c => c.RecordConnectionSuccessAsync(
+            It.Is<BankConnectionRef>(r => r.Id == credential.Id && r.Provider == "monobank" && r.Label == "Monobank"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_MonobankClientInfoFails_RecordsAFailedAttempt()
+    {
+        var h = BuildSut();
+        var credential = SetupMonobank(h);
+        var rejected = new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400);
+        h.MonobankAdapter.Setup(a => a.GetClientInfoAsync("mono-token", It.IsAny<CancellationToken>())).ThrowsAsync(rejected);
+
+        await h.Sut.DiscoverNewAccountsAsync();
+
+        h.ConnectionHealth.Verify(c => c.RecordConnectionFailureAsync(
+            It.Is<BankConnectionRef>(r => r.Id == credential.Id && r.Provider == "monobank"),
+            rejected, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── Monobank: one known + one new → first run creates exactly one row; second run creates none ──
@@ -341,6 +402,7 @@ public class AccountDiscoveryServiceTests
         created.Should().Be(0);
         h.MonobankAdapter.Verify(
             a => a.GetClientInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.ConnectionHealth.VerifyNoOtherCalls();
     }
 
     [Fact]

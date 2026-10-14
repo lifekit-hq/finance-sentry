@@ -42,6 +42,9 @@ public sealed class DisconnectInstitutionCommandHandler(
             recurringJobs.RemoveIfExists(SyncAccountJob.IdFor(account.Id));
         }
 
+        // The connection's own sync-failure alert is keyed on the institution id (connection health, Option B, S2).
+        await alerts.DeleteAlertsForAccountAsync(command.InstitutionId, ct);
+
         switch (provider)
         {
             case "monobank":

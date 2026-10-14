@@ -286,7 +286,7 @@ public interface ISyncJobRepository
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
-public interface IMonobankCredentialRepository
+public interface IMonobankCredentialRepository : IConnectionHealthStore
 {
     Task<MonobankCredential> AddAsync(MonobankCredential credential, CancellationToken cancellationToken = default);
     Task<MonobankCredential?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -326,7 +326,7 @@ public interface ICounterpartyRepository
     Task<Counterparty> UpdateAsync(Counterparty counterparty, CancellationToken cancellationToken = default);
 }
 
-public interface ITrueLayerConnectionRepository
+public interface ITrueLayerConnectionRepository : IConnectionHealthStore
 {
     Task<TrueLayerConnection> AddAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default);
     Task<TrueLayerConnection?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -360,3 +360,30 @@ public interface ITrueLayerConnectionRepository
     Task<TrueLayerConnection> UpdateAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// The connection-level health of one provider's connection rows (<see cref="MonobankCredential"/>,
+/// <see cref="TrueLayerConnection"/>): the record the connection-health policy keeps per token or consent.
+/// Every method opts out of the Owner query filter: the sync and discovery that call it have no person in scope.
+/// </summary>
+public interface IConnectionHealthStore
+{
+    /// <summary>The row's health read straight from the database, untracked, so a sibling sync's write is seen.</summary>
+    Task<StoredConnectionHealth?> GetHealthUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Stores the row's health alone, straight to the row, and keeps a tracked copy of the row in step.</summary>
+    Task SaveHealthUnscopedAsync(Guid id, ConnectionHealth health, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// How this provider's other connections, of every user, stand since <paramref name="since"/>: how many are
+    /// failing (not Healthy, last failure in the window) and whether any of them succeeded in the window.
+    /// </summary>
+    Task<ProviderHealthSnapshot> GetProviderHealthUnscopedAsync(
+        Guid excludingId, DateTimeOffset since, CancellationToken cancellationToken = default);
+}
+
+/// <summary>A connection row's health, with its consent expiry where the provider has one.</summary>
+public sealed record StoredConnectionHealth(ConnectionHealth Health, DateTime? ExpiresAt);
+
+/// <summary>How a provider's other connections stand in a recent window; see <see cref="IConnectionHealthStore"/>.</summary>
+public sealed record ProviderHealthSnapshot(int OtherConnectionsFailing, bool AnyOtherConnectionSucceeded);

@@ -1,7 +1,6 @@
 namespace FinanceSentry.Tests.Integration.BankSync;
 
 using System.Data.Common;
-using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
@@ -165,12 +164,16 @@ public sealed class SyncClaimConcurrencyTests : IAsyncLifetime
         var providerFactory = new Mock<IBankProviderFactory>();
         providerFactory.Setup(f => f.Resolve("monobank")).Returns(provider);
 
+        var trueLayerConnections = Mock.Of<ITrueLayerConnectionRepository>();
+        var alerts = Mock.Of<IAlertGeneratorService>();
+        var userPreferences = Mock.Of<IUserAlertPreferencesReader>();
         var syncService = new ScheduledSyncService(
             accounts, transactions.Object, syncJobs, encryption.Object, dedup.Object,
             Mock.Of<IBankSyncLogger>(), providerFactory.Object, monobankCredentials,
-            Mock.Of<ITrueLayerConnectionRepository>(), Mock.Of<ITrueLayerClient>(),
-            new MonobankBalanceCache(TimeProvider.System), Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
-            Mock.Of<IEventBus>(), Mock.Of<ITrueLayerTokenRefreshService>(), Mock.Of<IConnectionHealthShadow>());
+            trueLayerConnections, Mock.Of<ITrueLayerClient>(),
+            new MonobankBalanceCache(TimeProvider.System), alerts, userPreferences,
+            Mock.Of<IEventBus>(), Mock.Of<ITrueLayerTokenRefreshService>(),
+            BankConnectionHealthFactory.Create(accounts, monobankCredentials, trueLayerConnections, alerts, userPreferences));
 
         var coordinator = new TransactionSyncCoordinator(
             accounts, syncService, Mock.Of<IBackgroundJobClient>());

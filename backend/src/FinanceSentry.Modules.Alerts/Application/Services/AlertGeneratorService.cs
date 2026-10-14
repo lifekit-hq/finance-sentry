@@ -95,6 +95,19 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task GenerateSyncFailureAlertAsync(
         Guid userId, string provider, Guid? accountId, string? accountName,
         string? errorCode, SyncFailureClass failureClass, CancellationToken ct = default)
+        => EmitAsync(userId, SyncFailureDraft(provider, accountId, accountName, errorCode, failureClass), ct);
+
+    public Task EscalateSyncFailureAlertAsync(
+        Guid userId, string provider, Guid? accountId, string? accountName,
+        string? errorCode, CancellationToken ct = default)
+        => EmitAsync(
+            userId,
+            SyncFailureDraft(provider, accountId, accountName, errorCode, SyncFailureClass.Credential)
+                with { Dedup = AlertDedup.Always, SupersedeOpen = true },
+            ct);
+
+    private static AlertDraft SyncFailureDraft(
+        string provider, Guid? accountId, string? accountName, string? errorCode, SyncFailureClass failureClass)
     {
         var label = accountName ?? provider;
         var detail = errorCode is null ? string.Empty : $" (error: {errorCode})";
@@ -105,11 +118,10 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             _ => "We are retrying automatically. If this keeps happening, check the connection in settings.",
         };
 
-        return EmitAsync(userId, new AlertDraft(
+        return new AlertDraft(
             AlertType.SyncFailure, AlertSeverity.Error, SyncFailureReferenceId(provider, accountId), accountName,
             $"Sync failed for {label}",
-            $"We couldn't sync your {provider} account{detail}. {advice}"),
-            ct);
+            $"We couldn't sync your {provider} account{detail}. {advice}");
     }
 
     public Task ResolveSyncFailureAlertAsync(

@@ -553,6 +553,33 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
     public async Task<IReadOnlyList<MonobankCredential>> GetAllUnscopedAsync(CancellationToken cancellationToken = default)
         => await AllUsers.ToListAsync(cancellationToken);
 
+    public async Task<StoredConnectionHealth?> GetHealthUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(c => c.Id == id)
+            .Select(c => new StoredConnectionHealth(c.Health, (DateTime?)null))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task SaveHealthUnscopedAsync(Guid id, ConnectionHealth health, CancellationToken cancellationToken = default)
+    {
+        await AllUsers
+            .Where(c => c.Id == id)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), cancellationToken);
+
+        // A later tracked save of the same row would otherwise write the health it was loaded with back over this.
+        _context.MonobankCredentials.Local.FirstOrDefault(c => c.Id == id)?.ApplyHealth(health);
+    }
+
+    public async Task<ProviderHealthSnapshot> GetProviderHealthUnscopedAsync(
+        Guid excludingId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var others = AllUsers.Where(c => c.Id != excludingId);
+        var failing = await others.CountAsync(
+            c => c.Health.State != ConnectionHealthState.Healthy && c.Health.LastFailureAt >= since, cancellationToken);
+        var succeeded = await others.AnyAsync(c => c.Health.LastSuccessAt >= since, cancellationToken);
+        return new ProviderHealthSnapshot(failing, succeeded);
+    }
+
     public async Task<MonobankCredential> UpdateAsync(MonobankCredential credential, CancellationToken cancellationToken = default)
     {
         _context.MonobankCredentials.Update(credential);
@@ -623,6 +650,33 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
             .Where(tc => tc.UserId == userId)
             .OrderByDescending(tc => tc.CreatedAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<StoredConnectionHealth?> GetHealthUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(c => c.Id == id)
+            .Select(c => new StoredConnectionHealth(c.Health, c.ConnectionExpiresAt))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task SaveHealthUnscopedAsync(Guid id, ConnectionHealth health, CancellationToken cancellationToken = default)
+    {
+        await AllUsers
+            .Where(c => c.Id == id)
+            .ExecuteUpdateAsync(s => s.SetConnectionHealth(c => c.Health, health), cancellationToken);
+
+        // A later tracked save of the same row would otherwise write the health it was loaded with back over this.
+        _context.TrueLayerConnections.Local.FirstOrDefault(c => c.Id == id)?.ApplyHealth(health);
+    }
+
+    public async Task<ProviderHealthSnapshot> GetProviderHealthUnscopedAsync(
+        Guid excludingId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var others = AllUsers.Where(c => c.Id != excludingId);
+        var failing = await others.CountAsync(
+            c => c.Health.State != ConnectionHealthState.Healthy && c.Health.LastFailureAt >= since, cancellationToken);
+        var succeeded = await others.AnyAsync(c => c.Health.LastSuccessAt >= since, cancellationToken);
+        return new ProviderHealthSnapshot(failing, succeeded);
+    }
 
     public async Task<TrueLayerConnection> UpdateAsync(TrueLayerConnection connection, CancellationToken cancellationToken = default)
     {

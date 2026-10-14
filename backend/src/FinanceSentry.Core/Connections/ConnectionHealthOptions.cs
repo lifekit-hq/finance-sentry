@@ -20,4 +20,11 @@ public sealed class ConnectionHealthOptions
 
     /// <summary>A suspect credential failure is confirmed when seen again at least this long after the first.</summary>
     public TimeSpan SuspectConfirmationWindow { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// The providers whose alerts the policy drives, by the keys the shadow log uses (<c>monobank</c>, <c>truelayer</c>,
+    /// <c>ibkr</c>, …). Every other provider stays in shadow mode: its evaluation is recorded and logged, and its own
+    /// alerting and account status stay exactly as they were. Empty by default, so every provider starts in shadow.
+    /// </summary>
+    public List<string> ActiveProviders { get; set; } = [];
 }

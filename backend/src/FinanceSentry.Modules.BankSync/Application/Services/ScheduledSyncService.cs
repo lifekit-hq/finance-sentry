@@ -7,6 +7,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Events;
 using FinanceSentry.Modules.BankSync.Domain.Interfaces;
@@ -54,7 +55,7 @@ public class ScheduledSyncService(
     IUserAlertPreferencesReader userPreferences,
     IEventBus eventBus,
     ITrueLayerTokenRefreshService trueLayerTokenRefresh,
-    IConnectionHealthShadow connectionHealth) : IScheduledSyncService
+    IBankConnectionHealth connectionHealth) : IScheduledSyncService
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly ITransactionRepository _transactions = transactions;
@@ -71,7 +72,7 @@ public class ScheduledSyncService(
     private readonly IUserAlertPreferencesReader _userPreferences = userPreferences;
     private readonly IEventBus _eventBus = eventBus;
     private readonly ITrueLayerTokenRefreshService _trueLayerTokenRefresh = trueLayerTokenRefresh;
-    private readonly IConnectionHealthShadow _connectionHealth = connectionHealth;
+    private readonly IBankConnectionHealth _connectionHealth = connectionHealth;
 
     /// <inheritdoc />
     public async Task<SyncResult> PerformFullSyncAsync(
@@ -125,16 +126,22 @@ public class ScheduledSyncService(
                     $"Unknown provider '{account.Provider}' for account {account.Id}.");
 
             await EvaluateAlertsAfterSuccessAsync(account, ct);
-            await _connectionHealth.RecordSuccessAsync(
-                HealthSubject(account), account.Health, (health, c) => SaveHealthAsync(account, health, c), ct);
+            await _connectionHealth.RecordSyncSuccessAsync(account, ct);
             await PublishSyncCompletedAsync(account, result, ct);
 
             return result;
         }
         catch (Exception ex)
         {
-            var (errorCode, failureClass) = Classify(ex, account.Provider);
-            var isTransient = failureClass == FailureKind.Transient;
+            // Every failure is recorded with the connection-health policy (Option B). For a provider in
+            // ConnectionHealth:ActiveProviders the policy also raises the alert it earns and decides reauth_required;
+            // for one still in shadow mode the sync's own classification decides both, exactly as before.
+            // A cancellation of ours says nothing about the provider.
+            var cancelledByCaller = ex is OperationCanceledException && ct.IsCancellationRequested;
+            var verdict = await _connectionHealth.RecordSyncFailureAsync(account, ex, cancelledByCaller, CancellationToken.None);
+            var policyDriven = _connectionHealth.IsActive(account.Provider);
+            var (legacyCode, legacyKind) = Classify(ex, account.Provider);
+            var errorCode = policyDriven ? verdict.Failure.Code : legacyCode;
 
             var correlationId = job.CorrelationId ?? job.Id.ToString();
 
@@ -155,9 +162,16 @@ public class ScheduledSyncService(
                 var freshAccount = await _accounts.GetByIdUnscopedAsync(accountId, CancellationToken.None);
                 if (freshAccount != null)
                 {
-                    if (failureClass == FailureKind.Reauth)
+                    // reauth_required parks the account until the user reconnects, so under the policy it waits for the
+                    // credential loss to be confirmed; a suspect failure leaves it syncing to be confirmed or cleared.
+                    var reauth = policyDriven ? verdict.CredentialLost : legacyKind == FailureKind.Reauth;
+                    var transient = policyDriven
+                        ? verdict.Failure.Class == FailureClass.Transient || cancelledByCaller
+                        : legacyKind == FailureKind.Transient;
+
+                    if (reauth)
                         freshAccount.MarkReauthRequired();
-                    else if (isTransient && freshAccount.SyncStatus == "syncing")
+                    else if (transient && freshAccount.SyncStatus == "syncing")
                         freshAccount.MarkTransientRetry();
                     else if (freshAccount.SyncStatus == "syncing")
                         freshAccount.MarkFailed(DescribeFailure(errorCode, ex));
@@ -171,24 +185,15 @@ public class ScheduledSyncService(
                 await ReleaseClaimAsync(accountId, CancellationToken.None);
             }
 
-            await _connectionHealth.RecordFailureAsync(
-                HealthSubject(account),
-                account.Health,
-                ToProviderFailure(errorCode, failureClass),
-                (health, c) => SaveHealthAsync(account, health, c),
-                ct);
+            _logger.SyncFailed(correlationId, accountId, errorCode ?? "UNKNOWN", ex.Message, job.RetryCount);
 
-            _logger.SyncFailed(job.CorrelationId ?? job.Id.ToString(), accountId,
-                errorCode ?? "UNKNOWN", ex.Message, job.RetryCount);
-
-            // Throttling, provider 5xx, network and timeout failures are self-healing — the next
-            // scheduled cycle retries. Surfacing a "reconnect your credentials" alert here would be
-            // a false alarm, so we skip it. A genuine failure still alerts the user.
-            if (!isTransient)
+            // Shadow mode: throttling, provider 5xx, network and timeout failures are self-healing — the next
+            // scheduled cycle retries — so only a genuine failure alerts, on the account, at once.
+            if (!policyDriven && legacyKind != FailureKind.Transient)
             {
                 await EvaluateSyncFailureAlertAsync(
                     account, errorCode,
-                    failureClass is FailureKind.Reauth or FailureKind.CredentialSuspect
+                    legacyKind is FailureKind.Reauth or FailureKind.CredentialSuspect
                         ? SyncFailureClass.Credential
                         : SyncFailureClass.Unknown,
                     ct);
@@ -244,9 +249,6 @@ public class ScheduledSyncService(
             var prefs = await _userPreferences.GetAsync(account.UserId, ct);
             if (prefs is null) return;
 
-            if (prefs.SyncFailureAlerts)
-                await _alerts.ResolveSyncFailureAlertAsync(account.UserId, account.Provider, account.Id, ct);
-
             if (prefs.LowBalanceAlerts && account.CurrentBalance.HasValue)
             {
                 var balance = account.CurrentBalance.Value;
@@ -268,6 +270,7 @@ public class ScheduledSyncService(
         }
     }
 
+    /// <summary>Shadow mode: the sync's own sync-failure alert, keyed on the account, exactly as before the policy.</summary>
     private async Task EvaluateSyncFailureAlertAsync(
         Domain.BankAccount account, string? errorCode, SyncFailureClass failureClass, CancellationToken ct)
     {
@@ -294,7 +297,8 @@ public class ScheduledSyncService(
         var cred = await _monobankCredentials.GetByIdUnscopedAsync(account.MonobankCredentialId.Value, ct)
             ?? throw new InvalidOperationException($"Monobank credential {account.MonobankCredentialId} not found.");
 
-        var plainToken = _encryption.Decrypt(cred.EncryptedToken, cred.Iv, cred.AuthTag, cred.KeyVersion);
+        var plainToken = CredentialUnreadableException.Decrypt(
+            _encryption, cred.EncryptedToken, cred.Iv, cred.AuthTag, cred.KeyVersion);
         _logger.CredentialAccessed(job.CorrelationId ?? job.Id.ToString(), account.Id);
 
         var provider = _providerFactory.Resolve("monobank");
@@ -501,28 +505,6 @@ public class ScheduledSyncService(
         Other,
     }
 
-    private static ConnectionHealthSubject HealthSubject(Domain.BankAccount account) =>
-        new(account.Provider, nameof(Domain.BankAccount), account.Id, account.UserId);
-
-    private Task SaveHealthAsync(Domain.BankAccount account, ConnectionHealth health, CancellationToken ct)
-    {
-        account.ApplyHealth(health);
-        return _accounts.SaveHealthUnscopedAsync(account.Id, health, ct);
-    }
-
-    /// <summary>
-    /// Shadow mode (Option B, S1): this sync's own failure decision, read into the policy's taxonomy so the
-    /// policy's verdict can be compared with the alert this sync raises. The provider classifiers (S2) replace it.
-    /// </summary>
-    private static ProviderFailure ToProviderFailure(string? code, FailureKind kind) => kind switch
-    {
-        FailureKind.Reauth => ProviderFailure.CredentialDefinitive(code),
-        FailureKind.CredentialSuspect => ProviderFailure.CredentialSuspect(code),
-        FailureKind.Transient => ProviderFailure.Transient(code),
-        _ when code is not null && LocalFailureCodes.Contains(code) => ProviderFailure.Internal(code),
-        _ => ProviderFailure.Unknown(code),
-    };
-
     private const int ServerErrorStatus = 500;
 
     private static readonly HashSet<string> LocalFailureCodes =
@@ -534,11 +516,10 @@ public class ScheduledSyncService(
 
     private static bool IsUpstreamServerError(ApiException ex) =>
         ex.StatusCode >= ServerErrorStatus && !LocalFailureCodes.Contains(ex.ErrorCode);
-    private const int MaxLastSyncErrorLength = 500;
-    private const string ClaimReleaseFailedCode = "SYNC_CLAIM_RELEASE_FAILED";
-    private const string JobUpdateFailedCode = "SYNC_JOB_UPDATE_FAILED";
 
     /// <summary>
+    /// Shadow mode: the sync's own classification, which decides its alert and account status while the provider is
+    /// not in <see cref="ConnectionHealthOptions.ActiveProviders"/>.
     /// Classifies a failed sync from the typed exception (<see cref="TrueLayerException"/> /
     /// <see cref="MonobankException"/> status and code, then the shared network/timeout/5xx
     /// classifier) rather than from message text. Only an expired/revoked TrueLayer consent is still
@@ -582,6 +563,10 @@ public class ScheduledSyncService(
 
         return (null, FailureKind.Other);
     }
+
+    private const int MaxLastSyncErrorLength = 500;
+    private const string ClaimReleaseFailedCode = "SYNC_CLAIM_RELEASE_FAILED";
+    private const string JobUpdateFailedCode = "SYNC_JOB_UPDATE_FAILED";
 
     /// <summary>
     /// What <c>LastSyncError</c> records: the error code, plus Monobank's status and body, so a

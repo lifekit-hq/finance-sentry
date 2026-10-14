@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -45,6 +46,26 @@ public class StaleSyncReaperJobTests
         account.LastSyncError.Should().BeNull("a reaped sync is not a provider failure");
         _jobs.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
         _accounts.Verify(r => r.UpdateAsync(account, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Startup_ReapedSync_IsOursAndLeavesTheConnectionHealthAsItWas()
+    {
+        // Connection health (Option B, S2): an orphaned sync is internal, never a provider failure, so the reaper
+        // records no attempt - the streak neither grows nor resets, and no alert can follow from it.
+        var account = MakeSyncingAccount();
+        var degraded = ConnectionHealthPolicy.RecordFailure(
+            new ConnectionHealth(), ProviderFailure.Transient("TRUELAYER_ERROR"),
+            new DateTimeOffset(2026, 10, 14, 9, 0, 0, TimeSpan.Zero), new ConnectionHealthOptions()).Health;
+        account.ApplyHealth(degraded);
+        _accounts.Setup(r => r.GetBySyncStatusUnscopedAsync("syncing", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([account]);
+
+        await MakeReaper().ExecuteAsync();
+
+        account.Health.Should().Be(degraded);
+        _accounts.Verify(r => r.SaveHealthUnscopedAsync(
+            It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private StaleSyncReaperJob MakeReaper()

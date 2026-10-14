@@ -178,8 +178,8 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     }
 
     /// <summary>
-    /// Health of this connection by the connection-health policy. Shadow mode (Option B, S1): recorded on
-    /// each sync, read by nothing that alerts yet.
+    /// This account's own health by the connection-health policy, recorded on each of its syncs. It alerts only
+    /// for a failure its connection is not charged with (see <c>BankConnectionHealth</c>, Option B, S2).
     /// </summary>
     public ConnectionHealth Health { get; private set; } = new();
 
