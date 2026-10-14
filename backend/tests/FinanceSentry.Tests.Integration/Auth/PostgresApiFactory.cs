@@ -16,7 +16,8 @@ using Moq;
 /// The whole API over a real, freshly migrated Postgres database. TrueLayer is a loose mock, so a closure's
 /// best-effort revoke never leaves the test process.
 /// </summary>
-internal sealed class PostgresApiFactory(string connectionString) : WebApplicationFactory<Program>
+internal sealed class PostgresApiFactory(string connectionString, Action<IServiceCollection>? configureServices = null)
+    : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -29,7 +30,10 @@ internal sealed class PostgresApiFactory(string connectionString) : WebApplicati
         builder.UseSetting("Jwt:Secret", "test-jwt-secret-key-for-integration-tests-minimum-32-chars");
         builder.UseSetting("Jwt:ExpiryMinutes", "60");
         builder.ConfigureTestServices(services =>
-            services.Replace(ServiceDescriptor.Scoped(_ => Mock.Of<ITrueLayerClient>())));
+        {
+            services.Replace(ServiceDescriptor.Scoped(_ => Mock.Of<ITrueLayerClient>()));
+            configureServices?.Invoke(services);
+        });
     }
 
     /// <summary>An account as Identity creates it, in <paramref name="role"/> when one is given.</summary>
