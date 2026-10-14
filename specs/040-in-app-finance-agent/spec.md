@@ -129,5 +129,5 @@ The OpenClaw Ledger (Telegram + proactive/scheduled briefs) and the new browser 
 - [OUT OF SCOPE] **Embeddings / research-RAG activation (036)**: turning on semantic corpus retrieval is deferred; the agent uses the existing tool surface without it.
 - [OUT OF SCOPE] **Replacing the OpenClaw Ledger**: not a goal of this feature; the two coexist.
 - [OUT OF SCOPE] **Autonomous mutating actions**: moving money, trading, changing account state, rotating credentials — the agent drafts and escalates; it never executes these. This guardrail is not waived by this feature.
-- [DEFERRED] **Agent-as-code deploy to OpenClaw (032)**: making OpenClaw deploy its persona *from* this repo (closing the VPS→repo hand-edit loop) is the natural follow-on once the core lives here, but is not required to ship this feature.
+- [DONE] **Agent-as-code deploy to OpenClaw (032)**: OpenClaw's persona is now installed *from* this repo at a lifekit-stack pin, closing the VPS→repo hand-edit loop (#416); see `agent/ledger/README.md` § Deploy.
 - [DEFERRED] **Proactive/scheduled behavior in the FS-native runtime**: the browser agent is interactive/on-demand; proactive briefs remain OpenClaw's job for now.
