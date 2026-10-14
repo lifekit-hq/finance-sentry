@@ -4,7 +4,12 @@ Source of truth for Finance Sentry's money math. **Any PR that changes one of th
 behaviours must update this document in the same diff.** File references point at the
 implementing code; when they disagree, the code is the bug or this doc is stale — fix one.
 
-Last verified: 2026-10-06 (§11 FIRE projection).
+The rules that apply to *any* number (vocabulary, flow classes, the ten measures, the headline
+contract, the valuation rule for a new economy) live in [finance-framework.md](finance-framework.md).
+This document records what each existing number means today; a PR that changes money math updates
+both, or says in its description why the framework doc is untouched.
+
+Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15.
 
 ---
 
@@ -1005,6 +1010,13 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
+- **What the figure is.** The book side is the **change in invested value, which includes deposits** -
+  not a time-weighted or money-weighted return. SPY's side is the change in its adjusted close (which
+  includes dividends). The brief labels the book figure "Book value change (incl. deposits)" and the MCP tool
+  describes it the same way. The types and fields (`PeriodTwr`, `BookTwr`, `SpyTwr`) and the tool name keep
+  their `Twr` names for contract stability; the names are misleading and
+  [finance-framework.md](finance-framework.md) (known gaps) lists them.
+
 - **Invested brokerage only.** The book return is measured on `net_worth_snapshots.brokerage_invested`
   (the brokerage sleeve without idle broker cash, §8), not on `brokerage_total`. SPY holds no cash, so
   comparing a return that includes cash with it would be apples to oranges. Crypto, banking and venue
@@ -1020,10 +1032,15 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   split day is earlier than that before today, the book side is unavailable rather than compared over a
   shorter window. With fewer than two split days, a zero opening value, or a first or last split day
   outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
-  SPY is missing too), as it already is with too little history. The brief shows it as `Book N/A`.
+  SPY is missing too), as it already is with too little history. The brief shows it as `Book value change (incl. deposits) N/A`.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
   contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
-  loss. It is a holding-period return approximation, not a time-weighted or money-weighted return.
+  loss. A purchase made from idle broker cash (which the series excludes) reads as a gain too, with no deposit
+  at all. It is a holding-period change in value, not a time-weighted or money-weighted return, and the
+  `outperform` / `underperform` verdict inherits that. Fictional example: 10,000 grows to 11,000, a 10,000
+  deposit makes it 21,000, and it ends at 19,800; this figure reads +98%, while the time-weighted return is
+  +3.7%. A true TWR needs dated external flows (not ingested yet) and the cash-inclusive scope; see
+  [finance-framework.md](finance-framework.md), measure M3 and gap G1.
 
 ## 11. FIRE projection (#433)
 

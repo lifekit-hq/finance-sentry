@@ -9,7 +9,7 @@ using FinanceSentry.Modules.Radar.Domain.Ports;
 public sealed record PerformanceBrief(string Headline, string Body);
 
 /// <summary>
-/// Composes the weekly verdict-first brief (feature 414) from the TWR scoreboard, the Notable
+/// Composes the weekly verdict-first brief (feature 414) from the book-vs-SPY scoreboard, the Notable
 /// portfolio-scanner signals, and the thesis track record. Pure — no I/O, no clock.
 ///
 /// Layout, in reservation order so the highest-value lines survive the budget:
@@ -28,6 +28,9 @@ public static class PerformanceBriefComposer
     private const int MaxTrendLines = 4;
 
     private const string Benchmark = "SPY";
+
+    /// <summary>The book figure is last / first - 1 over invested value: deposits count, so it is not a TWR.</summary>
+    private const string BookLabel = "Book value change (incl. deposits)";
     private const decimal PercentDivisor = 100m;
     private const decimal ThousandThreshold = 1_000m;
     private const decimal MillionThreshold = 1_000_000m;
@@ -112,7 +115,7 @@ public static class PerformanceBriefComposer
             var diff = p.Delta.HasValue ? $" (Δ {p.Delta.Value:+0.##%;-0.##%;0%})" : string.Empty;
 
             lines.Add(AppUrl.Bullet(
-                $"{label}: Book {book} | {Benchmark} {spy}{diff}", appBaseUrl, AlertAppPath.AccountsInvestments));
+                $"{label}: {BookLabel} {book} | {Benchmark} {spy}{diff}", appBaseUrl, AlertAppPath.AccountsInvestments));
         }
 
         return lines;

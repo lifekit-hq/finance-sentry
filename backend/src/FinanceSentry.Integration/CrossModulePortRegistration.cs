@@ -31,7 +31,7 @@ public static class CrossModulePortRegistration
         services.AddScoped<IFiredAlertReader, EventsFiredAlertAdapter>();
         services.AddScoped<IEventDeliveryReader, EventsDeliveryAdapter>();
 
-        // 412: portfolio value source for book-vs-benchmark TWR; bridges Wealth snapshots → Radar.
+        // 412: portfolio value source for book-vs-benchmark change in invested value; bridges Wealth snapshots → Radar.
         services.AddScoped<IPortfolioValueSource, RadarPortfolioValueSource>();
 
         // 413: portfolio scan data — bridges Research IPS + Risk rules → Radar portfolio scanner.

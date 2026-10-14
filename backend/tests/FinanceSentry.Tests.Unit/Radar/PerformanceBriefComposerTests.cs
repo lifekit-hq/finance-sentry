@@ -224,7 +224,7 @@ public sealed class PerformanceBriefComposerTests
 
         var brief = PerformanceBriefComposer.Compose(result, [], null);
 
-        BodyLines(brief).Should().Contain(l => l.StartsWith("• 1Y: Book N/A | SPY +20%") && !l.Contains('Δ'));
+        BodyLines(brief).Should().Contain(l => l.StartsWith("• 1Y: Book value change (incl. deposits) N/A | SPY +20%") && !l.Contains('Δ'));
         brief.Headline.Should().Be("Weekly brief: N/A");
     }
 
