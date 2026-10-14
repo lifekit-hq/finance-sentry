@@ -7,6 +7,18 @@ export const FLEX_QUERY_SECTIONS: readonly string[] = [
   'Cash Report',
 ];
 
+/**
+ * Per-type option under Cash Transactions that carries cash deposits and withdrawals. Without it the
+ * report holds dividends and tax rows only, so contributions never arrive.
+ */
+export const FLEX_CASH_TRANSACTION_DEPOSITS_OPTION = 'Deposits & Withdrawals';
+
+/**
+ * Sections worth adding on top of {@link FLEX_QUERY_SECTIONS}. The Flex parser ignores sections it
+ * does not model, so they are safe to tick; today they feed nothing.
+ */
+export const FLEX_RECOMMENDED_SECTIONS: readonly string[] = ['Change in NAV'];
+
 export interface FlexDeliverySetting {
   readonly label: string;
   readonly value: string;

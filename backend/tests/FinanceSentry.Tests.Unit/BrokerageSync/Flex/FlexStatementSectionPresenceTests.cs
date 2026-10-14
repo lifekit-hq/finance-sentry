@@ -45,4 +45,16 @@ public class FlexStatementSectionPresenceTests
         statement.OpenPositions.Should().ContainSingle();
         statement.CashReport.Should().BeNull();
     }
+
+    [Fact]
+    public void UnmodelledSections_AreIgnoredNotFatal()
+    {
+        var statement = Parse("""
+            <ChangeInNAV accountId="U0000001" startingValue="100" depositsWithdrawals="25" twr="1.5" />
+            <StmtFunds><StatementOfFundsLine activityCode="DEP" amount="25" /></StmtFunds>
+            <OpenPositions><OpenPosition symbol="ZZZQ" position="1" levelOfDetail="SUMMARY" /></OpenPositions>
+            """);
+
+        statement.OpenPositions.Should().ContainSingle();
+    }
 }
