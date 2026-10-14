@@ -844,6 +844,20 @@ are closed periods.
   changed row is first copied with its original values and the
   derivation into `net_worth_snapshots_backup_inzhur_2026_10`, which is kept. The correction is idempotent:
   a row whose backup differs from it is already corrected. Down restores the originals from the backup.
+- **Inzhur history correction, restored window** (Wealth migration `M006_RestoreRowsBeforeInzhurInflation`, one-off):
+  M005 took the removal off every row from the credential's `CreatedAt`, but the Inzhur *holdings* only reached the
+  snapshots at the first sync of the buggy build, so the rows before that never held any Inzhur value and the
+  removal was a false dip (owner: 2026-10-07 to 2026-10-11, about $4,855 per row; the 10-12 row, which carried the
+  100× value, stays corrected). M006 puts the originals back from `net_worth_snapshots_backup_inzhur_2026_10`,
+  matched by `Id`, in `BrokerageTotal`, `TotalNetWorth`, `cash_total` and `brokerage_invested`, for the backed-up
+  rows that predate the inflation. The boundary is evidence, not a date list: per user, in `(SnapshotDate, TakenAt)`
+  order, the first backed-up row whose original `BrokerageTotal` stepped up from the previous snapshot's (as it
+  stood before M005) by at least half of the removal M005 took off it is the first inflated snapshot (a real 100×
+  value is one jump of about that size; day-to-day market moves are not), and every backed-up row before it is
+  restored. A user with no such step, or whose first-ever snapshot is the backed-up row (nothing before it to show it was
+  clean), keeps M005's correction. A row is restored only while it still holds exactly what M005 left; one changed
+  since is left alone. Idempotent; the backup table is kept. Down re-applies M005's recorded removal to exactly
+  the rows the same rule selects.
 - **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
   has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
   Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
