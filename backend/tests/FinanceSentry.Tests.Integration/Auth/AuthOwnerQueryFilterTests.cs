@@ -34,11 +34,12 @@ public sealed class AuthOwnerQueryFilterTests : IAsyncLifetime
     // Identity's own tables carry a UserId but are read before a person is in scope (sign-in, refresh, the
     // per-request principal load, the role seed) and across users (managing people), so they stay unfiltered.
     // McpServiceToken is not filtered yet: its revocation check runs while the MCP host is still authenticating.
+    // AccountClosure is read across people: an Owner lists and reopens others' closures, and the purge job has no principal.
     private static readonly Type[] DeliberatelyUnfiltered =
     [
         typeof(IdentityUserClaim<string>), typeof(IdentityUserLogin<string>),
         typeof(IdentityUserRole<string>), typeof(IdentityUserToken<string>),
-        typeof(McpServiceToken),
+        typeof(McpServiceToken), typeof(AccountClosure),
     ];
 
     private readonly Guid _userA = Guid.NewGuid();

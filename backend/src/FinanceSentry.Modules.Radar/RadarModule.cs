@@ -74,6 +74,7 @@ public static class RadarModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_radar", "public")).UseUpdatedAtStamping(sp));
+        services.AddScoped<IUserDataEraser, RadarUserDataEraser>();
 
         services.Configure<RadarOptions>(config.GetSection(RadarOptions.SectionName));
         services.Configure<RegimeOptions>(config.GetSection(RegimeOptions.SectionName));

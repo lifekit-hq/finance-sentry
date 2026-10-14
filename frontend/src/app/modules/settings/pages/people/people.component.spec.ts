@@ -112,4 +112,25 @@ describe('PeopleComponent', () => {
     expect(host.textContent).toContain('Failed to load people.');
     expect(host.textContent).toContain('friend@test.com');
   });
+
+  it('offers Reopen, not Revoke, for a closed account and names when its data is erased', () => {
+    service.list.mockReturnValue(
+      of([
+        {
+          id: 'u-2',
+          email: 'closed@test.com',
+          roles: ['Member'],
+          status: 'Closed',
+          purgeDueAt: '2026-11-13T09:00:00Z',
+        },
+      ])
+    );
+
+    const host = render();
+    const labels = Array.from(host.querySelectorAll('button')).map(b => b.textContent?.trim());
+
+    expect(labels).toContain('Reopen');
+    expect(labels).not.toContain('Revoke');
+    expect(host.textContent).toContain('erased Fri 13 Nov');
+  });
 });

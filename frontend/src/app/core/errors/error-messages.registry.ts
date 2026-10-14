@@ -11,6 +11,10 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   CANNOT_REVOKE_SELF: 'You cannot revoke your own access.',
   CANNOT_REVOKE_OWNER: "The owner's access cannot be revoked.",
   USER_NOT_FOUND: 'That person no longer exists.',
+  CLOSURE_CONFIRMATION_MISMATCH: 'Type your account email exactly to confirm closing the account.',
+  LAST_OWNER_CANNOT_CLOSE:
+    'You are the only owner. Make someone else an owner before closing your account.',
+  ACCOUNT_NOT_CLOSED: 'This account is no longer closed, or its data has already been erased.',
   ACCOUNT_UPDATE_CONFLICT: 'Your account was changed elsewhere. Reload and try again.',
   MONOBANK_TOKEN_INVALID: 'Invalid Monobank token. Please check and try again.',
   MONOBANK_TOKEN_DUPLICATE: 'This Monobank token is already connected.',

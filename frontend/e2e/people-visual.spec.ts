@@ -7,6 +7,13 @@ const PEOPLE = [
   {id: 'u-2', email: 'sam@example.com', roles: ['Member'], status: 'Active'},
   {id: 'u-3', email: 'robin@example.com', roles: ['Member'], status: 'Invited'},
   {id: 'u-4', email: 'former@example.com', roles: ['Member'], status: 'Revoked'},
+  {
+    id: 'u-5',
+    email: 'closed@example.com',
+    roles: ['Member'],
+    status: 'Closed',
+    purgeDueAt: '2026-10-10T09:00:00Z',
+  },
 ];
 
 describeVisualBaseline({

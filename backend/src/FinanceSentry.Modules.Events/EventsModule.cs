@@ -32,6 +32,7 @@ public static class EventsModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<EventsDbContext>("Events");
 
         services.AddScoped<IEventVerdictRepository, EventVerdictRepository>();
 

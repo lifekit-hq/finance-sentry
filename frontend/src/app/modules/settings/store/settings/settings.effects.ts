@@ -2,10 +2,12 @@ import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {ToastService} from '@lifekit-hq/ui';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, concatMap, EMPTY, pipe, switchMap, tap} from 'rxjs';
+import {catchError, concatMap, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
 import {AuthStore} from '../../../auth/store/auth.store';
+import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
+import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
 import {ProfileUtils} from '../../utils/profile.utils';
 
@@ -21,6 +23,12 @@ interface EffectsStore {
   setProfileSaveSuccess: () => void;
   setProfileSaveError: (errorCode: Nullable<string>) => void;
   profileSaveErrorMessage: () => string;
+  closureOptions: () => Nullable<AccountClosureOptions>;
+  setClosureOptions: (options: AccountClosureOptions) => void;
+  setClosureLoading: () => void;
+  setClosureSuccess: () => void;
+  setClosureError: (errorCode: Nullable<string>) => void;
+  closureErrorMessage: () => string;
 }
 
 interface ProfileWrite {
@@ -30,6 +38,7 @@ interface ProfileWrite {
 
 export function settingsEffects(store: EffectsStore) {
   const service = inject(SettingsService);
+  const accountService = inject(AccountService);
   const authStore = inject(AuthStore);
   const toast = inject(ToastService);
 
@@ -88,8 +97,50 @@ export function settingsEffects(store: EffectsStore) {
     )
   );
 
+  // A failed check leaves the options unset, which keeps the close action disabled.
+  const loadClosureOptions = rxMethod<void>(
+    pipe(
+      switchMap(() =>
+        accountService.getClosureOptions().pipe(
+          tap(options => store.setClosureOptions(options)),
+          catchError(() => EMPTY)
+        )
+      )
+    )
+  );
+
+  // The server locks the account, revokes every session and deletes the stored provider keys
+  // before it answers; signing out here only clears this tab's cookies and sends it to sign-in.
+  const closeAccount = rxMethod<string>(
+    pipe(
+      tap(() => store.setClosureLoading()),
+      exhaustMap(confirmEmail =>
+        accountService.close({confirmEmail}).pipe(
+          tap(() => {
+            store.setClosureSuccess();
+            const days = store.closureOptions()?.graceDays;
+            toast.show(
+              days
+                ? `Account closed. An owner can reopen it within ${days} days.`
+                : 'Account closed.',
+              'info'
+            );
+            authStore.logout();
+          }),
+          catchError(err => {
+            store.setClosureError(extractErrorCode(err));
+            toast.show(store.closureErrorMessage(), 'error');
+            return EMPTY;
+          })
+        )
+      )
+    )
+  );
+
   return {
     load,
+    loadClosureOptions,
+    closeAccount,
     applyChange(change: Partial<UpdateProfileRequest>): void {
       write({change, confirm: false});
     },
@@ -101,8 +152,10 @@ export function settingsEffects(store: EffectsStore) {
 
 interface HookStore extends EffectsStore {
   load: () => void;
+  loadClosureOptions: () => void;
 }
 
 export function settingsHooks(store: HookStore): void {
   store.load();
+  store.loadClosureOptions();
 }

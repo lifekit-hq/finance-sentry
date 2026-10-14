@@ -23,6 +23,48 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinanceSentry.Modules.Auth.Domain.Entities.AccountClosure", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CredentialRevocation")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ErasedRows")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("PurgeDueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PurgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReopenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReopenedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurgeDueAt");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AccountClosures_UserId_Pending")
+                        .HasFilter("\"ReopenedAt\" IS NULL AND \"PurgedAt\" IS NULL");
+
+                    b.ToTable("AccountClosures", "auth");
+                });
+
             modelBuilder.Entity("FinanceSentry.Modules.Auth.Domain.Entities.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")

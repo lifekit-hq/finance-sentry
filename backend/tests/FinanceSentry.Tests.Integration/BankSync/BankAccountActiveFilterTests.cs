@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Integration.BankSync;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
@@ -11,6 +12,7 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Services;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 using Xunit;
 
 /// <summary>
@@ -112,7 +114,9 @@ public sealed class BankAccountActiveFilterTests : IAsyncLifetime
 
         await using var ctx = CreateContext();
         var accounts = new BankAccountRepository(ctx);
-        var totals = new BankingTotalsReader(accounts, new SyncJobRepository(ctx));
+        var totals = new BankingTotalsReader(
+            accounts, new SyncJobRepository(ctx),
+            Mock.Of<IClosedAccountsReader>(r => r.GetClosedUserIdsAsync(It.IsAny<CancellationToken>()) == Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>())));
 
         (await totals.GetTotalUsdAsync(_user)).Should().Be(100m);
         (await totals.GetActiveUserIdsAsync()).Should().Contain(_user).And.NotContain(_otherUser);
@@ -121,7 +125,8 @@ public sealed class BankAccountActiveFilterTests : IAsyncLifetime
         (await accounts.GetByExternalAccountIdUnscopedAsync(removed.ExternalAccountId)).Should().BeNull();
         (await accounts.GetAllActiveUnscopedAsync()).Select(a => a.Id).Should().Contain(active.Id)
             .And.NotContain([removed.Id, onlyRemoved.Id]);
-        (await ActiveAccountSnapshot.ReadAsync(ctx, default)).AccountIds.Should().Contain(active.Id)
+        (await ActiveAccountSnapshot.ReadAsync(
+            ctx, Mock.Of<IClosedAccountsReader>(r => r.GetClosedUserIdsAsync(It.IsAny<CancellationToken>()) == Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>())), default)).AccountIds.Should().Contain(active.Id)
             .And.NotContain([removed.Id, onlyRemoved.Id]);
     }
 

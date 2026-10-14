@@ -25,6 +25,7 @@ using Microsoft.Extensions.Options;
 /// </summary>
 public sealed class FxSpreadDetectionJob(
     BankSyncDbContext db,
+    IClosedAccountsReader closedAccounts,
     ITransferDetectionService transferDetection,
     IAlertGeneratorService alerts,
     IOptions<HygieneSentinelsOptions> options,
@@ -64,7 +65,7 @@ public sealed class FxSpreadDetectionJob(
         ActiveAccountSnapshot accounts;
         try
         {
-            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, closedAccounts, ct);
         }
         catch (Exception ex)
         {

@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Infrastructure;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
@@ -98,11 +99,14 @@ public class SmokeDataSeederTests
         }
 
         using var read = NewContext();
-        var ids = await new BankingTotalsReader(new BankAccountRepository(read), Mock.Of<ISyncJobRepository>())
+        var ids = await new BankingTotalsReader(new BankAccountRepository(read), Mock.Of<ISyncJobRepository>(), NoClosedAccounts())
             .GetActiveUserIdsAsync();
 
         ids.Should().Equal(realUser);
     }
+
+    private static IClosedAccountsReader NoClosedAccounts() =>
+        Mock.Of<IClosedAccountsReader>(r => r.GetClosedUserIdsAsync(It.IsAny<CancellationToken>()) == Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>()));
 
     private BankSyncDbContext NewContext() =>
         new(new DbContextOptionsBuilder<BankSyncDbContext>().UseInMemoryDatabase(_database).Options, NoCurrentUser.Instance);

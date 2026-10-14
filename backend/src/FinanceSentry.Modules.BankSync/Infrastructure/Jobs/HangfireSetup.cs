@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
+using FinanceSentry.Core.Interfaces;
 using Hangfire;
 using Hangfire.InMemory;
 using Hangfire.PostgreSql;
@@ -83,6 +84,7 @@ public class SyncScheduler(
     IRecurringJobManager recurringJobs,
     JobStorage jobStorage,
     IAccountDiscoveryService accountDiscovery,
+    IClosedAccountsReader closedAccounts,
     ILogger<SyncScheduler> logger)
 {
     private const string PerAccountCron = "*/30 * * * *";
@@ -91,6 +93,7 @@ public class SyncScheduler(
     private readonly IRecurringJobManager _recurringJobs = recurringJobs;
     private readonly JobStorage _jobStorage = jobStorage;
     private readonly IAccountDiscoveryService _accountDiscovery = accountDiscovery;
+    private readonly IClosedAccountsReader _closedAccounts = closedAccounts;
     private readonly ILogger<SyncScheduler> _logger = logger;
 
     public async Task ScheduleAllActiveAccounts(CancellationToken ct = default)
@@ -108,7 +111,10 @@ public class SyncScheduler(
                 "Account discovery failed for this scheduled run; existing accounts will still be scheduled.");
         }
 
-        var activeAccounts = await _accounts.GetAllActiveUnscopedAsync(ct);
+        // A closed account's bank accounts are not synced: their recurring jobs are removed below like an inactive
+        // account's, and come back on the first pass after the account is reopened.
+        var closed = await _closedAccounts.GetClosedUserIdsAsync(ct);
+        var activeAccounts = (await _accounts.GetAllActiveUnscopedAsync(ct)).Where(a => !closed.Contains(a.UserId)).ToList();
         var activeIds = new HashSet<Guid>(activeAccounts.Select(a => a.Id));
 
         foreach (var account in activeAccounts)

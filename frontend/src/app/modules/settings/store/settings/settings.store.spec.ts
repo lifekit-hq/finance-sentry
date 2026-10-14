@@ -8,6 +8,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {type UpdateProfileRequest, type UserProfile} from '../../models/settings/settings.model';
+import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
 import {SettingsStore} from './settings.store';
 
@@ -20,13 +21,16 @@ const REQUEST = {safeWithdrawalRate: 0.04} as unknown as UpdateProfileRequest;
 
 describe('SettingsStore', () => {
   let service: {getProfile: ReturnType<typeof vi.fn>; updateProfile: ReturnType<typeof vi.fn>};
+  let account: {getClosureOptions: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>};
 
   beforeEach(() => {
     service = {getProfile: vi.fn(), updateProfile: vi.fn()};
+    account = {getClosureOptions: vi.fn().mockReturnValue(NEVER), close: vi.fn()};
     TestBed.configureTestingModule({
       providers: [
         SettingsStore,
         {provide: SettingsService, useValue: service},
+        {provide: AccountService, useValue: account},
         {provide: AuthStore, useValue: {setProfileName: vi.fn()}},
         {provide: ToastService, useValue: {show: vi.fn()}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
@@ -119,5 +123,58 @@ describe('SettingsStore', () => {
     store.saveProfile(REQUEST);
 
     expect(store.profileSaveErrorMessage()).toBe('Failed to save profile.');
+  });
+
+  describe('account closure', () => {
+    it('keeps the close action off until the server says this account may close', () => {
+      service.getProfile.mockReturnValue(of(PROFILE));
+
+      const store = TestBed.inject(SettingsStore);
+
+      expect(store.canCloseAccount()).toBe(false);
+      expect(store.closureDescription()).toBe('Close your account and sign out everywhere.');
+    });
+
+    it('explains the grace period when the account may close', () => {
+      service.getProfile.mockReturnValue(of(PROFILE));
+      account.getClosureOptions.mockReturnValue(of({canClose: true, reason: null, graceDays: 30}));
+
+      const store = TestBed.inject(SettingsStore);
+
+      expect(store.canCloseAccount()).toBe(true);
+      expect(store.closureDescription()).toContain('kept for 30 days so an owner can reopen it');
+    });
+
+    it('shows the reason when the account may not close', () => {
+      service.getProfile.mockReturnValue(of(PROFILE));
+      account.getClosureOptions.mockReturnValue(
+        of({canClose: false, reason: 'You are the only owner.', graceDays: 30})
+      );
+
+      const store = TestBed.inject(SettingsStore);
+
+      expect(store.canCloseAccount()).toBe(false);
+      expect(store.closureDescription()).toBe('You are the only owner.');
+    });
+
+    it('resolves a refused close through the registry', () => {
+      service.getProfile.mockReturnValue(of(PROFILE));
+      account.close.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 400,
+              error: {errorCode: 'CLOSURE_CONFIRMATION_MISMATCH'},
+            })
+        )
+      );
+      const store = TestBed.inject(SettingsStore);
+
+      store.closeAccount('wrong@example.com');
+
+      expect(store.closureErrorMessage()).toBe(
+        'Type your account email exactly to confirm closing the account.'
+      );
+    });
   });
 });

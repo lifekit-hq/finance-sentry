@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Integration.BankSync;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Infrastructure.Encryption;
@@ -197,7 +198,8 @@ public sealed class BankSyncOwnerQueryFilterTests : IAsyncLifetime
         await SeedAsync(accountA, accountB);
 
         await using var ctx = CreateContext();
-        var snapshot = await ActiveAccountSnapshot.ReadAsync(ctx, default);
+        var snapshot = await ActiveAccountSnapshot.ReadAsync(
+            ctx, Mock.Of<IClosedAccountsReader>(r => r.GetClosedUserIdsAsync(It.IsAny<CancellationToken>()) == Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>())), default);
 
         snapshot.AccountIds.Should().Contain([accountA.Id, accountB.Id]);
     }

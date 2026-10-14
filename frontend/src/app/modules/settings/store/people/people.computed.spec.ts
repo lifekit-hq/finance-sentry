@@ -15,12 +15,14 @@ function build(
     people: Person[];
     peopleStatus: AsyncStatus;
     revokeErrorCode: Nullable<string>;
+    reopenErrorCode: Nullable<string>;
   }> = {}
 ) {
   return {
     people: signal<Person[]>(overrides.people ?? []),
     peopleStatus: signal<AsyncStatus>(overrides.peopleStatus ?? 'idle'),
     revokeErrorCode: signal<Nullable<string>>(overrides.revokeErrorCode ?? null),
+    reopenErrorCode: signal<Nullable<string>>(overrides.reopenErrorCode ?? null),
   };
 }
 
@@ -72,6 +74,51 @@ describe('peopleComputed', () => {
     it('offers revoke only for non-owner, non-self, not-yet-revoked people', () => {
       const rows = compute(build({people})).rows();
       expect(rows.filter(r => r.canRevoke).map(r => r.id)).toEqual(['member', 'invited']);
+    });
+
+    describe('a closed account', () => {
+      const closed: Person = {
+        id: 'closed',
+        email: 'closed@test.com',
+        roles: ['Member'],
+        status: 'Closed',
+        purgeDueAt: '2026-11-13T09:00:00Z',
+      };
+
+      it('offers reopen and no revoke', () => {
+        const [row] = compute(build({people: [closed]})).rows();
+        expect(row.canReopen).toBe(true);
+        expect(row.canRevoke).toBe(false);
+      });
+
+      it('names the day its data is erased', () => {
+        const [row] = compute(build({people: [closed]})).rows();
+        expect(row.sublabel).toBe('Member · erased Fri 13 Nov');
+      });
+
+      it('keeps the plain roles label for everyone else', () => {
+        const rows = compute(build({people})).rows();
+        expect(rows.map(r => r.sublabel)).toEqual(rows.map(r => r.rolesLabel));
+        expect(rows.some(r => r.canReopen)).toBe(false);
+      });
+    });
+  });
+
+  describe('reopenErrorMessage', () => {
+    it('is empty without an error', () => {
+      expect(compute(build()).reopenErrorMessage()).toBe('');
+    });
+
+    it('resolves a known code through the registry', () => {
+      const result = compute(build({reopenErrorCode: 'ACCOUNT_NOT_CLOSED'}));
+      expect(result.reopenErrorMessage()).toBe(
+        'This account is no longer closed, or its data has already been erased.'
+      );
+    });
+
+    it('falls back to the feature default for an unknown code', () => {
+      const result = compute(build({reopenErrorCode: 'UNKNOWN'}));
+      expect(result.reopenErrorMessage()).toBe('Could not reopen the account.');
     });
   });
 

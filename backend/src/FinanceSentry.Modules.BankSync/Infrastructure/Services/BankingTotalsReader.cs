@@ -6,15 +6,18 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 
 public class BankingTotalsReader(
     IBankAccountRepository accounts,
-    ISyncJobRepository syncJobs) : IBankingTotalsReader
+    ISyncJobRepository syncJobs,
+    IClosedAccountsReader closedAccounts) : IBankingTotalsReader
 {
     private readonly IBankAccountRepository _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
     private readonly ISyncJobRepository _syncJobs = syncJobs ?? throw new ArgumentNullException(nameof(syncJobs));
+    private readonly IClosedAccountsReader _closedAccounts = closedAccounts;
 
     public async Task<IReadOnlyList<Guid>> GetActiveUserIdsAsync(CancellationToken ct = default)
     {
         var active = await _accounts.GetAllActiveUnscopedAsync(ct);
-        return active.Select(a => a.UserId).Distinct().ToList();
+        var closed = await _closedAccounts.GetClosedUserIdsAsync(ct);
+        return active.Select(a => a.UserId).Distinct().Where(id => !closed.Contains(id)).ToList();
     }
 
     public async Task<decimal> GetTotalUsdAsync(Guid userId, CancellationToken ct = default)

@@ -62,4 +62,25 @@ describe('peopleMethods', () => {
     expect(state.revokingId()).toBeNull();
     expect(state.revokeErrorCode()).toBe('CANNOT_REVOKE_OWNER');
   });
+
+  it('tracks a reopen from start to finish', () => {
+    const {state, methods} = makeState();
+
+    methods.setReopening('u-1');
+    expect(state.reopeningId()).toBe('u-1');
+
+    methods.setReopened();
+    expect(state.reopeningId()).toBeNull();
+    expect(state.reopenErrorCode()).toBeNull();
+  });
+
+  it('setReopenError records the code and stops tracking the reopen', () => {
+    const {state, methods} = makeState();
+    methods.setReopening('u-1');
+
+    methods.setReopenError('ACCOUNT_NOT_CLOSED');
+
+    expect(state.reopeningId()).toBeNull();
+    expect(state.reopenErrorCode()).toBe('ACCOUNT_NOT_CLOSED');
+  });
 });

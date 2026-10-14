@@ -7,5 +7,6 @@ export const PERSON_STATUS_TAG_VARIANT: Readonly<Record<PersonStatus, TagVariant
   Invited: 'info',
   Active: 'success',
   Revoked: 'neutral',
+  Closed: 'warning',
   /* eslint-enable @typescript-eslint/naming-convention */
 };

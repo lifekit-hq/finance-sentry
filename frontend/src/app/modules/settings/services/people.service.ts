@@ -21,4 +21,8 @@ export class PeopleService extends ApiService {
   public revoke(userId: string): Observable<void> {
     return this.post<void>(`${encodeURIComponent(userId)}/revoke`);
   }
+
+  public reopen(userId: string): Observable<void> {
+    return this.post<void>(`${encodeURIComponent(userId)}/reopen`);
+  }
 }

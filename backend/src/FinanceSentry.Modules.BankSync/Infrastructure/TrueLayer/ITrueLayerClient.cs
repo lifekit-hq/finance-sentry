@@ -10,6 +10,9 @@ public interface ITrueLayerClient
 
     Task<TrueLayerTokenSet> RefreshAccessTokenAsync(string refreshToken, CancellationToken ct = default);
 
+    /// <summary>Withdraws the connection's access at TrueLayer (<c>DELETE /api/delete</c>), so its tokens stop working.</summary>
+    Task RevokeAccessAsync(string accessToken, CancellationToken ct = default);
+
     Task<IReadOnlyList<TrueLayerAccountInfo>> ListAccountsAsync(string accessToken, CancellationToken ct = default);
 
     Task<TrueLayerAccountBalance?> GetBalanceAsync(string accessToken, string accountId, CancellationToken ct = default);

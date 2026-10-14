@@ -6,9 +6,11 @@ import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
+import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
+import {AccountService} from '../../services/account.service';
 import {SettingsService} from '../../services/settings.service';
-import {settingsEffects} from './settings.effects';
+import {settingsEffects, settingsHooks} from './settings.effects';
 
 const PROFILE = {
   firstName: 'Ada',
@@ -17,10 +19,14 @@ const PROFILE = {
   realAnnualReturn: 0.05,
 } as unknown as UserProfile;
 const SAVE_FAILED = 'Failed to save profile.';
+const CLOSE_FAILED = 'Could not close the account.';
+const CAN_CLOSE: AccountClosureOptions = {canClose: true, reason: null, graceDays: 30};
 
 function buildStore() {
   const errorMessage = signal('');
+  const closureError = signal('');
   const profile = signal<Nullable<UserProfile>>(PROFILE);
+  const closureOptions = signal<Nullable<AccountClosureOptions>>(CAN_CLOSE);
   return {
     profile: () => profile(),
     updateProfile: vi.fn((partial: Partial<UserProfile>) =>
@@ -37,20 +43,31 @@ function buildStore() {
     setProfileSaveSuccess: vi.fn(),
     setProfileSaveError: vi.fn(() => errorMessage.set(SAVE_FAILED)),
     profileSaveErrorMessage: () => errorMessage(),
+    closureOptions: () => closureOptions(),
+    setClosureOptions: vi.fn((options: AccountClosureOptions) => closureOptions.set(options)),
+    setClosureLoading: vi.fn(),
+    setClosureSuccess: vi.fn(),
+    setClosureError: vi.fn(() => closureError.set(CLOSE_FAILED)),
+    closureErrorMessage: () => closureError(),
   };
 }
 
 describe('settingsEffects', () => {
   let service: {getProfile: ReturnType<typeof vi.fn>; updateProfile: ReturnType<typeof vi.fn>};
   let toast: {show: ReturnType<typeof vi.fn>};
+  let account: {getClosureOptions: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>};
+  let auth: {setProfileName: ReturnType<typeof vi.fn>; logout: ReturnType<typeof vi.fn>};
 
   beforeEach(() => {
     service = {getProfile: vi.fn(), updateProfile: vi.fn()};
     toast = {show: vi.fn()};
+    account = {getClosureOptions: vi.fn(), close: vi.fn()};
+    auth = {setProfileName: vi.fn(), logout: vi.fn()};
     TestBed.configureTestingModule({
       providers: [
         {provide: SettingsService, useValue: service},
-        {provide: AuthStore, useValue: {setProfileName: vi.fn()}},
+        {provide: AccountService, useValue: account},
+        {provide: AuthStore, useValue: auth},
         {provide: ToastService, useValue: toast},
       ],
     });
@@ -183,5 +200,72 @@ describe('settingsEffects', () => {
         expect.objectContaining({emailAlerts: false, syncFailureAlerts: false})
       );
     });
+  });
+
+  describe('loadClosureOptions', () => {
+    it('stores whether this account may be closed', () => {
+      const store = buildStore();
+      const options = {canClose: false, reason: 'You are the only owner.', graceDays: 30};
+      account.getClosureOptions.mockReturnValue(of(options));
+
+      effects(store).loadClosureOptions();
+
+      expect(store.setClosureOptions).toHaveBeenCalledWith(options);
+    });
+
+    it('leaves the options unset when the check fails', () => {
+      const store = buildStore();
+      account.getClosureOptions.mockReturnValue(
+        throwError(() => new HttpErrorResponse({status: 500}))
+      );
+
+      effects(store).loadClosureOptions();
+
+      expect(store.setClosureOptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('closeAccount', () => {
+    it('sends the typed email, then signs this tab out', () => {
+      const store = buildStore();
+      account.close.mockReturnValue(
+        of({closedAt: '2026-10-14T10:00:00Z', purgeDueAt: '2026-11-13T10:00:00Z'})
+      );
+
+      effects(store).closeAccount('ada@example.com');
+
+      expect(store.setClosureLoading).toHaveBeenCalled();
+      expect(account.close).toHaveBeenCalledWith({confirmEmail: 'ada@example.com'});
+      expect(store.setClosureSuccess).toHaveBeenCalled();
+      expect(toast.show).toHaveBeenCalledWith(
+        'Account closed. An owner can reopen it within 30 days.',
+        'info'
+      );
+      expect(auth.logout).toHaveBeenCalled();
+    });
+
+    it('stays signed in and toasts the reason when the server refuses', () => {
+      const store = buildStore();
+      account.close.mockReturnValue(
+        throwError(
+          () => new HttpErrorResponse({status: 409, error: {errorCode: 'LAST_OWNER_CANNOT_CLOSE'}})
+        )
+      );
+
+      effects(store).closeAccount('ada@example.com');
+
+      expect(store.setClosureError).toHaveBeenCalledWith('LAST_OWNER_CANNOT_CLOSE');
+      expect(toast.show).toHaveBeenCalledWith(CLOSE_FAILED, 'error');
+      expect(auth.logout).not.toHaveBeenCalled();
+    });
+  });
+
+  it('settingsHooks loads the profile and the closure options', () => {
+    const store = {...buildStore(), load: vi.fn(), loadClosureOptions: vi.fn()};
+
+    settingsHooks(store);
+
+    expect(store.load).toHaveBeenCalled();
+    expect(store.loadClosureOptions).toHaveBeenCalled();
   });
 });

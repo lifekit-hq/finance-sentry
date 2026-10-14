@@ -60,9 +60,11 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
         return Options.Create(options);
     }
 
+    private readonly HashSet<Guid> _closedUsers = [];
+
     private FxSpreadDetectionJob MakeJob(
         BankSyncDbContext db, IOptions<HygieneSentinelsOptions>? options = null) =>
-        new(db, new TransferDetectionService(), _alerts.Object,
+        new(db, new StubClosedAccountsReader([.. _closedUsers]), new TransferDetectionService(), _alerts.Object,
             options ?? Options.Create(new HygieneSentinelsOptions()),
             Mock.Of<ILogger<FxSpreadDetectionJob>>());
 
@@ -125,6 +127,36 @@ public sealed class FxSpreadDetectionJobTests : IDisposable
             userId, debit.Id, "EUR", "UAH", 36m, EurUahMarketRate,
             It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsAClosedUser_AndStillAlertsForTheOthers()
+    {
+        await using var db = NewDb();
+        var closedUser = Guid.NewGuid();
+        var openUser = Guid.NewGuid();
+        var closedDebit = SeedCostlyConversion(db, closedUser);
+        var openDebit = SeedCostlyConversion(db, openUser);
+        await db.SaveChangesAsync();
+        _closedUsers.Add(closedUser);
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            closedUser, closedDebit.Id, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.GenerateFxSpreadAlertAsync(
+            openUser, openDebit.Id, "EUR", "UAH", 36m, EurUahMarketRate, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static Transaction SeedCostlyConversion(BankSyncDbContext db, Guid userId)
+    {
+        var eurAccount = MakeAccount(userId, "EUR");
+        var uahAccount = MakeAccount(userId, "UAH");
+        db.BankAccounts.AddRange(eurAccount, uahAccount);
+        var (debit, credit) = MakeConversion(eurAccount, 100m, uahAccount, 3600m, DateTime.UtcNow);
+        db.Transactions.AddRange(debit, credit);
+        return debit;
     }
 
     /// <summary>

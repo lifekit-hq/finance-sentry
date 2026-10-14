@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -16,10 +17,14 @@ public class SyncSchedulerReconciliationTests
     private readonly Mock<IBankAccountRepository> _accounts = new();
     private readonly Mock<IRecurringJobManager> _recurringJobs = new();
     private readonly Mock<IAccountDiscoveryService> _discovery = new();
+    private readonly Mock<IClosedAccountsReader> _closed = new();
     private readonly InMemoryStorage _storage = new();
 
+    public SyncSchedulerReconciliationTests()
+        => _closed.Setup(c => c.GetClosedUserIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new HashSet<Guid>());
+
     private SyncScheduler Scheduler() =>
-        new(_accounts.Object, _recurringJobs.Object, _storage, _discovery.Object, NullLogger<SyncScheduler>.Instance);
+        new(_accounts.Object, _recurringJobs.Object, _storage, _discovery.Object, _closed.Object, NullLogger<SyncScheduler>.Instance);
 
     private void Active(params BankAccount[] active)
         => _accounts.Setup(a => a.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(active);
@@ -66,5 +71,22 @@ public class SyncSchedulerReconciliationTests
         await Scheduler().ScheduleAllActiveAccounts();
 
         _recurringJobs.Verify(m => m.RemoveIfExists(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_closed_accounts_jobs_are_removed_and_not_rescheduled()
+    {
+        var closedOwner = Guid.NewGuid();
+        var closed = new BankAccount { UserId = closedOwner };
+        var open = new BankAccount { UserId = Guid.NewGuid() };
+        StoredRecurringJob(SyncAccountJob.IdFor(closed.Id));
+        StoredRecurringJob(SyncAccountJob.IdFor(open.Id));
+        Active(closed, open);
+        _closed.Setup(c => c.GetClosedUserIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new HashSet<Guid> { closedOwner });
+
+        await Scheduler().ScheduleAllActiveAccounts();
+
+        _recurringJobs.Verify(m => m.RemoveIfExists(SyncAccountJob.IdFor(closed.Id)), Times.Once);
+        _recurringJobs.Verify(m => m.RemoveIfExists(SyncAccountJob.IdFor(open.Id)), Times.Never);
     }
 }

@@ -19,6 +19,9 @@ interface EffectsStore {
   setRevoking: (userId: string) => void;
   setRevoked: () => void;
   setRevokeError: (errorCode: Nullable<string>) => void;
+  setReopening: (userId: string) => void;
+  setReopened: () => void;
+  setReopenError: (errorCode: Nullable<string>) => void;
 }
 
 export function peopleEffects(store: EffectsStore) {
@@ -76,6 +79,23 @@ export function peopleEffects(store: EffectsStore) {
             }),
             catchError((err: unknown) => {
               store.setRevokeError(extractErrorCode(err));
+              return EMPTY;
+            })
+          )
+        )
+      )
+    ),
+    reopen: rxMethod<string>(
+      pipe(
+        tap(userId => store.setReopening(userId)),
+        exhaustMap(userId =>
+          service.reopen(userId).pipe(
+            tap(() => {
+              store.setReopened();
+              load();
+            }),
+            catchError((err: unknown) => {
+              store.setReopenError(extractErrorCode(err));
               return EMPTY;
             })
           )

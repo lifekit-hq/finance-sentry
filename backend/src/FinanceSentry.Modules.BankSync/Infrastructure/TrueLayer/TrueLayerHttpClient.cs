@@ -89,6 +89,23 @@ public sealed class TrueLayerHttpClient(
         return await PostTokenAsync(body, ct);
     }
 
+    public async Task RevokeAccessAsync(string accessToken, CancellationToken ct = default)
+    {
+        var auth = httpClientFactory.CreateClient(AuthClientName);
+        using var request = new HttpRequestMessage(HttpMethod.Delete, "/api/delete");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await auth.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new TrueLayerException(
+                ErrorCodeForStatus(response.StatusCode),
+                $"TrueLayer delete-credentials error ({(int)response.StatusCode}): {body}",
+                (int)response.StatusCode);
+        }
+    }
+
     public async Task<IReadOnlyList<TrueLayerAccountInfo>> ListAccountsAsync(string accessToken, CancellationToken ct = default)
     {
         var raw = await GetWithBearerAsync<AccountsResponse>(accessToken, "/data/v1/accounts", ct);

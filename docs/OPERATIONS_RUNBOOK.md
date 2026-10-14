@@ -147,6 +147,16 @@ Normal sign-in is Logto only. The one password path left is `POST /api/v1/auth/l
 2. From the app's origin, in the browser console: `fetch('/api/v1/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email: '<owner email>', password: '<password>'})})`. The response sets the session cookies; reload the app. Five failed attempts lock the account for five minutes.
 3. When Logto is back, set the flag back to `false` (or remove it) and recreate the `api` container. Passwords already stored stay as they are; accounts created by invite have none and cannot use this path.
 
+## 12. Account Closure and Purge
+
+A person closes their own account from Settings (Danger zone). It is reversible for 30 days, then the `account-purge` Hangfire job (daily 03:30 UTC) erases it for good.
+
+- **Who is closed, and when they purge:** `SELECT "UserId", "ClosedAt", "PurgeDueAt" FROM auth."AccountClosures" WHERE "ReopenedAt" IS NULL AND "PurgedAt" IS NULL;` - People in the app shows the same rows as `Closed` with their purge day.
+- **Reopen** (before `PurgeDueAt`): an Owner presses Reopen on the person in Settings → People (`POST /api/v1/people/{userId}/reopen`). It lifts the lockout and stamps `ReopenedAt`; the person signs in through Logto again, which relinks their identity. Provider keys deleted at closure are gone: they reconnect each provider.
+- **Purge did not run:** check `account-purge` in the Hangfire dashboard (§4). The job is idempotent - a failed run leaves the closure pending and the next run retries it; a purged closure (`PurgedAt` set) is never picked up again.
+- **Audit:** a purged closure keeps its row (`PurgedAt`, `ErasedRows` per module, `CredentialRevocation`). Never delete these rows; they are the record that the erasure happened.
+- Do not edit `PurgeDueAt` to hurry a purge in production: once it runs, nothing is recoverable short of a backup restore.
+
 ## Contact
 
 - On-call channel: `#finance-sentry-oncall`
