@@ -110,7 +110,7 @@ public sealed class IbkrFlexClient(
         var body = await response.Content.ReadAsStringAsync(ct);
 
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            throw new IbkrFlexException(null, $"IBKR Flex rejected the request ({(int)response.StatusCode}).");
+            throw new IbkrFlexException(null, $"IBKR Flex rejected the request ({(int)response.StatusCode}).", response.StatusCode);
 
         response.EnsureSuccessStatusCode();
         return body;

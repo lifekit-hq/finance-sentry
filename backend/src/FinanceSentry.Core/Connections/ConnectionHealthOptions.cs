@@ -23,8 +23,12 @@ public sealed class ConnectionHealthOptions
 
     /// <summary>
     /// The providers whose alerts the policy drives, by the keys the shadow log uses (<c>monobank</c>, <c>truelayer</c>,
-    /// <c>ibkr</c>, …). Every other provider stays in shadow mode: its evaluation is recorded and logged, and its own
-    /// alerting and account status stay exactly as they were. Empty by default, so every provider starts in shadow.
+    /// <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other provider stays in shadow mode: its
+    /// evaluation is recorded and logged, and its own alerting and account status stay exactly as they were. Empty by
+    /// default, so every provider starts in shadow.
     /// </summary>
     public List<string> ActiveProviders { get; set; } = [];
+
+    /// <summary>Whether the policy drives <paramref name="provider"/>'s alerts (see <see cref="ActiveProviders"/>).</summary>
+    public bool IsActive(string provider) => ActiveProviders.Contains(provider, StringComparer.OrdinalIgnoreCase);
 }

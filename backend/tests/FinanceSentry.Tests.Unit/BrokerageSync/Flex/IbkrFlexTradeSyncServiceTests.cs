@@ -176,7 +176,7 @@ public class IbkrFlexTradeSyncServiceTests
     public async Task SyncAsync_NoCredential_ReturnsNoOpResult_AndPersistsNothing()
     {
         var (fetcher, instrumentRepo, tradeRepo, cashRepo, service) = Wiring();
-        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync((FlexStatementXml?)null);
 
         var result = await service.SyncAsync(UserId);
@@ -185,6 +185,21 @@ public class IbkrFlexTradeSyncServiceTests
         instrumentRepo.Store.Should().BeEmpty();
         tradeRepo.Store.Should().BeEmpty();
         cashRepo.Store.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SyncAsync_PassesTheStatementNotAvailableExpectationToTheFetcher(bool expected)
+    {
+        var (fetcher, _, _, _, service) = Wiring();
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), expected))
+            .ReturnsAsync((FlexStatementXml?)null)
+            .Verifiable();
+
+        await service.SyncAsync(UserId, statementNotAvailableIsExpected: expected);
+
+        fetcher.Verify();
     }
 
     [Fact]
@@ -197,7 +212,7 @@ public class IbkrFlexTradeSyncServiceTests
             Trades = [SyntheticTrade("0000abcd.00000001.01")],
             FinancialInstruments = [SyntheticInstrument()],
         };
-        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(statement);
 
         await service.SyncAsync(UserId);
@@ -220,7 +235,7 @@ public class IbkrFlexTradeSyncServiceTests
             Trades = [SyntheticTrade("0000abcd.00000001.01")],
             FinancialInstruments = [SyntheticInstrument()],
         };
-        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(statement);
 
         await service.SyncAsync(UserId);
@@ -238,7 +253,7 @@ public class IbkrFlexTradeSyncServiceTests
             AccountId = "U0000001",
             CashTransactions = [SyntheticCashTransaction()],
         };
-        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(statement);
 
         await service.SyncAsync(UserId);
@@ -256,7 +271,7 @@ public class IbkrFlexTradeSyncServiceTests
             AccountId = "U0000001",
             Trades = [SyntheticTrade("0000abcd.00000001.01")],
         };
-        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+        fetcher.Setup(f => f.FetchAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(statement);
 
         await service.SyncAsync(UserId);

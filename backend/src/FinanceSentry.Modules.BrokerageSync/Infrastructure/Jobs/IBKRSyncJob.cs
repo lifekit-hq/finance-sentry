@@ -2,16 +2,30 @@ using System.Net;
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Http;
 using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Commands;
 using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 
+/// <summary>
+/// Scheduled IBKR holdings sync for every user with an active credential. Each attempt is recorded with the
+/// connection-health policy (Option B), read by <see cref="IbkrFailureClassifier"/>. Who raises the in-app
+/// sync-failure alert depends on <see cref="ConnectionHealthOptions.ActiveProviders"/>:
+/// <list type="bullet">
+/// <item>With <c>ibkr</c> active, the policy's verdict does: a confirmed credential loss at once, any other
+/// failure once it has persisted (by default 3 failures and 2 h without a success).</item>
+/// <item>Otherwise (shadow mode) this job's own streak does, as before the policy existed: a non-transient
+/// failure at once, a transient one after <see cref="TransientFailureAlertThreshold"/> consecutive ticks.</item>
+/// </list>
+/// </summary>
 public sealed class IBKRSyncJob(
     IIBKRCredentialRepository credentialRepository,
     ICommandHandler<SyncIBKRHoldingsCommand, SyncIBKRHoldingsResult> syncHandler,
@@ -19,9 +33,12 @@ public sealed class IBKRSyncJob(
     IUserAlertPreferencesReader userPreferences,
     IJobFailureStreakStore failureStreaks,
     IConnectionHealthShadow connectionHealth,
+    IbkrFailureClassifier failureClassifier,
+    IOptionsMonitor<ConnectionHealthOptions> healthOptions,
+    TimeProvider time,
     ILogger<IBKRSyncJob> logger)
 {
-    private const string Provider = "ibkr";
+    private const string Provider = IbkrFailureClassifier.ProviderName;
     private const string StreakKeyPrefix = "ibkr-sync:";
 
     // The live session token is cached until near-expiry (~daily), so a failed token
@@ -35,6 +52,7 @@ public sealed class IBKRSyncJob(
 
     public async Task ExecuteAsync()
     {
+        var policyDrivesAlerts = healthOptions.CurrentValue.IsActive(Provider);
         var activeCredentials = await credentialRepository.GetAllActiveUnscopedAsync();
 
         foreach (var credential in activeCredentials)
@@ -42,10 +60,19 @@ public sealed class IBKRSyncJob(
             try
             {
                 await syncHandler.Handle(new SyncIBKRHoldingsCommand(credential.UserId), CancellationToken.None);
-                failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
-                await TryResolveSyncFailureAsync(credential.UserId);
-                await connectionHealth.RecordSuccessAsync(
+                var evaluation = await connectionHealth.RecordSuccessAsync(
                     HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
+                }
+                else
+                {
+                    failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
+                    await TryResolveSyncFailureAsync(credential.UserId);
+                }
             }
             catch (Exception ex)
             {
@@ -54,12 +81,22 @@ public sealed class IBKRSyncJob(
                     "Failed to sync IBKR holdings for user {UserId}",
                     credential.UserId);
 
-                await HandleFailureAsync(credential.UserId, ex);
-                await connectionHealth.RecordFailureAsync(
+                var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
+                var evaluation = await connectionHealth.RecordFailureAsync(
                     HealthSubject(credential),
                     credential.Health,
-                    ToProviderFailure(ex),
+                    failure,
                     (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
+                }
+                else
+                {
+                    await HandleFailureAsync(credential.UserId, ex);
+                }
             }
         }
     }
@@ -112,23 +149,6 @@ public sealed class IBKRSyncJob(
     {
         credential.ApplyHealth(health);
         return credentialRepository.SaveHealthUnscopedAsync(credential.Id, health, ct);
-    }
-
-    /// <summary>
-    /// Shadow mode (Option B, S1): this job's own failure decision, read into the policy's taxonomy so the
-    /// policy's verdict can be compared with the alert this job raises. The IBKR classifier (S3) replaces it.
-    /// A 401/403 without "backend down" is only suspect: IBKR sends it for other reasons too (report §5).
-    /// </summary>
-    private static ProviderFailure ToProviderFailure(Exception ex)
-    {
-        var code = ex is BrokerAuthException { UpstreamStatusCode: { } status } ? $"HTTP_{(int)status}" : ex.GetType().Name;
-
-        if (IsTransient(ex))
-            return ProviderFailure.Transient(code);
-
-        return ClassifyPermanent(ex) == SyncFailureClass.Credential
-            ? ProviderFailure.CredentialSuspect(code)
-            : ProviderFailure.Unknown(code);
     }
 
     private async Task TryResolveSyncFailureAsync(Guid userId)

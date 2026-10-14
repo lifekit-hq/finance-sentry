@@ -107,6 +107,7 @@ public class RevolutXSignerTests
         var thrown = act.Should().Throw<RevolutXException>().Which;
         thrown.StatusCode.Should().Be(422);
         thrown.ErrorCode.Should().Be("INVALID_CREDENTIALS");
+        thrown.IsUnreadableKey.Should().BeTrue("only entering the key again can fix it");
         if (input.Trim().Length > 0)
         {
             thrown.Message.Should().NotContain(input.Trim());

@@ -64,8 +64,7 @@ public sealed class SyncExchangeHoldingsCommandHandler(
             credential.MarkSyncFailed("Failed to decrypt credentials.");
             credentialRepository.Update(credential);
             await credentialRepository.SaveChangesAsync(ct);
-            throw new InvalidOperationException(
-                $"Failed to decrypt {CryptoExchangeProvider.DisplayName(request.Provider)} credentials.", ex);
+            throw new ExchangeCredentialUnreadableException(request.Provider, ex);
         }
 
         try

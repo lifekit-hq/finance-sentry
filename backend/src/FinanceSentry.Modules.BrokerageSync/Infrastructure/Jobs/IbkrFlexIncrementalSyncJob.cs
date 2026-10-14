@@ -1,10 +1,13 @@
 using FinanceSentry.Core.Connections;
-using FinanceSentry.Infrastructure.Observability.Hangfire;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 
@@ -15,15 +18,28 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// execution id / cash transaction hash) — the one-shot <see cref="IbkrFlexBackfillJob"/>
 /// covers full history. A clean no-op, logged and returned from, when no user has an active
 /// Flex credential — supplying one is a manual step in IBKR's account management.
+///
+/// Each attempt is recorded with the connection-health policy (Option B), read by
+/// <see cref="IbkrFlexFailureClassifier"/>. With <c>ibkr-flex</c> in
+/// <see cref="ConnectionHealthOptions.ActiveProviders"/> the policy's verdict raises and resolves the in-app
+/// sync-failure alert (a rejected or expired token at once, anything else once it has persisted: by default
+/// 3 failures and 2 h without a success, three daily runs); otherwise (shadow mode) this job raises none,
+/// as before the policy existed. IBKR answering that no statement is available yet is no failure at all:
+/// it is logged and leaves the credential's error and health as they were.
 /// </summary>
 public sealed class IbkrFlexIncrementalSyncJob(
     IIBKRFlexCredentialRepository credentialRepository,
     IIbkrFlexTradeSyncService syncService,
+    IAlertGeneratorService alerts,
+    IUserAlertPreferencesReader userPreferences,
     IConnectionHealthShadow connectionHealth,
+    IbkrFlexFailureClassifier failureClassifier,
+    IOptionsMonitor<ConnectionHealthOptions> healthOptions,
+    TimeProvider time,
     ILogger<IbkrFlexIncrementalSyncJob> logger)
 {
     private const int LookbackDays = 7;
-    private const string Provider = "ibkr-flex";
+    private const string Provider = IbkrFlexFailureClassifier.ProviderName;
 
     public async Task ExecuteAsync()
     {
@@ -34,26 +50,45 @@ public sealed class IbkrFlexIncrementalSyncJob(
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var policyDrivesAlerts = healthOptions.CurrentValue.IsActive(Provider);
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         var window = new FlexStatementWindow(today.AddDays(-LookbackDays), today);
 
         foreach (var credential in activeCredentials)
         {
             try
             {
-                await syncService.SyncAsync(credential.UserId, window, CancellationToken.None);
-                await connectionHealth.RecordSuccessAsync(
+                await syncService.SyncAsync(credential.UserId, window, CancellationToken.None, statementNotAvailableIsExpected: true);
+                var evaluation = await connectionHealth.RecordSuccessAsync(
                     HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
+                }
+            }
+            catch (IbkrFlexException ex) when (ex.IsStatementNotAvailable)
+            {
+                logger.LogInformation(
+                    "IBKR Flex has no statement available yet for user {UserId} ({FlexMessage}); trying again next run",
+                    credential.UserId,
+                    ex.Message);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to sync IBKR Flex trades for user {UserId}", credential.UserId);
                 await RecordFailureAsync(credential, ex);
-                await connectionHealth.RecordFailureAsync(
+                var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
+                var evaluation = await connectionHealth.RecordFailureAsync(
                     HealthSubject(credential),
                     credential.Health,
-                    ToProviderFailure(ex),
+                    failure,
                     (health, ct) => SaveHealthAsync(credential, health, ct));
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
+                }
             }
         }
     }
@@ -82,13 +117,4 @@ public sealed class IbkrFlexIncrementalSyncJob(
         credential.ApplyHealth(health);
         return credentialRepository.SaveHealthUnscopedAsync(credential.Id, health, ct);
     }
-
-    /// <summary>
-    /// Shadow mode (Option B, S1): the job's transient test read into the policy's taxonomy; anything else is
-    /// Unknown until the Flex classifier (S3) can tell a revoked token from a parse failure.
-    /// </summary>
-    private static ProviderFailure ToProviderFailure(Exception ex) =>
-        JobFailureTransientClassifier.IsTransient(ex)
-            ? ProviderFailure.Transient(ex.GetType().Name)
-            : ProviderFailure.Unknown(ex.GetType().Name);
 }

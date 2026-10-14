@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 
@@ -13,6 +14,18 @@ public interface IIbkrCredentialResolver
 public sealed class IbkrCredentialResolver(ICredentialEncryptionService encryption) : IIbkrCredentialResolver
 {
     public IbkrOAuthCredentials Resolve(IBKRCredential credential)
+    {
+        try
+        {
+            return ResolveStored(credential);
+        }
+        catch (Exception ex)
+        {
+            throw new BrokerCredentialUnreadableException("IBKR", ex);
+        }
+    }
+
+    private IbkrOAuthCredentials ResolveStored(IBKRCredential credential)
     {
         var accessTokenSecret = encryption.Decrypt(
             credential.EncryptedAccessTokenSecret,

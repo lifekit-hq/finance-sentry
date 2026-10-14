@@ -163,6 +163,53 @@ public class AlertGeneratorServiceTests
     }
 
     [Fact]
+    public async Task GenerateSyncFailure_WithAnAlertOpen_OnlyBumpsIt()
+    {
+        var existing = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, _accountId, default))
+            .ReturnsAsync(existing);
+
+        await _service.GenerateSyncFailureAlertAsync(_userId, "ibkr", _accountId, null, "HTTP_401", SyncFailureClass.Credential);
+
+        _repo.Verify(r => r.BumpOccurrenceAsync(existing.Id, default), Times.Once);
+        _repo.Verify(r => r.ResolveAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.IsAny<Alert>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task EscalateSyncFailure_SupersedesTheOpenAlert_WithTheReconnectAlert_PastTheSilenceWindow()
+    {
+        var open = new Alert { Id = Guid.NewGuid() };
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, _accountId, default))
+            .ReturnsAsync(open);
+        _repo.Setup(r => r.HasRecentAsync(
+                _userId, AlertType.SyncFailure, _accountId, It.IsAny<string?>(), It.IsAny<DateTimeOffset>(), default))
+            .ReturnsAsync(true);
+
+        await _service.EscalateSyncFailureAlertAsync(_userId, "ibkr", _accountId, null, "HTTP_401");
+
+        _repo.Verify(r => r.ResolveAsync(open.Id, default), Times.Once);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.SyncFailure &&
+            a.ReferenceId == _accountId &&
+            a.Message.Contains("reconnect")), default), Times.Once);
+        _repo.Verify(r => r.BumpOccurrenceAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task EscalateSyncFailure_NothingOpen_RecordsTheReconnectAlert()
+    {
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.SyncFailure, It.IsAny<Guid?>(), default))
+            .ReturnsAsync((Alert?)null);
+
+        await _service.EscalateSyncFailureAlertAsync(_userId, "binance", null, null, "-2015");
+
+        _repo.Verify(r => r.ResolveAsync(It.IsAny<Guid>(), default), Times.Never);
+        _repo.Verify(r => r.AddAsync(It.Is<Alert>(a =>
+            a.Type == AlertType.SyncFailure && a.Message.Contains("reconnect")), default), Times.Once);
+    }
+
+    [Fact]
     public async Task SyncFailure_ProviderLevel_TwoProvidersAlertIndependently()
     {
         var store = new List<Alert>();
