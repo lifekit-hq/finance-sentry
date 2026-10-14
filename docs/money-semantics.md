@@ -138,7 +138,8 @@ them.
 `investedUAH`), the broker account (`availableBalanceUAH`, `blockedBalanceUAH`, `totalBalanceUAH`) and every
 ledger `amount`. Its own web client divides them by 100 for display. *Prices* (`buyUAH`, `sellUAH`, `navUAH`)
 are hryvnia. `InzhurHoldingsMapper.FromMinorUnits` is the one place amounts become hryvnia. Rows synced
-before this rule (2026-10-12) were 100× too large and are rewritten by the next daily sync.
+before this rule (2026-10-12) were 100× too large and are rewritten by the next daily sync; the net-worth
+snapshots taken from them are corrected once by a migration (§8, *Inzhur history correction*).
 
 - **Funds and bonds** — one row per asset from `user-assets`, instrument type `REIT` for a fund
   (real estate, so the equity universes built from `STK` never pick it up) and `BOND` for a war
@@ -823,6 +824,20 @@ are closed periods.
   book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
   records 0 invested for it even when the previous row has no split. Idempotent and bounded: it fills only null columns, never
   overwrites, and reads at most one history window per user.
+- **Inzhur history correction** (Wealth migration `M005_CorrectInzhurNetWorthHistory`, one-off): snapshots
+  taken while the Inzhur holdings still held the pre-kopeck values (§1 *Inzhur*, 100× too large) are
+  corrected in place. Affected rows: per user, `TakenAt` from the Inzhur connection (`InzhurCredentials.CreatedAt`,
+  never before 2026-10-12, the first live sync) up to the fixed build's first sync, which is the earliest
+  `CreatedAt` of that user's Inzhur ledger rows (the ledger arrived with the fix). Rows that are
+  `IsApproximate` or carry the brokerage sleeve forward are skipped. The real Inzhur value at `TakenAt` is the
+  corrected holdings rolled back through the ledger dated after it: invested = Σ fund `UsdValue` − Σ units
+  traded since × the holding's unit value (an asset no longer held uses its own trade price), and cash =
+  `UAH Cash` − Σ cash movements since − Σ trade proceeds since. Both are converted at the holdings' own
+  UAH→USD rate (Σ `UsdValue` / Σ `NativeValue`). The stored figure held 100× that value, so 99× it comes off
+  `BrokerageTotal` and `TotalNetWorth`, the invested part off `brokerage_invested` and the cash part off
+  `cash_total`. A null split stays null. Every changed row is first copied with its original values and the
+  derivation into `net_worth_snapshots_backup_inzhur_2026_10`, which is kept. The correction is idempotent:
+  a row whose backup differs from it is already corrected. Down restores the originals from the backup.
 - **Chart stack and change figures** (frontend, `dashboard.computed.ts`): once any charted day
   has a split (all three fields non-null) the stacked area chart is **Cash / Brokerage invested /
   Crypto invested**, plotted straight from the snapshot's split, so each split day's bands add up to
