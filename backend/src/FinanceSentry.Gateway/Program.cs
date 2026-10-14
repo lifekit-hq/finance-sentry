@@ -38,6 +38,7 @@ builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
 // -----------------------------------------------------------------------------------------------
 
 const int DefaultAuthPermitPerMinute = 10;
+const int DefaultAuthSessionPermitPerMinute = 60;
 const int HstsMaxAgeDays = 365;
 const int TooManyRequestsStatusCode = StatusCodes.Status429TooManyRequests;
 
@@ -65,10 +66,21 @@ builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>
 // FR-004 / US3: per-client (real IP) fixed-window limits on abuse-prone routes. Limits are
 // config-tunable (Gateway:RateLimits:*); rejections return 429 (SC-005) and are visible in metrics.
 var authPermit = builder.Configuration.GetValue("Gateway:RateLimits:Auth:PermitPerMinute", DefaultAuthPermitPerMinute);
+var authSessionPermit = builder.Configuration.GetValue(
+    "Gateway:RateLimits:AuthSession:PermitPerMinute", DefaultAuthSessionPermitPerMinute);
 
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = TooManyRequestsStatusCode;
+    options.OnRejected = GatewayRateLimitRejection.WriteAsync;
+    options.AddPolicy(GatewayRateLimitPolicies.AuthSession, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientPartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = authSessionPermit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        }));
     options.AddPolicy(GatewayRateLimitPolicies.Auth, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(ClientPartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
         {

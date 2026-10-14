@@ -8,6 +8,13 @@ namespace FinanceSentry.Gateway;
 /// </summary>
 public static class GatewayRateLimitPolicies
 {
-    /// <summary>Per-client limit on unauthenticated auth endpoints (login, register, refresh, google).</summary>
+    /// <summary>Per-client limit on credential endpoints (login, refresh, logout, MCP token calls).</summary>
     public const string Auth = "auth";
+
+    /// <summary>
+    /// Per-client limit on the session bootstrap calls every launch makes (<c>GET /auth/me</c>,
+    /// <c>GET /auth/methods</c>, <c>GET /auth/oidc/start</c>). A separate, higher budget so a few
+    /// relaunches from one household NAT never exhaust the credential budget or fail the sign-in page.
+    /// </summary>
+    public const string AuthSession = "auth-session";
 }
