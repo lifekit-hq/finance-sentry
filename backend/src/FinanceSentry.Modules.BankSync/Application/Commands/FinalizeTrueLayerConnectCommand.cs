@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Commands;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Infrastructure.Encryption;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.TrueLayer;
@@ -21,6 +22,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
     ICredentialEncryptionService encryption,
     IBankAccountRepository accounts,
     IScheduledSyncService syncService,
+    IBankConnectionHealth connectionHealth,
     IConfiguration configuration,
     ILogger<FinalizeTrueLayerConnectCommandHandler> logger)
     : ICommandHandler<FinalizeTrueLayerConnectCommand, FinalizeTrueLayerConnectResult>
@@ -52,6 +54,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
 
         var providerAccounts = await client.ListAccountsAsync(tokens.AccessToken, cancellationToken);
         var createdIds = new List<Guid>();
+        var replacedConnectionIds = new HashSet<Guid>();
 
         foreach (var pa in providerAccounts)
         {
@@ -72,6 +75,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
                 // Reconnect/reauth: heal the existing account in place instead of skipping it.
                 // Re-point it at the freshly linked connection and clear reauth_required so the
                 // scheduler resumes syncing. A follow-up sync is enqueued below to backfill data.
+                NoteReplacedConnection(existing, connection.Id, replacedConnectionIds);
                 existing.MarkReconnected(connection.Id, currentBalance ?? existing.CurrentBalance ?? 0m);
                 await accounts.UpdateAsync(existing, cancellationToken);
                 createdIds.Add(existing.Id);
@@ -117,6 +121,7 @@ public class FinalizeTrueLayerConnectCommandHandler(
             var existing = await accounts.GetByExternalAccountIdUnscopedAsync(card.AccountId, cancellationToken);
             if (existing != null)
             {
+                NoteReplacedConnection(existing, connection.Id, replacedConnectionIds);
                 existing.MarkReconnected(connection.Id, owed ?? existing.CurrentBalance ?? 0m);
                 existing.CreditLimit = creditLimit ?? existing.CreditLimit;
                 await accounts.UpdateAsync(existing, cancellationToken);
@@ -137,6 +142,11 @@ public class FinalizeTrueLayerConnectCommandHandler(
         connection.SetRefreshToken(encrypted.Ciphertext, encrypted.Iv, encrypted.AuthTag, encrypted.KeyVersion);
         connection.MarkLinked(expiresAt: DateTime.UtcNow.AddDays(90));
         await connections.UpdateAsync(connection, cancellationToken);
+
+        // Accounts moved off an earlier connection of this user: its connection-keyed "reconnect" alert would otherwise
+        // stay open for good, because no sync ever runs against that connection again.
+        await connectionHealth.ResolveReplacedConnectionAlertsAsync(
+            connection.UserId, TrueLayerFailureClassifier.ProviderName, replacedConnectionIds, cancellationToken);
 
         // Sync inline with the freshly-exchanged access token while its SCA session is still
         // active — this is the only window in which strict banks (e.g. AIB) will return
@@ -163,5 +173,11 @@ public class FinalizeTrueLayerConnectCommandHandler(
             UserId: connection.UserId,
             AccountsConnected: createdIds.Count,
             CreatedAccountIds: createdIds);
+    }
+
+    private static void NoteReplacedConnection(Domain.BankAccount account, Guid newConnectionId, HashSet<Guid> replaced)
+    {
+        if (account.TrueLayerConnectionId is { } previous && previous != newConnectionId)
+            replaced.Add(previous);
     }
 }

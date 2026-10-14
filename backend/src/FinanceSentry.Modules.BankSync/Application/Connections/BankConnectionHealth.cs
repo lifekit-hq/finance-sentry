@@ -54,6 +54,14 @@ public interface IBankConnectionHealth
     /// <summary>Records a failed connection-level call, raises the alert the policy decides, and returns the verdict.</summary>
     Task<BankHealthVerdict> RecordConnectionFailureAsync(
         BankConnectionRef connection, Exception exception, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves the sync-failure alerts keyed on connections a successful reconnect has replaced: their accounts now
+    /// belong to the new connection, so nothing would ever resolve the old connection's "reconnect" alert. A provider in
+    /// shadow mode raised no connection-keyed alert, so there is nothing to resolve and this does nothing.
+    /// </summary>
+    Task ResolveReplacedConnectionAlertsAsync(
+        Guid userId, string provider, IReadOnlyCollection<Guid> replacedConnectionIds, CancellationToken ct = default);
 }
 
 /// <summary>A bank connection row, for the connection-level calls.</summary>
@@ -190,6 +198,16 @@ public sealed class BankConnectionHealth(
         return stored is null
             ? new BankHealthVerdict(failure, null)
             : await ChargeConnectionAsync(connection, stored, failure, at, ct);
+    }
+
+    public async Task ResolveReplacedConnectionAlertsAsync(
+        Guid userId, string provider, IReadOnlyCollection<Guid> replacedConnectionIds, CancellationToken ct = default)
+    {
+        if (!IsActive(provider))
+            return;
+
+        foreach (var connectionId in replacedConnectionIds)
+            await ResolveAsync(userId, provider, connectionId, ct);
     }
 
     private async Task<BankHealthVerdict> ChargeConnectionAsync(
