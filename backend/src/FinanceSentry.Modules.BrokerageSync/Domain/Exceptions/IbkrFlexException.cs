@@ -30,8 +30,9 @@ public sealed class IbkrFlexException(string? flexErrorCode, string message, Htt
     public string? FlexErrorCode { get; } = flexErrorCode;
 
     /// <summary>
-    /// IBKR has no statement for the window yet, which the daily ~06:00 run routinely meets: an expected
-    /// answer, not a failure of the connection.
+    /// IBKR has no statement for the requested window. A window ending on a day IBKR has not closed yet gets
+    /// this answer, so the daily sync asks only through yesterday and steps back a day once when it still
+    /// meets it; past that it is a failure like any other.
     /// </summary>
     public bool IsStatementNotAvailable => FlexErrorCode == StatementNotAvailableCode;
 

@@ -14,11 +14,7 @@ public interface IIbkrFlexTradeSyncService
     /// Flex credential, since configuring one is a manual step the human has not necessarily
     /// taken yet.
     /// </summary>
-    Task<IbkrFlexTradeSyncResult> SyncAsync(
-        Guid userId,
-        FlexStatementWindow? window = null,
-        CancellationToken ct = default,
-        bool statementNotAvailableIsExpected = false);
+    Task<IbkrFlexTradeSyncResult> SyncAsync(Guid userId, FlexStatementWindow? window = null, CancellationToken ct = default);
 }
 
 public sealed record IbkrFlexTradeSyncResult(int TradesUpserted, int CashTransactionsUpserted)
@@ -43,13 +39,9 @@ public sealed class IbkrFlexTradeSyncService(
 {
     private const string Provider = "ibkr";
 
-    public async Task<IbkrFlexTradeSyncResult> SyncAsync(
-        Guid userId,
-        FlexStatementWindow? window = null,
-        CancellationToken ct = default,
-        bool statementNotAvailableIsExpected = false)
+    public async Task<IbkrFlexTradeSyncResult> SyncAsync(Guid userId, FlexStatementWindow? window = null, CancellationToken ct = default)
     {
-        var statement = await statementFetcher.FetchAsync(userId, window, ct, statementNotAvailableIsExpected);
+        var statement = await statementFetcher.FetchAsync(userId, window, ct);
         if (statement is null)
         {
             // IbkrFlexStatementFetcher already logs the no-credential case.
