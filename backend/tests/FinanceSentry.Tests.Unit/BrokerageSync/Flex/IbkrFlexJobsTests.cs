@@ -452,6 +452,7 @@ public class IbkrFlexJobsTests
         harness.SyncService
             .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
 
         await harness.RunAsync();
 
@@ -460,5 +461,6 @@ public class IbkrFlexJobsTests
             Times.Once);
         harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         harness.Credential.Health.LastSuccessAt.Should().Be(Start);
+        harness.Alerts.Verify(a => a.ResolveSyncFailureAlertAsync(harness.UserId, "ibkr-flex", null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

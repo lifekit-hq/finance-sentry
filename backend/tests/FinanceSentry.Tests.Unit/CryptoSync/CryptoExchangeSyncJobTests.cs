@@ -770,14 +770,19 @@ public class CryptoExchangeSyncJobTests
         var credential = MakeLostCredential(provider, Start.AddHours(-1));
         credential.Reconnect([7], [8], [9], [10], [11], [12], 1);
         GivenActive(provider, credential);
+        _userPrefs
+            .Setup(p => p.GetAsync(credential.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserAlertPreferences(true, 0m, true));
         _syncHandler
             .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow));
+        credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
 
         await RunJobAsync(provider);
 
         VerifySyncCalls(credential.UserId, Times.Once());
         credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         credential.Health.LastSuccessAt.Should().Be(Start);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(credential.UserId, provider, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

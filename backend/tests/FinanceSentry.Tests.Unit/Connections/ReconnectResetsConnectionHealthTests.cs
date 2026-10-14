@@ -11,9 +11,10 @@ using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 /// <summary>
-/// A reconnect lifts the ActionRequired pause: the connect step resets the credential's health to its
-/// not-yet-checked state, and the reset reaches the row through the same Update + SaveChanges the connect
-/// handlers use. Health is not declared Healthy by the reconnect; the next scheduled run records it.
+/// A reconnect lifts the ActionRequired pause: the connect step clears the credential's last failure and keeps
+/// its state, and the change reaches the row through the same Update + SaveChanges the connect handlers use.
+/// Health is not declared Healthy by the reconnect; the next successful scheduled run records it and resolves
+/// the sync-failure alert.
 /// </summary>
 public class ReconnectResetsConnectionHealthTests
 {
@@ -34,7 +35,7 @@ public class ReconnectResetsConnectionHealthTests
         new DbContextOptionsBuilder<T>().UseInMemoryDatabase($"{name}-{Guid.NewGuid()}").Options;
 
     [Fact]
-    public async Task ExchangeCredential_Reconnect_ResetsHealth_AndTheResetIsPersisted()
+    public async Task ExchangeCredential_Reconnect_ClearsLastFailureKeepsState_AndIsPersisted()
     {
         var options = Options<CryptoSyncDbContext>("reconnect-crypto");
         var credential = ExchangeCredential.Create(Guid.NewGuid(), CryptoExchangeProvider.Binance, [1], [2], [3], [4], [5], [6], 1);
@@ -56,11 +57,11 @@ public class ReconnectResetsConnectionHealthTests
 
         await using var read = new CryptoSyncDbContext(options, NoCurrentUser.Instance);
         var reloaded = await read.ExchangeCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
-        reloaded.Health.Should().Be(new ConnectionHealth());
+        reloaded.Health.Should().Be(ActionRequired() with { LastFailureAt = null });
     }
 
     [Fact]
-    public async Task IBKRCredential_Reactivate_ResetsHealth_AndTheResetIsPersisted()
+    public async Task IBKRCredential_Reactivate_ClearsLastFailureKeepsState_AndIsPersisted()
     {
         var options = Options<BrokerageSyncDbContext>("reactivate-ibkr");
         var credential = new IBKRCredential(
@@ -85,11 +86,11 @@ public class ReconnectResetsConnectionHealthTests
 
         await using var read = new BrokerageSyncDbContext(options, NoCurrentUser.Instance);
         var reloaded = await read.IBKRCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
-        reloaded.Health.Should().Be(new ConnectionHealth());
+        reloaded.Health.Should().Be(ActionRequired() with { LastFailureAt = null });
     }
 
     [Fact]
-    public async Task IBKRFlexCredential_Replace_ResetsHealth_AndTheResetIsPersisted()
+    public async Task IBKRFlexCredential_Replace_ClearsLastFailureKeepsState_AndIsPersisted()
     {
         var options = Options<BrokerageSyncDbContext>("replace-flex");
         var credential = new IBKRFlexCredential(Guid.NewGuid(), "999999", [1], [2], [3], 1);
@@ -111,6 +112,6 @@ public class ReconnectResetsConnectionHealthTests
 
         await using var read = new BrokerageSyncDbContext(options, NoCurrentUser.Instance);
         var reloaded = await read.IBKRFlexCredentials.IgnoreQueryFilters([OwnerQueryFilter.Name]).SingleAsync();
-        reloaded.Health.Should().Be(new ConnectionHealth());
+        reloaded.Health.Should().Be(ActionRequired() with { LastFailureAt = null });
     }
 }

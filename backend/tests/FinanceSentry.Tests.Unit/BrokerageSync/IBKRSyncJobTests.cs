@@ -596,11 +596,13 @@ public class IBKRSyncJobTests
         credential.Reactivate(
             "FINSENTRY", "access-token", "dh-pem", [1], [2], [3], [4], [5], [6], [7], [8], [9], keyVersion: 1);
         GivenSyncSucceeds();
+        credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
 
         await CreatePolicyJob().ExecuteAsync();
 
         VerifySyncCalls(Times.Once());
         credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         credential.Health.LastSuccessAt.Should().Be(Start);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
