@@ -5,12 +5,14 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   inject,
   untracked,
+  ViewContainerRef,
 } from '@angular/core';
 import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {
   AppearanceSettingsComponent,
   ButtonComponent,
+  CmnDialogService,
   DangerZoneComponent,
   FormFieldComponent,
   InputComponent,
@@ -20,14 +22,15 @@ import {
   SettingRowComponent,
   SettingsSectionComponent,
   TagComponent,
-  ToastService,
   ToggleComponent,
 } from '@lifekit-hq/ui';
+import {take} from 'rxjs';
 
 import {InputHintsDirective} from '../../../../shared/directives/input-hints.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {PercentUtils} from '../../../../shared/utils/percent.utils';
 import {AuthStore} from '../../../auth/store/auth.store';
+import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
 import {APP_SEED} from '../../constants/appearance/appearance.constants';
 import {
   REAL_ANNUAL_RETURN_MAX_PERCENT,
@@ -35,6 +38,7 @@ import {
   SAFE_WITHDRAWAL_RATE_MAX_PERCENT,
   SAFE_WITHDRAWAL_RATE_MIN_PERCENT,
 } from '../../constants/fire/fire-assumptions.constants';
+import {type CloseAccountDialogData} from '../../models/account-closure/account-closure.model';
 import {type BaseCurrency} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -75,7 +79,8 @@ const CURRENCY_OPTIONS: {value: BaseCurrency; label: string}[] = [
 export class SettingsComponent {
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastService);
+  private readonly dialog = inject(CmnDialogService);
+  private readonly viewContainerRef = inject(ViewContainerRef);
 
   public readonly store = inject(SettingsStore);
   public readonly push = inject(PushStore);
@@ -197,7 +202,27 @@ export class SettingsComponent {
     this.authStore.logout();
   }
 
-  public deleteAccount(): void {
-    this.toast.show('Account deletion requested', 'warning');
+  // Second step after the danger zone's own confirm: the account email, typed, closes it.
+  public requestClose(): void {
+    const profile = this.store.profile();
+    const options = this.store.closureOptions();
+    if (!profile || !options?.canClose) {
+      return;
+    }
+    const data: CloseAccountDialogData = {email: profile.email, purgeDays: options.graceDays};
+    this.dialog
+      .open<string>(CloseAccountDialogComponent, {
+        data,
+        title: 'Close your account',
+        size: 'md',
+        viewContainerRef: this.viewContainerRef,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmEmail => {
+        if (confirmEmail) {
+          this.store.closeAccount(confirmEmail);
+        }
+      });
   }
 }

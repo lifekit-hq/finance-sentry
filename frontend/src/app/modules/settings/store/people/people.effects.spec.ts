@@ -29,6 +29,9 @@ function buildStore() {
     setRevoking: vi.fn(),
     setRevoked: vi.fn(),
     setRevokeError: vi.fn(),
+    setReopening: vi.fn(),
+    setReopened: vi.fn(),
+    setReopenError: vi.fn(),
   };
 }
 
@@ -41,6 +44,7 @@ describe('peopleEffects', () => {
     list: ReturnType<typeof vi.fn>;
     createInvite: ReturnType<typeof vi.fn>;
     revoke: ReturnType<typeof vi.fn>;
+    reopen: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -48,6 +52,7 @@ describe('peopleEffects', () => {
       list: vi.fn().mockReturnValue(of(PEOPLE)),
       createInvite: vi.fn(),
       revoke: vi.fn(),
+      reopen: vi.fn(),
     };
     TestBed.configureTestingModule({providers: [{provide: PeopleService, useValue: service}]});
   });
@@ -126,6 +131,30 @@ describe('peopleEffects', () => {
 
       expect(store.setRevokeError).toHaveBeenCalledWith('CANNOT_REVOKE_OWNER');
       expect(store.setRevoked).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reopen', () => {
+    it('reopens and reloads the list', () => {
+      const store = buildStore();
+      service.reopen.mockReturnValue(of(undefined));
+
+      effects(store).reopen('u-1');
+
+      expect(store.setReopening).toHaveBeenCalledWith('u-1');
+      expect(service.reopen).toHaveBeenCalledWith('u-1');
+      expect(store.setReopened).toHaveBeenCalled();
+      expect(service.list).toHaveBeenCalled();
+    });
+
+    it('records the error code on failure', () => {
+      const store = buildStore();
+      service.reopen.mockReturnValue(apiError('ACCOUNT_NOT_CLOSED'));
+
+      effects(store).reopen('u-1');
+
+      expect(store.setReopenError).toHaveBeenCalledWith('ACCOUNT_NOT_CLOSED');
+      expect(store.setReopened).not.toHaveBeenCalled();
     });
   });
 

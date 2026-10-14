@@ -27,6 +27,7 @@ public static class AnalyticsModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_analytics", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<AnalyticsDbContext>("Analytics");
 
         services.Configure<AnalyticsOptions>(config.GetSection(AnalyticsOptions.SectionName));
 

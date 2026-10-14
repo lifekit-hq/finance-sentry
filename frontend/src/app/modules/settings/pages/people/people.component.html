@@ -51,6 +51,9 @@
       @if (store.revokeErrorMessage()) {
         <cmn-alert variant="error">{{ store.revokeErrorMessage() }}</cmn-alert>
       }
+      @if (store.reopenErrorMessage()) {
+        <cmn-alert variant="error">{{ store.reopenErrorMessage() }}</cmn-alert>
+      }
 
       <cmn-async-state
         [status]="view().status"
@@ -75,8 +78,8 @@
           @for (person of store.rows(); track person.id) {
             <cmn-list-item-row
               [label]="person.email"
-              [sublabel]="person.rolesLabel"
-              [dimmed]="person.status === 'Revoked'"
+              [sublabel]="person.sublabel"
+              [dimmed]="person.status === 'Revoked' || person.status === 'Closed'"
             >
               <cmn-tag [variant]="statusVariant[person.status]" meta>{{ person.status }}</cmn-tag>
               @if (person.canRevoke) {
@@ -88,6 +91,17 @@
                   variant="secondary"
                   size="sm"
                   >Revoke</cmn-button
+                >
+              }
+              @if (person.canReopen) {
+                <cmn-button
+                  [loading]="store.reopeningId() === person.id"
+                  [disabled]="store.reopeningId() !== null"
+                  (clicked)="requestReopen(person)"
+                  actions
+                  variant="secondary"
+                  size="sm"
+                  >Reopen</cmn-button
                 >
               }
             </cmn-list-item-row>

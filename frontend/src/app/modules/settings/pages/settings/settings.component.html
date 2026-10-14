@@ -254,12 +254,14 @@
       }
 
       <cmn-danger-zone
-        (confirmed)="deleteAccount()"
+        [description]="store.closureDescription()"
+        [disabled]="!store.canCloseAccount()"
+        [busy]="store.isClosureLoading()"
+        (confirmed)="requestClose()"
         heading="Danger zone"
-        description="Permanently delete your account and all associated data. This cannot be undone."
-        actionLabel="Delete account"
-        confirmTitle="Delete your account?"
-        confirmMessage="All your connected accounts, transactions, and settings will be permanently erased. This action cannot be reversed."
+        actionLabel="Close account"
+        confirmTitle="Close your account?"
+        confirmMessage="You will be signed out everywhere and syncing stops. Next, type your email to confirm."
       />
 
       <div class="flex justify-end pt-cmn-6 pb-cmn-6">

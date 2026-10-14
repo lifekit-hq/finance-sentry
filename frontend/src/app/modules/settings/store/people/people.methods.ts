@@ -23,5 +23,14 @@ export function peopleMethods(store: WritableStateSource<PeopleState>) {
     setRevokeError(errorCode: Nullable<string>): void {
       patchState(store, {revokingId: null, revokeErrorCode: errorCode});
     },
+    setReopening(userId: string): void {
+      patchState(store, {reopeningId: userId, reopenErrorCode: null});
+    },
+    setReopened(): void {
+      patchState(store, {reopeningId: null, reopenErrorCode: null});
+    },
+    setReopenError(errorCode: Nullable<string>): void {
+      patchState(store, {reopeningId: null, reopenErrorCode: errorCode});
+    },
   };
 }

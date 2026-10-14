@@ -46,3 +46,12 @@ public sealed class CannotRevokeSelfException()
 
 public sealed class CannotRevokeOwnerException()
     : ApiException(400, "CANNOT_REVOKE_OWNER", "The owner's access cannot be revoked.");
+
+public sealed class ClosureConfirmationMismatchException()
+    : ApiException(400, "CLOSURE_CONFIRMATION_MISMATCH", "Type your account email exactly to confirm closing the account.");
+
+public sealed class LastOwnerCannotCloseException()
+    : ApiException(409, "LAST_OWNER_CANNOT_CLOSE", "You are the only owner. Make someone else an owner before closing your account.");
+
+public sealed class AccountNotClosedException()
+    : ApiException(409, "ACCOUNT_NOT_CLOSED", "This account is not closed and waiting to be deleted, or its access was revoked.");

@@ -143,6 +143,8 @@ public static class BankSyncModule
 
         services.AddUpdatedAtStamping();
         services.AddDbContext<BankSyncDbContext>((sp, o) => o.UseNpgsql(connectionString, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
+        services.AddScoped<IUserDataEraser, BankSyncUserDataEraser>();
+        services.AddScoped<IUserCredentialRevoker, BankSyncCredentialRevoker>();
 
         services.Configure<HygieneSentinelsOptions>(config.GetSection(HygieneSentinelsOptions.SectionName));
 

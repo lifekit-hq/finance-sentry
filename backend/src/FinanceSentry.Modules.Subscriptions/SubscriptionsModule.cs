@@ -24,6 +24,7 @@ public static class SubscriptionsModule
         services.AddUpdatedAtStamping();
         services.AddDbContext<SubscriptionsDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
+        services.AddScoped<IUserDataEraser, SubscriptionsUserDataEraser>();
 
         services.AddScoped<IDetectedSubscriptionRepository, DetectedSubscriptionRepository>();
         services.AddScoped<ISubscriptionDetectionResultService, SubscriptionDetectionResultService>();

@@ -102,4 +102,25 @@ export class PeopleComponent {
         }
       });
   }
+
+  public requestReopen(person: PersonRow): void {
+    const ref = this.dialog.open<boolean>(ConfirmDialogComponent, {
+      data: {
+        title: `Reopen ${person.email}?`,
+        message: 'They can sign in again, syncing resumes and their data is no longer erased.',
+        confirmLabel: 'Reopen account',
+        cancelLabel: 'Cancel',
+      },
+      size: 'sm',
+      viewContainerRef: this.viewContainerRef,
+    });
+    ref
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (confirmed === true) {
+          this.store.reopen(person.id);
+        }
+      });
+  }
 }

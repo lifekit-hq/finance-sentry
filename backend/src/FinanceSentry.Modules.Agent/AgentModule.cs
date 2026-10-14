@@ -37,6 +37,7 @@ public static class AgentModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_agent", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<AgentDbContext>("Agent");
 
         services.Configure<AgentOptions>(config.GetSection(AgentOptions.SectionName));
 

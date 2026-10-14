@@ -45,6 +45,7 @@ public static class RiskModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_risk", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<RiskDbContext>("Risk");
 
         services.AddScoped<IRiskRuleSetRepository, RiskRuleSetRepository>();
         // #673: published read port - the Integration adapters reach the rule set only through it.

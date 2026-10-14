@@ -5,6 +5,8 @@ export interface PeopleState {
   lastInvite: Nullable<Invite>;
   revokingId: Nullable<string>;
   revokeErrorCode: Nullable<string>;
+  reopeningId: Nullable<string>;
+  reopenErrorCode: Nullable<string>;
 }
 
 export const initialPeopleState: PeopleState = {
@@ -12,4 +14,6 @@ export const initialPeopleState: PeopleState = {
   lastInvite: null,
   revokingId: null,
   revokeErrorCode: null,
+  reopeningId: null,
+  reopenErrorCode: null,
 };

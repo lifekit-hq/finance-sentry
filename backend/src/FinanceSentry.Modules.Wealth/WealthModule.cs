@@ -60,6 +60,7 @@ public static class WealthModule
         services.AddDbContext<WealthDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable(MigrationsHistoryTable, "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<WealthDbContext>("Wealth");
 
         services.AddScoped<INetWorthSnapshotRepository, NetWorthSnapshotRepository>();
         // #673: published read port - the Integration adapter reaches the snapshots only through it.

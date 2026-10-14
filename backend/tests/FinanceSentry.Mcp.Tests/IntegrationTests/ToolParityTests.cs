@@ -189,6 +189,7 @@ public sealed class ToolParityTests
         services.Configure<ResearchRetrievalOptions>(_ => { });
 
         // Cross-provider readers used by several tools.
+        services.AddSingleton<IClosedAccountsReader, NoClosedAccounts>();
         services.AddScoped<IBankingAccountsReader, BankingAccountsReader>();
         services.AddScoped<IBankingTotalsReader, BankingTotalsReader>();
         services.AddScoped<ICryptoHoldingsReader, CryptoHoldingsReader>();
@@ -1991,5 +1992,11 @@ public sealed class ToolParityTests
 
         public Task<IReadOnlyList<BenchmarkRelativeRecord>> ListLatestRunAsync(Guid userId, CancellationToken ct = default)
             => Task.FromResult(runs.Count == 0 ? [] : runs.Last().Value);
+    }
+
+    private sealed class NoClosedAccounts : IClosedAccountsReader
+    {
+        public Task<IReadOnlySet<Guid>> GetClosedUserIdsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
     }
 }

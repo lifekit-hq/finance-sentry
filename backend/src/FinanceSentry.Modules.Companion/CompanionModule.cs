@@ -58,6 +58,8 @@ public static class CompanionModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_companion", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<CompanionDbContext>("Companion");
+        services.AddScoped<IUserCredentialRevoker, CompanionCredentialRevoker>();
 
         services.Configure<CompanionOptions>(config.GetSection(CompanionOptions.SectionName));
 

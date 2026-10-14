@@ -1,5 +1,6 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
 import {type SettingsState} from './settings.state';
 
@@ -19,8 +20,8 @@ export function settingsMethods(store: WritableStateSource<SettingsState>) {
         profileRevision: s.profileRevision + 1,
       }));
     },
-    setShowDeleteConfirm(show: boolean): void {
-      patchState(store, {showDeleteConfirm: show});
+    setClosureOptions(closureOptions: AccountClosureOptions): void {
+      patchState(store, {closureOptions});
     },
   };
 }

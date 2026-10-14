@@ -1,10 +1,13 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {ToastService} from '@lifekit-hq/ui';
+import {CmnDialogService, ToastService} from '@lifekit-hq/ui';
+import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
 import {AuthStore} from '../../../auth/store/auth.store';
+import {CloseAccountDialogComponent} from '../../components/close-account-dialog/close-account-dialog.component';
+import {type AccountClosureOptions} from '../../models/account-closure/account-closure.model';
 import {type UserProfile} from '../../models/settings/settings.model';
 import {PushStore} from '../../store/push/push.store';
 import {SettingsStore} from '../../store/settings/settings.store';
@@ -12,6 +15,7 @@ import {SettingsComponent} from './settings.component';
 
 const profile = {
   firstName: 'Ada',
+  email: 'ada@example.com',
   lastName: 'Lovelace',
   baseCurrency: 'USD',
   emailAlerts: true,
@@ -23,19 +27,25 @@ const profile = {
   realAnnualReturn: 0.05,
 } as unknown as UserProfile;
 
-function create() {
+const CAN_CLOSE: AccountClosureOptions = {canClose: true, reason: null, graceDays: 30};
+
+function create(dialogResult?: string) {
   const toast = {show: vi.fn()};
   const store = {
     profile: signal<UserProfile | null>(profile),
     profileRevision: signal(0),
+    closureOptions: signal<AccountClosureOptions | null>(CAN_CLOSE),
     saveProfile: vi.fn(),
     applyChange: vi.fn(),
+    closeAccount: vi.fn(),
   };
+  const dialog = {open: vi.fn(() => ({afterClosed: () => of(dialogResult)}))};
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
       {provide: AuthStore, useValue: {canManageUsers: signal(false)}},
       {provide: ToastService, useValue: toast},
+      {provide: CmnDialogService, useValue: dialog},
     ],
   });
   TestBed.overrideComponent(SettingsComponent, {
@@ -48,7 +58,7 @@ function create() {
     },
   });
   const fixture = TestBed.createComponent(SettingsComponent);
-  return {store, toast, fixture, component: fixture.componentInstance};
+  return {store, toast, dialog, fixture, component: fixture.componentInstance};
 }
 
 function setup() {
@@ -156,6 +166,9 @@ describe('SettingsComponent Save assumptions button', () => {
       avatarInitials: signal('AL'),
       fullName: signal('Ada Lovelace'),
       isProfileSaveLoading: signal(false),
+      closureDescription: signal('Close your account and sign out everywhere.'),
+      canCloseAccount: signal(true),
+      isClosureLoading: signal(false),
       updateProfile: vi.fn(),
       saveProfile: vi.fn(),
       applyChange: vi.fn(),
@@ -303,5 +316,36 @@ describe('SettingsComponent low balance threshold', () => {
 describe('SettingsComponent appearance', () => {
   it('offers Petrol as the app default', () => {
     expect(create().component.appSeed).toBe('#175a6d');
+  });
+});
+
+describe('SettingsComponent account closure', () => {
+  it('asks for the typed email with the account email and the grace period', () => {
+    const {dialog, component} = create();
+    component.requestClose();
+    expect(dialog.open).toHaveBeenCalledWith(
+      CloseAccountDialogComponent,
+      expect.objectContaining({data: {email: 'ada@example.com', purgeDays: 30}})
+    );
+  });
+
+  it('closes the account with the email typed in the dialog', () => {
+    const {store, component} = create('ada@example.com');
+    component.requestClose();
+    expect(store.closeAccount).toHaveBeenCalledWith('ada@example.com');
+  });
+
+  it('closes nothing when the dialog is cancelled', () => {
+    const {store, component} = create(undefined);
+    component.requestClose();
+    expect(store.closeAccount).not.toHaveBeenCalled();
+  });
+
+  it('opens no dialog when this account may not be closed', () => {
+    const {store, dialog, component} = create('ada@example.com');
+    store.closureOptions.set({canClose: false, reason: 'You are the only owner.', graceDays: 30});
+    component.requestClose();
+    expect(dialog.open).not.toHaveBeenCalled();
+    expect(store.closeAccount).not.toHaveBeenCalled();
   });
 });

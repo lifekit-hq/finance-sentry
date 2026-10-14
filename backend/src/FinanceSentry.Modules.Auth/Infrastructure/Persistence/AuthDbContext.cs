@@ -11,7 +11,8 @@ namespace FinanceSentry.Modules.Auth.Infrastructure.Persistence;
 // tables (users, roles, user claims/roles/logins/tokens) stay unfiltered: sign-in, token refresh, invite acceptance,
 // the per-request principal load and the role seed read them before a person is in scope, and managing people reads
 // them across users. McpServiceToken is not filtered yet: its revocation check runs while the MCP host is still
-// authenticating, before a person is in scope. DataProtectionKeys is the platform's key ring, shared by every
+// authenticating, before a person is in scope. AccountClosure is the closure audit record, read by the purge job and by
+// Owners managing people, never by the person it describes, so it is unfiltered. DataProtectionKeys is the platform's key ring, shared by every
 // instance and read by the key manager with no person in scope, so it is unfiltered too.
 public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser currentUser)
     : IdentityDbContext<ApplicationUser>(options), IDataProtectionKeyContext
@@ -20,6 +21,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
     public DbSet<McpAuthorizationCode> McpAuthorizationCodes => Set<McpAuthorizationCode>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<McpServiceToken> McpServiceTokens => Set<McpServiceToken>();
+    public DbSet<AccountClosure> AccountClosures => Set<AccountClosure>();
 
     // Read by the Owner query filter on every query this context runs. Identity user ids are strings holding
     // Guid.ToString() (lower-case "D" format), so the acting person's id is compared in that same form; null (no
@@ -68,6 +70,20 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options, ICurrentUser
             entity.HasIndex(t => t.UserId);
             entity.Property(t => t.UserId).IsRequired();
             entity.Property(t => t.Label).HasMaxLength(200).IsRequired();
+        });
+
+        // No foreign key to the user: the record survives the purge that deletes the account. At most one pending
+        // closure per person, so a repeated close request finds the first instead of opening a second.
+        builder.Entity<AccountClosure>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.HasIndex(c => c.UserId)
+                .IsUnique()
+                .HasFilter("\"ReopenedAt\" IS NULL AND \"PurgedAt\" IS NULL")
+                .HasDatabaseName("IX_AccountClosures_UserId_Pending");
+            entity.HasIndex(c => c.PurgeDueAt);
+            entity.Property(c => c.CredentialRevocation).HasColumnType("jsonb");
+            entity.Property(c => c.ErasedRows).HasColumnType("jsonb");
         });
 
         builder.Entity<ApplicationUser>(entity =>

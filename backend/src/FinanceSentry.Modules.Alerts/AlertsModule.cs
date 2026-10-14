@@ -39,6 +39,7 @@ public static class AlertsModule
         services.AddUpdatedAtStamping();
         services.AddDbContext<AlertsDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<AlertsDbContext>("Alerts");
 
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IAlertGeneratorService, AlertGeneratorService>();

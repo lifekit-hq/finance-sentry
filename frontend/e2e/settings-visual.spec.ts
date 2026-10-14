@@ -6,12 +6,13 @@ describeVisualBaseline({
   name: 'settings',
   title: 'Settings',
   path: '/settings',
-  desktopHeight: 2200,
-  phoneHeight: 3000,
+  desktopHeight: 2400,
+  phoneHeight: 3300,
   mocks: async page => {
     await mockGet(page, 'notifications/push/public-key', {available: false, publicKey: null});
     await mockGet(page, 'notifications/push/subscriptions', []);
     await mockGet(page, 'notifications/push/preferences', {pushEnabled: false});
+    await mockGet(page, 'account/closure', {canClose: true, reason: null, graceDays: 30});
   },
   ready: async page => {
     await expect(page.getByRole('heading', {name: 'Appearance'})).toBeVisible();

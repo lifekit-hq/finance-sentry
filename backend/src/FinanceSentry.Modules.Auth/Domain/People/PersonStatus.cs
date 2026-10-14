@@ -8,6 +8,7 @@ using FinanceSentry.Modules.Auth.Domain.Entities;
 /// <item><see cref="Invited"/>: created from the People page, no password set and no external login linked yet.</item>
 /// <item><see cref="Active"/>: can sign in.</item>
 /// <item><see cref="Revoked"/>: locked out until <see cref="RevokedLockoutEnd"/>, roles and grants removed.</item>
+/// <item><see cref="Closed"/>: the person closed their own account; locked out the same way, data kept until the purge.</item>
 /// </list>
 /// </summary>
 public static class PersonStatus
@@ -15,6 +16,7 @@ public static class PersonStatus
     public const string Invited = "Invited";
     public const string Active = "Active";
     public const string Revoked = "Revoked";
+    public const string Closed = "Closed";
 
     /// <summary>
     /// The lockout end a revoke sets. Far enough out to be permanent, and distinct from the short lockout that
@@ -24,8 +26,9 @@ public static class PersonStatus
 
     public static bool IsRevoked(ApplicationUser user) => user.LockoutEnd >= RevokedLockoutEnd;
 
-    public static string Of(ApplicationUser user, bool hasExternalLogin) =>
-        IsRevoked(user) ? Revoked
+    public static string Of(ApplicationUser user, bool hasExternalLogin, bool closurePending = false) =>
+        closurePending && IsRevoked(user) ? Closed
+        : IsRevoked(user) ? Revoked
         : user.PasswordHash is null && !hasExternalLogin ? Invited
         : Active;
 }

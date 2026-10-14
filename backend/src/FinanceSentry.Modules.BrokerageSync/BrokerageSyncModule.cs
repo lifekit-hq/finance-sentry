@@ -64,6 +64,8 @@ public static class BrokerageSyncModule
         services.AddUpdatedAtStamping();
         services.AddDbContext<BrokerageSyncDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));
+        services.AddOwnedRowEraser<BrokerageSyncDbContext>("BrokerageSync");
+        services.AddScoped<IUserCredentialRevoker, BrokerageSyncCredentialRevoker>();
 
         // Blocking connect: request-scoped, awaited by the controller. No
         // session store, no polling — the HTTP request itself is the state

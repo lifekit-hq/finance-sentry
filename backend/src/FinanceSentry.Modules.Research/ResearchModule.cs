@@ -224,6 +224,7 @@ public static class ResearchModule
             (sp, o) => o.UseNpgsql(
                 config.GetConnectionString("Default")!,
                 b => b.MigrationsHistoryTable("__ef_migrations_history_research", "public")).UseUpdatedAtStamping(sp));
+        services.AddScoped<IUserDataEraser, ResearchUserDataEraser>();
 
         services.AddScoped<IWatchlistRepository, WatchlistRepository>();
         services.AddScoped<IWatchlistReader, WatchlistReader>();
