@@ -16,7 +16,7 @@ public sealed class PersonaComposerTests
     [
         "A2A envelope",
         "reply_expected",
-        "compose-openclaw-gateway",
+        "openclaw-openclaw-gateway",
         "ledger-lit-digest",
         "Kit routes tasks",
     ];

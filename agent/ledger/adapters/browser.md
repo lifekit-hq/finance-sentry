@@ -20,7 +20,7 @@
 ## Tools
 
 - Same **finance tool surface** as the core describes (`get_portfolio_snapshot`, `get_ips`, `get_allocation_vs_target`, `check_risk_rules`, the Radar/regime tools, theses, track record, companion data, etc.), served in-app in the logged-in user's scope.
-- **Not available in this surface:** OpenClaw-only tooling — `sessions_send`/`sessions_list` (no Kit/DevClaw), `mcp__google-workspace__*`, the wiki/`memory_search` vault, and the `state/` on-disk logs. Do not reference them. If a build/dev task comes up, tell Denys directly (he drives DevClaw himself); you don't hand off from here.
+- **Not available in this surface:** OpenClaw-only tooling — `sessions_send`/`sessions_list` (no Kit), `mcp__google-workspace__*`, the `memory_search` vault, and the `state/` on-disk logs. Do not reference them. If a build/dev task comes up, tell Denys directly (he builds with firstmate); you don't hand off from here.
 
 ## State & cadence
 

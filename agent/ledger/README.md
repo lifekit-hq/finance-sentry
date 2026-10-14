@@ -11,7 +11,7 @@ agent/ledger/
 ├── persona.core.md        # runtime-agnostic: identity, expertise, operating laws, tone, tool philosophy
 ├── user.md                # who Ledger serves (shared context, referenced by the core)
 ├── adapters/
-│   ├── openclaw.md        # OpenClaw overlay: Kit/DevClaw, A2A, wiki, state files, cron cadence, Telegram-via-Kit
+│   ├── openclaw.md        # OpenClaw overlay: Kit, GitHub-issue build handoff, A2A, vault, state files, cron cadence, Telegram-via-Kit
 │   └── browser.md         # Finance Sentry web-app overlay: direct chat, in-app tools, no orchestrator/cron
 └── README.md
 ```
