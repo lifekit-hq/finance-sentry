@@ -3,7 +3,8 @@ namespace FinanceSentry.Core.Connections;
 /// <summary>
 /// Shadow mode of the connection-health policy (Option B, slice S1): a sync path reports each attempt here,
 /// the policy's verdict is logged and the new health stored through <c>persist</c>, and nothing else
-/// happens. No alert reads the outcome yet, so the sync path's own alerting stays exactly as it was.
+/// happens here. A provider in <see cref="ConnectionHealthOptions.ActiveProviders"/> raises and resolves its
+/// alert from the returned evaluation; every other provider ignores it and keeps its own alerting.
 /// Best-effort: a failure here is logged and swallowed, never thrown into the sync.
 /// </summary>
 public interface IConnectionHealthShadow

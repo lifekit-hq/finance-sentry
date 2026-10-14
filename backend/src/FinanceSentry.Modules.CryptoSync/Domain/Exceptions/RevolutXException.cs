@@ -10,6 +10,9 @@ public sealed class RevolutXException : CryptoExchangeException
     /// <summary>The HTTP status Revolut X answered with, when the failure was an HTTP response.</summary>
     public int? VenueStatusCode { get; }
 
+    /// <summary>The stored key pair cannot be used (missing, or not an Ed25519 PKCS#8 PEM): only the user can fix it.</summary>
+    public bool IsUnreadableKey { get; private init; }
+
     public RevolutXException(string message)
         : base(message)
     {
@@ -20,4 +23,6 @@ public sealed class RevolutXException : CryptoExchangeException
     {
         VenueStatusCode = innerException is HttpRequestException { StatusCode: { } status } ? (int)status : null;
     }
+
+    public static RevolutXException UnreadableKey(string message) => new(message) { IsUnreadableKey = true };
 }

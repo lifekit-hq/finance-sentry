@@ -14,6 +14,7 @@ using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence.Repositorie
 using FinanceSentry.Modules.CryptoSync.Application.Commands;
 using FinanceSentry.Modules.CryptoSync.Domain;
 using FinanceSentry.Modules.CryptoSync.Domain.Exceptions;
+using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
@@ -218,9 +219,12 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
 
         await using (var jobContext = CryptoSync())
         {
+            // Binance stays in shadow mode (not in ActiveProviders): its own alerting runs, the policy only records.
             var job = new BinanceSyncJob(
                 new ExchangeCredentialRepository(jobContext), syncHandler.Object, alerts.Object, preferences.Object,
-                new InMemoryJobFailureStreakStore(), shadow, NullLogger<BinanceSyncJob>.Instance);
+                new InMemoryJobFailureStreakStore(), shadow, new BinanceFailureClassifier(),
+                Mock.Of<IOptionsMonitor<ConnectionHealthOptions>>(m => m.CurrentValue == new ConnectionHealthOptions()),
+                TimeProvider.System, NullLogger<BinanceSyncJob>.Instance);
 
             // Every user failed, so the run fails, as it did before the shadow existed.
             await job.Invoking(j => j.ExecuteAsync()).Should().ThrowAsync<AggregateException>();

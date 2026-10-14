@@ -1,5 +1,6 @@
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FluentAssertions;
@@ -79,5 +80,29 @@ public class IbkrFlexStatementFetcherTests
 
         result.Should().BeSameAs(statement);
         credential.LastUsedAt.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("1003", "Statement is not available.", null)]
+    [InlineData("1015", "Token is invalid.", "Token is invalid.")]
+    public async Task FetchAsync_FlexError_IsRethrown_AndRecordedAsTheLastErrorUnlessNoStatementIsAvailableYet(
+        string flexCode, string message, string? expectedLastError)
+    {
+        var userId = Guid.NewGuid();
+        var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
+        var resolved = new IbkrFlexCredentials(userId, "synthetic-token", "999999");
+        _credentialRepo
+            .Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(credential);
+        _resolver.Setup(r => r.Resolve(credential)).Returns(resolved);
+        _flexClient
+            .Setup(c => c.FetchStatementAsync(resolved, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IbkrFlexException(flexCode, message));
+        _credentialRepo.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await FluentActions.Invoking(() => CreateFetcher().FetchAsync(userId, ct: CancellationToken.None))
+            .Should().ThrowAsync<IbkrFlexException>();
+
+        credential.LastError.Should().Be(expectedLastError);
     }
 }

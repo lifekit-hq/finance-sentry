@@ -1,5 +1,6 @@
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BrokerageSync.Domain;
+using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 
 namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 
@@ -12,8 +13,17 @@ public sealed class IbkrFlexCredentialResolver(ICredentialEncryptionService encr
 {
     public IbkrFlexCredentials Resolve(IBKRFlexCredential credential)
     {
-        var token = encryption.Decrypt(
-            credential.EncryptedToken, credential.TokenIv, credential.TokenAuthTag, credential.KeyVersion);
+        string token;
+        try
+        {
+            token = encryption.Decrypt(
+                credential.EncryptedToken, credential.TokenIv, credential.TokenAuthTag, credential.KeyVersion);
+        }
+        catch (Exception ex)
+        {
+            throw new BrokerCredentialUnreadableException("IBKR Flex", ex);
+        }
+
         return new IbkrFlexCredentials(credential.UserId, token, credential.QueryId);
     }
 }

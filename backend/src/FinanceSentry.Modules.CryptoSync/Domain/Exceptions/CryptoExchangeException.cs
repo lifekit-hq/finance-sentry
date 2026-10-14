@@ -22,14 +22,23 @@ public abstract class CryptoExchangeException : ApiException
 
 /// <summary>
 /// A sync whose holdings landed but whose trade walk failed for some assets. Raised after every
-/// other asset was walked, so the run fails loudly (it reaches the consecutive-failure gauge) without losing the
-/// rest; the failed assets resume from their unchanged cursors next run.
+/// other asset was walked, so the sync fails loudly (the connection-health policy reads the venue failure
+/// inside it; in shadow mode a run where every user failed also reaches the consecutive-failure gauge)
+/// without losing the rest; the failed assets resume from their unchanged cursors next run.
 /// </summary>
 public sealed class CryptoTradeHistoryException(string provider, IReadOnlyList<string> assets, Exception innerException)
     : CryptoExchangeException(
         $"{CryptoExchangeProvider.DisplayName(provider)} trade history could not be read for "
         + $"{string.Join(", ", assets)}: {innerException.Message}",
         innerException);
+
+/// <summary>
+/// The stored API credential could not be decrypted (a rotated or lost key): only entering it again can fix
+/// it. An <see cref="InvalidOperationException"/>, as the sync path threw before it had its own type.
+/// </summary>
+public sealed class ExchangeCredentialUnreadableException(string provider, Exception innerException)
+    : InvalidOperationException(
+        $"Failed to decrypt {CryptoExchangeProvider.DisplayName(provider)} credentials.", innerException);
 
 public sealed class ExchangeAlreadyConnectedException(string provider)
     : ApiException(409, "ALREADY_CONNECTED",

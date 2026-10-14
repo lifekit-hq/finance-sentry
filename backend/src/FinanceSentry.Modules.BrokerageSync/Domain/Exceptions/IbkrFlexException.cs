@@ -1,3 +1,4 @@
+using System.Net;
 using FinanceSentry.Core.Exceptions;
 
 namespace FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
@@ -6,7 +7,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 /// reference code, or any other <c>FlexStatementResponse</c> error. The API error code names
 /// the actionable cases (bad token, expired token, unknown query, still generating) so the
 /// connect form can say what to fix; anything else stays <c>IBKR_FLEX_ERROR</c>.</summary>
-public sealed class IbkrFlexException(string? flexErrorCode, string message)
+public sealed class IbkrFlexException(string? flexErrorCode, string message, HttpStatusCode? upstreamStatusCode = null)
     : ApiException(422, MapErrorCode(flexErrorCode), message)
 {
     private static readonly Dictionary<string, string> ErrorCodes = new()
@@ -22,8 +23,20 @@ public sealed class IbkrFlexException(string? flexErrorCode, string message)
         ["1018"] = "IBKR_FLEX_RATE_LIMITED",
     };
 
+    /// <summary>IBKR's "Statement is not available." code.</summary>
+    public const string StatementNotAvailableCode = "1003";
+
     /// <summary>IBKR's own numeric error code (e.g. <c>"1003"</c>), when the venue provided one.</summary>
     public string? FlexErrorCode { get; } = flexErrorCode;
+
+    /// <summary>
+    /// IBKR has no statement for the window yet, which the daily ~06:00 run routinely meets: an expected
+    /// answer, not a failure of the connection.
+    /// </summary>
+    public bool IsStatementNotAvailable => FlexErrorCode == StatementNotAvailableCode;
+
+    /// <summary>The HTTP status IBKR answered with, when it refused the request outright (401/403).</summary>
+    public HttpStatusCode? UpstreamStatusCode { get; } = upstreamStatusCode;
 
     private static string MapErrorCode(string? flexErrorCode) =>
         flexErrorCode is not null && ErrorCodes.TryGetValue(flexErrorCode, out var code) ? code : "IBKR_FLEX_ERROR";

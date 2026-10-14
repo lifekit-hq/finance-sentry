@@ -44,9 +44,9 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Records the sync-failure alert for a confirmed credential loss: an open alert on the same provider
-    /// or account (an outage or a neutral one) is superseded and the silence window does not apply, so the
-    /// reconnect ask is always seen.
+    /// Records the sync-failure alert for a confirmed credential loss, with the reconnect copy: an open alert on the
+    /// same provider or account (an outage or a neutral one) is superseded and the silence window does not apply, so
+    /// the reconnect ask is always seen. The caller raises it once, on the escalation.
     /// </summary>
     Task EscalateSyncFailureAlertAsync(
         Guid userId,
