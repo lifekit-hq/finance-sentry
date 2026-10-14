@@ -75,12 +75,16 @@
           >
             Active · {{ store.activeSubscriptions().length }}
           </span>
-          <lk-segmented
-            [options]="sortOptions"
-            [value]="store.sort()"
-            (lk-segmented-change)="onSortChange($event)"
-            label="Sort subscriptions"
-          />
+          <cmn-menu
+            [items]="sortItems()"
+            (itemSelect)="onSortSelect($event.id)"
+            ariaLabel="Sort subscriptions"
+            triggerClass="inline-flex min-h-11 items-center gap-cmn-1 rounded-cmn-md px-cmn-3 text-cmn-sm text-text-secondary hover:bg-surface-raised"
+            data-testid="sort-menu"
+          >
+            <span>Sort: {{ sortLabel() }}</span>
+            <cmn-icon name="ChevronDown" size="sm" />
+          </cmn-menu>
         </div>
 
         @for (section of store.activeSections(); track section.id) {

@@ -1,6 +1,7 @@
 import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {type ComponentFixture, TestBed} from '@angular/core/testing';
 import {provideRouter, Router} from '@angular/router';
+import {AppUpdateService} from '@lifekit-hq/core/pwa';
 import {
   ACCOUNT_SIGN_OUT_ID,
   APPEARANCE_PALETTE_ITEMS,
@@ -32,12 +33,16 @@ describe('AppShellComponent FAB clearance', () => {
   const openReport = vi.fn();
   const logout = vi.fn();
   const hasUnread = signal(false);
+  const updateReady = signal(false);
+  const reload = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     openWhatsNew.mockClear();
     openReport.mockClear();
     logout.mockClear();
     hasUnread.set(false);
+    updateReady.set(false);
+    reload.mockClear();
   });
   const canUseAi = signal(true);
 
@@ -60,6 +65,7 @@ describe('AppShellComponent FAB clearance', () => {
             logout,
           },
         },
+        {provide: AppUpdateService, useValue: {updateReady, reload}},
         {provide: WhatsNewPanelService, useValue: {open: openWhatsNew}},
         {provide: WhatsNewStore, useValue: {hasUnread}},
         {provide: ReportProblemPanelService, useValue: {open: openReport}},
@@ -86,6 +92,30 @@ describe('AppShellComponent FAB clearance', () => {
     fixture.detectChanges();
     return fixture;
   };
+
+  it('renders the offline, update and install prompts in the layout notice slot', async () => {
+    const fixture = await setup('/');
+    const host = fixture.nativeElement as HTMLElement;
+    const notice = host.querySelector('[cmnAppLayoutNotice]');
+
+    expect(notice?.querySelector('lk-offline-banner')).not.toBeNull();
+    expect(notice?.querySelector('lk-update-prompt')).not.toBeNull();
+    expect(notice?.querySelector('lk-install-hint')).not.toBeNull();
+  });
+
+  it('shows the update prompt once a version is downloaded and reloads on request', async () => {
+    updateReady.set(true);
+    const fixture = await setup('/');
+    const prompt = (fixture.nativeElement as HTMLElement).querySelector(
+      'lk-update-prompt'
+    ) as HTMLElement & {ready: boolean};
+
+    expect(prompt.ready).toBe(true);
+
+    prompt.dispatchEvent(new CustomEvent('lk-update-prompt-reload'));
+
+    expect(reload).toHaveBeenCalledOnce();
+  });
 
   it('adds held, watchlist and account entities to the palette', async () => {
     const fixture = await setup(AppRoute.Settings);

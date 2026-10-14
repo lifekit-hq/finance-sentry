@@ -1,13 +1,38 @@
 <cmn-page-container spacing="none" fill>
-  <p class="text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
+  <div class="flex items-center justify-between gap-cmn-3">
+    <p class="min-w-0 text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
+    <cmn-badge [count]="activeFilterCount()" status="default" class="shrink-0">
+      <cmn-button
+        (clicked)="openFilters()"
+        variant="secondary"
+        icon="SlidersHorizontal"
+        data-testid="alerts-filter-button"
+      >
+        <span class="sr-only">Filters</span>
+      </cmn-button>
+    </cmn-badge>
+  </div>
 
-  <lk-segmented
-    [options]="filterOptions()"
-    [value]="store.filter()"
-    (lk-segmented-change)="onFilterChange($event)"
-    class="mt-cmn-4 block"
-    label="Filter alerts"
-  />
+  @if (store.filter() !== 'all') {
+    <div
+      class="mt-cmn-3 flex flex-wrap items-center gap-x-cmn-2 gap-y-3"
+      data-testid="alerts-applied-filters"
+    >
+      <lk-dismissible-chip
+        [attr.label]="filterLabel()"
+        (lk-dismissible-chip-remove)="clearFilter()"
+        data-testid="alerts-chip-filter"
+      />
+      <cmn-button
+        (clicked)="clearFilter()"
+        variant="secondary"
+        size="sm"
+        data-testid="alerts-filter-clear"
+      >
+        Clear
+      </cmn-button>
+    </div>
+  }
 
   <cmn-async-state
     [status]="view().status"

@@ -11,7 +11,9 @@ import {
   AlertItemComponent,
   type AlertItemSeverity,
   AsyncStateComponent,
+  BadgeComponent,
   ButtonComponent,
+  CmnDrawerService,
   CmnPageActionsService,
   EmptyStateComponent,
   type LucideIconName,
@@ -23,6 +25,8 @@ import {
 import {ALERTS_MARK_ALL_READ_ACTION} from '../../../../shared/constants/page-actions/page-actions.constants';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
+import {AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
+import {ALERT_FILTER_LABELS} from '../../constants/alert/alert-filter.constants';
 import {
   type Alert,
   type AlertFilter,
@@ -37,6 +41,7 @@ import {AlertTypeUtils} from '../../utils/alert-type.utils';
 import {ALERT_PAGE_SIZE_OPTIONS, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_ROWS = 5;
+const FILTER_SHEET_WIDTH = '420px';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -57,18 +62,20 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertItemComponent,
     AlertMessagePipe,
     AsyncStateComponent,
+    BadgeComponent,
     ButtonComponent,
     EmptyStateComponent,
     SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block h-full'},
+  host: {class: 'block min-h-full md:h-full'},
   templateUrl: './alerts.component.html',
 })
 export class AlertsComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly drawer = inject(CmnDrawerService);
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(AlertsStore);
@@ -103,19 +110,11 @@ export class AlertsComponent {
     this.store.filter() === 'all' ? 'All your accounts are healthy.' : 'Try a different filter.'
   );
 
-  // lk-segmented reads `value` as a string, so the options carry the filter ids and the page sizes
-  // as strings; the change handlers convert back.
-  public readonly filterOptions = computed<{value: AlertFilter; label: string}[]>(() => [
-    {value: 'all', label: 'All'},
-    {
-      value: 'unread',
-      label: this.store.unreadCount() > 0 ? `Unread (${this.store.unreadCount()})` : 'Unread',
-    },
-    {value: 'error', label: 'Errors'},
-    {value: 'warning', label: 'Warnings'},
-    {value: 'info', label: 'Info'},
-  ]);
+  public readonly activeFilterCount = computed(() => (this.store.filter() === 'all' ? 0 : 1));
+  public readonly filterLabel = computed(() => ALERT_FILTER_LABELS[this.store.filter()]);
 
+  // lk-segmented reads `value` as a string, so the page sizes carry strings; the handler converts
+  // back.
   public readonly pageSizeOptions = ALERT_PAGE_SIZE_OPTIONS.map(size => ({
     value: String(size),
     label: `${size} per page`,
@@ -133,9 +132,24 @@ export class AlertsComponent {
       .subscribe(() => this.markAllRead());
   }
 
-  public onFilterChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: AlertFilter}>).detail;
-    this.store.setFilter(value);
+  public openFilters(): void {
+    this.drawer
+      .open<AlertFilter, AlertFilter, AlertFilterSheetComponent>(AlertFilterSheetComponent, {
+        title: 'Filters',
+        data: this.store.filter(),
+        mode: 'responsive',
+        width: FILTER_SHEET_WIDTH,
+      })
+      .afterClosed()
+      .subscribe(filter => {
+        if (filter) {
+          this.store.setFilter(filter);
+        }
+      });
+  }
+
+  public clearFilter(): void {
+    this.store.setFilter('all');
   }
 
   public onPageSizeChange(event: Event): void {

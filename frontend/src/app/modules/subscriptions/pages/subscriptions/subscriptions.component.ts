@@ -128,7 +128,16 @@ export class SubscriptionsComponent {
     });
   });
   public readonly noActiveCopy = NO_ACTIVE_SUBSCRIPTIONS_COPY;
-  public readonly sortOptions = SORT_OPTIONS;
+  public readonly sortLabel = computed(
+    () => SORT_OPTIONS.find(o => o.value === this.store.sort())?.label ?? ''
+  );
+  public readonly sortItems = computed<MenuItem[]>(() =>
+    SORT_OPTIONS.map(o => ({
+      id: o.value,
+      label: o.label,
+      icon: o.value === this.store.sort() ? 'Check' : undefined,
+    }))
+  );
   public readonly cadenceLabels = CADENCE_LABELS;
 
   constructor() {
@@ -156,9 +165,8 @@ export class SubscriptionsComponent {
     }
   }
 
-  public onSortChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: SubscriptionSort}>).detail;
-    this.setSort(value);
+  public onSortSelect(id: string): void {
+    this.setSort(id as SubscriptionSort);
   }
 
   public setSort(sort: SubscriptionSort): void {

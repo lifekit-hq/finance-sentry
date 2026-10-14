@@ -59,7 +59,7 @@ const SKELETON_ROWS = 4;
   ],
   providers: [EventsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block h-full'},
+  host: {class: 'block min-h-full md:h-full'},
   templateUrl: './events.component.html',
 })
 export class EventsComponent {

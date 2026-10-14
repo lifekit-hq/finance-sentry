@@ -1,5 +1,12 @@
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {Router, RouterOutlet} from '@angular/router';
+import {AppUpdateService} from '@lifekit-hq/core/pwa';
 import {
   ACCOUNT_SIGN_OUT_ID,
   APPEARANCE_PALETTE_ITEMS,
@@ -59,6 +66,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   imports: [AppLayoutComponent, RouterOutlet, ChatWidgetComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [PaletteEntitiesStore],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <cmn-app-layout
       [navItems]="navItems()"
@@ -75,6 +83,14 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
       (avatarMenuSelect)="handleAvatarMenuSelect($event)"
       brand="Finance Sentry"
     >
+      <div cmnAppLayoutNotice class="flex flex-col gap-cmn-2">
+        <lk-offline-banner />
+        <lk-update-prompt
+          [ready]="appUpdate.updateReady()"
+          (lk-update-prompt-reload)="appUpdate.reload()"
+        />
+        <lk-install-hint />
+      </div>
       <router-outlet />
       @if (canUseAi()) {
         <fns-chat-widget cmnAppLayoutFab />
@@ -87,6 +103,8 @@ export class AppShellComponent {
   private readonly shell = inject(CmnShellService);
   private readonly chrome = inject(ShellChromeService);
   private readonly paletteEntities = inject(PaletteEntitiesStore);
+
+  public readonly appUpdate = inject(AppUpdateService);
 
   public readonly canUseAi = inject(AuthStore).canUseAi;
   public readonly versionLabel = `v${APP_VERSION} · ${WHATS_NEW_LABEL}`;

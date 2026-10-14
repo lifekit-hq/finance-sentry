@@ -1,0 +1,55 @@
+<div class="flex flex-col gap-cmn-6 p-cmn-6">
+  <div class="flex justify-end">
+    <cmn-button (clicked)="reset()" variant="secondary" size="sm" data-testid="alert-filter-reset">
+      Reset
+    </cmn-button>
+  </div>
+
+  <section class="flex flex-col gap-cmn-2" aria-labelledby="alert-filter-read-heading">
+    <h3
+      id="alert-filter-read-heading"
+      class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Read state
+    </h3>
+    <div class="flex flex-wrap gap-cmn-2" role="group" aria-labelledby="alert-filter-read-heading">
+      @for (option of readStates; track option.value) {
+        <cmn-chip
+          [selected]="draft() === option.value"
+          [attr.data-testid]="'alert-filter-' + option.value"
+          (clicked)="select(option.value)"
+        >
+          {{ option.label }}
+        </cmn-chip>
+      }
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-cmn-2" aria-labelledby="alert-filter-severity-heading">
+    <h3
+      id="alert-filter-severity-heading"
+      class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+    >
+      Severity
+    </h3>
+    <div
+      class="flex flex-wrap gap-cmn-2"
+      role="group"
+      aria-labelledby="alert-filter-severity-heading"
+    >
+      @for (option of severities; track option.value) {
+        <cmn-chip
+          [selected]="draft() === option.value"
+          [attr.data-testid]="'alert-filter-' + option.value"
+          (clicked)="select(option.value)"
+        >
+          {{ option.label }}
+        </cmn-chip>
+      }
+    </div>
+  </section>
+
+  <cmn-button (clicked)="apply()" class="block [&_button]:w-full" data-testid="alert-filter-apply">
+    Show results
+  </cmn-button>
+</div>
