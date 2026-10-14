@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public sealed class SubscriptionDetectionJob(
     BankSyncDbContext db,
+    IClosedAccountsReader closedAccounts,
     ISubscriptionDetectionResultService resultService,
     ILogger<SubscriptionDetectionJob> logger)
 {
@@ -30,10 +31,12 @@ public sealed class SubscriptionDetectionJob(
     private async Task ProcessAccountsAsync(CancellationToken ct)
     {
         var cutoff = DateTime.UtcNow.AddMonths(-LookbackMonths);
+        var closed = (await closedAccounts.GetClosedUserIdsAsync(ct)).ToList();
 
         var transactions = await db.Transactions.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
-            .Where(t => t.IsActive
+            .Where(t => !closed.Contains(t.UserId)
+                     && t.IsActive
                      && !t.IsPending
                      && t.Amount != 0m   // skip €0.00 auth holds / reversals that skew amount stability
                      && t.TransactionDate >= cutoff

@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.BankSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,8 @@ public sealed record ActiveAccount(Guid AccountId, Guid UserId, string Currency)
 /// The 044 sentinels' shared liveness policy, read once: only transactions on active accounts
 /// participate, because a disconnected account's history must not raise new alerts. Every sentinel
 /// also needs the owning account's currency to normalise or partition amounts, so the same read
-/// answers both — and the policy is stated in one place rather than restated per job.
+/// answers both — and the policy is stated in one place rather than restated per job. A closed person's accounts
+/// are not active: nothing is derived or alerted for them while the closure waits out its grace.
 /// </summary>
 public sealed class ActiveAccountSnapshot
 {
@@ -29,10 +31,14 @@ public sealed class ActiveAccountSnapshot
     /// <summary>Materialised for EF's <c>Contains</c> translation in the callers' transaction queries.</summary>
     public List<Guid> AccountIds { get; }
 
-    public static async Task<ActiveAccountSnapshot> ReadAsync(BankSyncDbContext db, CancellationToken ct)
+    public static async Task<ActiveAccountSnapshot> ReadAsync(
+        BankSyncDbContext db, IClosedAccountsReader closedAccounts, CancellationToken ct)
     {
+        var closed = (await closedAccounts.GetClosedUserIdsAsync(ct)).ToList();
+
         var accounts = await db.BankAccounts.IgnoreQueryFilters([OwnerQueryFilter.Name])
             .AsNoTracking()
+            .Where(a => !closed.Contains(a.UserId))
             .Select(a => new ActiveAccount(a.Id, a.UserId, a.Currency))
             .ToListAsync(ct);
 

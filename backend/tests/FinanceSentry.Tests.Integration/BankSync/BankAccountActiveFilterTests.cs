@@ -125,7 +125,8 @@ public sealed class BankAccountActiveFilterTests : IAsyncLifetime
         (await accounts.GetByExternalAccountIdUnscopedAsync(removed.ExternalAccountId)).Should().BeNull();
         (await accounts.GetAllActiveUnscopedAsync()).Select(a => a.Id).Should().Contain(active.Id)
             .And.NotContain([removed.Id, onlyRemoved.Id]);
-        (await ActiveAccountSnapshot.ReadAsync(ctx, default)).AccountIds.Should().Contain(active.Id)
+        (await ActiveAccountSnapshot.ReadAsync(
+            ctx, Mock.Of<IClosedAccountsReader>(r => r.GetClosedUserIdsAsync(It.IsAny<CancellationToken>()) == Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>())), default)).AccountIds.Should().Contain(active.Id)
             .And.NotContain([removed.Id, onlyRemoved.Id]);
     }
 

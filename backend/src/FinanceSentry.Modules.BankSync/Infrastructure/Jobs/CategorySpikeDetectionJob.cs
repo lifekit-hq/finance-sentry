@@ -17,6 +17,7 @@ using Microsoft.Extensions.Options;
 /// </summary>
 public sealed class CategorySpikeDetectionJob(
     BankSyncDbContext db,
+    IClosedAccountsReader closedAccounts,
     IAlertGeneratorService alerts,
     IOptions<HygieneSentinelsOptions> options,
     ILogger<CategorySpikeDetectionJob> logger)
@@ -37,7 +38,7 @@ public sealed class CategorySpikeDetectionJob(
         ActiveAccountSnapshot accounts;
         try
         {
-            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, closedAccounts, ct);
             var activeAccountIds = accounts.AccountIds;
 
             // Debit-only and posted-only — the same predicate DuplicateChargeDetectionJob uses.

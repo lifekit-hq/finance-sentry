@@ -19,6 +19,7 @@ using Microsoft.Extensions.Options;
 /// </summary>
 public sealed class DuplicateChargeDetectionJob(
     BankSyncDbContext db,
+    IClosedAccountsReader closedAccounts,
     IAlertGeneratorService alerts,
     IOptions<HygieneSentinelsOptions> options,
     ILogger<DuplicateChargeDetectionJob> logger)
@@ -31,7 +32,7 @@ public sealed class DuplicateChargeDetectionJob(
         ActiveAccountSnapshot accounts;
         try
         {
-            accounts = await ActiveAccountSnapshot.ReadAsync(db, ct);
+            accounts = await ActiveAccountSnapshot.ReadAsync(db, closedAccounts, ct);
             var activeAccountIds = accounts.AccountIds;
 
             // Debit-only: adapters store amounts positive with TransactionType carrying the

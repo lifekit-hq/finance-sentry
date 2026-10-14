@@ -25,8 +25,10 @@ public class CategorySpikeDetectionJobTests
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"catspike-{Guid.NewGuid():N}").Options, NoCurrentUser.Instance);
 
+    private readonly HashSet<Guid> _closedUsers = [];
+
     private CategorySpikeDetectionJob MakeJob(BankSyncDbContext db, decimal? multiplier = null) =>
-        new(db, _alerts.Object,
+        new(db, new StubClosedAccountsReader([.. _closedUsers]), _alerts.Object,
             Options.Create(multiplier is null
                 ? new HygieneSentinelsOptions()
                 : new HygieneSentinelsOptions { CategorySpikeMultiplier = multiplier.Value }),
@@ -115,6 +117,37 @@ public class CategorySpikeDetectionJobTests
             userId, "FOOD_AND_DRINK", It.IsAny<decimal>(), It.IsAny<decimal>(),
             It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsAClosedUser_AndStillAlertsForTheOthers()
+    {
+        await using var db = NewDb();
+        var closedUser = Guid.NewGuid();
+        var openUser = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        foreach (var userId in new[] { closedUser, openUser })
+        {
+            var account = MakeAccount(userId);
+            db.BankAccounts.Add(account);
+            for (var i = 1; i <= 6; i++)
+            {
+                db.Transactions.Add(MakeTx(account, 100m, "FOOD_AND_DRINK",
+                    currentMonthStart.AddMonths(-i).AddDays(5)));
+            }
+            db.Transactions.Add(MakeTx(account, 300m, "FOOD_AND_DRINK", currentMonthStart.AddDays(5)));
+        }
+        await db.SaveChangesAsync();
+        _closedUsers.Add(closedUser);
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
+            closedUser, It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.ResolveCategorySpikeAlertAsync(closedUser, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.GenerateCategorySpikeAlertAsync(
+            openUser, "FOOD_AND_DRINK", It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -53,24 +53,24 @@ public class CloseAccountCommandHandler(
         if (await LastOwner.IsAsync(userManager, user))
             throw new LastOwnerCannotCloseException();
 
+        // The closure record and the lockout are committed last and in one save, so a failure in an earlier step leaves
+        // the account signed in and able to retry, and a pending closure always means the account is fully closed.
         var closure = new AccountClosure(request.UserId, clock.GetUtcNow().UtcDateTime);
-        db.AccountClosures.Add(closure);
-
-        // Saved with the lockout (the user store saves the shared context), so the account is never locked without a
-        // record of why, nor recorded as closed while it can still sign in.
-        Ensure(await userManager.SetLockoutEnabledAsync(user, true), "enable lockout");
-        Ensure(await userManager.SetLockoutEndDateAsync(user, PersonStatus.RevokedLockoutEnd), "lock the account");
-
-        foreach (var login in await userManager.GetLoginsAsync(user))
-            Ensure(await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey), "unlink the sign-in");
-
-        Ensure(await userManager.UpdateSecurityStampAsync(user), "rotate the security stamp");
 
         await refreshTokenService.RevokeAsync(user.Id, cancellationToken);
         await serviceTokens.RevokeAllAsync(user.Id, cancellationToken);
 
         closure.RecordCredentialRevocation(JsonSerializer.Serialize(await RevokeCredentialsAsync(request.UserId, cancellationToken)));
-        await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var login in await userManager.GetLoginsAsync(user))
+            Ensure(await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey), "unlink the sign-in");
+
+        // The user store saves the shared context, so this one update persists the lockout, the new security stamp and
+        // the closure record together.
+        db.AccountClosures.Add(closure);
+        user.LockoutEnabled = true;
+        user.LockoutEnd = PersonStatus.RevokedLockoutEnd;
+        Ensure(await userManager.UpdateSecurityStampAsync(user), "lock the account");
 
         logger.LogInformation(
             "Account {UserId} closed; data purge due {PurgeDueAt:O}", request.UserId, closure.PurgeDueAt);
@@ -78,8 +78,8 @@ public class CloseAccountCommandHandler(
         return ToDto(closure);
     }
 
-    // A failure in one module is recorded and the rest still run: the account is already locked, and the provider
-    // keys each module holds should go even if another module's cleanup fails.
+    // A failure in one module is recorded and the rest still run, so the provider keys each module holds go even if
+    // another module's cleanup fails.
     private async Task<Dictionary<string, CredentialRevocation>> RevokeCredentialsAsync(Guid userId, CancellationToken ct)
     {
         var outcomes = new Dictionary<string, CredentialRevocation>(StringComparer.Ordinal);

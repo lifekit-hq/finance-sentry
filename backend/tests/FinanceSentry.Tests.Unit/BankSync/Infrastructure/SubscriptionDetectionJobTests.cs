@@ -53,7 +53,7 @@ public class SubscriptionDetectionJobTests
         SeedMonthlyCharges(db, userB, "Spotify");
         await db.SaveChangesAsync();
 
-        await new SubscriptionDetectionJob(db, _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
         _results.Verify(r => r.UpsertDetectedSubscriptionsAsync(
@@ -86,7 +86,7 @@ public class SubscriptionDetectionJobTests
         }
         await db.SaveChangesAsync();
 
-        await new SubscriptionDetectionJob(db, _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+        await new SubscriptionDetectionJob(db, new StubClosedAccountsReader(), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
             .ExecuteAsync();
 
         var merchantKey = CommitmentKeyResolver.Resolve("Acme Hosting", "ACME HOSTING", 16.19m, null);
@@ -99,5 +99,28 @@ public class SubscriptionDetectionJobTests
                 && c.Count(x => x.Key == installmentKey) == 2
                 && c.All(x => x.Amount == 16.19m && x.Currency == "EUR")),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsAClosedUser_AndStillProcessesTheOthers()
+    {
+        await using var db = NewDb($"subs-{Guid.NewGuid():N}");
+        var closedUser = Guid.NewGuid();
+        var openUser = Guid.NewGuid();
+        SeedMonthlyCharges(db, closedUser, "Netflix");
+        SeedMonthlyCharges(db, openUser, "Spotify");
+        await db.SaveChangesAsync();
+
+        await new SubscriptionDetectionJob(
+                db, new StubClosedAccountsReader(closedUser), _results.Object, Mock.Of<ILogger<SubscriptionDetectionJob>>())
+            .ExecuteAsync();
+
+        _results.Verify(r => r.UpsertDetectedSubscriptionsAsync(
+            closedUser.ToString(), It.IsAny<IReadOnlyList<DetectedSubscriptionData>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _results.Verify(r => r.TrackManualCommitmentsAsync(
+            closedUser.ToString(), It.IsAny<IReadOnlyList<CommitmentCharge>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _results.Verify(r => r.MarkStaleAsPotentiallyCancelledAsync(closedUser.ToString(), It.IsAny<CancellationToken>()), Times.Never);
+        _results.Verify(r => r.UpsertDetectedSubscriptionsAsync(
+            openUser.ToString(), It.IsAny<IReadOnlyList<DetectedSubscriptionData>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

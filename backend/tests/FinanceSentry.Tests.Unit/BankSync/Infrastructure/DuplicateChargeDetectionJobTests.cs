@@ -25,8 +25,10 @@ public class DuplicateChargeDetectionJobTests
         new DbContextOptionsBuilder<BankSyncDbContext>()
             .UseInMemoryDatabase($"dup-{Guid.NewGuid():N}").Options, NoCurrentUser.Instance);
 
+    private readonly HashSet<Guid> _closedUsers = [];
+
     private DuplicateChargeDetectionJob MakeJob(BankSyncDbContext db, int? windowDays = null) =>
-        new(db, _alerts.Object,
+        new(db, new StubClosedAccountsReader([.. _closedUsers]), _alerts.Object,
             Options.Create(windowDays is null
                 ? new HygieneSentinelsOptions()
                 : new HygieneSentinelsOptions { DuplicateWindowDays = windowDays.Value }),
@@ -47,6 +49,33 @@ public class DuplicateChargeDetectionJobTests
         tx.MerchantName = merchant;
         tx.IsActive = true;
         return tx;
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsAClosedUser_AndStillAlertsForTheOthers()
+    {
+        await using var db = NewDb();
+        var closedUser = Guid.NewGuid();
+        var openUser = Guid.NewGuid();
+        var closedAccount = MakeAccount(closedUser);
+        var openAccount = MakeAccount(openUser);
+        db.BankAccounts.AddRange(closedAccount, openAccount);
+        db.Transactions.AddRange(
+            MakeTx(closedAccount, -9.99m, "Netflix"),
+            MakeTx(closedAccount, -9.99m, "Netflix"),
+            MakeTx(openAccount, -9.99m, "Netflix"),
+            MakeTx(openAccount, -9.99m, "Netflix"));
+        await db.SaveChangesAsync();
+        _closedUsers.Add(closedUser);
+
+        await MakeJob(db).ExecuteAsync();
+
+        _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
+            closedUser, It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _alerts.Verify(a => a.GenerateDuplicateChargeAlertAsync(
+            openUser, openAccount.Id, "netflix", "Netflix", 9.99m, "EUR", 2, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
