@@ -10,6 +10,7 @@ import {
   type DashboardData,
   type HistoryRange,
   type MonthlyFlow,
+  type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {dashboardComputed} from './dashboard.computed';
@@ -38,6 +39,7 @@ interface Fixture {
   baseCurrency?: string;
   topCategories?: CategoryStat[];
   scrubIndex?: number | null;
+  scopeChanges?: NetWorthScopeChangeDto[];
   cashUsd?: number | null;
   investedUsd?: number | null;
 }
@@ -51,6 +53,7 @@ function build(
     baseCurrency,
     topCategories = [],
     scrubIndex = null,
+    scopeChanges = [],
     cashUsd,
     investedUsd,
   }: Fixture,
@@ -77,6 +80,7 @@ function build(
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
     scrubIndex: signal<number | null>(scrubIndex),
+    historyScopeChanges: signal<NetWorthScopeChangeDto[]>(scopeChanges),
   };
 }
 
@@ -413,6 +417,68 @@ describe('dashboardComputed', () => {
       expect(c.netWorthChangeFormatted()).toBe('-$500');
       expect(c.netWorthChangePercentFormatted()).toBe('-5.0%');
       expect(c.netWorthChangeDirection()).toBe(-1);
+    });
+
+    describe('scope change inside the window', () => {
+      function dated(first: number, last: number): NetWorthSnapshotDto[] {
+        return [
+          {...snapshot(first, 0, 0), snapshotDate: '2026-07-01'},
+          {...snapshot(last, 0, 0), snapshotDate: '2026-07-31'},
+        ];
+      }
+
+      it('keeps the amount, drops the percentage and names the linked account', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: dated(10_000, 14_000),
+          scopeChanges: [{source: 'monobank', kind: 'linked', at: '2026-07-20'}],
+        });
+
+        expect(c.netWorthChangeFormatted()).toBe('+$4,000');
+        expect(c.netWorthChangePercentFormatted()).toBe('');
+        expect(c.netWorthScopeNote()).toBe('Includes newly linked accounts');
+      });
+
+      it('names removed accounts, and both when both happened', () => {
+        const removed = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: dated(10_000, 6_000),
+          scopeChanges: [{source: 'monobank', kind: 'removed', at: '2026-07-10'}],
+        });
+        const both = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: dated(10_000, 6_000),
+          scopeChanges: [
+            {source: 'monobank', kind: 'removed', at: '2026-07-10'},
+            {source: 'binance', kind: 'linked', at: '2026-07-12'},
+          ],
+        });
+
+        expect(removed.netWorthScopeNote()).toBe('Includes removed accounts');
+        expect(both.netWorthScopeNote()).toBe('Includes newly linked or removed accounts');
+      });
+
+      it('keeps the percentage when the link predates the window', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: dated(10_000, 10_320),
+          scopeChanges: [{source: 'monobank', kind: 'linked', at: '2026-06-15'}],
+        });
+
+        expect(c.netWorthChangePercentFormatted()).toBe('+3.2%');
+        expect(c.netWorthScopeNote()).toBe('');
+      });
+
+      it('ignores a link after the scrubbed day', () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: dated(10_000, 14_000),
+          scrubIndex: 0,
+          scopeChanges: [{source: 'monobank', kind: 'linked', at: '2026-07-20'}],
+        });
+
+        expect(c.netWorthScopeNote()).toBe('');
+      });
     });
 
     describe('invested / cash sub-line', () => {

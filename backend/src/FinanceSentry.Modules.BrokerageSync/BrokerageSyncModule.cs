@@ -136,6 +136,7 @@ public static class BrokerageSyncModule
         services.AddScoped<InzhurSyncJob>();
         services.AddScoped<InzhurKeepAliveJob>();
         services.AddScoped<IBrokerageConnectionStatusReader, BrokerageConnectionStatusReader>();
+        services.AddScoped<IAccountScopeChangeReader, BrokerageScopeChangeReader>();
 
         services.AddSingleton<IbkrFailureClassifier>();
         services.AddSingleton<IbkrFlexFailureClassifier>();

@@ -7,6 +7,7 @@ import {catchError, EMPTY, pipe, switchMap, tap, timer} from 'rxjs';
 import {
   type DashboardData,
   type HistoryRange,
+  type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {BankSyncService} from '../../services/bank-sync.service';
@@ -21,6 +22,7 @@ interface EffectsStore {
   setHistoryLoading: (loading: boolean) => void;
   setHistoryError: (error: string | null) => void;
   setHistoryHasHistory: (hasHistory: boolean) => void;
+  setHistoryScopeChanges: (scopeChanges: NetWorthScopeChangeDto[]) => void;
   historyRange: Signal<HistoryRange>;
 }
 
@@ -67,6 +69,7 @@ export function dashboardEffects(store: EffectsStore) {
             tap(response => {
               store.setNetWorthHistory(response.snapshots);
               store.setHistoryHasHistory(response.hasHistory);
+              store.setHistoryScopeChanges(response.scopeChanges ?? []);
               store.setHistoryLoading(false);
               store.setHistoryError(null);
             }),

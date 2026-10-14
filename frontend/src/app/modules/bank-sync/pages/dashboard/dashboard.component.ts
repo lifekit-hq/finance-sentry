@@ -185,6 +185,14 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
                     >
                   </p>
+                  @if (store.netWorthScopeNote()) {
+                    <p
+                      class="font-label text-cmn-xs text-text-secondary"
+                      data-testid="net-worth-scope-note"
+                    >
+                      {{ store.netWorthScopeNote() }}
+                    </p>
+                  }
                 }
               </div>
               <!--

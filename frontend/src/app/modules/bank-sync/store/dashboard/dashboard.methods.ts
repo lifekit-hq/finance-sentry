@@ -3,6 +3,7 @@ import {patchState, type WritableStateSource} from '@ngrx/signals';
 import {
   type DashboardData,
   type HistoryRange,
+  type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 import {type DashboardState} from './dashboard.state';
@@ -29,6 +30,9 @@ export function dashboardMethods(store: WritableStateSource<DashboardState>) {
     },
     setHistoryHasHistory(hasHistory: boolean): void {
       patchState(store, {historyHasHistory: hasHistory});
+    },
+    setHistoryScopeChanges(scopeChanges: NetWorthScopeChangeDto[]): void {
+      patchState(store, {historyScopeChanges: scopeChanges});
     },
   };
 }

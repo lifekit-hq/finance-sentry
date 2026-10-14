@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 public record NetWorthSnapshotDto(
@@ -16,13 +17,22 @@ public record NetWorthSnapshotDto(
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null);
 
+/// <summary>
+/// An account or connection that entered or left the book inside the returned window: <c>Kind</c> is
+/// <c>linked</c> or <c>removed</c>, <c>At</c> the date it happened (UTC).
+/// </summary>
+public record NetWorthScopeChangeDto(string Source, string Kind, DateOnly At);
+
 public record NetWorthHistoryResponse(
     IReadOnlyList<NetWorthSnapshotDto> Snapshots,
-    bool HasHistory);
+    bool HasHistory,
+    IReadOnlyList<NetWorthScopeChangeDto>? ScopeChanges = null);
 
 public record GetNetWorthHistoryQuery(Guid UserId, DateOnly? From, DateOnly? To) : IQuery<NetWorthHistoryResponse>;
 
-public class GetNetWorthHistoryQueryHandler(INetWorthSnapshotRepository repository)
+public class GetNetWorthHistoryQueryHandler(
+    INetWorthSnapshotRepository repository,
+    IEnumerable<IAccountScopeChangeReader> scopeChangeReaders)
     : IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse>
 {
     private readonly INetWorthSnapshotRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -38,6 +48,21 @@ public class GetNetWorthHistoryQueryHandler(INetWorthSnapshotRepository reposito
                 s.CashTotal, s.BrokerageInvested, s.CryptoInvested))
             .ToList();
 
-        return new NetWorthHistoryResponse(dtos, dtos.Count > 0);
+        // A change across the window includes accounts that joined or left it; the dashboard reads this to
+        // state the amount without a percentage. Removal is approximate until per-source rows exist (R8).
+        var scopeChanges = new List<NetWorthScopeChangeDto>();
+        if (dtos.Count > 0)
+        {
+            var windowStart = dtos.Min(d => d.SnapshotDate);
+            var since = windowStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            foreach (var reader in scopeChangeReaders)
+            {
+                var changes = await reader.GetChangesSinceAsync(query.UserId, since, cancellationToken);
+                scopeChanges.AddRange(changes.Select(c =>
+                    new NetWorthScopeChangeDto(c.Source, c.Kind, DateOnly.FromDateTime(c.AtUtc))));
+            }
+        }
+
+        return new NetWorthHistoryResponse(dtos, dtos.Count > 0, scopeChanges);
     }
 }

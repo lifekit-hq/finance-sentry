@@ -25,6 +25,7 @@ import {
   type DashboardData,
   type HistoryRange,
   type MonthlyFlow,
+  type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
   type NetWorthSplit,
 } from '../../models/dashboard/dashboard.model';
@@ -36,6 +37,7 @@ interface StateSignals {
   data: Signal<Nullable<DashboardData>>;
   historyRange: Signal<HistoryRange>;
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
+  historyScopeChanges: Signal<NetWorthScopeChangeDto[]>;
   historyLoading: Signal<boolean>;
   historyError: Signal<string | null>;
   scrubIndex: Signal<number | null>;
@@ -376,6 +378,28 @@ export function dashboardComputed(store: StateSignals) {
     return changeOf(start, end);
   });
 
+  // Which kinds of scope change (accounts linked or removed) fall inside the change's window: from
+  // the first snapshot to the figure shown, so a scrub back before a link does not carry its note.
+  // Removal is approximate (bank-account deactivation time) until per-source rows exist (R8).
+  const netWorthScopeNote = computed((): string => {
+    const history = validHistory();
+    if (history.length < MIN_POINTS_FOR_DELTA) {
+      return '';
+    }
+    const start = history[0].snapshotDate;
+    const end = scrubbed()?.snapshotDate ?? history[history.length - 1].snapshotDate;
+    const inWindow = store.historyScopeChanges().filter(c => c.at >= start && c.at <= end);
+    const linked = inWindow.some(c => c.kind === 'linked');
+    const removed = inWindow.some(c => c.kind === 'removed');
+    if (linked && removed) {
+      return 'Includes newly linked or removed accounts';
+    }
+    if (linked) {
+      return 'Includes newly linked accounts';
+    }
+    return removed ? 'Includes removed accounts' : '';
+  });
+
   // Change in the invested book (brokerage + crypto positions, cash excluded), over the days that
   // have a split only: from the first split day to the last, or to the scrubbed day. It is a
   // change in invested value, deposits included, not a return. Null until two split days exist
@@ -421,7 +445,12 @@ export function dashboardComputed(store: StateSignals) {
         ? MoneyUtils.format(change.delta, baseCurrency(), {...WHOLE_DOLLARS, signed: true})
         : '';
     }),
-    netWorthChangePercentFormatted: computed(() => formatPercent(netWorthChange()?.percent)),
+    // A percentage across a scope change measures the book growing or shrinking, not the money
+    // moving, so it is withheld (the amount stays) and the note below says why.
+    netWorthChangePercentFormatted: computed(() =>
+      netWorthScopeNote() ? '' : formatPercent(netWorthChange()?.percent)
+    ),
+    netWorthScopeNote,
     // Sign of the change, for colouring: 1 up, -1 down, 0 flat or unknown.
     netWorthChangeDirection: computed(() => Math.sign(netWorthChange()?.delta ?? 0)),
 

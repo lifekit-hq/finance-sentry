@@ -27,9 +27,19 @@ export interface NetWorthSplit {
   invested: number;
 }
 
+/** An account or connection that entered or left the book inside the returned window. */
+export interface NetWorthScopeChangeDto {
+  source: string;
+  kind: 'linked' | 'removed';
+  /** ISO date (YYYY-MM-DD, UTC). */
+  at: string;
+}
+
 export interface NetWorthHistoryResponse {
   snapshots: NetWorthSnapshotDto[];
   hasHistory: boolean;
+  /** Absent from older API builds; treat as none. */
+  scopeChanges?: NetWorthScopeChangeDto[];
 }
 
 export interface MonthlyFlow {
