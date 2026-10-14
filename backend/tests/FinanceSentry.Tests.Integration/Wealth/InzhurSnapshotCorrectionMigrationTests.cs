@@ -15,8 +15,9 @@ using Xunit;
 /// <summary>
 /// M005_CorrectInzhurNetWorthHistory against real Postgres, on production-shaped history: the Inzhur connection
 /// made on 2026-10-12, an inflated sync that day, the fixed build's first sync (holdings in hryvnia plus the full
-/// ledger) on 2026-10-13 07:00Z, and an IBKR account alongside. The fixture rate is 40 UAH/USD, so every expected
-/// figure below is exact:
+/// ledger) on 2026-10-13 07:00Z, and an IBKR account alongside. A second Inzhur user connected on 2026-10-08 and
+/// carries the brokerage sleeve forward across days and across its fixed sync (2026-10-13 12:00Z). The fixture rate
+/// is 40 UAH/USD, so every expected figure below is exact:
 /// <list type="bullet">
 /// <item>Corrected holdings: MilTech 4 units, 4,134.80 UAH ($103.37); REIT 92 units, 1,062.60 UAH ($26.565);
 /// cash 21.19 UAH ($0.52975).</item>
@@ -37,6 +38,7 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
     private readonly Guid _inzhurUser = Guid.NewGuid();
     private readonly Guid _ibkrOnlyUser = Guid.NewGuid();
     private readonly Guid _lateInzhurUser = Guid.NewGuid();
+    private readonly Guid _earlyInzhurUser = Guid.NewGuid();
     private TestDatabase? _database;
 
     public async Task InitializeAsync() => _database = await PostgresServer.Postgres14.CreateDatabaseAsync();
@@ -88,7 +90,8 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
                  "Health_State", "Health_ConsecutiveFailures")
             VALUES
                 (gen_random_uuid(), '{{_inzhurUser}}', 'Active', TIMESTAMPTZ '2026-10-12 10:30:00Z', TIMESTAMPTZ '2026-10-14 07:00:04Z', '\x00', '\x00', '\x00', 'Healthy', 0),
-                (gen_random_uuid(), '{{_lateInzhurUser}}', 'Active', TIMESTAMPTZ '2026-10-13 12:00:00Z', TIMESTAMPTZ '2026-10-14 07:00:04Z', '\x00', '\x00', '\x00', 'Healthy', 0);
+                (gen_random_uuid(), '{{_lateInzhurUser}}', 'Active', TIMESTAMPTZ '2026-10-13 12:00:00Z', TIMESTAMPTZ '2026-10-14 07:00:04Z', '\x00', '\x00', '\x00', 'Healthy', 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', 'Active', TIMESTAMPTZ '2026-10-08 06:00:00Z', TIMESTAMPTZ '2026-10-14 07:00:04Z', '\x00', '\x00', '\x00', 'Healthy', 0);
 
             -- Holdings as the fixed build writes them (hryvnia native values, USD at 40 UAH/USD), next to IBKR.
             INSERT INTO brokerage_sync."BrokerageHoldings"
@@ -99,7 +102,8 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
                 (gen_random_uuid(), '{{_inzhurUser}}', 'UAH Cash', 'CASH', 21.19, 0.52975, TIMESTAMPTZ '2026-10-14 07:00:04Z', 'inzhur', 'UAH', 21.19),
                 (gen_random_uuid(), '{{_inzhurUser}}', 'VWRA', 'STK', 120, 17000, TIMESTAMPTZ '2026-10-14 06:00:00Z', 'ibkr', 'USD', NULL),
                 (gen_random_uuid(), '{{_ibkrOnlyUser}}', 'VWRA', 'STK', 50, 7000, TIMESTAMPTZ '2026-10-14 06:00:00Z', 'ibkr', 'USD', NULL),
-                (gen_random_uuid(), '{{_lateInzhurUser}}', 'Inzhur REIT', 'FUND', 10, 2.8875, TIMESTAMPTZ '2026-10-14 07:00:04Z', 'inzhur', 'UAH', 115.50);
+                (gen_random_uuid(), '{{_lateInzhurUser}}', 'Inzhur REIT', 'FUND', 10, 2.8875, TIMESTAMPTZ '2026-10-14 07:00:04Z', 'inzhur', 'UAH', 115.50),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', 'Inzhur REIT', 'FUND', 10, 2.8875, TIMESTAMPTZ '2026-10-14 07:00:04Z', 'inzhur', 'UAH', 115.50);
 
             -- The ledger, imported by the fixed build's first sync (CreatedAt), dated by Inzhur (TradeDateTime / DateTime).
             INSERT INTO brokerage_sync."BrokerageTrades"
@@ -110,7 +114,8 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
                 (gen_random_uuid(), '{{_inzhurUser}}', 'inzhur', 'tx-2', 'tx-2', 'Inzhur REIT', TIMESTAMPTZ '2025-12-01 09:00:00Z', 91, 11, -1001, 'UAH', TIMESTAMPTZ '{{FixedSyncAt:O}}', TIMESTAMPTZ '{{FixedSyncAt:O}}'),
                 (gen_random_uuid(), '{{_inzhurUser}}', 'inzhur', 'tx-5', 'tx-5', 'Inzhur REIT', TIMESTAMPTZ '2026-10-12 21:00:00Z', 1, 11.55, -11.55, 'UAH', TIMESTAMPTZ '{{FixedSyncAt:O}}', TIMESTAMPTZ '{{FixedSyncAt:O}}'),
                 (gen_random_uuid(), '{{_ibkrOnlyUser}}', 'ibkr', 'ib-1', 'ib-1', 'VWRA', TIMESTAMPTZ '2026-10-12 15:00:00Z', 1, 140, -140, 'USD', TIMESTAMPTZ '2026-10-10 06:00:00Z', TIMESTAMPTZ '2026-10-10 06:00:00Z'),
-                (gen_random_uuid(), '{{_lateInzhurUser}}', 'inzhur', 'tx-9', 'tx-9', 'Inzhur REIT', TIMESTAMPTZ '2026-09-01 09:00:00Z', 10, 11, -110, 'UAH', TIMESTAMPTZ '2026-10-13 12:00:30Z', TIMESTAMPTZ '2026-10-13 12:00:30Z');
+                (gen_random_uuid(), '{{_lateInzhurUser}}', 'inzhur', 'tx-9', 'tx-9', 'Inzhur REIT', TIMESTAMPTZ '2026-09-01 09:00:00Z', 10, 11, -110, 'UAH', TIMESTAMPTZ '2026-10-13 12:00:30Z', TIMESTAMPTZ '2026-10-13 12:00:30Z'),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', 'inzhur', 'tx-e1', 'tx-e1', 'Inzhur REIT', TIMESTAMPTZ '2026-10-01 09:00:00Z', 10, 11, -110, 'UAH', TIMESTAMPTZ '2026-10-13 12:00:30Z', TIMESTAMPTZ '2026-10-13 12:00:30Z');
 
             INSERT INTO brokerage_sync."BrokerageCashTransactions"
                 ("Id", "UserId", "Provider", "IdempotencyKey", "TransactionType", "Amount", "Currency", "DateTime", "CreatedAt")
@@ -131,6 +136,20 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
                 (gen_random_uuid(), '{{_inzhurUser}}', DATE '2026-10-14', 5000, 17730.46, 1000, 23730.46, 'USD', TIMESTAMPTZ '2026-10-14 01:00:00Z', 5600.53, 17129.93, 1000),
                 (gen_random_uuid(), '{{_ibkrOnlyUser}}', DATE '2026-10-12', 2000, 7000.00, 0, 9000.00, 'USD', TIMESTAMPTZ '2026-10-12 18:00:00Z', 2000.00, 7000.00, 0),
                 (gen_random_uuid(), '{{_lateInzhurUser}}', DATE '2026-10-13', 300, 2.89, 0, 302.89, 'USD', TIMESTAMPTZ '2026-10-13 10:00:00Z', NULL, NULL, NULL);
+
+            -- The early user: a measured inflated row (10-08), the brokerage sleeve carried forward on 10-09 and 10-10
+            -- (a row's carried value is a copy of the one before it), an approximate-flagged inflated row (10-11), a
+            -- carry after its fixed sync (10-13 13:00Z, copy of 10-11) and the first row from the corrected holdings.
+            INSERT INTO net_worth_snapshots
+                ("Id", "UserId", "SnapshotDate", "BankingTotal", "BrokerageTotal", "CryptoTotal", "TotalNetWorth", "Currency",
+                 "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested, crypto_invested)
+            VALUES
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-08', 300, 288.75, 0, 588.75, 'USD', TIMESTAMPTZ '2026-10-08 07:00:00Z', NULL, false, 300.00, 288.75, 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-09', 310, 288.75, 0, 598.75, 'USD', TIMESTAMPTZ '2026-10-09 01:00:00Z', 'brokerage', false, 310.00, 288.75, 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-10', 305, 288.75, 0, 593.75, 'USD', TIMESTAMPTZ '2026-10-10 01:00:00Z', 'brokerage', false, 305.00, 288.75, 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-11', 300, 288.75, 0, 588.75, 'USD', TIMESTAMPTZ '2026-10-11 01:00:00Z', NULL, true, 300.00, 288.75, 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-13', 320, 288.75, 0, 608.75, 'USD', TIMESTAMPTZ '2026-10-13 13:00:00Z', 'brokerage', false, 320.00, 288.75, 0),
+                (gen_random_uuid(), '{{_earlyInzhurUser}}', DATE '2026-10-14', 300, 2.89, 0, 302.89, 'USD', TIMESTAMPTZ '2026-10-14 02:00:00Z', NULL, false, 300.00, 2.89, 0);
             """);
     }
 
@@ -180,6 +199,12 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
     private static SnapshotRow Row(IEnumerable<SnapshotRow> rows, Guid userId, int day) =>
         rows.Single(r => r.UserId == userId && r.Date == new DateOnly(2026, 10, day));
 
+    private static SnapshotRow EarlyRow(Guid userId, int day, decimal banking, decimal brokerage, decimal total, decimal cash) =>
+        new(userId, new DateOnly(2026, 10, day), banking, brokerage, 0, total, cash, brokerage, 0);
+
+    private static BackupRow EarlyBackup(Guid userId, int day, decimal brokerage, decimal total, decimal cash) =>
+        new(userId, new DateOnly(2026, 10, day), brokerage, total, cash, brokerage, 2.8875m, 0m, 285.86m, 0m);
+
     [DockerRequiredFact]
     public async Task Up_RemovesTheInflatedInzhurValue_FromTheRowsTakenBeforeTheFixedSync()
     {
@@ -205,11 +230,57 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
 
         await MigrateAsync(CorrectionMigration);
 
-        (await BackupAsync()).Should().Equal(
+        (await BackupAsync()).Where(r => r.UserId == _inzhurUser).Should().Equal(
             new BackupRow(_inzhurUser, new DateOnly(2026, 10, 12), 30573.73m, 36573.73m, 5609.10m, 29964.63m,
                 129.6463m, 0.0910m, 12834.98m, 9.01m),
             new BackupRow(_inzhurUser, new DateOnly(2026, 10, 13), 30646.48m, 36646.48m, null, null,
                 129.9350m, 0.5298m, 12863.57m, 52.45m));
+    }
+
+    [DockerRequiredFact]
+    public async Task Up_CorrectsTheRowsThatCarriedTheInflatedSleeveForward_ByTheRemovalOfTheirBaseline()
+    {
+        await MigrateAsync(PreviousMigration);
+        await SeedAsync();
+
+        await MigrateAsync(CorrectionMigration);
+
+        var rows = await SnapshotsAsync();
+        // 10-08 is derived from the ledger ($2.8875 held, 100x stored); 10-09 and 10-10 are carried copies of it,
+        // 10-11 is an approximate-flagged measured row, 10-13 (after the fixed sync) a carried copy of 10-11.
+        Row(rows, _earlyInzhurUser, 8).Should().Be(EarlyRow(_earlyInzhurUser, 8, 300, 2.89m, 302.89m, 300.00m));
+        Row(rows, _earlyInzhurUser, 9).Should().Be(EarlyRow(_earlyInzhurUser, 9, 310, 2.89m, 312.89m, 310.00m));
+        Row(rows, _earlyInzhurUser, 10).Should().Be(EarlyRow(_earlyInzhurUser, 10, 305, 2.89m, 307.89m, 305.00m));
+        Row(rows, _earlyInzhurUser, 11).Should().Be(EarlyRow(_earlyInzhurUser, 11, 300, 2.89m, 302.89m, 300.00m));
+        Row(rows, _earlyInzhurUser, 13).Should().Be(EarlyRow(_earlyInzhurUser, 13, 320, 2.89m, 322.89m, 320.00m));
+        Row(rows, _earlyInzhurUser, 14).Should().Be(EarlyRow(_earlyInzhurUser, 14, 300, 2.89m, 302.89m, 300.00m));
+
+        (await BackupAsync()).Where(r => r.UserId == _earlyInzhurUser).Should().Equal(
+            EarlyBackup(_earlyInzhurUser, 8, 288.75m, 588.75m, 300.00m),
+            EarlyBackup(_earlyInzhurUser, 9, 288.75m, 598.75m, 310.00m),
+            EarlyBackup(_earlyInzhurUser, 10, 288.75m, 593.75m, 305.00m),
+            EarlyBackup(_earlyInzhurUser, 11, 288.75m, 588.75m, 300.00m),
+            EarlyBackup(_earlyInzhurUser, 13, 288.75m, 608.75m, 320.00m));
+    }
+
+    [DockerRequiredFact]
+    public async Task Up_LeavesNoOneDayJumpInTheBrokerageSeries_AcrossTheFixDate()
+    {
+        const decimal tolerance = 200m;
+        await MigrateAsync(PreviousMigration);
+        await SeedAsync();
+
+        await MigrateAsync(CorrectionMigration);
+
+        var series = (await SnapshotsAsync())
+            .Where(r => r.UserId == _inzhurUser || r.UserId == _earlyInzhurUser)
+            .GroupBy(r => r.UserId);
+        foreach (var user in series)
+        {
+            var brokerage = user.OrderBy(r => r.Date).Select(r => r.Brokerage).ToList();
+            brokerage.Zip(brokerage.Skip(1), (previous, next) => Math.Abs(next - previous))
+                .Should().OnlyContain(step => step <= tolerance);
+        }
     }
 
     [DockerRequiredFact]
@@ -258,7 +329,7 @@ public sealed class InzhurSnapshotCorrectionMigrationTests : IAsyncLifetime
 
         await MigrateAsync(CorrectionMigration);
         (await SnapshotsAsync()).Should().Equal(corrected);
-        (await BackupAsync()).Should().HaveCount(2);
+        (await BackupAsync()).Should().HaveCount(7);
     }
 
     [DockerRequiredFact]

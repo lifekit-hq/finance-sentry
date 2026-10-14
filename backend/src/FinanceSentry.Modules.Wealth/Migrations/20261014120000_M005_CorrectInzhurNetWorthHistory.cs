@@ -12,18 +12,22 @@ namespace FinanceSentry.Modules.Wealth.Migrations
     /// <list type="bullet">
     /// <item>A user is corrected only once a fixed build has synced Inzhur: the first Inzhur ledger row it stored
     /// (the ledger arrived with the fix, in the same sync as the corrected holdings) marks that moment.</item>
-    /// <item>An affected snapshot is one taken from the Inzhur connection (and no earlier than 2026-10-12, the first
-    /// live Inzhur sync) up to that moment, with a measured, not carried-forward, brokerage sleeve.</item>
+    /// <item>A measured snapshot is affected when it was taken from the Inzhur connection (no earlier than the
+    /// connection's <c>CreatedAt</c> and no earlier than 2026-10-07, when the kopeck bug shipped with the initial sync
+    /// in #920) up to that moment, whether or not it is flagged approximate.</item>
     /// <item>The real Inzhur value at the snapshot comes from the corrected data: today's Inzhur holdings rolled back
     /// through the ledger rows dated after the snapshot (units bought or sold since, priced at the holding's corrected
     /// unit value or, for an asset no longer held, at its own trade price; cash less the movements since).</item>
     /// <item>The stored figure held 100 times that value (the unit error, every amount read in kopecks as hryvnia), so
     /// 99 times it comes off the brokerage sleeve and the total, the invested part off <c>brokerage_invested</c> and
     /// the cash part off <c>cash_total</c>. A null split stays null.</item>
+    /// <item>A snapshot that carried the brokerage sleeve forward (<c>stale_sleeves</c> holds <c>brokerage</c>) holds a
+    /// copy of the previous snapshot's brokerage total, so it takes exactly the removal that previous snapshot took,
+    /// following consecutive carries, also past the fixed sync. It is not derived from the ledger again.</item>
     /// </list>
-    /// Idempotent: a row whose backup holds a different brokerage figure from the live row is already corrected and is
-    /// left alone, so running the SQL again changes nothing. Down puts the original values back from the backup and
-    /// keeps the backup table.
+    /// A removal never takes more than the row holds. Idempotent: a row whose backup holds a different brokerage
+    /// figure from the live row is already corrected and is left alone, so running the SQL again changes nothing.
+    /// Down puts the original values back from the backup and keeps the backup table.
     /// </summary>
     public partial class M005_CorrectInzhurNetWorthHistory : Migration
     {
@@ -60,7 +64,7 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     RETURN;
                 END IF;
 
-                WITH fixed AS (
+                WITH RECURSIVE fixed AS (
                     SELECT l."UserId", min(l."CreatedAt") AS fixed_at
                     FROM (
                         SELECT "UserId", "CreatedAt" FROM brokerage_sync."BrokerageTrades" WHERE "Provider" = 'inzhur'
@@ -70,7 +74,7 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     GROUP BY l."UserId"
                 ),
                 windows AS (
-                    SELECT f."UserId", greatest(c."CreatedAt", TIMESTAMPTZ '2026-10-12 00:00:00+00') AS from_at, f.fixed_at
+                    SELECT f."UserId", greatest(c."CreatedAt", TIMESTAMPTZ '2026-10-07 00:00:00+00') AS from_at, f.fixed_at
                     FROM fixed f
                     JOIN brokerage_sync."InzhurCredentials" c ON c."UserId" = f."UserId"
                 ),
@@ -88,7 +92,6 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                     LEFT JOIN net_worth_snapshots_backup_inzhur_2026_10 b ON b."Id" = s."Id"
                     WHERE s."TakenAt" >= w.from_at
                       AND s."TakenAt" < w.fixed_at
-                      AND NOT s.is_approximate
                       AND coalesce(s.stale_sleeves, '') NOT LIKE '%brokerage%'
                       AND (b."Id" IS NULL OR b."BrokerageTotal" = s."BrokerageTotal")
                 ),
@@ -124,13 +127,31 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         round(99 * v.inzhur_cash_usd, 2) AS removed_cash_usd
                     FROM valued v
                 ),
-                correction AS (
+                direct_correction AS (
                     SELECT r.*
                     FROM removal r
                     JOIN net_worth_snapshots s ON s."Id" = r."Id"
                     WHERE r.removed_invested_usd + r.removed_cash_usd > 0
                       AND s."BrokerageTotal" >= r.removed_invested_usd + r.removed_cash_usd
                       AND (s.brokerage_invested IS NULL OR s.brokerage_invested >= r.removed_invested_usd)
+                ),
+                ordered AS (
+                    SELECT n."Id", lag(n."Id") OVER (PARTITION BY n."UserId" ORDER BY n."SnapshotDate", n."TakenAt") AS prev_id
+                    FROM net_worth_snapshots n
+                ),
+                correction AS (
+                    SELECT d."Id", d.inzhur_invested_usd, d.inzhur_cash_usd, d.removed_invested_usd, d.removed_cash_usd
+                    FROM direct_correction d
+                    UNION ALL
+                    SELECT o."Id", c.inzhur_invested_usd, c.inzhur_cash_usd, c.removed_invested_usd, c.removed_cash_usd
+                    FROM correction c
+                    JOIN ordered o ON o.prev_id = c."Id"
+                    JOIN net_worth_snapshots p ON p."Id" = c."Id"
+                    JOIN net_worth_snapshots s ON s."Id" = o."Id"
+                    WHERE coalesce(s.stale_sleeves, '') LIKE '%brokerage%'
+                      AND s."BrokerageTotal" = p."BrokerageTotal"
+                      AND s."BrokerageTotal" >= c.removed_invested_usd + c.removed_cash_usd
+                      AND (s.brokerage_invested IS NULL OR s.brokerage_invested >= c.removed_invested_usd)
                 ),
                 backed_up AS (
                     INSERT INTO net_worth_snapshots_backup_inzhur_2026_10 (
