@@ -1,8 +1,11 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {CmnDrawerService} from '@lifekit-hq/ui';
+import {of} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
+import {AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
 import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertsComponent} from './alerts.component';
@@ -12,7 +15,7 @@ const UNREAD_COUNT = 3;
 const PAGE_SIZE = 20;
 const TOTAL_COUNT = 45;
 
-type Segmented = HTMLElement & {options: {label: string; value: string}[]; value: string};
+const drawerOpen = vi.fn();
 
 function render(
   filter: AlertFilter = 'all',
@@ -41,7 +44,11 @@ function render(
     dismiss: vi.fn(),
   };
   TestBed.configureTestingModule({
-    providers: [provideRouter([]), {provide: AlertsStore, useValue: store}],
+    providers: [
+      provideRouter([]),
+      {provide: AlertsStore, useValue: store},
+      {provide: CmnDrawerService, useValue: {open: drawerOpen}},
+    ],
   });
   const fixture = TestBed.createComponent(AlertsComponent);
   fixture.detectChanges();
@@ -49,39 +56,59 @@ function render(
   return {fixture, el, store, component: fixture.componentInstance};
 }
 
-function change(control: Element | null | undefined, value: string) {
-  control?.dispatchEvent(new CustomEvent('lk-segmented-change', {detail: {value}}));
-}
+describe('AlertsComponent filter flow', () => {
+  beforeEach(() => drawerOpen.mockReset());
 
-describe('AlertsComponent single-choice controls', () => {
-  it('offers the filters in order with the unread count in its label', () => {
-    const {el} = render('all', UNREAD_COUNT);
-    const control = el.querySelector<Segmented>('lk-segmented[label="Filter alerts"]');
+  it('shows no applied filter and no badge count for the unfiltered list', () => {
+    const {el, component} = render('all', UNREAD_COUNT);
 
-    expect(control?.options).toEqual([
-      {value: 'all', label: 'All'},
-      {value: 'unread', label: `Unread (${UNREAD_COUNT})`},
-      {value: 'error', label: 'Errors'},
-      {value: 'warning', label: 'Warnings'},
-      {value: 'info', label: 'Info'},
-    ]);
-    expect(control?.value).toBe('all');
+    expect(component.activeFilterCount()).toBe(0);
+    expect(el.querySelector('[data-testid="alerts-applied-filters"]')).toBeNull();
+    expect(el.querySelector('lk-segmented[label="Filter alerts"]')).toBeNull();
   });
 
-  it('labels the unread filter plainly when nothing is unread', () => {
-    const {el} = render();
+  it('counts the filter and shows it as a dismissible chip with Clear', () => {
+    const {el, component} = render('warning');
 
-    expect(
-      el.querySelector<Segmented>('lk-segmented')?.options.find(o => o.value === 'unread')?.label
-    ).toBe('Unread');
+    expect(component.activeFilterCount()).toBe(1);
+    expect(el.querySelector('[data-testid="alerts-chip-filter"]')?.getAttribute('label')).toBe(
+      'Warnings'
+    );
+    expect(el.querySelector('[data-testid="alerts-filter-clear"]')).not.toBeNull();
   });
 
-  it('sets the filter through the store when the control changes', () => {
-    const {el, store} = render();
+  it('opens the filter sheet with the current filter and applies the chosen one', () => {
+    drawerOpen.mockReturnValue({afterClosed: () => of('unread')});
+    const {component, store} = render('error');
 
-    change(el.querySelector('lk-segmented[label="Filter alerts"]'), 'warning');
+    component.openFilters();
 
-    expect(store.setFilter).toHaveBeenCalledWith('warning');
+    expect(drawerOpen).toHaveBeenCalledWith(
+      AlertFilterSheetComponent,
+      expect.objectContaining({data: 'error'})
+    );
+    expect(store.setFilter).toHaveBeenCalledWith('unread');
+  });
+
+  it('leaves the filter alone when the sheet is dismissed', () => {
+    drawerOpen.mockReturnValue({afterClosed: () => of(undefined)});
+    const {component, store} = render('error');
+
+    component.openFilters();
+
+    expect(store.setFilter).not.toHaveBeenCalled();
+  });
+
+  it('clears the filter from the chip and from Clear', () => {
+    const {el, store} = render('info');
+
+    (el.querySelector('[data-testid="alerts-filter-clear"] button') as HTMLButtonElement).click();
+    el.querySelector('[data-testid="alerts-chip-filter"]')?.dispatchEvent(
+      new CustomEvent('lk-dismissible-chip-remove')
+    );
+
+    expect(store.setFilter).toHaveBeenCalledTimes(2);
+    expect(store.setFilter).toHaveBeenCalledWith('all');
   });
 
   it('converts the chosen page size back to a number', () => {

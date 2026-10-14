@@ -79,7 +79,7 @@ const FILTER_SHEET_WIDTH = '420px';
   templateUrl: './transaction-ledger.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block h-full'},
+  host: {class: 'block min-h-full md:h-full'},
   providers: [TransactionLedgerStore],
 })
 export class TransactionLedgerComponent {

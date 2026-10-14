@@ -49,7 +49,7 @@ const DRAWER_WIDTH = '480px';
   ],
   templateUrl: './flow-breakdown.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block h-full'},
+  host: {class: 'block min-h-full md:h-full'},
   providers: [FlowBreakdownStore],
 })
 export class FlowBreakdownComponent {

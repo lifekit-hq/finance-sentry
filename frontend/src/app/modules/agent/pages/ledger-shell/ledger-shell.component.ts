@@ -9,7 +9,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
   selector: 'fns-ledger-shell',
   imports: [RouterOutlet, TabGroupComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'flex h-full flex-col'},
+  host: {class: 'flex min-h-full flex-col md:h-full'},
   template: `
     <cmn-tab-group [tabs]="tabs" ariaLabel="Ledger view" class="shrink-0 px-cmn-4 md:px-cmn-8" />
     <router-outlet />

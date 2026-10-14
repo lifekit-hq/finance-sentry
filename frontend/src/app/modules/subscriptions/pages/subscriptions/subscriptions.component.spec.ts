@@ -104,14 +104,14 @@ describe('SubscriptionsComponent', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('sorts through the store when the sort control changes', () => {
+  it('sorts through the store when a sort menu item is chosen', () => {
     TestBed.configureTestingModule({});
     const component = TestBed.runInInjectionContext(() =>
       Object.create(SubscriptionsComponent.prototype)
     ) as SubscriptionsComponent;
     const setSort = vi.spyOn(component, 'setSort').mockImplementation(() => undefined);
 
-    component.onSortChange(new CustomEvent('lk-segmented-change', {detail: {value: 'amount'}}));
+    component.onSortSelect('amount');
 
     expect(setSort).toHaveBeenCalledWith('amount');
   });

@@ -2,6 +2,7 @@ import {ChangeDetectionStrategy, Component, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {Title} from '@angular/platform-browser';
 import {provideRouter, Router} from '@angular/router';
+import {AppUpdateService} from '@lifekit-hq/core/pwa';
 import {CmnShellService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
@@ -28,6 +29,7 @@ describe('AppTitleStrategy', () => {
   const setup = (): Router => {
     TestBed.configureTestingModule({
       providers: [
+        {provide: AppUpdateService, useValue: {updateReady: signal(false), reload: vi.fn()}},
         provideRouter([
           {
             path: '',
