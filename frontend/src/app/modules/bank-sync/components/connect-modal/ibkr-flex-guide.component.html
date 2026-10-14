@@ -45,14 +45,27 @@
     <p class="font-semibold">2. Create the report</p>
     <p>
       Next to <strong>Activity Flex Query</strong> press <strong>+</strong>. Name it
-      <em>Finance Sentry</em>. In <strong>Sections</strong> tick exactly these five, and in each one
-      press <strong>Select All</strong> so every field is included:
+      <em>Finance Sentry</em>. In <strong>Sections</strong> tick these five, and in each one press
+      <strong>Select All</strong> so every field is included:
     </p>
     <ul class="flex flex-wrap gap-cmn-2">
       @for (section of sections; track section) {
         <li class="rounded-cmn-md bg-cmn-surface-raised px-cmn-3 py-cmn-1">{{ section }}</li>
       }
     </ul>
+    <p>
+      In <strong>Cash Transactions</strong> also tick every type option shown at the top of the
+      section, including <strong>{{ depositsOption }}</strong
+      >. Without it your deposits and withdrawals never reach Finance Sentry.
+    </p>
+    <p>
+      Recommended: also tick
+      @for (section of recommendedSections; track section) {
+        <strong>{{ section }}</strong>
+      }
+      with <strong>Select All</strong> fields. It is not read yet, and adding it now means no
+      reconnect later.
+    </p>
     <p>
       Then scroll to <strong>Delivery Configuration</strong> and set the following. These make the
       report readable by Finance Sentry.
