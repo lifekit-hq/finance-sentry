@@ -2,6 +2,7 @@ namespace FinanceSentry.Tests.Unit.BankSync.Application.Commands;
 
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Commands;
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -66,7 +67,7 @@ public class FinalizeTrueLayerConnectCommandTests
 
         var sut = new FinalizeTrueLayerConnectCommandHandler(
             client.Object, connections.Object, encryption.Object, accounts.Object,
-            syncService.Object, configuration.Object, logger.Object);
+            syncService.Object, Mock.Of<IBankConnectionHealth>(), configuration.Object, logger.Object);
 
         return new Harness(sut, client, connections, accounts, syncService, connection);
     }
