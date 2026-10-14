@@ -55,6 +55,32 @@ public class TransactionCategorizerTests
         Categorize("Amazon installment 3 of 12").Should().Be(CategoryKeys.GeneralMerchandise);
     }
 
+    // ── Rung 5: the MCC map is direction-aware for transfers ─────────────────────
+
+    [Fact]
+    public void MccTransfer_Credit_IsTransferIn()
+    {
+        // Monobank incoming «Від: …» transfer: MCC 4829, credit, positive amount.
+        Categorize("Від: Іван Петренко", mcc: 4829, transactionType: "credit", amount: 2000m)
+            .Should().Be(CategoryKeys.TransferIn);
+    }
+
+    [Theory]
+    [InlineData("Переказ на картку")]
+    [InlineData("Від: Іван Петренко")]
+    public void MccTransfer_Debit_StaysTransferOut(string description)
+    {
+        Categorize(description, mcc: 4829, transactionType: "debit")
+            .Should().Be(CategoryKeys.TransferOut);
+    }
+
+    [Fact]
+    public void MccTransfer_LegacyNullType_StaysTransferOut()
+    {
+        Categorize("Переказ на картку", mcc: 4829, transactionType: null)
+            .Should().Be(CategoryKeys.TransferOut);
+    }
+
     // ── Rung 2: loan / installment repayments ────────────────────────────────────
 
     [Fact]
@@ -89,7 +115,7 @@ public class TransactionCategorizerTests
     {
         // An installment refund is money coming in; the rule is about outflow.
         Categorize("Платіж ТОВ Алло - monomarket", mcc: 4829, transactionType: "credit")
-            .Should().Be(CategoryKeys.TransferOut);
+            .Should().Be(CategoryKeys.TransferIn);
     }
 
     // ── Rung 3: the provider's own classification ────────────────────────────────

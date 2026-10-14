@@ -48,8 +48,16 @@ public sealed class TransactionCategorizer(ICategoryResolver categoryResolver) :
                 signals.Amount, signals.Mcc, activeInstallmentPlans)
             ?? Claimed(_categoryResolver.ResolveCanonicalKey(signals.ProviderCategory))
             ?? TransferDescriptionClassifier.Resolve(signals.Description)
-            ?? Claimed(_categoryResolver.ResolveMcc(signals.Mcc));
+            ?? DirectionAware(Claimed(_categoryResolver.ResolveMcc(signals.Mcc)), signals.TransactionType);
     }
+
+    // The MCC map is direction-blind: Monobank books incoming «Від: …» transfers under the
+    // wire-transfer MCC 4829 as credits, which the map would store as TRANSFER_OUT.
+    private static string? DirectionAware(string? categoryKey, string? transactionType) =>
+        categoryKey == CategoryKeys.TransferOut
+        && string.Equals(transactionType, "credit", StringComparison.OrdinalIgnoreCase)
+            ? CategoryKeys.TransferIn
+            : categoryKey;
 
     private static string? Claimed(string categoryKey) =>
         categoryKey == CategoryKeys.Uncategorized ? null : categoryKey;
