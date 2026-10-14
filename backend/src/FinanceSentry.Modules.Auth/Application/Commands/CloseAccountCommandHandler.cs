@@ -78,23 +78,13 @@ public class CloseAccountCommandHandler(
         return ToDto(closure);
     }
 
-    // A failure in one module is recorded and the rest still run, so the provider keys each module holds go even if
-    // another module's cleanup fails.
+    // A revoker reports a failed provider revoke in its outcome and throws only for a local failure, which aborts the
+    // closure before it commits so the person stays signed in and can retry.
     private async Task<Dictionary<string, CredentialRevocation>> RevokeCredentialsAsync(Guid userId, CancellationToken ct)
     {
         var outcomes = new Dictionary<string, CredentialRevocation>(StringComparer.Ordinal);
         foreach (var revoker in credentialRevokers)
-        {
-            try
-            {
-                outcomes[revoker.Module] = await revoker.RevokeAsync(userId, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Revoking {Module} credentials for closed account {UserId} failed", revoker.Module, userId);
-                outcomes[revoker.Module] = new CredentialRevocation(0, [$"{ex.GetType().Name}: {ex.Message}"]);
-            }
-        }
+            outcomes[revoker.Module] = await revoker.RevokeAsync(userId, ct);
 
         return outcomes;
     }

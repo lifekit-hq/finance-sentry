@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Integration.Auth;
 using System.Net;
 using System.Net.Http.Json;
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Auth.Application.Interfaces;
 using FinanceSentry.Modules.Auth.Domain.Entities;
 using FinanceSentry.Modules.Auth.Infrastructure.Jobs;
@@ -10,7 +11,6 @@ using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Xunit;
 
@@ -152,10 +152,10 @@ public sealed class AccountClosureTests : IAsyncLifetime
     [DockerRequiredFact]
     public async Task AFailedStepBeforeTheCommit_LeavesTheAccountSignedInWithNoClosure_AndTheRetrySucceeds()
     {
-        var serviceTokens = new FailingServiceTokens { Fail = true };
+        var revoker = new FailingCredentialRevoker { Fail = true };
         await using var factory = new PostgresApiFactory(
             _database!.ConnectionString,
-            services => services.Replace(ServiceDescriptor.Scoped<IMcpServiceTokenStore>(_ => serviceTokens)));
+            services => services.AddScoped<IUserCredentialRevoker>(_ => revoker));
         factory.CreateClient().Dispose();
 
         var owner = Guid.NewGuid();
@@ -172,7 +172,7 @@ public sealed class AccountClosureTests : IAsyncLifetime
         (await memberClient.GetAsync("/api/v1/account/closure")).StatusCode
             .Should().Be(HttpStatusCode.OK, "the person can still call the API and try again");
 
-        serviceTokens.Fail = false;
+        revoker.Fail = false;
         (await memberClient.PostAsJsonAsync("/api/v1/account/close", new { confirmEmail = $"{member}@test.local" }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -214,21 +214,14 @@ public sealed class AccountClosureTests : IAsyncLifetime
         return (long)(await cmd.ExecuteScalarAsync())!;
     }
 
-    private sealed class FailingServiceTokens : IMcpServiceTokenStore
+    private sealed class FailingCredentialRevoker : IUserCredentialRevoker
     {
         public bool Fail { get; set; }
 
-        public Task AddAsync(McpServiceToken token, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public string Module => "failing";
 
-        public Task<bool> IsActiveAsync(Guid jti, CancellationToken cancellationToken = default) => Task.FromResult(false);
-
-        public Task<bool> RevokeAsync(Guid jti, CancellationToken cancellationToken = default) => Task.FromResult(false);
-
-        public Task<int> RevokeAllAsync(string userId, CancellationToken cancellationToken = default) =>
-            Fail ? throw new InvalidOperationException("service token store unavailable") : Task.FromResult(0);
-
-        public Task<IReadOnlyList<McpServiceToken>> ListAsync(string userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<McpServiceToken>>([]);
+        public Task<CredentialRevocation> RevokeAsync(Guid userId, CancellationToken ct = default) =>
+            Fail ? throw new InvalidOperationException("credential store unavailable") : Task.FromResult(CredentialRevocation.Of(0));
     }
 
     private sealed record OptionsShape(bool CanClose, string? Reason, int GraceDays);
