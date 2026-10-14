@@ -463,7 +463,9 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   admin keeps the last word on a wording); the loan/installment rule above; the provider's own
   category (a bank calling "To Go Sushi" *Restaurants* beats the directional prefix below);
   the directional-transfer / savings-jar description (which outranks the MCC map because
-  Monobank tags jar operations with the charity MCC 8398); then the MCC map. A rung resolving
+  Monobank tags jar operations with the charity MCC 8398); then the MCC map, which is
+  direction-blind, so a `credit` it resolves to `TRANSFER_OUT` is re-keyed `TRANSFER_IN`
+  (Monobank books incoming «Від: …» transfers under MCC 4829 as credits). A rung resolving
   to `UNCATEGORIZED` has not claimed the row, so the ladder continues past it; when no rung
   claims it the result is null, which keeps a backfilled row eligible for a provider re-fetch.
   Before the ladder was shared, the three paths disagreed: the backfill re-buried savings jars
