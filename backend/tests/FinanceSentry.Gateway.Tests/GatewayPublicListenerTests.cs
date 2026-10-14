@@ -24,7 +24,7 @@ public sealed class GatewayPublicListenerTests(GatewayPublicListenerTests.Public
     private const string ClosedUpstream = "http://127.0.0.1:9/";
     private const string CatchAll = "{**catch-all}";
 
-    private static readonly string[] PublicRoutes = ["auth-route", "api-route", "frontend-route"];
+    private static readonly string[] PublicRoutes = ["auth-session-me-route", "auth-session-methods-route", "auth-session-oidc-start-route", "auth-route", "api-route", "frontend-route"];
 
     [Fact]
     public void AllowList_IsExactlyTheAppAndTheApi()
