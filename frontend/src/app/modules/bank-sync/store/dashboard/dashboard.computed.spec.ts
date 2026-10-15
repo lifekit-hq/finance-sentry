@@ -5,6 +5,7 @@ import {TestBed} from '@angular/core/testing';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {type Headline, type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {
   type CategoryStat,
   type DashboardData,
@@ -42,6 +43,10 @@ interface Fixture {
   scopeChanges?: NetWorthScopeChangeDto[];
   cashUsd?: number | null;
   investedUsd?: number | null;
+  netWorthHeadline?: MaybeHeadline;
+  cashHeadline?: MaybeHeadline;
+  investedHeadline?: MaybeHeadline;
+  changeHeadline?: MaybeHeadline;
 }
 
 function build(
@@ -56,6 +61,10 @@ function build(
     scopeChanges = [],
     cashUsd,
     investedUsd,
+    netWorthHeadline,
+    cashHeadline,
+    investedHeadline,
+    changeHeadline,
   }: Fixture,
   historyRange: HistoryRange = '3m'
 ) {
@@ -71,6 +80,9 @@ function build(
     baseCurrency,
     cashUsd,
     investedUsd,
+    netWorthHeadline,
+    cashHeadline,
+    investedHeadline,
   } as unknown as DashboardData;
 
   return {
@@ -81,6 +93,7 @@ function build(
     historyError: signal<string | null>(null),
     scrubIndex: signal<number | null>(scrubIndex),
     historyScopeChanges: signal<NetWorthScopeChangeDto[]>(scopeChanges),
+    historyChangeHeadline: signal<MaybeHeadline>(changeHeadline),
   };
 }
 
@@ -919,5 +932,136 @@ describe('dashboardComputed', () => {
         color: '#636a6d',
       });
     });
+  });
+});
+
+describe('dashboardComputed headline quality', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({toFake: ['Date']});
+    vi.setSystemTime(NOW);
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withXhr()),
+        provideHttpClientTesting(),
+        provideApiBaseUrl('http://localhost/api/v1'),
+      ],
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const headline = (overrides: Partial<Headline> = {}): Headline => ({
+    amount: 1000,
+    percent: null,
+    method: 'VALUE',
+    scope: 'umbrella',
+    window: {to: '2026-08-12'},
+    quality: 'COMPLETE',
+    reasons: [],
+    currency: 'USD',
+    ...overrides,
+  });
+  const unavailable = (code: string): Headline =>
+    headline({amount: null, quality: 'UNAVAILABLE', reasons: [{code}]});
+  const compute = (fixture: Fixture) =>
+    TestBed.runInInjectionContext(() => dashboardComputed(build(fixture)));
+
+  it('carries the API record on the hero figure unchanged', () => {
+    const h = headline({quality: 'ESTIMATED', reasons: [{code: 'FX_TODAY_RATE'}]});
+    const c = compute({monthlyFlow: [], totalNetWorthUsd: 1000, netWorthHeadline: h});
+
+    expect(c.netWorthHeadline()).toBe(h);
+  });
+
+  it('adds the latest snapshot stale sleeves as STALE_SOURCE when the record omits them', () => {
+    const c = compute({
+      monthlyFlow: [],
+      totalNetWorthUsd: 1000,
+      netWorthHeadline: headline(),
+      netWorthHistory: [{...snapshot(900, 0, 100), staleSleeves: 'crypto'}],
+    });
+
+    expect(c.netWorthHeadline()).toMatchObject({
+      quality: 'DEGRADED',
+      reasons: [{code: 'STALE_SOURCE', source: 'crypto'}],
+    });
+  });
+
+  it('builds a degraded record around the amount on an older API build', () => {
+    const c = compute({
+      monthlyFlow: [],
+      totalNetWorthUsd: 1000,
+      netWorthHistory: [{...snapshot(900, 0, 100), staleSleeves: 'crypto'}],
+    });
+
+    expect(c.netWorthHeadline()).toMatchObject({amount: 1000, quality: 'DEGRADED'});
+  });
+
+  it('has no record, and so no badge, when the API sent none and nothing is stale', () => {
+    expect(compute({monthlyFlow: [], totalNetWorthUsd: 1000}).netWorthHeadline()).toBeNull();
+  });
+
+  it('reads N/A, never 0, for an unavailable hero figure', () => {
+    const c = compute({
+      monthlyFlow: [],
+      totalNetWorthUsd: 0,
+      netWorthHeadline: unavailable('NOT_MEASURABLE'),
+    });
+
+    expect(c.totalBalanceFormatted()).toBe('N/A');
+  });
+
+  it('drops the record, and keeps the scrubbed figure, while scrubbing', () => {
+    const c = compute({
+      monthlyFlow: [],
+      totalNetWorthUsd: 0,
+      netWorthHeadline: unavailable('NOT_MEASURABLE'),
+      netWorthHistory: [snapshot(100, 0, 0), snapshot(200, 0, 0)],
+      scrubIndex: 1,
+    });
+
+    expect(c.netWorthHeadline()).toBeNull();
+    expect(c.totalBalanceFormatted()).not.toBe('N/A');
+  });
+
+  it('combines the cash and invested records on the split line', () => {
+    const c = compute({
+      monthlyFlow: [],
+      cashUsd: 100,
+      investedUsd: 900,
+      cashHeadline: headline({amount: 100}),
+      investedHeadline: headline({
+        amount: 900,
+        quality: 'DEGRADED',
+        reasons: [{code: 'STALE_SOURCE', source: 'brokerage'}],
+      }),
+    });
+
+    expect(c.bookSplitHeadline()).toMatchObject({quality: 'DEGRADED', amount: 1000});
+    expect(c.bookSplitUnavailable()).toBe(false);
+  });
+
+  it('marks the split unavailable when it is withheld', () => {
+    const c = compute({
+      monthlyFlow: [],
+      cashUsd: null,
+      investedUsd: null,
+      cashHeadline: unavailable('NO_SPLIT'),
+      investedHeadline: unavailable('NO_SPLIT'),
+    });
+
+    expect(c.bookSplitUnavailable()).toBe(true);
+    expect(c.bookSplitFormatted()).toBeNull();
+  });
+
+  it('marks the change unavailable only when the record says so and there is no change', () => {
+    const withheld = compute({monthlyFlow: [], changeHeadline: unavailable('SHORT_HISTORY')});
+    const measured = compute({
+      monthlyFlow: [],
+      changeHeadline: unavailable('SHORT_HISTORY'),
+      netWorthHistory: [snapshot(100, 0, 0), {...snapshot(200, 0, 0), snapshotDate: '2026-08-01'}],
+    });
+
+    expect(withheld.netWorthChangeUnavailable()).toBe(true);
+    expect(measured.netWorthChangeUnavailable()).toBe(false);
   });
 });

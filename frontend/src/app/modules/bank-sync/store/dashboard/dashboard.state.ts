@@ -1,3 +1,4 @@
+import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {DEFAULT_HISTORY_RANGE} from '../../constants/dashboard/dashboard.constants';
 import {
   type DashboardData,
@@ -15,6 +16,8 @@ export interface DashboardState {
   historyHasHistory: boolean;
   /** Accounts linked or removed inside the loaded window; hides the change percentage. */
   historyScopeChanges: NetWorthScopeChangeDto[];
+  /** The loaded window's change as a typed record; null when the API build predates it. */
+  historyChangeHeadline: MaybeHeadline;
   historyLoading: boolean;
   historyError: string | null;
   /** Index into the drawn history while a pointer scrubs the hero chart; null at rest. */
@@ -28,6 +31,7 @@ export const initialDashboardState: DashboardState = {
   historyRange: DEFAULT_HISTORY_RANGE,
   historyHasHistory: false,
   historyScopeChanges: [],
+  historyChangeHeadline: null,
   historyLoading: false,
   historyError: null,
   scrubIndex: null,

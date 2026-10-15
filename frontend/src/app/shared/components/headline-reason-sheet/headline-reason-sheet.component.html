@@ -1,0 +1,33 @@
+<div class="space-y-cmn-4 p-cmn-4 md:p-cmn-6" data-testid="headline-reason-sheet">
+  <p class="text-cmn-sm text-text-primary" data-testid="headline-reason-summary">{{ summary }}</p>
+
+  @if (reasons.length > 0) {
+    <ul class="space-y-cmn-3" data-testid="headline-reasons">
+      @for (reason of reasons; track reason.code + (reason.sourceLabel ?? '')) {
+        <li [attr.data-reason-code]="reason.code" class="text-cmn-sm text-text-secondary">
+          @if (reason.sourceLabel) {
+            <span class="block text-cmn-xs font-medium text-text-primary">{{
+              reason.sourceLabel
+            }}</span>
+          }
+          {{ reason.text }}
+        </li>
+      }
+    </ul>
+  }
+
+  <dl class="space-y-cmn-1 text-cmn-xs text-text-secondary">
+    @if (headline.asOf) {
+      <div class="flex justify-between gap-cmn-3" data-testid="headline-as-of">
+        <dt>As of</dt>
+        <dd>{{ headline.asOf | date: 'medium' }}</dd>
+      </div>
+    }
+    @if (coverage) {
+      <div class="flex justify-between gap-cmn-3" data-testid="headline-coverage">
+        <dt>Coverage</dt>
+        <dd>{{ coverage }}</dd>
+      </div>
+    }
+  </dl>
+</div>

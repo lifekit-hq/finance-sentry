@@ -29,6 +29,7 @@ import {
 } from '@lifekit-hq/ui';
 import {map, take} from 'rxjs';
 
+import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
@@ -69,6 +70,7 @@ const SKELETON_ROWS = 5;
     DecimalPipe,
     DisclosureRowComponent,
     EmptyStateComponent,
+    HeadlineBadgeComponent,
     IconComponent,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,

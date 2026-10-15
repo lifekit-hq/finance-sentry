@@ -1,3 +1,5 @@
+import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
+
 export type HistoryRange = '1w' | 'mtd' | '1m' | '3m' | 'ytd' | '1y' | 'all';
 
 export interface NetWorthSnapshotDto {
@@ -40,6 +42,8 @@ export interface NetWorthHistoryResponse {
   hasHistory: boolean;
   /** Absent from older API builds; treat as none. */
   scopeChanges?: NetWorthScopeChangeDto[];
+  /** The window's change as a typed record: quality, reasons, and the withheld percent's why. */
+  changeHeadline?: MaybeHeadline;
 }
 
 export interface MonthlyFlow {
@@ -89,4 +93,12 @@ export interface DashboardData {
    * card debt, so it can be negative. Null when the book was not read in full. */
   cashUsd?: Nullable<number>;
   investedUsd?: Nullable<number>;
+  /**
+   * The same figures as typed records (finance-framework §3.6): the net worth, and the cash and
+   * invested split lines. Absent from older API builds; their `quality` and `reasons` drive the
+   * badge on each figure.
+   */
+  netWorthHeadline?: MaybeHeadline;
+  cashHeadline?: MaybeHeadline;
+  investedHeadline?: MaybeHeadline;
 }

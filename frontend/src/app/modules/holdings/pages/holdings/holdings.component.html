@@ -2,7 +2,7 @@
   <cmn-async-state
     [status]="positionsStatus()"
     [errorMessage]="store.errorMessage()"
-    [isEmpty]="store.positionsByAssetClass().length === 0"
+    [isEmpty]="store.isEmpty()"
   >
     <cmn-card skeleton padding="none">
       <div class="divide-y divide-border-default" data-testid="holdings-skeleton">
@@ -40,9 +40,23 @@
           <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
             Total position value
           </p>
-          <p class="mt-cmn-1 text-cmn-2xl font-bold tabular-nums text-text-primary">
-            {{ store.totalPositionsValue() | money }}
-          </p>
+          <div class="mt-cmn-1 flex items-center gap-cmn-2">
+            <p
+              class="text-cmn-2xl font-bold tabular-nums text-text-primary"
+              data-testid="holdings-total-value"
+            >
+              @if (store.isTotalUnavailable()) {
+                N/A
+              } @else {
+                {{ store.totalPositionsValue() | money }}
+              }
+            </p>
+            <fns-headline-badge
+              [headline]="store.totalHeadline()"
+              label="Total position value"
+              data-testid="holdings-total-quality"
+            />
+          </div>
           <p class="mt-cmn-1 text-cmn-sm text-text-secondary">
             {{ store.positions().length }} position{{
               store.positions().length !== 1 ? 's' : ''

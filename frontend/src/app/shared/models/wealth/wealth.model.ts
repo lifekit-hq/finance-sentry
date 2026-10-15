@@ -1,4 +1,5 @@
 import {type AccountIdentity} from '../account-identity/account-identity.model';
+import {type MaybeHeadline} from '../headline/headline.model';
 
 export type AccountCategory = 'banking' | 'crypto' | 'brokerage' | 'other';
 
@@ -79,6 +80,8 @@ export interface WealthSummaryResponse {
   baseCurrency: string;
   categories: CategorySummary[];
   appliedFilters: AppliedFilters;
+  /** `totalNetWorth` as a typed record (finance-framework §3.6); absent from older API builds. */
+  headline?: MaybeHeadline;
 }
 
 /** A single row in the net-worth-by-category breakdown shown on the accounts hero. */

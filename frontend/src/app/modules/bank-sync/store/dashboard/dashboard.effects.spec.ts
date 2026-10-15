@@ -22,6 +22,7 @@ function buildStore() {
     setHistoryError: vi.fn(),
     setHistoryHasHistory: vi.fn(),
     setHistoryScopeChanges: vi.fn(),
+    setHistoryChangeHeadline: vi.fn(),
     load: vi.fn(),
     loadNetWorthHistory: vi.fn(),
     historyRange: signal<HistoryRange>('1m'),

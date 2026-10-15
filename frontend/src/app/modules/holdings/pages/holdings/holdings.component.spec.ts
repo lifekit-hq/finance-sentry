@@ -6,6 +6,7 @@ import {provideRouter, Router} from '@angular/router';
 import {DonutChartComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
 import {type Position} from '../../models/position/position.model';
 import {type AllocationBreakdownRow, type PositionAssetGroup} from '../../store/holdings.computed';
@@ -61,6 +62,9 @@ describe('InvestmentsComponent — positions view', () => {
     positions: ReturnType<typeof signal<Position[]>>;
     positionsByAssetClass: ReturnType<typeof signal<PositionAssetGroup[]>>;
     totalPositionsValue: ReturnType<typeof signal<number>>;
+    totalHeadline: ReturnType<typeof signal<Nullable<Headline>>>;
+    isTotalUnavailable: ReturnType<typeof signal<boolean>>;
+    isEmpty: ReturnType<typeof signal<boolean>>;
     allocationSegments: ReturnType<typeof signal<never[]>>;
     allocationBreakdown: ReturnType<typeof signal<AllocationBreakdownRow[]>>;
   };
@@ -100,6 +104,9 @@ describe('InvestmentsComponent — positions view', () => {
       ]),
       positionsByAssetClass: signal<PositionAssetGroup[]>([EQUITY_GROUP, CRYPTO_GROUP]),
       totalPositionsValue: signal(150),
+      totalHeadline: signal<Nullable<Headline>>(null),
+      isTotalUnavailable: signal(false),
+      isEmpty: signal(false),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
         {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},
@@ -219,6 +226,7 @@ describe('InvestmentsComponent — positions view', () => {
 
   it('shows an empty state when there are no positions', () => {
     mockStore.positionsByAssetClass.set([]);
+    mockStore.isEmpty.set(true);
 
     const fixture = TestBed.createComponent(InvestmentsComponent);
     fixture.detectChanges();
@@ -229,6 +237,7 @@ describe('InvestmentsComponent — positions view', () => {
 
   it('says the import is pending instead of the connect prompt while IBKR positions import', () => {
     mockStore.positionsByAssetClass.set([]);
+    mockStore.isEmpty.set(true);
     mockConnectStore.importPending.set(true);
 
     const fixture = TestBed.createComponent(InvestmentsComponent);

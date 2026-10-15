@@ -5,6 +5,7 @@ import {ActivatedRoute, provideRouter, Router} from '@angular/router';
 import {CmnDialogService} from '@lifekit-hq/ui';
 import {of} from 'rxjs';
 
+import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {
   type AccountBalanceItem,
   type Institution,
@@ -35,6 +36,8 @@ function setupFixture(
     errorMessage?: string;
     hasData?: boolean;
     load?: () => void;
+    totalNetWorth?: number;
+    headline?: Headline;
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -45,7 +48,9 @@ function setupFixture(
     summary: signal(state.hasData ? {} : null),
     lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
-    totalNetWorth: signal(0),
+    totalNetWorth: signal(state.totalNetWorth ?? 0),
+    netWorthHeadline: signal(state.headline ?? null),
+    isNetWorthUnavailable: signal(state.headline?.quality === 'UNAVAILABLE'),
     netWorthBreakdown: signal([]),
     baseCurrency: signal('USD'),
     categorySections: signal([
@@ -124,6 +129,51 @@ describe('AccountsListComponent sync status text', () => {
     const text = setup(false).textContent ?? '';
     expect(text).toContain('0 accounts');
     expect(text).not.toContain('0 accounts · Sync failed');
+  });
+});
+
+describe('AccountsListComponent net worth quality', () => {
+  const headline = (overrides: Partial<Headline>): Headline => ({
+    amount: 1000,
+    percent: null,
+    method: 'VALUE',
+    scope: 'umbrella',
+    window: {to: '2026-10-15'},
+    quality: 'COMPLETE',
+    reasons: [],
+    currency: 'USD',
+    ...overrides,
+  });
+  const header = (state: Parameters<typeof setupFixture>[3]): HTMLElement =>
+    setupFixture(false, {}, [], {hasData: true, ...state}).nativeElement as HTMLElement;
+
+  it('shows no badge for a complete total', () => {
+    const el = header({totalNetWorth: 1000, headline: headline({})});
+    expect(el.querySelector('[data-testid="headline-badge"]')).toBeNull();
+  });
+
+  it('badges a stale total', () => {
+    const el = header({
+      totalNetWorth: 1000,
+      headline: headline({
+        quality: 'DEGRADED',
+        reasons: [{code: 'STALE_SOURCE', source: 'banking'}],
+      }),
+    });
+    expect(el.querySelector('[data-testid="headline-badge"]')?.textContent?.trim()).toBe('Stale');
+  });
+
+  it('reads N/A with its badge, and keeps the card, when the total is withheld', () => {
+    const el = header({
+      totalNetWorth: 0,
+      headline: headline({
+        amount: null,
+        quality: 'UNAVAILABLE',
+        reasons: [{code: 'NOT_MEASURABLE'}],
+      }),
+    });
+    expect(el.querySelector('[data-testid="accounts-net-worth"]')?.textContent?.trim()).toBe('N/A');
+    expect(el.querySelector('[data-badge="unavailable"]')).not.toBeNull();
   });
 });
 

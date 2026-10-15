@@ -14,6 +14,7 @@ import {
   SkeletonComponent,
 } from '@lifekit-hq/ui';
 
+import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
@@ -37,6 +38,7 @@ const SKELETON_ROWS = 4;
     CmnColumnComponent,
     DataTableComponent,
     DecimalPipe,
+    HeadlineBadgeComponent,
     MoneyPipe,
     NgTemplateOutlet,
     RouterLink,

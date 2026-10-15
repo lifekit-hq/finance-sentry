@@ -1,5 +1,6 @@
 import {patchState, type WritableStateSource} from '@ngrx/signals';
 
+import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {
   type DashboardData,
   type HistoryRange,
@@ -33,6 +34,9 @@ export function dashboardMethods(store: WritableStateSource<DashboardState>) {
     },
     setHistoryScopeChanges(scopeChanges: NetWorthScopeChangeDto[]): void {
       patchState(store, {historyScopeChanges: scopeChanges});
+    },
+    setHistoryChangeHeadline(historyChangeHeadline: MaybeHeadline): void {
+      patchState(store, {historyChangeHeadline});
     },
   };
 }
