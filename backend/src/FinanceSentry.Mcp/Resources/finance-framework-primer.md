@@ -39,9 +39,9 @@ beats the benchmark, and judges every recommendation against the person's own st
 - **M9 Benchmark-relative**: book TWR minus the benchmark over the identical window.
 - **M10 Projection**: a savings path plus one shared, disclosed return assumption, shown as a range.
 
-Several are not wired yet (finance-framework §6 Known gaps). In particular `get_book_performance`'s book
-side is M1 on invested brokerage value, a change that includes deposits, despite its `Twr` field names
-(G1); its `holdingsBasedReturn` is the deposit-free price return. Never call a value change a return.
+Several are not wired yet (finance-framework §6 Known gaps). `get_book_performance`'s `bookTwr` is M3 on the
+cash-inclusive brokerage and `delta` is M9; its `book` headline is M1 on invested value, a change that includes
+deposits, and `holdingsBasedReturn` is the deposit-free price return. Never call a value change a return.
 
 ## The headline contract (finance-framework §3.6)
 

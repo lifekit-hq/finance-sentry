@@ -29,6 +29,7 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
+import {BrokerageGrowthComponent} from '../../components/brokerage-growth/brokerage-growth.component';
 import {type AssetClass} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 
@@ -39,6 +40,7 @@ const SKELETON_ROWS = 4;
   imports: [
     AssetLogoPipe,
     AsyncStateComponent,
+    BrokerageGrowthComponent,
     CardComponent,
     CmnCellDirective,
     CmnColumnComponent,

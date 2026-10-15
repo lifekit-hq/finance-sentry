@@ -8,7 +8,9 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {ConnectStore} from '../../../bank-sync/store/connect/connect.store';
+import {BrokerageGrowthComponent} from '../../components/brokerage-growth/brokerage-growth.component';
 import {type Position} from '../../models/position/position.model';
+import {BrokerageGrowthStore} from '../../store/brokerage-growth/brokerage-growth.store';
 import {type AllocationBreakdownRow, type PositionAssetGroup} from '../../store/holdings.computed';
 import {HoldingsStore} from '../../store/holdings.store';
 import {InvestmentsComponent} from './holdings.component';
@@ -133,6 +135,16 @@ describe('InvestmentsComponent — positions view', () => {
             {
               provide: ConnectStore,
               useValue: mockConnectStore,
+            },
+          ],
+        },
+      })
+      .overrideComponent(BrokerageGrowthComponent, {
+        set: {
+          providers: [
+            {
+              provide: BrokerageGrowthStore,
+              useValue: {status: signal('success'), hasHistory: signal(false)},
             },
           ],
         },
@@ -284,6 +296,18 @@ describe('InvestmentsComponent — positions view', () => {
       queryParams: {provider: null},
       queryParamsHandling: 'merge',
     });
+  });
+
+  it('shows the brokerage growth section on the whole book only', () => {
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('fns-brokerage-growth')).not.toBeNull();
+
+    mockStore.providerFilter.set('ibkr');
+    fixture.detectChanges();
+
+    expect(root.querySelector('fns-brokerage-growth')).toBeNull();
   });
 
   it('says so when the provider filter matches no positions', () => {

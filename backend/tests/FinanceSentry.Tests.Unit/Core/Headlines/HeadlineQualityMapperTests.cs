@@ -287,4 +287,51 @@ public class HeadlineQualityMapperTests
         merged.BackfilledEstimate.Should().BeTrue();
         merged.Fx.Should().Be(FxStatus.Unknown1To1);
     }
+
+    // Row: UnknownFlowSources -> UNKNOWN_FLOW per source; a growth figure cannot be split, so it is UNAVAILABLE.
+    [Fact]
+    public void UnknownFlowSources_MakeAGrowthFigureUnavailable_WithOneUnknownFlowPerSource()
+    {
+        var signals = HeadlineSignals.None with { UnknownFlowSources = ["inzhur", "ibkr"] };
+
+        var headline = HeadlineFactory.Growth(
+            110m, MeasuredRate.Of(0.1m), HeadlineScope.Sleeve("brokerage"), Today.AddDays(-30), Today, signals);
+
+        headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Amount.Should().BeNull();
+        headline.Percent.Should().BeNull();
+        headline.BasisStatus.Should().Be(BasisStatus.Missing);
+        headline.Reasons.Should().Equal(
+            new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"),
+            new HeadlineReason(HeadlineReasonCode.UnknownFlow, "inzhur"));
+    }
+
+    // Row: UnknownFlowSources on a figure that still has an amount -> ESTIMATED.
+    [Fact]
+    public void UnknownFlowSources_OnAnAvailableFigure_AreEstimated()
+    {
+        var assessment = HeadlineQualityMapper.Assess(
+            HeadlineSignals.None with { UnknownFlowSources = ["ibkr"] }, amountAvailable: true);
+
+        assessment.Quality.Should().Be(HeadlineQuality.Estimated);
+        assessment.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"));
+    }
+
+    // Row: ScopeChanged (bridged) -> COMPLETE + SCOPE_CHANGED, informative.
+    [Fact]
+    public void ScopeChanged_IsInformative_OnABridgedGrowthFigure()
+    {
+        var signals = HeadlineSignals.None with { ScopeChanged = true };
+
+        var headline = HeadlineFactory.Growth(
+            110m, MeasuredRate.Of(0.1m), HeadlineScope.Sleeve("brokerage"), Today.AddDays(-30), Today, signals);
+
+        headline.Quality.Should().Be(HeadlineQuality.Complete);
+        headline.Amount.Should().Be(110m);
+        headline.Percent.Should().Be(10m);
+        headline.Method.Should().Be(HeadlineMethod.ModifiedDietz);
+        headline.Basis.Should().Be(HeadlineBasis.AverageCapital);
+        headline.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
+    }
 }
+

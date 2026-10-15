@@ -26,11 +26,12 @@ rule or shape agreed but not implemented), **missing**.
 
 | Id | Decision | What it fixes |
 |---|---|---|
-| C3 | The book headline is the **cash-inclusive brokerage**, with "invested only" shown beneath. The benchmark is **SPY**. | Scope of the book figure and of M3/M9. Today the Book vs SPY figure is invested-only (gap G1). |
+| C3 | The book headline is the **cash-inclusive brokerage**, with "invested only" shown beneath. The benchmark is **SPY**. | Scope of the book figure and of M3/M9. Book vs SPY's TWR and the contributions vs growth split run on the cash-inclusive brokerage (C2(a)); the `book` value-change headline stays invested-only. |
 | C4 | **Compute in USD; show returns in the person's base currency**, using dated rates for flows and values. | Currency of M3–M5. Flows convert at the flow date's rate, positions at the valuation date's rate (§3.2 rule 5). |
 | C5 | The net-worth headline is the **total**, with "of which liquid" beneath. No toggle. | §5.3 totals; presentation pattern P10. |
 | C7(i) | **Designs only** from AGPL/GPL projects; **code only** from permissively licensed ones, with attribution. | What may be ported. AGPL/GPL code is never copied; AGPL designs are paraphrased. |
 | C8 | **One shared, disclosed projection assumption set**, shown in words next to every projection, as a **range**. | M10; presentation pattern P5. Today's two projections use two sets (gap G7). |
+| C2(a) | **Contributions vs growth for IBKR and Inzhur now, showing both MWR and TWR** (2026-10-15): "Contributed / Growth" with a Modified Dietz return on the Investments tab, and Book vs SPY as a time-weighted return. MWR only was declined. | M2 and M4 on the brokerage sleeve (§3.4); M3 and M9 on Book vs SPY (G1 closed). Internal moves are not flows; dividends and interest count as growth unless withdrawn. |
 | C9 | **Per-holding checks first**, each threshold cited from a public source. No portfolio-level score. | Presentation pattern P7; the per-holding screen of #824. |
 
 ### Open
@@ -39,7 +40,7 @@ rule or shape agreed but not implemented), **missing**.
 |---|---|---|
 | C6 | **Steam: whether and how to link.** | **Undecided.** Research comes first (report §5.5, the F1 list); no linking decision is made. The treatment in §5.5 below is the *valuation* rule for when it is decided, not a commitment to link. |
 | C1 | IBKR prerequisite steps: enabling Deposits & Withdrawals (and optionally Change in NAV) in the Flex query, and the one-off backfill. | Open, with the provider-data decisions. Without it no IBKR external flow arrives (gap G6). |
-| C2 | Contributions vs growth: (a) IBKR and Inzhur flows now and whether to show both MWR and TWR; (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. | Open, with the provider-data decisions. |
+| C2 | Contributions vs growth: (b) crypto flows now or later; (c) moving `ibkr-flex` out of shadow alerting. (a) is decided above. | Open, with the provider-data decisions. |
 | C7(ii) | Whether the public repository, unlicensed today, gets a license, and which. | Open; the captain's call. Without a license, default copyright applies. |
 
 ---
@@ -98,10 +99,11 @@ Three rules keep the layers apart:
 | 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (sums the registered `IWealthSource`s: banking, brokerage, crypto) | Sum of every registered source's figure in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | the `changeHeadline` badge (P9); the percentage itself is still not gated | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
-| 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain.** Beside it, since R1(b), the flow-neutral **holdings-based return** (`holdingsBasedReturn`) against SPY's price return (`spyPriceReturn`, close) | null when history misses the edge tolerance; the holdings-based figure carries a typed reason instead of a number | M1 (not M3), M9 | **G1** |
+| 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | Since C2(a): daily-chained TWR on the cash-inclusive brokerage total with the brokers' deposits and withdrawals taken out and provider links bridged (`ScopeLinks`); SPY's adjusted-close return over the same dates, `delta` = the difference. The `book` headline stays the change in invested value. Beside it, since R1(b), the flow-neutral **holdings-based return** (`holdingsBasedReturn`) against SPY's price return (`spyPriceReturn`, close) | null when history misses the edge tolerance; `bookTwrReasons` (`UNKNOWN_FLOW` while a provider has no deposits on record, `SCOPE_CHANGED` on a link); the holdings-based figure carries a typed reason instead of a number | M3, M9; `book` is M1 | none (G1 closed) |
 | 5 | Book drawdown | `BookDrawdownCalculator` | Flow-neutral chained index from holdings snapshots, with split detection | null under two captures | M8 | none: the pattern to reuse |
 | 6 | Position returns | `PositionReturnCalculator` | Average-cost walk: unrealized, realized, dividends net of withholding, currency effect | `Coverage` = complete / partial / unavailable | M6 | the vocabulary is local (G5) |
 | 7 | 12-month projection tile | `dashboard.computed.ts` | Median monthly savings × 12, no market return | hidden under three complete months | M10 | G7 |
+| 4b | Contributed vs growth (Investments tab, `GET /wealth/brokerage/growth`) | `GetBrokerageGrowthQuery` | growth = end − start − newly linked − net deposits on the cash-inclusive brokerage total since the value series starts; Modified Dietz on the same window | UNAVAILABLE with `UNKNOWN_FLOW` while a provider has no deposits on record; `SCOPE_CHANGED` on a link | M2, M4 | IBKR flows wait on C1 |
 | 8 | FIRE projection | `FireCalculator`; money-semantics §11 | Target = 12 × median outflow ÷ withdrawal rate (default 4%); 5% real return, compounding | `HasStaleSleeves`, `InsufficientHistory` | M10 | G7 |
 | 9 | Historical FX | `CachingHistoricalExchangeRateService` | `ConvertToUsdAsync` returns a `ConvertResult`: the published rate for the date (`EXACT`), the closest earlier published day (`NEAREST_PUBLISHED`), else today's rate (`TODAY_RATE`, or `SEED_TABLE` / `UNKNOWN_1TO1` when today's rate is itself the seed or absent) | `FxStatus` on the result (R4); the log line stays | valuation step 5 | G2 (closed for the live total) |
 
@@ -166,7 +168,7 @@ Two things already right and kept:
 | **Net contributions** | External inflows minus external outflows over a window. | — |
 | **Growth** | Value change minus net contributions: the investment result in money. | — |
 | **Return (%)** | Always stated with its method: TWR, MWR (XIRR or Modified Dietz), gain vs cost, or holding-period return (HPR). | GIPS 1.A.35, 2.A.24, 2.A.29 |
-| **Change in value** | End value minus start value, with no adjustment for flows. Includes deposits. This is what "Invested change" and the Book vs SPY figure are today. It is **not a return**. | — |
+| **Change in value** | End value minus start value, with no adjustment for flows. Includes deposits. This is what "Invested change" and the `book` headline of `get_book_performance` are today. It is **not a return**. | — |
 | **Cost basis** | What was paid for what is still held, by average cost (as `PositionReturnCalculator` does). | standard |
 | **Base currency** | The person's display currency. Compute stays in USD today. | `CurrencyConverter.ResolveBase`; C4 |
 | **As-of** | The timestamp of the *oldest* input in a figure: a figure is only as fresh as its stalest part. | this framework |
@@ -231,15 +233,15 @@ bridge yet.
 
 | Id | Measure | The question it answers | Method | Standard | Test oracle | Today |
 |---|---|---|---|---|---|---|
-| M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the Book vs SPY book side. Engine: `ValueChange`, not wired |
-| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | engine: `ContributionsAndGrowth`, not wired; no investment flows feed it yet (G6) |
-| M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | engine: `TimeWeightedReturn`, not wired; **no figure is a TWR yet** (the "TWR" names in code are not one; G1) |
-| M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | engine: `MoneyWeightedReturn` (XIRR ported from ExcelFinancialFunctions), not wired |
+| M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the `book` headline of `get_book_performance`. Engine: `ValueChange`, not wired |
+| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | the brokerage sleeve's "Contributed vs growth" (`GetBrokerageGrowthQuery`, flows from `BrokerageFlowReader`); no crypto flows feed it yet (G6) |
+| M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | Book vs SPY's `bookTwr` (brokerage sleeve, cash-inclusive, `BookPerformanceService`) |
+| M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | Modified Dietz on the brokerage sleeve's "Contributed vs growth"; XIRR (ported from ExcelFinancialFunctions) not wired |
 | M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
 | M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | drawdown only |
-| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY compares a value change with SPY's adjusted close (G1). Engine: `ExcessReturn`, not wired |
+| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY's `delta` (`ExcessReturn`: book TWR − SPY adjusted-close return over the book's own dates) |
 | M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration | — | tile + FIRE, two assumption sets (G7) |
 
 Choices the engine fixes once, so they stop being re-decided:
@@ -279,7 +281,7 @@ Golden fixtures live in `backend/tests/FinanceSentry.Tests.Unit/Core/Measures/`:
 holds the report's ten (R5) and `CryptoFlowGoldenFixtureTests` the crypto-flow fixtures 11-20. Each expected
 value comes from a hand calculation or LibreOffice Calc's XIRR on the same flows, cited beside its
 assertion, never from running the engine. The headline record (3.6) takes M1's amount, percent and failure
-for the figures that are changes (net-worth history's window change, the book side of `get_book_performance`);
+for the figures that are changes (net-worth history's window change, the `book` headline of `get_book_performance`);
 the gain-vs-cost headlines describe the unrealized P&L the readers already sum (value minus cost of the
 positions whose cost is known), not M6's event walk, which no reader feeds yet.
 
@@ -299,7 +301,7 @@ positions whose cost is known), not M6's event walk, which no reader feeds yet.
 | M3 TWR | (11,000 ÷ 10,000) × (19,800 ÷ 21,000) − 1 = 1.10 × 0.942857 − 1 | **+3.71%** |
 | M4 Modified Dietz | −200 ÷ (10,000 + 0.5 × 10,000) | **−1.33%** |
 | M4 XIRR | solve 10,000·y² + 10,000·y = 19,800 with y = (1 + x)^0.5 | **−1.33%** a year |
-| Today's Book vs SPY book side | (19,800 − 10,000) ÷ 10,000 | **+98%**: a value change, not a TWR |
+| Book vs SPY's book side before C2(a) | (19,800 − 10,000) ÷ 10,000 | **+98%**: a value change, not a TWR (it now reads the M3 +3.71%) |
 
 TWR and MWR differ because twice as much money was invested during the losing half as during the winning
 half. TWR ignores that, so it is the number to compare with SPY; MWR is the honest answer to "what did my
@@ -352,7 +354,8 @@ reason (`NOT_MEASURABLE` when nothing else explains it). It is an additive field
 | Net-worth history | `changeHeadline` | first to last point of the window, M1 (`SCOPE_CHANGED` from R3 withholds the percent; a window with one point is UNAVAILABLE with `SHORT_HISTORY`, not a zero change) |
 | `get_portfolio_snapshot` | `headlines` (`totalValue`, `investedValue`, `cash`, `unrealizedPnl`) | the book totals; `unrealizedPnl` is `GAIN_VS_COST` with `basisStatus` and `coverage` |
 | `get_net_worth_history` | `headline` per point | each day's total |
-| `get_book_performance` | `book` per period | the book side, M1 over `invested_brokerage` (`SHORT_HISTORY` or `ZERO_BASE` when there is no percent) |
+| `get_book_performance` | `book` per period | the change in invested value, M1 over `invested_brokerage` (`SHORT_HISTORY`, `ZERO_BASE` or `SCOPE_CHANGED` when there is no percent); the TWR's own reasons are in `bookTwrReasons` |
+| Brokerage growth (`GET /wealth/brokerage/growth`) | `headline` | M2's growth with the Modified Dietz percent, scope `sleeve:brokerage` (`UNKNOWN_FLOW` naming each provider with no deposits on record, `SCOPE_CHANGED` on a link) |
 | `get_allocation_vs_target` | `totalHeadline` | the total the drift weights are taken over |
 
 **Reasons are typed codes.** They become words through the frontend's existing registry pattern
@@ -377,16 +380,16 @@ Every row above except FIRE is mapped in `HeadlineQualityMapper` (tests: `Headli
 A live total's stale source is a sleeve whose read failed (`BookFigures.StaleSources`), a provider past its
 freshness window, or an institution whose sync status is stale, failed or needs re-authorisation. The
 `(new)` codes have their quality fixed (ESTIMATED for `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`,
-`PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`) but no source raises
-them until flows (G6) and the source registry (R8) land.
+`PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`). `UNKNOWN_FLOW` is raised by
+the brokerage growth headline and Book vs SPY's TWR (C2(a)); the others wait on crypto flows (G6) and the source
+registry (R8).
 
 **Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
 the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
 recommendation or per flow rather than a book total or return (`get_benchmark_track_record`,
 `get_thesis_performance`, `get_track_record`, postmortems, `get_cashflow_report`, budgets, the family
 clearing statement) and per-row figures (positions, accounts, tax lots); a net-worth change headline on
-`get_net_worth_history` (the tool returns a bare list); scope-change detection on the book side of
-`get_book_performance` (it always measures with no scope change); the holdings-based return on
+`get_net_worth_history` (the tool returns a bare list); the holdings-based return on
 `get_book_performance` (`holdingsBasedReturn`; the method label for a chained, dividend-excluded holdings price
 return is the next PR's choice); and dated-rate display conversion.
 **P9 (done)** renders `quality` as a badge on the dashboard hero, the cash / invested split line and the change
@@ -469,7 +472,7 @@ A source declares which facets it can supply; the engine computes only the measu
 | Identity | source id, economy kind, native unit(s) | yes | — | provider name strings |
 | Holdings | asset, quantity, native unit, exit price, price time, price source | yes | value, M1, M7 | `BankingAccountSummary`, `BrokerageHoldingSummary`, `CryptoHoldingSummary` |
 | Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource` |
-| Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | a landing table for IBKR and Inzhur with no reader; none for crypto (G6) |
+| Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | IBKR and Inzhur cash rows read by `BrokerageFlowReader`; none for crypto (G6) |
 | Income and costs | dividends, interest, rewards, fees, taxes | no | bridge lines, M6 | dividend and withholding rows read by `PositionReturnCalculator` |
 | History | past snapshots, or a way to rebuild them | no | windows longer than the link's age | daily snapshots; the banking backfill (#584) |
 | Cost basis | average cost per open position | no | M6 | nullable `CostBasisUsd` |
@@ -575,8 +578,8 @@ For every position, apply five steps in order:
 | Source | Kind | Holdings | Flows | Reliability | Convertibility | Status |
 |---|---|---|---|---|---|---|
 | Monobank; TrueLayer-connected banks | Bank | balances | bank transactions (money-semantics §4–5); "external" needs the counterparty rules | L1 | CASH | built; wrap as a source |
-| IBKR | Brokerage | positions + cash | landing table exists; the "Deposits & Withdrawals" type is not in the Flex query (C1) | L1 | CASH | flows not ingested (G6) |
-| Inzhur | Fund | units (`InzhurHoldingsMapper`) | deposits land in the same table | L2 (published unit price) | CASH or LOCKED, **not verified** (redemption terms) | wrap; check redemption terms |
+| IBKR | Brokerage | positions + cash | read by `BrokerageFlowReader`; the "Deposits & Withdrawals" type is not in the Flex query yet (C1) | L1 | CASH | deposits arrive once C1 is done |
+| Inzhur | Fund | units (`InzhurHoldingsMapper`) | deposits land in the same table, read by `BrokerageFlowReader` | L2 (published unit price) | CASH or LOCKED, **not verified** (redemption terms) | wrap; check redemption terms |
 | Binance, Revolut X | CryptoVenue | balances, venue fiat | not ingested | L1 for liquid pairs | CASH; LOCKED for lock-up products | fiat flows buildable; on-chain flows need research |
 | Self-custody wallets | ChainWallet | — | — | — | — | not built; needs research |
 | Steam | Marketplace | wallet + inventory | wallet top-ups, market sales: unverified | L1–L3 per item | IN_ECONOMY; LOCKED under a trade hold | **undecided (C6)** |
@@ -804,7 +807,7 @@ connection ActionRequired and raises the reconnect alert; any success clears the
 
 Each gap names the measure or rule it breaks. The report (§6, §5.7) holds the evidence.
 
-**G1. "Book vs SPY" is a change in invested value, not a time-weighted return.**
+**G1. "Book vs SPY" is a change in invested value, not a time-weighted return.** *Closed (C2(a), 2026-10-15): `bookTwr` is now a TWR on the cash-inclusive brokerage total, against SPY over the same dates (money-semantics §10). The history below is kept as the record.*
 The book side of `get_book_performance` and the weekly brief is last ÷ first − 1 over the invested
 brokerage value (M1, not M3). Deposits and withdrawals are not adjusted for, so a contribution reads as a
 gain: with the §3.5 example it reads +98% where TWR is +3.7%. Two further distortions come from scope: the
@@ -824,7 +827,10 @@ return" vs "S&P 500 price return". It is on the invested brokerage positions (th
 cash); the cash-inclusive scope (C3) and the position ledger's dividends are not in it. A missing price,
 too few captures or an uncovered window yield a typed reason, never 0. A position sold inside the window is
 carried at its earlier value for the step that sold it, so that step understates the position's move. Semantics:
-money-semantics §10. Later step: a true TWR once dated external flows land (G6, R1(c)).
+money-semantics §10. *C2(a) done:* `bookTwr` is a daily-chained TWR on the cash-inclusive brokerage total with the
+brokers' deposits and withdrawals taken out, so the `Twr` names are now true; SPY's adjusted close runs over the
+book's own dates (`bookTwrFrom` / `bookTwrTo`), and dividends paid into cash are inside the scope, so it is total
+against total. Until IBKR reports deposits (C1) it is an estimate (`UNKNOWN_FLOW`, "(est.)" in the brief).
 
 **G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status is stored since R8 PR 2 and returned per source in history since PR 3.*
 `CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
@@ -853,11 +859,10 @@ total or a return now carry the typed record beside these (§3.6), so MCP reads 
 fields stay for current consumers. The FIRE flag, the briefs and the per-thesis and flow tools are not yet
 covered (§3.6, "Not yet carrying the record").
 
-**G6. Investment flows land but nothing reads them.**
-IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"`; only income types are read.
-No IBKR deposits or withdrawals arrive, because the Flex query does not include that type (C1). Crypto
-venues store no flows. Without flows, M2–M5 cannot be computed for any investment scope, so G1 cannot be
-fixed properly either.
+**G6. Investment flows land but nothing reads them.** *Partly closed (C2(a)): `BrokerageFlowReader` reads IBKR and Inzhur deposits, withdrawals, income, fees and taxes at each row's dated rate, feeding M2-M4 and Book vs SPY. Open: IBKR deposits still need C1; crypto flows (C2(b)).*
+IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"` and `BrokerageFlowReader`
+classifies them. No IBKR deposits or withdrawals arrive, because the Flex query does not include that type
+(C1). Crypto venues store no flows, so M2–M5 cannot be computed for a crypto scope.
 
 **G7. Two projections use two different assumptions.**
 The 12-month tile is median monthly savings × 12 with no market return; the FIRE projection compounds a 5%

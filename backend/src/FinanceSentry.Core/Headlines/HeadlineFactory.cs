@@ -90,6 +90,29 @@ public static class HeadlineFactory
     }
 
     /// <summary>
+    /// M2's growth over a window, with M4 as its percent: the value change less net contributions (and less any
+    /// newly linked value), over the average capital Modified Dietz weighs (<paramref name="dietz"/>, never
+    /// annualised), so the amount and the percent share one numerator. A source whose flows are not recorded
+    /// (<see cref="HeadlineSignals.UnknownFlowSources"/>) makes the figure unavailable: its deposits would read
+    /// as growth. A missing window is <see cref="HeadlineReasonCode.ShortHistory"/>.
+    /// </summary>
+    public static Headline Growth(
+        decimal? growthUsd, MeasuredRate dietz, string scope, DateOnly from, DateOnly to,
+        HeadlineSignals signals, DateTimeOffset? asOf = null)
+    {
+        var amount = signals.UnknownFlowSources.Count > 0 ? null : growthUsd;
+        MeasureFailure? failure = amount is null
+            ? growthUsd is null ? MeasureFailure.MissingValue : null
+            : dietz.Failure;
+
+        var assessment = HeadlineQualityMapper.Assess(signals, amount is not null, failure);
+        return new Headline(
+            amount, amount is null ? null : ToPercent(dietz.Value), HeadlineMethod.ModifiedDietz,
+            HeadlineBasis.AverageCapital, scope, new HeadlineWindow(from, to), assessment.Quality,
+            amount is null ? BasisStatus.Missing : BasisStatus.Complete, null, assessment.Reasons, asOf, Usd);
+    }
+
+    /// <summary>
     /// <paramref name="headline"/> shown in <paramref name="baseCurrency"/> at today's rate. A window reaching
     /// before <paramref name="today"/> is converted at a rate that is not its own day's, so it gains
     /// <see cref="HeadlineReasonCode.FxTodayRate"/> (a headline figure is not dated-rate converted; the net-worth

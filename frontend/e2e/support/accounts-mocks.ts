@@ -134,9 +134,40 @@ export const CRYPTO_HOLDINGS_FULL = {
   totalUsdValue: 3200,
 };
 
-/** The accounts page and the investments tab read the wealth summary and both holdings feeds. */
+/** The investments tab's contributions-vs-growth split, from the day the value history starts. */
+export const BROKERAGE_GROWTH = {
+  seriesStart: '2026-06-30',
+  from: '2026-06-30',
+  to: '2026-09-14',
+  startValue: 31200,
+  endValue: 38500,
+  contributed: 4000,
+  newlyLinked: 0,
+  growth: 3300,
+  income: 120,
+  fees: 8,
+  taxes: 18,
+  moneyWeightedReturn: 0.0994,
+  sourcesWithoutFlows: [],
+  headline: {
+    amount: 3300,
+    percent: 9.94,
+    method: 'MODIFIED_DIETZ',
+    scope: 'sleeve:brokerage',
+    window: {from: '2026-06-30', to: '2026-09-14'},
+    quality: 'COMPLETE',
+    reasons: [],
+    currency: 'USD',
+  },
+  currency: 'USD',
+};
+
+/**
+ * The accounts page and the investments tab read the wealth summary and both holdings feeds;
+ * the investments tab also reads the brokerage growth split. */
 export async function mockAccounts(page: Page): Promise<void> {
   await mockGet(page, 'wealth/summary', WEALTH_SUMMARY_FULL);
   await mockGet(page, 'brokerage/holdings', BROKERAGE_HOLDINGS);
   await mockGet(page, 'crypto/holdings', CRYPTO_HOLDINGS_FULL);
+  await mockGet(page, 'wealth/brokerage/growth', BROKERAGE_GROWTH);
 }

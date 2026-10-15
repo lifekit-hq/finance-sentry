@@ -16,12 +16,13 @@ export const HEADLINE_REASON_MESSAGES: ErrorMessagesMap = {
     'A currency has no exchange rate yet, so its amounts were counted one-to-one. The total may be off.',
   NO_SPLIT: 'The cash and invested split could not be measured for this period.',
   SCOPE_CHANGED:
-    'Accounts were added or removed during this period, so a percentage would not mean much. The amount is still correct.',
+    'Accounts were connected or removed during this period. Their value on arrival is not counted as growth, and a percentage is left out where it would mislead.',
   SHORT_HISTORY: 'There is not enough history yet to measure this period.',
   ZERO_BASE: 'The starting value was zero, so there is no percentage to show.',
   NEGATIVE_BASE: 'The starting value was negative, so a percentage of it would be misleading.',
   NOT_MEASURABLE: 'This figure could not be measured from the data available.',
-  UNKNOWN_FLOW: 'Some money movements in this period could not be classified.',
+  UNKNOWN_FLOW:
+    'A connected account has not reported its deposits and withdrawals, or a day’s value is missing, so money paid in could read as gain.',
   UNMATCHED_TRANSFER: 'A transfer between your accounts has no matching entry on the other side.',
   NON_CASH_INCLUDED: 'Items that are not cash are counted in this cash figure.',
   PRICE_CARRIED_FORWARD: 'A price from an earlier day is used where today’s is missing.',

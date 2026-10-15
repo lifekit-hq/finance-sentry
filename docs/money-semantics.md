@@ -10,7 +10,8 @@ This document records what each existing number means today; a PR that changes m
 both, or says in its description why the framework doc is untouched.
 
 Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
-2026-10-15; headline records (§8, §10) added 2026-10-15.
+2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
+2026-10-15.
 
 ---
 
@@ -948,6 +949,35 @@ are closed periods.
   already-deactivated account reads as a removal - because credentials record no deactivation time;
   per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
   `CreatedAt` is re-stamped). The **Invested change** line is unaffected.
+- **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Investments tab's
+  "Contributed vs growth" section; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
+  broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
+  the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
+  `from`, which is `seriesStart` unless a provider linked on that first close moves it to the next close (§10);
+  the card names `from`, and says the history starts that day only when `from` equals `seriesStart`.
+  - **Flows.** `IBrokerageFlowReader` reads the cash rows the brokers report (`BrokerageCashTransactions`)
+    and classifies them per provider by type, never by sign alone (`BrokerageFlowClassifier`): deposits and
+    withdrawals are external flows; dividends, interest, bonuses, fees and taxes are return (income, fee,
+    tax) and so count as growth; Inzhur's dividend or distribution *payment* (income paid out of the account)
+    and its *bonus withdrawal* (a bonus is growth until it is withdrawn) are withdrawals. Trades and currency conversions move money inside the scope and are not flows; an unknown
+    type is left out, not guessed. Each row converts to USD at **its own date's rate**
+    (`IHistoricalExchangeRateService`, §3) - today's rate would read a currency move as growth; a row converted
+    at a fallback rate marks the figure `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1`. Rows on or before a provider's
+    link day are history its linked value already holds and are skipped.
+  - **Split.** `growth = end - start - newlyLinked - contributed`, where `contributed` is deposits less
+    withdrawals and `newlyLinked` is the value a provider brought when it was linked inside the window (the
+    stretch §10 bridges; neither paid in nor earned). `income`, `fees` and `taxes` break the growth down; the
+    remainder is market movement. `moneyWeightedReturn` is Modified Dietz over the window (a deposit counts
+    from the start of its day; not annualised), carried in the headline record (`MODIFIED_DIETZ`, scope
+    `sleeve:brokerage`, percent in percentage points).
+  - **No contributions recorded yet.** While a linked provider has never reported a deposit or withdrawal
+    (`sourcesWithoutFlows`; IBKR until the Flex Query includes *Deposits & Withdrawals* and the backfill runs),
+    every one of its deposits would read as growth, so the split is withheld: `contributed`, `growth` and the
+    return are null (never 0), the start and end values stay, and the headline is UNAVAILABLE with
+    `UNKNOWN_FLOW` naming each provider. The section says "No contributions recorded yet for <provider>".
+  - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
+    base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
+    The rates are untouched.
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,
@@ -1015,6 +1045,14 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
   reconstructed day, not the rate on that day.
 - Revolut X fills quoted in a non-USD fiat are converted at the current FX rate, not the
   fill-date rate (§1 "Crypto venues").
+- Brokerage TWR and contributions vs growth (§8, §10): the market move on a provider's link day is lost
+  into the "newly linked" line (one or two days, bridged as capital). A relinked IBKR / Flex credential
+  re-stamps its link day, so its rows up to the relink are treated as history the linked value held. A
+  credential re-entered inside the window can therefore count deposits made between the first link and the
+  relink as growth, and the headline does not flag this yet. A removed
+  provider is not seen (connections record no deactivation time); its value leaving reads as a loss unless a
+  withdrawal was recorded. Inzhur's link day is its credential's `CreatedAt` (Inzhur credentials have no
+  active flag).
 - A Revolut X fill landing in the sub-second gap between the sync's walk cut-off and its
   balance read is seen by the balance first, so the ledger books it as unpriced quantity and
   that holding's cost basis stays null until the position is next closed.
@@ -1075,47 +1113,52 @@ return percentages, not money, but they sit next to cost basis, so their rules a
 
 ### Book vs SPY (weekly brief "Book vs SPY", MCP `get_book_performance`)
 
-- **What the figure is.** The book side is the **change in invested value, which includes deposits** -
-  not a time-weighted or money-weighted return. SPY's side is the change in its adjusted close (which
-  includes dividends). The brief labels the book figure "Book value change (incl. deposits)" and the MCP tool
-  describes it the same way. The types and fields (`PeriodTwr`, `BookTwr`, `SpyTwr`) and the tool name keep
-  their `Twr` names for contract stability; the names are misleading and
-  [finance-framework.md](finance-framework.md) (known gaps) lists them.
-
-- **Invested brokerage only.** The book return is measured on `net_worth_snapshots.brokerage_invested`
-  (the brokerage sleeve without idle broker cash, §8), not on `brokerage_total`. SPY holds no cash, so
-  comparing a return that includes cash with it would be apples to oranges. Crypto, banking and venue
-  fiat are not in the series.
-- **Days with no split are skipped.** A snapshot whose `brokerage_invested` is null (a row from before the
-  split, or one the split could not be measured for) is left out of the series - never counted as zero and
-  never replaced by the cash-inclusive total. The window opens on the first split day at or after its start
-  and closes on the latest split day. SPY's window runs from the period's start to today, so the two must
-  cover the same span. Both ends of the book window are held to one tolerance,
-  `clamp(round(periodDays × 0.1), 1, 7)` days (`periodDays` = today minus the period's start; 1W → 1,
-  1M → 3, 3M and 1Y → 7): when the first split day is later than that after the period's start (split
-  history is backfilled 180 days, so 1Y reads unavailable until it reaches back that far), or the latest
-  split day is earlier than that before today, the book side is unavailable rather than compared over a
-  shorter window. With fewer than two split days, a zero opening value, or a first or last split day
-  outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
-  SPY and the holdings-based figure below are missing too), as it already is with too little history. The brief shows it as `Book value change (incl. deposits) N/A`.
-- **Headline record.** Each period also carries `Book`, the same book side as a typed headline record
-  (finance-framework §3.6): `VALUE_CHANGE` over `START_VALUE` on scope `invested_brokerage`, from the window's
-  first to last split day. Its `amount` is the dollar change and its `percent` is `bookTwr` in percentage
-  points. Where `bookTwr` is null it says why: no measurable window (fewer than two split days, an edge outside
-  the tolerance) is UNAVAILABLE with `NO_SPLIT` when the period has snapshot days whose cash/invested split was
-  not measured (the portfolio value port keeps those days, marked by a null invested value, and the calculation
-  still ignores them) and with `SHORT_HISTORY` otherwise; a zero opening value keeps the dollar change and
-  withholds the percent with `ZERO_BASE`. The two end rows' brokerage source staleness (per-source rows, or `StaleSleeves` before them), `IsApproximate`
-  and `fx_status` become its quality and reasons. No scope change is detected on this series, so the record
-  never carries `SCOPE_CHANGED`. The holdings-based return below carries no headline record yet.
-- **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
-  contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
-  loss. A purchase made from idle broker cash (which the series excludes) reads as a gain too, with no deposit
-  at all. It is a holding-period change in value, not a time-weighted or money-weighted return, and the
-  `outperform` / `underperform` verdict inherits that. Fictional example: 10,000 grows to 11,000, a 10,000
-  deposit makes it 21,000, and it ends at 19,800; this figure reads +98%, while the time-weighted return is
-  +3.7%. A true TWR needs dated external flows (not ingested yet) and the cash-inclusive scope; see
-  [finance-framework.md](finance-framework.md), measure M3 and gap G1.
+- **What the figure is (C2, decided 2026-10-15).** `bookTwr` is the brokerage sleeve's **time-weighted
+  return** (finance-framework M3): the daily snapshot closes chained, each sub-period's return taken with the
+  deposits and withdrawals the brokers report (§8 *Brokerage contributions vs growth*) taken out, so a
+  contribution is not a gain. `spyTwr` is SPY's adjusted-close (total) return over the **same dates**
+  (`bookTwrFrom` to `bookTwrTo`, the last bar on or before each, M9), so `delta` and the `outperform` /
+  `underperform` verdict compare like with like. The brief labels it "Book TWR". The fictional example from
+  before the fix: 10,000 grows to 11,000, a 10,000 deposit makes it 21,000, it ends at 19,800 - the old figure
+  read +98%, this one reads +3.7%. The money-weighted split of the same sleeve is on the Investments tab (§8).
+- **Cash-inclusive scope.** The TWR runs on `net_worth_snapshots.brokerage_total` (IBKR + Inzhur, idle
+  broker cash included), not on `brokerage_invested`. A purchase from idle cash moves value inside the scope,
+  so it is not a gain, and a deposit is a flow at the scope's edge, so it can be taken out. This deviates from
+  the earlier "SPY holds no cash" choice deliberately: an invested-only series reads every purchase from cash
+  as a gain with no flow to take out. Idle cash does dilute the book's return against SPY; that is a real
+  allocation cost, not a measurement error. Crypto, banking and venue fiat are not in the series.
+- **Window.** The closes inside the period, from the first one that holds value (a scope that held nothing
+  has no base) to the latest. Both ends are held to the edge tolerance below; outside it, or with fewer than
+  two closes, `bookTwr`, `delta` and `verdict` are null and `spyTwr` falls back to the first bar on or after
+  the period's start (the brief shows `Book TWR N/A`).
+- **Provider links are bridged, not read as return.** The day a provider was linked (its earliest active
+  connection's `CreatedAt`, UTC) is seen by the close after it and maybe its own close (the snapshot runs at
+  01:00 UTC), so the stretch from the last close before the link to the first close after it becomes one
+  sub-period with a zero return whose whole change, less its recorded flows, is capital (`ScopeLinks`). A
+  link on the window's first close moves the opening past it; on the last close it moves the closing before
+  it. `bookTwrReasons` then carries `SCOPE_CHANGED` (informative: the measure handled it).
+- **A close of zero is a failed read unless a withdrawal explains it.** A brokerage total of 0 after a valued
+  close with no recorded withdrawal in between is dropped as a missing valuation, not chained as a total loss,
+  and the figure carries `UNKNOWN_FLOW` (an estimate). So does value that appears from an empty scope with no
+  recorded flow.
+- **A provider with no deposits on record makes it an estimate.** While a linked provider has never reported
+  a deposit or withdrawal (IBKR until the Flex Query includes *Deposits & Withdrawals* and the backfill runs),
+  its contributions stay inside the chain as return. The figure is still shown, with `UNKNOWN_FLOW` naming the
+  provider in `bookTwrReasons`, and the brief appends "(est.)". The other end-row flags (stale source,
+  reconstructed row, FX status of the ends and of every flow's conversion) carry over the same way.
+- **The invested value's change stays as `Book`.** Each period also carries `Book`, the plain change in
+  invested value, as a typed headline record (finance-framework §3.6): `VALUE_CHANGE` over `START_VALUE` on
+  scope `invested_brokerage`, deposits included - a separate figure, not the TWR. It reads
+  `net_worth_snapshots.brokerage_invested`: a snapshot whose split is null is left out (never zero, never the
+  cash-inclusive total), the window opens on the first split day at or after the period's start and closes on
+  the latest split day, and both ends are held to the edge tolerance `clamp(round(periodDays × 0.1), 1, 7)`
+  days (`periodDays` = today minus the period's start; 1W → 1, 1M → 3, 3M and 1Y → 7), the same tolerance the
+  TWR window uses. Its `amount` is the dollar change and its `percent` the change in percentage points. With no
+  measurable window it is UNAVAILABLE with `NO_SPLIT` when the period has snapshot days whose split was not
+  measured, `SHORT_HISTORY` otherwise; a zero opening value keeps the dollar change and withholds the percent
+  with `ZERO_BASE`, and so does a provider linked inside the window (`SCOPE_CHANGED`: the linked value would
+  read as a change). The two end rows' brokerage source staleness, `IsApproximate` and `fx_status` become its
+  quality and reasons.
 
 - **Holdings-based return (the flow-neutral companion, R1(b)).** Each period also carries
   `holdingsBasedReturn` / `spyPriceReturn` / `holdingsBasedDelta`, labelled "holdings-based return" vs
@@ -1140,9 +1183,9 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   - **Splits and sales.** A position whose quantity moved more than 10% while its value moved less than 2%
     is a reorganisation and is carried flat for that step. A position sold between two captures is carried
     at its earlier value for that step (its exit price is not in a capture) and contributes nothing after:
-    the sale step understates that position's move. True TWR (dated external flows) is still R1(c).
+    the sale step understates that position's move. The true TWR (dated external flows) is `bookTwr` above.
   - **Scope.** The brokerage sleeve of the holdings captures, which is invested positions only (broker
-    cash is not a position). The cash-inclusive brokerage headline (C3) arrives with the measure engine.
+    cash is not a position); `bookTwr` above is the cash-inclusive figure.
   - **In the brief.** The same bullet carries `Holdings-based return X vs S&P 500 price return Y`, or
     `Holdings-based return N/A (<reason>)` when there is no number.
 
