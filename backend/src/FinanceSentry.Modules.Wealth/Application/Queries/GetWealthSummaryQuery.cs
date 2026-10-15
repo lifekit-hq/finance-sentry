@@ -25,7 +25,8 @@ public record AccountBalanceDto(
     DateTime? LastSyncTimestamp,
     string? ProductType = null,
     string? NativeCurrency = null,
-    decimal? NativeValue = null);
+    decimal? NativeValue = null,
+    string? Symbol = null);
 
 /// <summary>
 /// A physical card within an institution, grouping its per-currency sub-accounts. Populated

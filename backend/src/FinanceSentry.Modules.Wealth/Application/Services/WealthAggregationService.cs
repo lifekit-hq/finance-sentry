@@ -76,7 +76,8 @@ public class WealthAggregationService(
             {
                 var accounts = holdings.Select(h => new AccountBalanceDto(
                     Guid.Empty, DisplayNameFor(h.Provider), h.IsVenueFiat ? "cash" : "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
-                    h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt))
+                    h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt,
+                    Symbol: h.Asset))
                     .ToList<AccountBalanceDto>();
 
                 var institutionsByProvider = holdings
@@ -115,7 +116,8 @@ public class WealthAggregationService(
                     h.Symbol.Length >= 4 ? h.Symbol[..4] : h.Symbol,
                     h.Provider.ToLowerInvariant(), "brokerage", h.Symbol, h.Quantity, h.UsdValue,
                     BrokerageFreshness.IsStale(h.Provider, h.SyncedAt, now) ? "stale" : "synced", h.SyncedAt,
-                    NativeCurrency: h.NativeValue is null ? null : h.Currency, NativeValue: h.NativeValue))
+                    NativeCurrency: h.NativeValue is null ? null : h.Currency, NativeValue: h.NativeValue,
+                    Symbol: h.Symbol))
                     .ToList<AccountBalanceDto>();
 
                 var institutionsByProvider = holdings
