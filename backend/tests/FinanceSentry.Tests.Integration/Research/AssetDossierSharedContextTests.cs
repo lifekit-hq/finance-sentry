@@ -14,6 +14,7 @@ using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -93,7 +94,13 @@ public sealed class AssetDossierSharedContextTests : IAsyncLifetime
             Mock.Of<IFundamentalsService>(),
             new AssetPriceTargetRepository(db),
             new RecommendationRepository(db),
-            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
+            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
+            new ScorecardReader(
+                Mock.Of<IMarketStructureReader>(),
+                Mock.Of<IFundamentalsService>(),
+                Mock.Of<IMarketRegimeSource>(),
+                Options.Create(new OpportunityOptions()),
+                Options.Create(new VerdictOptions())));
 
         for (var i = 0; i < Loads; i++)
         {

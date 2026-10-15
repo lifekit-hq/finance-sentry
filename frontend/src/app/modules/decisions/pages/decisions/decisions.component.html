@@ -30,6 +30,7 @@
           <fns-recommendation-card
             [recommendation]="rec"
             [linkTicker]="true"
+            [scorecard]="store.scorecards()[rec.ticker] ?? null"
             (decide)="store.decide({recommendation: rec, verdict: $event})"
           />
         } @empty {

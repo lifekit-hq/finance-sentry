@@ -1,7 +1,7 @@
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
 import {ERROR_MESSAGES} from '@lifekit-hq/core';
-import {NEVER, of} from 'rxjs';
+import {EMPTY, NEVER, of} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
@@ -13,9 +13,11 @@ import {
   type RecommendationDto,
   type RecommendationsResult,
 } from '../../../../shared/models/recommendation/recommendation.model';
+import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {DECISIONS_EMPTY_COPY} from '../../constants/recommendation/recommendation.constants';
 import {DecisionSheetService} from '../../services/decision-sheet.service';
 import {RecommendationService} from '../../services/recommendation.service';
+import {ScorecardService} from '../../services/scorecard.service';
 import {DecisionsComponent} from './decisions.component';
 
 function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
@@ -56,6 +58,7 @@ function mkRecommendation(overrides: Partial<RecommendationDto> = {}): Recommend
 describe('DecisionsComponent', () => {
   let list: ReturnType<typeof vi.fn>;
   let open: ReturnType<typeof vi.fn>;
+  let read: ReturnType<typeof vi.fn>;
 
   const render = (result: RecommendationsResult) => {
     list.mockReturnValue(of(result));
@@ -64,6 +67,7 @@ describe('DecisionsComponent', () => {
         provideRouter([]),
         {provide: RecommendationService, useValue: {list}},
         {provide: DecisionSheetService, useValue: {open}},
+        {provide: ScorecardService, useValue: {read}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
     });
@@ -76,6 +80,29 @@ describe('DecisionsComponent', () => {
     TestBed.resetTestingModule();
     list = vi.fn().mockReturnValue(NEVER);
     open = vi.fn().mockReturnValue(of(undefined));
+    read = vi.fn().mockReturnValue(EMPTY);
+  });
+
+  it("opens each pending card's research verdict once its scorecard arrives", () => {
+    read.mockImplementation((symbol: string) =>
+      symbol === 'GRAB' ? of(ScorecardFixtures.scorecard({symbol})) : EMPTY
+    );
+    const {host} = render({
+      pending: [
+        mkRecommendation({id: 'a', ticker: 'GRAB'}),
+        mkRecommendation({id: 'b', ticker: 'DRAM'}),
+      ],
+      decided: [],
+    });
+
+    const verdictOf = (ticker: string): Nullable<Element> =>
+      host.querySelector(
+        `[data-testid="recommendation-card-${ticker}"] [data-testid="recommendation-verdict"]`
+      );
+    expect(
+      verdictOf('GRAB')?.querySelector('[data-testid="verdict-word"]')?.textContent?.trim()
+    ).toBe('AVOID');
+    expect(verdictOf('DRAM')).toBeNull();
   });
 
   it('says plainly that Finance Sentry never trades', () => {

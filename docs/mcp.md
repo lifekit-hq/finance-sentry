@@ -21,7 +21,7 @@
 
 ## Tool Surface
 
-The current runtime surface contains 72 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
+The current runtime surface contains 73 tools. The canonical list is the `AgreedToolSurface` set in `backend/tests/FinanceSentry.Mcp.Tests/ContractTests/ToolNameContractTests.cs`; the table below is a partial, representative view and is not kept row-complete.
 
 | Tool Name | Mode | Domain | Key Inputs | Notes |
 |---|---|---|---|---|
@@ -50,6 +50,7 @@ The current runtime surface contains 72 tools. The canonical list is the `Agreed
 | `get_daily_event_outcomes` | Read | Events | `date?` | Accountability view for one UTC day: every companion event that fired, of any kind, with fired/judged/sent/withheld counts and the per-item outcome; unlike `get_event_calendar` it is not limited to the five alert-backed event types |
 | `get_news_for_ticker` | Read | Research | `ticker`, `since?`, `limit` | Recent ticker-specific news |
 | `get_quotes` | Read | Research | `tickers` | Current quotes for one or more tickers, including requested/resolved ticker identity and market-session freshness metadata |
+| `get_scorecard` | Read | Research | `ticker` | One equity's four-axis scorecard (structure raw and regime-adjusted, fundamentals, crowding, valuation as raw facts) and its verdict word (`StrongBuy`\|`Buy`\|`Wait`\|`Avoid`\|`NotScored`) with the rules version, the fired rule and the whole ordered rule table (spec 726 US2). Computed at read time; never a composite number. REST mirror: `GET /research/scorecards/{symbol}` |
 | `search_market_news` | Read | Research | `query?`, `tickers?`, `since?`, `limit` | Search ingested market news |
 | `search_research_corpus` | Read | Research | `query`, `tickers?`, `thesisId?`, `sourceTypes?`, `from?`, `to?`, `limit?` | Hybrid semantic + lexical search over the stored research corpus; returns cited chunks with scores |
 | `get_research_context` | Read | Research | `thesisId?` or `ticker`, `question?`, `from?`, `maxChunks?`, `includeSourceTypes?` | Bounded, cited context packet grouped by source type for RAG |
