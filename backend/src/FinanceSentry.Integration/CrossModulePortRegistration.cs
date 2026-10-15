@@ -1,6 +1,5 @@
 namespace FinanceSentry.Integration;
 
-using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Services;
 using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Ports;
@@ -17,7 +16,7 @@ public static class CrossModulePortRegistration
 {
     public static IServiceCollection AddCrossModulePorts(this IServiceCollection services)
     {
-        services.AddScoped<IBookFiguresService, BookFiguresService>();
+        services.AddBookFigures();
 
         services.AddScoped<IAllocationPolicySource, IpsAllocationPolicySource>();
         services.AddScoped<IDrawdownPolicySource, IpsDrawdownPolicySource>();

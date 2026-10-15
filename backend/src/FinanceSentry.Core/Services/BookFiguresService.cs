@@ -1,86 +1,59 @@
 namespace FinanceSentry.Core.Services;
 
-using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Single canonical implementation of <see cref="IBookFiguresService"/>.
-/// Reads all three sources once, splits idle brokerage cash (instrument type "CASH") and fiat
-/// held on crypto venues from invested positions, and returns a consistent book snapshot.
+/// Sums every registered <see cref="IWealthSource"/> once and returns a consistent book snapshot. Idle
+/// brokerage cash and fiat held on crypto venues are already split from invested positions by their sources.
 /// </summary>
 public sealed class BookFiguresService(
-    IBankingAccountsReader bankingReader,
-    IBrokerageHoldingsReader brokerageReader,
-    ICryptoHoldingsReader cryptoReader,
+    IEnumerable<IWealthSource> sources,
     ILogger<BookFiguresService> logger) : IBookFiguresService
 {
     public async Task<BookFigures> ReadAsync(Guid userId, CancellationToken ct = default)
     {
         var positions = new List<BookFigurePosition>();
         var staleSources = new List<string>();
+        var cashUsd = 0m;
         var bankingCashUsd = 0m;
         var brokerageCashUsd = 0m;
         var venueCashUsd = 0m;
         var fxStatus = FxStatus.Exact;
 
-        try
+        foreach (var source in sources)
         {
-            foreach (var h in await cryptoReader.GetHoldingsAsync(userId, ct))
+            WealthSourceReading reading;
+            try
             {
-                var qty = h.FreeQuantity + h.LockedQuantity;
-                if (qty == 0m) continue;
-                fxStatus = fxStatus.Worst(h.FxStatus);
-                if (h.IsVenueFiat)
-                {
-                    venueCashUsd += h.UsdValue;
-                    continue;
-                }
+                reading = await source.ReadAsync(userId, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Wealth source {SourceId} unavailable for user {UserId}; contributing nothing.", source.SourceId, userId);
+                staleSources.Add(source.SourceId);
+                continue;
+            }
 
-                positions.Add(new BookFigurePosition(h.Asset, AssetClassNormalizer.Crypto, qty, h.CostBasisUsd, h.UsdValue, h.Provider));
+            positions.AddRange(reading.Positions);
+            cashUsd += reading.CashUsd;
+            fxStatus = fxStatus.Worst(reading.FxStatus);
+            switch (source.Kind)
+            {
+                case EconomyKind.Bank:
+                    bankingCashUsd += reading.CashUsd;
+                    break;
+                case EconomyKind.Brokerage:
+                    brokerageCashUsd += reading.CashUsd;
+                    break;
+                case EconomyKind.CryptoVenue:
+                    venueCashUsd += reading.CashUsd;
+                    break;
             }
         }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Crypto holdings unavailable for user {UserId}; contributing empty.", userId);
-            staleSources.Add("crypto");
-        }
 
-        try
-        {
-            foreach (var h in await brokerageReader.GetHoldingsAsync(userId, ct))
-            {
-                if (h.Quantity == 0m) continue;
-                fxStatus = fxStatus.Worst(h.FxStatus);
-                var assetClass = AssetClassNormalizer.Normalize(h.InstrumentType);
-                if (assetClass == AssetClassNormalizer.Cash)
-                    brokerageCashUsd += h.UsdValue;
-                else
-                    positions.Add(new BookFigurePosition(h.Symbol, assetClass, h.Quantity, h.CostBasisUsd, h.UsdValue, h.Provider));
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Brokerage holdings unavailable for user {UserId}; contributing empty.", userId);
-            staleSources.Add("brokerage");
-        }
-
-        try
-        {
-            var accounts = await bankingReader.GetAccountSummariesAsync(userId, ct);
-            bankingCashUsd = accounts.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceUsd ?? 0m));
-            // An account with no reported balance converted nothing, so its status says nothing.
-            foreach (var a in accounts.Where(a => a.BalanceUsd.HasValue))
-                fxStatus = fxStatus.Worst(a.FxStatus);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Banking accounts unavailable for user {UserId}; contributing zero cash.", userId);
-            staleSources.Add("banking");
-        }
-
-        var cashUsd = bankingCashUsd + brokerageCashUsd + venueCashUsd;
         var investedValueUsd = positions.Sum(p => p.UsdValue);
 
         return new BookFigures(

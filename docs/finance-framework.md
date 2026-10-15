@@ -73,8 +73,8 @@ rule or shape agreed but not implemented), **missing**.
        Presentation: dashboard · accounts · investments · MCP tools · briefs
 ```
 
-This is the target shape. Today only the top (three hard-coded sleeves) and bottom (dashboard, MCP, briefs)
-are wired. The measure engine is built for M1-M6 and M9 (3.4) but nothing calls it yet; the per-source rows
+This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1) and bottom
+(dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4) but nothing calls it yet; the per-source rows
 and the headline record are **designed, not built** (§6).
 
 Three rules keep the layers apart:
@@ -92,7 +92,7 @@ Three rules keep the layers apart:
 
 | # | Figure | Where | Method today | Quality signal today | Measure | Gap |
 |---|---|---|---|---|---|---|
-| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
+| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (sums the registered `IWealthSource`s: banking, brokerage, crypto) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | none on the figure | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
 | 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain.** Beside it, since R1(b), the flow-neutral **holdings-based return** (`holdingsBasedReturn`) against SPY's price return (`spyPriceReturn`, close) | null when history misses the edge tolerance; the holdings-based figure carries a typed reason instead of a number | M1 (not M3), M9 | **G1** |
@@ -117,7 +117,7 @@ Two things already right and kept:
   and crypto readers stamp each row, `BookFiguresService` carries the worst on `BookFigures.FxStatus`
   (`FxReasonCodes`), the snapshot job passes it in `NetWorthSnapshotData`, and net-worth history returns
   `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
-  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it (a carried-forward
+  per row, zero-quantity holdings left out as the wealth sources do), history maps it (a carried-forward
   sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
   `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
   `IsApproximate` reading `FX_TODAY_RATE`; a
@@ -374,8 +374,11 @@ verbatim.
 
 ## 5. Layer 2: the economy adapter contract
 
-**Status: designed, not built.** Today three hard-coded readers (banking, brokerage, crypto) feed
-`BookFiguresService` (§6, G4).
+**Status: partial.** The registry is built (R8 PR 1, §5.6): the banking, brokerage and crypto readers are
+registered as `IWealthSource` (`BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource`) and
+`BookFiguresService` sums whatever is registered. The contract below is still the target: today a source
+returns `WealthSourceReading` (USD cash, invested positions, worst FX status), not the full
+`SourceSnapshot`, and has no `asOf`, native units, reliability or events.
 
 ### 5.1 What every source supplies
 
@@ -385,7 +388,7 @@ A source declares which facets it can supply; the engine computes only the measu
 |---|---|---|---|---|
 | Identity | source id, economy kind, native unit(s) | yes | — | provider name strings |
 | Holdings | asset, quantity, native unit, exit price, price time, price source | yes | value, M1, M7 | `BankingAccountSummary`, `BrokerageHoldingSummary`, `CryptoHoldingSummary` |
-| Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BookFiguresService` |
+| Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource` |
 | Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | a landing table for IBKR and Inzhur with no reader; none for crypto (G6) |
 | Income and costs | dividends, interest, rewards, fees, taxes | no | bridge lines, M6 | dividend and withholding rows read by `PositionReturnCalculator` |
 | History | past snapshots, or a way to rebuild them | no | windows longer than the link's age | daily snapshots; the banking backfill (#584) |
@@ -524,15 +527,19 @@ and the list of what is not yet verified are in report §5.5 and §12.4; none of
 Today a fourth economy would need a new column on `net_worth_snapshots`, a new constructor parameter on
 `BookFiguresService`, a new name inside the `StaleSleeves` string, and a change in every consumer.
 
-1. **Wrap.** The three readers (`IBankingAccountsReader`, `IBrokerageHoldingsReader`,
-   `ICryptoHoldingsReader`) become three `IWealthSource` registrations. `BookFiguresService` loops over
-   them. Consumers do not change. Test: totals identical before and after.
-2. **One row per source.** A child table (for example `net_worth_snapshot_sources`: snapshot id, source id,
+1. **Wrap. Done.** The three readers (`IBankingAccountsReader`, `IBrokerageHoldingsReader`,
+   `ICryptoHoldingsReader`) are three `IWealthSource` registrations (`AddBookFigures`, which registers them in
+   the order positions have always had: crypto, brokerage, banking). `BookFiguresService` loops over the
+   registered sources; its consumers did not change. A source id is the name `StaleSources` has always
+   carried (`banking`, `brokerage`, `crypto`), and a kind with no legacy slice (`EconomyKind`) counts in
+   `CashUsd` and the totals only. `BookFiguresCharacterizationTests` pins the figures, and
+   `BookFiguresWealthSourceTests` that a fourth registered source is summed.
+2. **One row per source. Remaining.** A child table (for example `net_worth_snapshot_sources`: snapshot id, source id,
    kind, total, cash, invested, health, reasons), written by the snapshot job alongside the existing
    columns. `WealthDbContext` owns it, so there is no cross-module migration ordering.
-3. **Read per source.** History, the dashboard and MCP read the per-source rows. `StaleSleeves` gives way
+3. **Read per source. Remaining.** History, the dashboard and MCP read the per-source rows. `StaleSleeves` gives way
    to per-source health and reasons.
-4. **Freeze the old columns.** Keep `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` for
+4. **Freeze the old columns. Remaining.** Keep `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` for
    history, and stop extending them. The first new economy comes after this step.
 
 Rejected: a column per new economy (each economy then costs a migration and a change to every consumer) and
@@ -633,9 +640,11 @@ outside the headline paths are unchanged. money-semantics §9 accepts the approx
 about that (M1), but linking an existing account is not a change in wealth, yet shows as one, with a
 percentage (rule 3 of §3.2; reason `SCOPE_CHANGED`).
 
-**G4. The sleeves are hard-coded.**
-Three reader parameters, three total columns, staleness as a comma-separated string of sleeve names. Every
-new economy is a schema change plus a change in every consumer (§5.6).
+**G4. The sleeves are hard-coded.** *Partly closed (R8 PR 1): the live book sums registered sources; the stored
+snapshot and its consumers are still per sleeve.*
+Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names. A new
+economy would still be a schema change plus a change in every snapshot consumer until the per-source rows
+(§5.6, PRs 2-4) land.
 
 **G5. Quality signals are scattered and untyped.**
 `StaleSleeves` (string), `IsApproximate` (bool), `CashTotal` null, `Coverage` (string), `HasStaleSleeves`

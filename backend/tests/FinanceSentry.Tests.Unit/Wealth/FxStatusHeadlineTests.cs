@@ -67,7 +67,12 @@ public sealed class FxStatusHeadlineTests
         var cryptoReader = new Mock<ICryptoHoldingsReader>();
         cryptoReader.Setup(c => c.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(crypto);
         return new BookFiguresService(
-            banking, brokerage.Object, cryptoReader.Object, NullLogger<BookFiguresService>.Instance);
+            [
+                new CryptoWealthSource(cryptoReader.Object),
+                new BrokerageWealthSource(brokerage.Object),
+                new BankingWealthSource(banking),
+            ],
+            NullLogger<BookFiguresService>.Instance);
     }
 
     [Fact]
