@@ -30,6 +30,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {label: 'Subscriptions', icon: 'RefreshCw', route: AppRoute.Subscriptions},
   {label: 'Alerts', icon: 'Bell', route: AppRoute.Alerts},
   {label: 'Events', icon: 'CalendarDays', route: AppRoute.Events},
+  {label: 'Watchlist', icon: 'Eye', route: AppRoute.Watchlist},
   {label: 'Ledger', icon: 'Sparkles', route: AppRoute.Ledger},
 ];
 

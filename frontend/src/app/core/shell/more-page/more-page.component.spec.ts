@@ -56,6 +56,7 @@ describe('MorePageComponent', () => {
       '/budgets',
       '/subscriptions',
       '/events',
+      '/watchlist',
       '/ledger',
     ]);
   });

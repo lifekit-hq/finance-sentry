@@ -1,0 +1,126 @@
+<cmn-page-container spacing="none">
+  <div class="space-y-cmn-5">
+    <p class="text-cmn-sm text-text-secondary">
+      Names you are watching, with the trigger that would make you act
+    </p>
+
+    <cmn-card>
+      <form
+        [formGroup]="form"
+        (ngSubmit)="submit()"
+        class="space-y-cmn-3"
+        data-testid="watchlist-form"
+      >
+        <div class="grid grid-cols-1 gap-cmn-3 sm:grid-cols-2">
+          <cmn-form-field [control]="form.controls.ticker" label="Ticker">
+            <cmn-input
+              [maxlength]="maxTickerLength"
+              formControlName="ticker"
+              autocomplete="off"
+              enterkeyhint="next"
+              placeholder="PLTR"
+              data-testid="watchlist-ticker"
+            />
+          </cmn-form-field>
+          <cmn-form-field [control]="form.controls.exchange" label="Exchange (optional)">
+            <cmn-input
+              [maxlength]="maxExchangeLength"
+              formControlName="exchange"
+              autocomplete="off"
+              enterkeyhint="next"
+              placeholder="NASDAQ"
+              data-testid="watchlist-exchange"
+            />
+          </cmn-form-field>
+        </div>
+        <cmn-form-field label="Note (optional)">
+          <cmn-textarea
+            [maxlength]="maxNoteLength"
+            [rows]="noteRows"
+            formControlName="note"
+            data-testid="watchlist-note"
+          />
+        </cmn-form-field>
+        <cmn-button
+          [disabled]="store.isAddLoading() || store.isLoadLoading()"
+          type="submit"
+          variant="primary"
+          data-testid="watchlist-add"
+        >
+          Add to watchlist
+        </cmn-button>
+      </form>
+    </cmn-card>
+
+    @if (store.actionErrorMessage()) {
+      <cmn-alert variant="error" data-testid="watchlist-action-error">{{
+        store.actionErrorMessage()
+      }}</cmn-alert>
+    }
+
+    <cmn-async-state
+      [status]="view().status"
+      [errorMessage]="view().errorMessage"
+      [isEmpty]="isEmpty()"
+      [emptyMessage]="emptyCopy.message"
+      [emptySubMessage]="emptyCopy.subMessage"
+      [emptyIcon]="emptyCopy.icon"
+      (retry)="store.load()"
+      class="block space-y-cmn-5"
+      errorPlacement="above"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-3" data-testid="watchlist-skeleton">
+        @for (row of skeletonRows; track row) {
+          <cmn-skeleton height="4rem" />
+        }
+      </div>
+
+      <cmn-card padding="none" data-testid="watchlist-list">
+        @for (row of store.rows(); track row.id) {
+          <div
+            [class.opacity-60]="isPending(row)"
+            class="flex items-start gap-cmn-3 border-b border-border-subtle p-cmn-4 last:border-b-0"
+            data-testid="watchlist-row"
+          >
+            <div class="min-w-0 flex-1 space-y-cmn-1">
+              <div class="flex flex-wrap items-baseline gap-x-cmn-2">
+                <a
+                  [routerLink]="row.dossierRoute"
+                  class="text-cmn-base font-semibold text-text-primary hover:underline"
+                  data-testid="watchlist-ticker-link"
+                >
+                  {{ row.ticker }}
+                </a>
+                @if (row.exchange) {
+                  <span class="text-cmn-xs text-text-secondary">{{ row.exchange }}</span>
+                }
+                <span class="text-cmn-xs text-text-disabled">
+                  added {{ row.addedAt | date: 'd MMM y' }}
+                </span>
+              </div>
+              @if (row.note) {
+                <p
+                  class="whitespace-pre-line break-words text-cmn-sm text-text-secondary"
+                  data-testid="watchlist-row-note"
+                >
+                  {{ row.note }}
+                </p>
+              }
+            </div>
+            <cmn-button
+              [disabled]="isPending(row) || store.isLoadLoading()"
+              (clicked)="confirmRemove(row)"
+              variant="secondary"
+              size="sm"
+              icon="Trash2"
+              data-testid="watchlist-remove"
+            >
+              Remove
+            </cmn-button>
+          </div>
+        }
+      </cmn-card>
+    </cmn-async-state>
+  </div>
+</cmn-page-container>

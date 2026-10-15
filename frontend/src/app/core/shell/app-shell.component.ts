@@ -45,6 +45,7 @@ const PALETTE_ITEMS: CommandPaletteItem[] = [
   {id: AppRoute.Subscriptions, label: 'Subscriptions', icon: 'RefreshCw', group: 'Pages'},
   {id: AppRoute.Alerts, label: 'Alerts', icon: 'Bell', group: 'Pages'},
   {id: AppRoute.Events, label: 'Events', icon: 'CalendarDays', group: 'Pages'},
+  {id: AppRoute.Watchlist, label: 'Watchlist', icon: 'Eye', group: 'Pages'},
   {id: AppRoute.Ledger, label: 'Ledger', icon: 'Sparkles', group: 'Pages'},
   {id: AppRoute.LedgerDecisions, label: 'Decisions', icon: 'ListChecks', group: 'Pages'},
   {id: AppRoute.Settings, label: 'Settings', icon: 'Settings2', group: 'Pages'},
