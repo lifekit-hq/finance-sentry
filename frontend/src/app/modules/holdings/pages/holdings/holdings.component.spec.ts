@@ -64,6 +64,7 @@ describe('InvestmentsComponent — positions view', () => {
     totalPositionsValue: ReturnType<typeof signal<number>>;
     totalHeadline: ReturnType<typeof signal<Nullable<Headline>>>;
     isTotalUnavailable: ReturnType<typeof signal<boolean>>;
+    isEmpty: ReturnType<typeof signal<boolean>>;
     allocationSegments: ReturnType<typeof signal<never[]>>;
     allocationBreakdown: ReturnType<typeof signal<AllocationBreakdownRow[]>>;
   };
@@ -105,6 +106,7 @@ describe('InvestmentsComponent — positions view', () => {
       totalPositionsValue: signal(150),
       totalHeadline: signal<Nullable<Headline>>(null),
       isTotalUnavailable: signal(false),
+      isEmpty: signal(false),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
         {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},

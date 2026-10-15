@@ -380,7 +380,7 @@ generic line), plus `asOf` and `coverage` when the figure is not complete. The b
 px hit area. The ad-hoc stale alert under the dashboard chart (`netWorthStaleNotice`) is gone: the
 snapshot's `staleSleeves` becomes a `STALE_SOURCE` reason on the net-worth headline when the API's own record has
 none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
-connection is no longer buried mid-list, finding 5). The dashboard's "Change" line renders `changeHeadline` (G3).
+connection is no longer buried mid-list, finding 5). The dashboard's "Change" line wears the `changeHeadline` badge; its figure still comes from the snapshots (G3 stays open).
 The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection carries a record.
 
 **Display rules:**

@@ -2,7 +2,7 @@
   <cmn-async-state
     [status]="positionsStatus()"
     [errorMessage]="store.errorMessage()"
-    [isEmpty]="store.positionsByAssetClass().length === 0"
+    [isEmpty]="store.isEmpty()"
   >
     <cmn-card skeleton padding="none">
       <div class="divide-y divide-border-default" data-testid="holdings-skeleton">

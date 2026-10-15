@@ -70,6 +70,23 @@ describe('holdingsComputed headline', () => {
     expect(c.totalHeadline()).toBe(unavailable);
     expect(c.isTotalUnavailable()).toBe(true);
   });
+
+  it('is empty only when there are no positions and the headline needs no badge', () => {
+    expect(build([], {}, 'success', null).isEmpty()).toBe(true);
+    expect(build([], {}, 'success', headline({})).isEmpty()).toBe(true);
+    expect(build([position({})], {}, 'success', null).isEmpty()).toBe(false);
+  });
+
+  it('keeps the total card when a failed feed leaves no positions', () => {
+    const stale = headline({
+      quality: 'DEGRADED',
+      reasons: [{code: 'STALE_SOURCE', source: 'brokerage'}],
+    });
+    const unavailable = headline({amount: null, quality: 'UNAVAILABLE'});
+
+    expect(build([], {}, 'success', stale).isEmpty()).toBe(false);
+    expect(build([], {}, 'success', unavailable).isEmpty()).toBe(false);
+  });
 });
 
 describe('holdingsComputed', () => {

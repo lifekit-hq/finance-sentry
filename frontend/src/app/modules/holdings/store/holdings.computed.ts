@@ -142,6 +142,10 @@ export function holdingsComputed(store: StateSignals) {
     // The total's record: its badge, and N/A (never 0) when every feed failed.
     totalHeadline: computed((): Nullable<Headline> => store.headline()),
     isTotalUnavailable: computed(() => HeadlineUtils.isUnavailable(store.headline())),
+    // A failed feed is never read as an empty book: the total card keeps its N/A and badge.
+    isEmpty: computed(
+      () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null
+    ),
     positionsByAssetClass,
     allocationSegments: computed((): DonutSegment[] =>
       positionsByAssetClass().map(group => ({
