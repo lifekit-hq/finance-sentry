@@ -46,6 +46,7 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             CashTotal = hasSplit ? total - brokerageInvested!.Value - cryptoInvested!.Value : null,
             BrokerageInvested = hasSplit ? brokerageInvested : null,
             CryptoInvested = hasSplit ? cryptoInvested : null,
+            FxStatus = data.FxStatus,
         };
 
         // Upsert: the day's row is refreshed on every successful sync rather than frozen

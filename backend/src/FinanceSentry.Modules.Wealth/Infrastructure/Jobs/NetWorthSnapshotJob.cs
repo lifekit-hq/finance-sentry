@@ -80,9 +80,9 @@ public class NetWorthSnapshotJob(
         // The worst conversion status of what this snapshot was summed from: the book figures cover the
         // bank accounts, the two holdings reads this run's own sleeve totals.
         var fxStatus = book.FxStatus;
-        foreach (var h in cryptoHoldings)
+        foreach (var h in cryptoHoldings.Where(h => h.FreeQuantity + h.LockedQuantity != 0m))
             fxStatus = fxStatus.Worst(h.FxStatus);
-        foreach (var h in brokerageHoldings)
+        foreach (var h in brokerageHoldings.Where(h => h.Quantity != 0m))
             fxStatus = fxStatus.Worst(h.FxStatus);
 
         if (fxStatus.ToReason() is { } fxReason)

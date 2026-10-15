@@ -91,7 +91,7 @@ Three rules keep the layers apart:
 
 | # | Figure | Where | Method today | Quality signal today | Measure | Gap |
 |---|---|---|---|---|---|---|
-| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; the live total's `BookFigures.FxStatus` (R4) names a seed-table or 1:1 conversion, a stored row does not yet | valuation, M7 | G2 (live total closed), G4, G5 |
+| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a backfilled or older row) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | none on the figure | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
 | 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain** | null when history misses the edge tolerance | M1 (not M3), M9 | **G1** |
@@ -115,10 +115,12 @@ Two things already right and kept:
   `FX_UNKNOWN_1TO1` (`FxStatusExtensions.ToReason`). Adopted in the headline readers: the account, brokerage
   and crypto readers stamp each row, `BookFiguresService` carries the worst on `BookFigures.FxStatus`
   (`FxReasonCodes`), the snapshot job passes it in `NetWorthSnapshotData`, and net-worth history returns
-  `FxReasons` per point (`IsApproximate` reads `FX_TODAY_RATE`; a base currency shown on the seed table adds
-  it). **Not yet:** the status is not persisted on a snapshot row (that needs a column, with the typed headline
-  record in R6), and a brokerage or crypto row stores its USD value converted at sync time, so its status is
-  re-derived from the rate table in force when it is read. Display wording is R7.
+  `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
+  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it, and a row with none
+  recorded (backfilled or from before the column) falls back to `IsApproximate` reading `FX_TODAY_RATE`; a
+  base currency shown on the seed table adds it. R8's per-source rows will take over this field. A brokerage
+  or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
+  in force when it is read. Display wording is R7.
 
 ---
 
@@ -572,11 +574,11 @@ return. The `outperform` / `underperform` verdict inherits all of this.
 against the MCP tool surface and its tests. Later steps: a holdings-based price index on the cash-inclusive
 scope (C3), then a true TWR once dated external flows land (G6).
 
-**G2. Currency fallbacks are silent at the headline.** *Closed for the live total (R4); open for stored rows.*
+**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status waits for R8.*
 `CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
 use `Convert`, so `BookFigures`, the snapshot job and net-worth history say when a seed-table, today's-rate
-or 1:1 conversion touched a figure (`FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`). What remains: a persisted
-snapshot row records no per-row FX status (only `IsApproximate`), and the amount-only `ToUsd` callers
+or 1:1 conversion touched a figure (`FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`). A snapshot row records the worst
+status of its sources (`fx_status`; R8's per-source rows will take over), and the amount-only `ToUsd` callers
 outside the headline paths are unchanged. money-semantics §9 accepts the approximations.
 
 **G3. The dashboard "Change" percentage counts newly linked accounts.**

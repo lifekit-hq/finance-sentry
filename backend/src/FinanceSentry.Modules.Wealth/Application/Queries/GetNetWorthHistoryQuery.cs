@@ -48,9 +48,9 @@ public class GetNetWorthHistoryQueryHandler(
                 s.SnapshotDate, s.BankingTotal, s.BrokerageTotal,
                 s.CryptoTotal, s.TotalNetWorth, s.Currency, s.StaleSleeves, s.IsApproximate,
                 s.CashTotal, s.BrokerageInvested, s.CryptoInvested,
-                // A reconstructed row is valued at today's rate rather than the rate of its own day. The
-                // snapshot row stores no per-row conversion status yet, so no other reason is recoverable.
-                (s.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact).ToReasons()))
+                // A measured row carries the status its snapshot recorded; a reconstructed row (none recorded)
+                // is valued at today's rate rather than the rate of its own day.
+                (s.FxStatus ?? (s.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact)).ToReasons()))
             .ToList();
 
         // A change across the window includes accounts that joined or left it; the dashboard reads this to

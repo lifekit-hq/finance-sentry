@@ -11,8 +11,7 @@ public sealed record BackfillNetWorthHistoryCommand(Guid UserId) : ICommand<Back
 public sealed record BackfillNetWorthHistoryResult(
     int InsertedCount,
     DateOnly? AnchorSnapshotDate,
-    DateOnly? EarliestBackfilledDate,
-    FxStatus FxStatus = FxStatus.Exact);
+    DateOnly? EarliestBackfilledDate);
 
 /// <summary>
 /// Reconstructs banking-only net worth history for the gap before a user's earliest real
@@ -26,9 +25,8 @@ public sealed record BackfillNetWorthHistoryResult(
 /// carries BrokerageTotal = CryptoTotal = 0 and IsApproximate = true. Currency conversion
 /// uses <see cref="CurrencyConverter.ToUsd"/>'s current rate table, not the historical
 /// rate on the reconstructed date; that, plus the banking-only scope, is why the segment
-/// is approximate rather than measured; the result's <see cref="BackfillNetWorthHistoryResult.FxStatus"/> says
-/// so (never better than <see cref="FxStatus.TodayRate"/> once a row was written, worse when a currency's
-/// own rate was a seed value or missing). Each account's reconstructable range is bounded
+/// is approximate rather than measured (history reads it as <c>FX_TODAY_RATE</c> from
+/// <c>IsApproximate</c>). Each account's reconstructable range is bounded
 /// by its own earliest synced transaction — an account connected after the gap started
 /// contributes only from that date onward, never fabricated further back.
 ///
@@ -107,8 +105,6 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
             return new BackfillNetWorthHistoryResult(0, anchor.SnapshotDate, null);
 
         var rows = new List<NetWorthSnapshot>();
-        // Reconstructed days are valued at today's rate, so a backfilled row is never better than TodayRate.
-        var fxStatus = FxStatus.TodayRate;
         for (var date = anchor.SnapshotDate.AddDays(-1); date >= globalFloor.Value; date = date.AddDays(-1))
         {
             var includedAccounts = accounts
@@ -120,9 +116,8 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
             var bankingTotalUsd = 0m;
             foreach (var a in includedAccounts)
             {
-                var usd = CurrencyConverter.Convert(balanceByAccountDay[(a.AccountId, date)], a.Currency);
-                fxStatus = fxStatus.Worst(usd.Status);
-                bankingTotalUsd += AccountBalanceMath.SignedForNetTotal(a.AccountType, usd.Amount);
+                var usd = CurrencyConverter.ToUsd(balanceByAccountDay[(a.AccountId, date)], a.Currency);
+                bankingTotalUsd += AccountBalanceMath.SignedForNetTotal(a.AccountType, usd);
             }
 
             rows.Add(new NetWorthSnapshot
@@ -146,7 +141,7 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
         var inserted = await _snapshotRepository.InsertMissingAsync(rows, cancellationToken);
         var earliestBackfilled = rows.Min(r => r.SnapshotDate);
 
-        return new BackfillNetWorthHistoryResult(inserted, anchor.SnapshotDate, earliestBackfilled, fxStatus);
+        return new BackfillNetWorthHistoryResult(inserted, anchor.SnapshotDate, earliestBackfilled);
     }
 
     /// <summary>

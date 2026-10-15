@@ -16,8 +16,8 @@ public interface INetWorthSnapshotService
 /// </param>
 /// <param name="CryptoInvested">Invested part of <paramref name="CryptoTotal"/>; null as <paramref name="BrokerageInvested"/>.</param>
 /// <param name="FxStatus">
-/// The worst conversion status among the figures the totals were summed from. The snapshot row does not store
-/// it (no column yet); a history read re-derives the reason from <c>IsApproximate</c>.
+/// The worst conversion status among the figures the totals were summed from; stored on the snapshot row so a
+/// history read can name a seed-table or 1:1 conversion.
 /// </param>
 public record NetWorthSnapshotData(
     DateOnly SnapshotDate,

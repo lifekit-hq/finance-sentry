@@ -46,4 +46,11 @@ public sealed class NetWorthSnapshot : IUserOwned
 
     /// <summary>Crypto sleeve without venue fiat (the invested positions); null = no split, as <see cref="CashTotal"/>.</summary>
     public decimal? CryptoInvested { get; init; }
+
+    /// <summary>
+    /// The worst currency-conversion status among the figures the snapshot job summed this row from (see
+    /// <see cref="FinanceSentry.Core.Utils.FxStatus"/>). Null = not recorded (a backfilled row, or one from
+    /// before the status was kept); history then falls back to <see cref="IsApproximate"/>.
+    /// </summary>
+    public FinanceSentry.Core.Utils.FxStatus? FxStatus { get; init; }
 }
