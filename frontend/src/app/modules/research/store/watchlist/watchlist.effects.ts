@@ -9,6 +9,7 @@ import {
 } from '../../constants/watchlist/watchlist.constants';
 import {type AddWatchlistRequest, type WatchlistItem} from '../../models/watchlist/watchlist.model';
 import {WatchlistService} from '../../services/watchlist.service';
+import {type WatchlistAction} from './watchlist.state';
 
 export interface AddWatchlistCommand {
   payload: AddWatchlistRequest;
@@ -18,6 +19,7 @@ export interface AddWatchlistCommand {
 interface EffectsStore {
   items: () => WatchlistItem[];
   setLoadedItems: (items: WatchlistItem[]) => void;
+  setLastAction: (action: WatchlistAction) => void;
   appendItem: (item: WatchlistItem) => void;
   replaceItem: (id: string, item: WatchlistItem) => void;
   insertItem: (index: number, item: WatchlistItem) => void;
@@ -60,6 +62,7 @@ export function watchlistEffects(store: EffectsStore) {
       pipe(
         mergeMap(({payload, onAdded}) => {
           const pendingId = `${PENDING_ID_PREFIX}${crypto.randomUUID()}`;
+          store.setLastAction('add');
           store.setAddLoading();
           store.appendItem({id: pendingId, ...payload, addedAt: new Date().toISOString()});
           return service.add(payload).pipe(
@@ -83,6 +86,7 @@ export function watchlistEffects(store: EffectsStore) {
         mergeMap(id => {
           const index = store.items().findIndex(i => i.id === id);
           const removed = index === -1 ? null : store.items()[index];
+          store.setLastAction('remove');
           store.setRemoveLoading();
           store.removeItem(id);
           return service.remove(id).pipe(

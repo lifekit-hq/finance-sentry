@@ -2,7 +2,7 @@ import {patchState, type WritableStateSource} from '@ngrx/signals';
 
 import {PENDING_ID_PREFIX} from '../../constants/watchlist/watchlist.constants';
 import {type WatchlistItem} from '../../models/watchlist/watchlist.model';
-import {type WatchlistState} from './watchlist.state';
+import {type WatchlistAction, type WatchlistState} from './watchlist.state';
 
 export function watchlistMethods(store: WritableStateSource<WatchlistState>) {
   return {
@@ -10,6 +10,9 @@ export function watchlistMethods(store: WritableStateSource<WatchlistState>) {
       patchState(store, (s: WatchlistState) => ({
         items: [...items, ...s.items.filter(i => i.id.startsWith(PENDING_ID_PREFIX))],
       }));
+    },
+    setLastAction(lastAction: WatchlistAction): void {
+      patchState(store, {lastAction});
     },
     appendItem(item: WatchlistItem): void {
       patchState(store, (s: WatchlistState) => ({items: [...s.items, item]}));

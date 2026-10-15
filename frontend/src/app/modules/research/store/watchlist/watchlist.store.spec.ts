@@ -150,6 +150,20 @@ describe('WatchlistStore', () => {
     expect(store.removeErrorMessage()).toBe('That watchlist item no longer exists.');
   });
 
+  it('shows only the error of the latest action', () => {
+    const store = setup({
+      getItems: vi.fn().mockReturnValue(of([PLTR])),
+      remove: vi.fn().mockReturnValue(throwError(() => new HttpErrorResponse({status: 500}))),
+      add: vi.fn().mockReturnValue(of(MRNA)),
+    });
+
+    store.remove('w1');
+    expect(store.actionErrorMessage()).toBe('Failed to remove from your watchlist.');
+
+    store.add({payload: {ticker: 'MRNA', exchange: null, note: null}, onAdded: vi.fn()});
+    expect(store.actionErrorMessage()).toBe('');
+  });
+
   it('puts a row back when its delete fails', () => {
     const store = setup({
       getItems: vi.fn().mockReturnValue(of([PLTR, MRNA])),

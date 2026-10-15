@@ -82,9 +82,6 @@ export class WatchlistComponent {
     });
   });
   public readonly isEmpty = computed(() => this.store.items().length === 0);
-  public readonly actionError = computed(
-    () => this.store.addErrorMessage() || this.store.removeErrorMessage()
-  );
 
   public readonly form = new FormGroup({
     ticker: new FormControl('', {nonNullable: true, validators: [Validators.required]}),

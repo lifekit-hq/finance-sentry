@@ -52,9 +52,9 @@
       </form>
     </cmn-card>
 
-    @if (actionError()) {
+    @if (store.actionErrorMessage()) {
       <cmn-alert variant="error" data-testid="watchlist-action-error">{{
-        actionError()
+        store.actionErrorMessage()
       }}</cmn-alert>
     }
 
