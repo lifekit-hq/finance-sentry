@@ -9,7 +9,7 @@ import {
   ViewContainerRef,
 } from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
-import {ActivatedRoute, Router} from '@angular/router';
+import {ActivatedRoute, Router, RouterLink} from '@angular/router';
 import {formatRelativeTime} from '@lifekit-hq/core/format';
 import {
   AlertComponent,
@@ -32,7 +32,6 @@ import {map, take} from 'rxjs';
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
-import {AssetLogoPipe} from '../../../../shared/pipes/asset-logo.pipe';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
@@ -44,10 +43,9 @@ import {ConnectModalComponent} from '../../components/connect-modal/connect-moda
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
-import {PositionQuantityPipe} from '../../pipes/position-quantity.pipe';
-import {PositionValuePipe} from '../../pipes/position-value.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
+import {InstitutionNavUtils} from '../../utils/institution-nav.utils';
 import {
   DISCONNECT_ONLY_MENU,
   MENU_ACTION_DISCONNECT,
@@ -66,7 +64,6 @@ const SKELETON_SECTIONS = 2;
   imports: [
     AccountBalancePipe,
     AlertComponent,
-    AssetLogoPipe,
     AsyncStateComponent,
     ButtonComponent,
     CardComponent,
@@ -81,9 +78,8 @@ const SKELETON_SECTIONS = 2;
     MoneyPipe,
     NetBalancePipe,
     NgTemplateOutlet,
-    PositionQuantityPipe,
-    PositionValuePipe,
     RelativeTimePipe,
+    RouterLink,
     SkeletonComponent,
     SyncStatusLabelPipe,
     SyncStatusVariantPipe,
@@ -125,6 +121,7 @@ export class AccountsListComponent implements OnInit {
     })
   );
   public readonly dotClass = SYNC_DOT_CLASS;
+  public readonly investmentsRoute = AppRoute.AccountsInvestments;
 
   public ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -207,6 +204,17 @@ export class AccountsListComponent implements OnInit {
     return this.isPhone() ? `${count} · ${this.syncSummary(institution)}` : count;
   }
 
+  /**
+   * A brokerage or exchange row: its positions live on Investments, so it says how many and what cash it
+   * holds. A phone adds the sync text only when the connection is broken, so the line stays on one row.
+   */
+  public navSublabel(institution: Institution, noun: string): string {
+    const base = InstitutionNavUtils.sublabel(institution, noun, this.store.baseCurrency());
+    return this.isPhone() && this.needsAttention(institution)
+      ? `${base} · ${this.syncSummary(institution)}`
+      : base;
+  }
+
   public syncSummary(institution: Institution): string {
     if (institution.syncStatus === 'reauth_required') {
       return 'Reconnect needed';
@@ -258,10 +266,6 @@ export class AccountsListComponent implements OnInit {
     } else if (action === MENU_ACTION_DISCONNECT) {
       this.disconnectInstitution(institution);
     }
-  }
-
-  public navigateToDossier(symbol: string): void {
-    void this.router.navigate([AppRoute.AssetDossier, symbol]);
   }
 
   public navigateToTransactions(accountId: string): void {

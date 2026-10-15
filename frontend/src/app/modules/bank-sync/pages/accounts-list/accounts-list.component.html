@@ -122,67 +122,67 @@
         </div>
         <cmn-card padding="none">
           @for (inst of section.summary.institutions; track inst.institutionId + inst.provider) {
-            <cmn-disclosure-row
-              [label]="inst.name"
-              [sublabel]="rowSublabel(inst, section.rowNoun)"
-              [avatarName]="inst.name"
-              [avatarLogoUrl]="inst.name | institutionLogo: inst.provider"
-              [open]="true"
-            >
-              <div class="flex items-center gap-cmn-2 text-cmn-xs text-text-secondary" status>
-                <span
-                  [class]="dotClass[inst.syncStatus | syncStatusVariant]"
-                  class="h-2 w-2 shrink-0 rounded-full"
-                ></span>
-                <span
-                  [title]="
-                    inst.lastSuccessfulSyncTimestamp
-                      ? 'Last successful sync ' +
-                        (inst.lastSuccessfulSyncTimestamp | cmnRelativeTime: 'Never')
-                      : 'No successful sync yet'
-                  "
-                  class="hidden whitespace-nowrap sm:inline"
-                >
-                  @if (needsAttention(inst)) {
-                    <span class="text-status-error">{{ inst.syncStatus | syncStatusLabel }}</span>
-                    ·
-                  }
-                  {{ inst.lastSyncTimestamp | cmnRelativeTime: 'Never' }}
-                </span>
-              </div>
-
-              <div
-                [class.text-loss]="inst.totalInBaseCurrency < 0"
-                [class.text-text-primary]="inst.totalInBaseCurrency >= 0"
-                class="tabular-nums font-medium text-right min-w-[5.5rem]"
-                status
+            @if (section.category === 'banking') {
+              <cmn-disclosure-row
+                [label]="inst.name"
+                [sublabel]="rowSublabel(inst, section.rowNoun)"
+                [avatarName]="inst.name"
+                [avatarLogoUrl]="inst.name | institutionLogo: inst.provider"
+                [open]="true"
               >
-                {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
-              </div>
-
-              <div class="flex items-center gap-cmn-2" actions>
-                <!-- On a phone the menu carries Reconnect; the row keeps room for the figure. -->
-                @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
-                  <cmn-button
-                    (clicked)="reconnect(inst); $event.stopPropagation()"
-                    class="hidden sm:inline-block"
-                    variant="primary"
-                    size="sm"
+                <div class="flex items-center gap-cmn-2 text-cmn-xs text-text-secondary" status>
+                  <span
+                    [class]="dotClass[inst.syncStatus | syncStatusVariant]"
+                    class="h-2 w-2 shrink-0 rounded-full"
+                  ></span>
+                  <span
+                    [title]="
+                      inst.lastSuccessfulSyncTimestamp
+                        ? 'Last successful sync ' +
+                          (inst.lastSuccessfulSyncTimestamp | cmnRelativeTime: 'Never')
+                        : 'No successful sync yet'
+                    "
+                    class="hidden whitespace-nowrap sm:inline"
                   >
-                    Reconnect
-                  </cmn-button>
-                }
-                <cmn-menu
-                  [items]="institutionMenu(inst)"
-                  [ariaLabel]="'Actions for ' + inst.name"
-                  (itemSelect)="onInstitutionAction(inst, $event.id)"
-                >
-                  <cmn-icon name="Ellipsis" />
-                </cmn-menu>
-              </div>
+                    @if (needsAttention(inst)) {
+                      <span class="text-status-error">{{ inst.syncStatus | syncStatusLabel }}</span>
+                      ·
+                    }
+                    {{ inst.lastSyncTimestamp | cmnRelativeTime: 'Never' }}
+                  </span>
+                </div>
 
-              <ul class="bg-surface-bg">
-                @if (section.category === 'banking') {
+                <div
+                  [class.text-loss]="inst.totalInBaseCurrency < 0"
+                  [class.text-text-primary]="inst.totalInBaseCurrency >= 0"
+                  class="tabular-nums font-medium text-right min-w-[5.5rem]"
+                  status
+                >
+                  {{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}
+                </div>
+
+                <div class="flex items-center gap-cmn-2" actions>
+                  <!-- On a phone the menu carries Reconnect; the row keeps room for the figure. -->
+                  @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+                    <cmn-button
+                      (clicked)="reconnect(inst); $event.stopPropagation()"
+                      class="hidden sm:inline-block"
+                      variant="primary"
+                      size="sm"
+                    >
+                      Reconnect
+                    </cmn-button>
+                  }
+                  <cmn-menu
+                    [items]="institutionMenu(inst)"
+                    [ariaLabel]="'Actions for ' + inst.name"
+                    (itemSelect)="onInstitutionAction(inst, $event.id)"
+                  >
+                    <cmn-icon name="Ellipsis" />
+                  </cmn-menu>
+                </div>
+
+                <ul class="bg-surface-bg">
                   @if (inst.cards && inst.cards.length > 0) {
                     @for (card of inst.cards; track card.cardType) {
                       <li class="border-t border-border-default">
@@ -218,70 +218,70 @@
                       </li>
                     }
                   }
-                } @else {
-                  @for (
-                    account of inst.accounts;
-                    track account.accountId + (account.symbol ?? account.accountNumberLast4)
-                  ) {
-                    @if (account.accountType === 'cash') {
-                      <li
-                        class="flex items-center justify-between gap-cmn-4 border-t border-border-default py-cmn-3 pl-cmn-12 pr-cmn-4"
-                        data-testid="cash-row"
-                      >
-                        <span class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary">
-                          <cmn-institution-avatar [name]="account.currency" size="sm" />
-                          <span class="truncate">{{ account.currency }}</span>
-                          <span
-                            class="shrink-0 rounded-full border border-border-default px-cmn-2 text-cmn-xs text-text-secondary"
-                            data-testid="cash-label"
-                            >Cash</span
-                          >
-                        </span>
-                        <ng-container
-                          *ngTemplateOutlet="amountCell; context: {$implicit: account}"
-                        />
-                      </li>
-                    } @else {
-                      <li class="border-t border-border-default">
-                        <button
-                          (click)="navigateToDossier(account.symbol ?? account.accountNumberLast4)"
-                          class="flex w-full items-center justify-between gap-cmn-4 py-cmn-3 pl-cmn-12 pr-cmn-4 text-left transition-colors hover:bg-surface-card"
-                          type="button"
-                        >
-                          <span
-                            class="inline-flex min-w-0 items-center gap-cmn-2 text-text-primary"
-                          >
-                            <cmn-institution-avatar
-                              [name]="account.symbol ?? account.accountNumberLast4"
-                              [logoUrl]="
-                                account.symbol ?? account.accountNumberLast4
-                                  | assetLogo: account.provider
-                              "
-                              size="sm"
-                            />
-                            <span class="min-w-0">
-                              <span class="block truncate" data-testid="position-ticker">{{
-                                account.symbol ?? account.accountNumberLast4
-                              }}</span>
-                              <span
-                                class="block truncate text-cmn-xs text-text-secondary"
-                                data-testid="position-quantity"
-                                >{{ account | positionQuantity }}</span
-                              >
-                            </span>
-                          </span>
-                          <span
-                            class="shrink-0 text-cmn-sm tabular-nums font-medium text-text-primary"
-                            data-testid="position-value"
-                            >{{ account | positionValue: store.baseCurrency() }}</span
-                          >
-                        </button>
-                      </li>
-                    }
+                </ul>
+              </cmn-disclosure-row>
+            } @else {
+              <div
+                class="flex items-center gap-cmn-2 border-t border-border-default first:border-t-0"
+                data-testid="institution-nav-row"
+              >
+                <a
+                  [queryParams]="{provider: inst.provider}"
+                  [routerLink]="investmentsRoute"
+                  [attr.aria-label]="inst.name + ' positions'"
+                  class="flex min-h-[3.5rem] min-w-0 flex-1 items-center gap-cmn-3 p-cmn-3 transition-colors hover:bg-surface-card"
+                  data-testid="institution-nav-link"
+                >
+                  <span class="relative shrink-0">
+                    <cmn-institution-avatar
+                      [name]="inst.name"
+                      [logoUrl]="inst.name | institutionLogo: inst.provider"
+                    />
+                    <span
+                      [class]="dotClass[inst.syncStatus | syncStatusVariant]"
+                      class="absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full ring-2 ring-surface-card"
+                    ></span>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-cmn-sm font-medium text-text-primary">{{
+                      inst.name
+                    }}</span>
+                    <span
+                      class="block truncate text-cmn-xs text-text-secondary"
+                      data-testid="institution-nav-sublabel"
+                      >{{ navSublabel(inst, section.rowNoun) }}</span
+                    >
+                  </span>
+                  <span
+                    [class.text-loss]="inst.totalInBaseCurrency < 0"
+                    [class.text-text-primary]="inst.totalInBaseCurrency >= 0"
+                    class="shrink-0 text-right text-cmn-sm font-medium tabular-nums"
+                    data-testid="institution-nav-total"
+                    >{{ inst.totalInBaseCurrency | netBalance: store.baseCurrency() }}</span
+                  >
+                  <cmn-icon class="shrink-0 text-text-secondary" name="ChevronRight" />
+                </a>
+                <div class="flex shrink-0 items-center gap-cmn-2 pr-cmn-3">
+                  @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+                    <cmn-button
+                      (clicked)="reconnect(inst)"
+                      class="hidden sm:inline-block"
+                      variant="primary"
+                      size="sm"
+                    >
+                      Reconnect
+                    </cmn-button>
                   }
-                }
-              </ul>
-            </cmn-disclosure-row>
+                  <cmn-menu
+                    [items]="institutionMenu(inst)"
+                    [ariaLabel]="'Actions for ' + inst.name"
+                    (itemSelect)="onInstitutionAction(inst, $event.id)"
+                  >
+                    <cmn-icon name="Ellipsis" />
+                  </cmn-menu>
+                </div>
+              </div>
+            }
           }
         </cmn-card>
       </div>

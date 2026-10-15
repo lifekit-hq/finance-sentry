@@ -149,13 +149,14 @@ test.describe('Asset Dossier', () => {
     await expect(page).toHaveURL(/\/accounts\/investments/);
   });
 
-  test('accounts list brokerage row navigates to dossier on click', async ({page}) => {
+  test('accounts list brokerage row opens investments filtered to its provider', async ({page}) => {
     await page.goto('/accounts/list');
-    await expect(page.getByText('AAPL').first()).toBeVisible();
+    const link = page.getByTestId('institution-nav-link').first();
+    await expect(link).toBeVisible();
 
-    await page.getByText('AAPL').first().click();
+    await link.click();
 
-    await expect(page).toHaveURL(/\/assets\/AAPL/);
+    await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
   });
 
   test('dossier page keeps tax lots collapsed and shows triggers as sentences', async ({page}) => {
