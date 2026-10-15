@@ -88,6 +88,8 @@ const INCOME_COLOUR = FLOW_IN_COLOUR;
 const SPENDING_COLOUR = FLOW_OUT_COLOUR;
 const PERCENT = 100;
 const OTHER_CATEGORIES_LABEL = 'Other categories';
+const OTHER_SOURCES_LABEL = 'Other sources';
+const OTHER_SOURCES_EPSILON = 0.005;
 
 // A savings rate over a single month is only meaningful once the month's income has actually
 // landed. Salary posts once, often on the last day, so before then the month holds a full run
@@ -297,6 +299,10 @@ export function dashboardComputed(store: StateSignals) {
     const banking = carryForward(s => s.bankingTotal);
     const brokerage = carryForward(s => s.brokerageTotal);
     const crypto = carryForward(s => s.cryptoTotal);
+    const other = history.map((s, i) =>
+      Math.max(0, s.totalNetWorth - banking[i] - brokerage[i] - crypto[i])
+    );
+    const hasOther = other.some(value => value > OTHER_SOURCES_EPSILON);
     const splits = splitHistory();
     if (!hasSplit()) {
       return [
@@ -315,6 +321,15 @@ export function dashboardComputed(store: StateSignals) {
           color: ChartColorUtils.canvas(SLEEVE_COLOUR.crypto),
           points: toPoints(crypto),
         },
+        ...(hasOther
+          ? [
+              {
+                label: OTHER_SOURCES_LABEL,
+                color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
+                points: toPoints(other),
+              },
+            ]
+          : []),
       ];
     }
     const bands: AreaSeries[] = [
@@ -343,7 +358,9 @@ export function dashboardComputed(store: StateSignals) {
         label: 'No split',
         color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
         points: toPoints(
-          splits.map((split, i) => (split === null ? banking[i] + brokerage[i] + crypto[i] : 0))
+          splits.map((split, i) =>
+            split === null ? banking[i] + brokerage[i] + crypto[i] + other[i] : 0
+          )
         ),
       },
     ];

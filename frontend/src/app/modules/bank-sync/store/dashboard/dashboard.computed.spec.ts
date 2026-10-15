@@ -673,6 +673,37 @@ describe('dashboardComputed', () => {
         expect(c.netWorthChartLabel()).toBe('Net worth by sleeve');
       });
 
+      it('adds an "Other sources" band so a fourth source keeps the stack at the total', () => {
+        const withOther = {...noSplitDay('2026-07-02', 1_100, 2_100, 310), totalNetWorth: 4_210};
+        const history = [
+          {...noSplitDay('2026-07-01', 1_000, 2_000, 300), totalNetWorth: 4_000},
+          withOther,
+        ];
+        const c = projectionFor({monthlyFlow: [], netWorthHistory: history});
+        const series = c.netWorthAreaSeries();
+
+        expect(series.map(s => s.label)).toEqual([
+          'Banking',
+          'Brokerage',
+          'Crypto',
+          'Other sources',
+        ]);
+        expect(values(series[3])).toEqual([700, 700]);
+        history.forEach((day, i) => {
+          expect(series.reduce((sum, s) => sum + s.points[i].value, 0)).toBe(day.totalNetWorth);
+        });
+      });
+
+      it('counts a fourth source on a day with no split among the unsplit band', () => {
+        const unsplit = {...noSplitDay('2026-07-01', 3_000, 5_000, 500), totalNetWorth: 9_200};
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: [unsplit, splitDay('2026-08-01', 4_000, 5_000, 1_000)],
+        });
+
+        expect(values(c.netWorthAreaSeries()[3])).toEqual([9_200, 0]);
+      });
+
       it('stacks cash, brokerage invested and crypto invested when every day has a split', () => {
         const c = projectionFor({
           monthlyFlow: [],
