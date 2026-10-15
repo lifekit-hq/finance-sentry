@@ -11,6 +11,7 @@ function build(totalCount: number, currentPage: number, pageSize = 20) {
     totalCount: signal(totalCount),
     currentPage: signal(currentPage),
     pageSize: signal(pageSize),
+    search: signal(' rent '),
   });
 }
 
@@ -32,7 +33,12 @@ describe('alertsComputed paging', () => {
     expect(last.hasNextPage()).toBe(false);
   });
 
-  it('query bundles the filter, page and page size the list is showing', () => {
-    expect(build(45, 2, 50).query()).toEqual({filter: 'unread', page: 2, pageSize: 50});
+  it('query bundles the filter, page, page size and trimmed search the list is showing', () => {
+    expect(build(45, 2, 50).query()).toEqual({
+      filter: 'unread',
+      page: 2,
+      pageSize: 50,
+      search: 'rent',
+    });
   });
 });

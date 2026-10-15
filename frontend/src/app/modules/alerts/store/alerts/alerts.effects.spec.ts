@@ -1,16 +1,18 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {of, throwError} from 'rxjs';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
-import {alertsEffects, alertsHooks} from './alerts.effects';
+import {ALERT_SEARCH_DEBOUNCE_MS, alertsEffects, alertsHooks} from './alerts.effects';
 
 const PAGE = {items: [], totalCount: 45, unreadCount: 7, page: 2, pageSize: 20, totalPages: 3};
 
 function build() {
   return {
+    search: signal(''),
+    setSearch: vi.fn(),
     setData: vi.fn(),
     setUnreadCount: vi.fn(),
     setLoading: vi.fn(),
@@ -37,10 +39,10 @@ describe('alertsEffects', () => {
   it('load fetches the requested filter, page and page size', () => {
     const store = build();
     TestBed.runInInjectionContext(() => {
-      alertsEffects(store).load({filter: 'error', page: 2, pageSize: 50});
+      alertsEffects(store).load({filter: 'error', page: 2, pageSize: 50, search: 'rent'});
     });
 
-    expect(api.getAlerts).toHaveBeenCalledWith('error', 2, 50);
+    expect(api.getAlerts).toHaveBeenCalledWith('error', 2, 50, 'rent');
     expect(store.setLoading).toHaveBeenCalledOnce();
     expect(store.setData).toHaveBeenCalledWith([], 45, 7);
     expect(store.setSuccess).toHaveBeenCalledOnce();
@@ -51,7 +53,7 @@ describe('alertsEffects', () => {
     api.getAlerts.mockReturnValue(throwError(() => new Error('boom')));
     const store = build();
     TestBed.runInInjectionContext(() => {
-      alertsEffects(store).load({filter: 'all', page: 1, pageSize: 20});
+      alertsEffects(store).load({filter: 'all', page: 1, pageSize: 20, search: ''});
     });
 
     expect(store.setError).toHaveBeenCalledWith(null);
@@ -61,17 +63,54 @@ describe('alertsEffects', () => {
 
   it('the hook refetches whenever the query signal changes', () => {
     const store = build();
-    const query = signal<AlertsQuery>({filter: 'all', page: 1, pageSize: 20});
+    const query = signal<AlertsQuery>({filter: 'all', page: 1, pageSize: 20, search: ''});
     TestBed.runInInjectionContext(() => {
       const effects = alertsEffects(store);
       alertsHooks({query, load: effects.load, loadUnreadCount: effects.loadUnreadCount});
     });
     TestBed.tick();
-    expect(api.getAlerts).toHaveBeenLastCalledWith('all', 1, 20);
+    expect(api.getAlerts).toHaveBeenLastCalledWith('all', 1, 20, '');
 
-    query.set({filter: 'all', page: 2, pageSize: 20});
+    query.set({filter: 'all', page: 2, pageSize: 20, search: ''});
     TestBed.tick();
-    expect(api.getAlerts).toHaveBeenLastCalledWith('all', 2, 20);
+    expect(api.getAlerts).toHaveBeenLastCalledWith('all', 2, 20, '');
     expect(api.getAlerts).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('alertsEffects.applySearch', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({providers: [{provide: AlertsService, useValue: {}}]});
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('writes the box to the store once typing pauses', () => {
+    const store = build();
+    const box = signal('');
+    TestBed.runInInjectionContext(() => alertsEffects(store).applySearch(box));
+    TestBed.tick();
+
+    box.set('re');
+    TestBed.tick();
+    box.set('rent');
+    TestBed.tick();
+    vi.advanceTimersByTime(ALERT_SEARCH_DEBOUNCE_MS);
+
+    expect(store.setSearch).toHaveBeenCalledExactlyOnceWith('rent');
+  });
+
+  it('ignores a box that only differs from the store by whitespace', () => {
+    const store = build();
+    store.search.set('rent');
+    const box = signal('rent');
+    TestBed.runInInjectionContext(() => alertsEffects(store).applySearch(box));
+    TestBed.tick();
+    box.set('rent ');
+    TestBed.tick();
+    vi.advanceTimersByTime(ALERT_SEARCH_DEBOUNCE_MS);
+
+    expect(store.setSearch).not.toHaveBeenCalled();
   });
 });

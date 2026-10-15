@@ -83,3 +83,28 @@ describe('DateUtils.dayLabel', () => {
     expect(DateUtils.dayLabel('2026-10-25')).toBe('Sun 25 Oct');
   });
 });
+
+describe('DateUtils.recentDayLabel', () => {
+  const now = new Date(2026, 9, 15, 12);
+
+  it('names today and yesterday', () => {
+    expect(DateUtils.recentDayLabel('2026-10-15', now)).toBe('Today');
+    expect(DateUtils.recentDayLabel('2026-10-14', now)).toBe('Yesterday');
+  });
+
+  it('labels an older day of this year without the year', () => {
+    expect(DateUtils.recentDayLabel('2026-10-05', now)).toBe('Mon 5 Oct');
+  });
+
+  it('adds the year to a day from another year', () => {
+    expect(DateUtils.recentDayLabel('2025-12-29', now)).toBe('Mon 29 Dec 2025');
+  });
+
+  it('returns text that is not a date unchanged', () => {
+    expect(DateUtils.recentDayLabel('not-a-date', now)).toBe('not-a-date');
+  });
+
+  it('reads the current day by default', () => {
+    expect(DateUtils.recentDayLabel(DateUtils.isoDateLocal(new Date()))).toBe('Today');
+  });
+});

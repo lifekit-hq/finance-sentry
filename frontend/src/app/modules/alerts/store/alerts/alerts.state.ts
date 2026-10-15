@@ -5,6 +5,7 @@ const DEFAULT_PAGE_SIZE = 20;
 export interface AlertsState {
   alerts: Alert[];
   filter: AlertFilter;
+  search: string;
   totalCount: number;
   unreadCount: number;
   currentPage: number;
@@ -14,6 +15,7 @@ export interface AlertsState {
 export const initialAlertsState: AlertsState = {
   alerts: [],
   filter: 'all',
+  search: '',
   totalCount: 0,
   unreadCount: 0,
   currentPage: 1,

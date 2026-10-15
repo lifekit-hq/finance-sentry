@@ -1,11 +1,11 @@
-import {signal} from '@angular/core';
+import {ApplicationRef, getDebugNode, type Signal, signal, type TemplateRef} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {CmnDrawerService} from '@lifekit-hq/ui';
-import {of} from 'rxjs';
+import {CmnDrawerService, type FilterBarSheetContext} from '@lifekit-hq/ui';
+import {Subject} from 'rxjs';
 import {describe, expect, it, vi} from 'vitest';
 
-import {AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
+import {type AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
 import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {AlertsStore} from '../../store/alerts/alerts.store';
 import {AlertsComponent} from './alerts.component';
@@ -15,17 +15,20 @@ const UNREAD_COUNT = 3;
 const PAGE_SIZE = 20;
 const TOTAL_COUNT = 45;
 
-const drawerOpen = vi.fn();
+const drawerOpen = vi.fn(() => ({beforeClose$: new Subject<void>(), close: vi.fn()}));
+
+type DismissibleChipElement = HTMLElement & {label: string};
 
 function render(
   filter: AlertFilter = 'all',
   unreadCount = 0,
   alerts: Alert[] = [],
-  async: {isLoading?: boolean; errorMessage?: Nullable<string>} = {}
+  async: {isLoading?: boolean; errorMessage?: Nullable<string>; search?: string} = {}
 ) {
   const store = {
     alerts: signal(alerts),
     filter: signal(filter),
+    search: signal(async.search ?? ''),
     unreadCount: signal(unreadCount),
     pageSize: signal(PAGE_SIZE),
     totalCount: signal(TOTAL_COUNT),
@@ -35,9 +38,10 @@ function render(
     totalPages: signal(3),
     setFilter: vi.fn(),
     setPageSize: vi.fn(),
+    applySearch: vi.fn(),
     isLoading: signal(async.isLoading ?? false),
     errorMessage: signal<Nullable<string>>(async.errorMessage ?? null),
-    query: signal({filter, page: 1, pageSize: PAGE_SIZE}),
+    query: signal({filter, page: 1, pageSize: PAGE_SIZE, search: ''}),
     load: vi.fn(),
     markRead: vi.fn(),
     markAllRead: vi.fn(),
@@ -56,59 +60,107 @@ function render(
   return {fixture, el, store, component: fixture.componentInstance};
 }
 
+function appliedChips(root: HTMLElement): DismissibleChipElement[] {
+  return Array.from(root.querySelectorAll<DismissibleChipElement>('lk-dismissible-chip'));
+}
+
+function filtersButton(root: HTMLElement): HTMLButtonElement {
+  return root.querySelector('cmn-filter-bar cmn-badge button') as HTMLButtonElement;
+}
+
+function clearButton(root: HTMLElement): HTMLButtonElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLButtonElement>('cmn-filter-bar button')).find(
+    b => b.textContent?.trim() === 'Clear'
+  );
+}
+
+/** Renders the sheet template the filter bar hands the drawer and returns the sheet in it. */
+function openSheet(root: HTMLElement, close: () => void): AlertFilterSheetComponent {
+  filtersButton(root).click();
+  const [, config] = drawerOpen.mock.calls.at(-1) as unknown as [
+    unknown,
+    {data: {template: TemplateRef<FilterBarSheetContext>}},
+  ];
+  const view = config.data.template.createEmbeddedView({
+    $implicit: drawerOpen.mock.results.at(-1)
+      ?.value as unknown as FilterBarSheetContext['$implicit'],
+    close,
+  });
+  TestBed.inject(ApplicationRef).attachView(view);
+  view.detectChanges();
+  const host = view.rootNodes.find((n: Node) => n instanceof HTMLElement) as HTMLElement;
+  return getDebugNode(host)?.componentInstance as AlertFilterSheetComponent;
+}
+
 describe('AlertsComponent filter flow', () => {
-  beforeEach(() => drawerOpen.mockReset());
+  beforeEach(() => drawerOpen.mockClear());
 
   it('shows no applied filter and no badge count for the unfiltered list', () => {
     const {el, component} = render('all', UNREAD_COUNT);
 
     expect(component.activeFilterCount()).toBe(0);
-    expect(el.querySelector('[data-testid="alerts-applied-filters"]')).toBeNull();
-    expect(el.querySelector('lk-segmented[label="Filter alerts"]')).toBeNull();
+    expect(appliedChips(el)).toHaveLength(0);
+    expect(clearButton(el)).toBeUndefined();
   });
 
-  it('counts the filter and shows it as a dismissible chip with Clear', () => {
+  it('counts the filter and shows it as a removable chip with Clear', () => {
     const {el, component} = render('warning');
 
     expect(component.activeFilterCount()).toBe(1);
-    expect(el.querySelector('[data-testid="alerts-chip-filter"]')?.getAttribute('label')).toBe(
-      'Warnings'
-    );
-    expect(el.querySelector('[data-testid="alerts-filter-clear"]')).not.toBeNull();
+    expect(appliedChips(el).map(c => c.label)).toEqual(['Warnings']);
+    expect(clearButton(el)).toBeDefined();
   });
 
-  it('opens the filter sheet with the current filter and applies the chosen one', () => {
-    drawerOpen.mockReturnValue({afterClosed: () => of('unread')});
-    const {component, store} = render('error');
+  it('opens the responsive Filters sheet from the filter bar', () => {
+    const {el} = render('error');
 
-    component.openFilters();
+    filtersButton(el).click();
 
     expect(drawerOpen).toHaveBeenCalledWith(
-      AlertFilterSheetComponent,
-      expect.objectContaining({data: 'error'})
+      expect.anything(),
+      expect.objectContaining({title: 'Filters', mode: 'responsive'})
     );
-    expect(store.setFilter).toHaveBeenCalledWith('unread');
   });
 
-  it('leaves the filter alone when the sheet is dismissed', () => {
-    drawerOpen.mockReturnValue({afterClosed: () => of(undefined)});
-    const {component, store} = render('error');
+  it('seeds the sheet with the current filter, applies the chosen one and closes', () => {
+    const close = vi.fn();
+    const {el, store} = render('error');
 
-    component.openFilters();
+    const sheet = openSheet(el, close);
+    expect(sheet.initial()).toBe('error');
+    sheet.applied.emit('unread');
 
-    expect(store.setFilter).not.toHaveBeenCalled();
+    expect(store.setFilter).toHaveBeenCalledWith('unread');
+    expect(close).toHaveBeenCalled();
   });
 
   it('clears the filter from the chip and from Clear', () => {
     const {el, store} = render('info');
 
-    (el.querySelector('[data-testid="alerts-filter-clear"] button') as HTMLButtonElement).click();
-    el.querySelector('[data-testid="alerts-chip-filter"]')?.dispatchEvent(
-      new CustomEvent('lk-dismissible-chip-remove')
-    );
+    clearButton(el)?.click();
+    appliedChips(el)[0].dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
 
     expect(store.setFilter).toHaveBeenCalledTimes(2);
     expect(store.setFilter).toHaveBeenCalledWith('all');
+  });
+
+  it('feeds typed search text to the store', () => {
+    const {el, store} = render();
+    const feed = store.applySearch.mock.calls[0][0] as Signal<string>;
+
+    const input = el.querySelector('input[type="search"]') as HTMLInputElement;
+    input.value = 'rent';
+    input.dispatchEvent(new Event('input'));
+
+    expect(feed()).toBe('rent');
+  });
+
+  it('starts the search box from the search the store holds', async () => {
+    const {el, fixture} = render('all', 0, [], {search: 'rent'});
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((el.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('rent');
   });
 
   it('converts the chosen page size back to a number', () => {
@@ -162,7 +214,12 @@ describe('AlertsComponent async states', () => {
     retryButton(el)?.click();
     fixture.detectChanges();
 
-    expect(store.load).toHaveBeenCalledWith({filter: 'warning', page: 1, pageSize: PAGE_SIZE});
+    expect(store.load).toHaveBeenCalledWith({
+      filter: 'warning',
+      page: 1,
+      pageSize: PAGE_SIZE,
+      search: '',
+    });
   });
 
   it('replaces the previous query rows with the error when the new query fails', () => {
@@ -179,6 +236,13 @@ describe('AlertsComponent async states', () => {
     expect(el.textContent).toContain('Try a different filter.');
   });
 
+  it('shows the search-aware empty state when the search matches nothing', () => {
+    const {el} = render('error', 0, [], {search: 'rent'});
+
+    expect(el.textContent).toContain('No matching alerts');
+    expect(el.textContent).toContain('Try a different search or filter.');
+  });
+
   it('shows the all-clear copy when there are no alerts at all', () => {
     const {el} = render('all');
 
@@ -191,6 +255,19 @@ describe('AlertsComponent async states', () => {
 
     expect(el.querySelectorAll('[data-testid="alert-row"]').length).toBe(1);
     expect(el.querySelector('[data-testid="alerts-skeleton"]')).toBeNull();
+  });
+
+  it('groups the rows under a labelled day section', () => {
+    const older = {...ALERT, id: 'a0', createdAt: '2026-09-20T10:00:00Z'} as unknown as Alert;
+    const {el} = render('all', 1, [ALERT, older]);
+    const sections = Array.from(el.querySelectorAll('cmn-list-section section'));
+
+    expect(sections).toHaveLength(2);
+    expect(sections.map(s => s.querySelector('h2')?.textContent?.trim())).toEqual([
+      'Tue 22 Sept',
+      'Sun 20 Sept',
+    ]);
+    expect(sections[0].querySelectorAll('[data-testid="alert-row"]')).toHaveLength(1);
   });
 
   it('mutes a resolved alert by recolour, fading only its icon, never the whole row', () => {

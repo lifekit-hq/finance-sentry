@@ -2,8 +2,13 @@ namespace FinanceSentry.Modules.Alerts.Domain.Repositories;
 
 public interface IAlertRepository
 {
+    /// <summary>
+    /// One page of the user's open (non-dismissed) alerts, newest first. <paramref name="search"/>, when set,
+    /// keeps the alerts whose title, message or reference label contains it, ignoring case; the unread count
+    /// ignores both the filter and the search.
+    /// </summary>
     Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-        Guid userId, string filter, int page, int pageSize, CancellationToken ct = default);
+        Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default);
 
     Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default);
 

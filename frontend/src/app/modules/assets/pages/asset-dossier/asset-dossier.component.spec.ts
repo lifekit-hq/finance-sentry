@@ -900,11 +900,11 @@ describe('AssetDossierComponent', () => {
       expect(byTestId('chart-key')?.textContent).toContain('Buy');
     });
 
-    it('asks the store for a new range when a tab is picked', () => {
+    it('asks the store for a new range when a chip is pressed', () => {
       fixture.detectChanges();
 
       byTestId('chart-ranges')?.dispatchEvent(
-        new CustomEvent('lk-segmented-change', {detail: {value: '5Y'}})
+        new CustomEvent('lk-chip-row-change', {detail: {selected: ['5Y'], value: '5Y'}})
       );
 
       expect(mockStore.selectChartRange).toHaveBeenCalledWith('5Y');

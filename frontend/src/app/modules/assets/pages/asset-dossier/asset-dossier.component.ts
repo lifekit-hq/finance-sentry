@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
+import {type ChipRowChangeDetail} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   AreaChartComponent,
@@ -114,7 +115,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   ],
   templateUrl: './asset-dossier.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // lk-segmented (the chart's timeframe tabs) is a custom element from @lifekit-hq/elements.
+  // lk-chip-row (the chart's timeframe range) is a custom element from @lifekit-hq/elements.
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DossierStore],
 })
@@ -199,8 +200,8 @@ export class AssetDossierComponent {
   }
 
   public onChartRangeChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: ChartRangeId}>).detail;
-    this.store.selectChartRange(value);
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.selectChartRange(value as ChartRangeId);
   }
 
   public generateLedgerRead(symbol: string, force: boolean): void {

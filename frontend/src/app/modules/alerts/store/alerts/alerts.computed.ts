@@ -6,6 +6,7 @@ import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 interface StateSignals {
   alerts: Signal<Alert[]>;
   filter: Signal<AlertFilter>;
+  search: Signal<string>;
   unreadCount: Signal<number>;
   totalCount: Signal<number>;
   currentPage: Signal<number>;
@@ -23,6 +24,7 @@ export function alertsComputed(store: StateSignals) {
       filter: store.filter(),
       page: store.currentPage(),
       pageSize: store.pageSize(),
+      search: store.search().trim(),
     })),
   };
 }

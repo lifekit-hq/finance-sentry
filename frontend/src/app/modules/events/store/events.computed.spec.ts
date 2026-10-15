@@ -91,13 +91,6 @@ describe('eventsComputed', () => {
     ]);
   });
 
-  it('isKindSelected lights no chip for an empty selection, only explicit picks', () => {
-    expect(build().isKindSelected()('macro')).toBe(false);
-    const narrowed = build({kinds: ['earnings']});
-    expect(narrowed.isKindSelected()('earnings')).toBe(true);
-    expect(narrowed.isKindSelected()('macro')).toBe(false);
-  });
-
   it('upcomingSections splits days into this week and later, dropping empty sections', () => {
     const both = build({
       upcoming: [upcoming('2026-09-23', 'MU'), upcoming('2026-10-20', 'PLTR')],

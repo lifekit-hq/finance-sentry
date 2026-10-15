@@ -17,9 +17,15 @@ export class AlertsService extends ApiService {
   public getAlerts(
     filter: AlertFilter = 'all',
     page = 1,
-    pageSize = 20
+    pageSize = 20,
+    search = ''
   ): Observable<AlertsPageResponse> {
-    return this.get<AlertsPageResponse>('', {filter, page, pageSize});
+    return this.get<AlertsPageResponse>('', {
+      filter,
+      page,
+      pageSize,
+      search: search.trim() || undefined,
+    });
   }
 
   public getUnreadCount(): Observable<UnreadCountResponse> {

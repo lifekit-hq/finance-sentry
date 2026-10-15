@@ -103,7 +103,7 @@ describe('DashboardComponent range presets', () => {
 
   it('offers the IBKR presets in order, with no 6M', () => {
     const control = render().el.querySelector<HTMLElement & {options: {label: string}[]}>(
-      'lk-segmented[label="History range"]'
+      'lk-chip-row[label="History range"]'
     );
 
     expect(control?.options.map(o => o.label)).toEqual([
@@ -119,16 +119,18 @@ describe('DashboardComponent range presets', () => {
 
   it('selects a preset through the store when the control changes', () => {
     const {el, store} = render();
-    const control = el.querySelector('lk-segmented');
+    const control = el.querySelector('lk-chip-row[label="History range"]');
 
-    control?.dispatchEvent(new CustomEvent('lk-segmented-change', {detail: {value: 'mtd'}}));
+    control?.dispatchEvent(
+      new CustomEvent('lk-chip-row-change', {detail: {selected: ['mtd'], value: 'mtd'}})
+    );
 
     expect(store['setHistoryRange']).toHaveBeenCalledWith('mtd');
   });
 
   it('puts the chart between the figure and the range control in the hero card', () => {
     const card = render().el.querySelector('cmn-card');
-    const order = ['[data-testid="net-worth-value"]', 'cmn-area-chart', 'lk-segmented'].map(sel =>
+    const order = ['[data-testid="net-worth-value"]', 'cmn-area-chart', 'lk-chip-row'].map(sel =>
       card?.querySelector(sel)
     );
 

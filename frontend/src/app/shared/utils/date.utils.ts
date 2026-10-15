@@ -1,7 +1,7 @@
 import {formatDate, registerLocaleData} from '@angular/common';
 import localeEnGb from '@angular/common/locales/en-GB';
 
-import {APP_LOCALE} from '../constants/date/date.constants';
+import {APP_LOCALE, MS_PER_DAY} from '../constants/date/date.constants';
 
 registerLocaleData(localeEnGb, APP_LOCALE);
 
@@ -47,5 +47,23 @@ export class DateUtils {
       withYear ? DAY_LABEL_WITH_YEAR_FORMAT : DAY_LABEL_FORMAT,
       APP_LOCALE
     );
+  }
+
+  /**
+   * A past calendar day as a list heading: "Today", "Yesterday", otherwise "Mon 10 Aug" (the year
+   * is added outside the current one). `now` is read in the viewer's time zone.
+   */
+  public static recentDayLabel(isoDate: string, now: Date = new Date()): string {
+    if (isoDate === DateUtils.isoDateLocal(now)) {
+      return 'Today';
+    }
+    if (isoDate === DateUtils.isoDateLocal(new Date(now.getTime() - MS_PER_DAY))) {
+      return 'Yesterday';
+    }
+    const date = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return isoDate;
+    }
+    return DateUtils.dayLabel(isoDate, date.getFullYear() !== now.getFullYear());
   }
 }

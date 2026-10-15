@@ -58,7 +58,7 @@ async function mockApis(page: Page): Promise<void> {
 }
 
 function heroCard(page: Page): Locator {
-  return page.locator('cmn-card', {has: page.locator('lk-segmented')}).first();
+  return page.locator('cmn-card', {has: page.locator('lk-chip-row')}).first();
 }
 
 /** Every distinct rendered height of the card seen on each frame during `windowMs`. */
@@ -110,7 +110,10 @@ for (const [name, viewport] of [
       for (const range of RANGES) {
         const heights = sampleHeights(card, SAMPLE_WINDOW_MS);
         const tileHeights = sampleHeights(tiles, SAMPLE_WINDOW_MS);
-        await page.getByRole('radio', {name: range, exact: true}).click();
+        await page
+          .getByRole('group', {name: 'History range'})
+          .getByRole('button', {name: range, exact: true})
+          .click();
         expect(await heights, `range ${range}`).toEqual([baseline]);
         expect(await tileHeights, `tiles, range ${range}`).toEqual([tilesBaseline]);
       }

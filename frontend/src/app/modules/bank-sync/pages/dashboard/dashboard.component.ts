@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {type ChartPointClick, type DonutSegmentClick} from '@lifekit-hq/charts-core';
+import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   AreaChartComponent,
@@ -45,8 +46,8 @@ import {type CategoryStat, type HistoryRange} from '../../models/dashboard/dashb
 import {DashboardStore} from '../../store/dashboard/dashboard.store';
 import {DashboardRangeUtils} from '../../utils/dashboard-range.utils';
 
-// lk-segmented reads `value` as a string; the options are the preset keys.
-const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
+// Seven presets are more than lk-segmented holds, so they sit in a chip row keyed by the preset.
+const HISTORY_RANGES: ChipRowOption[] = [
   {label: '1W', value: '1w'},
   {label: 'MTD', value: 'mtd'},
   {label: '1M', value: '1m'},
@@ -305,10 +306,10 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   (scrubEnd)="store.setScrubIndex(null)"
                 />
               }
-              <lk-segmented
+              <lk-chip-row
                 [options]="rangeOptions"
-                [value]="store.historyRange()"
-                (lk-segmented-change)="onRangeChange($event)"
+                [selected]="[store.historyRange()]"
+                (lk-chip-row-change)="onRangeChange($event)"
                 label="History range"
               />
             </div>
@@ -490,8 +491,8 @@ export class DashboardComponent {
   }
 
   public onRangeChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: HistoryRange}>).detail;
-    this.store.setHistoryRange(value);
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.setHistoryRange(value as HistoryRange);
   }
 
   public retry(): void {

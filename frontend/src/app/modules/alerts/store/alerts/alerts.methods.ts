@@ -19,6 +19,9 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
     setFilter(filter: AlertFilter): void {
       patchState(store, {filter, currentPage: 1});
     },
+    setSearch(search: string): void {
+      patchState(store, {search, currentPage: 1});
+    },
     setPage(currentPage: number): void {
       patchState(store, {currentPage: Math.max(1, currentPage)});
     },

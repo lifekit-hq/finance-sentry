@@ -71,18 +71,19 @@
     </div>
 
     @if (store.accountChips().length > 1) {
-      <div class="mb-cmn-6 flex flex-wrap items-center gap-cmn-2">
-        <span class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
+      <div class="mb-cmn-6 flex items-center gap-cmn-2">
+        <span
+          class="shrink-0 text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary"
           >Account</span
         >
-        @for (chip of store.accountChips(); track chip.accountId) {
-          <cmn-chip
-            [selected]="store.accountFilter() === chip.accountId"
-            (clicked)="toggleAccount(chip.accountId)"
-          >
-            {{ chip.label }}
-          </cmn-chip>
-        }
+        <lk-chip-row
+          [options]="accountOptions()"
+          [selected]="selectedAccount()"
+          (lk-chip-row-change)="onAccountChange($event)"
+          class="min-w-0 flex-1"
+          label="Account filter"
+          data-testid="breakdown-account-chips"
+        />
       </div>
     }
 

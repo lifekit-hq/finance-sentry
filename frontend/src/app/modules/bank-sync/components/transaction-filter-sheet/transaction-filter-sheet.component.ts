@@ -1,14 +1,17 @@
-import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  type OnInit,
+  output,
+  signal,
+} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormControl, ReactiveFormsModule} from '@angular/forms';
-import {
-  ButtonComponent,
-  ChipComponent,
-  CMN_DRAWER_DATA,
-  CmnDrawerRef,
-  type DateRange,
-  DateRangeComponent,
-} from '@lifekit-hq/ui';
+import {ButtonComponent, ChipComponent, type DateRange, DateRangeComponent} from '@lifekit-hq/ui';
 
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
@@ -21,8 +24,9 @@ import {
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 
 /**
- * Body of the ledger's filter sheet (Period / Type / Category). It edits a draft copy of the
- * page's filters and hands it back on "Show results"; closing the sheet any other way drops it.
+ * Body of the ledger's filter sheet (Period / Type / Category), rendered by `cmn-filter-bar`. It
+ * edits a draft copy of `initial` and emits it on "Show results"; closing the sheet any other way
+ * drops it.
  */
 @Component({
   selector: 'fns-transaction-filter-sheet',
@@ -30,18 +34,17 @@ import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
   templateUrl: './transaction-filter-sheet.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TransactionFilterSheetComponent {
-  private readonly drawerRef = inject<CmnDrawerRef<TransactionFilterSelection>>(CmnDrawerRef);
+export class TransactionFilterSheetComponent implements OnInit {
+  public readonly initial = input.required<TransactionFilterSelection>();
+  public readonly applied = output<TransactionFilterSelection>();
 
   public readonly categoryStore = inject(CategoryStore);
   public readonly periods = LEDGER_PERIODS;
 
-  public readonly draft = signal<TransactionFilterSelection>(
-    inject<TransactionFilterSelection>(CMN_DRAWER_DATA)
-  );
+  public readonly draft = linkedSignal<TransactionFilterSelection>(() => this.initial());
   public readonly customOpen = signal(false);
   public readonly rangeControl = new FormControl<DateRange>(
-    {from: this.draft().from, to: this.draft().to},
+    {from: null, to: null},
     {nonNullable: true}
   );
 
@@ -62,6 +65,11 @@ export class TransactionFilterSheetComponent {
     this.rangeControl.valueChanges.pipe(takeUntilDestroyed()).subscribe(range => {
       this.draft.update(d => ({...d, from: range.from || null, to: range.to || null}));
     });
+  }
+
+  public ngOnInit(): void {
+    const {from, to} = this.draft();
+    this.rangeControl.setValue({from, to}, {emitEvent: false});
   }
 
   public selectPeriod(period: LedgerPeriod): void {
@@ -95,6 +103,6 @@ export class TransactionFilterSheetComponent {
   }
 
   public apply(): void {
-    this.drawerRef.close(this.draft());
+    this.applied.emit(this.draft());
   }
 }

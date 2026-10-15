@@ -1,11 +1,17 @@
 import {DatePipe, DecimalPipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
+import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AsyncStateComponent,
   type AsyncStateStatus,
   CardComponent,
-  ChipComponent,
   CmnDrawerService,
   EmptyStateComponent,
   ListItemRowComponent,
@@ -20,6 +26,10 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {MerchantCategoryPipe} from '../../../../shared/pipes/merchant-category.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
+import {
+  ALL_ACCOUNTS_LABEL,
+  ALL_ACCOUNTS_VALUE,
+} from '../../constants/account-filter/account-filter.constants';
 import {type FlowBreakdownItem} from '../../models/flow-breakdown/flow-breakdown.model';
 import {FlowBreakdownStore} from '../../store/flow-breakdown/flow-breakdown.store';
 import {FlowBreakdownUtils} from '../../utils/flow-breakdown.utils';
@@ -34,7 +44,6 @@ const DRAWER_WIDTH = '480px';
     PageContainerComponent,
     AsyncStateComponent,
     CardComponent,
-    ChipComponent,
     DatePipe,
     DecimalPipe,
     EmptyStateComponent,
@@ -49,7 +58,8 @@ const DRAWER_WIDTH = '480px';
   ],
   templateUrl: './flow-breakdown.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block min-h-full md:h-full'},
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  host: {class: 'block h-full'},
   providers: [FlowBreakdownStore],
 })
 export class FlowBreakdownComponent {
@@ -68,6 +78,14 @@ export class FlowBreakdownComponent {
   public readonly currentMonth = new Date();
   public readonly monthDate = computed(() => MonthKeyUtils.toDate(this.store.month()));
   public readonly transactionsRoute = AppRoute.Transactions;
+
+  public readonly accountOptions = computed((): ChipRowOption[] => [
+    {value: ALL_ACCOUNTS_VALUE, label: ALL_ACCOUNTS_LABEL},
+    ...this.store.accountChips().map(chip => ({value: chip.accountId, label: chip.label})),
+  ]);
+  public readonly selectedAccount = computed(() => [
+    this.store.accountFilter() ?? ALL_ACCOUNTS_VALUE,
+  ]);
 
   // The days the page covers, so a drill-down lists the same window the figures total.
   public readonly windowDates = computed((): {from?: string; to?: string} => {
@@ -103,8 +121,9 @@ export class FlowBreakdownComponent {
     });
   }
 
-  public toggleAccount(accountId: string): void {
-    this.store.setAccountFilter(accountId);
+  public onAccountChange(event: Event): void {
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.setAccountFilter(value === ALL_ACCOUNTS_VALUE ? null : value);
   }
 
   private navigateToMonth(month: string): void {

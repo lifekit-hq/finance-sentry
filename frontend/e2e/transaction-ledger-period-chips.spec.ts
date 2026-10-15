@@ -1,4 +1,7 @@
-import {expect, test} from '@playwright/test';
+import {expect, type Page, test} from '@playwright/test';
+
+const thisMonth = (page: Page) =>
+  page.getByRole('group', {name: 'Period filter'}).getByRole('button', {name: 'This month'});
 
 // Origin-agnostic glob — see dashboard-drilldown.spec.ts for why the dev apiBaseUrl is not used.
 const API = '**/api/v1';
@@ -63,29 +66,20 @@ test.describe('Transaction ledger — quick period chips', () => {
     await page.goto('/transactions');
     await expect(page.getByTestId('ledger-row')).toHaveCount(2);
 
-    await page.getByTestId('period-this-month').click();
+    await thisMonth(page).click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
     await expect(page.getByText('Synthetic current row')).toBeVisible();
-    await expect(page.getByTestId('period-this-month').getByRole('button')).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    await expect(page.getByTestId('chip-date-range')).toHaveAttribute(
-      'label',
-      'Period: This month'
-    );
+    await expect(thisMonth(page)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', {name: 'Remove Period: This month'})).toBeVisible();
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/);
 
     // A custom range matches no period chip; the Dates chip names the range instead.
     await page.goto('/transactions?from=2020-01-01&to=2020-01-31');
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
-    await expect(page.getByTestId('period-this-month').getByRole('button')).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    await expect(thisMonth(page)).toHaveAttribute('aria-pressed', 'false');
 
     // Clearing the dates clears the chip and restores the full list.
-    await page.getByTestId('chip-date-range').getByRole('button').click();
+    await page.getByRole('button', {name: /^Remove (Period|Dates):/}).click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(2);
   });
 });

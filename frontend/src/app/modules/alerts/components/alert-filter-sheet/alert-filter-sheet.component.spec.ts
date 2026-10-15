@@ -1,39 +1,35 @@
 import {TestBed} from '@angular/core/testing';
-import {CMN_DRAWER_DATA, CmnDrawerRef} from '@lifekit-hq/ui';
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it} from 'vitest';
 
 import {type AlertFilter} from '../../models/alert/alert.model';
 import {AlertFilterSheetComponent} from './alert-filter-sheet.component';
 
 function setup(initial: AlertFilter) {
-  const close = vi.fn();
-  TestBed.configureTestingModule({
-    providers: [
-      {provide: CMN_DRAWER_DATA, useValue: initial},
-      {provide: CmnDrawerRef, useValue: {close}},
-    ],
-  });
   const fixture = TestBed.createComponent(AlertFilterSheetComponent);
+  fixture.componentRef.setInput('initial', initial);
   fixture.detectChanges();
-  return {component: fixture.componentInstance, close};
+  const applied: AlertFilter[] = [];
+  fixture.componentInstance.applied.subscribe(f => applied.push(f));
+  return {component: fixture.componentInstance, applied};
 }
 
 describe('AlertFilterSheetComponent', () => {
-  it('starts from the page filter and hands the draft back on apply', () => {
-    const {component, close} = setup('unread');
+  it('starts from the page filter and emits the draft on apply', () => {
+    const {component, applied} = setup('unread');
 
     expect(component.draft()).toBe('unread');
     component.select('error');
     component.apply();
 
-    expect(close).toHaveBeenCalledWith('error');
+    expect(applied).toEqual(['error']);
   });
 
-  it('resets the draft to all', () => {
-    const {component} = setup('warning');
+  it('resets the draft to all without emitting', () => {
+    const {component, applied} = setup('warning');
 
     component.reset();
 
     expect(component.draft()).toBe('all');
+    expect(applied).toHaveLength(0);
   });
 });

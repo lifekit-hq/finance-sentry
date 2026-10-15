@@ -18,7 +18,7 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
     private IQueryable<Alert> AllUsers => _db.Alerts.IgnoreQueryFilters([OwnerQueryFilter.Name]);
 
     public async Task<(IReadOnlyList<Alert> Items, int TotalCount, int UnreadCount)> GetPagedAsync(
-        Guid userId, string filter, int page, int pageSize, CancellationToken ct = default)
+        Guid userId, string filter, int page, int pageSize, string? search = null, CancellationToken ct = default)
     {
         var baseQuery = _db.Alerts.AsNoTracking()
             .Where(a => a.UserId == userId && !a.IsDismissed);
@@ -31,6 +31,15 @@ public class AlertRepository(AlertsDbContext db) : IAlertRepository
             "info" => baseQuery.Where(a => a.Severity == AlertSeverity.Info),
             _ => baseQuery,
         };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // A plain substring (strpos on PostgreSQL), so '%' or '_' in the text is matched literally.
+            var term = search.Trim().ToLowerInvariant();
+            filtered = filtered.Where(a => a.Title.ToLower().Contains(term)
+                || a.Message.ToLower().Contains(term)
+                || (a.ReferenceLabel != null && a.ReferenceLabel.ToLower().Contains(term)));
+        }
 
         var totalCount = await filtered.CountAsync(ct);
         var unreadCount = await baseQuery.CountAsync(a => !a.IsRead && !a.IsResolved, ct);

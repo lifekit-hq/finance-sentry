@@ -12,26 +12,29 @@
   />
 
   @if (store.view() === 'calendar') {
-    <div class="mt-cmn-4 flex flex-wrap items-center gap-cmn-2" data-testid="horizon-chips">
-      <span class="text-cmn-xs uppercase tracking-wide text-text-secondary">Next</span>
-      @for (days of horizons; track days) {
-        <cmn-chip
-          [selected]="store.horizonDays() === days"
-          (clicked)="store.selectHorizon(days)"
-          data-testid="horizon-chip"
-        >
-          {{ days }} days
-        </cmn-chip>
-      }
+    <div class="mt-cmn-4 flex items-center gap-cmn-2">
+      <span class="shrink-0 text-cmn-xs uppercase tracking-wide text-text-secondary">Next</span>
+      <lk-chip-row
+        [options]="horizonOptions"
+        [selected]="selectedHorizon()"
+        (lk-chip-row-change)="onHorizonChange($event)"
+        class="min-w-0 flex-1"
+        label="Horizon"
+        data-testid="horizon-chips"
+      />
     </div>
 
-    <div class="mt-cmn-2 flex flex-wrap items-center gap-cmn-2" data-testid="kind-chips">
-      <span class="text-cmn-xs uppercase tracking-wide text-text-secondary">Kinds</span>
-      @for (kind of kinds; track kind) {
-        <cmn-chip [selected]="store.isKindSelected()(kind)" (clicked)="store.toggleKind(kind)">
-          {{ kindMeta(kind).label }}
-        </cmn-chip>
-      }
+    <div class="mt-cmn-2 flex items-center gap-cmn-2">
+      <span class="shrink-0 text-cmn-xs uppercase tracking-wide text-text-secondary">Kinds</span>
+      <lk-chip-row
+        [options]="kindOptions"
+        [selected]="store.kinds()"
+        (lk-chip-row-change)="onKindChange($event)"
+        class="min-w-0 flex-1"
+        mode="multi"
+        label="Event kinds"
+        data-testid="kind-chips"
+      />
     </div>
 
     @if (store.unavailableSourceLabels().length > 0) {

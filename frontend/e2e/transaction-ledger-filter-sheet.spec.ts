@@ -82,9 +82,9 @@ test.describe('Transaction ledger — filter sheet', () => {
 
     await page.goto('/transactions');
     await expect(page.getByTestId('ledger-row')).toHaveCount(4);
-    await expect(page.getByTestId('applied-filters')).toHaveCount(0);
+    await expect(page.locator('lk-dismissible-chip')).toHaveCount(0);
 
-    await page.getByTestId('filter-button').getByRole('button').click();
+    await page.getByRole('button', {name: 'Filters', exact: true}).click();
     await page.getByTestId('sheet-period-3m').getByRole('button').click();
     await page.getByTestId('type-out').getByRole('button').click();
     await page.getByTestId('category-FOOD_AND_DRINK').getByRole('button').click();
@@ -96,24 +96,21 @@ test.describe('Transaction ledger — filter sheet', () => {
     await expect(page).toHaveURL(/type=debit/);
     await expect(page).toHaveURL(/category=FOOD_AND_DRINK/);
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&/);
-    await expect(page.getByTestId('chip-date-range')).toHaveAttribute('label', 'Period: 3M');
-    await expect(page.getByTestId('chip-type')).toHaveAttribute('label', 'Type: Out');
-    await expect(page.getByTestId('chip-category-FOOD_AND_DRINK')).toHaveAttribute(
-      'label',
-      'Category: Food & Drink'
-    );
+    await expect(page.getByRole('button', {name: 'Remove Period: 3M'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Remove Type: Out'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Remove Category: Food & Drink'})).toBeVisible();
 
     // Dismissing a chip widens the list; Clear removes the rest.
-    await page.getByTestId('chip-category-FOOD_AND_DRINK').getByRole('button').click();
+    await page.getByRole('button', {name: 'Remove Category: Food & Drink'}).click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(2);
-    await page.getByTestId('filter-clear').getByRole('button').click();
+    await page.getByRole('button', {name: 'Clear', exact: true}).click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(4);
-    await expect(page.getByTestId('applied-filters')).toHaveCount(0);
+    await expect(page.locator('lk-dismissible-chip')).toHaveCount(0);
 
     // Reset in the sheet empties the draft before it is applied.
     await page.goto('/transactions?type=credit');
     await expect(page.getByTestId('ledger-row')).toHaveCount(1);
-    await page.getByTestId('filter-button').getByRole('button').click();
+    await page.getByRole('button', {name: 'Filters', exact: true}).click();
     await page.getByTestId('filter-reset').getByRole('button').click();
     await page.getByTestId('filter-apply').getByRole('button').click();
     await expect(page.getByTestId('ledger-row')).toHaveCount(4);
@@ -136,11 +133,10 @@ test.describe('Transaction ledger — filter sheet', () => {
     );
 
     await page.goto('/transactions?from=2020-01-01&to=2020-01-31');
-    await expect(page.getByTestId('chip-date-range')).toHaveAttribute(
-      'label',
-      'Dates: 2020-01-01 – 2020-01-31'
-    );
-    await page.getByTestId('filter-button').getByRole('button').click();
+    await expect(
+      page.getByRole('button', {name: 'Remove Dates: 2020-01-01 – 2020-01-31'})
+    ).toBeVisible();
+    await page.getByRole('button', {name: 'Filters', exact: true}).click();
     await expect(page.getByTestId('sheet-period-custom').getByRole('button')).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -189,7 +185,7 @@ test.describe('Transaction ledger — filter sheet', () => {
     const y = async (locator: ReturnType<typeof page.locator>) =>
       (await locator.boundingBox())?.y ?? Number.NaN;
     const search = await y(page.getByRole('searchbox', {name: 'Search transactions'}));
-    const button = await y(page.getByTestId('filter-button'));
+    const button = await y(page.getByRole('button', {name: 'Filters', exact: true}));
     const periods = await y(page.getByRole('group', {name: 'Period filter'}));
     const accounts = await y(page.getByRole('group', {name: 'Account filter'}));
     const row = await y(page.getByTestId('ledger-row'));
@@ -204,12 +200,14 @@ test.describe('Transaction ledger — filter sheet', () => {
     // Sheet content lines up with the padded "Filters" header instead of the panel edge.
     // Reduced motion keeps the slide-in from skewing the measurements.
     await page.emulateMedia({reducedMotion: 'reduce'});
-    await page.getByTestId('filter-button').getByRole('button').click();
+    await page.getByRole('button', {name: 'Filters', exact: true}).click();
     await expect(page.getByRole('heading', {name: 'Filters'})).toBeInViewport();
     const x = async (locator: ReturnType<typeof page.locator>) =>
       (await locator.boundingBox())?.x ?? Number.NaN;
     const header = await x(page.getByRole('heading', {name: 'Filters'}));
     expect(await x(page.getByTestId('sheet-period-this-month'))).toBeGreaterThanOrEqual(header);
-    expect(await x(page.getByRole('button', {name: 'Show results'}))).toBeGreaterThanOrEqual(header);
+    expect(await x(page.getByRole('button', {name: 'Show results'}))).toBeGreaterThanOrEqual(
+      header
+    );
   });
 });

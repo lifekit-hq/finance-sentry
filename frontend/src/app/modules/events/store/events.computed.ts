@@ -55,11 +55,6 @@ export function eventsComputed(store: StateSignals) {
         .filter(s => s.status === 'unavailable')
         .map(s => EVENT_SOURCE_LABELS[s.source] ?? s.source)
     ),
-    /** Chips light up only for an explicit pick; an empty selection means every kind. */
-    isKindSelected: computed(() => {
-      const selected = store.kinds();
-      return (kind: EventKind): boolean => selected.includes(kind);
-    }),
     isFiredEmpty: computed(() => store.firedStatus() === 'success' && store.fired().length === 0),
     hasFiredRows: computed(() => store.fired().length > 0),
     hasMoreFired: computed(
