@@ -230,6 +230,12 @@ also fixes:
 - **A negative value** anywhere in a TWR window fails `NegativeBase`: a ratio through a negative base has no
   meaning. Value appearing in an empty scope with no recorded inflow is listed as unexplained and left out of
   the chain (rule 4), never chained as a return.
+- **M6 splits each gain** into a price effect and a currency effect. With the position's local-currency
+  amounts (each buy's and sell's, a sell's rate, and the held value with its rate), the price effect is the
+  local gain converted at the end (or sale) rate and the currency effect is the USD gain minus it. A position
+  given in USD only reports `UsdOnly`: its currency effect is 0 because it was not measured. Local amounts on
+  some events and not others fail `InvalidInput`. A sale of the held quantity to within rounding (a reverse
+  split by 1/3 leaves 0.999...) sells everything. Income is at its pay date's rate and is not split.
 
 Golden fixtures live in `backend/tests/FinanceSentry.Tests.Unit/Core/Measures/`: `MeasureEngineGoldenFixtureTests`
 holds the report's ten (R5) and `CryptoFlowGoldenFixtureTests` the crypto-flow fixtures 11-20. Each expected

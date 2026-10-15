@@ -329,6 +329,53 @@ public class MeasureEngineGoldenFixtureTests
     }
 
     [Fact]
+    public void Fixture7_FxOnlyMove_GainVsCostIsAllCurrencyEffect()
+    {
+        // EUR 1,000 bought at 1.10 (USD 1,100), still held, worth EUR 1,000 at 1.20 (USD 1,200).
+        var result = GainVsCost.Measure(
+            [new(Day(2026, 12, 31), CostEventKind.Buy, Quantity: 1000m, AmountUsd: 1100m, AmountLocal: 1000m)],
+            1200m,
+            new LocalValue(1000m, 1.20m)).Value!;
+
+        // Oracle: hand. USD gain 1,200 - 1,100 = 100. Price effect = local gain (1,000 - 1,000) × 1.20 = 0;
+        // currency effect = 100 - 0 = 100 (= 1,000 × (1.20 - 1.10)). Nothing realized.
+        result.CurrencyBasis.Should().Be(GainCurrencyBasis.LocalAmounts);
+        result.UnrealizedUsd.Should().Be(100m);
+        result.UnrealizedCurrencyUsd.Should().Be(100m);
+        result.PriceEffectUsd.Should().Be(0m);
+        result.CurrencyEffectUsd.Should().Be(100m);
+        result.RealizedUsd.Should().Be(0m);
+        result.TotalGainUsd.Should().Be(100m);
+    }
+
+    [Fact]
+    public void Fixture7_PriceAndFxMovesTogether_GainsSplitIntoPriceAndCurrencyEffect()
+    {
+        // 10 units bought for EUR 1,000 at 1.10 (USD 1,100); 5 sold for EUR 600 at 1.30 (USD 780);
+        // the 5 left are worth EUR 520 at 1.25 (USD 650).
+        var result = GainVsCost.Measure(
+            [
+                new(Day(2027, 1, 4), CostEventKind.Buy, Quantity: 10m, AmountUsd: 1100m, AmountLocal: 1000m),
+                new(Day(2027, 2, 1), CostEventKind.Sell, Quantity: 5m, AmountUsd: 780m, AmountLocal: 600m, RateUsd: 1.30m),
+            ],
+            650m,
+            new LocalValue(520m, 1.25m)).Value!;
+
+        // Oracle: hand. Sold half: cost EUR 500 = USD 550. Realized USD 780 - 550 = 230; price effect
+        // (600 - 500) × 1.30 = 130; currency effect 230 - 130 = 100 (= 500 × (1.30 - 1.10)).
+        // Held half: cost EUR 500 = USD 550, value USD 650, unrealized USD 100; price effect (520 - 500) × 1.25
+        // = 25; currency effect 100 - 25 = 75 (= 500 × (1.25 - 1.10)).
+        // Totals: USD gain 330 = price 155 + currency 175.
+        result.RealizedUsd.Should().Be(230m);
+        result.RealizedCurrencyUsd.Should().Be(100m);
+        result.UnrealizedUsd.Should().Be(100m);
+        result.UnrealizedCurrencyUsd.Should().Be(75m);
+        result.PriceEffectUsd.Should().Be(155m);
+        result.CurrencyEffectUsd.Should().Be(175m);
+        result.TotalGainUsd.Should().Be(330m);
+    }
+
+    [Fact]
     public void Fixture7_FxLineLeftOut_ResidualAboveTolerance()
     {
         var bridge = NetWorthBridge.Measure(1100m, 1200m, [], new BridgePositionLines(0m, 0m, 0m, 0m, 0m)).Value!;

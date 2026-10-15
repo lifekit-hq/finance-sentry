@@ -5,7 +5,9 @@
 // Changes from the original: translated from F# to C#; every failure the original throws (no positive and
 // negative cash flow, no bracketing interval, no root within the iteration limits) is returned as a typed
 // MeasureFailure instead; the mutable module-level precision is replaced by constants; a date before the first
-// date is rejected as InvalidInput; a Newton result that is not finite falls through to bisection.
+// date is rejected as InvalidInput; a Newton result that is not finite falls through to bisection; the amounts
+// are divided by the largest one before solving (the rate does not change), so the NPV tolerance is relative
+// to the size of the flows instead of absolute in dollars.
 namespace FinanceSentry.Core.Measures;
 
 /// <summary>One dated cash flow for <see cref="Xirr"/>: negative is money paid in, positive is money taken out.</summary>
@@ -43,13 +45,15 @@ public static class Xirr
         if (!cashFlows.Any(c => c.Amount > 0d) || !cashFlows.Any(c => c.Amount <= 0d))
             return Fail(MeasureFailure.NoSignChange);
 
+        // The rate is scale-invariant. Positive cash flow exists, so the scale is above zero.
+        var scale = cashFlows.Max(c => Math.Abs(c.Amount));
         var first = cashFlows[0].Date;
         var years = cashFlows.Select(c => (c.Date.DayNumber - first.DayNumber) / DaysPerYear).ToArray();
         double Npv(double rate)
         {
             var sum = 0d;
             for (var i = 0; i < cashFlows.Count; i++)
-                sum += cashFlows[i].Amount / Math.Pow(1d + rate, years[i]);
+                sum += cashFlows[i].Amount / scale / Math.Pow(1d + rate, years[i]);
             return sum;
         }
 

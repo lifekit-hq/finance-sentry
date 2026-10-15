@@ -82,4 +82,15 @@ public class XirrTests
     [Fact]
     public void Solve_NoCashFlows_FailsInvalidInput()
         => Xirr.Solve([]).Should().Be(new XirrOutcome(null, MeasureFailure.InvalidInput));
+
+    [Fact]
+    public void Solve_DeepLossOnTenThousandTimesTheAmounts_GivesTheSameRate()
+    {
+        // Oracle: the rate is scale-invariant, so XirrIssue27's flows multiplied by 10,000 have the same root,
+        // -0.990247691899517 (spreadsheet). An NPV tolerance in absolute dollars could not be met there.
+        var outcome = Xirr.Solve([new(Day(2020, 7, 3), -1779000000000d), new(Day(2021, 2, 25), 87998058500d)]);
+
+        outcome.Failure.Should().BeNull();
+        outcome.Rate!.Value.Should().BeApproximately(-0.990247691899517, RateTolerance);
+    }
 }
