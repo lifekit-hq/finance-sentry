@@ -28,10 +28,26 @@ public sealed class ConnectionHealthOptions
     public TimeSpan ActionRequiredProbeInterval { get; set; } = TimeSpan.FromDays(1);
 
     /// <summary>
-    /// The providers whose alerts the policy drives, by the keys the shadow log uses (<c>monobank</c>, <c>truelayer</c>,
-    /// <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other provider stays in shadow mode: its
-    /// evaluation is recorded and logged, and its own alerting and account status stay exactly as they were. Empty by
-    /// default, so every provider starts in shadow.
+    /// The slowed cadence of a Dormant connection of an active provider: its scheduled runs pause, and one run in this
+    /// interval, timed from the last failure, still tries it, so a recovery is picked up within a day
+    /// (<see cref="ConnectionHealthPolicy.DormantPausedUntil"/>).
+    /// </summary>
+    public TimeSpan DormantSyncInterval { get; set; } = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// How long after the failure that raised a suspect credential signal an active provider looks again once, so a
+    /// blip clears within minutes; the look after <see cref="SuspectConfirmationWindow"/> still decides a loss
+    /// (<see cref="ConnectionHealthPolicy.SuspectRecheckAfter"/>). The captain's "try again after a minute". Zero turns the
+    /// re-checks off.
+    /// </summary>
+    public TimeSpan SuspectQuickRetryDelay { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// The providers whose alerts, Dormant cadence and suspect re-checks the policy drives, by the keys the shadow log uses
+    /// (<c>monobank</c>, <c>truelayer</c>, <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other
+    /// provider stays in shadow mode: its evaluation is recorded and logged, and its own alerting, account status and sync
+    /// schedule stay exactly as they were (the pause on ActionRequired and on <see cref="ConnectionHealth.NotBefore"/>
+    /// applies to every provider). Empty by default, so every provider starts in shadow.
     /// </summary>
     public List<string> ActiveProviders { get; set; } = [];
 

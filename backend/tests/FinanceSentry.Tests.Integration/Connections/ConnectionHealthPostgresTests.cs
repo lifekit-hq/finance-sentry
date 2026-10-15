@@ -20,6 +20,7 @@ using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -226,7 +227,7 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
                 new ExchangeCredentialRepository(jobContext), syncHandler.Object, alerts.Object, preferences.Object,
                 new InMemoryJobFailureStreakStore(), shadow, new BinanceFailureClassifier(),
                 Mock.Of<IOptionsMonitor<ConnectionHealthOptions>>(m => m.CurrentValue == new ConnectionHealthOptions()),
-                TimeProvider.System, NullLogger<BinanceSyncJob>.Instance);
+                Mock.Of<IBackgroundJobClient>(), TimeProvider.System, NullLogger<BinanceSyncJob>.Instance);
 
             // Every user failed, so the run fails, as it did before the shadow existed.
             await job.Invoking(j => j.ExecuteAsync()).Should().ThrowAsync<AggregateException>();

@@ -21,7 +21,8 @@ using Microsoft.Extensions.Logging;
 /// Each connection's listing is one attempt on that connection's health (connection health, Option B, S2): a
 /// listing that works records a success, a failed one is classified and recorded through
 /// <see cref="IBankConnectionHealth"/>, which raises the alert the policy decides once the provider is listed in
-/// <c>ConnectionHealth:ActiveProviders</c> (in shadow mode it only records).
+/// <c>ConnectionHealth:ActiveProviders</c> (in shadow mode it only records). For a listed provider the listing also
+/// keeps the Dormant cadence: a Dormant connection is listed at most once per <c>ConnectionHealth:DormantSyncInterval</c>.
 ///
 /// Existing accounts are never touched here: this only adds rows. On SCA-strict banks (e.g. AIB)
 /// a discovered account stays balance-only until a user-present reconnect re-establishes the SCA
@@ -66,6 +67,9 @@ public class AccountDiscoveryService(
         {
             var health = new BankConnectionRef(
                 TrueLayerFailureClassifier.ProviderName, connection.Id, connection.UserId, connection.ProviderDisplayName);
+            if (connectionHealth.DormantPausedUntil(health, connection.Health) is not null)
+                continue;
+
             try
             {
                 var accessToken = await trueLayerTokenRefresh.AcquireAccessTokenAsync(connection.Id, ct);
@@ -204,6 +208,9 @@ public class AccountDiscoveryService(
         {
             var health = new BankConnectionRef(
                 MonobankFailureClassifier.ProviderName, credential.Id, credential.UserId, MonobankBankName);
+            if (connectionHealth.DormantPausedUntil(health, credential.Health) is not null)
+                continue;
+
             try
             {
                 var token = CredentialUnreadableException.Decrypt(

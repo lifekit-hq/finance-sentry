@@ -21,6 +21,14 @@ public class ScheduledSyncJob(ITransactionSyncCoordinator coordinator)
           => await _coordinator.TriggerScheduledSyncAsync(accountId);
 
     /// <summary>
+    /// Entry-point for one look at a suspect credential failure on the account's connection, scheduled after the
+    /// scheduled sync before it; see <see cref="ITransactionSyncCoordinator.TriggerSuspectRecheckAsync"/>.
+    /// </summary>
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ExecuteSuspectRecheckAsync(Guid accountId, int recheck, DateTimeOffset scheduledAt)
+          => await _coordinator.TriggerSuspectRecheckAsync(accountId, recheck, scheduledAt);
+
+    /// <summary>
     /// Entry-point for a sync a person asked for (<c>POST /accounts/{id}/sync</c>). It goes through the
     /// coordinator's manual path, so a provider-named wait (<c>NotBefore</c>) that pauses the scheduled run
     /// does not silently drop it.

@@ -12,6 +12,9 @@ using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -30,6 +33,7 @@ public class IBKRSyncJobTests
     private readonly Mock<IUserAlertPreferencesReader> _userPrefs = new(MockBehavior.Loose);
     private readonly IJobFailureStreakStore _failureStreaks = new InMemoryJobFailureStreakStore();
     private readonly Mock<IConnectionHealthShadow> _connectionHealth = new(MockBehavior.Loose);
+    private readonly Mock<IBackgroundJobClient> _backgroundJobs = new(MockBehavior.Loose);
     private readonly FakeTimeProvider _time = new(Start);
 
     // IBKR is live in the committed appsettings; the shadow-mode tests clear it.
@@ -44,8 +48,8 @@ public class IBKRSyncJobTests
 
     private IBKRSyncJob CreateJob(IConnectionHealthShadow? shadow = null) =>
         new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks,
-            shadow ?? _connectionHealth.Object, new IbkrFailureClassifier(), HealthOptions.Monitor(_options), _time,
-            NullLogger<IBKRSyncJob>.Instance);
+            shadow ?? _connectionHealth.Object, new IbkrFailureClassifier(), HealthOptions.Monitor(_options),
+            _backgroundJobs.Object, _time, NullLogger<IBKRSyncJob>.Instance);
 
     /// <summary>The job with the real policy behind it, on the test's clock.</summary>
     private IBKRSyncJob CreatePolicyJob() => CreateJob(ShadowRecorders.Create(_time, _options));
@@ -604,5 +608,218 @@ public class IBKRSyncJobTests
         credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         credential.Health.LastSuccessAt.Should().Be(Start);
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Dormant cadence and suspect re-checks (S4) ──────────────────────────
+
+    private static ConnectionHealth DormantSince(DateTimeOffset lastFailureAt) => new()
+    {
+        State = ConnectionHealthState.Dormant,
+        ConsecutiveFailures = 700,
+        FirstFailureAt = lastFailureAt.AddDays(-8),
+        LastFailureAt = lastFailureAt,
+        LastFailureClass = FailureClass.Transient,
+        StateChangedAt = lastFailureAt.AddDays(-1),
+    };
+
+    private List<(Job Job, IState State)> CaptureScheduled()
+    {
+        var scheduled = new List<(Job Job, IState State)>();
+        _backgroundJobs
+            .Setup(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Callback<Job, IState>((job, state) => scheduled.Add((job, state)))
+            .Returns("job-id");
+        return scheduled;
+    }
+
+    private static void ShouldBeLook(
+        (Job Job, IState State) scheduled, Guid userId, int recheck, TimeSpan delay)
+    {
+        scheduled.Job.Type.Should().Be(typeof(IBKRSyncJob));
+        scheduled.Job.Method.Name.Should().Be(nameof(IBKRSyncJob.RecheckSuspectAsync));
+        scheduled.Job.Args[0].Should().Be(userId);
+        scheduled.Job.Args[1].Should().Be(recheck);
+        scheduled.State.Should().BeOfType<ScheduledState>().Which.EnqueueAt
+            .Should().BeCloseTo(DateTime.UtcNow + delay, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Active_Dormant_SyncsOnceADay_TimedFromTheLastFailure()
+    {
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddHours(-1)));
+        GivenSyncFails(Ibkr503());
+
+        // 15-minute ticks for the rest of the day after the last failure: none of them calls IBKR.
+        for (var i = 0; i < 90; i++)
+        {
+            if (i > 0) _time.Advance(Tick);
+            await CreatePolicyJob().ExecuteAsync();
+        }
+        VerifySyncCalls(Times.Never());
+
+        // A day after it, the run tries it; the failure renews the pause and raises nothing new.
+        _time.Advance(Tick * 3);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Dormant);
+        VerifyNoAlert();
+
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Once());
+    }
+
+    [Fact]
+    public async Task Active_Dormant_SuccessGoesHealthy_ResolvesTheAlert_AndTheCadenceIsBack()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(DormantSince(Start.AddDays(-1)));
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
+
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Active_Dormant_AfterReactivate_TheNextScheduledRunSyncs()
+    {
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddMinutes(-15)));
+        credential.Reactivate(
+            "FINSENTRY", "access-token", "dh-pem", [1], [2], [3], [4], [5], [6], [7], [8], [9], keyVersion: 1);
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+    }
+
+    [Fact]
+    public async Task Shadow_Dormant_SyncsEveryTick_AsBefore()
+    {
+        GivenShadowMode();
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddMinutes(-15)));
+        GivenSyncFails(Ibkr503());
+
+        await RunTicksAsync(4);
+
+        VerifySyncCalls(Times.Exactly(4));
+    }
+
+    [Fact]
+    public async Task Active_SuspectFailure_LooksAgainAMinuteOn()
+    {
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        GivenOneCredential(userId);
+        GivenSyncFails(Ibkr401());
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        ShouldBeLook(scheduled.Should().ContainSingle().Subject, userId, recheck: 1, TimeSpan.FromMinutes(1));
+        VerifyNoAlert();
+    }
+
+    [Fact]
+    public async Task Active_QuickLookSucceeds_ClearsTheSuspicion_AndLooksNoMore()
+    {
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        _credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        GivenSyncFails(Ibkr401());
+        await CreatePolicyJob().ExecuteAsync();
+        scheduled.Clear();
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        GivenSyncSucceeds();
+        await CreatePolicyJob().RecheckSuspectAsync(userId, recheck: 1, scheduledAt: Start);
+
+        VerifySyncCalls(Times.Exactly(2));
+        credential.Health.SuspectSince.Should().BeNull();
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        scheduled.Should().BeEmpty();
+        VerifyNoAlert();
+    }
+
+    [Fact]
+    public async Task Active_QuickLookFails_ConfirmingLookAtTheWindow_ConfirmsTheLoss()
+    {
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        _credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        GivenSyncFails(Ibkr401());
+        await CreatePolicyJob().ExecuteAsync();
+        scheduled.Clear();
+
+        // The quick look fails: nothing is confirmed, and the confirming look is set for the end of the window.
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await CreatePolicyJob().RecheckSuspectAsync(userId, recheck: 1, scheduledAt: Start);
+        credential.Health.State.Should().NotBe(ConnectionHealthState.ActionRequired);
+        VerifyNoAlert();
+        ShouldBeLook(scheduled.Should().ContainSingle().Subject, userId, recheck: 2, TimeSpan.FromMinutes(29));
+        scheduled.Clear();
+
+        // The confirming look fails too: the loss is confirmed, the reconnect alert goes out, and the looks end.
+        _time.Advance(TimeSpan.FromMinutes(29));
+        await CreatePolicyJob().RecheckSuspectAsync(userId, recheck: 2, scheduledAt: Start.AddMinutes(1));
+        credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        VerifyEscalated(userId, Times.Once());
+        scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Active_LookOnASettledSuspicion_MakesNoCall()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        _credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().RecheckSuspectAsync(userId, recheck: 1, scheduledAt: Start);
+
+        VerifySyncCalls(Times.Never());
+    }
+
+    [Fact]
+    public async Task Shadow_SuspectFailure_SchedulesNoLook_AndAlertsAsBefore()
+    {
+        GivenShadowMode();
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        GivenOneCredential(userId);
+        GivenSyncFails(Ibkr401());
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        scheduled.Should().BeEmpty();
+        VerifyAlerts(userId, SyncFailureClass.Credential, Times.Once());
+    }
+
+    [Fact]
+    public async Task LookScheduledWhileActive_DoesNothingOnceIbkrIsBackInShadow()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        _credentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(credential);
+        GivenSyncFails(Ibkr401());
+        await CreatePolicyJob().ExecuteAsync();
+
+        GivenShadowMode();
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await CreatePolicyJob().RecheckSuspectAsync(userId, recheck: 1, scheduledAt: Start);
+
+        VerifySyncCalls(Times.Once());
     }
 }
