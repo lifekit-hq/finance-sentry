@@ -1,29 +1,17 @@
 import {expect, type Page, type Request, test} from '@playwright/test';
 
 import {API, mockApis} from './support/dossier-mocks';
+import {seedUnreadWhatsNew} from './support/whats-new-mocks';
 
 const PHONE = {width: 390, height: 844};
 const DESKTOP = {width: 1440, height: 900};
-const SEEN_KEY = 'fns.whatsNew.lastSeen';
 const REFERENCE = 'FS-R-42';
 
-const WHATS_NEW = {
-  versions: [
-    {
-      version: '1.14.0',
-      date: '2026-10-05',
-      notes: [{text: 'You can show only money in or only money out.', owner: false}],
-      changes: ['Group transactions by day'],
-    },
-  ],
-};
+const WHATS_NEW_NOTES = [{text: 'You can show only money in or only money out.', owner: false}];
 
 async function open(page: Page, path: string): Promise<{requests: Request[]}> {
   const requests: Request[] = [];
-  await page.addInitScript(key => localStorage.setItem(key, '1.13.0'), SEEN_KEY);
-  await page.route('**/whats-new.json*', route =>
-    route.fulfill({contentType: 'application/json', body: JSON.stringify(WHATS_NEW)})
-  );
+  await seedUnreadWhatsNew(page, WHATS_NEW_NOTES);
   await mockApis(page);
   await page.route(`${API}/alerts/unread-count`, route =>
     route.fulfill({contentType: 'application/json', body: JSON.stringify({count: 0})})
