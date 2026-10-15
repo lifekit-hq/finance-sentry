@@ -592,8 +592,9 @@ and the list of what is not yet verified are in report §5.5 and §12.4; none of
 
 ### 5.6 From three sleeves to a registry (four PRs)
 
-Today a fourth economy would need a new column on `net_worth_snapshots`, a new constructor parameter on
-`BookFiguresService`, a new name inside the `StaleSleeves` string, and a change in every consumer.
+Today a fourth economy gets its per-source row with no schema change, but would need a new column on
+`net_worth_snapshots` to count in the stored totals, a new name inside the `StaleSleeves` string, and a change
+in every consumer.
 
 1. **Wrap. Done.** The three readers (`IBankingAccountsReader`, `IBrokerageHoldingsReader`,
    `ICryptoHoldingsReader`) are three `IWealthSource` registrations (`AddBookFigures`, which registers them in
@@ -760,7 +761,7 @@ about that (M1), but linking an existing account is not a change in wealth, yet 
 percentage (rule 3 of §3.2; reason `SCOPE_CHANGED`).
 
 **G4. The sleeves are hard-coded.** *Partly closed (R8 PRs 1-2): the live book sums registered sources and every
-snapshot has a per-source row; the stored totals and their consumers are still per sleeve.*
+snapshot written since has a per-source row; the stored totals and their consumers are still per sleeve.*
 Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names. A new
 economy would still be a change in every snapshot consumer until the per-source rows are read and the old
 columns frozen (§5.6, PRs 3-4).
