@@ -113,9 +113,6 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
         SyncStatus = "active";
         CurrentBalance = balance;
         LastSyncError = null;
-        // The state is kept so the first success still resolves the open alert, but the old failure no longer times a
-        // Dormant account's slowed cadence: the next scheduled run tries it.
-        Health = Health with { LastFailureAt = null };
     }
 
     public void MarkFailed(string? errorCode = null)
