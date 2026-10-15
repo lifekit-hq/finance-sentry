@@ -71,9 +71,6 @@ for (const [name, viewport] of [
       await expect(note).toContainText('Includes newly linked accounts');
       await expect(note).toHaveAttribute('title', 'Includes newly linked accounts');
       await expect(note).toHaveAttribute('aria-label', 'Includes newly linked accounts');
-      await page.screenshot({
-        path: `/home/denys/.no-mistakes/evidence/01M4YBYP97SCSGW4Q4VKGGDTED/scope-note-linked-${viewport.width}.png`,
-      });
     });
 
     test('a removed account names removal', async ({page}) => {
@@ -90,9 +87,6 @@ for (const [name, viewport] of [
       await page.goto('/dashboard');
       await expect(page.getByTestId('net-worth-change')).toContainText('%');
       await expect(page.getByTestId('net-worth-scope-note')).toHaveCount(0);
-      await page.screenshot({
-        path: `/home/denys/.no-mistakes/evidence/01M4YBYP97SCSGW4Q4VKGGDTED/scope-note-none-${viewport.width}.png`,
-      });
     });
 
     test('an older API without scopeChanges keeps the percentage', async ({page}) => {
