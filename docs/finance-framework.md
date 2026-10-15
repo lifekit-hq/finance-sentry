@@ -74,7 +74,8 @@ rule or shape agreed but not implemented), **missing**.
 ```
 
 This is the target shape. Today only the top (three hard-coded sleeves) and bottom (dashboard, MCP, briefs)
-exist; the measure engine, the per-source rows and the headline record are **designed, not built** (§6).
+are wired. The measure engine is built for M1-M6 and M9 (3.4) but nothing calls it yet; the per-source rows
+and the headline record are **designed, not built** (§6).
 
 Three rules keep the layers apart:
 
@@ -183,21 +184,24 @@ End − Start =   savings              external inflows − external outflows at
 ```
 
 A residual above 0.2% of the start value makes the bridge DEGRADED (reason `RESIDUAL_ABOVE_TOLERANCE`).
-**Status: missing.** No bridge is computed anywhere today.
+**Status: engine built, not wired.** `NetWorthBridge` (3.4) computes these lines and the tolerance flag
+from the window's classified flows plus the per-position market, FX, revaluation and linking lines;
+`NetWorthBridge.Translate` splits a holding's move into its local part and its FX part. No figure shows a
+bridge yet.
 
 ### 3.4 The ten measures
 
 | Id | Measure | The question it answers | Method | Standard | Test oracle | Today |
 |---|---|---|---|---|---|---|
-| M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the Book vs SPY book side |
-| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | missing (G6) |
-| M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | **missing** (the "TWR" names in code are not one; G1) |
-| M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | missing |
-| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | missing |
-| M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); #982 asks for it at header level |
+| M1 | Value change | How much more or less do I have? | End − Start. The % is Δ ÷ Start, shown only when the scope did not change, and labelled as including deposits | — | arithmetic | dashboard "Change"; "Invested change"; the Book vs SPY book side. Engine: `ValueChange`, not wired |
+| M2 | Contributions vs growth | How much did I put in, and how much did it earn? | growth = ΔValue − net external flows | — | Portfolio Performance categories | engine: `ContributionsAndGrowth`, not wired; no investment flows feed it yet (G6) |
+| M3 | Time-weighted return | How did the investments do, regardless of when I added money? The number to compare with a benchmark | Daily chain-linking (3.2 rule 7): Π(1 + r_t) − 1 | GIPS 1.A.35, 2.A.24 | Portfolio Performance `ClientIndex`; the broker's own TWR | engine: `TimeWeightedReturn`, not wired; **no figure is a TWR yet** (the "TWR" names in code are not one; G1) |
+| M4 | Money-weighted return | What did *my money* earn, timing included? | XIRR on an actual/365 day count for windows of one year or more; Modified Dietz, not annualised, for shorter windows | GIPS 2.A.29, 2.A.12 | Excel XIRR / ExcelFinancialFunctions; hledger `roi` | engine: `MoneyWeightedReturn` (XIRR ported from ExcelFinancialFunctions), not wired |
+| M5 | Net-worth bridge | Why did my net worth change? | 3.3 | — | Portfolio Performance categories | engine: `NetWorthBridge`, not wired |
+| M6 | Gain vs cost | How much am I up on what I hold? | unrealized = value − average cost; realized = proceeds − average cost of what was sold; plus income and currency effect | standard average cost | Ghostfolio, Paisa | per position (`PositionReturnCalculator`); engine: `GainVsCost`, not wired; #982 asks for it at header level |
 | M7 | Allocation | What is my money in? | weight = value ÷ total by asset class, currency, source, convertibility. Liabilities shown separately; weights over gross assets | — | arithmetic | partly (sleeves) |
 | M8 | Risk | How bumpy is it, and how deep are the falls? | Volatility = standard deviation of monthly TWR returns × √12 (the "3-year" figure needs 36 months). Max drawdown on a flow-neutral index. Downside deviation over *all* observations | GIPS 4.A.1.j; empyrical definitions | empyrical-reloaded, quantstats | drawdown only |
-| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY compares a value change with SPY's adjusted close (G1) |
+| M9 | Benchmark-relative | Did I beat the simple alternative? | Excess = book TWR − benchmark total return over the identical window and periodicity. Benchmark is SPY (C3) | GIPS 2.A.18 | empyrical | Book vs SPY compares a value change with SPY's adjusted close (G1). Engine: `ExcessReturn`, not wired |
 | M10 | Projection | Where am I heading? | A savings path plus a stated return assumption, one shared assumption set, shown as a range (C8) | FINRA 2210(d)(1)(F) / 2214 pattern; DOL lifetime income illustration | — | tile + FIRE, two assumption sets (G7) |
 
 Choices the engine fixes once, so they stop being re-decided:
@@ -208,6 +212,36 @@ Choices the engine fixes once, so they stop being re-decided:
   number and not an exception. Never return `0` on bad input.
 - **Return base:** a window starting at a value of zero (a new account) has no percent. Show the money
   figures with reason `ZERO_BASE`.
+
+**The engine.** `backend/src/FinanceSentry.Core/Measures/` holds M1-M6 and M9 as pure static calculators,
+built the way `BookDrawdownCalculator` is: no I/O, no clock, no shared precision setting. Inputs are USD
+values (C4: conversion for display is not the engine's job) and flows already classified into the five
+classes for the scope asked; classifying provider events (3.2 rule 1, 5.2) comes before it and is not built.
+Each measure returns either a value or a `MeasureFailure` reason (`ZeroBase` is `ZERO_BASE`, and so on). It
+also fixes:
+
+- **Values are decimal**; only the XIRR root finder works in double, as its source does.
+- **XIRR** (`Xirr.cs`) is ported from ExcelFinancialFunctions (Apache-2.0; attribution in the file and in
+  `backend/THIRD-PARTY-NOTICES.txt`): Newton's method, then bracketing and bisection. One-sign cash flows
+  fail `NoSignChange` and a search without a root fails `NoConvergence`. M4 dates an inflow the day before
+  it lands, so it is in place for the whole day, as rule 7 places it.
+- **A missing value inside the window** (a day with no price) is bridged: the sub-period runs to the next
+  valued close and the day is listed. A missing first or last value fails `MissingValue`.
+- **A negative value** anywhere in a TWR window fails `NegativeBase`: a ratio through a negative base has no
+  meaning. Value appearing in an empty scope with no recorded inflow is listed as unexplained and left out of
+  the chain (rule 4), never chained as a return.
+- **M6 splits each gain** into a price effect and a currency effect. With the position's local-currency
+  amounts (each buy's and sell's, a sell's rate, and the held value with its rate), the price effect is the
+  local gain converted at the end (or sale) rate and the currency effect is the USD gain minus it. A position
+  given in USD only reports `UsdOnly`: its currency effect is 0 because it was not measured. Local amounts on
+  some events and not others fail `InvalidInput`. A sale of the held quantity to within rounding (a reverse
+  split by 1/3 leaves 0.999...) sells everything. Income is at its pay date's rate and is not split.
+
+Golden fixtures live in `backend/tests/FinanceSentry.Tests.Unit/Core/Measures/`: `MeasureEngineGoldenFixtureTests`
+holds the report's ten (R5) and `CryptoFlowGoldenFixtureTests` the crypto-flow fixtures 11-20. Each expected
+value comes from a hand calculation or LibreOffice Calc's XIRR on the same flows, cited beside its
+assertion, never from running the engine. Wiring the engine to the headline record (3.6) and the surfaces
+is the next step.
 
 ### 3.5 Worked example (fictional numbers)
 
@@ -230,7 +264,8 @@ Choices the engine fixes once, so they stop being re-decided:
 TWR and MWR differ because twice as much money was invested during the losing half as during the winning
 half. TWR ignores that, so it is the number to compare with SPY; MWR is the honest answer to "what did my
 money earn". Both are correct; they answer different questions. This example is golden fixture #1 for the
-measure engine (R5 in the report).
+measure engine (`MeasureEngineGoldenFixtureTests`). Its XIRR there is −1.328%, not the idealised −1.332%:
+the real dates put the deposit 181 days after the first flow (exponent 181/365), not exactly half a year.
 
 ### 3.6 The headline contract
 
