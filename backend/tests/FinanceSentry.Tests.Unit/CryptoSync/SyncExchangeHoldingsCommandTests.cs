@@ -345,9 +345,11 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
             .ReturnsAsync([]);
 
         var book = await new BookFiguresService(
-            banking.Object,
-            brokerage.Object,
-            new CryptoHoldingsReader(new CryptoHoldingRepository(_db)),
+            [
+                new CryptoWealthSource(new CryptoHoldingsReader(new CryptoHoldingRepository(_db))),
+                new BrokerageWealthSource(brokerage.Object),
+                new BankingWealthSource(banking.Object),
+            ],
             NullLogger<BookFiguresService>.Instance).ReadAsync(_userId);
 
         book.BankingCashUsd.Should().Be(0m);
@@ -576,9 +578,11 @@ public sealed class SyncExchangeHoldingsCommandTests : IDisposable
             .ReturnsAsync([]);
 
         return await new BookFiguresService(
-            banking.Object,
-            brokerage.Object,
-            new CryptoHoldingsReader(new CryptoHoldingRepository(_db)),
+            [
+                new CryptoWealthSource(new CryptoHoldingsReader(new CryptoHoldingRepository(_db))),
+                new BrokerageWealthSource(brokerage.Object),
+                new BankingWealthSource(banking.Object),
+            ],
             NullLogger<BookFiguresService>.Instance).ReadAsync(_userId);
     }
 }

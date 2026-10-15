@@ -196,7 +196,7 @@ public sealed class ToolParityTests
         services.AddScoped<IBrokerageHoldingsReader, BrokerageHoldingsReader>();
 
         // Canonical book-figures service — single source for cash/invested/total across all surfaces.
-        services.AddScoped<IBookFiguresService, BookFiguresService>();
+        services.AddBookFigures();
 
         // Risk (022): repositories + pure evaluation services backing the 3 risk MCP tools.
         services.AddScoped<IRiskRuleSetRepository, RiskRuleSetRepository>();
