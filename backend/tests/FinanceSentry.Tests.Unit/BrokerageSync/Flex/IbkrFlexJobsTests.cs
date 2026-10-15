@@ -259,6 +259,7 @@ public class IbkrFlexJobsTests
         {
             NotReadyDeadline = TimeSpan.FromHours(48),
             NotReadyRetryAfter = TimeSpan.FromHours(2),
+            EarlyRechecks = [TimeSpan.FromHours(1), TimeSpan.FromHours(4)],
         };
 
         public PolicyHarness()
@@ -299,6 +300,8 @@ public class IbkrFlexJobsTests
         public Task RunAsync() => CreateJob().ExecuteAsync();
 
         public Task RetryAsync(int attempt) => CreateJob().RetryUserAsync(UserId, attempt);
+
+        public Task RecheckAsync(int recheck) => CreateJob().RecheckUserAsync(UserId, recheck);
 
         public async Task RunDailyAsync(int days)
         {
@@ -515,15 +518,182 @@ public class IbkrFlexJobsTests
     }
 
     [Theory]
-    [InlineData("1015")] // credential
+    [InlineData("1015")] // credential, definitive
     [InlineData("1018")] // rate limited
-    [InlineData("1009")] // transient
     public async Task OtherFailureClasses_ScheduleNoSoonerLook(string flexCode)
     {
         var harness = new PolicyHarness().Active();
         harness.GivenSyncFails(new IbkrFlexException(flexCode, "refused"));
 
         await harness.RunAsync();
+
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    // ── Early re-checks of a once-a-day source ───────────────────────────────
+
+    [Fact]
+    public async Task TransientFailure_SchedulesOneEarlyRecheck_AnHourOn()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        var (job, state) = harness.Scheduled.Should().ContainSingle().Subject;
+        job.Method.Name.Should().Be(nameof(IbkrFlexIncrementalSyncJob.RecheckUserAsync));
+        job.Args[0].Should().Be(harness.UserId);
+        job.Args[1].Should().Be(1);
+        state.Should().BeOfType<ScheduledState>().Which.EnqueueAt
+            .Should().BeCloseTo(DateTime.UtcNow + TimeSpan.FromHours(1), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task SuccessfulRun_SchedulesNoRecheck()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.SyncService
+            .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+
+        await harness.RunAsync();
+
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SuspectCredentialFailure_SchedulesAnEarlyRecheck_SoItIsConfirmedTheSameDay()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1020", "Request failed."));
+
+        await harness.RunAsync();
+
+        harness.Scheduled.Should().ContainSingle().Which.Job.Method.Name
+            .Should().Be(nameof(IbkrFlexIncrementalSyncJob.RecheckUserAsync));
+    }
+
+    [Fact]
+    public async Task Recheck_Chain_EndsWithTheConfiguredList()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+        await harness.RunAsync();
+        harness.Scheduled.Clear();
+
+        await harness.RecheckAsync(recheck: 1);
+        var (job, state) = harness.Scheduled.Should().ContainSingle().Subject;
+        job.Args[1].Should().Be(2);
+        state.Should().BeOfType<ScheduledState>().Which.EnqueueAt
+            .Should().BeCloseTo(DateTime.UtcNow + TimeSpan.FromHours(4), TimeSpan.FromMinutes(1));
+
+        harness.Scheduled.Clear();
+        await harness.RecheckAsync(recheck: 2);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FailureThatReachesFailing_SchedulesNoRecheck()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Degraded,
+            ConsecutiveFailures = 2,
+            FirstFailureAt = Start.AddDays(-2),
+            LastFailureAt = Start.AddDays(-1),
+            LastFailureClass = FailureClass.Transient,
+        });
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Failing);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FailureWhileAlreadyFailing_SchedulesNoRecheck()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Failing,
+            ConsecutiveFailures = 4,
+            FirstFailureAt = Start.AddDays(-4),
+            LastFailureAt = Start.AddDays(-1),
+            LastFailureClass = FailureClass.Transient,
+        });
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Failing);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Failure_WithNoEarlyRecheckSetting_SchedulesNothing()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Source.EarlyRechecks = [];
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Recheck_ForARecoveredConnection_DoesNotCallIbkr()
+    {
+        var harness = new PolicyHarness().Active();
+
+        await harness.RecheckAsync(recheck: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Recheck_BeforeNotBefore_DoesNotCallIbkr()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Degraded,
+            ConsecutiveFailures = 1,
+            FirstFailureAt = Start,
+            LastFailureAt = Start,
+            LastFailureClass = FailureClass.RateLimited,
+            NotBefore = Start.AddHours(3),
+        });
+
+        await harness.RecheckAsync(recheck: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Recheck_WhilePaused_DoesNotCallIbkr()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-1)));
+
+        await harness.RecheckAsync(recheck: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task NotReadyRetry_FailingTransiently_StartsNoRecheckChain()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RetryAsync(attempt: 1);
 
         harness.Scheduled.Should().BeEmpty();
     }

@@ -64,9 +64,11 @@ public static class BrokerageSyncModule
         services.AddConnectionHealthShadow(config);
         // Flex generates a statement on request, so its answers can be "not ready" for a while: not counted for 48 h
         // after the last success, and asked again every 2 h meanwhile. Configuration (ConnectionHealth:Sources:ibkr-flex)
-        // overrides these.
+        // overrides these. It runs once a day, so a counted failure is looked at again after 1 h and 4 h later
+        // (EarlyRechecks) rather than reaching Failing on its third day.
         services.Configure<ConnectionHealthSourceOptions>(IbkrFlexFailureClassifier.ProviderName, source =>
         {
+            source.EarlyRechecks = [TimeSpan.FromHours(1), TimeSpan.FromHours(4)];
             source.NotReadyDeadline = TimeSpan.FromHours(48);
             source.NotReadyRetryAfter = TimeSpan.FromHours(2);
         });

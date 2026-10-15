@@ -216,6 +216,26 @@ public class ConnectionHealthShadowRecorderTests
         monitor.Get("binance").NotReadyDeadline.Should().BeNull();
     }
 
+    [Fact]
+    public void SourceOptions_ConfiguredEarlyRechecks_ReplaceTheCodeDefault()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionHealth:Sources:ibkr-flex:EarlyRechecks:0"] = "00:30:00",
+            })
+            .Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddConnectionHealthShadow(config);
+        services.Configure<ConnectionHealthSourceOptions>(
+            "ibkr-flex", o => o.EarlyRechecks = [TimeSpan.FromHours(1), TimeSpan.FromHours(4)]);
+        using var provider = services.BuildServiceProvider();
+
+        var monitor = provider.GetRequiredService<IOptionsMonitor<ConnectionHealthSourceOptions>>();
+
+        monitor.Get("ibkr-flex").EarlyRechecks.Should().Equal(TimeSpan.FromMinutes(30));
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

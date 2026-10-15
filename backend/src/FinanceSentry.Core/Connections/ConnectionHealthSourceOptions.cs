@@ -22,4 +22,13 @@ public sealed class ConnectionHealthSourceOptions
     /// Null: it waits for that run.
     /// </summary>
     public TimeSpan? NotReadyRetryAfter { get; set; }
+
+    /// <summary>
+    /// For a source that runs once a day: how long after a counted failure it looks again before the next scheduled
+    /// run, one entry per look (1 h, then 4 h after that, for Flex), so a real outage is told within hours instead of
+    /// on the third day. The list is the bound: when it is spent the chain stops. Empty: none; a source that runs
+    /// every 15 or 30 minutes retries soon enough on its own schedule. Names intervals only; the source's job
+    /// decides which failures earn one (never a rate-limited, not-ready or definitive credential failure).
+    /// </summary>
+    public TimeSpan[] EarlyRechecks { get; set; } = [];
 }
