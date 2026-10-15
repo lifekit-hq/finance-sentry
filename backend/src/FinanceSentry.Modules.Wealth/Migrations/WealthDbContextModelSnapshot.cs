@@ -55,6 +55,10 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<int?>("FxStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("fx_status");
+
                     b.Property<bool>("IsApproximate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

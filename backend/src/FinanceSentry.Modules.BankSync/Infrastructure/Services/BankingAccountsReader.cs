@@ -19,21 +19,30 @@ public class BankingAccountsReader(
         var list = await _accounts.GetByUserIdUnscopedAsync(userId, ct);
         var lastSuccessful = await _syncJobs.GetLastSuccessfulSyncTimesByUserUnscopedAsync(userId, ct);
 
-        return list.Select(a => new BankingAccountSummary(
-            a.Id,
-            a.BankName,
-            a.AccountType,
-            a.AccountNumberLast4,
-            a.Provider,
-            a.Currency,
-            a.CurrentBalance,
-            a.CurrentBalance.HasValue ? CurrencyConverter.ToUsd(a.CurrentBalance.Value, a.Currency) : null,
-            a.SyncStatus == "active" ? "synced" : a.SyncStatus,
-            a.UpdatedAt,
-            lastSuccessful.TryGetValue(a.Id, out var lastOk) ? lastOk : null,
-            a.MonobankCredentialId,
-            a.TrueLayerConnectionId,
-            a.ProductType))
+        return list.Select(a =>
+        {
+            // A balance that is not reported has nothing to convert, so nothing was substituted.
+            ConvertResult? usd = a.CurrentBalance.HasValue
+                ? CurrencyConverter.Convert(a.CurrentBalance.Value, a.Currency)
+                : null;
+
+            return new BankingAccountSummary(
+                a.Id,
+                a.BankName,
+                a.AccountType,
+                a.AccountNumberLast4,
+                a.Provider,
+                a.Currency,
+                a.CurrentBalance,
+                usd?.Amount,
+                a.SyncStatus == "active" ? "synced" : a.SyncStatus,
+                a.UpdatedAt,
+                lastSuccessful.TryGetValue(a.Id, out var lastOk) ? lastOk : null,
+                a.MonobankCredentialId,
+                a.TrueLayerConnectionId,
+                a.ProductType,
+                usd?.Status ?? FxStatus.Exact);
+        })
         .ToList();
     }
 

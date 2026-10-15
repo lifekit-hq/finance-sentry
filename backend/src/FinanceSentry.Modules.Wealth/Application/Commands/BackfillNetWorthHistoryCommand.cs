@@ -23,9 +23,10 @@ public sealed record BackfillNetWorthHistoryResult(
 /// docs/money-semantics.md). Only banking is reconstructable this way — brokerage and
 /// crypto positions leave no transaction ledger to walk here — so every inserted row
 /// carries BrokerageTotal = CryptoTotal = 0 and IsApproximate = true. Currency conversion
-/// uses <see cref="CurrencyConverter.ToUsd"/>'s current rate table, not the historical
+/// uses <see cref="CurrencyConverter.Convert"/>'s current rate table, not the historical
 /// rate on the reconstructed date; that, plus the banking-only scope, is why the segment
-/// is approximate rather than measured. Each account's reconstructable range is bounded
+/// is approximate rather than measured: each row stores the worst conversion status of its
+/// accounts, never better than <see cref="FxStatus.TodayRate"/>. Each account's reconstructable range is bounded
 /// by its own earliest synced transaction — an account connected after the gap started
 /// contributes only from that date onward, never fabricated further back.
 ///
@@ -112,10 +113,14 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
             if (includedAccounts.Count == 0)
                 continue;
 
-            var bankingTotalUsd = includedAccounts.Sum(a =>
-                AccountBalanceMath.SignedForNetTotal(
-                    a.AccountType,
-                    CurrencyConverter.ToUsd(balanceByAccountDay[(a.AccountId, date)], a.Currency)));
+            var bankingTotalUsd = 0m;
+            var fxStatus = FxStatus.TodayRate;
+            foreach (var a in includedAccounts)
+            {
+                var usd = CurrencyConverter.Convert(balanceByAccountDay[(a.AccountId, date)], a.Currency);
+                fxStatus = fxStatus.Worst(usd.Status);
+                bankingTotalUsd += AccountBalanceMath.SignedForNetTotal(a.AccountType, usd.Amount);
+            }
 
             rows.Add(new NetWorthSnapshot
             {
@@ -129,6 +134,7 @@ public sealed class BackfillNetWorthHistoryCommandHandler(
                 Currency = "USD",
                 TakenAt = DateTimeOffset.UtcNow,
                 IsApproximate = true,
+                FxStatus = fxStatus,
             });
         }
 

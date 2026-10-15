@@ -1,4 +1,5 @@
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 
 namespace FinanceSentry.Modules.BrokerageSync.Application.Services;
@@ -42,7 +43,8 @@ public sealed class BrokerageHoldingsReader : IBrokerageHoldingsReader
                     reconciliation.State.ToString(),
                     h.FlexAsOfDate,
                     h.Currency,
-                    h.NativeValue);
+                    h.NativeValue,
+                    CurrencyConverter.Convert(1m, h.Currency).Status);
             })
             .ToList();
     }

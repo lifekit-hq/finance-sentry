@@ -19,15 +19,20 @@ public sealed class CryptoHoldingsReader : ICryptoHoldingsReader
         var holdings = await _holdingRepository.GetByUserIdUnscopedAsync(userId, ct);
 
         return holdings
-            .Select(h => new CryptoHoldingSummary(
-                h.Asset,
-                h.FreeQuantity,
-                h.LockedQuantity,
-                CryptoHoldingValuation.UsdValue(h),
-                h.SyncedAt,
-                h.Provider,
-                h.IsFiat ? null : h.CostBasisUsd,
-                h.IsFiat))
+            .Select(h =>
+            {
+                var value = CryptoHoldingValuation.Convert(h);
+                return new CryptoHoldingSummary(
+                    h.Asset,
+                    h.FreeQuantity,
+                    h.LockedQuantity,
+                    value.Amount,
+                    h.SyncedAt,
+                    h.Provider,
+                    h.IsFiat ? null : h.CostBasisUsd,
+                    h.IsFiat,
+                    value.Status);
+            })
             .ToList();
     }
 }

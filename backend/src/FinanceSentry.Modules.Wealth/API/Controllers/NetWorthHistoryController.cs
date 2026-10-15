@@ -31,7 +31,24 @@ public class NetWorthHistoryController(
         if (baseCurrency == "USD")
             return Ok(result);
 
-        // Snapshots are stored in USD; the profile's base currency is applied at the boundary.
+        // Snapshots are stored in USD; the profile's base currency is applied at the boundary at today's rate.
+        // A base currency with no live rate shows its figures through a stand-in, so every row says so, and a
+        // row dated before today is converted at a rate that is not its own day's, so it says so too.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var todayStatus = CurrencyConverter.ConvertFromUsd(1m, baseCurrency).Status;
+        string? DisplayReason(DateOnly snapshotDate) =>
+            (snapshotDate < today ? todayStatus.Worst(FxStatus.TodayRate) : todayStatus).ToReason();
+        IReadOnlyList<string>? Reasons(NetWorthSnapshotDto s)
+        {
+            var added = DisplayReason(s.SnapshotDate);
+            if (added is null)
+                return s.FxReasons;
+
+            var carried = s.FxReasons ?? [];
+            return carried.Contains(FxReasons.Unknown1To1) || added == FxReasons.Unknown1To1
+                ? [FxReasons.Unknown1To1]
+                : [added];
+        }
         decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
         decimal? FxOrNull(decimal? usd) => usd is null ? null : Fx(usd.Value);
         return Ok(result with
@@ -46,6 +63,7 @@ public class NetWorthHistoryController(
                 BrokerageInvested = FxOrNull(s.BrokerageInvested),
                 CryptoInvested = FxOrNull(s.CryptoInvested),
                 Currency = baseCurrency,
+                FxReasons = Reasons(s),
             })],
         });
     }

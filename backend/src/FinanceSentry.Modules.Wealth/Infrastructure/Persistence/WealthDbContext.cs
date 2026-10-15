@@ -38,6 +38,8 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         e.Property(s => s.CashTotal).HasColumnName("cash_total");
         e.Property(s => s.BrokerageInvested).HasColumnName("brokerage_invested");
         e.Property(s => s.CryptoInvested).HasColumnName("crypto_invested");
+        // Stored as its ordinal (the worst status is the maximum), not under the enum-to-string convention.
+        e.Property(s => s.FxStatus).HasColumnName("fx_status").HasConversion<int>();
 
         e.HasIndex(s => new { s.UserId, s.SnapshotDate })
             .IsDescending(false, true)

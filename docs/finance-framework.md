@@ -92,7 +92,7 @@ Three rules keep the layers apart:
 
 | # | Figure | Where | Method today | Quality signal today | Measure | Gap |
 |---|---|---|---|---|---|---|
-| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; an unknown currency converts 1:1 with no flag | valuation, M7 | G2, G4, G5 |
+| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | none on the figure | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
 | 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain** | null when history misses the edge tolerance | M1 (not M3), M9 | **G1** |
@@ -100,14 +100,32 @@ Three rules keep the layers apart:
 | 6 | Position returns | `PositionReturnCalculator` | Average-cost walk: unrealized, realized, dividends net of withholding, currency effect | `Coverage` = complete / partial / unavailable | M6 | the vocabulary is local (G5) |
 | 7 | 12-month projection tile | `dashboard.computed.ts` | Median monthly savings × 12, no market return | hidden under three complete months | M10 | G7 |
 | 8 | FIRE projection | `FireCalculator`; money-semantics §11 | Target = 12 × median outflow ÷ withdrawal rate (default 4%); 5% real return, compounding | `HasStaleSleeves`, `InsufficientHistory` | M10 | G7 |
-| 9 | Historical FX | `CachingHistoricalExchangeRateService` | Published rate for the date; else today's rate, or 1:1 for an unknown currency | a log line only | valuation step 5 | G2 |
+| 9 | Historical FX | `CachingHistoricalExchangeRateService` | `ConvertToUsdAsync` returns a `ConvertResult`: the published rate for the date (`EXACT`), the closest earlier published day (`NEAREST_PUBLISHED`), else today's rate (`TODAY_RATE`, or `SEED_TABLE` / `UNKNOWN_1TO1` when today's rate is itself the seed or absent) | `FxStatus` on the result (R4); the log line stays | valuation step 5 | G2 (closed for the live total) |
 
 Two things already right and kept:
 
 - **The compute currency is USD and the display base is per user** (`CurrencyConverter.ResolveBase`, used
   by the dashboard, net-worth history and wealth controllers).
 - **`IHistoricalExchangeRateService.GetPublishedRateAsync` never substitutes today's live rate.** It is the
-  primitive an exact FX status needs.
+  primitive the exact FX status is built on.
+- **Typed FX status (R4, done).** `CurrencyConverter.Convert` and `IHistoricalExchangeRateService.ConvertToUsdAsync`
+  return `ConvertResult(Amount, FxStatus)`; `FxStatus` is `EXACT`, `NEAREST_PUBLISHED`, `TODAY_RATE`,
+  `SEED_TABLE` or `UNKNOWN_1TO1`, ordered best to worst so a figure carries the worst of its conversions
+  (`FxStatusExtensions.Worst`). `ToUsd` stays as the amount-only adapter and an unknown currency never throws
+  (option c was rejected). The statuses map to the reasons `FX_TODAY_RATE` (today's-rate and seed-table) and
+  `FX_UNKNOWN_1TO1` (`FxStatusExtensions.ToReason`). Adopted in the headline readers: the account, brokerage
+  and crypto readers stamp each row, `BookFiguresService` carries the worst on `BookFigures.FxStatus`
+  (`FxReasonCodes`), the snapshot job passes it in `NetWorthSnapshotData`, and net-worth history returns
+  `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
+  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it (a carried-forward
+  sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
+  `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
+  `IsApproximate` reading `FX_TODAY_RATE`; a
+  base currency shown on the seed table adds it, and a row dated before today shown in a non-USD base adds it
+  too (the display boundary converts at today's rate, not the row's own day's: dated-rate display conversion,
+  C4's "dated rates", is a separate queued follow-up). R8's per-source rows will take over this field. A brokerage
+  or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
+  in force when it is read. Display wording is R7.
 
 ---
 
@@ -299,8 +317,8 @@ them:
 | `IsApproximate` (bool; backfill from #584) | ESTIMATED + `BACKFILLED_ESTIMATE` + `FX_TODAY_RATE` |
 | `CashTotal` null | `NO_SPLIT`: cash and invested splits are UNAVAILABLE |
 | `PositionReturns.Coverage` | basisStatus COMPLETE / PARTIAL / MISSING |
-| Unknown currency converted 1:1 (`CurrencyConverter.ToUsd`) | DEGRADED + `FX_UNKNOWN_1TO1` |
-| Historical FX replaced by today's rate | ESTIMATED + `FX_TODAY_RATE` |
+| Unknown currency converted 1:1 (`CurrencyConverter.Convert` → `UNKNOWN_1TO1`) | DEGRADED + `FX_UNKNOWN_1TO1` (reason code live, R4) |
+| Historical FX replaced by today's rate (`TODAY_RATE`) or a seed-table rate (`SEED_TABLE`) | ESTIMATED + `FX_TODAY_RATE` (reason code live, R4) |
 | `HasStaleSleeves` on FIRE | DEGRADED + `STALE_SOURCE` |
 | "Book N/A" | UNAVAILABLE + `SHORT_HISTORY` or `NO_SPLIT` |
 | (new) | `SCOPE_CHANGED`, `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`, `ZERO_BASE`, `NON_CASH_INCLUDED`, `PRICE_CARRIED_FORWARD`, `RESIDUAL_ABOVE_TOLERANCE` |
@@ -595,11 +613,12 @@ return. The `outperform` / `underperform` verdict inherits all of this.
 against the MCP tool surface and its tests. Later steps: a holdings-based price index on the cash-inclusive
 scope (C3), then a true TWR once dated external flows land (G6).
 
-**G2. Currency fallbacks are silent at the headline.**
-`CurrencyConverter.ToUsd` returns an unknown currency's amount unchanged; no headline path checks
-`IsKnown`. With the FX refresh not yet run it uses a hard-coded seed table. Historical conversion falls back
-to today's rate, and only a log line records it. money-semantics §9 accepts the approximations; the gap is
-that the figure does not say it is approximate (typed FX status; `FX_UNKNOWN_1TO1`, `FX_TODAY_RATE`).
+**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status waits for R8.*
+`CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
+use `Convert`, so `BookFigures`, the snapshot job and net-worth history say when a seed-table, today's-rate
+or 1:1 conversion touched a figure (`FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`). A snapshot row records the worst
+status of its sources (`fx_status`; R8's per-source rows will take over), and the amount-only `ToUsd` callers
+outside the headline paths are unchanged. money-semantics §9 accepts the approximations.
 
 **G3. The dashboard "Change" percentage counts newly linked accounts.**
 (end − start) ÷ start over snapshots. Savings legitimately belong in a value change and the label is honest

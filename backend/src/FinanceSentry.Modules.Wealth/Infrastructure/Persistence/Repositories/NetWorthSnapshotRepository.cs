@@ -27,12 +27,13 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
             $"""
             INSERT INTO public.net_worth_snapshots
                 ("Id", "UserId", "SnapshotDate", "BankingTotal", "BrokerageTotal", "CryptoTotal", "TotalNetWorth",
-                 "Currency", "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested, crypto_invested)
+                 "Currency", "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested, crypto_invested,
+                 fx_status)
             VALUES
                 ({snapshot.Id}, {snapshot.UserId}, {snapshot.SnapshotDate}, {snapshot.BankingTotal},
                  {snapshot.BrokerageTotal}, {snapshot.CryptoTotal}, {snapshot.TotalNetWorth}, {snapshot.Currency},
                  {snapshot.TakenAt.ToUniversalTime()}, {snapshot.StaleSleeves}, {snapshot.IsApproximate},
-                 {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested})
+                 {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested}, {(int?)snapshot.FxStatus})
             ON CONFLICT ("UserId", "SnapshotDate") DO UPDATE SET
                 "BankingTotal" = EXCLUDED."BankingTotal",
                 "BrokerageTotal" = EXCLUDED."BrokerageTotal",
@@ -44,7 +45,8 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
                 is_approximate = EXCLUDED.is_approximate,
                 cash_total = EXCLUDED.cash_total,
                 brokerage_invested = EXCLUDED.brokerage_invested,
-                crypto_invested = EXCLUDED.crypto_invested
+                crypto_invested = EXCLUDED.crypto_invested,
+                fx_status = EXCLUDED.fx_status
             """,
             ct);
 
@@ -94,12 +96,13 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
                 INSERT INTO public.net_worth_snapshots
                     ("Id", "UserId", "SnapshotDate", "BankingTotal", "BrokerageTotal", "CryptoTotal", "TotalNetWorth",
                      "Currency", "TakenAt", stale_sleeves, is_approximate, cash_total, brokerage_invested,
-                     crypto_invested)
+                     crypto_invested, fx_status)
                 VALUES
                     ({snapshot.Id}, {snapshot.UserId}, {snapshot.SnapshotDate}, {snapshot.BankingTotal},
                      {snapshot.BrokerageTotal}, {snapshot.CryptoTotal}, {snapshot.TotalNetWorth}, {snapshot.Currency},
                      {snapshot.TakenAt.ToUniversalTime()}, {snapshot.StaleSleeves}, {snapshot.IsApproximate},
-                     {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested})
+                     {snapshot.CashTotal}, {snapshot.BrokerageInvested}, {snapshot.CryptoInvested},
+                     {(int?)snapshot.FxStatus})
                 ON CONFLICT ("UserId", "SnapshotDate") DO NOTHING
                 """,
                 ct);

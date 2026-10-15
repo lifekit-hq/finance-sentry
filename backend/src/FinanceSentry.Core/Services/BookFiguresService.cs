@@ -23,6 +23,7 @@ public sealed class BookFiguresService(
         var bankingCashUsd = 0m;
         var brokerageCashUsd = 0m;
         var venueCashUsd = 0m;
+        var fxStatus = FxStatus.Exact;
 
         try
         {
@@ -30,6 +31,7 @@ public sealed class BookFiguresService(
             {
                 var qty = h.FreeQuantity + h.LockedQuantity;
                 if (qty == 0m) continue;
+                fxStatus = fxStatus.Worst(h.FxStatus);
                 if (h.IsVenueFiat)
                 {
                     venueCashUsd += h.UsdValue;
@@ -50,6 +52,7 @@ public sealed class BookFiguresService(
             foreach (var h in await brokerageReader.GetHoldingsAsync(userId, ct))
             {
                 if (h.Quantity == 0m) continue;
+                fxStatus = fxStatus.Worst(h.FxStatus);
                 var assetClass = AssetClassNormalizer.Normalize(h.InstrumentType);
                 if (assetClass == AssetClassNormalizer.Cash)
                     brokerageCashUsd += h.UsdValue;
@@ -67,6 +70,9 @@ public sealed class BookFiguresService(
         {
             var accounts = await bankingReader.GetAccountSummariesAsync(userId, ct);
             bankingCashUsd = accounts.Sum(a => AccountBalanceMath.SignedForNetTotal(a.AccountType, a.BalanceUsd ?? 0m));
+            // An account with no reported balance converted nothing, so its status says nothing.
+            foreach (var a in accounts.Where(a => a.BalanceUsd.HasValue))
+                fxStatus = fxStatus.Worst(a.FxStatus);
         }
         catch (Exception ex)
         {
@@ -86,6 +92,7 @@ public sealed class BookFiguresService(
             positions,
             staleSources.Count > 0,
             staleSources,
-            venueCashUsd);
+            venueCashUsd,
+            fxStatus);
     }
 }

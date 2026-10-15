@@ -69,7 +69,12 @@ public sealed class NetWorthSplitMigrationTests : IAsyncLifetime
 
         (await SplitColumnsPresentAsync()).Should().BeEquivalentTo(SplitColumns);
         await using var read = CreateContext();
-        var row = await read.NetWorthSnapshots.IgnoreQueryFilters().AsNoTracking().SingleAsync(s => s.UserId == userId);
+        // Project only the columns that exist at this migration: a whole-entity read selects every column the
+        // current model maps (later migrations' included), which the schema stopped at M004 does not have yet.
+        var row = await read.NetWorthSnapshots.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .Select(s => new { s.BankingTotal, s.BrokerageTotal, s.CryptoTotal, s.TotalNetWorth, s.CashTotal, s.BrokerageInvested, s.CryptoInvested })
+            .SingleAsync();
         (row.BankingTotal, row.BrokerageTotal, row.CryptoTotal, row.TotalNetWorth).Should().Be((1000.10m, 300.20m, 50.30m, 1350.60m));
         row.CashTotal.Should().BeNull();
         row.BrokerageInvested.Should().BeNull();

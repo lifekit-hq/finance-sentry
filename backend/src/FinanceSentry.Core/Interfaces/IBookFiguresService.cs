@@ -1,5 +1,7 @@
 namespace FinanceSentry.Core.Interfaces;
 
+using FinanceSentry.Core.Utils;
+
 /// <summary>
 /// A single position in the invested (non-cash) portion of the book, already normalized
 /// to a canonical asset class by <see cref="Domain.AssetClassNormalizer"/>.
@@ -23,6 +25,11 @@ public sealed record BookFigurePosition(
 /// <param name="VenueCashUsd">
 /// Fiat held on crypto venues (Revolut X EUR/USD balances, #472) — cash, but not bank cash.
 /// </param>
+/// <param name="FxStatus">
+/// The worst conversion status among the holdings and accounts the figures were summed from
+/// (<see cref="Utils.FxStatus"/>): <see cref="FxStatusExtensions.ToReasons"/> turns it into the
+/// FX_TODAY_RATE / FX_UNKNOWN_1TO1 reason codes. A source that failed to read contributes nothing.
+/// </param>
 public sealed record BookFigures(
     decimal CashUsd,
     decimal BankingCashUsd,
@@ -32,8 +39,12 @@ public sealed record BookFigures(
     IReadOnlyList<BookFigurePosition> Positions,
     bool IsStale,
     IReadOnlyList<string> StaleSources,
-    decimal VenueCashUsd = 0m)
+    decimal VenueCashUsd = 0m,
+    FxStatus FxStatus = FxStatus.Exact)
 {
+    /// <summary>The FX reason codes the figures carry; empty when every conversion used a live rate.</summary>
+    public IReadOnlyList<string> FxReasonCodes => FxStatus.ToReasons();
+
     public static BookFigures Empty { get; } =
         new(0m, 0m, 0m, 0m, 0m, [], false, []);
 }
