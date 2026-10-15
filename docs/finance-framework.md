@@ -561,7 +561,7 @@ against the MCP tool surface and its tests.
 *R1(b) done:* the same tool and brief now also carry a holdings-based price return (`HoldingsBasedReturnCalculator`,
 the `BookDrawdownCalculator` method: revalue the earlier capture's quantities at the later capture's prices,
 then chain), so a deposit or a purchase from idle cash reads 0%. It excludes dividends, so it is compared with
-SPY's *price* return (close, not adjusted close) over the identical window, and it is labelled "holdings-based
+SPY's *price* return (close, not adjusted close) between the first and last capture the index covers, and it is labelled "holdings-based
 return" vs "S&P 500 price return". It is on the invested brokerage positions (the holdings captures hold no
 cash); the cash-inclusive scope (C3) and the position ledger's dividends are not in it. A missing price,
 too few captures or an uncovered window yield a typed reason, never 0. A position sold inside the window is

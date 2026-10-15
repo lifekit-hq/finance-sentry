@@ -19,7 +19,7 @@ public enum BookPerformancePeriod
 /// <c>HoldingsBasedReturn</c> is the flow-neutral companion: the book's price return from revaluing each
 /// capture's quantities at the next capture's prices and chaining, so deposits and purchases from idle cash
 /// read as 0%. It excludes dividends, so it is compared with <c>SpyPriceReturn</c>, SPY's change in close
-/// (not adjusted close), over the identical window; <c>HoldingsBasedDelta</c> is the difference. When there is
+/// (not adjusted close), measured between the first and last capture the index covers; <c>HoldingsBasedDelta</c> is the difference. When there is
 /// no number, <c>HoldingsBasedUnavailableReason</c> says why (never a 0) and, for a missing price,
 /// <c>HoldingsBasedMissingPriceSymbols</c> names the positions.
 /// </para>

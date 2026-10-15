@@ -1065,8 +1065,10 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   purchase from idle cash reads 0%, not a gain. Fictional example, the one above with no price change:
   1,000 + a 500 deposit that buys 5 more shares at an unchanged 100 reads +50% as a value change and 0% here.
   - **Price return, not total return.** Dividends paid to cash are outside the index, so the comparator is
-    SPY's change in **close** (`DailyBar.Close`), over the same window (first bar on or after the period's
-    start to the latest bar), not the adjusted close the value-change comparison uses.
+    SPY's change in **close** (`DailyBar.Close`) between the first and last capture the index covers (the
+    latest SPY bar at or before each capture's date), not the adjusted close the value-change comparison
+    uses. The span can sit inside the period by up to the edge tolerance at each end; SPY is measured over
+    that same span, not over the nominal period.
   - **Window.** The captures at or after the period's start, with the same edge tolerance as the book
     value-change figure (`clamp(round(periodDays × 0.1), 1, 7)` days at both ends).
   - **A reason, never 0.** `holdingsBasedUnavailableReason` is `InsufficientCaptures` (fewer than two

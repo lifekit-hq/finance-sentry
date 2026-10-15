@@ -459,6 +459,35 @@ public sealed class BookPerformanceServiceTests
         period.HoldingsBasedUnavailableReason.Should().BeNull();
     }
 
+    // Golden: 1M window, captures sit 2 days inside each edge (tolerance is 3 days), so the index covers
+    // since+2 .. today-2. SPY close is measured between those dates: 410 -> 440 = +7.32%, not the nominal
+    // since .. today span (400 -> 500 = +25%). Holdings: 10 shares 1,000 -> 1,100 = +10%; delta = +2.68%.
+    [Fact]
+    public async Task GetAsync_MeasuresSpyPriceReturnOverTheCaptureSpan_WhenCapturesSitInsideTheEdgeTolerance()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddMonths(-1);
+        var firstCapture = since.AddDays(2);
+        var lastCapture = today.AddDays(-2);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                BarWithClose("SPY", since, 400m, 400m),
+                BarWithClose("SPY", firstCapture, 410m, 410m),
+                BarWithClose("SPY", lastCapture, 440m, 440m),
+                BarWithClose("SPY", today, 500m, 500m),
+            ]);
+        GivenCaptures(
+            Capture(firstCapture, new CapturedHolding("AAA", 10m, 1_000m)),
+            Capture(lastCapture, new CapturedHolding("AAA", 10m, 1_100m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth])).Periods.Single();
+
+        period.HoldingsBasedReturn.Should().Be(0.1m);
+        period.SpyPriceReturn.Should().Be(0.0732m);
+        period.HoldingsBasedDelta.Should().Be(0.0268m);
+    }
+
     // Golden: no captures at all -> a reason, never 0, while the value-change figure is untouched.
     [Fact]
     public async Task GetAsync_ReturnsInsufficientCapturesReason_WhenNoHoldingsWereCaptured()
