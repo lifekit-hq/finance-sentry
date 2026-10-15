@@ -26,6 +26,15 @@ public sealed record HeadlineSignals
     /// <summary>No position the figure was summed from has a known cost basis, so the gain against cost is unavailable.</summary>
     public bool NoCostBasis { get; init; }
 
+    /// <summary>
+    /// Sources in the figure's scope whose external flows are not recorded (finance-framework §3.2 rule 4): a
+    /// figure that splits value change from flows cannot be measured for them (<c>UNKNOWN_FLOW</c> per source).
+    /// </summary>
+    public IReadOnlyList<string> UnknownFlowSources { get; init; } = [];
+
+    /// <summary>A source joined the scope inside the window and the measure bridged it (<c>SCOPE_CHANGED</c>, informative).</summary>
+    public bool ScopeChanged { get; init; }
+
     /// <summary>Both figures' signals: the start and the end of a window.</summary>
     public HeadlineSignals Merge(HeadlineSignals other) => new()
     {
@@ -34,6 +43,8 @@ public sealed record HeadlineSignals
         Fx = Fx.Worst(other.Fx),
         NoSplit = NoSplit || other.NoSplit,
         NoCostBasis = NoCostBasis || other.NoCostBasis,
+        UnknownFlowSources = [.. UnknownFlowSources.Concat(other.UnknownFlowSources).Distinct(StringComparer.OrdinalIgnoreCase)],
+        ScopeChanged = ScopeChanged || other.ScopeChanged,
     };
 
     /// <summary>

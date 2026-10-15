@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Radar.Application.Services;
 
 using System.Text.Json;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
@@ -29,8 +30,11 @@ public static class PerformanceBriefComposer
 
     private const string Benchmark = "SPY";
 
-    /// <summary>The book figure is last / first - 1 over invested value: deposits count, so it is not a TWR.</summary>
-    private const string BookLabel = "Book value change (incl. deposits)";
+    /// <summary>The book figure is the brokerage sleeve's time-weighted return: reported deposits are taken out.</summary>
+    private const string BookLabel = "Book TWR";
+
+    /// <summary>A provider with no recorded deposits leaves its contributions in the TWR, so the figure is an estimate.</summary>
+    private const string EstimatedSuffix = " (est.)";
     private const string HoldingsLabel = "Holdings-based return";
     private const string BenchmarkPriceLabel = "S&P 500 price return";
     private const decimal PercentDivisor = 100m;
@@ -138,7 +142,11 @@ public static class PerformanceBriefComposer
                 _ => p.Period.ToString(),
             };
 
-            var book = p.BookTwr.HasValue ? $"{p.BookTwr.Value:+0.##%;-0.##%;0%}" : "N/A";
+            var estimated = p.BookTwr.HasValue
+                && p.BookTwrReasons?.Any(r => r.Code == HeadlineReasonCode.UnknownFlow) == true;
+            var book = p.BookTwr.HasValue
+                ? $"{p.BookTwr.Value:+0.##%;-0.##%;0%}{(estimated ? EstimatedSuffix : string.Empty)}"
+                : "N/A";
             var spy = p.SpyTwr.HasValue ? $"{p.SpyTwr.Value:+0.##%;-0.##%;0%}" : "N/A";
             var diff = p.Delta.HasValue ? $" (Δ {p.Delta.Value:+0.##%;-0.##%;0%})" : string.Empty;
 

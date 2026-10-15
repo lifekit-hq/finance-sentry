@@ -2,6 +2,7 @@ using System.Reflection;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Integration;
 using FinanceSentry.Mcp.Abstractions;
 using Microsoft.Extensions.Configuration;
@@ -60,6 +61,10 @@ public static class McpServiceRegistration
         // composition lib so every host — API and this MCP host — registers them. Without this the MCP host
         // leaves IAllocationPolicySource / IPositionCapSource unregistered and risk/allocation tools throw.
         services.AddCrossModulePorts();
+
+        // The brokerage flow reader behind get_book_performance converts each flow at its own date's rate
+        // (finance-framework §3.2 rule 5), so this host needs the historical-rate feeds the API registers.
+        services.AddExchangeRates(config);
 
         services.AddHttpContextAccessor();
         services.AddSingleton<LocalMcpCredentialStore>();

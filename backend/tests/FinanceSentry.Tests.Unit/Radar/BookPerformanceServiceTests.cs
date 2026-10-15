@@ -1,4 +1,6 @@
 using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Measures;
 using FinanceSentry.Core.Utils;
 using FluentAssertions;
 using Moq;
@@ -17,6 +19,7 @@ public sealed class BookPerformanceServiceTests
     private readonly Mock<IDailyBarRepository> _bars = new();
     private readonly Mock<IPortfolioValueSource> _portfolio = new();
     private readonly Mock<IHoldingsHistorySource> _holdings = new();
+    private readonly Mock<IBrokerageFlowReader> _flows = new();
 
     public BookPerformanceServiceTests()
     {
@@ -24,9 +27,15 @@ public sealed class BookPerformanceServiceTests
             .ReturnsAsync([]);
         _holdings.Setup(h => h.GetBrokerageCapturesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
             .ReturnsAsync([]);
+        _flows.Setup(f => f.ReadAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
+            .ReturnsAsync(BrokerageFlowReading.Empty);
     }
 
-    private BookPerformanceService CreateSut() => new(_bars.Object, _portfolio.Object, _holdings.Object);
+    private BookPerformanceService CreateSut() => new(_bars.Object, _portfolio.Object, _holdings.Object, _flows.Object);
+
+    // A day whose cash-inclusive total equals its invested value: no idle cash.
+    private static DailyPortfolioValue Day(DateOnly date, decimal? invested, HeadlineSignals? signals = null)
+        => new(date, invested, signals, invested);
 
     private static DailyBar Bar(string ticker, DateOnly date, decimal adjClose) => new()
     {
@@ -55,8 +64,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today, 103_000m),  // +3% book
+                Day(since, 100_000m),
+                Day(today, 103_000m),  // +3% book
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -83,8 +92,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today, 102_000m),  // +2% book
+                Day(since, 100_000m),
+                Day(today, 102_000m),  // +2% book
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -108,8 +117,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today, 100_050m),  // +0.05% — within 0.1% threshold
+                Day(since, 100_000m),
+                Day(today, 100_050m),  // +0.05% — within 0.1% threshold
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -128,8 +137,8 @@ public sealed class BookPerformanceServiceTests
         var since = today.AddDays(-7);
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today, 103_000m),
+                Day(since, 100_000m),
+                Day(today, 103_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -187,7 +196,7 @@ public sealed class BookPerformanceServiceTests
             .ReturnsAsync([Bar("SPY", today, 400m)]);
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
-            .ReturnsAsync([new DailyPortfolioValue(today, 100_000m)]);
+            .ReturnsAsync([Day(today, 100_000m)]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
 
@@ -211,9 +220,9 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(month, 90_000m),
-                new DailyPortfolioValue(week, 95_000m),
-                new DailyPortfolioValue(today, 100_000m),
+                Day(month, 90_000m),
+                Day(week, 95_000m),
+                Day(today, 100_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId,
@@ -239,8 +248,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today, 100_000m),  // flat
+                Day(since, 100_000m),
+                Day(today, 100_000m),  // flat
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -267,7 +276,7 @@ public sealed class BookPerformanceServiceTests
             ]);
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
-            .ReturnsAsync([new DailyPortfolioValue(today, 100_000m)]);
+            .ReturnsAsync([Day(today, 100_000m)]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
 
@@ -290,8 +299,8 @@ public sealed class BookPerformanceServiceTests
         // Days before firstSplitDay are absent from the series; the return runs from the first one present.
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(firstSplitDay, 80_000m),
-                new DailyPortfolioValue(today, 84_000m),
+                Day(firstSplitDay, 80_000m),
+                Day(today, 84_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -320,8 +329,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since.AddDays(daysAfterStart), 100_000m),
-                new DailyPortfolioValue(today, 103_000m),
+                Day(since.AddDays(daysAfterStart), 100_000m),
+                Day(today, 103_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [period]);
@@ -345,13 +354,14 @@ public sealed class BookPerformanceServiceTests
         _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
             .ReturnsAsync([
                 Bar("SPY", since, 400m),
+                Bar("SPY", today.AddDays(-daysBeforeToday), 404m),
                 Bar("SPY", today, 404m),
             ]);
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 100_000m),
-                new DailyPortfolioValue(today.AddDays(-daysBeforeToday), 103_000m),
+                Day(since, 100_000m),
+                Day(today.AddDays(-daysBeforeToday), 103_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [period]);
@@ -373,8 +383,8 @@ public sealed class BookPerformanceServiceTests
 
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(today.AddDays(-1), 100_000m),
-                new DailyPortfolioValue(today, 103_000m),
+                Day(today.AddDays(-1), 100_000m),
+                Day(today, 103_000m),
             ]);
 
         var result = await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek]);
@@ -403,7 +413,7 @@ public sealed class BookPerformanceServiceTests
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var since = today.AddDays(-7);
-        SetupOneWeek(since, today, new DailyPortfolioValue(since, 100_000m), new DailyPortfolioValue(today, 103_000m));
+        SetupOneWeek(since, today, Day(since, 100_000m), Day(today, 103_000m));
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -426,8 +436,8 @@ public sealed class BookPerformanceServiceTests
         var since = today.AddDays(-7);
         SetupOneWeek(
             since, today,
-            new DailyPortfolioValue(since, 100_000m, HeadlineSignals.FromSnapshot(null, true, (FxStatus?)null)),
-            new DailyPortfolioValue(today, 103_000m, HeadlineSignals.FromSnapshot("brokerage", false, FxStatus.Exact)));
+            Day(since, 100_000m, HeadlineSignals.FromSnapshot(null, true, (FxStatus?)null)),
+            Day(today, 103_000m, HeadlineSignals.FromSnapshot("brokerage", false, FxStatus.Exact)));
 
         var book = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single().Book!;
 
@@ -444,7 +454,7 @@ public sealed class BookPerformanceServiceTests
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var since = today.AddDays(-7);
-        SetupOneWeek(since, today, new DailyPortfolioValue(today, 100_000m));
+        SetupOneWeek(since, today, Day(today, 100_000m));
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -462,9 +472,9 @@ public sealed class BookPerformanceServiceTests
         var since = today.AddDays(-7);
         SetupOneWeek(
             since, today,
-            new DailyPortfolioValue(since, null),
-            new DailyPortfolioValue(today.AddDays(-1), null),
-            new DailyPortfolioValue(today, 103_000m));
+            Day(since, null),
+            Day(today.AddDays(-1), null),
+            Day(today, 103_000m));
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -482,9 +492,9 @@ public sealed class BookPerformanceServiceTests
         var since = today.AddDays(-7);
         SetupOneWeek(
             since, today,
-            new DailyPortfolioValue(since, 100_000m),
-            new DailyPortfolioValue(today.AddDays(-3), null),
-            new DailyPortfolioValue(today, 103_000m));
+            Day(since, 100_000m),
+            Day(today.AddDays(-3), null),
+            Day(today, 103_000m));
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -497,7 +507,7 @@ public sealed class BookPerformanceServiceTests
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var since = today.AddDays(-7);
-        SetupOneWeek(since, today, new DailyPortfolioValue(since, 0m), new DailyPortfolioValue(today, 5_000m));
+        SetupOneWeek(since, today, Day(since, 0m), Day(today, 5_000m));
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -561,8 +571,8 @@ public sealed class BookPerformanceServiceTests
             ]);
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
             .ReturnsAsync([
-                new DailyPortfolioValue(since, 1_000m),
-                new DailyPortfolioValue(today, 1_500m),
+                Day(since, 1_000m),
+                Day(today, 1_500m),
             ]);
         GivenCaptures(
             Capture(since, new CapturedHolding("AAA", 10m, 1_000m)),
@@ -617,7 +627,7 @@ public sealed class BookPerformanceServiceTests
         _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
             .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
         _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
-            .ReturnsAsync([new DailyPortfolioValue(since, 100m), new DailyPortfolioValue(today, 103m)]);
+            .ReturnsAsync([Day(since, 100m), Day(today, 103m)]);
 
         var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
 
@@ -683,4 +693,121 @@ public sealed class BookPerformanceServiceTests
         period.HoldingsBasedUnavailableReason.Should().Be(HoldingsReturnUnavailableReason.MissingPrice);
         period.HoldingsBasedMissingPriceSymbols.Should().BeEquivalentTo(["BBB"]);
     }
+
+    private void SetupFlows(params (string Source, DateOnly LinkedOn, bool Recorded)[] sources)
+        => SetupFlows(sources, []);
+
+    private void SetupFlows((string Source, DateOnly LinkedOn, bool Recorded)[] sources, SourceFlow[] flows)
+        => _flows.Setup(f => f.ReadAsync(UserId, It.IsAny<DateOnly>(), default))
+            .ReturnsAsync(new BrokerageFlowReading(
+                [.. sources.Select(s => new FlowSourceCoverage(s.Source, s.LinkedOn, s.Recorded))], flows));
+
+    private static DailyPortfolioValue Total(DateOnly date, decimal total, decimal? invested = null)
+        => new(date, invested ?? total, null, total);
+
+    [Fact]
+    public async Task GetAsync_BookTwr_TakesOutAReportedDeposit()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(since, today, Total(since, 100_000m), Total(today.AddDays(-3), 101_000m), Total(today, 111_000m));
+        SetupFlows(
+            [("ibkr", since.AddDays(-30), true)],
+            [new SourceFlow("ibkr", new ClassifiedFlow(today, FlowClass.ExternalInflow, 10_000m), FxStatus.Exact)]);
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        // (101 / 100) x (111 / (101 + 10)) - 1: the deposit is not a gain, so the book returned 1%, not 11%.
+        period.BookTwr.Should().Be(0.01m);
+        period.SpyTwr.Should().Be(0.01m);
+        period.Delta.Should().Be(0m);
+        period.Verdict.Should().Be("inline");
+        period.BookTwrFrom.Should().Be(since);
+        period.BookTwrTo.Should().Be(today);
+        period.BookTwrReasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAsync_BookTwr_IsAnEstimateNamingTheProvider_WhenItHasNeverReportedADeposit()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(since, today, Total(since, 100_000m), Total(today, 103_000m));
+        SetupFlows(("ibkr", since.AddDays(-30), false), ("inzhur", since.AddDays(-30), true));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().Be(0.03m);
+        period.BookTwrReasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.UnknownFlow, "ibkr"));
+    }
+
+    [Fact]
+    public async Task GetAsync_BookTwr_IsMeasuredOnTheCashInclusiveTotal_SoABuyFromCashIsNotAGain()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        // 20k of idle cash buys positions: invested rises 20%, the total does not move.
+        SetupOneWeek(since, today, Total(since, 120_000m, 100_000m), Total(today, 120_000m, 120_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().Be(0m);
+        period.Book!.Percent.Should().Be(20.00m);
+    }
+
+    [Fact]
+    public async Task GetAsync_BookTwr_BridgesAProviderLinkedInsideTheWindow()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        var linked = today.AddDays(-3);
+        SetupOneWeek(
+            since, today,
+            Total(since, 100_000m), Total(linked.AddDays(-1), 102_000m), Total(linked, 102_500m),
+            Total(linked.AddDays(1), 152_000m), Total(today, 155_040m));
+        SetupFlows(("ibkr", since.AddDays(-30), true), ("inzhur", linked, true));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        // 1.02 before the link, the linked stretch at zero, then 155,040 / 152,000 = 1.02: 4.04% in all.
+        period.BookTwr.Should().Be(0.0404m);
+        period.BookTwrReasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
+        period.Book!.Percent.Should().BeNull();
+        period.Book.Reasons.Should().Contain(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
+    }
+
+    [Fact]
+    public async Task GetAsync_BookTwr_DropsAZeroCloseNoWithdrawalExplains()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(
+            since, today, Total(since, 100_000m), Total(today.AddDays(-3), 0m), Total(today, 103_000m));
+        SetupFlows(("ibkr", since.AddDays(-30), true));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        // A failed read stored as zero is not a -100% day.
+        period.BookTwr.Should().Be(0.03m);
+        period.BookTwrReasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.UnknownFlow));
+    }
+
+    [Fact]
+    public async Task GetAsync_SpyTwr_RunsOverTheBooksOwnWindow()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", since.AddDays(1), 410m), Bar("SPY", today, 420m)]);
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([Total(since.AddDays(1), 100_000m), Total(today, 103_000m)]);
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        // 420 / 410 - 1 from the book's first close, not 420 / 400 - 1 from the period's first bar.
+        period.SpyTwr.Should().Be(0.0244m);
+        period.BookTwrFrom.Should().Be(since.AddDays(1));
+        period.Delta.Should().Be(0.0056m);
+    }
 }
+

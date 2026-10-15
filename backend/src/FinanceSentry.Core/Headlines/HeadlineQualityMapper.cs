@@ -43,6 +43,12 @@ public static class HeadlineQualityMapper
         if (signals.NoCostBasis)
             reasons.Add(new HeadlineReason(HeadlineReasonCode.NoCostBasis));
 
+        foreach (var source in signals.UnknownFlowSources.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.UnknownFlow, source));
+
+        if (signals.ScopeChanged)
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.ScopeChanged));
+
         if (percentFailure is { } failure)
             reasons.Add(new HeadlineReason(ReasonFor(failure)));
 

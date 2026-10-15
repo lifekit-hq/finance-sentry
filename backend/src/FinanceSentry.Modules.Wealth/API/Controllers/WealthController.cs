@@ -16,8 +16,10 @@ public class WealthController(
     IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> wealthSummaryHandler,
     IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> txSummaryHandler,
     IQueryHandler<GetFireProjectionQuery, FireProjectionResponse> fireProjectionHandler,
+    IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse> brokerageGrowthHandler,
     IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
 {
+    private readonly IQueryHandler<GetBrokerageGrowthQuery, BrokerageGrowthResponse> _brokerageGrowthHandler = brokerageGrowthHandler ?? throw new ArgumentNullException(nameof(brokerageGrowthHandler));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetWealthSummaryQuery, WealthSummaryResponse> _wealthSummaryHandler = wealthSummaryHandler ?? throw new ArgumentNullException(nameof(wealthSummaryHandler));
     private readonly IQueryHandler<GetTransactionSummaryQuery, TransactionSummaryResponse> _txSummaryHandler = txSummaryHandler ?? throw new ArgumentNullException(nameof(txSummaryHandler));
@@ -125,6 +127,43 @@ public class WealthController(
             MonthlySavings = Fx(fire.MonthlySavings),
             AnnualSpend = Fx(fire.AnnualSpend),
             BaseCurrency = baseCurrency,
+        };
+    }
+
+    /// <summary>
+    /// Contributions vs growth for the brokerage sleeve since its value series began (M2, with Modified Dietz as
+    /// the percent): <c>GET /api/v1/wealth/brokerage/growth</c>.
+    /// </summary>
+    [HttpGet("brokerage/growth")]
+    public async Task<IActionResult> GetBrokerageGrowth(CancellationToken ct)
+    {
+        var userId = User.RequireUserId();
+        var result = await _brokerageGrowthHandler.Handle(new GetBrokerageGrowthQuery(userId), ct);
+        var baseCurrency = CurrencyConverter.ResolveBase(await _baseCurrencyReader.GetAsync(userId, ct));
+        return Ok(InBaseCurrency(result, baseCurrency));
+    }
+
+    // Computed in USD over dated flows; shown in the base currency at today's rate, as the summary is. The headline
+    // names that rate (FX_TODAY_RATE) for a window reaching into the past; the rate is a ratio and does not change.
+    private static BrokerageGrowthResponse InBaseCurrency(BrokerageGrowthResponse growth, string baseCurrency)
+    {
+        if (baseCurrency == "USD")
+            return growth;
+
+        decimal? Fx(decimal? usd) => usd is { } v ? CurrencyConverter.FromUsd(v, baseCurrency) : null;
+        return growth with
+        {
+            StartValue = Fx(growth.StartValue),
+            EndValue = Fx(growth.EndValue),
+            Contributed = Fx(growth.Contributed),
+            NewlyLinked = Fx(growth.NewlyLinked),
+            Growth = Fx(growth.Growth),
+            Income = Fx(growth.Income),
+            Fees = Fx(growth.Fees),
+            Taxes = Fx(growth.Taxes),
+            Headline = HeadlineFactory.InBaseCurrency(
+                growth.Headline, baseCurrency, DateOnly.FromDateTime(DateTime.UtcNow)),
+            Currency = baseCurrency,
         };
     }
 }

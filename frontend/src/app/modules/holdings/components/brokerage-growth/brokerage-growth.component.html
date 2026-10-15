@@ -1,0 +1,118 @@
+@if (store.status() !== 'success' || store.hasHistory()) {
+  <section class="mt-cmn-6 border-t border-border-default pt-cmn-5" data-testid="brokerage-growth">
+    <cmn-async-state
+      [status]="store.status()"
+      [errorMessage]="store.errorMessage()"
+      (retry)="store.load()"
+      retryable
+    >
+      <div skeleton class="space-y-cmn-2">
+        <cmn-skeleton height="1rem" width="40%" />
+        <cmn-skeleton height="0.875rem" width="70%" />
+        <cmn-skeleton height="0.875rem" width="70%" />
+      </div>
+
+      @if (store.growth(); as growth) {
+        <div class="flex items-baseline justify-between gap-cmn-2">
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">
+            Contributed vs growth
+          </h2>
+          <fns-headline-badge
+            [headline]="growth.headline"
+            label="Brokerage growth"
+            data-testid="brokerage-growth-quality"
+          />
+        </div>
+        <p class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="brokerage-growth-since">
+          Interactive Brokers and Inzhur, cash included, since
+          {{ growth.seriesStart | date: 'd MMM y' }} - the day value history starts.
+        </p>
+
+        @switch (store.view()) {
+          @case ('split') {
+            <div class="mt-cmn-4 space-y-cmn-2" data-testid="brokerage-growth-split">
+              <div class="flex items-center justify-between text-cmn-sm">
+                <span class="text-text-secondary">Value then</span>
+                <span class="tabular-nums text-text-primary">
+                  {{ growth.startValue | money: growth.currency }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between text-cmn-sm">
+                <span class="text-text-secondary">Contributed</span>
+                <span
+                  class="tabular-nums text-text-primary"
+                  data-testid="brokerage-growth-contributed"
+                >
+                  {{ growth.contributed | money: growth.currency : {signed: true} }}
+                </span>
+              </div>
+              @if (store.showsNewlyLinked()) {
+                <div class="flex items-center justify-between text-cmn-sm">
+                  <span class="text-text-secondary">Newly linked accounts</span>
+                  <span
+                    class="tabular-nums text-text-primary"
+                    data-testid="brokerage-growth-newly-linked"
+                  >
+                    {{ growth.newlyLinked | money: growth.currency : {signed: true} }}
+                  </span>
+                </div>
+              }
+              <div class="flex items-center justify-between text-cmn-sm">
+                <span class="text-text-secondary">Growth</span>
+                <span
+                  class="tabular-nums font-semibold text-text-primary"
+                  data-testid="brokerage-growth-growth"
+                >
+                  {{ growth.growth | money: growth.currency : {signed: true} }}
+                  @if (store.returnLabel(); as returnLabel) {
+                    <span class="ml-cmn-1 font-normal text-text-secondary"
+                      >({{ returnLabel }})</span
+                    >
+                  }
+                </span>
+              </div>
+              <div
+                class="flex items-center justify-between border-t border-border-default pt-cmn-2 text-cmn-sm"
+              >
+                <span class="text-text-secondary">Value now</span>
+                <span class="tabular-nums text-text-primary">
+                  {{ growth.endValue | money: growth.currency }}
+                </span>
+              </div>
+              <p class="text-cmn-xs text-text-secondary">
+                Growth includes dividends and interest. The percentage is money-weighted: it counts
+                each deposit only from the day it arrived.
+              </p>
+            </div>
+          }
+          @case ('no-flows') {
+            <div
+              class="mt-cmn-4 space-y-cmn-1 text-cmn-sm text-text-secondary"
+              data-testid="brokerage-growth-no-flows"
+            >
+              <p class="text-text-primary">
+                No contributions recorded yet for {{ store.missingProviderLabels() }}.
+              </p>
+              <p>
+                Without its deposits and withdrawals every one of them would read as growth, so the
+                split is held back.
+                @if (store.isIbkrMissing()) {
+                  Tick Deposits &amp; Withdrawals in your IBKR Flex Query; growth shows once the
+                  backfill runs.
+                }
+              </p>
+            </div>
+          }
+          @default {
+            <p
+              class="mt-cmn-4 text-cmn-sm text-text-secondary"
+              data-testid="brokerage-growth-short-history"
+            >
+              Growth shows once there are two days of value history.
+            </p>
+          }
+        }
+      }
+    </cmn-async-state>
+  </section>
+}

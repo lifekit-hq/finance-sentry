@@ -124,6 +124,10 @@
         </p>
       }
 
+      @if (!store.providerFilter()) {
+        <fns-brokerage-growth />
+      }
+
       @for (group of store.positionsByAssetClass(); track group.assetClass) {
         <section
           class="mt-cmn-6 grid gap-cmn-3 border-t border-border-default pt-cmn-5"
