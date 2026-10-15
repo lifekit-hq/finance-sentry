@@ -35,7 +35,7 @@ new is stored and there is no migration.
 | FR-009 | Partial: four per-axis rows, each expandable to its evidence, no radar or single shape. Not yet the lifekit chip strip. | `fns-scorecard-verdict` |
 | FR-010 | Partial: one shared component used on both surfaces; composed from `cmn-tag` and native disclosure, no new primitive. Lifting it into lifekit-common is a follow-up. | `shared/components/scorecard-verdict/` |
 | FR-011 | Covered: raw beside adjusted, the verdict reads adjusted, and the drill-down names which value the rules read (raw when there is no regime reading). | `ScorecardStructureAxis`, `VerdictDto.StructureBasis` |
-| FR-021 | Partial: the single scorecard read is `GET /api/v1/research/scorecards/{symbol}` and MCP `get_scorecard`; the dossier payload carries it too. The universe, construction and gap reads are not built. | `ScorecardsController`, `GetScorecardTool` |
+| FR-021 | Partial: the single scorecard read is `GET /api/v1/research/scorecards/{symbol}`; the dossier payload carries it too. The MCP tool is not built in this slice - the verdict reaches agents through the dossier payload. The universe, construction and gap reads are not built. | `ScorecardsController` |
 | FR-023 | Not applied: the owner's call ships the verdict on two existing surfaces, so it is not behind a flag. | - |
 | OQ-3 | Covered: `STRONG BUY / BUY / WAIT / AVOID` plus `NOT SCORED`. | `VerdictWord` |
 | OQ-4 | Covered: ordered decision list, first match wins, thresholds in configuration (`Verdict` section). | `VerdictOptions` |

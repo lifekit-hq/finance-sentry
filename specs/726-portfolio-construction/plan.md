@@ -98,7 +98,7 @@ change (spec FR-012). v1 ships `growth` and `balanced` (spec OQ-2).
 | REST (`/api/v1/…`)                                | MCP tool               | Spec |
 | ------------------------------------------------- | ---------------------- | ---- |
 | `GET /portfolio-construction/universe`            | `get_universe_screen`  | US1  |
-| `GET /research/scorecards/{symbol}`               | `get_scorecard`        | US2  |
+| `GET /research/scorecards/{symbol}`               | not built in this slice | US2  |
 | `GET /portfolio-construction/proposal?archetype=` | `construct_portfolio`  | US3  |
 | `GET /portfolio-construction/gap?archetype=`      | `get_construction_gap` | US4  |
 
@@ -133,7 +133,7 @@ The dossier header adoption of the strip is #824's own slice.
 
 **Built ahead of this shape (2026-10-15, owner's call "3. a")**: the verdict-only slice. `VerdictRules`
 (table v1, thresholds in `VerdictOptions`) and a read-time `ScorecardReader` over the unchanged scorers, served by
-`GET research/scorecards/{symbol}`, MCP `get_scorecard` and the dossier payload, and rendered by the shared
+`GET research/scorecards/{symbol}` and the dossier payload (no MCP tool in this slice), and rendered by the shared
 `fns-scorecard-verdict` drill-down on the dossier and the recommendation card. Step 1 calibrated on a synthetic
 fixture (`VerdictRulesTests`); calibrating against stored `CandidateScore` rows stays open, as do steps 2-6. See the
 spec's [Build status](./spec.md#build-status-verdict-only-slice).

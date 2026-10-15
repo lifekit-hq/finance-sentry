@@ -7,8 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 /// <summary>
-/// A single symbol's scorecard with its verdict word and full drill-down (spec 726 US2, FR-021). Mirrors the
-/// <c>get_scorecard</c> MCP tool.
+/// A single symbol's scorecard with its verdict word and full drill-down (spec 726 US2, FR-021).
 /// </summary>
 [ApiController]
 [Authorize]

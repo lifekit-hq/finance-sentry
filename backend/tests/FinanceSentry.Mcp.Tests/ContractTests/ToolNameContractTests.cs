@@ -41,7 +41,6 @@ public sealed class ToolNameContractTests
         "get_recent_filings",
         "get_research_context",
         "get_risk_rules",
-        "get_scorecard",
         "get_sync_health",
         "get_tax_lots",
         "get_thesis_evaluability",
