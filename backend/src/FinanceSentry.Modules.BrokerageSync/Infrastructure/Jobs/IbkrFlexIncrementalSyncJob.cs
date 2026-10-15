@@ -36,6 +36,14 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/> (48 h by default), and the job asks again sooner
 /// than the next daily run (<see cref="ConnectionHealthSourceOptions.NotReadyRetryAfter"/>, 2 h by default),
 /// through <see cref="RetryUserAsync"/>, until the next daily run is due.
+///
+/// A counted failure of a transient kind (transient, unclassified, or a suspect credential signal) on the daily
+/// run schedules an earlier re-check through <see cref="RecheckUserAsync"/>, one per entry of
+/// <see cref="ConnectionHealthSourceOptions.EarlyRechecks"/> (1 h, then 4 h after that, by default), so a real
+/// outage reaches Failing within hours rather than on the third day. The chain ends with the list, and a re-check
+/// never starts another chain beside it. It leaves a rate-limited answer to <see cref="ConnectionHealth.NotBefore"/>,
+/// a not-ready one to the retry above, and a confirmed credential loss to the pause; a re-check goes through the same
+/// gate, so it also waits out NotBefore and a pause, and it does nothing once the connection is healthy again.
 /// </summary>
 public sealed class IbkrFlexIncrementalSyncJob(
     IIBKRFlexCredentialRepository credentialRepository,
@@ -77,7 +85,7 @@ public sealed class IbkrFlexIncrementalSyncJob(
                     logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
                 continue;
 
-            await SyncCredentialAsync(credential, today, policyDrivesAlerts, attempt: 0);
+            await SyncCredentialAsync(credential, today, policyDrivesAlerts, attempt: 0, recheck: 0);
         }
     }
 
@@ -96,10 +104,29 @@ public sealed class IbkrFlexIncrementalSyncJob(
             return;
 
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
-        await SyncCredentialAsync(credential, today, healthOptions.CurrentValue.IsActive(Provider), attempt);
+        await SyncCredentialAsync(credential, today, healthOptions.CurrentValue.IsActive(Provider), attempt, recheck: null);
     }
 
-    private async Task SyncCredentialAsync(IBKRFlexCredential credential, DateOnly today, bool policyDrivesAlerts, int attempt)
+    /// <summary>
+    /// One earlier re-check of a user's sync after a counted failure, scheduled by the run before it (the daily run,
+    /// or the re-check before this one). <paramref name="recheck"/> is how many re-checks have run, this one included.
+    /// Goes through the same gate and recording as the daily run; skipped when the connection has recovered since.
+    /// </summary>
+    public async Task RecheckUserAsync(Guid userId, int recheck)
+    {
+        var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId);
+        if (credential is not { IsActive: true } || credential.Health.ConsecutiveFailures == 0)
+            return;
+
+        if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+            return;
+
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        await SyncCredentialAsync(credential, today, healthOptions.CurrentValue.IsActive(Provider), attempt: 0, recheck);
+    }
+
+    private async Task SyncCredentialAsync(IBKRFlexCredential credential, DateOnly today, bool policyDrivesAlerts, int attempt, int? recheck)
     {
         try
         {
@@ -133,8 +160,53 @@ public sealed class IbkrFlexIncrementalSyncJob(
             }
 
             ScheduleNotReadyRetry(credential.UserId, failure, attempt);
+            ScheduleEarlyRecheck(credential.UserId, failure, evaluation, recheck);
         }
     }
+
+    // After a failure that counted and may be over by the time we look again: ask again at the source's next early
+    // re-check interval, never sooner than the provider's NotBefore. `recheck` is null on a run that must not start
+    // a chain (the not-ready retries have their own); the list's length is the bound, so the chain cannot loop.
+    // Inzhur is not on the policy yet: when it joins, it takes the same hook from its sync job.
+    private void ScheduleEarlyRecheck(Guid userId, ProviderFailure failure, ConnectionHealthEvaluation? evaluation, int? recheck)
+    {
+        var intervals = sourceOptions.Get(Provider).EarlyRechecks;
+        if (recheck is not { } done
+            || done >= intervals.Length
+            || evaluation is null
+            || !IsRecheckable(failure)
+            || evaluation.Health.ConsecutiveFailures <= evaluation.Previous.ConsecutiveFailures
+            || evaluation.Health.State is ConnectionHealthState.ActionRequired or ConnectionHealthState.Dormant
+            || intervals[done] <= TimeSpan.Zero)
+            return;
+
+        var now = time.GetUtcNow();
+        var delay = intervals[done];
+        if (evaluation.Health.NotBefore is { } notBefore && notBefore - now > delay)
+            delay = notBefore - now;
+
+        try
+        {
+            backgroundJobs.Schedule<IbkrFlexIncrementalSyncJob>(job => job.RecheckUserAsync(userId, done + 1), delay);
+            logger.LogInformation(
+                "IBKR Flex sync failed for user {UserId} ({FailureClass}); checking again in {Delay} (re-check {Recheck} of {Total})",
+                userId,
+                failure.Class,
+                delay,
+                done + 1,
+                intervals.Length);
+        }
+        catch (Exception scheduleEx)
+        {
+            logger.LogWarning(scheduleEx, "Could not schedule the early IBKR Flex re-check for user {UserId}", userId);
+        }
+    }
+
+    // Transient kinds only: a rate limit waits for its NotBefore, a not-ready answer has its own retry, a definitive
+    // credential failure pauses, and a suspect one is worth a second sighting 30+ minutes on.
+    private static bool IsRecheckable(ProviderFailure failure) =>
+        failure.Class is FailureClass.Transient or FailureClass.Unknown
+        || (failure.Class == FailureClass.Credential && failure.Strength == FailureStrength.Suspect);
 
     // A statement IBKR has not generated yet is likely to be there within hours, so ask again sooner than the next
     // daily run. The chain is bounded: it ends where the next daily run would take over, and a failure to schedule

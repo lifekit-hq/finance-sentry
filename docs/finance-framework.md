@@ -553,15 +553,15 @@ bespoke engine): Microsoft.Extensions.Http.Resilience (Polly v8) inside the call
 3. Nobody is told about a single failure. The one exception is a definitive credential loss: the provider
    has said plainly that access is gone, so that signal is its own confirmation.
 
-**Failure classes** (`RateLimited` and `NotReady` were built in R12 PR 2; the early re-checks in the settings table below are not):
+**Failure classes** (`RateLimited` and `NotReady` came with R12 PR 2; the early re-checks with PR 3; the pause on a lost credential with PR 1):
 
 | Class | Typical signals | In the call | Across runs | Who is told, and when |
 |---|---|---|---|---|
-| **Transient** | 5xx, 408, network errors, timeouts; IBKR's "backend down" 401 | Exponential backoff with jitter, safe methods (GET) only; 2 retries by default | The next scheduled run | Nobody while Degraded. The outage alert once Failing (at least 3 failures and 2 h without success). Dormant after 7 days |
+| **Transient** | 5xx, 408, network errors, timeouts; IBKR's "backend down" 401 | Exponential backoff with jitter, safe methods (GET) only; 2 retries by default | The next scheduled run; a once-a-day source also looks again earlier (early re-checks below) | Nobody while Degraded. The outage alert once Failing (at least 3 failures and 2 h without success). Dormant after 7 days |
 | **RateLimited** | 429; Monobank's rate-limit code; Flex 1018 | Wait as long as `Retry-After` asks if that fits the call's time budget; otherwise stop at once | No scheduled call before the time the provider named (`ConnectionHealth.NotBefore`, from `Retry-After`, as named; a bank sync is skipped, a sweep leaves the credential alone) | Counts like Transient; never a credential signal. A 429 that persists across runs reaches Failing like any outage |
 | **NotReady** | Flex 1003, "statement is not available" | Poll while the provider says it is still generating (Flex: the retries of 1003 and 1019 inside a run) | Flex reschedules itself sooner (every 2 h, until the next daily run) instead of waiting for it | Not counted until the last success (the connection's creation, before the first one) is older than the source's NotReady deadline (48 h for Flex); then like Transient. A source with no deadline counts it at once |
 | **Credential, definitive** | TrueLayer `invalid_grant` with a consent marker; Flex 1012–1015; a stored key that cannot be decrypted | Never retried | Scheduled calls pause, except one probe a day, until the person reconnects or a probe succeeds | The reconnect alert at once (ActionRequired) |
-| **Credential, suspect** | 401/403 without proof: Monobank 403, IBKR and Revolut X 401/403, Flex 1020 | Never retried (repeated failed sign-ins are what trigger account lockouts) | Later runs try again with a fresh session where the source has one. A sighting at least 30 min after the first confirms it. Simultaneous failures across one bank's connections read as an outage | The reconnect alert once confirmed |
+| **Credential, suspect** | 401/403 without proof: Monobank 403, IBKR and Revolut X 401/403, Flex 1020 | Never retried (repeated failed sign-ins are what trigger account lockouts) | Later runs try again with a fresh session where the source has one (a once-a-day source: its early re-checks, so the confirming sighting comes the same day). A sighting at least 30 min after the first confirms it. Simultaneous failures across one bank's connections read as an outage | The reconnect alert once confirmed |
 | **ResourceGone** | TrueLayer 404 on one account | Never retried | A slower cadence | Failing, then Dormant, for that account only |
 | **Internal** | Parse errors; our own bugs | Never retried | The next run | Never the person; it goes to the operations path |
 | **Unknown** | Anything not classified | Only if the HTTP status is transient | The next run | Counts like Transient, with neutral alert wording |
@@ -581,11 +581,33 @@ makes its own:
 | Setting | Default | Override, and why |
 |---|---|---|
 | In-call retries on safe methods | 2 | 0 for signed requests (IBKR, Flex, Binance, Revolut X): a replayed nonce or timestamp is rejected |
-| Early re-checks after a failure (new) | none | a once-a-day source re-checks 1 h after a failure, then 4 h after that |
+| Early re-checks after a failure (`EarlyRechecks`) | none | a once-a-day source re-checks 1 h after a counted failure, then 4 h after that (Flex; Inzhur when it joins the policy) |
 | NotReady deadline, NotReady retry delay | none | Flex: 48 h, 2 h (`ConnectionHealthSourceOptions`, bound from `ConnectionHealth:Sources:<provider>`) |
-| Pause on ActionRequired (new outside the banks) | yes | — |
-| Probe while ActionRequired (new) | once a day | 0 to never probe |
+| Pause on ActionRequired | yes (every scheduled sync) | — |
+| Probe while ActionRequired | once a day, timed from `LastFailureAt` | shared (`ActionRequiredProbeInterval`) |
 | Failing after / Dormant after / Suspect confirmed after | 3 failures and 2 h / 7 days / 30 min (shared) | none |
+
+**Early re-checks** (`ConnectionHealthSourceOptions.EarlyRechecks`, R12 PR 3). A source that runs once a day
+would otherwise reach Failing (3 failures and 2 h) on its third day. After a counted failure of a transient kind
+(Transient, Unknown, or a suspect credential signal) on its daily run, the job schedules one earlier look with
+Hangfire's `BackgroundJob.Schedule` at the first listed interval, and each look that fails again schedules the
+next one: the list is the bound, so the chain ends (Flex: 1 h, then 4 h). A look goes through the same gate as
+the daily run, so it waits out `NotBefore` and a pause, and does nothing once the connection is healthy again.
+None follows a success, a RateLimited answer (it waits for `NotBefore`), a NotReady one (it has its own retry,
+which is not duplicated), a definitive credential failure (the pause), or a Dormant connection. An interval
+set in `ConnectionHealth:Sources:<provider>:EarlyRechecks` replaces the code default.
+
+**Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
+settings the way Flex does in `BrokerageSyncModule`):
+
+| Source | In the call | Across runs | Classification | Settings (`ConnectionHealth:Sources:<source>`) | Policy-driven alerts |
+|---|---|---|---|---|---|
+| IBKR | No retries (signed); drops its cached session token on a 401/403 | Every 15 min; ActionRequired pauses it, one probe a day | 401/403 suspect; "backend down" 401 transient | shared defaults | Yes |
+| IBKR Flex | No retries; limiter 1 call/s and 10/min; polls while generating | Daily 06:00; early re-checks after 1 h and 4 h; NotReady retried every 2 h until the next run | 1012–1015 definitive; 1020 suspect; 1003 NotReady; 1018 RateLimited; 1001, 1004–1009, 1019, 1021 transient | `EarlyRechecks` 1 h, 4 h; `NotReadyDeadline` 48 h; `NotReadyRetryAfter` 2 h | Shadow (`ibkr-flex` not yet in `ActiveProviders`) |
+| Monobank | Only 429, within 180 s | Per-account schedule, every 30 min | 403 suspect; rate limit RateLimited | shared defaults | Shadow |
+| TrueLayer | 2 retries on GETs; the token POST never | Same schedule | `invalid_grant` with consent marker definitive; 401/403 suspect; 404 ResourceGone | shared defaults | Shadow |
+| Binance, Revolut X | No retries (signed) | Every 15 min | Revolut X 401/403 suspect; unreadable key definitive | shared defaults | Shadow |
+| Inzhur | Default handler's 2 retries | `[AutomaticRetry]` after 1 h and 4 h, then the outage alert; **not on the policy**: when it joins, move that onto `EarlyRechecks` (1 h, 4 h) and the policy | Its own `reauth_required` status | not yet | No |
 
 The IBKR rule, "retry once, then confirm at 30 minutes", is one instance of this contract: a 401/403
 without "backend down" is a suspect credential failure; the signed call never retries inside itself; the
@@ -675,5 +697,8 @@ in shadow mode: their `NotBefore` is recorded there, and it pauses scheduled ban
 - A PR that closes a gap removes it from §6 (and moves the `Today` cell in §3.4 and §2.2).
 - A captain decision moves a row from **Open** to **Decided** in §1, with its date.
 - A new economy adds its row to §5.4 and declares its facets (§5.1), reliability and convertibility (§5.3)
-  and failure classes (§5.7) before its adapter is written.
+  and failure classes (§5.7) before its adapter is written. Its "Failures and retries, per source" row in §5.7
+  is part of the new-source checklist: its signals mapped to each failure class, whether its requests are
+  signed or safe to retry, whether failed sign-ins lock the account, its cadence, and its per-source settings
+  (`EarlyRechecks` if it runs once a day, `NotReadyDeadline` and `NotReadyRetryAfter` if it can be not ready).
 - No real balance, amount, token or account identifier belongs in this document.

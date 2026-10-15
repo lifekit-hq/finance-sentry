@@ -37,8 +37,15 @@ public static class ConnectionHealthServiceCollectionExtensions
     {
         public void PostConfigure(string? name, ConnectionHealthSourceOptions options)
         {
-            if (!string.IsNullOrEmpty(name))
-                sources.GetSection(name).Bind(options);
+            if (string.IsNullOrEmpty(name))
+                return;
+
+            var section = sources.GetSection(name);
+            // The binder appends configured array entries to the existing ones; a configured list replaces the
+            // code default instead, as a scalar key does.
+            if (section.GetSection(nameof(ConnectionHealthSourceOptions.EarlyRechecks)).GetChildren().Any())
+                options.EarlyRechecks = [];
+            section.Bind(options);
         }
     }
 }
