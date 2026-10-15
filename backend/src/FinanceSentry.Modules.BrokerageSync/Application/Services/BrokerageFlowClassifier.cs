@@ -48,6 +48,7 @@ public static class BrokerageFlowClassifier
     {
         ["Deposit"] = FlowClass.ExternalInflow,
         ["Withdrawal"] = FlowClass.ExternalOutflow,
+        ["Bonus withdrawal"] = FlowClass.ExternalOutflow,
         ["Dividend payment"] = FlowClass.ExternalOutflow,
         ["Distribution payment"] = FlowClass.ExternalOutflow,
         ["Dividend crediting"] = FlowClass.Income,

@@ -19,6 +19,7 @@ public class BrokerageFlowClassifierTests
     [InlineData("IBKR", "dividends", 5, FlowClass.Income)]
     [InlineData("inzhur", "Deposit", 2200, FlowClass.ExternalInflow)]
     [InlineData("inzhur", "Withdrawal", -500, FlowClass.ExternalOutflow)]
+    [InlineData("inzhur", "Bonus withdrawal", -30, FlowClass.ExternalOutflow)]
     [InlineData("inzhur", "Dividend crediting", 40, FlowClass.Income)]
     [InlineData("inzhur", "Dividend payment", -40, FlowClass.ExternalOutflow)]
     [InlineData("inzhur", "Dividend tax", -9, FlowClass.Tax)]

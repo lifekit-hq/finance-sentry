@@ -23,10 +23,14 @@ public class BrokerageFlowReaderTests
 
     public BrokerageFlowReaderTests()
     {
-        // 1 UAH = 0.025 USD on every day but 2026-10-12, when it is 0.024: the reader must ask for the row's own day.
-        _fx.Setup(f => f.ConvertToUsdAsync(It.IsAny<decimal>(), "UAH", It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((decimal amount, string _, DateOnly date, CancellationToken _) =>
-                new ConvertResult(amount * (date == new DateOnly(2026, 10, 12) ? 0.024m : 0.025m), FxStatus.Exact));
+        // 1 UAH = 0.025 USD, but 0.024 on 2026-10-12: the reader must resolve each row against its own day. The feed
+        // skips 2026-10-13 (a weekend), so that day borrows the closest earlier published rate.
+        _fx.Setup(f => f.GetPublishedSeriesAsync("UAH", It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<DateOnly, decimal>
+            {
+                [new DateOnly(2026, 10, 2)] = 0.025m,
+                [new DateOnly(2026, 10, 12)] = 0.024m,
+            });
         _fx.Setup(f => f.ConvertToUsdAsync(It.IsAny<decimal>(), "USD", It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((decimal amount, string _, DateOnly _, CancellationToken _) => new ConvertResult(amount, FxStatus.Exact));
     }
@@ -85,8 +89,42 @@ public class BrokerageFlowReaderTests
         reading.Sources.Should().Equal(new FlowSourceCoverage("inzhur", new DateOnly(2026, 10, 7), true));
         reading.ClassifiedFlows.Should().Equal(
             new ClassifiedFlow(new DateOnly(2026, 10, 12), FlowClass.ExternalInflow, 72m),
-            new ClassifiedFlow(new DateOnly(2026, 10, 13), FlowClass.Income, 1m));
+            new ClassifiedFlow(new DateOnly(2026, 10, 13), FlowClass.Income, 0.96m));
         reading.SourcesWithoutFlows(new DateOnly(2026, 10, 14)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ReadAsync_FetchesOneSeriesPerCurrency_AndReportsHowEachRateWasObtained()
+    {
+        await using var db = NewDb();
+        db.InzhurCredentials.Add(Inzhur(InzhurLinked));
+        db.BrokerageCashTransactions.AddRange(
+            Cash("inzhur", "Deposit", 3000m, "UAH", new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)),
+            Cash("inzhur", "Deposit", 1000m, "UAH", new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc)));
+        await db.SaveChangesAsync();
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Select(f => f.Fx).Should().Equal(FxStatus.Exact, FxStatus.NearestPublished);
+        _fx.Verify(f => f.GetPublishedSeriesAsync(
+            "UAH", new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 13), It.IsAny<CancellationToken>()), Times.Once);
+        _fx.Verify(f => f.ConvertToUsdAsync(It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReadAsync_FallsBackToPerRowConversion_WhenTheFeedPublishesNothingForARow()
+    {
+        await using var db = NewDb();
+        db.InzhurCredentials.Add(Inzhur(InzhurLinked));
+        db.BrokerageCashTransactions.Add(
+            Cash("inzhur", "Deposit", 1000m, "UAH", new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc)));
+        await db.SaveChangesAsync();
+        _fx.Setup(f => f.ConvertToUsdAsync(1000m, "UAH", new DateOnly(2026, 11, 20), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConvertResult(24m, FxStatus.TodayRate));
+
+        var reading = await Sut(db).ReadAsync(UserId, DateOnly.MinValue);
+
+        reading.Flows.Should().ContainSingle(f => f.Fx == FxStatus.TodayRate && f.Flow.AmountUsd == 24m);
     }
 
     [Fact]

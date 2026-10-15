@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Measures;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,8 @@ using Microsoft.EntityFrameworkCore;
 /// </summary>
 public sealed class BrokerageFlowReader(BrokerageSyncDbContext db, IHistoricalExchangeRateService fx) : IBrokerageFlowReader
 {
+    private const string UsdCode = "USD";
+
     public async Task<BrokerageFlowReading> ReadAsync(Guid userId, DateOnly from, CancellationToken ct = default)
     {
         var links = await LinkDaysAsync(userId, ct);
@@ -45,15 +48,31 @@ public sealed class BrokerageFlowReader(BrokerageSyncDbContext db, IHistoricalEx
             .OrderBy(s => s.Source, StringComparer.Ordinal)
             .ToList();
 
+        var inScope = classified.Where(r => r.Date > from && r.Date > links[r.Source]).OrderBy(r => r.Date).ToList();
+
+        // One published series per currency covers every row's date; a row the feed cannot answer falls back to the
+        // per-row conversion, which reports how its rate was obtained.
+        var seriesByCurrency = new Dictionary<string, IReadOnlyDictionary<DateOnly, decimal>>(StringComparer.Ordinal);
+        foreach (var group in inScope.GroupBy(r => NormalizeCurrency(r.Currency)).Where(g => g.Key != UsdCode && g.Key.Length > 0))
+            seriesByCurrency[group.Key] = await fx.GetPublishedSeriesAsync(group.Key, group.Min(r => r.Date), group.Max(r => r.Date), ct);
+
         var flows = new List<SourceFlow>();
-        foreach (var row in classified.Where(r => r.Date > from && r.Date > links[r.Source]).OrderBy(r => r.Date))
+        foreach (var row in inScope)
         {
-            var usd = await fx.ConvertToUsdAsync(Math.Abs(row.Amount), row.Currency, row.Date, ct);
+            var amount = Math.Abs(row.Amount);
+            var published = seriesByCurrency.TryGetValue(NormalizeCurrency(row.Currency), out var series)
+                ? PublishedRateLookup.Resolve(series, row.Date)
+                : null;
+            var usd = published is { } rate
+                ? new ConvertResult(amount * rate.Rate, rate.Status)
+                : await fx.ConvertToUsdAsync(amount, row.Currency, row.Date, ct);
             flows.Add(new SourceFlow(row.Source, new ClassifiedFlow(row.Date, row.Class!.Value, usd.Amount), usd.Status));
         }
 
         return new BrokerageFlowReading(sources, flows);
     }
+
+    private static string NormalizeCurrency(string currency) => currency.Trim().ToUpperInvariant();
 
     // The IBKR OAuth and Flex connections read one account, so IBKR's link day is the earlier of the two.
     private async Task<Dictionary<string, DateOnly>> LinkDaysAsync(Guid userId, CancellationToken ct)
