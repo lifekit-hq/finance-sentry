@@ -21,6 +21,7 @@ import {
   EmptyStateComponent,
   IconComponent,
   InstitutionAvatarComponent,
+  ListSectionComponent,
   MenuComponent,
   type MenuItem,
   RelativeTimePipe,
@@ -30,6 +31,7 @@ import {
 import {map, take} from 'rxjs';
 
 import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
+import {DisclosureToggleDirective} from '../../../../shared/directives/disclosure-toggle.directive';
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
@@ -45,6 +47,7 @@ import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
+import {AccountsDisclosureUtils} from '../../utils/accounts-disclosure.utils';
 import {InstitutionNavUtils} from '../../utils/institution-nav.utils';
 import {
   DISCONNECT_ONLY_MENU,
@@ -69,11 +72,13 @@ const SKELETON_SECTIONS = 2;
     CardComponent,
     DecimalPipe,
     DisclosureRowComponent,
+    DisclosureToggleDirective,
     EmptyStateComponent,
     HeadlineBadgeComponent,
     IconComponent,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,
+    ListSectionComponent,
     MenuComponent,
     MoneyPipe,
     NetBalancePipe,
@@ -229,6 +234,10 @@ export class AccountsListComponent implements OnInit {
       return 'Not synced yet';
     }
     return formatRelativeTime(institution.lastSyncTimestamp);
+  }
+
+  public disclosureKey(institution: Institution): string {
+    return AccountsDisclosureUtils.key(institution);
   }
 
   public needsAttention(institution: Institution): boolean {
