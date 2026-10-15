@@ -35,7 +35,7 @@ public static class ConnectionHealthSyncFailureAlerts
         SyncFailureClass? failureClass = evaluation?.Outcome switch
         {
             ConnectionHealthOutcome.NotifyActionRequired => SyncFailureClass.Credential,
-            ConnectionHealthOutcome.NotifyFailing => evaluation.Health.LastFailureClass == FailureClass.Transient
+            ConnectionHealthOutcome.NotifyFailing => evaluation.Health.LastFailureClass is { } lastClass && lastClass.IsTransientLike()
                 ? SyncFailureClass.Outage
                 : SyncFailureClass.Unknown,
             _ => null,

@@ -166,7 +166,7 @@ public class ScheduledSyncService(
                     // credential loss to be confirmed; a suspect failure leaves it syncing to be confirmed or cleared.
                     var reauth = policyDriven ? verdict.CredentialLost : legacyKind == FailureKind.Reauth;
                     var transient = policyDriven
-                        ? verdict.Failure.Class == FailureClass.Transient || cancelledByCaller
+                        ? verdict.Failure.Class.IsTransientLike() || cancelledByCaller
                         : legacyKind == FailureKind.Transient;
 
                     if (reauth)

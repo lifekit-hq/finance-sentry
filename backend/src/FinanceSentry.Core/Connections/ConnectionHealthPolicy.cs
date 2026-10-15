@@ -11,6 +11,10 @@ namespace FinanceSentry.Core.Connections;
 /// <see cref="ConnectionHealthOptions.FailingMinConsecutiveFailures"/> failures and
 /// <see cref="ConnectionHealthOptions.FailingMinTimeWithoutSuccess"/> without a success; Dormant once the streak
 /// has lasted <see cref="ConnectionHealthOptions.DormantAfter"/>.</item>
+/// <item>A rate-limited answer counts like a transient one, is never a credential signal, and may carry the time
+/// before which no scheduled run calls the provider (<see cref="ConnectionHealth.NotBefore"/>).</item>
+/// <item>A not-ready answer is not counted while the last success is younger than the source's
+/// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/>; past it, it counts like a transient failure.</item>
 /// <item>An internal failure is ours, not the provider's: it leaves the health as it was.</item>
 /// <item>A scheduled run skips an ActionRequired connection (<see cref="ScheduledRunPausedUntil"/>), except for one
 /// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.</item>
@@ -36,6 +40,7 @@ public static class ConnectionHealthPolicy
             LastSuccessAt = at,
             SuspectSince = null,
             StateChangedAt = current.State == ConnectionHealthState.Healthy ? current.StateChangedAt : at,
+            NotBefore = null,
         };
 
         var userWasTold = current.State is ConnectionHealthState.Failing
@@ -45,8 +50,15 @@ public static class ConnectionHealthPolicy
         return new ConnectionHealthEvaluation(current, next, userWasTold ? ConnectionHealthOutcome.Resolve : ConnectionHealthOutcome.None);
     }
 
+    /// <param name="source">
+    /// The failing source's own values; null reads as the defaults (a not-ready answer has no grace).
+    /// </param>
     public static ConnectionHealthEvaluation RecordFailure(
-        ConnectionHealth current, ProviderFailure failure, DateTimeOffset at, ConnectionHealthOptions options)
+        ConnectionHealth current,
+        ProviderFailure failure,
+        DateTimeOffset at,
+        ConnectionHealthOptions options,
+        ConnectionHealthSourceOptions? source = null)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(failure);
@@ -62,10 +74,14 @@ public static class ConnectionHealthPolicy
             LastFailureAt = at,
             LastFailureClass = failure.Class,
             LastFailureCode = Truncate(failure.Code),
+            NotBefore = LaterOf(current.NotBefore is { } held && held > at ? held : null, failure.NotBefore),
         };
 
         if (current.State == ConnectionHealthState.ActionRequired)
             return new ConnectionHealthEvaluation(current, counted, ConnectionHealthOutcome.None);
+
+        if (failure.Class == FailureClass.NotReady && IsWithinNotReadyGrace(current, at, source))
+            return new ConnectionHealthEvaluation(current, current, ConnectionHealthOutcome.None);
 
         if (failure.Class == FailureClass.Credential)
         {
@@ -87,11 +103,17 @@ public static class ConnectionHealthPolicy
     }
 
     /// <summary>
-    /// When a scheduled run of an ActionRequired connection may next call the provider, or null when it may go
-    /// ahead now: the connection is not ActionRequired, or its probe is due. The probe is timed from
+    /// When a scheduled run may next call the provider, or null when it may go ahead now. Two things pause it, and
+    /// the later wins:
+    /// <list type="bullet">
+    /// <item>The provider named a time (<see cref="ConnectionHealth.NotBefore"/>, a rate limit's <c>Retry-After</c>)
+    /// that has not come.</item>
+    /// <item>The connection is ActionRequired and its probe is not due. The probe is timed from
     /// <see cref="ConnectionHealth.LastFailureAt"/>, which a failed probe renews, so no field is added; a
     /// connection with no failure on record has nothing to time from and is probed at once. A probe may start
-    /// <see cref="ProbeSlack"/> early. A run the person triggers does not ask: it always goes ahead.
+    /// <see cref="ProbeSlack"/> early.</item>
+    /// </list>
+    /// A run the person triggers does not ask: it always goes ahead.
     /// </summary>
     public static DateTimeOffset? ScheduledRunPausedUntil(
         ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options)
@@ -99,12 +121,43 @@ public static class ConnectionHealthPolicy
         ArgumentNullException.ThrowIfNull(health);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (health.State != ConnectionHealthState.ActionRequired || health.LastFailureAt is not { } lastFailureAt)
-            return null;
+        var notBefore = NotBeforePausedUntil(health, now);
 
-        var nextProbeAt = lastFailureAt + options.ActionRequiredProbeInterval;
-        return now < nextProbeAt - ProbeSlack ? nextProbeAt : null;
+        DateTimeOffset? probeAt = null;
+        if (health.State == ConnectionHealthState.ActionRequired && health.LastFailureAt is { } lastFailureAt)
+        {
+            var nextProbeAt = lastFailureAt + options.ActionRequiredProbeInterval;
+            if (now < nextProbeAt - ProbeSlack)
+                probeAt = nextProbeAt;
+        }
+
+        return LaterOf(notBefore, probeAt);
     }
+
+    /// <summary>
+    /// The time the provider asked scheduled runs to wait for (<see cref="ConnectionHealth.NotBefore"/>), or null
+    /// when it has passed or none was named. For a scheduler that parks an unusable credential its own way and so
+    /// asks only about this.
+    /// </summary>
+    public static DateTimeOffset? NotBeforePausedUntil(ConnectionHealth health, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(health);
+        return health.NotBefore is { } named && now < named ? named : null;
+    }
+
+    /// <summary>
+    /// A not-ready answer is the provider still preparing what we asked for. It is not counted while the last
+    /// success is younger than the source's deadline; a source with no deadline has no grace, and a connection
+    /// that never succeeded has no age to excuse it, so both count.
+    /// </summary>
+    private static bool IsWithinNotReadyGrace(
+        ConnectionHealth current, DateTimeOffset at, ConnectionHealthSourceOptions? source) =>
+        source?.NotReadyDeadline is { } deadline
+        && current.LastSuccessAt is { } lastSuccessAt
+        && at - lastSuccessAt < deadline;
+
+    private static DateTimeOffset? LaterOf(DateTimeOffset? a, DateTimeOffset? b) =>
+        a is null ? b : b is null ? a : a >= b ? a : b;
 
     private static ConnectionHealthEvaluation Progress(
         ConnectionHealth current, ConnectionHealth counted, DateTimeOffset at, ConnectionHealthOptions options)

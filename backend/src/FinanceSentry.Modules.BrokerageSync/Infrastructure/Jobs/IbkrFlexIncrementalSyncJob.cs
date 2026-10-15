@@ -6,6 +6,7 @@ using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
+using Hangfire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -30,7 +31,10 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// sync-failure alert (a rejected or expired token at once, anything else once it has persisted: by default
 /// 3 failures and 2 h without a success, three daily runs); otherwise (shadow mode) this job raises none,
 /// as before the policy existed. A "statement is not available" answer that survives the step-back is
-/// recorded like any other failure.
+/// recorded as not ready: the policy does not count it while the last success is younger than the source's
+/// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/> (48 h by default), and the job asks again sooner
+/// than the next daily run (<see cref="ConnectionHealthSourceOptions.NotReadyRetryAfter"/>, 2 h by default),
+/// through <see cref="RetryUserAsync"/>, until the next daily run is due.
 /// </summary>
 public sealed class IbkrFlexIncrementalSyncJob(
     IIBKRFlexCredentialRepository credentialRepository,
@@ -40,6 +44,8 @@ public sealed class IbkrFlexIncrementalSyncJob(
     IConnectionHealthShadow connectionHealth,
     IbkrFlexFailureClassifier failureClassifier,
     IOptionsMonitor<ConnectionHealthOptions> healthOptions,
+    IOptionsMonitor<ConnectionHealthSourceOptions> sourceOptions,
+    IBackgroundJobClient backgroundJobs,
     TimeProvider time,
     ILogger<IbkrFlexIncrementalSyncJob> logger)
 {
@@ -48,6 +54,9 @@ public sealed class IbkrFlexIncrementalSyncJob(
     // How many days further back than yesterday the window's end may move when IBKR has no statement yet.
     private const int MaxEndDateStepBacks = 1;
     private const string Provider = IbkrFlexFailureClassifier.ProviderName;
+
+    // The recurring run is daily: a chain of sooner retries hands over to it rather than overlap it.
+    private static readonly TimeSpan RecurringInterval = TimeSpan.FromDays(1);
 
     public async Task ExecuteAsync()
     {
@@ -67,37 +76,88 @@ public sealed class IbkrFlexIncrementalSyncJob(
                     logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
                 continue;
 
-            try
+            await SyncCredentialAsync(credential, today, policyDrivesAlerts, attempt: 0);
+        }
+    }
+
+    /// <summary>
+    /// One sooner retry of a user's sync after a "not ready" answer, scheduled by the run before it. Goes through the
+    /// same gate and recording as the daily run, and hands over to that run once its attempts are spent.
+    /// </summary>
+    public async Task RetryUserAsync(Guid userId, int attempt)
+    {
+        var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId);
+        if (credential is not { IsActive: true })
+            return;
+
+        if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+            return;
+
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        await SyncCredentialAsync(credential, today, healthOptions.CurrentValue.IsActive(Provider), attempt);
+    }
+
+    private async Task SyncCredentialAsync(IBKRFlexCredential credential, DateOnly today, bool policyDrivesAlerts, int attempt)
+    {
+        try
+        {
+            await SyncThroughLastClosedDayAsync(credential.UserId, today);
+            var evaluation = await connectionHealth.RecordSuccessAsync(
+                HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
+            if (policyDrivesAlerts)
             {
-                await SyncThroughLastClosedDayAsync(credential.UserId, today);
-                var evaluation = await connectionHealth.RecordSuccessAsync(
-                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
-                if (policyDrivesAlerts)
-                {
-                    await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
-                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
-                }
+                await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
+                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to sync IBKR Flex trades for user {UserId} (Flex error code {FlexErrorCode})",
+                credential.UserId,
+                (ex as IbkrFlexException)?.FlexErrorCode);
+            await RecordFailureAsync(credential, ex);
+            var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
+            var evaluation = await connectionHealth.RecordFailureAsync(
+                HealthSubject(credential),
+                credential.Health,
+                failure,
+                (health, ct) => SaveHealthAsync(credential, health, ct));
+            if (policyDrivesAlerts)
             {
-                logger.LogError(
-                    ex,
-                    "Failed to sync IBKR Flex trades for user {UserId} (Flex error code {FlexErrorCode})",
-                    credential.UserId,
-                    (ex as IbkrFlexException)?.FlexErrorCode);
-                await RecordFailureAsync(credential, ex);
-                var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
-                var evaluation = await connectionHealth.RecordFailureAsync(
-                    HealthSubject(credential),
-                    credential.Health,
-                    failure,
-                    (health, ct) => SaveHealthAsync(credential, health, ct));
-                if (policyDrivesAlerts)
-                {
-                    await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
-                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
-                }
+                await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
+                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
             }
+
+            ScheduleNotReadyRetry(credential.UserId, failure, attempt);
+        }
+    }
+
+    // A statement IBKR has not generated yet is likely to be there within hours, so ask again sooner than the next
+    // daily run. The chain is bounded: it ends where the next daily run would take over, and a failure to schedule
+    // costs only that earlier look.
+    private void ScheduleNotReadyRetry(Guid userId, ProviderFailure failure, int attempt)
+    {
+        if (failure.Class != FailureClass.NotReady
+            || sourceOptions.Get(Provider).NotReadyRetryAfter is not { } delay
+            || delay <= TimeSpan.Zero
+            || (attempt + 1) * delay >= RecurringInterval)
+            return;
+
+        try
+        {
+            backgroundJobs.Schedule<IbkrFlexIncrementalSyncJob>(job => job.RetryUserAsync(userId, attempt + 1), delay);
+            logger.LogInformation(
+                "IBKR Flex statement not ready for user {UserId}; asking again in {Delay} (attempt {Attempt})",
+                userId,
+                delay,
+                attempt + 1);
+        }
+        catch (Exception scheduleEx)
+        {
+            logger.LogWarning(scheduleEx, "Could not schedule the IBKR Flex retry for user {UserId}", userId);
         }
     }
 

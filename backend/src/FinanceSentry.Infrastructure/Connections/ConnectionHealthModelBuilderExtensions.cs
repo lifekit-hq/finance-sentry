@@ -43,7 +43,8 @@ public static class ConnectionHealthModelBuilderExtensions
             .SetProperty(Member(health, h => h.LastFailureClass), value.LastFailureClass)
             .SetProperty(Member(health, h => h.LastFailureCode), value.LastFailureCode)
             .SetProperty(Member(health, h => h.SuspectSince), value.SuspectSince)
-            .SetProperty(Member(health, h => h.StateChangedAt), value.StateChangedAt);
+            .SetProperty(Member(health, h => h.StateChangedAt), value.StateChangedAt)
+            .SetProperty(Member(health, h => h.NotBefore), value.NotBefore);
 
     // e => e.Health composed with h => h.State gives e => e.Health.State.
     private static Expression<Func<TEntity, TProperty>> Member<TEntity, TProperty>(

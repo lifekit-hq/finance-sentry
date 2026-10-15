@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 /// </summary>
 public sealed class ConnectionHealthShadowRecorder(
     IOptionsMonitor<ConnectionHealthOptions> options,
+    IOptionsMonitor<ConnectionHealthSourceOptions> sourceOptions,
     TimeProvider time,
     ILogger<ConnectionHealthShadowRecorder> logger) : IConnectionHealthShadow
 {
@@ -30,7 +31,8 @@ public sealed class ConnectionHealthShadowRecorder(
         RecordAsync(
             subject,
             failure,
-            () => ConnectionHealthPolicy.RecordFailure(current, failure, time.GetUtcNow(), options.CurrentValue),
+            () => ConnectionHealthPolicy.RecordFailure(
+                current, failure, time.GetUtcNow(), options.CurrentValue, sourceOptions.Get(subject.Provider)),
             persist,
             ct);
 
@@ -48,7 +50,8 @@ public sealed class ConnectionHealthShadowRecorder(
             logger.LogInformation(
                 "Connection health (shadow): {Provider} {SubjectKind} {SubjectId} of user {UserId} went "
                 + "{PreviousHealthState} -> {HealthState}, would {HealthOutcome}; attempt {Attempt} "
-                + "{FailureClass}/{FailureStrength} {FailureCode}, {ConsecutiveFailures} consecutive failures",
+                + "{FailureClass}/{FailureStrength} {FailureCode}, {ConsecutiveFailures} consecutive failures, "
+                + "not before {NotBefore:O}",
                 subject.Provider,
                 subject.Kind,
                 subject.Id,
@@ -60,7 +63,8 @@ public sealed class ConnectionHealthShadowRecorder(
                 failure?.Class,
                 failure?.Strength,
                 failure?.Code,
-                evaluation.Health.ConsecutiveFailures);
+                evaluation.Health.ConsecutiveFailures,
+                evaluation.Health.NotBefore);
 
             if (evaluation.Health != evaluation.Previous)
                 await persist(evaluation.Health, ct);

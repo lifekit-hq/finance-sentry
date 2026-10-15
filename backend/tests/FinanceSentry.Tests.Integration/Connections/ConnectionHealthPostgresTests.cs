@@ -116,6 +116,7 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
         LastFailureClass = FailureClass.Credential,
         LastFailureCode = "MONOBANK_TOKEN_INVALID",
         SuspectSince = null,
+        NotBefore = At.AddHours(1),
         StateChangedAt = At.AddMinutes(30),
     };
 
@@ -214,6 +215,7 @@ public sealed class ConnectionHealthPostgresTests : IAsyncLifetime
             .ReturnsAsync(new UserAlertPreferences(false, 0m, SyncFailureAlerts: true));
         var shadow = new ConnectionHealthShadowRecorder(
             Mock.Of<IOptionsMonitor<ConnectionHealthOptions>>(m => m.CurrentValue == new ConnectionHealthOptions()),
+            Mock.Of<IOptionsMonitor<ConnectionHealthSourceOptions>>(m => m.Get(It.IsAny<string?>()) == new ConnectionHealthSourceOptions()),
             TimeProvider.System,
             NullLogger<ConnectionHealthShadowRecorder>.Instance);
 

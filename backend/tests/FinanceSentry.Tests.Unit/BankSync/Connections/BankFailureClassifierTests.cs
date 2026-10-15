@@ -26,7 +26,7 @@ public class BankFailureClassifierTests
     {
         // MonobankHttpClient: 401 and 403 both become MONOBANK_TOKEN_INVALID; Monobank sends 403 for more than a dead token.
         { new MonobankException("MONOBANK_TOKEN_INVALID", "Invalid or expired Monobank token.", 400), FailureClass.Credential, FailureStrength.Suspect, "MONOBANK_TOKEN_INVALID" },
-        { new MonobankException("MONOBANK_RATE_LIMITED", "Monobank API rate limit exceeded.", 429), FailureClass.Transient, FailureStrength.Definitive, "MONOBANK_RATE_LIMITED" },
+        { new MonobankException("MONOBANK_RATE_LIMITED", "Monobank API rate limit exceeded.", 429), FailureClass.RateLimited, FailureStrength.Definitive, "MONOBANK_RATE_LIMITED" },
         { new MonobankException("MONOBANK_SERVER_ERROR", "Monobank API error (502): bad gateway", 502), FailureClass.Transient, FailureStrength.Definitive, "MONOBANK_SERVER_ERROR" },
         { new MonobankException("MONOBANK_HTTP_ERROR", "Monobank API error (400): {\"errorDescription\":\"Unknown account\"}", 400), FailureClass.Unknown, FailureStrength.Definitive, "MONOBANK_HTTP_ERROR" },
         { new MonobankException("MONOBANK_PARSE_ERROR", "Failed to parse client info response."), FailureClass.Internal, FailureStrength.Definitive, "MONOBANK_PARSE_ERROR" },
@@ -57,7 +57,7 @@ public class BankFailureClassifierTests
         { new TrueLayerException("TRUELAYER_UNAUTHORIZED", "TrueLayer API error (401): access has been revoked", 401), FailureClass.Credential, FailureStrength.Definitive, TrueLayerFailureClassifier.ConsentLostCode },
         { new TrueLayerException("TRUELAYER_UNAUTHORIZED", "TrueLayer API error (401) on /data/v1/accounts", 401), FailureClass.Credential, FailureStrength.Suspect, "TRUELAYER_UNAUTHORIZED" },
         { new TrueLayerException("TRUELAYER_FORBIDDEN", "TrueLayer API error (403) on /data/v1/accounts", 403), FailureClass.Credential, FailureStrength.Suspect, "TRUELAYER_FORBIDDEN" },
-        { new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429), FailureClass.Transient, FailureStrength.Definitive, "TRUELAYER_RATE_LIMITED" },
+        { new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429), FailureClass.RateLimited, FailureStrength.Definitive, "TRUELAYER_RATE_LIMITED" },
         { new TrueLayerException("TRUELAYER_ERROR", "TrueLayer API error (503)", 503), FailureClass.Transient, FailureStrength.Definitive, "TRUELAYER_ERROR" },
         { new TrueLayerException("TRUELAYER_NOT_FOUND", "TrueLayer API error (404) on /data/v1/accounts/x/transactions", 404), FailureClass.ResourceGone, FailureStrength.Definitive, "TRUELAYER_NOT_FOUND" },
         { new TrueLayerException("TRUELAYER_BAD_REQUEST", "TrueLayer API error (400): {\"error\":\"invalid_request\"}", 400), FailureClass.Unknown, FailureStrength.Definitive, "TRUELAYER_BAD_REQUEST" },
@@ -87,6 +87,45 @@ public class BankFailureClassifierTests
         var failure = new TrueLayerFailureClassifier().Classify(refused, Context, consentExpiresAt: At);
 
         failure.Should().Be(ProviderFailure.CredentialDefinitive(code));
+    }
+
+    [Fact]
+    public void Monobank_RateLimitWithRetryAfter_NamesWhenTheNextCallMayGo()
+    {
+        var limited = new MonobankException("MONOBANK_RATE_LIMITED", "Monobank API rate limit exceeded.", 429)
+        {
+            RetryAfter = TimeSpan.FromSeconds(60),
+        };
+
+        var failure = new MonobankFailureClassifier().Classify(limited, Context);
+
+        failure.Should().Be(ProviderFailure.RateLimited("MONOBANK_RATE_LIMITED", At.AddSeconds(60)));
+    }
+
+    [Fact]
+    public void TrueLayer_RateLimitWithRetryAfter_NamesWhenTheNextCallMayGo()
+    {
+        var limited = new TrueLayerException("TRUELAYER_RATE_LIMITED", "TrueLayer API error (429)", 429)
+        {
+            RetryAfter = TimeSpan.FromMinutes(5),
+        };
+
+        var failure = new TrueLayerFailureClassifier().Classify(limited, Context);
+
+        failure.Should().Be(ProviderFailure.RateLimited("TRUELAYER_RATE_LIMITED", At.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void TrueLayer_ServerErrorWithRetryAfter_StaysTransientWithNoPause()
+    {
+        var down = new TrueLayerException("TRUELAYER_ERROR", "TrueLayer API error (503)", 503)
+        {
+            RetryAfter = TimeSpan.FromMinutes(5),
+        };
+
+        var failure = new TrueLayerFailureClassifier().Classify(down, Context);
+
+        failure.Should().Be(ProviderFailure.Transient("TRUELAYER_ERROR"));
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BrokerageSync;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Http;
@@ -61,6 +62,14 @@ public static class BrokerageSyncModule
         this IServiceCollection services, IConfiguration config)
     {
         services.AddConnectionHealthShadow(config);
+        // Flex generates a statement on request, so its answers can be "not ready" for a while: not counted for 48 h
+        // after the last success, and asked again every 2 h meanwhile. Configuration (ConnectionHealth:Sources:ibkr-flex)
+        // overrides these.
+        services.Configure<ConnectionHealthSourceOptions>(IbkrFlexFailureClassifier.ProviderName, source =>
+        {
+            source.NotReadyDeadline = TimeSpan.FromHours(48);
+            source.NotReadyRetryAfter = TimeSpan.FromHours(2);
+        });
         services.AddUpdatedAtStamping();
         services.AddDbContext<BrokerageSyncDbContext>(
             (sp, o) => o.UseNpgsql(config.GetConnectionString("Default")!, b => b.MigrationsHistoryTable("__EFMigrationsHistory", "public")).UseUpdatedAtStamping(sp));

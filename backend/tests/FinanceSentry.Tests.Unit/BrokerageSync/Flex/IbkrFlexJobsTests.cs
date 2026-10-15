@@ -10,6 +10,9 @@ using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -34,8 +37,8 @@ public class IbkrFlexJobsTests
         var job = new IbkrFlexIncrementalSyncJob(
             credentialRepo.Object, syncService.Object, Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             Mock.Of<IConnectionHealthShadow>(), new IbkrFlexFailureClassifier(),
-            HealthOptions.Monitor(new ConnectionHealthOptions()), TimeProvider.System,
-            NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            HealthOptions.Monitor(new ConnectionHealthOptions()), ShadowRecorders.SourceOptions(), Mock.Of<IBackgroundJobClient>(),
+            TimeProvider.System, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -66,8 +69,8 @@ public class IbkrFlexJobsTests
         var job = new IbkrFlexIncrementalSyncJob(
             credentialRepo.Object, syncService.Object, Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             Mock.Of<IConnectionHealthShadow>(), new IbkrFlexFailureClassifier(),
-            HealthOptions.Monitor(new ConnectionHealthOptions()), TimeProvider.System,
-            NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            HealthOptions.Monitor(new ConnectionHealthOptions()), ShadowRecorders.SourceOptions(), Mock.Of<IBackgroundJobClient>(),
+            TimeProvider.System, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -143,8 +146,8 @@ public class IbkrFlexJobsTests
         var job = new IbkrFlexIncrementalSyncJob(
             credentialRepo.Object, syncService.Object, Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             Mock.Of<IConnectionHealthShadow>(), new IbkrFlexFailureClassifier(),
-            HealthOptions.Monitor(new ConnectionHealthOptions()), new FakeTimeProvider(Start),
-            NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            HealthOptions.Monitor(new ConnectionHealthOptions()), ShadowRecorders.SourceOptions(), Mock.Of<IBackgroundJobClient>(),
+            new FakeTimeProvider(Start), NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -211,7 +214,8 @@ public class IbkrFlexJobsTests
         var job = new IbkrFlexIncrementalSyncJob(
             credentialRepo.Object, syncService.Object, Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             shadow.Object, new IbkrFlexFailureClassifier(), HealthOptions.Monitor(new ConnectionHealthOptions()),
-            TimeProvider.System, NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+            ShadowRecorders.SourceOptions(), Mock.Of<IBackgroundJobClient>(), TimeProvider.System,
+            NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
@@ -244,15 +248,29 @@ public class IbkrFlexJobsTests
         public readonly Mock<IAlertGeneratorService> Alerts = new();
         public readonly Mock<IUserAlertPreferencesReader> Preferences = new();
         public readonly FakeTimeProvider Time = new(Start);
+        public readonly Mock<IBackgroundJobClient> Jobs = new();
+        public readonly List<(Job Job, IState State)> Scheduled = [];
 
         /// <summary>Flex stays in shadow in the committed appsettings; a test opts it in.</summary>
         public readonly ConnectionHealthOptions Options = new();
 
+        /// <summary>The settings the BrokerageSync module registers for Flex, so the job is exercised as deployed.</summary>
+        public readonly ConnectionHealthSourceOptions Source = new()
+        {
+            NotReadyDeadline = TimeSpan.FromHours(48),
+            NotReadyRetryAfter = TimeSpan.FromHours(2),
+        };
+
         public PolicyHarness()
         {
+            Jobs.Setup(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+                .Callback<Job, IState>((job, state) => Scheduled.Add((job, state)))
+                .Returns("1");
             Credential = new IBKRFlexCredential(UserId, "999999", [1], [2], [3], 1);
             CredentialRepo.Setup(r => r.GetAllActiveUnscopedAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[Credential]);
+            CredentialRepo.Setup(r => r.GetByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Credential);
             Preferences.Setup(p => p.GetAsync(UserId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new UserAlertPreferences(false, 0m, SyncFailureAlerts: true));
         }
@@ -268,11 +286,19 @@ public class IbkrFlexJobsTests
                 .Setup(s => s.SyncAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(ex);
 
-        public Task RunAsync() =>
-            new IbkrFlexIncrementalSyncJob(
+        private IbkrFlexIncrementalSyncJob CreateJob()
+        {
+            var sources = new Dictionary<string, ConnectionHealthSourceOptions> { ["ibkr-flex"] = Source };
+            return new IbkrFlexIncrementalSyncJob(
                 CredentialRepo.Object, SyncService.Object, Alerts.Object, Preferences.Object,
-                ShadowRecorders.Create(Time, Options), new IbkrFlexFailureClassifier(), HealthOptions.Monitor(Options), Time,
-                NullLogger<IbkrFlexIncrementalSyncJob>.Instance).ExecuteAsync();
+                ShadowRecorders.Create(Time, Options, sources: sources), new IbkrFlexFailureClassifier(),
+                HealthOptions.Monitor(Options), ShadowRecorders.SourceOptions(sources), Jobs.Object, Time,
+                NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
+        }
+
+        public Task RunAsync() => CreateJob().ExecuteAsync();
+
+        public Task RetryAsync(int attempt) => CreateJob().RetryUserAsync(UserId, attempt);
 
         public async Task RunDailyAsync(int days)
         {
@@ -385,9 +411,43 @@ public class IbkrFlexJobsTests
     }
 
     [Fact]
-    public async Task StatementNotAvailable_PastTheStepBack_IsRecordedAsAFailure_WithoutAnAlertInShadow()
+    public async Task StatementNotAvailable_PastTheStepBack_IsRecordedAsNotReady_NotCountedWithinTheDeadline()
     {
-        // While the window ended today this answer met every weekday run and was recorded nowhere.
+        // While the window ended today this answer met every weekday run and was recorded nowhere. It is the
+        // provider still preparing the day: the last success is younger than the source's deadline, so no failure
+        // is counted, but LastError still says what happened.
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth { LastSuccessAt = Start.AddHours(-20) });
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        harness.Credential.LastError.Should().Be("Statement is not available.");
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(0);
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        harness.VerifyNoAlertCalls();
+    }
+
+    [Fact]
+    public async Task StatementNotAvailable_PastTheDeadline_CountsLikeATransientFailure_AndAlertsAsAnOutage()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth { LastSuccessAt = Start.AddHours(-49) });
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        await harness.RunDailyAsync(3);
+
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(3);
+        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.NotReady);
+        harness.Credential.Health.LastFailureCode.Should().Be("1003");
+        harness.VerifyRaised(SyncFailureClass.Outage, Times.Once());
+    }
+
+    [Fact]
+    public async Task StatementNotAvailable_InShadow_RecordsNotReadyAndRaisesNoAlert()
+    {
         var harness = new PolicyHarness();
         harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
 
@@ -395,11 +455,135 @@ public class IbkrFlexJobsTests
 
         harness.SyncService.Verify(
             s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Exactly(6));
-        harness.Credential.LastError.Should().Be("Statement is not available.");
-        harness.Credential.Health.ConsecutiveFailures.Should().Be(3);
-        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.Unknown);
-        harness.Credential.Health.LastFailureCode.Should().Be("1003");
+        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.NotReady);
         harness.VerifyNoAlertCalls();
+    }
+
+    // ── Not ready: ask again sooner than the next daily run ──────────────────
+
+    [Fact]
+    public async Task NotReady_SchedulesAnotherLookTwoHoursOn_ForThatUser()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        await harness.RunAsync();
+
+        var (job, state) = harness.Scheduled.Should().ContainSingle().Subject;
+        job.Type.Should().Be(typeof(IbkrFlexIncrementalSyncJob));
+        job.Method.Name.Should().Be(nameof(IbkrFlexIncrementalSyncJob.RetryUserAsync));
+        job.Args[0].Should().Be(harness.UserId);
+        job.Args[1].Should().Be(1);
+        state.Should().BeOfType<ScheduledState>().Which.EnqueueAt
+            .Should().BeCloseTo(DateTime.UtcNow + TimeSpan.FromHours(2), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task NotReady_RetryChain_EndsWhereTheNextDailyRunTakesOver()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        // 2 h x 11 = 22 h is still before the next daily run; the 12th look would land after it.
+        await harness.RetryAsync(attempt: 10);
+        harness.Scheduled.Should().ContainSingle().Which.Job.Args[1].Should().Be(11);
+
+        harness.Scheduled.Clear();
+        await harness.RetryAsync(attempt: 11);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("1015")] // credential
+    [InlineData("1018")] // rate limited
+    [InlineData("1009")] // transient
+    public async Task OtherFailureClasses_ScheduleNoSoonerLook(string flexCode)
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException(flexCode, "refused"));
+
+        await harness.RunAsync();
+
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task NotReady_WithNoRetrySetting_WaitsForTheNextDailyRun()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Source.NotReadyRetryAfter = null;
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        await harness.RunAsync();
+
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task NotReady_SchedulerFailing_DoesNotFailTheRun()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Jobs.Setup(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>())).Throws(new InvalidOperationException("storage down"));
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        var act = () => harness.RunAsync();
+
+        await act.Should().NotThrowAsync();
+        harness.Credential.LastError.Should().Be("Statement is not available.");
+    }
+
+    [Fact]
+    public async Task RetryUser_SyncsThatUsersCredentialOnce_AndRecordsASuccess()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.SyncService
+            .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+
+        await harness.RetryAsync(attempt: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Once);
+        harness.Credential.Health.LastSuccessAt.Should().Be(Start);
+    }
+
+    [Fact]
+    public async Task RetryUser_ForAnActionRequiredConnectionInsideTheDay_DoesNotCallIbkr()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
+
+        await harness.RetryAsync(attempt: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RetryUser_ForACredentialThatIsGone_DoesNothing()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.CredentialRepo
+            .Setup(r => r.GetByUserIdUnscopedAsync(harness.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IBKRFlexCredential?)null);
+
+        await harness.RetryAsync(attempt: 1);
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RateLimited_1018_IsRecordedAsRateLimited_AndAsksNoSoonerThanTheDailyRun()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1018", "Too many requests."));
+
+        await harness.RunAsync();
+
+        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.RateLimited);
+        harness.Credential.Health.NotBefore.Should().BeNull();
+        harness.Scheduled.Should().BeEmpty();
     }
 
     // ── A confirmed-lost credential is not re-hit every run ──────────────────

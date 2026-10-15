@@ -138,6 +138,84 @@ public class ConnectionHealthShadowRecorderTests
         bound.SuspectConfirmationWindow.Should().Be(TimeSpan.FromMinutes(30));
     }
 
+    [Fact]
+    public async Task NotReady_IsHeldBackByTheDeadlineOfThatProvidersSource_AndNothingIsPersisted()
+    {
+        var flex = new ConnectionHealthSubject("ibkr-flex", "IBKRFlexCredential", Guid.NewGuid(), Guid.NewGuid());
+        var recorder = ShadowRecorders.Create(
+            new FixedTimeProvider(Now),
+            logger: _logger,
+            sources: new Dictionary<string, ConnectionHealthSourceOptions>
+            {
+                ["ibkr-flex"] = new() { NotReadyDeadline = TimeSpan.FromHours(48) },
+            });
+        var health = new ConnectionHealth { LastSuccessAt = Now.AddHours(-30) };
+        var persisted = false;
+
+        var evaluation = await recorder.RecordFailureAsync(
+            flex, health, ProviderFailure.NotReady("1003"), (_, _) => { persisted = true; return Task.CompletedTask; });
+
+        evaluation!.Health.Should().Be(health);
+        persisted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NotReady_ForAProviderWithNoSourceSettings_CountsAtOnce()
+    {
+        var health = new ConnectionHealth { LastSuccessAt = Now.AddHours(-30) };
+
+        var evaluation = await CreateRecorder().RecordFailureAsync(
+            Subject, health, ProviderFailure.NotReady("1003"), (_, _) => Task.CompletedTask);
+
+        evaluation!.Health.ConsecutiveFailures.Should().Be(1);
+        evaluation.Health.LastFailureClass.Should().Be(FailureClass.NotReady);
+    }
+
+    [Fact]
+    public async Task RateLimited_StoresTheNamedTimeAndLogsIt()
+    {
+        var notBefore = Now.AddMinutes(10);
+        ConnectionHealth? persisted = null;
+
+        await CreateRecorder().RecordFailureAsync(
+            Subject,
+            new ConnectionHealth(),
+            ProviderFailure.RateLimited("MONOBANK_RATE_LIMITED", notBefore),
+            (health, _) => { persisted = health; return Task.CompletedTask; });
+
+        persisted!.NotBefore.Should().Be(notBefore);
+        persisted.LastFailureClass.Should().Be(FailureClass.RateLimited);
+        _logger.Entries.Should().ContainSingle().Which.Values["NotBefore"].Should().Be(notBefore);
+    }
+
+    [Fact]
+    public void Registration_GivesTheSourceCodeDefaults_ThatConfigurationOverridesPerSource()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionHealth:Sources:ibkr-flex:NotReadyDeadline"] = "12:00:00",
+            })
+            .Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddConnectionHealthShadow(config);
+        services.Configure<ConnectionHealthSourceOptions>("ibkr-flex", o =>
+        {
+            o.NotReadyDeadline = TimeSpan.FromHours(48);
+            o.NotReadyRetryAfter = TimeSpan.FromHours(2);
+        });
+        services.Configure<ConnectionHealthSourceOptions>("monobank", o => o.NotReadyDeadline = TimeSpan.FromHours(1));
+        using var provider = services.BuildServiceProvider();
+
+        var monitor = provider.GetRequiredService<IOptionsMonitor<ConnectionHealthSourceOptions>>();
+
+        var flex = monitor.Get("ibkr-flex");
+        flex.NotReadyDeadline.Should().Be(TimeSpan.FromHours(12), "configuration overrides the code default");
+        flex.NotReadyRetryAfter.Should().Be(TimeSpan.FromHours(2), "an unset key keeps the code default");
+        monitor.Get("monobank").NotReadyDeadline.Should().Be(TimeSpan.FromHours(1));
+        monitor.Get("binance").NotReadyDeadline.Should().BeNull();
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using FinanceSentry.Modules.BankSync.Infrastructure.Jobs;
 using Hangfire;
@@ -21,7 +22,8 @@ public interface ITransactionSyncCoordinator
 public class TransactionSyncCoordinator(
     IBankAccountRepository accounts,
     IScheduledSyncService syncService,
-    IBackgroundJobClient backgroundJobs) : ITransactionSyncCoordinator
+    IBackgroundJobClient backgroundJobs,
+    IBankConnectionHealth connectionHealth) : ITransactionSyncCoordinator
 {
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly IScheduledSyncService _syncService = syncService;
@@ -36,6 +38,10 @@ public class TransactionSyncCoordinator(
         var account = await _accounts.GetByIdUnscopedAsync(accountId, ct);
         if (account?.SyncStatus == "reauth_required")
             return new SyncResult(false, 0, 0, "ITEM_LOGIN_REQUIRED", "Account requires reconnection; scheduled sync skipped.");
+
+        // The provider asked for a wait (a rate limit's Retry-After): the scheduled run leaves it alone until then.
+        if (account is not null && await connectionHealth.ScheduledSyncPausedUntilAsync(account, ct) is { } pausedUntil)
+            return new SyncResult(false, 0, 0, "SYNC_RATE_LIMITED", $"The provider asked for a wait until {pausedUntil:O}; scheduled sync skipped.");
 
         return ChaseWithDetection(await _syncService.PerformFullSyncAsync(accountId, ct: ct));
     }

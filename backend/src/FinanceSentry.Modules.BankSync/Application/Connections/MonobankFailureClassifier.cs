@@ -7,7 +7,8 @@ using FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 /// Reads a failed Monobank call as a <see cref="ProviderFailure"/> (connection health, Option B, S2).
 /// Monobank answers 403 for a dead token but also for reasons that clear on their own, so a rejected
 /// token is only a suspect credential failure: the policy confirms it when it is seen again after
-/// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/>.
+/// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/>. A rate limit is its own class and carries the
+/// time Monobank's <c>Retry-After</c> named, so no scheduled call goes out before it.
 /// </summary>
 public sealed class MonobankFailureClassifier : IProviderFailureClassifier
 {
@@ -29,7 +30,8 @@ public sealed class MonobankFailureClassifier : IProviderFailureClassifier
             return mono.ErrorCode switch
             {
                 "MONOBANK_TOKEN_INVALID" => ProviderFailure.CredentialSuspect(mono.ErrorCode),
-                "MONOBANK_RATE_LIMITED" => ProviderFailure.Transient(mono.ErrorCode),
+                "MONOBANK_RATE_LIMITED" => ProviderFailure.RateLimited(
+                    mono.ErrorCode, RetryAfterHint.NotBefore(context.At, mono.RetryAfter)),
                 "MONOBANK_PARSE_ERROR" => ProviderFailure.Internal(mono.ErrorCode),
                 _ when mono.StatusCode >= ServerErrorStatus => ProviderFailure.Transient(mono.ErrorCode),
                 _ => ProviderFailure.Unknown(mono.ErrorCode),

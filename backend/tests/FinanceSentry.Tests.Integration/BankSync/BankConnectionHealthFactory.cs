@@ -28,7 +28,11 @@ internal static class BankConnectionHealthFactory
         var options = Mock.Of<IOptionsMonitor<ConnectionHealthOptions>>(
             m => m.CurrentValue == new ConnectionHealthOptions { ActiveProviders = activeProviders.ToList() });
         return new BankConnectionHealth(
-            new ConnectionHealthShadowRecorder(options, time, NullLogger<ConnectionHealthShadowRecorder>.Instance),
+            new ConnectionHealthShadowRecorder(
+                options,
+                Mock.Of<IOptionsMonitor<ConnectionHealthSourceOptions>>(m => m.Get(It.IsAny<string?>()) == new ConnectionHealthSourceOptions()),
+                time,
+                NullLogger<ConnectionHealthShadowRecorder>.Instance),
             new MonobankFailureClassifier(),
             new TrueLayerFailureClassifier(),
             monobankCredentials,

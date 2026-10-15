@@ -25,8 +25,8 @@ public class BinanceFailureClassifierTests
         { new BinanceException("Binance API error: HTTP 403", venueStatusCode: 403), FailureClass.Credential, FailureStrength.Suspect, "HTTP_403" },
         // Throttling, 5xx, network.
         { new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500), FailureClass.Transient, FailureStrength.Definitive, "HTTP_500" },
-        { new BinanceException("Too many requests.", binanceErrorCode: -1003, venueStatusCode: 429), FailureClass.Transient, FailureStrength.Definitive, "-1003" },
-        { new CryptoTradeHistoryException(CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)), FailureClass.Transient, FailureStrength.Definitive, "HTTP_429" },
+        { new BinanceException("Too many requests.", binanceErrorCode: -1003, venueStatusCode: 429), FailureClass.RateLimited, FailureStrength.Definitive, "-1003" },
+        { new CryptoTradeHistoryException(CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)), FailureClass.RateLimited, FailureStrength.Definitive, "HTTP_429" },
         { new HttpRequestException("Connection refused", new SocketException()), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
         { new TaskCanceledException("The request timed out."), FailureClass.Transient, FailureStrength.Definitive, nameof(TaskCanceledException) },
         // Binance answered, but not in a way that says whose fault it is.

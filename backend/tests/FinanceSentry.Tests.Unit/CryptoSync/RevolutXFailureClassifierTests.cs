@@ -26,7 +26,7 @@ public class RevolutXFailureClassifierTests
         { new CryptoTradeHistoryException(CryptoExchangeProvider.RevolutX, ["BTC"], ApiError(HttpStatusCode.Unauthorized)), FailureClass.Credential, FailureStrength.Suspect, "HTTP_401" },
         // Throttling, 5xx, network, timeout.
         { ApiError(HttpStatusCode.ServiceUnavailable), FailureClass.Transient, FailureStrength.Definitive, "HTTP_503" },
-        { ApiError(HttpStatusCode.TooManyRequests), FailureClass.Transient, FailureStrength.Definitive, "HTTP_429" },
+        { ApiError(HttpStatusCode.TooManyRequests), FailureClass.RateLimited, FailureStrength.Definitive, "HTTP_429" },
         { new RevolutXException("Revolut X is unreachable.", new HttpRequestException("Connection refused", new SocketException())), FailureClass.Transient, FailureStrength.Definitive, nameof(RevolutXException) },
         { new RevolutXException("Revolut X did not respond in time.", new TaskCanceledException("timeout")), FailureClass.Transient, FailureStrength.Definitive, nameof(RevolutXException) },
         { new CryptoTradeHistoryException(CryptoExchangeProvider.RevolutX, ["ETH"], ApiError(HttpStatusCode.BadGateway)), FailureClass.Transient, FailureStrength.Definitive, "HTTP_502" },

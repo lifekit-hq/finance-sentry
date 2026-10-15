@@ -31,4 +31,10 @@ public sealed record ConnectionHealth
 
     /// <summary>When <see cref="State"/> last changed; null until the first change.</summary>
     public DateTimeOffset? StateChangedAt { get; init; }
+
+    /// <summary>
+    /// The earliest time a scheduled run may call the provider again, as the provider asked (a rate limit's
+    /// <c>Retry-After</c>); null when it asked for nothing. A success clears it; a run the person triggers ignores it.
+    /// </summary>
+    public DateTimeOffset? NotBefore { get; init; }
 }

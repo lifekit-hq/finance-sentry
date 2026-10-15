@@ -7,6 +7,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Web;
+using FinanceSentry.Infrastructure.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -102,7 +103,10 @@ public sealed class TrueLayerHttpClient(
             throw new TrueLayerException(
                 ErrorCodeForStatus(response.StatusCode),
                 $"TrueLayer delete-credentials error ({(int)response.StatusCode}): {body}",
-                (int)response.StatusCode);
+                (int)response.StatusCode)
+            {
+                RetryAfter = RetryAfterHeader.WaitFrom(response, DateTimeOffset.UtcNow),
+            };
         }
     }
 
@@ -286,7 +290,10 @@ public sealed class TrueLayerHttpClient(
             throw new TrueLayerException(
                 ErrorCodeForStatus(response.StatusCode),
                 $"TrueLayer token endpoint error ({(int)response.StatusCode}): {errBody}",
-                (int)response.StatusCode);
+                (int)response.StatusCode)
+            {
+                RetryAfter = RetryAfterHeader.WaitFrom(response, DateTimeOffset.UtcNow),
+            };
         }
 
         var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(JsonOpts, ct)
@@ -312,7 +319,10 @@ public sealed class TrueLayerHttpClient(
             throw new TrueLayerException(
                 ErrorCodeForStatus(response.StatusCode),
                 $"TrueLayer API error ({(int)response.StatusCode}) on {path}: {body}",
-                (int)response.StatusCode);
+                (int)response.StatusCode)
+            {
+                RetryAfter = RetryAfterHeader.WaitFrom(response, DateTimeOffset.UtcNow),
+            };
         }
 
         var payload = await response.Content.ReadFromJsonAsync<T>(JsonOpts, ct);

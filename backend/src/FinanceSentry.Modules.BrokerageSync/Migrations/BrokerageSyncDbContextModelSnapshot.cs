@@ -562,6 +562,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                             b1.Property<DateTimeOffset?>("LastSuccessAt")
                                 .HasColumnType("timestamp with time zone");
 
+                            b1.Property<DateTimeOffset?>("NotBefore")
+                                .HasColumnType("timestamp with time zone");
+
                             b1.Property<string>("State")
                                 .IsRequired()
                                 .HasMaxLength(20)
@@ -612,6 +615,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                             b1.Property<DateTimeOffset?>("LastSuccessAt")
                                 .HasColumnType("timestamp with time zone");
 
+                            b1.Property<DateTimeOffset?>("NotBefore")
+                                .HasColumnType("timestamp with time zone");
+
                             b1.Property<string>("State")
                                 .IsRequired()
                                 .HasMaxLength(20)
@@ -660,6 +666,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Migrations
                                 .HasColumnType("character varying(100)");
 
                             b1.Property<DateTimeOffset?>("LastSuccessAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<DateTimeOffset?>("NotBefore")
                                 .HasColumnType("timestamp with time zone");
 
                             b1.Property<string>("State")
