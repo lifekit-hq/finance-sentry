@@ -885,6 +885,10 @@ in shadow mode: their `NotBefore` is recorded there, and it pauses scheduled ban
   document for any rule, measure, gap or decision it touches, in the same diff.
 - A PR that closes a gap removes it from §6 (and moves the `Today` cell in §3.4 and §2.2).
 - A captain decision moves a row from **Open** to **Decided** in §1, with its date.
+- The MCP framework primer (`backend/src/FinanceSentry.Mcp/Resources/finance-framework-primer.md`, served as
+  `finance-framework://primer`) is the short map of this document; a change to a measure name, the headline
+  contract's methods or qualities, a §1 call id or a section it cites updates it in the same diff
+  (`FinanceFrameworkPrimerContractTests` fails until it does).
 - A new economy adds its row to §5.4 and declares its facets (§5.1), reliability and convertibility (§5.3)
   and failure classes (§5.7) before its adapter is written. Its "Failures and retries, per source" row in §5.7
   is part of the new-source checklist: its signals mapped to each failure class, whether its requests are

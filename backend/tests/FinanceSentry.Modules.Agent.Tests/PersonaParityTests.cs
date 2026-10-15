@@ -82,4 +82,11 @@ public sealed class PersonaParityTests
         browser.Should().NotContain("A2A envelope");
         browser.Should().NotContain("Kit routes tasks");
     }
+
+    [Fact]
+    public void OpenClaw_PointsAtTheFrameworkPrimer()
+    {
+        // The MCP resource FinanceFrameworkPrimerResource serves; the primer is the only big-picture source.
+        OpenClawPrompt().Should().Contain("""MCP.financeSentry.resources.read({uri:"finance-framework://primer"})""");
+    }
 }

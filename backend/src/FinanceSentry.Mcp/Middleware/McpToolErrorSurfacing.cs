@@ -28,12 +28,13 @@ public static class McpToolErrorSurfacing
     private const string UnknownToolName = "unknown";
 
     /// <summary>
-    /// Registers the host's tools together with the filter that makes their failures legible.
-    /// Both transports call this one method rather than composing the pair themselves, so a
-    /// transport cannot end up serving tools whose errors are still the blanket string.
+    /// Registers the host's tools together with the filter that makes their failures legible, and
+    /// its resources (the framework primer). Both transports call this one method rather than
+    /// composing the pieces themselves, so a transport cannot end up serving tools whose errors are
+    /// still the blanket string, or tools without the primer that explains their numbers.
     /// </summary>
     public static IMcpServerBuilder WithFinanceSentryTools(this IMcpServerBuilder builder, Assembly toolAssembly)
-        => builder.WithToolErrorSurfacing().WithToolsFromAssembly(toolAssembly);
+        => builder.WithToolErrorSurfacing().WithToolsFromAssembly(toolAssembly).WithResourcesFromAssembly(toolAssembly);
 
     public static IMcpServerBuilder WithToolErrorSurfacing(this IMcpServerBuilder builder)
     {
