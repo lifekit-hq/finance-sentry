@@ -42,4 +42,9 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The framework primer served as finance-framework://primer (FinanceFrameworkPrimerResource). -->
+    <EmbeddedResource Include="Resources\finance-framework-primer.md" LogicalName="FinanceSentry.Mcp.Resources.finance-framework-primer.md" />
+  </ItemGroup>
+
 </Project>

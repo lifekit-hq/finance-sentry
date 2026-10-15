@@ -77,6 +77,14 @@ support one; never annualised), `method` (`VALUE`, `VALUE_CHANGE`, `GAIN_VS_COST
 `ZERO_BASE`, `NEGATIVE_BASE`, `NO_COST_BASIS`, `NOT_MEASURABLE`), `asOf` and `currency` (USD on MCP). Read `quality` and
 `reasons` before quoting a figure as measured. Contract and mapping: `docs/finance-framework.md` §3.6.
 
+## Resources
+
+| URI | Name | MIME type | Content |
+|---|---|---|---|
+| `finance-framework://primer` | `finance_framework_primer` | `text/markdown` | The framework primer: what Finance Sentry is, server computes / client interprets, Radar tiers, the ten measures, the headline contract, flow classes and liability signs, valuation and currency, decided and open calls, and which tool each figure comes from. A client reads it before reasoning about a number |
+
+Served over both transports (`resources/list`, `resources/read`; OpenClaw Code Mode: `MCP.financeSentry.resources.read({uri: "finance-framework://primer"})`). The primer is hand-written in `backend/src/FinanceSentry.Mcp/Resources/finance-framework-primer.md`, embedded in the MCP assembly so it deploys with the numbers it describes, and points to the long docs rather than copying them. `FinanceFrameworkPrimerContractTests` pins its measure names, headline-contract methods and qualities, decided and open call ids, and cited sections to `docs/finance-framework.md` and `docs/money-semantics.md`: a PR that moves one of those anchors updates the primer in the same diff.
+
 ## Research Retrieval Guidance
 
 `search_research_corpus` and `get_research_context` return **non-authoritative research context**: stored news, theses, and decision notes with citations. They are never the source for current balances, holdings, exposure, tax lots, or risk verdicts — those come from the structured portfolio/risk tools. Retrieval visibility is derived from the authenticated MCP identity (global documents plus the caller's own private documents). Embeddings are optional deploy-time configuration (`ResearchRetrieval:Embedding` section, OpenAI-compatible endpoint); with embeddings disabled, ranking degrades to lexical-only. Vectors are stored as plain `real[]` columns — no Postgres extension required; `pgvector` is the documented upgrade path if the corpus outgrows in-app ranking.
