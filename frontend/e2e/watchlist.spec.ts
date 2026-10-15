@@ -115,11 +115,11 @@ test.describe('Watchlist', () => {
     await expect(page.getByTestId('watchlist-note').locator('textarea')).toHaveValue('typed note');
 
     await page.getByTestId('watchlist-remove').first().click();
-    await page.getByRole('button', {name: 'Keep'}).click();
+    await page.getByRole('dialog').getByRole('button', {name: 'Keep'}).click();
     await expect(page.getByTestId('watchlist-row')).toHaveCount(2);
 
     await page.getByTestId('watchlist-remove').first().click();
-    await page.getByRole('button', {name: 'Remove', exact: true}).last().click();
+    await page.getByRole('dialog').getByRole('button', {name: 'Remove'}).click();
     await expect(page.getByTestId('watchlist-row')).toHaveCount(1);
     expect(server.removed).toHaveLength(1);
   });

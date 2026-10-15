@@ -79,7 +79,7 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await openPage(page, '/more');
 
       const links = page.locator('fns-more-page [data-more-section="nav"] a');
-      await expect(links).toHaveText([/Budgets/, /Subscriptions/, /Events/, /Ledger/]);
+      await expect(links).toHaveText([/Budgets/, /Subscriptions/, /Events/, /Watchlist/, /Ledger/]);
       const identity = page.locator('fns-more-page [data-more-identity]');
       await expect(identity).toContainText(SIGNED_IN_EMAIL);
       const account = page.locator('fns-more-page [data-more-section="account"]');
