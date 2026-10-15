@@ -10,7 +10,8 @@ This document records what each existing number means today; a PR that changes m
 both, or says in its description why the framework doc is untouched.
 
 Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
-2026-10-15; headline records (§8, §10) added 2026-10-15.
+2026-10-15; headline records (§8, §10) added 2026-10-15; §8 contributions vs growth and the §10 TWR
+2026-10-15.
 
 ---
 
@@ -951,12 +952,14 @@ are closed periods.
 - **Brokerage contributions vs growth** (S1; `GET /api/v1/wealth/brokerage/growth`, the Investments tab's
   "Contributed vs growth" section; finance-framework M2 and M4): the brokerage sleeve (IBKR + Inzhur, idle
   broker cash included - `brokerage_total`) from the first snapshot that holds brokerage value (`seriesStart`;
-  the daily value series starts there, 2026-06-30/07-01 for the live book, and the UI says so) to the latest.
+  the daily value series starts there, 2026-06-30/07-01 for the live book) to the latest. The figures run from
+  `from`, which is `seriesStart` unless a provider linked on that first close moves it to the next close (§10);
+  the card names `from`, and says the history starts that day only when `from` equals `seriesStart`.
   - **Flows.** `IBrokerageFlowReader` reads the cash rows the brokers report (`BrokerageCashTransactions`)
     and classifies them per provider by type, never by sign alone (`BrokerageFlowClassifier`): deposits and
     withdrawals are external flows; dividends, interest, bonuses, fees and taxes are return (income, fee,
     tax) and so count as growth; Inzhur's dividend or distribution *payment* (income paid out of the account)
-    is a withdrawal. Trades and currency conversions move money inside the scope and are not flows; an unknown
+    and its *bonus withdrawal* (a bonus is growth until it is withdrawn) are withdrawals. Trades and currency conversions move money inside the scope and are not flows; an unknown
     type is left out, not guessed. Each row converts to USD at **its own date's rate**
     (`IHistoricalExchangeRateService`, §3) - today's rate would read a currency move as growth; a row converted
     at a fallback rate marks the figure `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1`. Rows on or before a provider's

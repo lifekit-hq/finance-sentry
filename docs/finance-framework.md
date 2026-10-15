@@ -168,7 +168,7 @@ Two things already right and kept:
 | **Net contributions** | External inflows minus external outflows over a window. | — |
 | **Growth** | Value change minus net contributions: the investment result in money. | — |
 | **Return (%)** | Always stated with its method: TWR, MWR (XIRR or Modified Dietz), gain vs cost, or holding-period return (HPR). | GIPS 1.A.35, 2.A.24, 2.A.29 |
-| **Change in value** | End value minus start value, with no adjustment for flows. Includes deposits. This is what "Invested change" and the Book vs SPY figure are today. It is **not a return**. | — |
+| **Change in value** | End value minus start value, with no adjustment for flows. Includes deposits. This is what "Invested change" and the `book` headline of `get_book_performance` are today. It is **not a return**. | — |
 | **Cost basis** | What was paid for what is still held, by average cost (as `PositionReturnCalculator` does). | standard |
 | **Base currency** | The person's display currency. Compute stays in USD today. | `CurrencyConverter.ResolveBase`; C4 |
 | **As-of** | The timestamp of the *oldest* input in a figure: a figure is only as fresh as its stalest part. | this framework |
@@ -860,10 +860,9 @@ fields stay for current consumers. The FIRE flag, the briefs and the per-thesis 
 covered (§3.6, "Not yet carrying the record").
 
 **G6. Investment flows land but nothing reads them.** *Partly closed (C2(a)): `BrokerageFlowReader` reads IBKR and Inzhur deposits, withdrawals, income, fees and taxes at each row's dated rate, feeding M2-M4 and Book vs SPY. Open: IBKR deposits still need C1; crypto flows (C2(b)).*
-IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"`; only income types are read.
-No IBKR deposits or withdrawals arrive, because the Flex query does not include that type (C1). Crypto
-venues store no flows. Without flows, M2–M5 cannot be computed for any investment scope, so G1 cannot be
-fixed properly either.
+IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"` and `BrokerageFlowReader`
+classifies them. No IBKR deposits or withdrawals arrive, because the Flex query does not include that type
+(C1). Crypto venues store no flows, so M2–M5 cannot be computed for a crypto scope.
 
 **G7. Two projections use two different assumptions.**
 The 12-month tile is median monthly savings × 12 with no market return; the FIRE projection compounds a 5%
