@@ -67,8 +67,10 @@ export function build(
 
   return {
     data: signal<Nullable<DashboardData>>(data),
+    dataRange: signal<Nullable<HistoryRange>>(historyRange),
     historyRange: signal<HistoryRange>(historyRange),
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
+    historyLoadedRange: signal<Nullable<HistoryRange>>(historyRange),
     isLoading: signal(false),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),

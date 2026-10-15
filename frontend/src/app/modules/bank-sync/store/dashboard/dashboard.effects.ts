@@ -18,8 +18,8 @@ interface EffectsStore {
   setLoading: () => void;
   setSuccess: () => void;
   setError: (errorCode: Nullable<string>) => void;
-  setData: (data: DashboardData) => void;
-  setNetWorthHistory: (snapshots: NetWorthSnapshotDto[]) => void;
+  setData: (data: DashboardData, range: HistoryRange) => void;
+  setNetWorthHistory: (snapshots: NetWorthSnapshotDto[], range: HistoryRange) => void;
   setHistoryLoading: (loading: boolean) => void;
   setHistoryError: (error: string | null) => void;
   setHistoryHasHistory: (hasHistory: boolean) => void;
@@ -51,7 +51,7 @@ export function dashboardEffects(store: EffectsStore) {
             )
             .pipe(
               tap(data => {
-                store.setData(data);
+                store.setData(data, range);
                 store.setSuccess();
               }),
               catchError((err: unknown) => {
@@ -69,7 +69,7 @@ export function dashboardEffects(store: EffectsStore) {
         switchMap(range =>
           bankSyncService.getNetWorthHistory(range).pipe(
             tap(response => {
-              store.setNetWorthHistory(response.snapshots);
+              store.setNetWorthHistory(response.snapshots, range);
               store.setHistoryHasHistory(response.hasHistory);
               store.setHistoryScopeChanges(response.scopeChanges ?? []);
               store.setHistoryChangeHeadline(response.changeHeadline);
@@ -116,17 +116,18 @@ export function dashboardHooks(store: HookStore): void {
       switchMap(() =>
         timer(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS).pipe(
           // The catch sits inside the inner stream: one failed refresh must not end the timer.
-          switchMap(() =>
-            bankSyncService
+          switchMap(() => {
+            const range = untracked(store.historyRange);
+            return bankSyncService
               .getDashboardData(
-                DashboardRangeUtils.months(untracked(store.historyRange)),
-                DashboardRangeUtils.windowMonths(untracked(store.historyRange)),
-                DashboardRangeUtils.windowFrom(untracked(store.historyRange))
+                DashboardRangeUtils.months(range),
+                DashboardRangeUtils.windowMonths(range),
+                DashboardRangeUtils.windowFrom(range)
               )
               .pipe(
                 tap(data =>
                   untracked(() => {
-                    store.setData(data);
+                    store.setData(data, range);
                     store.setSuccess();
                   })
                 ),
@@ -134,8 +135,8 @@ export function dashboardHooks(store: HookStore): void {
                   untracked(() => store.setError(extractErrorCode(err)));
                   return EMPTY;
                 })
-              )
-          )
+              );
+          })
         )
       )
     )

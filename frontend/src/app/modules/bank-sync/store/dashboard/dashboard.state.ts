@@ -9,9 +9,13 @@ import {
 
 export interface DashboardState {
   data: Nullable<DashboardData>;
+  /** The range `data` was loaded for; a range change shows skeletons until the new figures land. */
+  dataRange: Nullable<HistoryRange>;
   /** Epoch ms of the last successful dashboard load; drives the offline "last synced" notice. */
   lastSyncedAt: Nullable<number>;
   netWorthHistory: NetWorthSnapshotDto[];
+  /** The range `netWorthHistory` was loaded for. */
+  historyLoadedRange: Nullable<HistoryRange>;
   historyRange: HistoryRange;
   historyHasHistory: boolean;
   /** Accounts linked or removed inside the loaded window; hides the change percentage. */
@@ -26,8 +30,10 @@ export interface DashboardState {
 
 export const initialDashboardState: DashboardState = {
   data: null,
+  dataRange: null,
   lastSyncedAt: null,
   netWorthHistory: [],
+  historyLoadedRange: null,
   historyRange: DEFAULT_HISTORY_RANGE,
   historyHasHistory: false,
   historyScopeChanges: [],
@@ -37,12 +43,13 @@ export const initialDashboardState: DashboardState = {
   scrubIndex: null,
 };
 
-/** What a revisit restores: the last visit's numbers and history, for the range they were loaded for. */
+/** What a revisit restores: the last visit's numbers and history with the range each was loaded for. */
 export const DASHBOARD_SESSION_FIELDS = [
   'data',
+  'dataRange',
   'lastSyncedAt',
   'netWorthHistory',
-  'historyRange',
+  'historyLoadedRange',
   'historyHasHistory',
   'historyScopeChanges',
   'historyChangeHeadline',

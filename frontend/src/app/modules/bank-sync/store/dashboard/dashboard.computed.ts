@@ -39,8 +39,10 @@ import {NetWorthSplitUtils} from '../../utils/net-worth-split.utils';
 interface StateSignals {
   isLoading: Signal<boolean>;
   data: Signal<Nullable<DashboardData>>;
+  dataRange: Signal<Nullable<HistoryRange>>;
   historyRange: Signal<HistoryRange>;
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
+  historyLoadedRange: Signal<Nullable<HistoryRange>>;
   historyScopeChanges: Signal<NetWorthScopeChangeDto[]>;
   historyChangeHeadline: Signal<MaybeHeadline>;
   historyLoading: Signal<boolean>;
@@ -664,11 +666,17 @@ export function dashboardComputed(store: StateSignals) {
     incomeVsSpendingMonthKeys: computed((): string[] => completeMonths().map(([key]) => key)),
 
     isHistoryLoading: computed(() => store.historyLoading()),
-    // Keep content: a widget swaps for its skeleton only while it has nothing to show yet. A range
-    // change, the periodic refresh or a revisit keeps the numbers on screen until the new ones land.
-    isFirstLoad: computed(() => store.isLoading() && store.data() === null),
-    isHistoryFirstLoad: computed(
-      () => store.historyLoading() && store.netWorthHistory().length === 0
+    // Keep content: a widget swaps for its skeleton while it has nothing to show for the selected
+    // range. A same-range refresh or a revisit keeps the numbers on screen until the new ones land;
+    // figures loaded for another range never sit under this range's label, so a range change shows
+    // the skeletons until its own figures arrive.
+    isFirstLoad: computed(() =>
+      store.data() === null ? store.isLoading() : store.dataRange() !== store.historyRange()
+    ),
+    isHistoryFirstLoad: computed(() =>
+      store.netWorthHistory().length === 0
+        ? store.historyLoading()
+        : store.historyLoadedRange() !== store.historyRange()
     ),
     historyErrorMessage: computed(() => store.historyError()),
   };

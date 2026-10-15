@@ -26,7 +26,7 @@ export const DashboardStore = signalStore(
   withSessionCache<DashboardState>(
     'dashboard',
     DASHBOARD_SESSION_FIELDS,
-    (kept, current) => kept.historyRange === current.historyRange
+    (kept, current) => kept.dataRange === current.historyRange
   ),
   withMethods(dashboardMethods),
   withComputed(dashboardComputed),

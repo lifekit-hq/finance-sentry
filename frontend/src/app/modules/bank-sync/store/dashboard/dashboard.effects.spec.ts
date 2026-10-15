@@ -59,6 +59,6 @@ describe('dashboardHooks auto-refresh', () => {
 
     vi.advanceTimersByTime(REFRESH_INTERVAL_MS);
     expect(service.getDashboardData).toHaveBeenCalledTimes(2);
-    expect(store.setData).toHaveBeenCalledWith(DATA);
+    expect(store.setData).toHaveBeenCalledWith(DATA, '1m');
   });
 });
