@@ -131,6 +131,25 @@ describe('WatchlistStore', () => {
     expect(store.items()).toEqual([MRNA]);
   });
 
+  it('keeps a row gone when the server no longer has it', () => {
+    const store = setup({
+      getItems: vi.fn().mockReturnValue(of([PLTR, MRNA])),
+      remove: vi
+        .fn()
+        .mockReturnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({status: 404, error: {errorCode: 'WATCHLIST_ITEM_NOT_FOUND'}})
+          )
+        ),
+    });
+
+    store.remove('w1');
+
+    expect(store.items()).toEqual([MRNA]);
+    expect(store.removeErrorMessage()).toBe('That watchlist item no longer exists.');
+  });
+
   it('puts a row back when its delete fails', () => {
     const store = setup({
       getItems: vi.fn().mockReturnValue(of([PLTR, MRNA])),

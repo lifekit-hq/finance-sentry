@@ -3,7 +3,10 @@ import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, mergeMap, pipe, switchMap, tap} from 'rxjs';
 
-import {PENDING_ID_PREFIX} from '../../constants/watchlist/watchlist.constants';
+import {
+  PENDING_ID_PREFIX,
+  WATCHLIST_ITEM_NOT_FOUND,
+} from '../../constants/watchlist/watchlist.constants';
 import {type AddWatchlistRequest, type WatchlistItem} from '../../models/watchlist/watchlist.model';
 import {WatchlistService} from '../../services/watchlist.service';
 
@@ -74,7 +77,7 @@ export function watchlistEffects(store: EffectsStore) {
         })
       )
     ),
-    // Optimistic: the row leaves at once and comes back, where it was, if the delete fails.
+    // Optimistic: the row leaves at once and comes back, where it was, if the delete fails (unless the server no longer has it).
     remove: rxMethod<string>(
       pipe(
         mergeMap(id => {
@@ -85,10 +88,11 @@ export function watchlistEffects(store: EffectsStore) {
           return service.remove(id).pipe(
             tap(() => store.setRemoveSuccess()),
             catchError((err: unknown) => {
-              if (removed) {
+              const errorCode = extractErrorCode(err);
+              if (removed && errorCode !== WATCHLIST_ITEM_NOT_FOUND) {
                 store.insertItem(index, removed);
               }
-              store.setRemoveError(extractErrorCode(err));
+              store.setRemoveError(errorCode);
               return EMPTY;
             })
           );
