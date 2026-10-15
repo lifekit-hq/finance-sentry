@@ -1,12 +1,14 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Services;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Services;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 using FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -18,6 +20,9 @@ public class NetWorthSnapshotSourceRowTests
 {
     private static readonly Guid UserId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly DateOnly Day = new(2026, 10, 15);
+
+    private static WealthSourceReading Reading(decimal cash, decimal invested = 0m, FxStatus fx = FxStatus.Exact)
+        => new(cash, invested == 0m ? [] : [new BookFigurePosition("AAPL", "equity", 1m, null, invested, "ibkr")], fx);
 
     private sealed class FakeSource(string id, EconomyKind kind, WealthSourceReading? reading) : IWealthSource
     {
@@ -31,24 +36,6 @@ public class NetWorthSnapshotSourceRowTests
                 : Task.FromResult(reading);
     }
 
-    private static WealthSourceReading Reading(decimal cash, decimal invested = 0m, FxStatus fx = FxStatus.Exact)
-        => new(cash, invested == 0m ? [] : [new BookFigurePosition("AAPL", "equity", 1m, null, invested, "ibkr")], fx);
-
-    private static NetWorthSnapshotJob JobOver(
-        Mock<INetWorthSnapshotService> service, params IWealthSource[] sources)
-    {
-        var banking = new Mock<IBankingTotalsReader>();
-        banking.Setup(b => b.GetTotalUsdAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(0m);
-        var crypto = new Mock<ICryptoHoldingsReader>();
-        crypto.Setup(c => c.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        var brokerage = new Mock<IBrokerageHoldingsReader>();
-        brokerage.Setup(b => b.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        return new NetWorthSnapshotJob(
-            banking.Object, crypto.Object, brokerage.Object, service.Object,
-            Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)),
-            sources);
-    }
-
     private static Mock<INetWorthSnapshotService> CapturingService(Action<NetWorthSnapshotData> capture)
     {
         var service = new Mock<INetWorthSnapshotService>();
@@ -59,16 +46,40 @@ public class NetWorthSnapshotSourceRowTests
         return service;
     }
 
+    private static NetWorthSnapshotJob JobOver(
+        INetWorthSnapshotService service, params IWealthSource[] sources)
+        => JobOver(service, DateTime.UtcNow, sources);
+
+    private static NetWorthSnapshotJob JobOver(
+        INetWorthSnapshotService service, DateTime bankingLastSync, params IWealthSource[] sources)
+    {
+        var banking = new Mock<IBankingTotalsReader>();
+        banking.Setup(b => b.GetLatestSuccessfulSyncAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(bankingLastSync);
+        var crypto = new Mock<ICryptoHoldingsReader>();
+        crypto.Setup(c => c.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            [new CryptoHoldingSummary("BTC", 1m, 0m, 50m, DateTime.UtcNow, "binance")]);
+        var brokerage = new Mock<IBrokerageHoldingsReader>();
+        brokerage.Setup(b => b.GetHoldingsAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            [new BrokerageHoldingSummary("AAPL", "equity", 1m, 200m, DateTime.UtcNow, "ibkr")]);
+        return new NetWorthSnapshotJob(
+            banking.Object, crypto.Object, brokerage.Object, service,
+            new BookFiguresService(sources, NullLogger<BookFiguresService>.Instance));
+    }
+
+    private static IWealthSource[] ThreeSources(WealthSourceReading? crypto = null) =>
+    [
+        new FakeSource("banking", EconomyKind.Bank, Reading(cash: 100m)),
+        new FakeSource("brokerage", EconomyKind.Brokerage, Reading(cash: 10m, invested: 190m)),
+        new FakeSource("crypto", EconomyKind.CryptoVenue, crypto ?? Reading(cash: 0m, invested: 50m)),
+    ];
+
     [Fact]
     public async Task Job_HandsOneFigurePerRegisteredSource_InRegistrationOrder_WithNoChangeForAFourthSource()
     {
         NetWorthSnapshotData? captured = null;
         var job = JobOver(
-            CapturingService(d => captured = d),
-            new FakeSource("banking", EconomyKind.Bank, Reading(cash: 100m)),
-            new FakeSource("brokerage", EconomyKind.Brokerage, Reading(cash: 10m, invested: 200m)),
-            new FakeSource("crypto", EconomyKind.CryptoVenue, Reading(cash: 0m, invested: 50m)),
-            new FakeSource("fund", EconomyKind.Fund, Reading(cash: 0m, invested: 700m)));
+            CapturingService(d => captured = d).Object,
+            [.. ThreeSources(), new FakeSource("fund", EconomyKind.Fund, Reading(cash: 0m, invested: 700m))]);
 
         await job.CaptureForUserAsync(UserId, Day);
 
@@ -78,14 +89,34 @@ public class NetWorthSnapshotSourceRowTests
             ("crypto", EconomyKind.CryptoVenue),
             ("fund", EconomyKind.Fund));
         captured.Sources![3].Reading!.TotalValueUsd.Should().Be(700m);
+        captured.BankingTotal.Should().Be(100m);
+        captured.BrokerageTotal.Should().Be(200m);
+        captured.CryptoTotal.Should().Be(50m);
     }
 
     [Fact]
-    public async Task Job_RecordsAThrowingSourceAsUnreadInsteadOfDroppingIt()
+    public async Task Job_ReadsEachSourceOnce_SoRowsAndColumnsComeFromTheSameRead()
+    {
+        var reads = 0;
+        var counting = new Mock<IWealthSource>();
+        counting.SetupGet(s => s.SourceId).Returns("banking");
+        counting.SetupGet(s => s.Kind).Returns(EconomyKind.Bank);
+        counting.Setup(s => s.ReadAsync(UserId, It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(Reading(cash: ++reads * 100m)));
+        NetWorthSnapshotData? captured = null;
+
+        await JobOver(CapturingService(d => captured = d).Object, counting.Object).CaptureForUserAsync(UserId, Day);
+
+        reads.Should().Be(1);
+        captured!.BankingTotal.Should().Be(captured.Sources!.Single().Reading!.TotalValueUsd);
+    }
+
+    [Fact]
+    public async Task Job_RecordsAThrowingSourceAsUnreadInsteadOfDroppingIt_AndCarriesItsSleeveForward()
     {
         NetWorthSnapshotData? captured = null;
         var job = JobOver(
-            CapturingService(d => captured = d),
+            CapturingService(d => captured = d).Object,
             new FakeSource("banking", EconomyKind.Bank, Reading(cash: 100m)),
             new FakeSource("crypto", EconomyKind.CryptoVenue, reading: null));
 
@@ -95,6 +126,7 @@ public class NetWorthSnapshotSourceRowTests
         captured.Sources![1].SourceId.Should().Be("crypto");
         captured.Sources[1].Reading.Should().BeNull();
         captured.Sources[0].Reading!.CashUsd.Should().Be(100m, "one failing source does not stop the others");
+        captured.CryptoFresh.Should().BeFalse("a sleeve that did not read is carried forward, not recorded as $0");
     }
 
     private static (Mock<INetWorthSnapshotRepository> Repo, Func<IReadOnlyList<NetWorthSnapshotSource>?> Rows) Repo(
@@ -110,7 +142,7 @@ public class NetWorthSnapshotSourceRowTests
         return (repo, () => rows);
     }
 
-    private static NetWorthSnapshotData Data(params SourceSnapshotFigure[] figures) => new(
+    private static NetWorthSnapshotData Data(params BookSourceReading[] figures) => new(
         Day, BankingTotal: 100m, BrokerageTotal: 210m, CryptoTotal: 50m, Sources: figures);
 
     [Fact]
@@ -143,7 +175,7 @@ public class NetWorthSnapshotSourceRowTests
         var (repo, rows) = Repo();
 
         await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, Data(
-            new SourceSnapshotFigure("banking", EconomyKind.Bank, Reading(cash: 100m, fx: fx))));
+            new BookSourceReading("banking", EconomyKind.Bank, Reading(cash: 100m, fx: fx))));
 
         rows()!.Single().Health.Should().Be(health);
         rows()!.Single().Reasons.Should().Equal(reasons);
@@ -202,5 +234,80 @@ public class NetWorthSnapshotSourceRowTests
         repo.Verify(r => r.UpsertAsync(It.IsAny<NetWorthSnapshot>(), It.IsAny<CancellationToken>()), Times.Once);
         repo.Verify(r => r.UpsertWithSourcesAsync(
             It.IsAny<NetWorthSnapshot>(), It.IsAny<IReadOnlyList<NetWorthSnapshotSource>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static async Task<(NetWorthSnapshot Snapshot, IReadOnlyList<NetWorthSnapshotSource> Rows)> CaptureThroughServiceAsync(
+        DateTime bankingLastSync, NetWorthSnapshot? previous, params IWealthSource[] sources)
+    {
+        NetWorthSnapshot? snapshot = null;
+        IReadOnlyList<NetWorthSnapshotSource>? rows = null;
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetLatestBeforeUnscopedAsync(UserId, Day, It.IsAny<CancellationToken>())).ReturnsAsync(previous);
+        repo.Setup(r => r.UpsertWithSourcesAsync(
+                It.IsAny<NetWorthSnapshot>(), It.IsAny<IReadOnlyList<NetWorthSnapshotSource>>(), It.IsAny<CancellationToken>()))
+            .Callback<NetWorthSnapshot, IReadOnlyList<NetWorthSnapshotSource>, CancellationToken>((s, r, _) => (snapshot, rows) = (s, r))
+            .Returns(Task.CompletedTask);
+
+        await JobOver(new NetWorthSnapshotService(repo.Object), bankingLastSync, sources).CaptureForUserAsync(UserId, Day);
+
+        return (snapshot!, rows!);
+    }
+
+    private static decimal ColumnOf(NetWorthSnapshot snapshot, string sourceId) => sourceId switch
+    {
+        "banking" => snapshot.BankingTotal,
+        "brokerage" => snapshot.BrokerageTotal,
+        _ => snapshot.CryptoTotal,
+    };
+
+    [Fact]
+    public async Task EndToEnd_WhenEverySourceIsCompleteOrEstimated_TheRowsAddUpToTheSleeveColumns()
+    {
+        var (snapshot, rows) = await CaptureThroughServiceAsync(
+            DateTime.UtcNow, previous: null,
+            ThreeSources(crypto: Reading(cash: 0m, invested: 50m, fx: FxStatus.TodayRate)));
+
+        rows.Should().OnlyContain(r => r.Health == SourceHealth.Complete || r.Health == SourceHealth.Estimated);
+        rows.Sum(r => r.Total!.Value).Should().Be(snapshot.TotalNetWorth);
+        foreach (var row in rows)
+            row.Total.Should().Be(ColumnOf(snapshot, row.SourceId));
+    }
+
+    [Fact]
+    public async Task EndToEnd_AStaleSleeveIsCarriedForward_AndItsRowIsNeitherCompleteNorEstimated()
+    {
+        var previous = new NetWorthSnapshot { BankingTotal = 500m, BrokerageTotal = 200m, CryptoTotal = 50m };
+
+        var (snapshot, rows) = await CaptureThroughServiceAsync(
+            DateTime.UtcNow.AddDays(-3), previous, ThreeSources());
+
+        snapshot.BankingTotal.Should().Be(500m, "the stale sleeve carries yesterday's figure");
+        snapshot.StaleSleeves.Should().Be("banking");
+        var banking = rows.Single(r => r.SourceId == "banking");
+        banking.Health.Should().Be(SourceHealth.Degraded);
+        banking.Reasons.Should().Contain(SourceReasons.StaleSource);
+        banking.Total.Should().Be(100m, "the row is what the source read, the column the carried figure");
+        foreach (var row in rows.Where(r => r.Health is SourceHealth.Complete or SourceHealth.Estimated))
+            row.Total.Should().Be(ColumnOf(snapshot, row.SourceId));
+    }
+
+    [Fact]
+    public async Task EndToEnd_AFailedSource_IsUnavailableAndItsSleeveIsCarriedForward()
+    {
+        var previous = new NetWorthSnapshot { BankingTotal = 100m, BrokerageTotal = 200m, CryptoTotal = 45m };
+
+        var (snapshot, rows) = await CaptureThroughServiceAsync(
+            DateTime.UtcNow, previous,
+            new FakeSource("banking", EconomyKind.Bank, Reading(cash: 100m)),
+            new FakeSource("brokerage", EconomyKind.Brokerage, Reading(cash: 10m, invested: 190m)),
+            new FakeSource("crypto", EconomyKind.CryptoVenue, reading: null));
+
+        snapshot.CryptoTotal.Should().Be(45m);
+        snapshot.StaleSleeves.Should().Be("crypto");
+        var crypto = rows.Single(r => r.SourceId == "crypto");
+        crypto.Health.Should().Be(SourceHealth.Unavailable);
+        crypto.Total.Should().BeNull();
+        foreach (var row in rows.Where(r => r.Health is SourceHealth.Complete or SourceHealth.Estimated))
+            row.Total.Should().Be(ColumnOf(snapshot, row.SourceId));
     }
 }

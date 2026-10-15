@@ -10,12 +10,6 @@ public interface INetWorthSnapshotService
         CancellationToken ct = default);
 }
 
-/// <summary>
-/// One registered <see cref="IWealthSource"/>'s read for a snapshot run. <see cref="Reading"/> is null when the
-/// read threw: the source then contributed nothing, as it does in <see cref="BookFigures"/>, and its row says so.
-/// </summary>
-public sealed record SourceSnapshotFigure(string SourceId, EconomyKind Kind, WealthSourceReading? Reading);
-
 /// <param name="BrokerageInvested">
 /// Invested (non-cash) part of <paramref name="BrokerageTotal"/> as measured this run, from
 /// <see cref="IBookFiguresService"/>; null when the book figures could not be trusted (a stale source).
@@ -26,7 +20,8 @@ public sealed record SourceSnapshotFigure(string SourceId, EconomyKind Kind, Wea
 /// history read can name a seed-table or 1:1 conversion.
 /// </param>
 /// <param name="Sources">
-/// What each registered source read this run, written as that snapshot's per-source rows. Null = the caller has
+/// What each registered source read this run (<see cref="BookFigures.Sources"/>), written as that snapshot's
+/// per-source rows. Null = the caller has
 /// no per-source figures and the day's existing per-source rows are left as they are; an empty list replaces
 /// them with none.
 /// </param>
@@ -42,4 +37,4 @@ public record NetWorthSnapshotData(
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null,
     FxStatus FxStatus = FxStatus.Exact,
-    IReadOnlyList<SourceSnapshotFigure>? Sources = null);
+    IReadOnlyList<BookSourceReading>? Sources = null);

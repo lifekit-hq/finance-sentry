@@ -140,18 +140,16 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         crypto.Setup(c => c.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>())).ReturnsAsync([]);
         var brokerage = new Mock<IBrokerageHoldingsReader>();
         brokerage.Setup(b => b.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        var bank = new Mock<IWealthSource>();
-        bank.SetupGet(s => s.SourceId).Returns("banking");
-        bank.SetupGet(s => s.Kind).Returns(EconomyKind.Bank);
-        bank.Setup(s => s.ReadAsync(_userA, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new WealthSourceReading(1_250m, []));
+        var book = new BookFigures(0m, 0m, 0m, 0m, 0m, [], false, [])
+        {
+            Sources = [new BookSourceReading("banking", EconomyKind.Bank, new WealthSourceReading(1_250m, []))],
+        };
 
         await using (var asNoOne = CreateContext())
         {
             var repo = new NetWorthSnapshotRepository(asNoOne);
             var job = new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, new NetWorthSnapshotService(repo),
-                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)),
-                [bank.Object]);
+                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(book)));
             await job.CaptureForUserAsync(_userA, Today);
         }
 
@@ -225,8 +223,7 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
         {
             var repo = new NetWorthSnapshotRepository(asNoOne);
             var job = new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, new NetWorthSnapshotService(repo),
-                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)),
-                []);
+                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)));
             await new NetWorthSnapshotBackfillService(banking.Object, repo, job).BackfillAsync();
         }
 

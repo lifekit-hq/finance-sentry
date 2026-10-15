@@ -69,7 +69,7 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
     /// reasons (ESTIMATED for today's/seed rate, DEGRADED for a 1:1 conversion), and a sleeve this snapshot carried
     /// forward is at best DEGRADED + STALE_SOURCE. The snapshot's own column then holds the carried figure.
     /// </summary>
-    private static NetWorthSnapshotSource ToRow(SourceSnapshotFigure figure, List<string> staleSleeves)
+    private static NetWorthSnapshotSource ToRow(BookSourceReading figure, List<string> staleSleeves)
     {
         var reasons = new List<string>();
         var health = SourceHealth.Complete;

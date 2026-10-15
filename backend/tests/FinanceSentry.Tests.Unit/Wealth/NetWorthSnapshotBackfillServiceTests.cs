@@ -39,8 +39,7 @@ public class NetWorthSnapshotBackfillServiceTests
             cryptoMock.Object,
             brokerageMock.Object,
             snapshotServiceMock.Object,
-            Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)),
-            []);
+            Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(BookFigures.Empty)));
     }
 
     [Fact]

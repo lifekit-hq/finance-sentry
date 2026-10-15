@@ -607,19 +607,25 @@ Today a fourth economy would need a new column on `net_worth_snapshots`, a new c
    `(snapshot, source id)`, unique, cascade-deleted with its snapshot. Columns: `source_id`, `kind`
    (`EconomyKind` by name), `total`, `cash`, `invested` (`numeric(18,2)`, USD like the snapshot's totals; null,
    never zero, when the source could not be read), `health` and `reasons` (`text[]`). The row has no `UserId`;
-   the Owner filter reaches it through its snapshot. `NetWorthSnapshotJob` reads every registered
-   `IWealthSource` itself and `NetWorthSnapshotService` persists the snapshot and its rows in one transaction
+   the Owner filter reaches it through its snapshot. `NetWorthSnapshotJob` takes one `IBookFiguresService` read
+   - `BookFigures.Sources`, what each registered `IWealthSource` read - and derives both the rows and the sleeve
+   columns from it; `NetWorthSnapshotService` persists the snapshot and its rows in one transaction
    (`UpsertWithSourcesAsync`): a same-day refresh replaces the day's rows, and a fourth registered source gets its
-   row with no change to the job. The existing columns (`BankingTotal`, `BrokerageTotal`, `CryptoTotal`,
-   `StaleSleeves`, `fx_status`) are written exactly as before.
+   row with no change to the job. The sleeve columns (`BankingTotal`, `BrokerageTotal`, `CryptoTotal`) are the
+   `banking`, `brokerage` and `crypto` readings' totals, `StaleSleeves` and `fx_status` are written as before;
+   the holdings and sync-time reads that remain only decide freshness, since a reading carries no sync
+   timestamp. A source that failed to read is not fresh, so its sleeve is carried forward instead of recorded as
+   zero.
    - **Health** is the framework's quality vocabulary (§3.6) stored by name: `Complete`; `Estimated` (a
      today's-rate or seed-table conversion, reason `FX_TODAY_RATE`); `Degraded` (a 1:1 conversion,
      `FX_UNKNOWN_1TO1`, or a sleeve this snapshot carried forward, `STALE_SOURCE`); `Unavailable` (the read
      threw: null figures, `STALE_SOURCE`, the same way `BookFigures` reports a failed source stale).
    - **A row is what the source read this run.** When the snapshot carried a sleeve forward, the snapshot's own
-     column holds the carried figure and the row says so through its health. Whenever every source is
-     `Complete` or `Estimated` the rows add up to the snapshot's sleeve columns, up to a cent: each figure
-     rounds to cents on its own.
+     column holds the carried figure and the row says so through its health. A sleeve that was read,
+     is fresh and was not carried forward is `Complete` or `Estimated`, and its row total is its column
+     (`NetWorthSnapshotSourceRowTests` pins this through the job and the service, with a stale and a failed
+     source); whenever every source is, the rows add up to the sleeve columns, up to a cent: each figure rounds
+     to cents on its own.
    - **Totals do not read the rows yet.** `TotalNetWorth` stays `banking + brokerage + crypto`; a fourth
      source's row is recorded but not part of that total until PRs 3 and 4.
    - **Not backfilled.** Past snapshots are untouched and have no rows (PR 3 treats "no rows" as "legacy").
