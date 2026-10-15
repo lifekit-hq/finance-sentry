@@ -456,6 +456,43 @@ public sealed class BookPerformanceServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_BookHeadline_IsUnavailableWithNoSplit_WhenSnapshotDaysHaveNoSplit()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(
+            since, today,
+            new DailyPortfolioValue(since, null),
+            new DailyPortfolioValue(today.AddDays(-1), null),
+            new DailyPortfolioValue(today, 103_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().BeNull();
+        period.Book!.Amount.Should().BeNull();
+        period.Book.Percent.Should().BeNull();
+        period.Book.Quality.Should().Be(HeadlineQuality.Unavailable);
+        period.Book.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.NoSplit));
+    }
+
+    [Fact]
+    public async Task GetAsync_UnsplitSnapshotDays_DoNotChangeTheMeasuredBook()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(
+            since, today,
+            new DailyPortfolioValue(since, 100_000m),
+            new DailyPortfolioValue(today.AddDays(-3), null),
+            new DailyPortfolioValue(today, 103_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().Be(0.03m);
+        period.Book!.Reasons.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetAsync_BookHeadline_KeepsTheChangeButNoPercent_FromAZeroStart()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);

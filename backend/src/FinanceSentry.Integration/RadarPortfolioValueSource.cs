@@ -15,10 +15,9 @@ public sealed class RadarPortfolioValueSource(IBrokerageValueHistoryReader broke
         Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         var daily = await brokerageHistory.GetDailyAsync(userId, from, to, ct);
-        // A day with no split is skipped: neither zero nor the cash-inclusive total stands in for it.
+        // A day with no split keeps a null value: neither zero nor the cash-inclusive total stands in for it.
         return daily
-            .Where(d => d.BrokerageInvestedUsd is not null)
-            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageInvestedUsd!.Value, d.Signals))
+            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageInvestedUsd, d.Signals))
             .ToList();
     }
 }

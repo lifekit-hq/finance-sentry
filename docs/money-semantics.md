@@ -1075,7 +1075,9 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   (finance-framework §3.6): `VALUE_CHANGE` over `START_VALUE` on scope `invested_brokerage`, from the window's
   first to last split day. Its `amount` is the dollar change and its `percent` is `bookTwr` in percentage
   points. Where `bookTwr` is null it says why: no measurable window (fewer than two split days, an edge outside
-  the tolerance) is UNAVAILABLE with `SHORT_HISTORY`; a zero opening value keeps the dollar change and
+  the tolerance) is UNAVAILABLE with `NO_SPLIT` when the period has snapshot days whose cash/invested split was
+  not measured (the portfolio value port keeps those days, marked by a null invested value, and the calculation
+  still ignores them) and with `SHORT_HISTORY` otherwise; a zero opening value keeps the dollar change and
   withholds the percent with `ZERO_BASE`. The two end rows' `StaleSleeves` (brokerage only), `IsApproximate`
   and `fx_status` become its quality and reasons. No scope change is detected on this series, so the record
   never carries `SCOPE_CHANGED`. The holdings-based return below carries no headline record yet.

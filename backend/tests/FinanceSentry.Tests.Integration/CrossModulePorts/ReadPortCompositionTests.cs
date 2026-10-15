@@ -171,7 +171,7 @@ public sealed class ReadPortCompositionTests
     }
 
     [Fact]
-    public async Task Portfolio_value_skips_days_with_no_split_instead_of_zeroing_or_using_the_total()
+    public async Task Portfolio_value_keeps_days_with_no_split_as_null_instead_of_zeroing_or_using_the_total()
     {
         var from = new DateOnly(2026, 9, 1);
         var to = new DateOnly(2026, 9, 3);
@@ -183,11 +183,11 @@ public sealed class ReadPortCompositionTests
         var rows = await new RadarPortfolioValueSource(new BrokerageValueHistoryReader(snapshots.Object))
             .GetAsync(User, from, to);
 
-        rows.Select(r => (r.Date, r.BrokerageInvestedUsd)).Should().Equal((from.AddDays(1), 90m), (to, 0m));
+        rows.Select(r => (r.Date, r.BrokerageInvestedUsd)).Should().Equal((from, (decimal?)null), (from.AddDays(1), 90m), (to, 0m));
     }
 
     [Fact]
-    public async Task Portfolio_value_is_empty_when_no_day_has_a_split()
+    public async Task Portfolio_value_marks_every_day_unsplit_when_no_day_has_a_split()
     {
         var from = new DateOnly(2026, 9, 1);
         var to = new DateOnly(2026, 9, 2);
@@ -198,7 +198,7 @@ public sealed class ReadPortCompositionTests
         var rows = await new RadarPortfolioValueSource(new BrokerageValueHistoryReader(snapshots.Object))
             .GetAsync(User, from, to);
 
-        rows.Should().BeEmpty();
+        rows.Select(r => (r.Date, r.BrokerageInvestedUsd)).Should().Equal((from, (decimal?)null), (to, (decimal?)null));
     }
 
     [Fact]

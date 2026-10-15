@@ -31,7 +31,8 @@ public static class HeadlineFactory
 
     /// <summary>
     /// M1 over a window: end minus start, and that change over the start value. A missing end of the window makes
-    /// the figure unavailable (<see cref="HeadlineReasonCode.ShortHistory"/>); a zero, negative or re-scoped start
+    /// the figure unavailable (<see cref="HeadlineReasonCode.ShortHistory"/>, or <see cref="HeadlineReasonCode.NoSplit"/>
+    /// alone when <paramref name="signals"/> say the split was not measured); a zero, negative or re-scoped start
     /// keeps the amount and withholds the percent.
     /// </summary>
     public static Headline Change(
@@ -41,7 +42,11 @@ public static class HeadlineFactory
         decimal? amount = null;
         decimal? percent = null;
         MeasureFailure? failure = MeasureFailure.MissingValue;
-        if (startUsd is { } start && endUsd is { } end)
+        if (signals.NoSplit)
+        {
+            failure = null;
+        }
+        else if (startUsd is { } start && endUsd is { } end)
         {
             var measured = ValueChange.Measure(start, end, scopeChanged);
             amount = measured.ChangeUsd;

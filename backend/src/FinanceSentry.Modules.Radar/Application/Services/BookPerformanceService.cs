@@ -68,10 +68,16 @@ public sealed class BookPerformanceService(
         IReadOnlyList<HoldingsCapture> captures)
     {
         var spyTwr = ComputeSpyTwr(spyBars, since);
-        var window = BookWindow(portfolioSnapshots, since, today);
-        decimal? bookTwr = window is { } w && w.Start.BrokerageInvestedUsd != 0m
-            ? Math.Round((w.End.BrokerageInvestedUsd - w.Start.BrokerageInvestedUsd) / w.Start.BrokerageInvestedUsd, 4)
+        var splitDays = portfolioSnapshots
+            .Where(s => s.BrokerageInvestedUsd is not null)
+            .Select(s => new SplitDay(s.Date, s.BrokerageInvestedUsd!.Value, s.Signals))
+            .ToList();
+        var window = BookWindow(splitDays, since, today);
+        decimal? bookTwr = window is { } w && w.Start.InvestedUsd != 0m
+            ? Math.Round((w.End.InvestedUsd - w.Start.InvestedUsd) / w.Start.InvestedUsd, 4)
             : null;
+        var splitWithheld = window is null
+            && portfolioSnapshots.Any(s => s.BrokerageInvestedUsd is null && s.Date >= since && s.Date <= today);
         var (holdings, span) = ComputeHoldingsBasedReturn(captures, since, today);
 
         if (spyTwr is null && bookTwr is null && holdings.Value is null)
@@ -110,7 +116,7 @@ public sealed class BookPerformanceService(
             holdingsDelta,
             holdings.Reason,
             holdings.MissingPriceSymbols is { Count: > 0 } ? holdings.MissingPriceSymbols : null,
-            BookHeadline(window, since, today));
+            BookHeadline(window, since, today, splitWithheld));
     }
 
     private static (HoldingsBasedReturnResult Result, CaptureSpan? Span) ComputeHoldingsBasedReturn(
@@ -152,16 +158,20 @@ public sealed class BookPerformanceService(
     }
 
     // The book side as M1 over the invested brokerage value. With no measurable window the figure is unavailable
-    // (SHORT_HISTORY); a zero start keeps the dollar change and withholds the percent (ZERO_BASE).
+    // (SHORT_HISTORY, or NO_SPLIT when the period has snapshot days whose split was not measured); a zero start
+    // keeps the dollar change and withholds the percent (ZERO_BASE).
     private static Headline BookHeadline(
-        (DailyPortfolioValue Start, DailyPortfolioValue End)? window, DateOnly since, DateOnly today)
+        (SplitDay Start, SplitDay End)? window, DateOnly since, DateOnly today, bool splitWithheld)
     {
         if (window is not { } w)
-            return HeadlineFactory.Change(null, null, HeadlineScope.InvestedBrokerage, since, today, false, HeadlineSignals.None);
+        {
+            var missing = splitWithheld ? HeadlineSignals.None with { NoSplit = true } : HeadlineSignals.None;
+            return HeadlineFactory.Change(null, null, HeadlineScope.InvestedBrokerage, since, today, false, missing);
+        }
 
         var signals = (w.Start.Signals ?? HeadlineSignals.None).Merge(w.End.Signals ?? HeadlineSignals.None);
         return HeadlineFactory.Change(
-            w.Start.BrokerageInvestedUsd, w.End.BrokerageInvestedUsd, HeadlineScope.InvestedBrokerage,
+            w.Start.InvestedUsd, w.End.InvestedUsd, HeadlineScope.InvestedBrokerage,
             w.Start.Date, w.End.Date, false, signals);
     }
 
@@ -183,10 +193,10 @@ public sealed class BookPerformanceService(
         return Math.Round((endBar.AdjClose - startBar.AdjClose) / startBar.AdjClose, 4);
     }
 
-    // The first and last rows of the period, or null when the history does not cover it: a missing end, an edge gap
-    // past the allowance, or a single day.
-    private static (DailyPortfolioValue Start, DailyPortfolioValue End)? BookWindow(
-        IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since, DateOnly today)
+    // The first and last split days of the period, or null when the history does not cover it: a missing end, an
+    // edge gap past the allowance, or a single day.
+    private static (SplitDay Start, SplitDay End)? BookWindow(
+        IReadOnlyList<SplitDay> snapshots, DateOnly since, DateOnly today)
     {
         var startSnapshot = snapshots.FirstOrDefault(s => s.Date >= since);
         var endSnapshot = snapshots.LastOrDefault();
@@ -212,6 +222,8 @@ public sealed class BookPerformanceService(
     }
 
     private readonly record struct CaptureSpan(DateOnly First, DateOnly Last);
+
+    private sealed record SplitDay(DateOnly Date, decimal InvestedUsd, HeadlineSignals? Signals);
 
     private static int AllowedEdgeGapDays(int periodDays) =>
         Math.Clamp(

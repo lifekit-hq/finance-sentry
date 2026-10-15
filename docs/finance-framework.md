@@ -349,7 +349,7 @@ them:
 | Unknown currency converted 1:1 (`CurrencyConverter.Convert` → `UNKNOWN_1TO1`) | DEGRADED + `FX_UNKNOWN_1TO1` (reason code live, R4) |
 | Historical FX replaced by today's rate (`TODAY_RATE`) or a seed-table rate (`SEED_TABLE`) | ESTIMATED + `FX_TODAY_RATE` (reason code live, R4) |
 | `HasStaleSleeves` on FIRE | DEGRADED + `STALE_SOURCE` |
-| "Book N/A" | UNAVAILABLE + `SHORT_HISTORY` or `NO_SPLIT` |
+| "Book N/A" | UNAVAILABLE + `NO_SPLIT` (the period has snapshot days but no measured cash/invested split to form the window) or `SHORT_HISTORY` (no measurable window otherwise) |
 | A measure's failure (`MeasureFailure`) on a change | the amount stands, the percent is null: `ZERO_BASE`, `NEGATIVE_BASE`, `SCOPE_CHANGED`, `SHORT_HISTORY` (a missing end: UNAVAILABLE), `NOT_MEASURABLE` |
 | (new) | `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`, `NON_CASH_INCLUDED`, `PRICE_CARRIED_FORWARD`, `RESIDUAL_ABOVE_TOLERANCE` |
 

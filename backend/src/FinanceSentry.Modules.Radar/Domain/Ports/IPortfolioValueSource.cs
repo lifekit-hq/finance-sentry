@@ -11,12 +11,15 @@ public interface IPortfolioValueSource
 {
     /// <summary>
     /// Daily invested brokerage values for the user from <paramref name="from"/> through <paramref name="to"/>,
-    /// ordered oldest→newest. Days with no cash/invested split are left out. Returns an empty list when no
-    /// day in the range has one.
+    /// ordered oldest→newest. A snapshot day with no cash/invested split is kept with a null
+    /// <see cref="DailyPortfolioValue.BrokerageInvestedUsd"/>, so a reader can tell "no split measured" from "no snapshot".
     /// </summary>
     Task<IReadOnlyList<DailyPortfolioValue>> GetAsync(
         Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default);
 }
 
-/// <summary>One day's invested brokerage value and the day's quality <see cref="Signals"/> (none when the source records none).</summary>
-public sealed record DailyPortfolioValue(DateOnly Date, decimal BrokerageInvestedUsd, HeadlineSignals? Signals = null);
+/// <summary>
+/// One snapshot day's invested brokerage value and the day's quality <see cref="Signals"/> (none when the source
+/// records none). <see cref="BrokerageInvestedUsd"/> is null on a day with no cash/invested split - never zero.
+/// </summary>
+public sealed record DailyPortfolioValue(DateOnly Date, decimal? BrokerageInvestedUsd, HeadlineSignals? Signals = null);
