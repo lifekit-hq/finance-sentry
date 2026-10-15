@@ -265,7 +265,7 @@ TWR and MWR differ because twice as much money was invested during the losing ha
 half. TWR ignores that, so it is the number to compare with SPY; MWR is the honest answer to "what did my
 money earn". Both are correct; they answer different questions. This example is golden fixture #1 for the
 measure engine (`MeasureEngineGoldenFixtureTests`). Its XIRR there is −1.328%, not the idealised −1.332%:
-the real dates give the deposit 184 of 365 days, not exactly half a year.
+the real dates put the deposit 181 days after the first flow (exponent 181/365), not exactly half a year.
 
 ### 3.6 The headline contract
 
