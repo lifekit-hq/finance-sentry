@@ -12,6 +12,9 @@ using FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.RevolutX;
 using FinanceSentry.Tests.Unit.Connections;
 using FluentAssertions;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -27,6 +30,7 @@ public class CryptoExchangeSyncJobTests
     private readonly Mock<IUserAlertPreferencesReader> _userPrefs = new(MockBehavior.Loose);
     private readonly IJobFailureStreakStore _failureStreaks = new InMemoryJobFailureStreakStore();
     private readonly Mock<IConnectionHealthShadow> _connectionHealth = new(MockBehavior.Loose);
+    private readonly Mock<IBackgroundJobClient> _backgroundJobs = new(MockBehavior.Loose);
     private readonly FakeTimeProvider _time = new(Start);
 
     // Both venues stay in shadow in the committed appsettings; the policy tests opt one in.
@@ -37,13 +41,13 @@ public class CryptoExchangeSyncJobTests
 
     private BinanceSyncJob CreateBinanceJob(IConnectionHealthShadow? shadow = null) =>
         new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks,
-            shadow ?? _connectionHealth.Object, new BinanceFailureClassifier(), HealthOptions.Monitor(_options), _time,
-            NullLogger<BinanceSyncJob>.Instance);
+            shadow ?? _connectionHealth.Object, new BinanceFailureClassifier(), HealthOptions.Monitor(_options),
+            _backgroundJobs.Object, _time, NullLogger<BinanceSyncJob>.Instance);
 
     private RevolutXSyncJob CreateRevolutXJob(IConnectionHealthShadow? shadow = null) =>
         new(_credentialRepo.Object, _syncHandler.Object, _alerts.Object, _userPrefs.Object, _failureStreaks,
-            shadow ?? _connectionHealth.Object, new RevolutXFailureClassifier(), HealthOptions.Monitor(_options), _time,
-            NullLogger<RevolutXSyncJob>.Instance);
+            shadow ?? _connectionHealth.Object, new RevolutXFailureClassifier(), HealthOptions.Monitor(_options),
+            _backgroundJobs.Object, _time, NullLogger<RevolutXSyncJob>.Instance);
 
     private static ExchangeCredential MakeCredential(Guid userId, string provider = CryptoExchangeProvider.Binance) =>
         ExchangeCredential.Create(userId, provider, [1], [2], [3], [4], [5], [6], 1);
@@ -784,5 +788,117 @@ public class CryptoExchangeSyncJobTests
         credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         credential.Health.LastSuccessAt.Should().Be(Start);
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(credential.UserId, provider, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Dormant cadence and suspect re-checks (S4) ──────────────────────────
+
+    private static RevolutXException RevolutX401() =>
+        new("Revolut X API error (HTTP 401): Unauthorized",
+            new HttpRequestException("Unauthorized", null, System.Net.HttpStatusCode.Unauthorized));
+
+    private List<(Job Job, IState State)> CaptureScheduled()
+    {
+        var scheduled = new List<(Job Job, IState State)>();
+        _backgroundJobs
+            .Setup(j => j.Create(It.IsAny<Job>(), It.IsAny<IState>()))
+            .Callback<Job, IState>((job, state) => scheduled.Add((job, state)))
+            .Returns("job-id");
+        return scheduled;
+    }
+
+    [Fact]
+    public async Task Active_SuspectFailure_LooksAgainAMinuteOn_ByTheVenuesOwnJob()
+    {
+        GivenPolicyDrives(CryptoExchangeProvider.RevolutX);
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenSyncFails(RevolutX401());
+
+        await RunPolicyTicksAsync(CryptoExchangeProvider.RevolutX, 1);
+
+        var (job, state) = scheduled.Should().ContainSingle().Subject;
+        job.Type.Should().Be(typeof(RevolutXSyncJob));
+        job.Method.Name.Should().Be(nameof(RevolutXSyncJob.RecheckSuspectAsync));
+        job.Args.Should().Equal(userId, 1, Start);
+        state.Should().BeOfType<ScheduledState>().Which.EnqueueAt
+            .Should().BeCloseTo(DateTime.UtcNow + TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Active_QuickLookSucceeds_ClearsTheSuspicion()
+    {
+        GivenPolicyDrives(CryptoExchangeProvider.RevolutX);
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        var credential = MakeCredential(userId, CryptoExchangeProvider.RevolutX);
+        GivenActive(CryptoExchangeProvider.RevolutX, credential);
+        _credentialRepo
+            .Setup(r => r.GetUnscopedAsync(userId, CryptoExchangeProvider.RevolutX, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(credential);
+        GivenSyncFails(RevolutX401());
+        await RunPolicyTicksAsync(CryptoExchangeProvider.RevolutX, 1);
+        scheduled.Clear();
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _syncHandler
+            .Setup(h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SyncExchangeHoldingsResult(1, DateTime.UtcNow));
+        await CreateRevolutXJob(ShadowRecorders.Create(_time, _options)).RecheckSuspectAsync(userId, recheck: 1, scheduledAt: Start);
+
+        credential.Health.SuspectSince.Should().BeNull();
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Shadow_SuspectFailure_SchedulesNoLook()
+    {
+        var scheduled = CaptureScheduled();
+        var userId = Guid.NewGuid();
+        GivenActive(CryptoExchangeProvider.RevolutX, MakeCredential(userId, CryptoExchangeProvider.RevolutX));
+        GivenSyncFails(RevolutX401());
+
+        // Shadow mode fails a run in which every user failed, as before.
+        await this.Invoking(t => t.RunPolicyTicksAsync(CryptoExchangeProvider.RevolutX, 1))
+            .Should().ThrowAsync<AggregateException>();
+
+        scheduled.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 4)]
+    public async Task Dormant_ActiveVenueSyncsOnceADay_ShadowVenueEveryTick(bool active, int expectedCalls)
+    {
+        if (active) GivenPolicyDrives(CryptoExchangeProvider.Binance);
+        var credential = MakeCredential(Guid.NewGuid());
+        credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Dormant,
+            ConsecutiveFailures = 700,
+            FirstFailureAt = Start.AddDays(-8),
+            LastFailureAt = Start.AddMinutes(-15),
+            LastFailureClass = FailureClass.Transient,
+        });
+        GivenActive(CryptoExchangeProvider.Binance, credential);
+        GivenSyncFails(new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500));
+
+        for (var i = 0; i < 4; i++)
+        {
+            if (i > 0) _time.Advance(Tick);
+            try
+            {
+                await CreateBinanceJob(ShadowRecorders.Create(_time, _options)).ExecuteAsync();
+            }
+            catch (AggregateException)
+            {
+                // Shadow mode fails a run in which every user failed, as before.
+            }
+        }
+
+        _syncHandler.Verify(
+            h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(expectedCalls));
     }
 }

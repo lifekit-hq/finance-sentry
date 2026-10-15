@@ -113,6 +113,9 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
         SyncStatus = "active";
         CurrentBalance = balance;
         LastSyncError = null;
+        // The state is kept so the first success still resolves the open alert, but the old failure no longer times a
+        // Dormant account's slowed cadence: the next scheduled run tries it.
+        Health = Health with { LastFailureAt = null };
     }
 
     public void MarkFailed(string? errorCode = null)
@@ -155,7 +158,7 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
     /// Heals an account after a successful reconnect/reauth. Unlike <see cref="MarkActive"/>,
     /// which only transitions from "syncing", this transitions from <b>any</b> status (notably
     /// "reauth_required"), re-points the account at the freshly linked TrueLayer connection, and
-    /// clears the stale error so the scheduler resumes syncing it on the next cycle.
+    /// clears the stale error (and the last failure on its health) so the scheduler resumes syncing it on the next cycle.
     /// </summary>
     public void MarkReconnected(Guid trueLayerConnectionId, decimal balance)
     {
@@ -163,6 +166,9 @@ public class BankAccount : Entity, IHasUpdatedAt, IUserOwned
         SyncStatus = "active";
         CurrentBalance = balance;
         LastSyncError = null;
+        // The state is kept so the first success still resolves the open alert, but the old failure no longer times a
+        // Dormant account's slowed cadence: the next scheduled run tries it.
+        Health = Health with { LastFailureAt = null };
     }
 
     public void ValidateInvariants()

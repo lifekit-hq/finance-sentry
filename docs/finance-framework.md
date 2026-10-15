@@ -739,11 +739,11 @@ bespoke engine): Microsoft.Extensions.Http.Resilience (Polly v8) inside the call
 
 | Class | Typical signals | In the call | Across runs | Who is told, and when |
 |---|---|---|---|---|
-| **Transient** | 5xx, 408, network errors, timeouts; IBKR's "backend down" 401 | Exponential backoff with jitter, safe methods (GET) only; 2 retries by default | The next scheduled run; a once-a-day source also looks again earlier (early re-checks below) | Nobody while Degraded. The outage alert once Failing (at least 3 failures and 2 h without success). Dormant after 7 days |
+| **Transient** | 5xx, 408, network errors, timeouts; IBKR's "backend down" 401 | Exponential backoff with jitter, safe methods (GET) only; 2 retries by default | The next scheduled run; a once-a-day source also looks again earlier (early re-checks below). Once Dormant, an active provider's scheduled runs try it once a day | Nobody while Degraded. The outage alert once Failing (at least 3 failures and 2 h without success). Dormant after 7 days |
 | **RateLimited** | 429; Monobank's rate-limit code; Flex 1018 | Wait as long as `Retry-After` asks if that fits the call's time budget; otherwise stop at once | No scheduled call before the time the provider named (`ConnectionHealth.NotBefore`, from `Retry-After`, as named; a bank sync is skipped, a sweep leaves the credential alone) | Counts like Transient; never a credential signal. A 429 that persists across runs reaches Failing like any outage |
 | **NotReady** | Flex 1003, "statement is not available" | Poll while the provider says it is still generating (Flex: the retries of 1003 and 1019 inside a run) | Flex reschedules itself sooner (every 2 h, until the next daily run) instead of waiting for it | Not counted until the last success (the connection's creation, before the first one) is older than the source's NotReady deadline (48 h for Flex); then like Transient. A source with no deadline counts it at once |
 | **Credential, definitive** | TrueLayer `invalid_grant` with a consent marker; Flex 1012–1015; a stored key that cannot be decrypted | Never retried | Scheduled calls pause, except one probe a day, until the person reconnects or a probe succeeds | The reconnect alert at once (ActionRequired) |
-| **Credential, suspect** | 401/403 without proof: Monobank 403, IBKR and Revolut X 401/403, Flex 1020 | Never retried (repeated failed sign-ins are what trigger account lockouts) | Later runs try again with a fresh session where the source has one (a once-a-day source: its early re-checks, so the confirming sighting comes the same day). A sighting at least 30 min after the first confirms it. Simultaneous failures across one bank's connections read as an outage | The reconnect alert once confirmed |
+| **Credential, suspect** | 401/403 without proof: Monobank 403, IBKR and Revolut X 401/403, Flex 1020 | Never retried (repeated failed sign-ins are what trigger account lockouts) | An active provider looks once more a minute after the failure that raised the suspicion (a success clears it there and then), and once more when the 30 min are up: one quick re-check and one confirming look per suspicion, never more (suspect re-checks below). Later runs also try again with a fresh session where the source has one (a once-a-day source: its early re-checks, so the confirming sighting comes the same day). A sighting at least 30 min after the first confirms it. Simultaneous failures across one bank's connections read as an outage | The reconnect alert once confirmed |
 | **ResourceGone** | TrueLayer 404 on one account | Never retried | A slower cadence | Failing, then Dormant, for that account only |
 | **Internal** | Parse errors; our own bugs | Never retried | The next run | Never the person; it goes to the operations path |
 | **Unknown** | Anything not classified | Only if the HTTP status is transient | The next run | Counts like Transient, with neutral alert wording |
@@ -768,6 +768,8 @@ makes its own:
 | Pause on ActionRequired | yes (every scheduled sync) | — |
 | Probe while ActionRequired | once a day, timed from `LastFailureAt` | shared (`ActionRequiredProbeInterval`) |
 | Failing after / Dormant after / Suspect confirmed after | 3 failures and 2 h / 7 days / 30 min (shared) | none |
+| Scheduled runs while Dormant | once a day, timed from `LastFailureAt`; active providers only | shared (`DormantSyncInterval`) |
+| Quick look at a suspect credential failure | 1 min after it, then the confirming look at 30 min; active providers only | shared (`SuspectQuickRetryDelay`; 0 turns the looks off); Monobank never under 60 s |
 
 **Early re-checks** (`ConnectionHealthSourceOptions.EarlyRechecks`, R12 PR 3). A source that runs once a day
 would otherwise reach Failing (3 failures and 2 h) on its third day. After a counted failure of a transient kind
@@ -780,12 +782,29 @@ which is not duplicated), a definitive credential failure (the pause), or a fail
 Failing or Dormant (the alert is out, and the next daily run picks up a recovery). An interval
 set in `ConnectionHealth:Sources:<provider>:EarlyRechecks` replaces the code default.
 
+**Dormant cadence and suspect re-checks** (connection-health slice S4), both only for a provider in
+`ConnectionHealth:ActiveProviders`; a shadow provider's schedule is untouched, and one `Connection health (shadow)`
+line says what either would have done. A Dormant connection is paused by the same gate as ActionRequired
+(`ConnectionHealthPolicy.ScheduledRunPausedUntil`, `DormantPausedUntil`): one scheduled run a day, timed from the
+last failure, so a failed run renews the pause, a success goes Healthy and resolves the alert through the usual path,
+and a reconnect (which clears the last failure) lets the next run through. The bank scheduler and the discovery pass
+apply it to Dormant accounts and connections the same way. A scheduled run whose failure raises a suspect credential
+signal schedules one look `SuspectQuickRetryDelay` (1 min) later; if that look fails too, it confirms nothing and
+schedules the confirming look for when the confirmation window ends (`ConnectionHealthPolicy.SuspectRecheckAfter`).
+Each look is the source's own sync for that one connection, scheduled with `BackgroundJob.Schedule`
+(`IBKRSyncJob.RecheckSuspectAsync`, the venue jobs' `RecheckSuspectAsync`, `ScheduledSyncJob.ExecuteSuspectRecheckAsync`
+for a bank account) and gated like the scheduled run; it does nothing once the suspicion is confirmed, cleared or
+Dormant, the connection was tried after the look was scheduled (so of a Monobank token's cards that each schedule one,
+only the last calls), or the provider has left `ActiveProviders`. That is one sign-in more than the schedule would make per
+suspicion, and no more. IBKR Flex keeps its own early re-checks for a suspect 1020 (its first look, 1 h on, already
+confirms).
+
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
 settings the way Flex does in `BrokerageSyncModule`):
 
 | Source | In the call | Across runs | Classification | Settings (`ConnectionHealth:Sources:<source>`) | Policy-driven alerts |
 |---|---|---|---|---|---|
-| IBKR | No retries (signed); drops its cached session token on a 401/403 | Every 15 min; ActionRequired pauses it, one probe a day | 401/403 suspect; "backend down" 401 transient | shared defaults | Yes |
+| IBKR | No retries (signed); drops its cached session token on a 401/403 | Every 15 min; ActionRequired pauses it, one probe a day; Dormant, one run a day; a suspect 401/403 looked at again after 1 min and at 30 min | 401/403 suspect; "backend down" 401 transient | shared defaults | Yes |
 | IBKR Flex | No retries; limiter 1 call/s and 10/min; polls while generating | Daily 06:00; early re-checks after 1 h and 4 h; NotReady retried every 2 h until the next run | 1012–1015 definitive; 1020 suspect; 1003 NotReady; 1018 RateLimited; 1001, 1004–1009, 1019, 1021 transient | `EarlyRechecks` 1 h, 4 h; `NotReadyDeadline` 48 h; `NotReadyRetryAfter` 2 h | Shadow (`ibkr-flex` not yet in `ActiveProviders`) |
 | Monobank | Only 429, within 180 s | Per-account schedule, every 30 min | 403 suspect; rate limit RateLimited | shared defaults | Shadow |
 | TrueLayer | 2 retries on GETs; the token POST never | Same schedule | `invalid_grant` with consent marker definitive; 401/403 suspect; 404 ResourceGone | shared defaults | Shadow |

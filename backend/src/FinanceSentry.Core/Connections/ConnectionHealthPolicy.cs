@@ -18,7 +18,11 @@ namespace FinanceSentry.Core.Connections;
 /// connected); past it, it counts like a transient failure.</item>
 /// <item>An internal failure is ours, not the provider's: it leaves the health as it was.</item>
 /// <item>A scheduled run skips an ActionRequired connection (<see cref="ScheduledRunPausedUntil"/>), except for one
-/// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.</item>
+/// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.
+/// An active provider's Dormant connection is slowed the same way, to one run per
+/// <see cref="ConnectionHealthOptions.DormantSyncInterval"/> (<see cref="DormantPausedUntil"/>).</item>
+/// <item>A suspect credential failure is looked at again twice and no more (<see cref="SuspectRecheckAfter"/>): soon, so a
+/// blip clears in minutes, and once the confirmation window has passed, so a real loss is confirmed on time.</item>
 /// </list>
 /// </summary>
 public static class ConnectionHealthPolicy
@@ -118,25 +122,86 @@ public static class ConnectionHealthPolicy
     /// connection with no failure on record has nothing to time from and is probed at once. A probe may start
     /// <see cref="ProbeSlack"/> early.</item>
     /// </list>
-    /// A run the person triggers does not ask: it always goes ahead.
+    /// With <paramref name="slowDormant"/> (the provider is in <see cref="ConnectionHealthOptions.ActiveProviders"/>), a
+    /// Dormant connection is paused too (<see cref="DormantPausedUntil"/>). A run the person triggers does not ask: it
+    /// always goes ahead.
     /// </summary>
     public static DateTimeOffset? ScheduledRunPausedUntil(
-        ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options)
+        ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options, bool slowDormant = false)
     {
         ArgumentNullException.ThrowIfNull(health);
         ArgumentNullException.ThrowIfNull(options);
 
         var notBefore = NotBeforePausedUntil(health, now);
+        var probeAt = health.State == ConnectionHealthState.ActionRequired
+            ? NextRunAt(health, now, options.ActionRequiredProbeInterval)
+            : null;
+        var dormant = slowDormant ? DormantPausedUntil(health, now, options) : null;
 
-        DateTimeOffset? probeAt = null;
-        if (health.State == ConnectionHealthState.ActionRequired && health.LastFailureAt is { } lastFailureAt)
+        return LaterOf(LaterOf(notBefore, probeAt), dormant);
+    }
+
+    /// <summary>
+    /// When a Dormant connection's slowed cadence next lets a scheduled run try it, or null when it may go ahead now
+    /// (or is not Dormant): one run per <see cref="ConnectionHealthOptions.DormantSyncInterval"/>, timed from
+    /// <see cref="ConnectionHealth.LastFailureAt"/> as the ActionRequired probe is, so a failed run renews the pause and a
+    /// reconnect that clears the last failure lets the next run through. A success leaves Dormant, so the cadence is
+    /// back at once. Whether it applies is the caller's: only to a provider in
+    /// <see cref="ConnectionHealthOptions.ActiveProviders"/>.
+    /// </summary>
+    public static DateTimeOffset? DormantPausedUntil(ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(health);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return health.State == ConnectionHealthState.Dormant
+            ? NextRunAt(health, now, options.DormantSyncInterval)
+            : null;
+    }
+
+    /// <summary>
+    /// How long until the next look at a suspect credential failure, or null for none. <paramref name="recheck"/> is how
+    /// many looks have run (0 after the scheduled run's own attempt); <paramref name="before"/> and
+    /// <paramref name="after"/> are the health around the attempt just made.
+    /// <list type="bullet">
+    /// <item>The attempt that raised the suspicion earns a quick look after
+    /// <see cref="ConnectionHealthOptions.SuspectQuickRetryDelay"/>: a success clears it at once.</item>
+    /// <item>A quick look that leaves it standing earns the confirming look, once
+    /// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/> has passed since it was raised.</item>
+    /// </list>
+    /// Never more: a sign-in is not repeated beyond that, since failed ones are what lock accounts. Nothing once the
+    /// failure is confirmed (ActionRequired), cleared, or the connection is Dormant, and never sooner than
+    /// <see cref="ConnectionHealth.NotBefore"/>. Whether a look is made is the caller's: only for a provider in
+    /// <see cref="ConnectionHealthOptions.ActiveProviders"/>.
+    /// </summary>
+    public static TimeSpan? SuspectRecheckAfter(
+        ConnectionHealth before, ConnectionHealth after, int recheck, DateTimeOffset now, ConnectionHealthOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (after.SuspectSince is not { } since
+            || after.State is ConnectionHealthState.ActionRequired or ConnectionHealthState.Dormant
+            || options.SuspectQuickRetryDelay <= TimeSpan.Zero)
+            return null;
+
+        TimeSpan delay;
+        switch (recheck)
         {
-            var nextProbeAt = lastFailureAt + options.ActionRequiredProbeInterval;
-            if (now < nextProbeAt - ProbeSlack)
-                probeAt = nextProbeAt;
+            case 0 when before.SuspectSince is null:
+                delay = options.SuspectQuickRetryDelay;
+                break;
+            case 1:
+                delay = since + options.SuspectConfirmationWindow - now;
+                if (delay <= TimeSpan.Zero)
+                    return null;
+                break;
+            default:
+                return null;
         }
 
-        return LaterOf(notBefore, probeAt);
+        return after.NotBefore is { } notBefore && notBefore - now > delay ? notBefore - now : delay;
     }
 
     /// <summary>
@@ -161,6 +226,17 @@ public static class ConnectionHealthPolicy
         source?.NotReadyDeadline is { } deadline
         && (current.LastSuccessAt ?? connectedAt) is { } since
         && at - since < deadline;
+
+    // The next run of a paused connection, timed from its last failure; null when it is due (it may start ProbeSlack
+    // early) or there is no failure on record to time from.
+    private static DateTimeOffset? NextRunAt(ConnectionHealth health, DateTimeOffset now, TimeSpan interval)
+    {
+        if (health.LastFailureAt is not { } lastFailureAt)
+            return null;
+
+        var nextRunAt = lastFailureAt + interval;
+        return now < nextRunAt - ProbeSlack ? nextRunAt : null;
+    }
 
     private static DateTimeOffset? LaterOf(DateTimeOffset? a, DateTimeOffset? b) =>
         a is null ? b : b is null ? a : a >= b ? a : b;

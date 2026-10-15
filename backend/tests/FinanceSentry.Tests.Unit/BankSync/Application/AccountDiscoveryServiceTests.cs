@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Unit.BankSync.Application;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Infrastructure.Encryption;
 using FinanceSentry.Modules.BankSync.Application.Connections;
 using FinanceSentry.Modules.BankSync.Application.Services;
@@ -402,7 +403,41 @@ public class AccountDiscoveryServiceTests
         created.Should().Be(0);
         h.MonobankAdapter.Verify(
             a => a.GetClientInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Only the Dormant-cadence read; nothing is recorded for a listing that was not made.
+        h.ConnectionHealth.Verify(
+            c => c.DormantPausedUntil(It.IsAny<BankConnectionRef>(), It.IsAny<ConnectionHealth>()), Times.Once);
         h.ConnectionHealth.VerifyNoOtherCalls();
+    }
+
+    // ── Dormant cadence (S4): a Dormant connection of an active provider is listed once a day ──
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_DormantConnectionsPaused_ListsNeither()
+    {
+        var h = BuildSut();
+        SetupTrueLayer(h, "new-acc");
+        SetupMonobank(h, new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+        h.ConnectionHealth
+            .Setup(c => c.DormantPausedUntil(It.IsAny<BankConnectionRef>(), It.IsAny<ConnectionHealth>()))
+            .Returns(new DateTimeOffset(2026, 10, 16, 8, 0, 0, TimeSpan.Zero));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(0);
+        h.TrueLayerClient.Verify(c => c.ListAccountsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.MonobankAdapter.Verify(
+            a => a.GetClientInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DiscoverNewAccountsAsync_DormantConnectionNotPaused_IsListedAsBefore()
+    {
+        var h = BuildSut();
+        SetupMonobank(h, new MonobankAccountInfo("new-mono", "Card", "white", "5678", 980, 2000, 0));
+
+        var created = await h.Sut.DiscoverNewAccountsAsync();
+
+        created.Should().Be(1);
     }
 
     [Fact]
