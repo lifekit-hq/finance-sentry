@@ -594,8 +594,8 @@ Hangfire's `BackgroundJob.Schedule` at the first listed interval, and each look 
 next one: the list is the bound, so the chain ends (Flex: 1 h, then 4 h). A look goes through the same gate as
 the daily run, so it waits out `NotBefore` and a pause, and does nothing once the connection is healthy again.
 None follows a success, a RateLimited answer (it waits for `NotBefore`), a NotReady one (it has its own retry,
-which is not duplicated), a definitive credential failure (the pause), or a connection that is already Failing
-or Dormant (the alert is out, and the next daily run picks up a recovery). An interval
+which is not duplicated), a definitive credential failure (the pause), or a failure that leaves the connection
+Failing or Dormant (the alert is out, and the next daily run picks up a recovery). An interval
 set in `ConnectionHealth:Sources:<provider>:EarlyRechecks` replaces the code default.
 
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
