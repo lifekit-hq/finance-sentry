@@ -328,7 +328,8 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   nullable, additive; zero-quantity holdings are left out; a sleeve carried forward from the previous row
   folds that row's status in), a backfilled row stores the worst of its accounts' statuses with
   `TODAY_RATE` as the floor (it is valued at today's rate), a row with none recorded falls back to
-  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows (written since PR 2, read from PR 3) will take over the stored field. A
+  `IsApproximate` reading `FX_TODAY_RATE`. Each per-source row (R8) carries its own FX reasons, returned per source in
+  history's `sources`; the row-level `FxReasons` still reads `fx_status`. A
   brokerage or crypto row's USD value is converted at sync time, so its status is re-derived from the
   rate table in force at read. `CurrencyConverter.IsKnown` remains for callers outside these paths.
 - **Net-worth history in a non-USD base converts each row at its own date's rate (C4).** One batched,
@@ -841,6 +842,19 @@ are closed periods.
   previous day's value is carried forward and the sleeve is listed in `StaleSleeves`
   (`NetWorthSnapshotService`). The baseline is the latest snapshot *strictly before* the
   snapshot date, so a same-day refresh never carries forward from itself.
+- **Per-source figures on history rows** (`sources` on `/net-worth/history` and the MCP
+  `get_net_worth_history` tool, additive; framework §5.6 step 3): each row lists its sources -
+  the three sleeves first, then any other registered source - with the figure the row counted for
+  each, its health and its typed reasons. Read through one adapter (`SnapshotSources`): a snapshot
+  with `net_worth_snapshot_sources` rows reads health and reasons from them; one taken before those
+  rows existed reads the three sleeve columns and `StaleSleeves` (a listed sleeve is DEGRADED with
+  `STALE_SOURCE`). A carried-forward or unread sleeve's counted figure is its column (the carried
+  value), never the row's own reading, so the sleeves' figures always add up to `totalNetWorth`.
+  Figures are USD like the snapshot's totals; a non-USD base converts them at the row's own rate
+  (C4). Only the three sleeves count in `totalNetWorth` until the columns are frozen (R8 PR 4); a
+  source beyond them is listed (null figure when its read failed) but not summed. `staleSleeves`
+  is still returned, derived from the sources (sleeves only). Stale state everywhere (history and
+  hero badges, FIRE, the brokerage history reader, the split backfill) is `STALE_SOURCE` per source.
 - **Cash / invested split per snapshot** (`net_worth_snapshots.cash_total`, `brokerage_invested`,
   `crypto_invested`; exposed as `cashTotal` / `brokerageInvested` / `cryptoInvested` on
   `/net-worth/history` and the MCP `get_net_worth_history` tool): `brokerageInvested` and
@@ -860,7 +874,7 @@ are closed periods.
   own stored total minus that day's Risk-run invested value. The two are captured at different
   moments, so intraday moves can shift a little between cash and invested. That table keeps 180 days (about 2026-07-08 onward at
   the time of writing), so days before it keep a null split. Rows flagged `IsApproximate` or
-  with a non-empty brokerage/crypto sleeve in `StaleSleeves` are skipped (their stored sleeve value is not
+  with a stale brokerage or crypto source (per-source rows, or `StaleSleeves` on older rows) are skipped (their stored sleeve value is not
   what the positions describe), as is a day where a sleeve's stored total is non-zero but
   `holding_snapshots` holds no positions for it (a source that failed when Risk ran), so a stale
   book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
@@ -1087,7 +1101,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   the tolerance) is UNAVAILABLE with `NO_SPLIT` when the period has snapshot days whose cash/invested split was
   not measured (the portfolio value port keeps those days, marked by a null invested value, and the calculation
   still ignores them) and with `SHORT_HISTORY` otherwise; a zero opening value keeps the dollar change and
-  withholds the percent with `ZERO_BASE`. The two end rows' `StaleSleeves` (brokerage only), `IsApproximate`
+  withholds the percent with `ZERO_BASE`. The two end rows' brokerage source staleness (per-source rows, or `StaleSleeves` before them), `IsApproximate`
   and `fx_status` become its quality and reasons. No scope change is detected on this series, so the record
   never carries `SCOPE_CHANGED`. The holdings-based return below carries no headline record yet.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
@@ -1153,7 +1167,8 @@ reaches the financial-independence target. Computed on read; nothing is persiste
   today plus the months rounded up.
 - Unlike the 12-month net-worth projection tile, contributions compound here, because at a FIRE
   horizon (years to decades) ignoring compounding is most of the answer.
-- `HasStaleSleeves` mirrors the snapshot's `StaleSleeves` (§8): the figure is shown, with a notice.
+- `HasStaleSleeves` is true when any of the latest snapshot's sources is stale (`STALE_SOURCE` on its
+  per-source rows, or `StaleSleeves` on a snapshot taken before them, §8): the figure is shown, with a notice.
 - **Currency.** The handler computes in USD; `WealthController` re-expresses the five amounts in the profile base currency and returns `baseCurrency` (§3). The monthly brief reads the handler directly and stays USD.
 - **Monthly brief.** `FireBriefJob` (1st of the month, 09:00 UTC) reads this same projection per user and
   raises an Info alert with a 10-cell gauge (`NetWorth ÷ Target`, clamped to 0-100%) plus the same

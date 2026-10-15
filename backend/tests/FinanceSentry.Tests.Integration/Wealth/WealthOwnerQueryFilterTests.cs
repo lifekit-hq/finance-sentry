@@ -132,6 +132,36 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
     }
 
     [DockerRequiredFact]
+    public async Task Source_row_reads_follow_the_acting_person_and_the_unscoped_read_names_its_user()
+    {
+        var snapshotA = NewSnapshot(_userA, Today);
+        var snapshotB = NewSnapshot(_userB, Today);
+        await SeedAsync(snapshotA, snapshotB);
+        await using (var seed = CreateContext())
+        {
+            seed.NetWorthSnapshotSources.AddRange(
+                new NetWorthSnapshotSource { Id = Guid.NewGuid(), SnapshotId = snapshotA.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 1_000m, Health = SourceHealth.Complete },
+                new NetWorthSnapshotSource { Id = Guid.NewGuid(), SnapshotId = snapshotB.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 2_000m, Health = SourceHealth.Complete });
+            await seed.SaveChangesAsync();
+        }
+
+        Guid[] both = [snapshotA.Id, snapshotB.Id];
+        await using (var asA = CreateContext(_userA))
+        {
+            var repo = new NetWorthSnapshotRepository(asA);
+            (await repo.GetSourcesAsync(_userA, both)).Select(r => r.Total).Should().Equal(1_000m);
+            (await repo.GetSourcesAsync(_userB, both)).Should().BeEmpty("naming another person does not lift the owner scope");
+        }
+
+        await using var asNoOne = CreateContext();
+        var unscoped = new NetWorthSnapshotRepository(asNoOne);
+        (await unscoped.GetSourcesAsync(_userA, both)).Should().BeEmpty();
+        (await unscoped.GetSourcesUnscopedAsync(_userA, both)).Select(r => r.Total).Should().Equal(
+            [1_000m], "the unscoped read keeps its own user predicate");
+        (await unscoped.GetSourcesUnscopedAsync(_userA, [])).Should().BeEmpty();
+    }
+
+    [DockerRequiredFact]
     public async Task Snapshot_job_with_no_person_writes_one_row_per_registered_source()
     {
         var banking = new Mock<IBankingTotalsReader>();

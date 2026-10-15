@@ -72,6 +72,32 @@ public class GetFireProjectionQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_FlagsStaleSleeves_FromThePerSourceRows_WhenTheSnapshotHasThem()
+    {
+        var snapshot = Snapshot(100_000m, staleSleeves: null);
+        _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(snapshot);
+        _snapshots.Setup(r => r.GetSourcesUnscopedAsync(
+                UserId, It.Is<IReadOnlyCollection<Guid>>(ids => ids.Single() == snapshot.Id), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new NetWorthSnapshotSource { SnapshotId = snapshot.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 100_000m },
+                new NetWorthSnapshotSource
+                {
+                    SnapshotId = snapshot.Id, SourceId = "inzhur", Kind = EconomyKind.Fund,
+                    Health = SourceHealth.Unavailable, Reasons = [SourceReasons.StaleSource],
+                },
+            ]);
+        _monthlyFlow.Setup(r => r.GetMonthlyFlowAsync(UserId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ThreeCompleteMonths(outflowUsd: 3_000m, netUsd: 1_000m));
+        _assumptions.Setup(r => r.GetAsync(UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FireAssumptions(0.04m, 0.05m));
+
+        var result = await CreateHandler().Handle(new GetFireProjectionQuery(UserId), CancellationToken.None);
+
+        result.HasStaleSleeves.Should().BeTrue("a source the rows mark STALE_SOURCE degrades the projection");
+        result.CurrentNetWorth.Should().Be(100_000m);
+    }
+
+    [Fact]
     public async Task Handle_ExcludesCurrentInProgressMonth_FromTheMedianWindow()
     {
         _snapshots.Setup(r => r.GetLatestByUserIdUnscopedAsync(UserId, It.IsAny<CancellationToken>()))

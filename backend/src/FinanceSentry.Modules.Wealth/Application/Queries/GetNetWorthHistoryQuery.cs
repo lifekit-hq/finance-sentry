@@ -19,7 +19,22 @@ public record NetWorthSnapshotDto(
     decimal? CashTotal = null,
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null,
-    IReadOnlyList<string>? FxReasons = null);
+    IReadOnlyList<string>? FxReasons = null,
+    IReadOnlyList<NetWorthSourceDto>? Sources = null);
+
+/// <summary>
+/// One source's part of a history row (framework §5.6): <c>Total</c> is the figure the row counted for it (a
+/// carried-forward sleeve's carried figure; null only for a source outside the three sleeves whose read failed),
+/// <c>Health</c> COMPLETE / ESTIMATED / DEGRADED / UNAVAILABLE and <c>Reasons</c> its typed codes
+/// (<c>STALE_SOURCE</c>, <c>FX_TODAY_RATE</c>, <c>FX_UNKNOWN_1TO1</c>). A row taken before per-source rows were
+/// stored lists the three sleeves from its columns, with <c>STALE_SOURCE</c> on the ones it carried forward.
+/// </summary>
+public record NetWorthSourceDto(
+    string SourceId,
+    string Kind,
+    decimal? Total,
+    HeadlineQuality Health,
+    IReadOnlyList<string> Reasons);
 
 /// <summary>
 /// An account or connection that entered or left the book inside the returned window: <c>Kind</c> is
@@ -50,19 +65,23 @@ public class GetNetWorthHistoryQueryHandler(
     public async Task<NetWorthHistoryResponse> Handle(GetNetWorthHistoryQuery query, CancellationToken cancellationToken)
     {
         var snapshots = await _repository.GetByUserIdAsync(query.UserId, query.From, query.To, cancellationToken);
+        var withSources = SnapshotSources.OfEach(
+            snapshots,
+            await _repository.GetSourcesAsync(query.UserId, [.. snapshots.Select(s => s.Id)], cancellationToken));
 
-        var dtos = snapshots
-            .Select(s => new NetWorthSnapshotDto(
-                s.SnapshotDate, s.BankingTotal, s.BrokerageTotal,
-                s.CryptoTotal, s.TotalNetWorth, s.Currency, s.StaleSleeves, s.IsApproximate,
-                s.CashTotal, s.BrokerageInvested, s.CryptoInvested,
+        var dtos = withSources
+            .Select(x => new NetWorthSnapshotDto(
+                x.Snapshot.SnapshotDate, x.Snapshot.BankingTotal, x.Snapshot.BrokerageTotal,
+                x.Snapshot.CryptoTotal, x.Snapshot.TotalNetWorth, x.Snapshot.Currency, x.Sources.StaleSleeves,
+                x.Snapshot.IsApproximate, x.Snapshot.CashTotal, x.Snapshot.BrokerageInvested, x.Snapshot.CryptoInvested,
                 // A measured row carries the status its snapshot recorded; a reconstructed row (none recorded)
                 // is valued at today's rate rather than the rate of its own day.
-                (s.FxStatus ?? (s.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact)).ToReasons()))
+                (x.Snapshot.FxStatus ?? (x.Snapshot.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact)).ToReasons(),
+                [.. x.Sources.Sources.Select(ToDto)]))
             .ToList();
 
         // A change across the window includes accounts that joined or left it; the dashboard reads this to
-        // state the amount without a percentage. Removal is approximate until per-source rows exist (R8).
+        // state the amount without a percentage. Removal is approximate: the scope readers report it, not the per-source rows.
         var scopeChanges = new List<NetWorthScopeChangeDto>();
         if (dtos.Count > 0)
         {
@@ -76,25 +95,38 @@ public class GetNetWorthHistoryQueryHandler(
             }
         }
 
-        return new NetWorthHistoryResponse(dtos, dtos.Count > 0, scopeChanges, ChangeHeadline(snapshots, scopeChanges.Count > 0));
+        return new NetWorthHistoryResponse(
+            dtos, dtos.Count > 0, scopeChanges, ChangeHeadline(withSources, scopeChanges.Count > 0));
     }
 
+    private static NetWorthSourceDto ToDto(SnapshotSourceFigure source)
+        => new(source.SourceId, source.Kind.ToString(), source.Total, Quality(source.Health), source.Reasons);
+
+    // A source's health is the framework's quality vocabulary (§3.6), named the same way a headline's is.
+    private static HeadlineQuality Quality(SourceHealth health) => health switch
+    {
+        SourceHealth.Estimated => HeadlineQuality.Estimated,
+        SourceHealth.Degraded => HeadlineQuality.Degraded,
+        SourceHealth.Unavailable => HeadlineQuality.Unavailable,
+        _ => HeadlineQuality.Complete,
+    };
+
     // The repository returns the window in date order: the change runs from its first row to its last.
-    private static Headline? ChangeHeadline(IReadOnlyList<NetWorthSnapshot> snapshots, bool scopeChanged)
+    private static Headline? ChangeHeadline(
+        IReadOnlyList<(NetWorthSnapshot Snapshot, SnapshotSources Sources)> snapshots, bool scopeChanged)
     {
         if (snapshots.Count == 0)
             return null;
 
-        var first = snapshots[0];
-        var last = snapshots[^1];
+        var (first, firstSources) = snapshots[0];
+        var (last, lastSources) = snapshots[^1];
         if (snapshots.Count == 1)
         {
             return HeadlineFactory.Change(
                 null, null, HeadlineScope.Umbrella, first.SnapshotDate, first.SnapshotDate, false, HeadlineSignals.None);
         }
 
-        var signals = HeadlineSignals.FromSnapshot(first.StaleSleeves, first.IsApproximate, first.FxStatus)
-            .Merge(HeadlineSignals.FromSnapshot(last.StaleSleeves, last.IsApproximate, last.FxStatus));
+        var signals = firstSources.Signals(first).Merge(lastSources.Signals(last));
         return HeadlineFactory.Change(
             first.TotalNetWorth, last.TotalNetWorth, HeadlineScope.Umbrella,
             first.SnapshotDate, last.SnapshotDate, scopeChanged, signals);

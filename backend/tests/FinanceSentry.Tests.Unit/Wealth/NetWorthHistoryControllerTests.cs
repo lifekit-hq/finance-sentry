@@ -112,6 +112,30 @@ public class NetWorthHistoryControllerTests
     }
 
     [Fact]
+    public async Task GetHistory_ConvertsEachSourcesTotalAtTheRowsRate_AndKeepsItsHealthAndReasons()
+    {
+        using var _ = FxTableScope.Seed();
+        var rates = Eur((Friday, 1.10m));
+        var day = Day(Friday) with
+        {
+            Sources =
+            [
+                new NetWorthSourceDto("banking", "Bank", 1_100m, HeadlineQuality.Complete, []),
+                new NetWorthSourceDto("crypto", "CryptoVenue", 0m, HeadlineQuality.Degraded, ["STALE_SOURCE"]),
+                new NetWorthSourceDto("inzhur", "Fund", null, HeadlineQuality.Unavailable, ["STALE_SOURCE"]),
+            ],
+        };
+
+        var row = (await GetHistoryAsync("EUR", rates, day)).Snapshots.Single();
+
+        row.Sources!.Select(s => s.Total).Should().Equal(1_100m / 1.10m, 0m, null);
+        row.Sources!.Select(s => s.Health).Should().Equal(
+            HeadlineQuality.Complete, HeadlineQuality.Degraded, HeadlineQuality.Unavailable);
+        row.Sources![1].Reasons.Should().Equal("STALE_SOURCE");
+        row.Sources![0].Total.Should().Be(row.TotalNetWorth, "the one counted source is the whole row");
+    }
+
+    [Fact]
     public async Task GetHistory_AsksForTheWholeRangeInOneLookup()
     {
         using var _ = FxTableScope.Seed();

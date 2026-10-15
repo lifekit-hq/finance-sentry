@@ -73,10 +73,11 @@ rule or shape agreed but not implemented), **missing**.
        Presentation: dashboard · accounts · investments · MCP tools · briefs
 ```
 
-This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1, and a
-per-source row written beside every snapshot, R8 PR 2) and bottom (dashboard, MCP, briefs) are wired. The
-measure engine is built for M1-M6 and M9 (3.4); the headline record (3.6) is built in the backend and MCP and
-calls M1 for the figures that are changes. Nothing reads the per-source rows yet (R8 PR 3).
+This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1, a
+per-source row written beside every snapshot, R8 PR 2, and read back by history, the dashboard, MCP and FIRE,
+R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the
+headline record (3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The stored
+totals are still the three sleeve columns until R8 PR 4 freezes them.
 
 Three rules keep the layers apart:
 
@@ -121,7 +122,8 @@ Two things already right and kept:
   per row, zero-quantity holdings left out as the wealth sources do), history maps it (a carried-forward
   sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
   `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
-  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows (written since PR 2, read from PR 3) will take over this field. A brokerage
+  `IsApproximate` reading `FX_TODAY_RATE`. Each per-source row carries its own FX reasons, returned per source in history's `sources` since R8 PR 3; the
+  row-level `FxReasons` still reads `fx_status`. A brokerage
   or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
   in force when it is read. Display wording is R7.
 - **Dated display conversion of history (C4, done).** A non-USD base shows each net-worth history row at the
@@ -394,8 +396,8 @@ COMPLETE shows nothing, ESTIMATED reads "Estimated", DEGRADED reads "Stale" (a `
 `core/errors/headline-reasons.registry.ts` and resolved through `ErrorMessageService` (an unknown code gets a
 generic line), plus `asOf` and `coverage` when the figure is not complete. The badge and its sheet hold a 44 x 44
 px hit area. The ad-hoc stale alert under the dashboard chart (`netWorthStaleNotice`) is gone: the
-snapshot's `staleSleeves` becomes a `STALE_SOURCE` reason on the net-worth headline when the API's own record has
-none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
+latest history row's stale sources (its `sources` marked `STALE_SOURCE`; `staleSleeves` on an older API build) become
+`STALE_SOURCE` reasons on the net-worth headline when the API's own record has none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
 connection is no longer buried mid-list, finding 5). The dashboard's "Change" line wears the `changeHeadline` badge; its figure still comes from the snapshots (G3 stays open).
 The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection carries a record.
 
@@ -453,7 +455,7 @@ verbatim.
 **Status: partial.** The registry is built (R8 PR 1, §5.6): the banking, brokerage and crypto readers are
 registered as `IWealthSource` (`BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource`) and
 `BookFiguresService` sums whatever is registered; the snapshot job writes one `net_worth_snapshot_sources` row
-per registered source (R8 PR 2). The contract below is still the target: today a source
+per registered source (R8 PR 2), which history, the dashboard, MCP and FIRE read back (R8 PR 3). The contract below is still the target: today a source
 returns `WealthSourceReading` (USD cash, invested positions, worst FX status), not the full
 `SourceSnapshot`, and has no `asOf`, native units, reliability or events.
 
@@ -643,8 +645,26 @@ in every consumer.
      carry the figures read at that moment, like their snapshot columns. The history reconstruction command
      (`BackfillNetWorthHistoryCommand`, banking only, rebuilt from transactions) writes no per-source rows: it
      has no per-source figures without further provider reads.
-3. **Read per source. Remaining.** History, the dashboard and MCP read the per-source rows. `StaleSleeves` gives way
-   to per-source health and reasons.
+3. **Read per source. Done.** One adapter, `SnapshotSources` (Wealth `Domain`), is the only reader of a stored
+   snapshot's sources: a snapshot with rows reads each source's health and reasons from them; one taken before
+   PR 2 (no rows) reads the three sleeve columns and `StaleSleeves` exactly as before (a listed sleeve is
+   `Degraded` with `STALE_SOURCE`, the rest `Complete`). A sleeve's counted figure is its column whenever its row
+   is stale or has no total (a carried-forward row holds this run's reading, not the carried one), so every
+   figure is unchanged; a sleeve with no row of its own falls back to its column. Readers take stale state from
+   the sources (`STALE_SOURCE` per source), never by parsing the column:
+   - **Net-worth history** (`GetNetWorthHistoryQuery`, the API and the `get_net_worth_history` MCP tool) returns
+     an additive `sources` list per row (`sourceId`, `kind`, `total`, `health` in the headline vocabulary,
+     `reasons`), the three sleeves first. `staleSleeves` is still returned, derived from the sources (sleeves
+     only, legacy order). The change headline, each MCP row's headline and the dashboard hero's stale badge take
+     one `STALE_SOURCE` per stale source, so a source beyond the sleeves is named too. A non-USD base converts
+     each source's total at the row's rate (C4); the conversion's own reason stays row-level in `fxReasons`.
+   - **FIRE** (`HasStaleSleeves`), the **brokerage history reader** (Radar portfolio value; only the brokerage
+     source's own staleness reaches its signals) and the **split backfill** read stale state from the sources.
+   - `GetSourcesAsync` (Owner-filtered) and `GetSourcesUnscopedAsync` (jobs and cross-module readers, own
+     `UserId` predicate) read the rows for a window in one query. `SnapshotSourcesTests` pins that a legacy
+     snapshot gives the same stale state and signals as its columns, and the history handler test that a mixed
+     window (pre-PR-2 day and a day with rows, a carried-forward source) returns the same figures and change
+     headline as the column formula. The legacy columns are still written; nothing is migrated or backfilled.
 4. **Freeze the old columns. Remaining.** Keep `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` for
    history, and stop extending them. The first new economy comes after this step.
 
@@ -757,7 +777,7 @@ too few captures or an uncovered window yield a typed reason, never 0. A positio
 carried at its earlier value for the step that sold it, so that step understates the position's move. Semantics:
 money-semantics §10. Later step: a true TWR once dated external flows land (G6, R1(c)).
 
-**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status is stored since R8 PR 2 and surfaces when PR 3 reads it.*
+**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status is stored since R8 PR 2 and returned per source in history since PR 3.*
 `CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
 use `Convert`, so `BookFigures`, the snapshot job and net-worth history say when a seed-table, today's-rate
 or 1:1 conversion touched a figure (`FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`). A snapshot row records the worst
@@ -769,11 +789,12 @@ outside the headline paths are unchanged. money-semantics §9 accepts the approx
 about that (M1), but linking an existing account is not a change in wealth, yet shows as one, with a
 percentage (rule 3 of §3.2; reason `SCOPE_CHANGED`).
 
-**G4. The sleeves are hard-coded.** *Partly closed (R8 PRs 1-2): the live book sums registered sources and every
-snapshot written since has a per-source row; the stored totals and their consumers are still per sleeve.*
-Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names. A new
-economy would still be a change in every snapshot consumer until the per-source rows are read and the old
-columns frozen (§5.6, PRs 3-4).
+**G4. The sleeves are hard-coded.** *Partly closed (R8 PRs 1-3): the live book sums registered sources, every
+snapshot written since has a per-source row, and the snapshot readers take sources and staleness from those rows
+(§5.6 step 3); the stored totals are still the three sleeve columns.*
+Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names, still
+written. A new economy is recorded and reported per source, but counts in the stored totals only once the old
+columns are frozen (§5.6, PR 4).
 
 **G5. Quality signals are scattered and untyped.** *Closed for the headline figures, the MCP
 totals and the UI badges (R6, first PR and P9); the FIRE tile still reads its own untyped `hasStaleSleeves`.*
