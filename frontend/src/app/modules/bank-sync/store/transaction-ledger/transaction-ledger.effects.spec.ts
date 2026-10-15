@@ -1,5 +1,6 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -124,6 +125,7 @@ function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []
   return {
     transactions: signal(transactions),
     offset: signal(initialOffset),
+    status: signal<AsyncStatus>('idle'),
     accountId: signal<string | null>(null),
     transactionType: signal<TransactionType | null>(null),
     categories: signal<string[]>([]),
@@ -319,6 +321,18 @@ describe('transactionLedgerEffects', () => {
   });
 
   describe('loadMore', () => {
+    it('waits while the first page is loading', () => {
+      const store = buildStore(PAGE_SIZE);
+      store.status.set('loading');
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(store.setAppendLoading).not.toHaveBeenCalled();
+    });
+
     it('fetches the page after the loaded one, then advances the offset and appends', () => {
       const store = buildStore(PAGE_SIZE);
       const service = buildService();

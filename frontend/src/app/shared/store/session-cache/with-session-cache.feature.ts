@@ -27,6 +27,7 @@ export function withSessionCache<State extends object>(
         if (kept && restoreIf(kept, getState(state))) {
           patchState(state, {...kept, ...onRestore});
         }
+        cache.open();
       },
       onDestroy(): void {
         const current = getState(state);

@@ -1,4 +1,5 @@
 import {inject, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {
   catchError,
@@ -39,6 +40,7 @@ function sumCurrentMonthOutflow(monthlyFlow: MonthlyFlow[]): number {
 interface EffectsStore {
   transactions: Signal<GlobalTransactionDto[]>;
   offset: Signal<number>;
+  status: Signal<AsyncStatus>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
   categories: Signal<string[]>;
@@ -133,6 +135,7 @@ export function transactionLedgerEffects(store: EffectsStore) {
   /** Appends the next page under the rows on screen (the infinite list's paging contract). */
   const fetchNextPage = rxMethod<void>(
     pipe(
+      filter(() => store.status() !== 'loading'),
       tap(() => store.setAppendLoading()),
       exhaustMap(() =>
         bankSyncService.getAllTransactions(pageParams(store, store.offset() + PAGE_SIZE)).pipe(

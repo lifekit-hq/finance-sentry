@@ -8,11 +8,16 @@ export function sessionCacheMethods(store: WritableStateSource<SessionCacheState
       return getState(store).entries[key] as T | undefined;
     },
     write(key: string, value: unknown): void {
-      patchState(store, state => ({entries: {...state.entries, [key]: value}}));
+      patchState(store, state =>
+        state.closed ? state : {entries: {...state.entries, [key]: value}}
+      );
+    },
+    open(): void {
+      patchState(store, {closed: false});
     },
     /** Sign-out: the next person on this tab never sees the previous one's numbers. */
     clear(): void {
-      patchState(store, {entries: {}});
+      patchState(store, {entries: {}, closed: true});
     },
   };
 }

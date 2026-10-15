@@ -69,4 +69,16 @@ describe('withSessionCache', () => {
     cache.clear();
     expect(cache.read('page')).toBeUndefined();
   });
+
+  it('writes nothing back when the page closes after sign-out, and keeps data again once a page opens', () => {
+    const cache = TestBed.inject(SessionCacheStore);
+    const signedOut = open();
+    cache.clear();
+    signedOut.close();
+    expect(cache.read('page')).toBeUndefined();
+
+    const next = open();
+    next.close();
+    expect(cache.read('page')).toEqual({rows: [], filter: 'all'});
+  });
 });

@@ -1,6 +1,7 @@
 import {inject, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {exhaustMap, pipe, switchMap, tap} from 'rxjs';
+import {exhaustMap, filter, pipe, Subject, switchMap, takeUntil, tap} from 'rxjs';
 
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {
@@ -15,6 +16,7 @@ interface EffectsStore {
   kinds: Signal<EventKind[]>;
   calendarWindow: Signal<CalendarWindow>;
   firedPage: Signal<number>;
+  firedStatus: Signal<AsyncStatus>;
   firedPageSize: Signal<number>;
   setHorizonDays: (days: number) => void;
   toggleKindLocal: (kind: EventKind) => void;
@@ -30,10 +32,12 @@ interface EffectsStore {
   setFiredAppendLoading: () => void;
   setFiredAppendSuccess: () => void;
   setFiredAppendError: (code: Nullable<string>) => void;
+  setFiredAppendIdle: () => void;
 }
 
 export function eventsEffects(store: EffectsStore) {
   const api = inject(EventsService);
+  const firedStarted$ = new Subject<void>();
 
   const fetchUpcoming = () => {
     const {from, to} = store.calendarWindow();
@@ -67,7 +71,11 @@ export function eventsEffects(store: EffectsStore) {
     },
     loadFired: rxMethod<void>(
       pipe(
-        tap(() => store.setFiredLoading()),
+        tap(() => {
+          firedStarted$.next();
+          store.setFiredAppendIdle();
+          store.setFiredLoading();
+        }),
         switchMap(() =>
           api.getFired(1, store.firedPageSize()).pipe(
             tap(response => {
@@ -85,6 +93,7 @@ export function eventsEffects(store: EffectsStore) {
     /** Appends the next fired page (the infinite list's paging contract): near the end and on retry. */
     loadMoreFired: rxMethod<void>(
       pipe(
+        filter(() => store.firedStatus() !== 'loading'),
         tap(() => store.setFiredAppendLoading()),
         exhaustMap(() =>
           api.getFired(store.firedPage() + 1, store.firedPageSize()).pipe(
@@ -94,7 +103,8 @@ export function eventsEffects(store: EffectsStore) {
             }),
             StoreErrorUtils.catchAndSetError({
               setError: (code: Nullable<string>) => store.setFiredAppendError(code),
-            })
+            }),
+            takeUntil(firedStarted$)
           )
         )
       )

@@ -1,10 +1,11 @@
 import {computed, type Signal} from '@angular/core';
 
-import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
+import {type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
+import {ALERTS_PAGE_SIZE} from './alerts.state';
 
 interface StateSignals {
-  alerts: Signal<Alert[]>;
+  currentPage: Signal<number>;
   filter: Signal<AlertFilter>;
   search: Signal<string>;
   unreadCount: Signal<number>;
@@ -13,7 +14,7 @@ interface StateSignals {
 
 export function alertsComputed(store: StateSignals) {
   return {
-    hasMore: computed(() => store.alerts().length < store.totalCount()),
+    hasMore: computed(() => store.currentPage() * ALERTS_PAGE_SIZE < store.totalCount()),
     /** What the list is filtered by — the load effect refetches the first page whenever it changes. */
     query: computed<AlertsQuery>(() => ({
       filter: store.filter(),

@@ -1,6 +1,18 @@
 import {inject, type Signal} from '@angular/core';
+import {type AsyncStatus} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, debounceTime, EMPTY, exhaustMap, filter, pipe, switchMap, tap} from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  EMPTY,
+  exhaustMap,
+  filter,
+  pipe,
+  Subject,
+  switchMap,
+  takeUntil,
+  tap,
+} from 'rxjs';
 
 import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
@@ -12,6 +24,7 @@ export const ALERT_SEARCH_DEBOUNCE_MS = 300;
 interface EffectsStore {
   search: Signal<string>;
   filter: Signal<AlertFilter>;
+  status: Signal<AsyncStatus>;
   currentPage: Signal<number>;
   setSearch: (search: string) => void;
   setData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
@@ -20,6 +33,7 @@ interface EffectsStore {
   setAppendLoading: () => void;
   setAppendSuccess: () => void;
   setAppendError: (errorCode: Nullable<string>) => void;
+  setAppendIdle: () => void;
   setUnreadCount: (n: number) => void;
   setLoading: () => void;
   setSuccess: () => void;
@@ -31,12 +45,17 @@ interface EffectsStore {
 
 export function alertsEffects(store: EffectsStore) {
   const api = inject(AlertsService);
+  const firstPageStarted$ = new Subject<void>();
 
   return {
     /** Loads the first page of a query; the rows on screen stay (dimmed) until it lands. */
     load: rxMethod<AlertsQuery>(
       pipe(
-        tap(() => store.setLoading()),
+        tap(() => {
+          firstPageStarted$.next();
+          store.setAppendIdle();
+          store.setLoading();
+        }),
         switchMap(({filter: kind, search}) =>
           api.getAlerts(kind, 1, ALERTS_PAGE_SIZE, search).pipe(
             tap(res => {
@@ -56,6 +75,7 @@ export function alertsEffects(store: EffectsStore) {
     /** Appends the next page (the infinite list's paging contract): asked near the end and on retry. */
     loadMore: rxMethod<void>(
       pipe(
+        filter(() => store.status() !== 'loading'),
         tap(() => store.setAppendLoading()),
         exhaustMap(() =>
           api
@@ -73,7 +93,8 @@ export function alertsEffects(store: EffectsStore) {
               catchError(() => {
                 store.setAppendError(null);
                 return EMPTY;
-              })
+              }),
+              takeUntil(firstPageStarted$)
             )
         )
       )

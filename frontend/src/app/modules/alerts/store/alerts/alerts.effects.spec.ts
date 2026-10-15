@@ -1,6 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
-import {of, throwError} from 'rxjs';
+import {type AsyncStatus} from '@lifekit-hq/core';
+import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type AlertFilter} from '../../models/alert/alert.model';
@@ -15,6 +16,7 @@ function build() {
   return {
     search: signal(''),
     filter: signal<AlertFilter>('all'),
+    status: signal<AsyncStatus>('idle'),
     currentPage: signal(1),
     setSearch: vi.fn(),
     setData: vi.fn(),
@@ -23,6 +25,7 @@ function build() {
     setAppendLoading: vi.fn(),
     setAppendSuccess: vi.fn(),
     setAppendError: vi.fn(),
+    setAppendIdle: vi.fn(),
     setUnreadCount: vi.fn(),
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
@@ -98,6 +101,31 @@ describe('alertsEffects', () => {
     expect(store.appendData).toHaveBeenCalledWith([], 45, 7);
     expect(store.setAppendSuccess).toHaveBeenCalledOnce();
     expect(store.setLoading).not.toHaveBeenCalled();
+  });
+
+  it('loadMore waits while the first page is loading', () => {
+    const store = build();
+    store.status.set('loading');
+    TestBed.runInInjectionContext(() => alertsEffects(store).loadMore());
+
+    expect(api.getAlerts).not.toHaveBeenCalled();
+    expect(store.setAppendLoading).not.toHaveBeenCalled();
+  });
+
+  it('a new first page drops the next page still in flight', () => {
+    const stalePage = new Subject<unknown>();
+    api.getAlerts.mockReturnValueOnce(stalePage).mockReturnValueOnce(of(PAGE));
+    const store = build();
+    TestBed.runInInjectionContext(() => {
+      const effects = alertsEffects(store);
+      effects.loadMore();
+      effects.load({filter: 'error', search: ''});
+    });
+    stalePage.next(PAGE);
+
+    expect(store.appendData).not.toHaveBeenCalled();
+    expect(store.setData).toHaveBeenCalledOnce();
+    expect(store.setAppendIdle).toHaveBeenCalledOnce();
   });
 
   it('loadMore keeps the rows and flags only the append on failure', () => {
