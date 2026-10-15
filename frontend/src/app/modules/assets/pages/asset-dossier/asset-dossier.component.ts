@@ -115,7 +115,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
   ],
   templateUrl: './asset-dossier.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // lk-segmented (the chart's timeframe tabs) is a custom element from @lifekit-hq/elements.
+  // lk-chip-row (the chart's timeframe range) is a custom element from @lifekit-hq/elements.
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [DossierStore],
 })
