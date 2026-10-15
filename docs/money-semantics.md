@@ -328,7 +328,7 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   nullable, additive; zero-quantity holdings are left out; a sleeve carried forward from the previous row
   folds that row's status in), a backfilled row stores the worst of its accounts' statuses with
   `TODAY_RATE` as the floor (it is valued at today's rate), a row with none recorded falls back to
-  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows will take over the stored field. A
+  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows (written since PR 2, read from PR 3) will take over the stored field. A
   brokerage or crypto row's USD value is converted at sync time, so its status is re-derived from the
   rate table in force at read. `CurrencyConverter.IsKnown` remains for callers outside these paths.
 - **Net-worth history in a non-USD base converts each row at its own date's rate (C4).** One batched,

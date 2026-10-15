@@ -17,6 +17,7 @@ public sealed class BookFiguresService(
     {
         var positions = new List<BookFigurePosition>();
         var staleSources = new List<string>();
+        var readings = new List<BookSourceReading>();
         var cashUsd = 0m;
         var bankingCashUsd = 0m;
         var brokerageCashUsd = 0m;
@@ -34,9 +35,11 @@ public sealed class BookFiguresService(
             {
                 logger.LogWarning(ex, "Wealth source {SourceId} unavailable for user {UserId}; contributing nothing.", source.SourceId, userId);
                 staleSources.Add(source.SourceId);
+                readings.Add(new BookSourceReading(source.SourceId, source.Kind, null));
                 continue;
             }
 
+            readings.Add(new BookSourceReading(source.SourceId, source.Kind, reading));
             positions.AddRange(reading.Positions);
             cashUsd += reading.CashUsd;
             fxStatus = fxStatus.Worst(reading.FxStatus);
@@ -66,6 +69,9 @@ public sealed class BookFiguresService(
             staleSources.Count > 0,
             staleSources,
             venueCashUsd,
-            fxStatus);
+            fxStatus)
+        {
+            Sources = readings,
+        };
     }
 }

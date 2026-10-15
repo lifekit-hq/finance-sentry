@@ -73,10 +73,10 @@ rule or shape agreed but not implemented), **missing**.
        Presentation: dashboard · accounts · investments · MCP tools · briefs
 ```
 
-This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1) and bottom
-(dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the headline record
-(3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The per-source rows are
-**designed, not built** (§6).
+This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1, and a
+per-source row written beside every snapshot, R8 PR 2) and bottom (dashboard, MCP, briefs) are wired. The
+measure engine is built for M1-M6 and M9 (3.4); the headline record (3.6) is built in the backend and MCP and
+calls M1 for the figures that are changes. Nothing reads the per-source rows yet (R8 PR 3).
 
 Three rules keep the layers apart:
 
@@ -121,7 +121,7 @@ Two things already right and kept:
   per row, zero-quantity holdings left out as the wealth sources do), history maps it (a carried-forward
   sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
   `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
-  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows will take over this field. A brokerage
+  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows (written since PR 2, read from PR 3) will take over this field. A brokerage
   or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
   in force when it is read. Display wording is R7.
 - **Dated display conversion of history (C4, done).** A non-USD base shows each net-worth history row at the
@@ -452,7 +452,8 @@ verbatim.
 
 **Status: partial.** The registry is built (R8 PR 1, §5.6): the banking, brokerage and crypto readers are
 registered as `IWealthSource` (`BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource`) and
-`BookFiguresService` sums whatever is registered. The contract below is still the target: today a source
+`BookFiguresService` sums whatever is registered; the snapshot job writes one `net_worth_snapshot_sources` row
+per registered source (R8 PR 2). The contract below is still the target: today a source
 returns `WealthSourceReading` (USD cash, invested positions, worst FX status), not the full
 `SourceSnapshot`, and has no `asOf`, native units, reliability or events.
 
@@ -600,8 +601,9 @@ and the list of what is not yet verified are in report §5.5 and §12.4; none of
 
 ### 5.6 From three sleeves to a registry (four PRs)
 
-Today a fourth economy would need a new column on `net_worth_snapshots`, a new constructor parameter on
-`BookFiguresService`, a new name inside the `StaleSleeves` string, and a change in every consumer.
+Today a fourth economy gets its per-source row with no schema change, but would need a new column on
+`net_worth_snapshots` to count in the stored totals, a new name inside the `StaleSleeves` string, and a change
+in every consumer.
 
 1. **Wrap. Done.** The three readers (`IBankingAccountsReader`, `IBrokerageHoldingsReader`,
    `ICryptoHoldingsReader`) are three `IWealthSource` registrations (`AddBookFigures`, which registers them in
@@ -610,9 +612,37 @@ Today a fourth economy would need a new column on `net_worth_snapshots`, a new c
    carried (`banking`, `brokerage`, `crypto`), and a kind with no legacy slice (`EconomyKind`) counts in
    `CashUsd` and the totals only. `BookFiguresCharacterizationTests` pins the figures, and
    `BookFiguresWealthSourceTests` that a fourth registered source is summed.
-2. **One row per source. Remaining.** A child table (for example `net_worth_snapshot_sources`: snapshot id, source id,
-   kind, total, cash, invested, health, reasons), written by the snapshot job alongside the existing
-   columns. `WealthDbContext` owns it, so there is no cross-module migration ordering.
+2. **One row per source. Done.** `net_worth_snapshot_sources` (`WealthDbContext`, `public` schema, so no
+   cross-module migration ordering; migration `M008_AddNetWorthSnapshotSources`): one row per
+   `(snapshot, source id)`, unique, cascade-deleted with its snapshot. Columns: `source_id`, `kind`
+   (`EconomyKind` by name), `total`, `cash`, `invested` (`numeric(18,2)`, USD like the snapshot's totals; null,
+   never zero, when the source could not be read), `health` and `reasons` (`text[]`). The row has no `UserId`;
+   the Owner filter reaches it through its snapshot. `NetWorthSnapshotJob` takes one `IBookFiguresService` read
+   - `BookFigures.Sources`, what each registered `IWealthSource` read - and derives both the rows and the sleeve
+   columns from it; `NetWorthSnapshotService` persists the snapshot and its rows in one transaction
+   (`UpsertWithSourcesAsync`): a same-day refresh replaces the day's rows, and a fourth registered source gets its
+   row with no change to the job. The sleeve columns (`BankingTotal`, `BrokerageTotal`, `CryptoTotal`) are the
+   `banking`, `brokerage` and `crypto` readings' totals, `StaleSleeves` and `fx_status` are written as before;
+   the holdings and sync-time reads that remain only decide freshness, since a reading carries no sync
+   timestamp. A source that failed to read is not fresh, so its sleeve is carried forward instead of recorded as
+   zero; with no earlier snapshot to carry it from, nothing is written and the run fails, so the job retries.
+   - **Health** is the framework's quality vocabulary (§3.6) stored by name: `Complete`; `Estimated` (a
+     today's-rate or seed-table conversion, reason `FX_TODAY_RATE`); `Degraded` (a 1:1 conversion,
+     `FX_UNKNOWN_1TO1`, or a sleeve this snapshot carried forward, `STALE_SOURCE`); `Unavailable` (the read
+     threw: null figures, `STALE_SOURCE`, the same way `BookFigures` reports a failed source stale).
+   - **A row is what the source read this run.** When the snapshot carried a sleeve forward, the snapshot's own
+     column holds the carried figure and the row says so through its health. A sleeve that was read,
+     is fresh and was not carried forward is `Complete` or `Estimated`, and its row total is its column
+     (`NetWorthSnapshotSourceRowTests` pins this through the job and the service, with a stale and a failed
+     source); whenever every source is, the rows add up to the sleeve columns, up to a cent: each figure rounds
+     to cents on its own.
+   - **Totals do not read the rows yet.** `TotalNetWorth` stays `banking + brokerage + crypto`; a fourth
+     source's row is recorded but not part of that total until PRs 3 and 4.
+   - **Not backfilled.** Past snapshots are untouched and have no rows (PR 3 treats "no rows" as "legacy").
+     The startup catch-up (`NetWorthSnapshotBackfillService`) fills gap days through the same job, so those rows
+     carry the figures read at that moment, like their snapshot columns. The history reconstruction command
+     (`BackfillNetWorthHistoryCommand`, banking only, rebuilt from transactions) writes no per-source rows: it
+     has no per-source figures without further provider reads.
 3. **Read per source. Remaining.** History, the dashboard and MCP read the per-source rows. `StaleSleeves` gives way
    to per-source health and reasons.
 4. **Freeze the old columns. Remaining.** Keep `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` for
@@ -727,11 +757,11 @@ too few captures or an uncovered window yield a typed reason, never 0. A positio
 carried at its earlier value for the step that sold it, so that step understates the position's move. Semantics:
 money-semantics §10. Later step: a true TWR once dated external flows land (G6, R1(c)).
 
-**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status waits for R8.*
+**G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status is stored since R8 PR 2 and surfaces when PR 3 reads it.*
 `CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
 use `Convert`, so `BookFigures`, the snapshot job and net-worth history say when a seed-table, today's-rate
 or 1:1 conversion touched a figure (`FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`). A snapshot row records the worst
-status of its sources (`fx_status`; R8's per-source rows will take over), and the amount-only `ToUsd` callers
+status of its sources (`fx_status`; each per-source row carries its own status as health and reasons), and the amount-only `ToUsd` callers
 outside the headline paths are unchanged. money-semantics §9 accepts the approximations.
 
 **G3. The dashboard "Change" percentage counts newly linked accounts.**
@@ -739,11 +769,11 @@ outside the headline paths are unchanged. money-semantics §9 accepts the approx
 about that (M1), but linking an existing account is not a change in wealth, yet shows as one, with a
 percentage (rule 3 of §3.2; reason `SCOPE_CHANGED`).
 
-**G4. The sleeves are hard-coded.** *Partly closed (R8 PR 1): the live book sums registered sources; the stored
-snapshot and its consumers are still per sleeve.*
+**G4. The sleeves are hard-coded.** *Partly closed (R8 PRs 1-2): the live book sums registered sources and every
+snapshot written since has a per-source row; the stored totals and their consumers are still per sleeve.*
 Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names. A new
-economy would still be a schema change plus a change in every snapshot consumer until the per-source rows
-(§5.6, PRs 2-4) land.
+economy would still be a change in every snapshot consumer until the per-source rows are read and the old
+columns frozen (§5.6, PRs 3-4).
 
 **G5. Quality signals are scattered and untyped.** *Closed for the headline figures, the MCP
 totals and the UI badges (R6, first PR and P9); the FIRE tile still reads its own untyped `hasStaleSleeves`.*

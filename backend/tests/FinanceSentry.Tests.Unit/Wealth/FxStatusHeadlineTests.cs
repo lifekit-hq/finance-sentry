@@ -194,11 +194,22 @@ public sealed class FxStatusHeadlineTests
                 new BrokerageHoldingSummary("AAPL", "equity", 1m, 700m, DateTime.UtcNow, "ibkr", FxStatus: brokerageStatus),
                 new BrokerageHoldingSummary("OLD", "equity", 0m, 0m, DateTime.UtcNow, "ibkr", FxStatus: closedPositionStatus),
             ]);
-        var book = new Mock<IBookFiguresService>();
-        book.Setup(b => b.ReadAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(BookFigures.Empty with { FxStatus = bookStatus });
+        var bankAccounts = new Mock<IBankingAccountsReader>();
+        bankAccounts.Setup(a => a.GetAccountSummariesAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            [
+                new BankingAccountSummary(
+                    Guid.NewGuid(), "Bank", "checking", "1234", "monobank", "USD", 1_000m, 1_000m, "synced", null,
+                    FxStatus: bookStatus),
+            ]);
+        var book = new BookFiguresService(
+            [
+                new BankingWealthSource(bankAccounts.Object),
+                new BrokerageWealthSource(brokerage.Object),
+                new CryptoWealthSource(crypto.Object),
+            ],
+            NullLogger<BookFiguresService>.Instance);
 
-        return new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, service, book.Object);
+        return new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, service, book);
     }
 
     [Theory]

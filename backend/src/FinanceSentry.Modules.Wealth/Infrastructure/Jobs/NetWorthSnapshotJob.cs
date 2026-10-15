@@ -44,31 +44,47 @@ public class NetWorthSnapshotJob(
     // stale and carried forward rather than counted as the live number.
     private static readonly TimeSpan StaleWindow = TimeSpan.FromHours(36);
 
+    // The source ids of the three sleeves the snapshot's columns hold (WealthSources); any other registered
+    // source gets its per-source row only.
+    private const string BankingSourceId = "banking";
+    private const string BrokerageSourceId = "brokerage";
+    private const string CryptoSourceId = "crypto";
+
     private async Task TakeSnapshotAsync(Guid userId, DateOnly snapshotDate, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var bankingTotal = await _bankingTotals.GetTotalUsdAsync(userId, ct);
+
+        // One read of every registered source: the sleeve totals, the invested split, the conversion status and
+        // the per-source rows below are all taken from it, so the rows add up to the columns. The holdings and
+        // sync-time reads that follow only decide freshness - the readings carry no sync timestamp.
+        var book = await _bookFigures.ReadAsync(userId, ct);
+
+        var banking = book.Sources.FirstOrDefault(s => s.SourceId == BankingSourceId)?.Reading;
+        var bankingTotal = banking?.TotalValueUsd ?? 0m;
         // Banking is fresh only if a successful sync landed within the window; a lapsed
         // connection (stale Revolut/AIB) must carry forward, not record a phantom drop.
         var bankingLastSync = await _bankingTotals.GetLatestSuccessfulSyncAsync(userId, ct);
-        var bankingFresh = bankingLastSync is null
+        var bankingFresh = banking is not null && (bankingLastSync is null
             ? bankingTotal == 0m
-            : bankingLastSync.Value >= now - StaleWindow;
+            : bankingLastSync.Value >= now - StaleWindow);
 
+        var crypto = book.Sources.FirstOrDefault(s => s.SourceId == CryptoSourceId)?.Reading;
+        var cryptoTotal = crypto?.TotalValueUsd ?? 0m;
         var cryptoHoldings = await _cryptoReader.GetHoldingsAsync(userId, ct);
-        var cryptoTotal = cryptoHoldings.Sum(h => h.UsdValue);
-        var cryptoFresh = cryptoHoldings.Count > 0
+        var cryptoFresh = crypto is not null
+            && cryptoHoldings.Count > 0
             && cryptoHoldings.Max(h => h.SyncedAt) >= now - StaleWindow;
 
+        var brokerage = book.Sources.FirstOrDefault(s => s.SourceId == BrokerageSourceId)?.Reading;
+        var brokerageTotal = brokerage?.TotalValueUsd ?? 0m;
         var brokerageHoldings = await _brokerageReader.GetHoldingsAsync(userId, ct);
-        var brokerageTotal = brokerageHoldings.Sum(h => h.UsdValue);
-        var brokerageFresh = brokerageHoldings.Count > 0
+        var brokerageFresh = brokerage is not null
+            && brokerageHoldings.Count > 0
             && brokerageHoldings.Max(h => h.SyncedAt) >= now - StaleWindow;
 
         // The invested part of each sleeve comes from the canonical book figures, so the stored cash is the
         // dashboard's "cash" for the same moment. A stale source would make the split partial, so it is
         // withheld (null), as the dashboard hides its sub-line.
-        var book = await _bookFigures.ReadAsync(userId, ct);
         var measured = !book.IsStale;
         decimal? brokerageInvested = measured
             ? book.Positions.Where(p => p.AssetClass != AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
@@ -77,14 +93,8 @@ public class NetWorthSnapshotJob(
             ? book.Positions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
             : null;
 
-        // The worst conversion status of what this snapshot was summed from: the book figures cover the
-        // bank accounts, the two holdings reads this run's own sleeve totals.
+        // The worst conversion status of what this snapshot was summed from, which is what the book summed.
         var fxStatus = book.FxStatus;
-        foreach (var h in cryptoHoldings.Where(h => h.FreeQuantity + h.LockedQuantity != 0m))
-            fxStatus = fxStatus.Worst(h.FxStatus);
-        foreach (var h in brokerageHoldings.Where(h => h.Quantity != 0m))
-            fxStatus = fxStatus.Worst(h.FxStatus);
-
         if (fxStatus.ToReason() is { } fxReason)
             _logger?.LogWarning(
                 "Net worth snapshot for user {UserId} on {SnapshotDate} used a substituted FX rate ({FxStatus}, {Reason})",
@@ -94,6 +104,7 @@ public class NetWorthSnapshotJob(
             snapshotDate, bankingTotal, brokerageTotal, cryptoTotal,
             BankingFresh: bankingFresh, BrokerageFresh: brokerageFresh, CryptoFresh: cryptoFresh,
             BrokerageInvested: brokerageInvested, CryptoInvested: cryptoInvested,
-            FxStatus: fxStatus), ct);
+            FxStatus: fxStatus,
+            Sources: book.Sources), ct);
     }
 }

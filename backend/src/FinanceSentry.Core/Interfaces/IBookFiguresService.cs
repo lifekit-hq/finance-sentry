@@ -15,6 +15,12 @@ public sealed record BookFigurePosition(
     string Provider);
 
 /// <summary>
+/// One registered <see cref="IWealthSource"/>'s read for a <see cref="BookFigures"/>. <see cref="Reading"/> is null
+/// when the read threw: the source then contributed nothing and is named in <see cref="BookFigures.StaleSources"/>.
+/// </summary>
+public sealed record BookSourceReading(string SourceId, EconomyKind Kind, WealthSourceReading? Reading);
+
+/// <summary>
 /// The canonical book snapshot — one source of truth for cash, invested value, and totals.
 /// Produced by <see cref="IBookFiguresService"/> and consumed by all three surfaces
 /// (portfolio snapshot, allocation-drift, and risk compliance) so they are guaranteed
@@ -45,6 +51,13 @@ public sealed record BookFigures(
 {
     /// <summary>The FX reason codes the figures carry; empty when every conversion used a live rate.</summary>
     public IReadOnlyList<string> FxReasonCodes => FxStatus.ToReasons();
+
+    /// <summary>
+    /// What each registered source read, in registration order. The figures above are summed from exactly these
+    /// readings, so a consumer that stores or shows a per-source figure takes it from here rather than reading the
+    /// sources a second time.
+    /// </summary>
+    public IReadOnlyList<BookSourceReading> Sources { get; init; } = [];
 
     public static BookFigures Empty { get; } =
         new(0m, 0m, 0m, 0m, 0m, [], false, []);

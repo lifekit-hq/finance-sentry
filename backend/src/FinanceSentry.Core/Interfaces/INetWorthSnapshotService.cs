@@ -19,6 +19,12 @@ public interface INetWorthSnapshotService
 /// The worst conversion status among the figures the totals were summed from; stored on the snapshot row so a
 /// history read can name a seed-table or 1:1 conversion.
 /// </param>
+/// <param name="Sources">
+/// What each registered source read this run (<see cref="BookFigures.Sources"/>), written as that snapshot's
+/// per-source rows. Null = the caller has
+/// no per-source figures and the day's existing per-source rows are left as they are; an empty list replaces
+/// them with none.
+/// </param>
 public record NetWorthSnapshotData(
     DateOnly SnapshotDate,
     decimal BankingTotal,
@@ -30,4 +36,5 @@ public record NetWorthSnapshotData(
     string Currency = "USD",
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null,
-    FxStatus FxStatus = FxStatus.Exact);
+    FxStatus FxStatus = FxStatus.Exact,
+    IReadOnlyList<BookSourceReading>? Sources = null);

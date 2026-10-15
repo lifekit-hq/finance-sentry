@@ -14,6 +14,8 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
 
     public DbSet<NetWorthSnapshot> NetWorthSnapshots { get; set; } = null!;
 
+    public DbSet<NetWorthSnapshotSource> NetWorthSnapshotSources { get; set; } = null!;
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
@@ -48,5 +50,31 @@ public class WealthDbContext(DbContextOptions<WealthDbContext> options, ICurrent
         e.HasIndex(s => new { s.UserId, s.SnapshotDate })
             .IsUnique()
             .HasDatabaseName("idx_net_worth_snapshot_user_date_unique");
+
+        // One row per registered source per snapshot (framework §5.6, step 2). Amounts take the precision of the
+        // snapshot's own totals and are in its Currency; kind and health are stored by name (the enum convention).
+        var source = modelBuilder.Entity<NetWorthSnapshotSource>();
+        source.ToTable("net_worth_snapshot_sources");
+        source.HasKey(x => x.Id);
+        source.Property(x => x.SnapshotId).HasColumnName("snapshot_id").IsRequired();
+        source.Property(x => x.SourceId).HasColumnName("source_id").IsRequired().HasMaxLength(64);
+        source.Property(x => x.Kind).HasColumnName("kind").IsRequired().HasMaxLength(32);
+        source.Property(x => x.Total).HasColumnName("total");
+        source.Property(x => x.Cash).HasColumnName("cash");
+        source.Property(x => x.Invested).HasColumnName("invested");
+        source.Property(x => x.Health).HasColumnName("health").IsRequired().HasMaxLength(16);
+        source.Property(x => x.Reasons).HasColumnName("reasons").HasColumnType("text[]").IsRequired();
+        source.HasOne<NetWorthSnapshot>()
+            .WithMany()
+            .HasForeignKey(x => x.SnapshotId)
+            .OnDelete(DeleteBehavior.Cascade);
+        source.HasIndex(x => new { x.SnapshotId, x.SourceId })
+            .IsUnique()
+            .HasDatabaseName("idx_net_worth_snapshot_sources_snapshot_source");
+
+        // A source row carries no UserId of its own (so it is not IUserOwned); it belongs to whoever owns its snapshot.
+        source.HasQueryFilter(
+            OwnerQueryFilter.Name,
+            x => NetWorthSnapshots.Any(s => s.Id == x.SnapshotId && s.UserId == CurrentUserId));
     }
 }

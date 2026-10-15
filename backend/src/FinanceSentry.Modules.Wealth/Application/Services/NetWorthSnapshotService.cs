@@ -20,6 +20,13 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var previous = await _repository.GetLatestBeforeUnscopedAsync(userId, data.SnapshotDate, ct);
         var stale = new List<string>();
 
+        // A sleeve whose source failed to read has nothing to record and, with no earlier snapshot, nothing to
+        // carry forward: fail the run (the job retries) instead of persisting it as $0 over a correct figure.
+        if (previous is null
+            && data.Sources?.FirstOrDefault(s => s.Reading is null && s.SourceId is "banking" or "brokerage" or "crypto") is { } failed)
+            throw new InvalidOperationException(
+                $"Wealth source '{failed.SourceId}' could not be read and there is no earlier snapshot to carry its sleeve forward from.");
+
         var banking = ResolveSleeve("banking", data.BankingTotal, data.BankingFresh, previous?.BankingTotal, stale);
         var brokerage = ResolveSleeve("brokerage", data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, stale);
         var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);
@@ -55,8 +62,55 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         };
 
         // Upsert: the day's row is refreshed on every successful sync rather than frozen
-        // at first write, so the chart's newest point tracks the live position.
-        await _repository.UpsertAsync(snapshot, ct);
+        // at first write, so the chart's newest point tracks the live position. The per-source rows go in the same
+        // transaction, so a snapshot never exists with some of its sources.
+        if (data.Sources is null)
+            await _repository.UpsertAsync(snapshot, ct);
+        else
+            await _repository.UpsertWithSourcesAsync(snapshot, data.Sources.Select(f => ToRow(f, stale)).ToList(), ct);
+    }
+
+    /// <summary>
+    /// A source's row, as the source read this run. A failed read has no figures (null, never zero) and is
+    /// UNAVAILABLE + STALE_SOURCE, the way <see cref="BookFigures"/> reports it; a read that succeeded takes its FX
+    /// reasons (ESTIMATED for today's/seed rate, DEGRADED for a 1:1 conversion), and a sleeve this snapshot carried
+    /// forward is at best DEGRADED + STALE_SOURCE. The snapshot's own column then holds the carried figure.
+    /// </summary>
+    private static NetWorthSnapshotSource ToRow(BookSourceReading figure, List<string> staleSleeves)
+    {
+        var reasons = new List<string>();
+        var health = SourceHealth.Complete;
+        if (figure.Reading is { } reading)
+        {
+            reasons.AddRange(reading.FxStatus.ToReasons());
+            health = reading.FxStatus switch
+            {
+                FxStatus.Unknown1To1 => SourceHealth.Degraded,
+                FxStatus.TodayRate or FxStatus.SeedTable => SourceHealth.Estimated,
+                _ => SourceHealth.Complete,
+            };
+            if (staleSleeves.Contains(figure.SourceId))
+            {
+                health = SourceHealth.Degraded > health ? SourceHealth.Degraded : health;
+                reasons.Add(SourceReasons.StaleSource);
+            }
+        }
+        else
+        {
+            health = SourceHealth.Unavailable;
+            reasons.Add(SourceReasons.StaleSource);
+        }
+
+        return new NetWorthSnapshotSource
+        {
+            SourceId = figure.SourceId,
+            Kind = figure.Kind,
+            Total = figure.Reading?.TotalValueUsd,
+            Cash = figure.Reading?.CashUsd,
+            Invested = figure.Reading?.InvestedValueUsd,
+            Health = health,
+            Reasons = [.. reasons],
+        };
     }
 
     /// <summary>

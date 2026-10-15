@@ -79,9 +79,10 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
     {
         using var ctx = CreateContext();
 
-        var perUser = ctx.Model.GetEntityTypes().Where(e => e.FindProperty("UserId") is not null).ToList();
+        // Every entity type, not only those with a UserId: a source row has none and is filtered through its snapshot.
+        var perUser = ctx.Model.GetEntityTypes().ToList();
 
-        perUser.Should().HaveCount(1);
+        perUser.Should().HaveCount(2);
         perUser.Should().OnlyContain(
             e => e.GetDeclaredQueryFilters().Any(f => f.Key == OwnerQueryFilter.Name),
             "a per-user entity without the Owner filter would be readable across people");
@@ -103,6 +104,58 @@ public sealed class WealthOwnerQueryFilterTests : IAsyncLifetime
 
         await using var asNoOne = CreateContext();
         (await asNoOne.NetWorthSnapshots.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task Source_rows_follow_their_snapshots_owner_and_no_person_sees_none()
+    {
+        var snapshotA = NewSnapshot(_userA, Today);
+        var snapshotB = NewSnapshot(_userB, Today);
+        await SeedAsync(snapshotA, snapshotB);
+        await using (var seed = CreateContext())
+        {
+            seed.NetWorthSnapshotSources.AddRange(
+                new NetWorthSnapshotSource { Id = Guid.NewGuid(), SnapshotId = snapshotA.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 1_000m, Health = SourceHealth.Complete },
+                new NetWorthSnapshotSource { Id = Guid.NewGuid(), SnapshotId = snapshotB.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 2_000m, Health = SourceHealth.Complete });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var asA = CreateContext(_userA))
+            (await asA.NetWorthSnapshotSources.Select(x => x.Total).ToListAsync()).Should().Equal(1_000m);
+
+        await using (var asB = CreateContext(_userB))
+            (await asB.NetWorthSnapshotSources.AnyAsync(x => x.SnapshotId == snapshotA.Id)).Should().BeFalse(
+                "the filter holds even when a query names another person's snapshot");
+
+        await using var asNoOne = CreateContext();
+        (await asNoOne.NetWorthSnapshotSources.AnyAsync()).Should().BeFalse("no person in scope matches no row");
+    }
+
+    [DockerRequiredFact]
+    public async Task Snapshot_job_with_no_person_writes_one_row_per_registered_source()
+    {
+        var banking = new Mock<IBankingTotalsReader>();
+        banking.Setup(b => b.GetTotalUsdAsync(_userA, It.IsAny<CancellationToken>())).ReturnsAsync(0m);
+        var crypto = new Mock<ICryptoHoldingsReader>();
+        crypto.Setup(c => c.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var brokerage = new Mock<IBrokerageHoldingsReader>();
+        brokerage.Setup(b => b.GetHoldingsAsync(_userA, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var book = new BookFigures(0m, 0m, 0m, 0m, 0m, [], false, [])
+        {
+            Sources = [new BookSourceReading("banking", EconomyKind.Bank, new WealthSourceReading(1_250m, []))],
+        };
+
+        await using (var asNoOne = CreateContext())
+        {
+            var repo = new NetWorthSnapshotRepository(asNoOne);
+            var job = new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, new NetWorthSnapshotService(repo),
+                Mock.Of<IBookFiguresService>(b => b.ReadAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()) == Task.FromResult(book)));
+            await job.CaptureForUserAsync(_userA, Today);
+        }
+
+        await using var asA = CreateContext(_userA);
+        var rows = await asA.NetWorthSnapshotSources.ToListAsync();
+        rows.Should().ContainSingle().Which.Total.Should().Be(1_250m);
     }
 
     [DockerRequiredFact]
