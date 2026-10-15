@@ -428,7 +428,7 @@ public class IbkrFlexJobsTests
         await harness.RunAsync();
 
         harness.SyncService.Verify(
-            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Never);
         harness.VerifyNoAlertCalls();
         harness.CredentialRepo.Verify(r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -451,7 +451,7 @@ public class IbkrFlexJobsTests
         await harness.RunAsync();
 
         harness.SyncService.Verify(
-            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(3));
         harness.VerifyEscalated(Times.Once());
     }
@@ -467,7 +467,7 @@ public class IbkrFlexJobsTests
         await harness.RunAsync();
 
         harness.SyncService.Verify(
-            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -477,7 +477,7 @@ public class IbkrFlexJobsTests
         // A definitive loss fixed on IBKR's side (an IP restriction lifted) heals on the daily probe.
         var harness = new PolicyHarness().Active();
         harness.SyncService
-            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IbkrFlexException("1013", "Invalid IP address."))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
@@ -494,14 +494,14 @@ public class IbkrFlexJobsTests
         harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
         harness.Credential.Replace("888888", [4], [5], [6], 1);
         harness.SyncService
-            .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
         harness.Credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
 
         await harness.RunAsync();
 
         harness.SyncService.Verify(
-            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Once);
         harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
         harness.Credential.Health.LastSuccessAt.Should().Be(Start);
