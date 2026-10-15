@@ -1,0 +1,17 @@
+@if (badge(); as b) {
+  <button
+    [attr.aria-label]="ariaLabel()"
+    [attr.data-badge]="b.kind"
+    (click)="open()"
+    type="button"
+    class="-my-3 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-cmn-md focus-visible:outline-2 focus-visible:outline-offset-2"
+    aria-haspopup="dialog"
+    data-testid="headline-badge"
+  >
+    <span
+      class="rounded-full px-2 py-0.5 text-cmn-xs font-medium whitespace-nowrap {{ classes() }}"
+    >
+      {{ b.label }}
+    </span>
+  </button>
+}

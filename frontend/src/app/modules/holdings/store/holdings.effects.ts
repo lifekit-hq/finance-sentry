@@ -2,6 +2,7 @@ import {inject} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap} from 'rxjs';
 
+import {type Headline} from '../../../shared/models/headline/headline.model';
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {type Position} from '../models/position/position.model';
 import {PositionsService} from '../services/positions.service';
@@ -13,6 +14,7 @@ interface StoreMethods {
   setSuccess(): void;
   setError(errorCode: Nullable<string>): void;
   setPositions(positions: Position[]): void;
+  setHeadline(headline: Nullable<Headline>): void;
   setDayChangePct(dayChangePctByTicker: Record<string, number>): void;
 }
 
@@ -39,9 +41,10 @@ export function holdingsEffects(store: StoreMethods) {
     pipe(
       tap(() => store.setLoading()),
       switchMap(() =>
-        positionsService.getPositions().pipe(
-          tap(positions => {
+        positionsService.getHoldings().pipe(
+          tap(({positions, headline}) => {
             store.setPositions(positions);
+            store.setHeadline(headline);
             store.setSuccess();
             loadQuotes(DayChangeUtils.quotableTickers(positions));
           }),

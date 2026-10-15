@@ -1,6 +1,9 @@
 import {type ErrorMessagesMap} from '@lifekit-hq/core';
 
+import {HEADLINE_REASON_MESSAGES} from './headline-reasons.registry';
+
 export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
+  ...HEADLINE_REASON_MESSAGES,
   EXTERNAL_ACCOUNT_ONLY: 'This account signs in through single sign-on and has no password.',
   DUPLICATE_EMAIL: 'This email already belongs to an account.',
   SIGN_IN_METHOD_DISABLED: 'This sign-in method is not available.',

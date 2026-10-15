@@ -292,7 +292,7 @@ the real dates put the deposit 181 days after the first flow (exponent 181/365),
 
 Every top-line figure carries the same record: the dashboard hero, the accounts and investments headers,
 every MCP tool that returns a total or a return, and the briefs. **Status: built in the backend and MCP
-(R6, first PR); the badges and reason sheet (P9) are the second.** The shape is paraphrased from
+(R6, first PR) and rendered in the UI (R6 P9: `fns-headline-badge` and the reason sheet).** The shape is paraphrased from
 Wealthfolio's performance-semantics design (AGPL: design only, no code).
 
 ```
@@ -361,7 +361,7 @@ freshness window, or an institution whose sync status is stale, failed or needs 
 `PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`) but no source raises
 them until flows (G6) and the source registry (R8) land.
 
-**Not yet carrying the record** (R6's remaining work, with P9): the FIRE projection and its `HasStaleSleeves`;
+**Not yet carrying the record** (R6's remaining work): the FIRE projection and its `HasStaleSleeves`;
 the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
 recommendation or per flow rather than a book total or return (`get_benchmark_track_record`,
 `get_thesis_performance`, `get_track_record`, postmortems, `get_cashflow_report`, budgets, the family
@@ -370,9 +370,18 @@ clearing statement) and per-row figures (positions, accounts, tax lots); a net-w
 `get_book_performance` (it always measures with no scope change); the holdings-based return on
 `get_book_performance` (`holdingsBasedReturn`; the method label for a chained, dividend-excluded holdings price
 return is the next PR's choice); and dated-rate display conversion.
-**P9** then renders `quality` as a badge on the dashboard hero, the accounts and investments headers and the
-split lines, with a reason sheet whose words come from the `ERROR_MESSAGES` registry, and moves the
-dashboard's own "Change" percentage (`dashboard.computed.ts`) onto `changeHeadline` (G3).
+**P9 (done)** renders `quality` as a badge on the dashboard hero, the cash / invested split line and the change
+line, the accounts header and the investments header (`fns-headline-badge`, `shared/components/headline-badge`).
+COMPLETE shows nothing, ESTIMATED reads "Estimated", DEGRADED reads "Stale" (a `STALE_SOURCE` reason) or "Partial"
+(any other), and an UNAVAILABLE figure reads "N/A", never 0 or 0%. One tap opens a reason sheet (a
+`CmnDrawerService` drawer) listing each reason in plain words, keyed by code in
+`core/errors/headline-reasons.registry.ts` and resolved through `ErrorMessageService` (an unknown code gets a
+generic line), plus `asOf` and `coverage` when the figure is not complete. The badge and its sheet hold a 44 x 44
+px hit area. The ad-hoc stale alert under the dashboard chart (`netWorthStaleNotice`) is gone: the
+snapshot's `staleSleeves` becomes a `STALE_SOURCE` reason on the net-worth headline when the API's own record has
+none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
+connection is no longer buried mid-list, finding 5). The dashboard's "Change" line renders `changeHeadline` (G3).
+The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection carries a record.
 
 **Display rules:**
 
@@ -403,7 +412,7 @@ yet except where noted.
 | P6 | 1 / 5 / 10-year table | Average annual total return per standard window, book vs benchmark | M3, long history |
 | P7 | Checklist score | A few yes/no checks per holding, drawn as a shape; ideas only, thresholds cited (C9) | cited thresholds; fits #824 |
 | P8 | Timing gap | "Your investments returned A; your money earned B; the difference is timing" | M3, M4 |
-| P9 | Quality badges | "Estimated", "Stale" or "Partial" with a reason sheet | headline contract |
+| P9 | Quality badges | "Estimated", "Stale" or "Partial" with a reason sheet | headline contract. **Done (R6 P9)** |
 | P10 | Liquid vs total | Total net worth as the headline, "of which liquid" beneath (C5) | convertibility |
 
 The Simply Wall St model behind P7 is licensed CC BY-NC-SA: take ideas only, no checks or thresholds
@@ -720,8 +729,8 @@ Three total columns on `net_worth_snapshots` and staleness as a comma-separated 
 economy would still be a schema change plus a change in every snapshot consumer until the per-source rows
 (§5.6, PRs 2-4) land.
 
-**G5. Quality signals are scattered and untyped.** *Closed for the backend headline figures and the MCP
-totals (R6, first PR); the frontend still reads the untyped fields until P9.*
+**G5. Quality signals are scattered and untyped.** *Closed for the headline figures, the MCP
+totals and the UI badges (R6, first PR and P9); the FIRE tile still reads its own untyped `hasStaleSleeves`.*
 `StaleSleeves` (string), `IsApproximate` (bool), `CashTotal` null, `Coverage` (string), `HasStaleSleeves`
 (FIRE flag), "Book N/A" (null fields), FX substitution. The headline figures and the MCP tools that return a
 total or a return now carry the typed record beside these (§3.6), so MCP reads one vocabulary; the untyped

@@ -47,7 +47,11 @@ function fakeStore(
     load: vi.fn(),
     loadNetWorthHistory: vi.fn(),
     historyErrorMessage: signal(null),
-    netWorthStaleNotice: signal(null),
+    netWorthHeadline: signal(null),
+    bookSplitHeadline: signal(null),
+    netWorthChangeHeadline: signal(null),
+    bookSplitUnavailable: signal(false),
+    netWorthChangeUnavailable: signal(false),
     netWorthChangeFormatted: signal(null),
     netWorthChangePercentFormatted: signal(null),
     investedChangeFormatted: signal(''),
@@ -207,6 +211,75 @@ describe('DashboardComponent range presets', () => {
 
     expect(store['setScrubIndex']).toHaveBeenNthCalledWith(1, 4);
     expect(store['setScrubIndex']).toHaveBeenNthCalledWith(2, null);
+  });
+
+  describe('quality badges', () => {
+    const stale = {
+      amount: 100,
+      percent: null,
+      method: 'VALUE',
+      scope: 'umbrella',
+      window: {to: '2026-10-15'},
+      quality: 'DEGRADED',
+      reasons: [{code: 'STALE_SOURCE', source: 'crypto'}],
+      currency: 'USD',
+    };
+
+    it('shows no badge when the figures are complete or carry no headline', () => {
+      const {el} = render();
+
+      expect(el.querySelector('[data-testid="headline-badge"]')).toBeNull();
+    });
+
+    it('badges the hero figure Stale and opens the reason from it', () => {
+      const {el} = render('3m', undefined, null, {netWorthHeadline: signal(stale)});
+      const badge = el.querySelector<HTMLElement>(
+        '[data-testid="net-worth-quality"] [data-testid="headline-badge"]'
+      );
+
+      expect(badge?.textContent?.trim()).toBe('Stale');
+      expect(badge?.getAttribute('aria-label')).toContain('Net worth');
+    });
+
+    it('badges the split line and reads N/A when the split is withheld', () => {
+      const {el} = render('3m', undefined, null, {
+        bookSplitUnavailable: signal(true),
+        bookSplitHeadline: signal({
+          ...stale,
+          amount: null,
+          quality: 'UNAVAILABLE',
+          reasons: [{code: 'NO_SPLIT'}],
+        }),
+      });
+
+      expect(el.querySelector('[data-testid="net-worth-split"]')?.textContent).toContain('N/A');
+      expect(
+        el.querySelector('[data-testid="net-worth-split-quality"] [data-badge="unavailable"]')
+      ).not.toBeNull();
+    });
+
+    it('reads Change N/A with its badge when the change is withheld', () => {
+      const {el} = render('3m', undefined, null, {
+        netWorthChangeUnavailable: signal(true),
+        netWorthChangeHeadline: signal({
+          ...stale,
+          amount: null,
+          quality: 'UNAVAILABLE',
+          reasons: [{code: 'SHORT_HISTORY'}],
+        }),
+      });
+
+      expect(el.querySelector('[data-testid="net-worth-change"]')?.textContent).toContain(
+        'Change N/A'
+      );
+      expect(el.querySelector('[data-testid="net-worth-change-quality"]')).not.toBeNull();
+    });
+
+    it('no longer shows the ad-hoc stale alert under the chart', () => {
+      const {el} = render();
+
+      expect(el.textContent).not.toContain('carried forward from the last successful sync');
+    });
   });
 
   it('links the net-worth hero to the accounts list', () => {

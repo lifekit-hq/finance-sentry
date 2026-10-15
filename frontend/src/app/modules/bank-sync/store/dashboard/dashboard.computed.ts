@@ -11,10 +11,13 @@ import {
   NEUTRAL_COLOUR,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {APP_LOCALE, MS_PER_DAY} from '../../../../shared/constants/date/date.constants';
+import {STALE_SOURCE_CODE} from '../../../../shared/constants/headline/headline.constants';
 import {DEFAULT_BASE_CURRENCY} from '../../../../shared/constants/money/money.constants';
+import {type Headline, type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {CategoryStore} from '../../../../shared/store/categories/categories.store';
 import {CategoryColourUtils} from '../../../../shared/utils/category-colour.utils';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
+import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {MoneyUtils} from '../../../../shared/utils/money.utils';
 import {
@@ -38,6 +41,7 @@ interface StateSignals {
   historyRange: Signal<HistoryRange>;
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
   historyScopeChanges: Signal<NetWorthScopeChangeDto[]>;
+  historyChangeHeadline: Signal<MaybeHeadline>;
   historyLoading: Signal<boolean>;
   historyError: Signal<string | null>;
   scrubIndex: Signal<number | null>;
@@ -414,11 +418,73 @@ export function dashboardComputed(store: StateSignals) {
     return start && end && endIndex > first ? changeOf(start.invested, end.invested) : null;
   });
 
+  // The live net worth as a typed record, with the latest snapshot's stale sleeves added when the
+  // API's own record does not already name them (and one built around the amount on an older
+  // build). Null while scrubbing: a historical point is not the live figure, so it carries no
+  // badge and never reads N/A.
+  const netWorthHeadline = computed((): Nullable<Headline> => {
+    const data = store.data();
+    if (scrubbedTotal() !== null || !data) {
+      return null;
+    }
+    const history = store.netWorthHistory();
+    const sleeves = (history[history.length - 1]?.staleSleeves ?? '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const named = data.netWorthHeadline?.reasons.some(r => r.code === STALE_SOURCE_CODE) ?? false;
+    return HeadlineUtils.withStaleSources(
+      data.netWorthHeadline,
+      named ? [] : sleeves,
+      baseCurrency(),
+      data.totalNetWorthUsd
+    );
+  });
+
+  // The split line's record: the cash and invested records together; null while scrubbing or
+  // when the API sent neither.
+  const bookSplitHeadline = computed((): Nullable<Headline> => {
+    const data = store.data();
+    if (scrubbedTotal() !== null || !data) {
+      return null;
+    }
+    return HeadlineUtils.combine([data.cashHeadline, data.investedHeadline]);
+  });
+
+  // The window's change as a typed record; null while scrubbing (the pointer measures its own
+  // span) and when the API sent none.
+  const netWorthChangeHeadline = computed((): Nullable<Headline> =>
+    scrubbedTotal() === null ? (store.historyChangeHeadline() ?? null) : null
+  );
+
   return {
     baseCurrency,
-    // The scrubbed point's total while a pointer holds the chart, else the live net worth.
+    netWorthHeadline,
+    bookSplitHeadline,
+    netWorthChangeHeadline,
+    // The scrubbed point's total while a pointer holds the chart, else the live net worth; N/A
+    // (never 0) when the API says the figure is unavailable.
     totalBalanceFormatted: computed(() =>
-      MoneyUtils.format(scrubbedTotal() ?? store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
+      HeadlineUtils.display(
+        netWorthHeadline(),
+        MoneyUtils.format(scrubbedTotal() ?? store.data()?.totalNetWorthUsd ?? 0, baseCurrency())
+      )
+    ),
+    // True when the split line has no figure to show but its record says why: it reads "N/A"
+    // with its badge instead of vanishing.
+    bookSplitUnavailable: computed((): boolean => {
+      const headline = bookSplitHeadline();
+      if (!headline) {
+        return false;
+      }
+      const {cashUsd, investedUsd} = store.data() ?? {};
+      return (cashUsd == null || investedUsd == null) && headline.quality !== 'COMPLETE';
+    }),
+    // True when the change line has no figure but its record says why (a withheld change
+    // reads "N/A" with its badge, never a 0 or a blank).
+    netWorthChangeUnavailable: computed(
+      (): boolean =>
+        HeadlineUtils.isUnavailable(netWorthChangeHeadline()) && netWorthChange() === null
     ),
     // "invested X · cash Y" under the live headline; null while scrubbing (the split is live
     // only) and when the book was not read in full.
@@ -568,21 +634,6 @@ export function dashboardComputed(store: StateSignals) {
 
     // Index-aligned with the x positions of `incomeVsSpendingBars`: the `YYYY-MM` each bar pair covers.
     incomeVsSpendingMonthKeys: computed((): string[] => completeMonths().map(([key]) => key)),
-
-    netWorthStaleNotice: computed((): string | null => {
-      const history = store.netWorthHistory();
-      const latest = history[history.length - 1];
-      const sleeves = latest?.staleSleeves?.trim();
-      if (!sleeves) {
-        return null;
-      }
-      const names = sleeves
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .map(s => s.charAt(0).toUpperCase() + s.slice(1));
-      return `${names.join(' & ')} data is stale — carried forward from the last successful sync, not a real change.`;
-    }),
 
     isHistoryLoading: computed(() => store.historyLoading()),
     historyErrorMessage: computed(() => store.historyError()),

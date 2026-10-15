@@ -4,6 +4,7 @@ import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
 import {catchError, EMPTY, pipe, switchMap, tap, timer} from 'rxjs';
 
+import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {
   type DashboardData,
   type HistoryRange,
@@ -23,6 +24,7 @@ interface EffectsStore {
   setHistoryError: (error: string | null) => void;
   setHistoryHasHistory: (hasHistory: boolean) => void;
   setHistoryScopeChanges: (scopeChanges: NetWorthScopeChangeDto[]) => void;
+  setHistoryChangeHeadline: (headline: MaybeHeadline) => void;
   historyRange: Signal<HistoryRange>;
 }
 
@@ -70,6 +72,7 @@ export function dashboardEffects(store: EffectsStore) {
               store.setNetWorthHistory(response.snapshots);
               store.setHistoryHasHistory(response.hasHistory);
               store.setHistoryScopeChanges(response.scopeChanges ?? []);
+              store.setHistoryChangeHeadline(response.changeHeadline);
               store.setHistoryLoading(false);
               store.setHistoryError(null);
             }),

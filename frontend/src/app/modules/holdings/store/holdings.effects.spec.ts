@@ -27,13 +27,14 @@ function buildStore() {
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
     setPositions: vi.fn(),
+    setHeadline: vi.fn(),
     setError: vi.fn(),
     setDayChangePct: vi.fn(),
   };
 }
 
 function buildPositions() {
-  return {getPositions: vi.fn().mockReturnValue(of(FAKE_POSITIONS))};
+  return {getHoldings: vi.fn().mockReturnValue(of({positions: FAKE_POSITIONS, headline: null}))};
 }
 
 function configure(
@@ -67,10 +68,24 @@ describe('holdingsEffects', () => {
     expect(store.setSuccess).toHaveBeenCalledOnce();
   });
 
+  it('loadPositions: stores the total headline beside the positions', () => {
+    const store = buildStore();
+    const positions = buildPositions();
+    const headline = {quality: 'DEGRADED', reasons: [{code: 'STALE_SOURCE', source: 'crypto'}]};
+    positions.getHoldings.mockReturnValue(of({positions: FAKE_POSITIONS, headline}));
+    configure(positions);
+
+    TestBed.runInInjectionContext(() => {
+      holdingsEffects(store).loadPositions();
+    });
+
+    expect(store.setHeadline).toHaveBeenCalledWith(headline);
+  });
+
   it('loadPositions: error path forwards errorCode', () => {
     const store = buildStore();
     const positions = buildPositions();
-    positions.getPositions.mockReturnValue(
+    positions.getHoldings.mockReturnValue(
       throwError(
         () => new HttpErrorResponse({status: 400, error: {errorCode: 'POSITIONS_FETCH_FAILED'}})
       )
@@ -87,12 +102,15 @@ describe('holdingsEffects', () => {
   it('loadPositions: quotes the held equities once and stores their day change', () => {
     const store = buildStore();
     const positions = buildPositions();
-    positions.getPositions.mockReturnValue(
-      of([
-        EQUITY,
-        {...EQUITY, provider: 'binance', symbol: 'BTC', instrumentType: null},
-        {...EQUITY, symbol: 'USD Cash', instrumentType: 'CASH'},
-      ])
+    positions.getHoldings.mockReturnValue(
+      of({
+        positions: [
+          EQUITY,
+          {...EQUITY, provider: 'binance', symbol: 'BTC', instrumentType: null},
+          {...EQUITY, symbol: 'USD Cash', instrumentType: 'CASH'},
+        ],
+        headline: null,
+      })
     );
     const quotes = {
       getQuotes: vi.fn().mockReturnValue(
@@ -121,7 +139,7 @@ describe('holdingsEffects', () => {
   it('loadPositions: a failed quote fetch keeps the positions and the previous day changes', () => {
     const store = buildStore();
     const positions = buildPositions();
-    positions.getPositions.mockReturnValue(of([EQUITY]));
+    positions.getHoldings.mockReturnValue(of({positions: [EQUITY], headline: null}));
     configure(positions, {getQuotes: vi.fn().mockReturnValue(throwError(() => new Error('boom')))});
 
     TestBed.runInInjectionContext(() => {

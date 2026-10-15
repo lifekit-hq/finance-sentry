@@ -3,6 +3,7 @@ import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {describe, expect, it} from 'vitest';
 
+import {type Headline} from '../../../shared/models/headline/headline.model';
 import {type Position} from '../models/position/position.model';
 import {holdingsComputed} from './holdings.computed';
 
@@ -25,16 +26,51 @@ function position(overrides: Partial<Position>): Position {
 function build(
   positions: Position[],
   dayChangePctByTicker: Record<string, number> = {},
-  status: AsyncStatus = 'idle'
+  status: AsyncStatus = 'idle',
+  headline: Nullable<Headline> = null
 ) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
       positions: signal(positions),
+      headline: signal(headline),
       status: signal<AsyncStatus>(status),
       dayChangePctByTicker: signal(dayChangePctByTicker),
     })
   );
 }
+
+describe('holdingsComputed headline', () => {
+  const headline = (overrides: Partial<Headline>): Headline => ({
+    amount: 100,
+    percent: null,
+    method: 'VALUE',
+    scope: 'umbrella',
+    window: {to: '2026-10-15'},
+    quality: 'COMPLETE',
+    reasons: [],
+    currency: 'USD',
+    ...overrides,
+  });
+
+  it('carries the record and is available by default', () => {
+    const c = build([], {}, 'success', null);
+
+    expect(c.totalHeadline()).toBeNull();
+    expect(c.isTotalUnavailable()).toBe(false);
+  });
+
+  it('flags an unavailable total so the header reads N/A', () => {
+    const unavailable = headline({
+      amount: null,
+      quality: 'UNAVAILABLE',
+      reasons: [{code: 'STALE_SOURCE', source: 'crypto'}],
+    });
+    const c = build([], {}, 'success', unavailable);
+
+    expect(c.totalHeadline()).toBe(unavailable);
+    expect(c.isTotalUnavailable()).toBe(true);
+  });
+});
 
 describe('holdingsComputed', () => {
   it('positionsLoaded is false before the first load and true once it succeeds, even when empty', () => {

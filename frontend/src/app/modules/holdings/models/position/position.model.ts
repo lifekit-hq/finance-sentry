@@ -1,3 +1,5 @@
+import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
+
 export interface BrokeragePositionDto {
   symbol: string;
   instrumentType: string;
@@ -21,6 +23,8 @@ export interface BrokerageHoldingsDto {
   isStale: boolean;
   positions: BrokeragePositionDto[];
   totalUsdValue: number;
+  /** The sleeve total as a typed record (USD); absent from older API builds. */
+  headline?: MaybeHeadline;
 }
 
 export interface CryptoHoldingDto {
@@ -41,6 +45,8 @@ export interface CryptoHoldingsDto {
   isStale: boolean;
   holdings: CryptoHoldingDto[];
   totalUsdValue: number;
+  /** The sleeve total as a typed record (USD); absent from older API builds. */
+  headline?: MaybeHeadline;
 }
 
 /** Holdings slice a position belongs to. */

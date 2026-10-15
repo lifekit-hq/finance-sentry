@@ -24,6 +24,7 @@ import {
 } from '@lifekit-hq/ui';
 
 import {AppDecimalPipe} from '../../../../core/pipes/app-decimal.pipe';
+import {HeadlineBadgeComponent} from '../../../../shared/components/headline-badge/headline-badge.component';
 import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
@@ -71,6 +72,7 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
     DataTableComponent,
     DonutChartComponent,
     FireTileComponent,
+    HeadlineBadgeComponent,
     IconComponent,
     MerchantCategoryPipe,
     MoneyPipe,
@@ -142,24 +144,38 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
               @if (store.isLoading()) {
                 <cmn-skeleton class="block" height="1.875rem" width="50%" />
               } @else {
-                <p
-                  class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
-                  data-testid="net-worth-value"
-                >
-                  {{ store.totalBalanceFormatted() }}
-                </p>
+                <div class="flex items-center gap-cmn-2">
+                  <p
+                    class="text-cmn-2xl font-semibold tabular-nums text-text-primary"
+                    data-testid="net-worth-value"
+                  >
+                    {{ store.totalBalanceFormatted() }}
+                  </p>
+                  <fns-headline-badge
+                    [headline]="store.netWorthHeadline()"
+                    label="Net worth"
+                    data-testid="net-worth-quality"
+                  />
+                </div>
               }
               <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
               <div class="h-4 leading-4" data-testid="net-worth-split-slot">
                 @if (store.isLoading()) {
                   <cmn-skeleton height="0.875rem" width="45%" />
-                } @else if (store.bookSplitFormatted()) {
-                  <p
-                    class="text-cmn-xs leading-4 text-text-secondary tabular-nums"
-                    data-testid="net-worth-split"
-                  >
-                    {{ store.bookSplitFormatted() }}
-                  </p>
+                } @else if (store.bookSplitFormatted() || store.bookSplitUnavailable()) {
+                  <div class="flex items-center gap-cmn-2">
+                    <p
+                      class="text-cmn-xs leading-4 text-text-secondary tabular-nums"
+                      data-testid="net-worth-split"
+                    >
+                      {{ store.bookSplitFormatted() || 'Cash / invested split N/A' }}
+                    </p>
+                    <fns-headline-badge
+                      [headline]="store.bookSplitHeadline()"
+                      label="Cash and invested split"
+                      data-testid="net-worth-split-quality"
+                    />
+                  </div>
                 }
               </div>
               <!--
@@ -171,28 +187,49 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                 @if (store.isLoading() || store.isHistoryLoading()) {
                   <cmn-skeleton height="1rem" width="40%" />
                 } @else if (store.netWorthChangeFormatted()) {
-                  <p
-                    [class]="changeClass()"
-                    class="block truncate font-label text-cmn-sm font-medium leading-5"
-                    data-testid="net-worth-change"
-                  >
-                    <span class="font-normal text-text-secondary">Change</span>
-                    {{ store.netWorthChangeFormatted() }}
-                    @if (store.netWorthChangePercentFormatted()) {
-                      ({{ store.netWorthChangePercentFormatted() }})
-                    } @else if (store.netWorthScopeNote()) {
-                      <span
-                        [attr.title]="store.netWorthScopeNote()"
-                        [attr.aria-label]="store.netWorthScopeNote()"
-                        class="font-normal text-text-secondary"
-                        data-testid="net-worth-scope-note"
-                        >· {{ store.netWorthScopeNote() }}</span
-                      >
-                    }
-                    <span class="font-normal text-text-secondary"
-                      >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
+                  <div class="flex items-center gap-cmn-2">
+                    <p
+                      [class]="changeClass()"
+                      class="block min-w-0 truncate font-label text-cmn-sm font-medium leading-5"
+                      data-testid="net-worth-change"
                     >
-                  </p>
+                      <span class="font-normal text-text-secondary">Change</span>
+                      {{ store.netWorthChangeFormatted() }}
+                      @if (store.netWorthChangePercentFormatted()) {
+                        ({{ store.netWorthChangePercentFormatted() }})
+                      } @else if (store.netWorthScopeNote()) {
+                        <span
+                          [attr.title]="store.netWorthScopeNote()"
+                          [attr.aria-label]="store.netWorthScopeNote()"
+                          class="font-normal text-text-secondary"
+                          data-testid="net-worth-scope-note"
+                          >· {{ store.netWorthScopeNote() }}</span
+                        >
+                      }
+                      <span class="font-normal text-text-secondary"
+                        >· {{ store.scrubDateFormatted() ?? rangeLabel() }}</span
+                      >
+                    </p>
+                    <fns-headline-badge
+                      [headline]="store.netWorthChangeHeadline()"
+                      label="Net worth change"
+                      data-testid="net-worth-change-quality"
+                    />
+                  </div>
+                } @else if (store.netWorthChangeUnavailable()) {
+                  <div class="flex items-center gap-cmn-2">
+                    <p
+                      class="font-label text-cmn-sm font-medium leading-5 text-text-secondary"
+                      data-testid="net-worth-change"
+                    >
+                      Change N/A
+                    </p>
+                    <fns-headline-badge
+                      [headline]="store.netWorthChangeHeadline()"
+                      label="Net worth change"
+                      data-testid="net-worth-change-quality"
+                    />
+                  </div>
                 }
               </div>
               <!--
@@ -267,11 +304,6 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                   (pointClick)="onNetWorthClick($event)"
                   (scrubEnd)="store.setScrubIndex(null)"
                 />
-                @if (store.netWorthStaleNotice()) {
-                  <div class="mt-cmn-2">
-                    <cmn-alert variant="warning">{{ store.netWorthStaleNotice() }}</cmn-alert>
-                  </div>
-                }
               }
               <lk-segmented
                 [options]="rangeOptions"

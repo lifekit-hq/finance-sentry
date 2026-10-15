@@ -8,6 +8,7 @@ import {
   NEUTRAL_COLOUR,
 } from '../../../../shared/constants/chart-colour/chart-colour.constants';
 import {type ChartColour} from '../../../../shared/models/chart-colour/chart-colour.model';
+import {type Headline} from '../../../../shared/models/headline/headline.model';
 import {
   type AccountCategory,
   type CategorySection,
@@ -15,6 +16,7 @@ import {
   type WealthSummaryResponse,
 } from '../../../../shared/models/wealth/wealth.model';
 import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
+import {HeadlineUtils} from '../../../../shared/utils/headline.utils';
 
 const PERCENT = 100;
 
@@ -51,6 +53,12 @@ export function accountsComputed(store: StateSignals) {
       () => store.status() === 'success' && (store.summary()?.categories ?? []).length === 0
     ),
     totalNetWorth: computed(() => store.summary()?.totalNetWorth ?? 0),
+    // The header total's typed record; null on an older API build (no badge, shown as before).
+    netWorthHeadline: computed((): Nullable<Headline> => store.summary()?.headline ?? null),
+    // The total is withheld: the header reads N/A with its badge, never 0 or a hidden card.
+    isNetWorthUnavailable: computed((): boolean =>
+      HeadlineUtils.isUnavailable(store.summary()?.headline)
+    ),
     baseCurrency: computed(() => store.summary()?.baseCurrency ?? 'USD'),
     // The inventory sections, in display order. The noun is what one institution of the
     // section is called ("2 brokers"), and the child noun what its rows are ("positions").

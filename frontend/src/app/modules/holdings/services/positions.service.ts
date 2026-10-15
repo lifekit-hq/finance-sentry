@@ -3,6 +3,8 @@ import {ApiService} from '@lifekit-hq/core';
 import {forkJoin, map, type Observable, of} from 'rxjs';
 import {catchError} from 'rxjs/operators';
 
+import {type Headline} from '../../../shared/models/headline/headline.model';
+import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {BROKERAGE_ASSET_CLASS} from '../constants/position/position.constants';
 import {
   type BrokerageHoldingsDto,
@@ -13,6 +15,18 @@ import {
 } from '../models/position/position.model';
 
 const PERCENT_SCALE = 100;
+
+/** The two holdings feeds, named as the headline's stale-source reasons name them. */
+const BROKERAGE_SOURCE = 'brokerage';
+const CRYPTO_SOURCE = 'crypto';
+const HOLDINGS_CURRENCY = 'USD';
+
+/** Every position across the feeds, and the quality of the total they add up to. */
+export interface HoldingsResult {
+  positions: Position[];
+  /** The total's typed record; null when both feeds read cleanly and the API sent none. */
+  headline: Nullable<Headline>;
+}
 
 // P&L % from the provider's own cost basis. Returns null when no usable cost
 // basis is available, so callers render "no data" rather than a fabricated number.
@@ -57,6 +71,15 @@ export class PositionsService extends ApiService {
   }
 
   public getPositions(): Observable<Position[]> {
+    return this.getHoldings().pipe(map(result => result.positions));
+  }
+
+  /**
+   * Positions from both feeds with the headline of their total. A feed that fails to read is
+   * left out of the positions as before, but now named on the headline as a stale source, so a
+   * total that silently lacks a broken connection says so.
+   */
+  public getHoldings(): Observable<HoldingsResult> {
     const brokerage$ = this.get<BrokerageHoldingsDto>('brokerage/holdings').pipe(
       catchError(() => of(null))
     );
@@ -100,7 +123,20 @@ export class PositionsService extends ApiService {
           assetClass: h.isFiat ? 'cash' : 'crypto',
         }));
 
-        return [...brokeragePositions, ...cryptoPositions];
+        const positions = [...brokeragePositions, ...cryptoPositions];
+        const failed = [
+          ...(brokerage ? [] : [BROKERAGE_SOURCE]),
+          ...(crypto ? [] : [CRYPTO_SOURCE]),
+        ];
+        const bothFailed = !brokerage && !crypto;
+        const total = positions.reduce((sum, p) => sum + p.currentValue, 0);
+        const headline = HeadlineUtils.withStaleSources(
+          HeadlineUtils.combine([brokerage?.headline, crypto?.headline]),
+          failed,
+          HOLDINGS_CURRENCY,
+          bothFailed ? null : total
+        );
+        return {positions, headline};
       })
     );
   }

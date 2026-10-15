@@ -9,13 +9,16 @@ import {
   EQUITY_COLOUR,
 } from '../../../shared/constants/chart-colour/chart-colour.constants';
 import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
+import {type Headline} from '../../../shared/models/headline/headline.model';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
+import {HeadlineUtils} from '../../../shared/utils/headline.utils';
 import {ProviderUtils} from '../../../shared/utils/provider.utils';
 import {type Position, type PositionAssetClass} from '../models/position/position.model';
 import {DayChangeUtils} from '../utils/day-change.utils';
 
 interface StateSignals {
   positions: Signal<Position[]>;
+  headline: Signal<Nullable<Headline>>;
   status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
 }
@@ -136,6 +139,9 @@ export function holdingsComputed(store: StateSignals) {
     positions: computed((): Position[] => store.positions()),
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
+    // The total's record: its badge, and N/A (never 0) when every feed failed.
+    totalHeadline: computed((): Nullable<Headline> => store.headline()),
+    isTotalUnavailable: computed(() => HeadlineUtils.isUnavailable(store.headline())),
     positionsByAssetClass,
     allocationSegments: computed((): DonutSegment[] =>
       positionsByAssetClass().map(group => ({

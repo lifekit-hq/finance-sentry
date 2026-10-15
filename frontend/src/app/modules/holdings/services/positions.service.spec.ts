@@ -4,14 +4,23 @@ import {TestBed} from '@angular/core/testing';
 import {API_BASE_URL} from '@lifekit-hq/core';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 
+import {type Headline} from '../../../shared/models/headline/headline.model';
 import {
   type BrokerageHoldingsDto,
   type CryptoHoldingsDto,
   type Position,
 } from '../models/position/position.model';
-import {PositionsService} from './positions.service';
+import {type HoldingsResult, PositionsService} from './positions.service';
 
 const BASE = 'http://api.test';
+
+const emptyBrokerage: BrokerageHoldingsDto = {
+  provider: 'ibkr',
+  syncedAt: null,
+  isStale: false,
+  totalUsdValue: 0,
+  positions: [],
+};
 
 describe('PositionsService', () => {
   let service: PositionsService;
@@ -264,5 +273,80 @@ describe('PositionsService', () => {
         ['AAPL', 10, undefined, undefined],
       ]
     );
+  });
+
+  describe('getHoldings headline', () => {
+    const feed = (usdValue: number): CryptoHoldingsDto => ({
+      provider: 'binance',
+      syncedAt: null,
+      isStale: false,
+      totalUsdValue: usdValue,
+      holdings: [
+        {
+          asset: 'BTC',
+          freeQuantity: 1,
+          lockedQuantity: 0,
+          usdValue,
+          provider: 'binance',
+          isFiat: false,
+        },
+      ],
+    });
+    const load = (
+      brokerage: Nullable<BrokerageHoldingsDto>,
+      crypto: Nullable<CryptoHoldingsDto>
+    ): HoldingsResult => {
+      let result: Nullable<HoldingsResult> = null;
+      service.getHoldings().subscribe(r => (result = r));
+      http.match(req => req.url.endsWith('brokerage/holdings'))[0].flush(brokerage);
+      http.match(req => req.url.endsWith('crypto/holdings'))[0].flush(crypto);
+      return result as unknown as HoldingsResult;
+    };
+
+    it('has no headline when both feeds read and the API sent none', () => {
+      expect(load({...emptyBrokerage}, feed(100)).headline).toBeNull();
+    });
+
+    it("combines the feeds' own records", () => {
+      const record = (amount: number): Headline => ({
+        amount,
+        percent: null,
+        method: 'VALUE',
+        basis: 'MARKET_VALUE',
+        scope: 'sleeve:invested',
+        window: {from: null, to: '2026-10-15'},
+        quality: 'ESTIMATED',
+        basisStatus: 'COMPLETE',
+        coverage: 1,
+        reasons: [{code: 'FX_TODAY_RATE'}],
+        asOf: '2026-10-15T08:00:00Z',
+        currency: 'USD',
+      });
+      const result = load(
+        {...emptyBrokerage, headline: record(10)},
+        {...feed(100), headline: record(100)}
+      );
+
+      expect(result.headline).toMatchObject({amount: 110, quality: 'ESTIMATED'});
+    });
+
+    it('names a failed feed as a stale source and keeps the other one', () => {
+      const result = load(null, feed(100));
+
+      expect(result.positions).toHaveLength(1);
+      expect(result.headline).toMatchObject({
+        amount: 100,
+        quality: 'DEGRADED',
+        reasons: [{code: 'STALE_SOURCE', source: 'brokerage'}],
+      });
+    });
+
+    it('is unavailable, not zero, when every feed failed', () => {
+      const result = load(null, null);
+
+      expect(result.positions).toEqual([]);
+      expect(result.headline).toMatchObject({amount: null, quality: 'UNAVAILABLE'});
+      expect(result.headline?.reasons.map(r => r.source)).toEqual(['brokerage', 'crypto']);
+    });
   });
 });
