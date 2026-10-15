@@ -13,6 +13,8 @@ const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 const FROZEN_SINCE = new Date(Date.now() - THREE_DAYS_MS).toISOString();
 const SYNCED_AT = new Date().toISOString();
 const MAX_SCREENS = 2;
+const HIT_TARGET_HALF_PX = 22;
+const PIN_SCROLL_PX = 40;
 
 function position(
   id: string,
@@ -223,6 +225,69 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await row.getByTestId('institution-nav-link').click();
 
       await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
+    });
+
+    test('gives every actions menu a 44px hit target without growing the row', async ({page}) => {
+      await openAccounts(page);
+
+      const menus = page.getByRole('button', {name: /^Actions for /});
+      await expect(menus).toHaveCount(3);
+      for (const menu of await menus.all()) {
+        await menu.scrollIntoViewIfNeeded();
+        const box = await menu.boundingBox();
+        const covered = await menu.evaluate((el, edge) => {
+          const r = el.getBoundingClientRect();
+          const cx = r.x + r.width / 2;
+          const cy = r.y + r.height / 2;
+          return [
+            [-edge, 0],
+            [edge, 0],
+            [0, -edge],
+            [0, edge],
+          ].every(([dx, dy]) => {
+            const hit = document.elementFromPoint(cx + (dx ?? 0), cy + (dy ?? 0));
+            return hit !== null && el.contains(hit);
+          });
+        }, HIT_TARGET_HALF_PX - 1);
+        expect(covered).toBe(true);
+        expect(box?.height).toBeLessThan(HIT_TARGET_HALF_PX * 2);
+      }
+    });
+
+    test('keeps the section header pinned while its rows scroll under it', async ({page}) => {
+      await openAccounts(page, heavySummary());
+      const header = page.locator('cmn-list-section h2').first();
+      await expect(header).toBeVisible();
+
+      const pinnedAt = async (scrollTop: number): Promise<number> => {
+        await page.locator('main').evaluate((el, top) => (el.scrollTop = top), scrollTop);
+        return (await header.boundingBox())?.y ?? -1;
+      };
+      const naturalY = await pinnedAt(0);
+      const before = await pinnedAt(naturalY);
+      const after = await pinnedAt(naturalY + PIN_SCROLL_PX);
+      expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
+    });
+
+    test('remembers a collapsed bank across a reload, subtotal still in the header', async ({
+      page,
+    }) => {
+      await openAccounts(page);
+      const group = page.locator('cmn-disclosure-row details').first();
+      await expect(group).toHaveJSProperty('open', true);
+
+      await group.locator('summary').click();
+      await expect(group).toHaveJSProperty('open', false);
+      await expect
+        .poll(() => page.evaluate(() => localStorage.getItem('fns.accounts.collapsedInstitutions')))
+        .toContain('truelayer:aib-1');
+      await page.reload();
+
+      await expect(page.locator('cmn-disclosure-row details').first()).toHaveJSProperty(
+        'open',
+        false
+      );
+      await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
     });
 
     test('keeps a 23-position portfolio within two screens', async ({page}) => {
