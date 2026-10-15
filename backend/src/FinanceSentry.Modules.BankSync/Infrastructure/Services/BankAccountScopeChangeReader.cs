@@ -10,8 +10,9 @@ public class BankAccountScopeChangeReader(BankSyncDbContext db) : IAccountScopeC
     public async Task<IReadOnlyList<AccountScopeChange>> GetChangesSinceAsync(
         Guid userId, DateTime sinceUtc, CancellationToken ct = default)
     {
+        // The active-account filter must go too: a removed account is an inactive row, so it would never be seen.
         var rows = await db.BankAccounts
-            .IgnoreQueryFilters([OwnerQueryFilter.Name])
+            .IgnoreQueryFilters([OwnerQueryFilter.Name, BankSyncDbContext.AccountActiveFilterName])
             .Where(a => a.UserId == userId && (a.CreatedAt >= sinceUtc || (!a.IsActive && a.UpdatedAt >= sinceUtc)))
             .Select(a => new { a.Provider, a.IsActive, a.CreatedAt, a.UpdatedAt })
             .ToListAsync(ct);

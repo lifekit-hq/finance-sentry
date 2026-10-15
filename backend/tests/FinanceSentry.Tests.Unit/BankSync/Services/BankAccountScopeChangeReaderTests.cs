@@ -15,13 +15,16 @@ public class BankAccountScopeChangeReaderTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly DateTime Since = new(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    private static BankAccount Account(Guid userId, string externalId, DateTime createdAt, bool isActive = true)
+    private static BankAccount Account(
+        Guid userId, string externalId, DateTime createdAt, bool isActive = true, DateTime? updatedAt = null)
     {
         var account = new BankAccount(userId, externalId, "Bank", "savings", "1234", "Owner", "EUR", userId, "truelayer")
         {
             IsActive = isActive,
         };
         typeof(Entity).GetProperty(nameof(Entity.CreatedAt))!.SetValue(account, createdAt);
+        if (updatedAt is not null)
+            typeof(Entity).GetProperty(nameof(Entity.UpdatedAt))!.SetValue(account, updatedAt);
         return account;
     }
 
@@ -51,6 +54,32 @@ public class BankAccountScopeChangeReaderTests
     {
         await using var db = NewDb();
         db.BankAccounts.Add(Account(UserId, "before", Since.AddDays(-30)));
+        await db.SaveChangesAsync();
+
+        var changes = await new BankAccountScopeChangeReader(db).GetChangesSinceAsync(UserId, Since);
+
+        changes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ReportsAnAccountDeactivatedInsideTheWindowAsRemoved()
+    {
+        await using var db = NewDb();
+        db.BankAccounts.Add(Account(UserId, "gone", Since.AddDays(-30), isActive: false, updatedAt: Since.AddDays(5)));
+        await db.SaveChangesAsync();
+
+        var changes = await new BankAccountScopeChangeReader(db).GetChangesSinceAsync(UserId, Since);
+
+        changes.Should().ContainSingle()
+            .Which.Should().Match<AccountScopeChange>(c =>
+                c.Kind == AccountScopeChangeKinds.Removed && c.AtUtc == Since.AddDays(5));
+    }
+
+    [Fact]
+    public async Task IgnoresAnAccountDeactivatedBeforeTheWindow()
+    {
+        await using var db = NewDb();
+        db.BankAccounts.Add(Account(UserId, "long-gone", Since.AddDays(-60), isActive: false, updatedAt: Since.AddDays(-20)));
         await db.SaveChangesAsync();
 
         var changes = await new BankAccountScopeChangeReader(db).GetChangesSinceAsync(UserId, Since);
