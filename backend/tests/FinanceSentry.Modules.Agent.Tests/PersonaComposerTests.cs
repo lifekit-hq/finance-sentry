@@ -31,7 +31,7 @@ public sealed class PersonaComposerTests
 
         // Core identity + laws.
         prompt.Should().Contain("Ledger");
-        prompt.Should().Contain("Verdict first");
+        prompt.Should().Contain("Answer shape");
         prompt.Should().Contain("Three-layer");
         prompt.Should().Contain("Stay-invested");
 
