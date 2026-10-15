@@ -54,7 +54,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   revalidating: false,
 };
 
-/** What a revisit restores: the rows and summary of the last visit, with the filter they match. */
+/** What a revisit restores: the rows and summary of the last visit, with the filter they were loaded for. The URL alone decides the current filter. */
 export const LEDGER_SESSION_FIELDS = [
   'transactions',
   'totalCount',
@@ -65,10 +65,4 @@ export const LEDGER_SESSION_FIELDS = [
   'monthlyOutflowCurrency',
   'accounts',
   'rowsFilter',
-  'accountId',
-  'transactionType',
-  'categories',
-  'from',
-  'to',
-  'search',
 ] as const satisfies readonly (keyof TransactionLedgerState)[];

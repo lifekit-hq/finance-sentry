@@ -275,7 +275,10 @@ describe('TransactionLedgerStore revisit', () => {
     hasMore: false,
   };
 
-  async function visitAndLeave(url: string) {
+  async function visitAndLeave(
+    url: string,
+    beforeLeave: (store: InstanceType<typeof TransactionLedgerStore>) => void = () => undefined
+  ) {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -291,8 +294,9 @@ describe('TransactionLedgerStore revisit', () => {
     });
     service.getAllTransactions.mockReturnValueOnce(of(PAGE) as never);
     const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl(url, HostComponent);
+    const host = await harness.navigateByUrl(url, HostComponent);
     await harness.fixture.whenStable();
+    beforeLeave(host.store);
     await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
     return harness;
   }
@@ -312,6 +316,7 @@ describe('TransactionLedgerStore revisit', () => {
     expect(store.transactions()).toHaveLength(1);
     expect(store.revalidating()).toBe(true);
     expect(store.status()).toBe('loading');
+    expect(store.accountId()).toBe('acc-1');
   });
 
   it('keeps the restored rows when their revalidation fails', async () => {
@@ -334,5 +339,29 @@ describe('TransactionLedgerStore revisit', () => {
 
     expect(store.transactions()).toEqual([]);
     expect(store.revalidating()).toBe(false);
+    expect(store.accountId()).toBe('acc-2');
+  });
+
+  it('refuses rows cached for the empty filter when the URL asks for an account', async () => {
+    const harness = await visitAndLeave('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.transactions()).toEqual([]);
+    expect(store.revalidating()).toBe(false);
+    expect(store.accountId()).toBe('acc-1');
+  });
+
+  it('does not carry a filter picked just before leaving into the next visit', async () => {
+    const harness = await visitAndLeave('/transactions', store =>
+      patchState(unprotected(store), {accountId: 'acc-2'})
+    );
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions');
+
+    expect(store.accountId()).toBeNull();
+    expect(store.transactions()).toHaveLength(1);
   });
 });
