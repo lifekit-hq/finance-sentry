@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.BankSync.Application.Connections;
 
 using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Modules.BankSync.Domain;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -50,6 +51,17 @@ public interface IBankConnectionHealth
     /// </summary>
     Task<DateTimeOffset?> ScheduledSyncPausedUntilAsync(BankAccount account, CancellationToken ct = default);
 
+    /// <summary>
+    /// The slowed cadence of a Dormant account or connection (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>):
+    /// when a scheduled sync of <paramref name="account"/> may next try it, or null when it may go ahead. Only for a
+    /// provider in <see cref="ConnectionHealthOptions.ActiveProviders"/>; a shadow provider syncs as before and the
+    /// would-be pause is logged. A sync the person triggers never asks.
+    /// </summary>
+    Task<DateTimeOffset?> DormantSyncPausedUntilAsync(BankAccount account, CancellationToken ct = default);
+
+    /// <summary>The same slowed cadence for a scheduled connection-level call (the discovery pass's listing).</summary>
+    DateTimeOffset? DormantPausedUntil(BankConnectionRef connection, ConnectionHealth health);
+
     /// <summary>Records a failed sync of <paramref name="account"/>, raises the alert the policy decides, and returns the verdict.</summary>
     /// <param name="cancelledByCaller">The sync was cancelled from our side (shutdown), which says nothing about the provider.</param>
     /// <param name="ct">Bookkeeping token; a failure path passes <see cref="CancellationToken.None"/> so a cancelled sync is still recorded.</param>
@@ -61,6 +73,14 @@ public interface IBankConnectionHealth
 
     /// <summary>Records a failed connection-level call, raises the alert the policy decides, and returns the verdict.</summary>
     Task<BankHealthVerdict> RecordConnectionFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records a failed probe of the connection (<see cref="BankConnectionHealthProbe"/>): as a failed connection-level
+    /// call, except that a credential failure on a connection already suspect confirms it
+    /// (<see cref="ConnectionHealthPolicy.RecordProbeFailure"/>), so the reconnect ask goes out at once.
+    /// </summary>
+    Task<BankHealthVerdict> RecordConnectionProbeFailureAsync(
         BankConnectionRef connection, Exception exception, CancellationToken ct = default);
 
     /// <summary>
@@ -147,6 +167,22 @@ public sealed class BankConnectionHealth(
         };
     }
 
+    public async Task<DateTimeOffset?> DormantSyncPausedUntilAsync(BankAccount account, CancellationToken ct = default)
+    {
+        var now = time.GetUtcNow();
+        var accountPause = ConnectionHealthScheduledRunGate.DormantPausedUntil(
+            logger, AccountSubject(account), account.Health, now, options.CurrentValue);
+        if (ConnectionOf(account) is not { } connection || await ReadAsync(connection, ct) is not { } stored)
+            return accountPause;
+
+        var connectionPause = DormantPausedUntil(connection, stored.Health);
+        return accountPause is null || connectionPause > accountPause ? connectionPause : accountPause;
+    }
+
+    public DateTimeOffset? DormantPausedUntil(BankConnectionRef connection, ConnectionHealth health) =>
+        ConnectionHealthScheduledRunGate.DormantPausedUntil(
+            logger, ConnectionSubject(connection), health, time.GetUtcNow(), options.CurrentValue);
+
     public async Task<BankHealthVerdict> RecordSyncFailureAsync(
         BankAccount account, Exception exception, bool cancelledByCaller, CancellationToken ct = default)
     {
@@ -213,8 +249,16 @@ public sealed class BankConnectionHealth(
             await ResolveAsync(connection.UserId, connection.Provider, connection.Id, ct);
     }
 
-    public async Task<BankHealthVerdict> RecordConnectionFailureAsync(
-        BankConnectionRef connection, Exception exception, CancellationToken ct = default)
+    public Task<BankHealthVerdict> RecordConnectionFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default) =>
+        RecordConnectionFailureCoreAsync(connection, exception, probe: false, ct);
+
+    public Task<BankHealthVerdict> RecordConnectionProbeFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default) =>
+        RecordConnectionFailureCoreAsync(connection, exception, probe: true, ct);
+
+    private async Task<BankHealthVerdict> RecordConnectionFailureCoreAsync(
+        BankConnectionRef connection, Exception exception, bool probe, CancellationToken ct)
     {
         var at = time.GetUtcNow();
         var stored = await ReadAsync(connection, ct);
@@ -222,7 +266,7 @@ public sealed class BankConnectionHealth(
 
         return stored is null
             ? new BankHealthVerdict(failure, null)
-            : await ChargeConnectionAsync(connection, stored, failure, at, ct);
+            : await ChargeConnectionAsync(connection, stored, failure, at, ct, probe);
     }
 
     public async Task ResolveReplacedConnectionAlertsAsync(
@@ -236,7 +280,12 @@ public sealed class BankConnectionHealth(
     }
 
     private async Task<BankHealthVerdict> ChargeConnectionAsync(
-        BankConnectionRef connection, StoredConnectionHealth stored, ProviderFailure failure, DateTimeOffset at, CancellationToken ct)
+        BankConnectionRef connection,
+        StoredConnectionHealth stored,
+        ProviderFailure failure,
+        DateTimeOffset at,
+        CancellationToken ct,
+        bool probe = false)
     {
         if (failure is { Class: FailureClass.Credential, Strength: FailureStrength.Suspect }
             && await IsProviderWideOutageAsync(connection, at, ct))
@@ -244,12 +293,11 @@ public sealed class BankConnectionHealth(
             failure = ProviderFailure.Transient(failure.Code);
         }
 
-        var evaluation = await recorder.RecordFailureAsync(
-            ConnectionSubject(connection),
-            stored.Health,
-            failure,
-            (health, c) => StoreOf(connection).SaveHealthUnscopedAsync(connection.Id, health, c),
-            ct);
+        Func<ConnectionHealth, CancellationToken, Task> persist =
+            (health, c) => StoreOf(connection).SaveHealthUnscopedAsync(connection.Id, health, c);
+        var evaluation = probe
+            ? await recorder.RecordProbeFailureAsync(ConnectionSubject(connection), stored.Health, failure, persist, ct)
+            : await recorder.RecordFailureAsync(ConnectionSubject(connection), stored.Health, failure, persist, ct);
 
         switch (evaluation?.Outcome)
         {
@@ -264,8 +312,8 @@ public sealed class BankConnectionHealth(
                 await RaiseAsync(connection.UserId, connection.Provider, connection.Id, connection.Label, failure, FailingClass(failure), ct);
                 break;
             default:
-                // Resolve fires only on a success; GoDormant's one ask to hide the connection is a later slice, and the
-                // alert raised when it went Failing stays open meanwhile.
+                // Resolve fires only on a success. GoDormant raises nothing new (its one ask to hide the connection is a
+                // later slice): the alert raised when it went Failing stays open, and the sync slows (DormantSyncPausedUntilAsync).
                 break;
         }
 

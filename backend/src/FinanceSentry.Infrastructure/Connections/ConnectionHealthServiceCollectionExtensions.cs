@@ -1,6 +1,8 @@
 namespace FinanceSentry.Infrastructure.Connections;
 
 using FinanceSentry.Core.Connections;
+using FinanceSentry.Core.Interfaces;
+using Hangfire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -24,6 +26,31 @@ public static class ConnectionHealthServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IConnectionHealthShadow, ConnectionHealthShadowRecorder>();
         return services;
+    }
+
+    /// <summary>
+    /// Registers a sync module's probes (<typeparamref name="TProbe"/>) with the shared
+    /// <see cref="ConnectionHealthProbeJob"/>, which the first call registers together with its recurring schedule.
+    /// </summary>
+    public static IServiceCollection AddConnectionHealthProbe<TProbe>(this IServiceCollection services)
+        where TProbe : class, IConnectionHealthProbe
+    {
+        services.AddScoped<IConnectionHealthProbe, TProbe>();
+        services.TryAddScoped<ConnectionHealthProbeRecorder>();
+        if (services.Any(d => d.ServiceType == typeof(ConnectionHealthProbeJob)))
+            return services;
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<ConnectionHealthProbeJob>();
+        services.AddSingleton<IJobRegistrar, ProbeJobRegistrar>();
+        return services;
+    }
+
+    private sealed class ProbeJobRegistrar : IJobRegistrar
+    {
+        public void RegisterJobs(IServiceProvider sp) =>
+            sp.GetRequiredService<IRecurringJobManager>().AddOrUpdate<ConnectionHealthProbeJob>(
+                ConnectionHealthProbeJob.JobId, job => job.ExecuteAsync(CancellationToken.None), ConnectionHealthProbeJob.Cron);
     }
 
     /// <summary>

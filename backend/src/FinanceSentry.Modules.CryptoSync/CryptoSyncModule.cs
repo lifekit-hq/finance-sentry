@@ -9,6 +9,7 @@ using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain.Interfaces;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
+using FinanceSentry.Modules.CryptoSync.Infrastructure.Connections;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Encryption;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 using FinanceSentry.Modules.CryptoSync.Infrastructure.Persistence;
@@ -76,6 +77,7 @@ public static class CryptoSyncModule
         services.AddSingleton<RevolutXFailureClassifier>();
         services.AddScoped<BinanceSyncJob>();
         services.AddScoped<RevolutXSyncJob>();
+        services.AddConnectionHealthProbe<CryptoConnectionHealthProbe>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

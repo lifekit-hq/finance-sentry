@@ -23,6 +23,30 @@ public interface IConnectionHealthShadow
         ProviderFailure failure,
         Func<ConnectionHealth, CancellationToken, Task> persist,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// A successful probe (<see cref="IConnectionHealthProbe"/>): as <see cref="RecordSuccessAsync"/>, through
+    /// <see cref="ConnectionHealthPolicy.RecordProbeSuccess"/>, so a probe clears a suspicion but never heals a Dormant
+    /// connection.
+    /// </summary>
+    /// <returns>The evaluation, or null if it could not be recorded.</returns>
+    Task<ConnectionHealthEvaluation?> RecordProbeSuccessAsync(
+        ConnectionHealthSubject subject,
+        ConnectionHealth current,
+        Func<ConnectionHealth, CancellationToken, Task> persist,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// A failed probe (<see cref="IConnectionHealthProbe"/>): as <see cref="RecordFailureAsync"/>, through
+    /// <see cref="ConnectionHealthPolicy.RecordProbeFailure"/>, so a credential failure confirms a standing suspicion.
+    /// </summary>
+    /// <returns>The evaluation, or null if it could not be recorded.</returns>
+    Task<ConnectionHealthEvaluation?> RecordProbeFailureAsync(
+        ConnectionHealthSubject subject,
+        ConnectionHealth current,
+        ProviderFailure failure,
+        Func<ConnectionHealth, CancellationToken, Task> persist,
+        CancellationToken ct = default);
 }
 
 /// <summary>Which connection an attempt belongs to, for the log line.</summary>

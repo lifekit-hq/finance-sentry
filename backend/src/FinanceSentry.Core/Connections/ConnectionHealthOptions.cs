@@ -18,7 +18,10 @@ public sealed class ConnectionHealthOptions
     /// <summary>Continuous failure after which a connection becomes Dormant.</summary>
     public TimeSpan DormantAfter { get; set; } = TimeSpan.FromDays(7);
 
-    /// <summary>A suspect credential failure is confirmed when seen again at least this long after the first.</summary>
+    /// <summary>
+    /// A suspect credential failure is confirmed when seen again at least this long after the first, or at once by a failed
+    /// probe (<see cref="ConnectionHealthPolicy.RecordProbeFailure"/>).
+    /// </summary>
     public TimeSpan SuspectConfirmationWindow { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
@@ -28,10 +31,24 @@ public sealed class ConnectionHealthOptions
     public TimeSpan ActionRequiredProbeInterval { get; set; } = TimeSpan.FromDays(1);
 
     /// <summary>
-    /// The providers whose alerts the policy drives, by the keys the shadow log uses (<c>monobank</c>, <c>truelayer</c>,
-    /// <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other provider stays in shadow mode: its
-    /// evaluation is recorded and logged, and its own alerting and account status stay exactly as they were. Empty by
-    /// default, so every provider starts in shadow.
+    /// The slowed cadence of a Dormant connection of an active provider: its scheduled runs pause, and one run in this
+    /// interval, timed from the last failure, still tries it, so a recovery is picked up within a day
+    /// (<see cref="ConnectionHealthPolicy.DormantPausedUntil"/>).
+    /// </summary>
+    public TimeSpan DormantSyncInterval { get; set; } = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// The probe window: a suspect connection is probed at most once in it (<see cref="ConnectionHealthPolicy.ProbeDue"/>).
+    /// The probe job itself runs on a fixed schedule every 30 minutes, so a shorter window probes no more often.
+    /// </summary>
+    public TimeSpan ProbeInterval { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// The providers whose alerts, Dormant cadence and probes the policy drives, by the keys the shadow log uses
+    /// (<c>monobank</c>, <c>truelayer</c>, <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other
+    /// provider stays in shadow mode: its evaluation is recorded and logged, and its own alerting, account status and sync
+    /// schedule stay exactly as they were (the pause on ActionRequired and on <see cref="ConnectionHealth.NotBefore"/>
+    /// applies to every provider). Empty by default, so every provider starts in shadow.
     /// </summary>
     public List<string> ActiveProviders { get; set; } = [];
 

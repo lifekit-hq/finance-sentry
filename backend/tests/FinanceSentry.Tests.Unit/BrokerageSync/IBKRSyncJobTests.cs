@@ -605,4 +605,89 @@ public class IBKRSyncJobTests
         credential.Health.LastSuccessAt.Should().Be(Start);
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    // ── Dormant cadence (S4) ──────────────────────────────────────────
+
+    private static ConnectionHealth DormantSince(DateTimeOffset lastFailureAt) => new()
+    {
+        State = ConnectionHealthState.Dormant,
+        ConsecutiveFailures = 700,
+        FirstFailureAt = lastFailureAt.AddDays(-8),
+        LastFailureAt = lastFailureAt,
+        LastFailureClass = FailureClass.Transient,
+        StateChangedAt = lastFailureAt.AddDays(-1),
+    };
+
+    [Fact]
+    public async Task Active_Dormant_SyncsOnceADay_TimedFromTheLastFailure()
+    {
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddHours(-1)));
+        GivenSyncFails(Ibkr503());
+
+        // 15-minute ticks for the rest of the day after the last failure: none of them calls IBKR.
+        for (var i = 0; i < 90; i++)
+        {
+            if (i > 0) _time.Advance(Tick);
+            await CreatePolicyJob().ExecuteAsync();
+        }
+        VerifySyncCalls(Times.Never());
+
+        // A day after it, the run tries it; the failure renews the pause and raises nothing new.
+        _time.Advance(Tick * 3);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Dormant);
+        VerifyNoAlert();
+
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Once());
+    }
+
+    [Fact]
+    public async Task Active_Dormant_SuccessGoesHealthy_ResolvesTheAlert_AndTheCadenceIsBack()
+    {
+        var userId = Guid.NewGuid();
+        var credential = GivenOneCredential(userId);
+        credential.ApplyHealth(DormantSince(Start.AddDays(-1)));
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(userId, "ibkr", null, It.IsAny<CancellationToken>()), Times.Once);
+
+        _time.Advance(Tick);
+        await CreatePolicyJob().ExecuteAsync();
+        VerifySyncCalls(Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Active_Dormant_AfterReactivate_TheNextScheduledRunSyncs()
+    {
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddMinutes(-15)));
+        credential.Reactivate(
+            "FINSENTRY", "access-token", "dh-pem", [1], [2], [3], [4], [5], [6], [7], [8], [9], keyVersion: 1);
+        GivenSyncSucceeds();
+
+        await CreatePolicyJob().ExecuteAsync();
+
+        VerifySyncCalls(Times.Once());
+        credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+    }
+
+    [Fact]
+    public async Task Shadow_Dormant_SyncsEveryTick_AsBefore()
+    {
+        GivenShadowMode();
+        var credential = GivenOneCredential(Guid.NewGuid());
+        credential.ApplyHealth(DormantSince(Start.AddMinutes(-15)));
+        GivenSyncFails(Ibkr503());
+
+        await RunTicksAsync(4);
+
+        VerifySyncCalls(Times.Exactly(4));
+    }
 }

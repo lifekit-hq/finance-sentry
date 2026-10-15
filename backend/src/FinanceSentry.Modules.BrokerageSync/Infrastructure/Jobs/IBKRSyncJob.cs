@@ -26,7 +26,9 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// failure at once, a transient one after <see cref="TransientFailureAlertThreshold"/> consecutive ticks.</item>
 /// </list>
 /// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
-/// mode, except for one probe a day.
+/// mode, except for one probe a day. With <c>ibkr</c> active, a Dormant credential is tried once a day
+/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>); a suspect credential failure is confirmed or cleared by
+/// the probe job (<see cref="IConnectionHealthProbe"/>), not by this sync.
 /// </summary>
 public sealed class IBKRSyncJob(
     IIBKRCredentialRepository credentialRepository,

@@ -34,7 +34,9 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 /// and 2 h without a success). The run itself then succeeds even when every user failed.
 ///
 /// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
-/// mode, except for one probe a day.
+/// mode, except for one probe a day. With the venue active, a Dormant credential is tried once a day
+/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>); a suspect credential failure is confirmed or cleared by
+/// the probe job (<see cref="IConnectionHealthProbe"/>), not by this sync.
 ///
 /// One subclass per venue, because Hangfire names a job by its type: each venue gets its own
 /// schedule, metrics and failure streak.

@@ -785,4 +785,42 @@ public class CryptoExchangeSyncJobTests
         credential.Health.LastSuccessAt.Should().Be(Start);
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(credential.UserId, provider, null, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    // ── Dormant cadence (S4) ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 4)]
+    public async Task Dormant_ActiveVenueSyncsOnceADay_ShadowVenueEveryTick(bool active, int expectedCalls)
+    {
+        if (active) GivenPolicyDrives(CryptoExchangeProvider.Binance);
+        var credential = MakeCredential(Guid.NewGuid());
+        credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Dormant,
+            ConsecutiveFailures = 700,
+            FirstFailureAt = Start.AddDays(-8),
+            LastFailureAt = Start.AddMinutes(-15),
+            LastFailureClass = FailureClass.Transient,
+        });
+        GivenActive(CryptoExchangeProvider.Binance, credential);
+        GivenSyncFails(new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500));
+
+        for (var i = 0; i < 4; i++)
+        {
+            if (i > 0) _time.Advance(Tick);
+            try
+            {
+                await CreateBinanceJob(ShadowRecorders.Create(_time, _options)).ExecuteAsync();
+            }
+            catch (AggregateException)
+            {
+                // Shadow mode fails a run in which every user failed, as before.
+            }
+        }
+
+        _syncHandler.Verify(
+            h => h.Handle(It.IsAny<SyncExchangeHoldingsCommand>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(expectedCalls));
+    }
 }

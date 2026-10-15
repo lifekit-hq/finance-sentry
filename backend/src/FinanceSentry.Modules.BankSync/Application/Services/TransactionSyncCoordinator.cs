@@ -25,6 +25,9 @@ public class TransactionSyncCoordinator(
     IBackgroundJobClient backgroundJobs,
     IBankConnectionHealth connectionHealth) : ITransactionSyncCoordinator
 {
+    /// <summary>The result code of a scheduled sync the Dormant cadence held back.</summary>
+    public const string DormantCode = "SYNC_DORMANT";
+
     private readonly IBankAccountRepository _accounts = accounts;
     private readonly IScheduledSyncService _syncService = syncService;
     private readonly IBackgroundJobClient _backgroundJobs = backgroundJobs;
@@ -42,6 +45,10 @@ public class TransactionSyncCoordinator(
         // The provider asked for a wait (a rate limit's Retry-After): the scheduled run leaves it alone until then.
         if (account is not null && await connectionHealth.ScheduledSyncPausedUntilAsync(account, ct) is { } pausedUntil)
             return new SyncResult(false, 0, 0, "SYNC_RATE_LIMITED", $"The provider asked for a wait until {pausedUntil:O}; scheduled sync skipped.");
+
+        // A Dormant account or connection of an active provider syncs once a day.
+        if (account is not null && await connectionHealth.DormantSyncPausedUntilAsync(account, ct) is { } dormantUntil)
+            return new SyncResult(false, 0, 0, DormantCode, $"The connection is Dormant; its next scheduled sync is at {dormantUntil:O}.");
 
         return ChaseWithDetection(await _syncService.PerformFullSyncAsync(accountId, ct: ct));
     }
