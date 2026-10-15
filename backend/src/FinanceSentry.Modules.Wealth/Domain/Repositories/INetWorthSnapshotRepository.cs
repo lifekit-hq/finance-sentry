@@ -11,6 +11,14 @@ public interface INetWorthSnapshotRepository
     /// </summary>
     Task UpsertAsync(NetWorthSnapshot snapshot, CancellationToken ct = default);
 
+    /// <summary>
+    /// <see cref="UpsertAsync"/> plus the snapshot's per-source rows, in one transaction. The rows' <c>SnapshotId</c>
+    /// is ignored: it is the Id the snapshot row has after the upsert, which an existing day keeps. They replace
+    /// whatever rows that snapshot had, so a refresh never leaves a source from an earlier run beside the new
+    /// figures; an empty list leaves the snapshot with none.
+    /// </summary>
+    Task UpsertWithSourcesAsync(NetWorthSnapshot snapshot, IReadOnlyList<NetWorthSnapshotSource> sources, CancellationToken ct = default);
+
     Task<bool> ExistsAsync(Guid userId, DateOnly snapshotDate, CancellationToken ct = default);
     Task<NetWorthSnapshot?> GetLatestByUserIdAsync(Guid userId, CancellationToken ct = default);
 

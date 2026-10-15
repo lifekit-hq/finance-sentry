@@ -30,24 +30,30 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("BankingTotal")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal?>("BrokerageInvested")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("brokerage_invested");
 
                     b.Property<decimal>("BrokerageTotal")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal?>("CashTotal")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("cash_total");
 
                     b.Property<decimal?>("CryptoInvested")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("crypto_invested");
 
                     b.Property<decimal>("CryptoTotal")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Currency")
@@ -79,6 +85,7 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<decimal>("TotalNetWorth")
+                        .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid>("UserId")
@@ -92,6 +99,73 @@ namespace FinanceSentry.Modules.Wealth.Migrations
                         .HasDatabaseName("idx_net_worth_snapshot_user_date_unique");
 
                     b.ToTable("net_worth_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshotSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal?>("Cash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cash");
+
+                    b.Property<string>("Health")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("health");
+
+                    b.Property<decimal?>("Invested")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("invested");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.PrimitiveCollection<string[]>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("reasons");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_id");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_id");
+
+                    b.Property<decimal?>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SnapshotId", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_net_worth_snapshot_sources_snapshot_source");
+
+                    b.ToTable("net_worth_snapshot_sources", (string)null);
+                });
+
+            modelBuilder.Entity("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshotSource", b =>
+                {
+                    b.HasOne("FinanceSentry.Modules.Wealth.Domain.NetWorthSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("SnapshotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

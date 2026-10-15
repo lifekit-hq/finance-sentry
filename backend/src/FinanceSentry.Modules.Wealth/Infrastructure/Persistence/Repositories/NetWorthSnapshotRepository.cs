@@ -23,6 +23,44 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
     // two snapshots of one day leave one row instead of the loser failing on the index, and no read precedes it. The
     // row keeps its Id. It runs at once and the snapshot is not tracked by this context.
     public async Task UpsertAsync(NetWorthSnapshot snapshot, CancellationToken ct = default)
+        => await UpsertSnapshotAsync(snapshot, ct);
+
+    // The upsert, the delete of the day's earlier source rows and the inserts share one transaction: the upsert
+    // holds the snapshot row's lock until commit, so two writers of one day are serialized and a reader never sees a
+    // snapshot with half its sources.
+    public async Task UpsertWithSourcesAsync(
+        NetWorthSnapshot snapshot, IReadOnlyList<NetWorthSnapshotSource> sources, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await UpsertSnapshotAsync(snapshot, ct);
+
+        // The row keeps the Id of the day's first write, so the children hang off whichever Id the table holds now.
+        var snapshotId = (await _db.Database.SqlQuery<Guid>(
+            $"""
+            SELECT "Id" AS "Value" FROM public.net_worth_snapshots
+            WHERE "UserId" = {snapshot.UserId} AND "SnapshotDate" = {snapshot.SnapshotDate}
+            """).ToListAsync(ct)).Single();
+
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM public.net_worth_snapshot_sources WHERE snapshot_id = {snapshotId}", ct);
+
+        foreach (var source in sources)
+        {
+            await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public.net_worth_snapshot_sources
+                    ("Id", snapshot_id, source_id, kind, total, cash, invested, health, reasons)
+                VALUES
+                    ({Guid.NewGuid()}, {snapshotId}, {source.SourceId}, {source.Kind.ToString()}, {source.Total},
+                     {source.Cash}, {source.Invested}, {source.Health.ToString()}, {source.Reasons})
+                """,
+                ct);
+        }
+
+        await transaction.CommitAsync(ct);
+    }
+
+    private async Task UpsertSnapshotAsync(NetWorthSnapshot snapshot, CancellationToken ct)
         => await _db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO public.net_worth_snapshots

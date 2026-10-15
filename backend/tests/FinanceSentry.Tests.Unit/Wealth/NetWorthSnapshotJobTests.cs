@@ -61,7 +61,8 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
             snapshotServiceMock.Object,
-            BookStub());
+            BookStub(),
+            []);
 
         await sut.ExecuteAsync();
 
@@ -96,7 +97,8 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 0m).Object,
             BrokerageMock(usdValue: 0m).Object,
             snapshotServiceMock.Object,
-            BookStub());
+            BookStub(),
+            []);
 
         await sut.ExecuteForUserAsync(UserId);
 
@@ -119,7 +121,8 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
             snapshotServiceMock.Object,
-            BookStub());
+            BookStub(),
+            []);
 
         var snapshotDate = new DateOnly(2026, 6, 29);
 
@@ -150,7 +153,8 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
             snapshotServiceMock.Object,
-            BookStub(positions));
+            BookStub(positions),
+            []);
 
         await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
 
@@ -175,7 +179,8 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
             snapshotServiceMock.Object,
-            BookStub(isStale: true));
+            BookStub(isStale: true),
+            []);
 
         await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
 

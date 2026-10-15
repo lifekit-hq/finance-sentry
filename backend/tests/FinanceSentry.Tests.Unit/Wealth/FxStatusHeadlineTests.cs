@@ -198,7 +198,7 @@ public sealed class FxStatusHeadlineTests
         book.Setup(b => b.ReadAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(BookFigures.Empty with { FxStatus = bookStatus });
 
-        return new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, service, book.Object);
+        return new NetWorthSnapshotJob(banking.Object, crypto.Object, brokerage.Object, service, book.Object, []);
     }
 
     [Theory]
