@@ -92,7 +92,8 @@ public static class HeadlineFactory
     /// <summary>
     /// <paramref name="headline"/> shown in <paramref name="baseCurrency"/> at today's rate. A window reaching
     /// before <paramref name="today"/> is converted at a rate that is not its own day's, so it gains
-    /// <see cref="HeadlineReasonCode.FxTodayRate"/> (dated-rate conversion is not built yet); a base with no live
+    /// <see cref="HeadlineReasonCode.FxTodayRate"/> (a headline figure is not dated-rate converted; the net-worth
+    /// history's own change figure is, see <see cref="ChangeInBaseCurrency"/>); a base with no live
     /// rate gains its own FX reason. The percent is a ratio and does not change.
     /// </summary>
     public static Headline InBaseCurrency(Headline headline, string baseCurrency, DateOnly today)
