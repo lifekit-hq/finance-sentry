@@ -74,8 +74,9 @@ rule or shape agreed but not implemented), **missing**.
 ```
 
 This is the target shape. Today the top (three sources registered as `IWealthSource`, R8 PR 1) and bottom
-(dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4) but nothing calls it yet; the per-source rows
-and the headline record are **designed, not built** (§6).
+(dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the headline record
+(3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The per-source rows are
+**designed, not built** (§6).
 
 Three rules keep the layers apart:
 
@@ -258,8 +259,10 @@ also fixes:
 Golden fixtures live in `backend/tests/FinanceSentry.Tests.Unit/Core/Measures/`: `MeasureEngineGoldenFixtureTests`
 holds the report's ten (R5) and `CryptoFlowGoldenFixtureTests` the crypto-flow fixtures 11-20. Each expected
 value comes from a hand calculation or LibreOffice Calc's XIRR on the same flows, cited beside its
-assertion, never from running the engine. Wiring the engine to the headline record (3.6) and the surfaces
-is the next step.
+assertion, never from running the engine. The headline record (3.6) takes M1's amount, percent and failure
+for the figures that are changes (net-worth history's window change, the book side of `get_book_performance`);
+the gain-vs-cost headlines describe the unrealized P&L the readers already sum (value minus cost of the
+positions whose cost is known), not M6's event walk, which no reader feeds yet.
 
 ### 3.5 Worked example (fictional numbers)
 
@@ -288,16 +291,17 @@ the real dates put the deposit 181 days after the first flow (exponent 181/365),
 ### 3.6 The headline contract
 
 Every top-line figure carries the same record: the dashboard hero, the accounts and investments headers,
-every MCP tool that returns a total or a return, and the briefs. **Status: designed, not built.** The shape
-is paraphrased from Wealthfolio's performance-semantics design (AGPL: design only, no code).
+every MCP tool that returns a total or a return, and the briefs. **Status: built in the backend and MCP
+(R6, first PR); the badges and reason sheet (P9) are the second.** The shape is paraphrased from
+Wealthfolio's performance-semantics design (AGPL: design only, no code).
 
 ```
 Headline
   amount       decimal?   in `currency`; null = unavailable
   percent      decimal?   null unless the method and coverage allow one (D4, D5)
-  method       VALUE_CHANGE | CONTRIBUTIONS_VS_GROWTH | TWR | MWR_XIRR | MODIFIED_DIETZ | GAIN_VS_COST | HPR
+  method       VALUE | VALUE_CHANGE | CONTRIBUTIONS_VS_GROWTH | TWR | MWR_XIRR | MODIFIED_DIETZ | GAIN_VS_COST | HPR
   basis        what the percent is "of": START_VALUE | COST | NET_CONTRIBUTED | AVERAGE_CAPITAL
-  scope        umbrella | invested_brokerage | source:<id> | account:<opaque id>
+  scope        umbrella | invested_brokerage | source:<id> | account:<opaque id> | sleeve:<name>
   window       from, to
   quality      COMPLETE | ESTIMATED | DEGRADED | UNAVAILABLE
   basisStatus  COMPLETE | PARTIAL | MISSING   (cost basis or flow history)
@@ -306,6 +310,31 @@ Headline
   asOf         oldest input timestamp
   currency     the base the amount is expressed in
 ```
+
+`VALUE` is a point-in-time value (net worth, a sleeve or split line): no window start, no basis, no percent.
+`sleeve:<name>` covers today's sleeve totals (`sleeve:crypto`, `sleeve:brokerage`, `sleeve:banking`) and the
+split lines (`sleeve:cash`, `sleeve:invested`) until R8's per-source rows replace the sleeves.
+
+**Built (R6, first PR).** `Headline` and its enums live in `FinanceSentry.Core.Headlines` and serialise as the
+names above (`JsonStringEnumMemberName`). Amounts are computed in USD (`HeadlineFactory`) and converted once at
+the display boundary to the base currency (`HeadlineFactory.InBaseCurrency`, C4), which adds `FX_TODAY_RATE`
+for a window reaching before today (today's rate, not the dated one) and the base's own FX status. A percent is
+in percentage points, shares the amount's numerator (D1), is never annualised (D6) and is null with a reason
+when the basis does not support one (D4, D5). `HeadlineSignals` gathers a figure's signals and
+`HeadlineQualityMapper` is the single place that turns them into quality, basis status and reasons; the
+quality is the worst its reasons imply and a figure with no amount is UNAVAILABLE. It is an additive field
+beside the existing ones:
+
+| Surface | Field | What it describes |
+|---|---|---|
+| Dashboard (`GET /dashboard/aggregated`) | `netWorthHeadline`, `cashHeadline`, `investedHeadline` | the hero (`umbrella`) and the C5 split lines (`sleeve:cash`, `sleeve:invested`; `NO_SPLIT` when withheld) |
+| Wealth summary | `headline` | the accounts header total; `source:<provider>` / `sleeve:<category>` when filtered |
+| Crypto and brokerage holdings | `headline` | the investments headers' sleeve totals |
+| Net-worth history | `changeHeadline` | first to last point of the window, M1 (`SCOPE_CHANGED` from R3 withholds the percent) |
+| `get_portfolio_snapshot` | `headlines` (`totalValue`, `investedValue`, `cash`, `unrealizedPnl`) | the book totals; `unrealizedPnl` is `GAIN_VS_COST` with `basisStatus` and `coverage` |
+| `get_net_worth_history` | `headline` per point | each day's total |
+| `get_book_performance` | `book` per period | the book side, M1 over `invested_brokerage` (`SHORT_HISTORY` or `ZERO_BASE` when there is no percent) |
+| `get_allocation_vs_target` | `totalHeadline` | the total the drift weights are taken over |
 
 **Reasons are typed codes.** They become words through the frontend's existing registry pattern
 (`ERROR_MESSAGES` / `ErrorMessageService`), never by parsing strings. Today's scattered signals map onto
@@ -321,7 +350,28 @@ them:
 | Historical FX replaced by today's rate (`TODAY_RATE`) or a seed-table rate (`SEED_TABLE`) | ESTIMATED + `FX_TODAY_RATE` (reason code live, R4) |
 | `HasStaleSleeves` on FIRE | DEGRADED + `STALE_SOURCE` |
 | "Book N/A" | UNAVAILABLE + `SHORT_HISTORY` or `NO_SPLIT` |
-| (new) | `SCOPE_CHANGED`, `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`, `ZERO_BASE`, `NON_CASH_INCLUDED`, `PRICE_CARRIED_FORWARD`, `RESIDUAL_ABOVE_TOLERANCE` |
+| A measure's failure (`MeasureFailure`) on a change | the amount stands, the percent is null: `ZERO_BASE`, `NEGATIVE_BASE`, `SCOPE_CHANGED`, `SHORT_HISTORY` (a missing end: UNAVAILABLE), `NOT_MEASURABLE` |
+| (new) | `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`, `NON_CASH_INCLUDED`, `PRICE_CARRIED_FORWARD`, `RESIDUAL_ABOVE_TOLERANCE` |
+
+Every row above except FIRE is mapped in `HeadlineQualityMapper` (tests: `HeadlineQualityMapperTests`).
+A live total's stale source is a sleeve whose read failed (`BookFigures.StaleSources`), a provider past its
+freshness window, or an institution whose sync status is stale, failed or needs re-authorisation. The
+`(new)` codes have their quality fixed (ESTIMATED for `UNKNOWN_FLOW`, `UNMATCHED_TRANSFER`,
+`PRICE_CARRIED_FORWARD`; DEGRADED for `NON_CASH_INCLUDED`, `RESIDUAL_ABOVE_TOLERANCE`) but no source raises
+them until flows (G6) and the source registry (R8) land.
+
+**Not yet carrying the record** (R6's remaining work, with P9): the FIRE projection and its `HasStaleSleeves`;
+the briefs (`PerformanceBriefComposer`, the FIRE brief); the MCP tools whose figures are per thesis, per
+recommendation or per flow rather than a book total or return (`get_benchmark_track_record`,
+`get_thesis_performance`, `get_track_record`, postmortems, `get_cashflow_report`, budgets, the family
+clearing statement) and per-row figures (positions, accounts, tax lots); a net-worth change headline on
+`get_net_worth_history` (the tool returns a bare list); scope-change detection on the book side of
+`get_book_performance` (it always measures with no scope change); the holdings-based return on
+`get_book_performance` (`holdingsBasedReturn`; the method label for a chained, dividend-excluded holdings price
+return is the next PR's choice); and dated-rate display conversion.
+**P9** then renders `quality` as a badge on the dashboard hero, the accounts and investments headers and the
+split lines, with a reason sheet whose words come from the `ERROR_MESSAGES` registry, and moves the
+dashboard's own "Change" percentage (`dashboard.computed.ts`) onto `changeHeadline` (G3).
 
 **Display rules:**
 
@@ -669,10 +719,13 @@ Three total columns on `net_worth_snapshots` and staleness as a comma-separated 
 economy would still be a schema change plus a change in every snapshot consumer until the per-source rows
 (§5.6, PRs 2-4) land.
 
-**G5. Quality signals are scattered and untyped.**
+**G5. Quality signals are scattered and untyped.** *Closed for the backend headline figures and the MCP
+totals (R6, first PR); the frontend still reads the untyped fields until P9.*
 `StaleSleeves` (string), `IsApproximate` (bool), `CashTotal` null, `Coverage` (string), `HasStaleSleeves`
-(FIRE flag), "Book N/A" (null fields), FX substitution (log line only). Each consumer interprets them on its
-own; MCP tools and briefs cannot tell an estimated figure from a measured one uniformly (§3.6).
+(FIRE flag), "Book N/A" (null fields), FX substitution. The headline figures and the MCP tools that return a
+total or a return now carry the typed record beside these (§3.6), so MCP reads one vocabulary; the untyped
+fields stay for current consumers. The FIRE flag, the briefs and the per-thesis and flow tools are not yet
+covered (§3.6, "Not yet carrying the record").
 
 **G6. Investment flows land but nothing reads them.**
 IBKR and Inzhur cash rows land in `brokerage_sync."BrokerageCashTransactions"`; only income types are read.

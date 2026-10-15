@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Radar.Domain.Ports;
 
+using FinanceSentry.Core.Headlines;
+
 /// <summary>
 /// Read-port: daily invested brokerage value for a user (idle broker cash excluded), sourced from net-worth snapshots.
 /// Lives in Radar's domain so the BookPerformanceService can consume portfolio history without
@@ -16,4 +18,5 @@ public interface IPortfolioValueSource
         Guid userId, DateOnly from, DateOnly to, CancellationToken ct = default);
 }
 
-public sealed record DailyPortfolioValue(DateOnly Date, decimal BrokerageInvestedUsd);
+/// <summary>One day's invested brokerage value and the day's quality <see cref="Signals"/> (none when the source records none).</summary>
+public sealed record DailyPortfolioValue(DateOnly Date, decimal BrokerageInvestedUsd, HeadlineSignals? Signals = null);

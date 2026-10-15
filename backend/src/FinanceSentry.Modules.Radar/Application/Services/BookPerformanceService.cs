@@ -1,3 +1,4 @@
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Modules.Radar.Domain;
 using FinanceSentry.Modules.Radar.Domain.Ports;
 using FinanceSentry.Modules.Radar.Domain.Repositories;
@@ -67,7 +68,10 @@ public sealed class BookPerformanceService(
         IReadOnlyList<HoldingsCapture> captures)
     {
         var spyTwr = ComputeSpyTwr(spyBars, since);
-        var bookTwr = ComputeBookTwr(portfolioSnapshots, since, today);
+        var window = BookWindow(portfolioSnapshots, since, today);
+        decimal? bookTwr = window is { } w && w.Start.BrokerageInvestedUsd != 0m
+            ? Math.Round((w.End.BrokerageInvestedUsd - w.Start.BrokerageInvestedUsd) / w.Start.BrokerageInvestedUsd, 4)
+            : null;
         var (holdings, span) = ComputeHoldingsBasedReturn(captures, since, today);
 
         if (spyTwr is null && bookTwr is null && holdings.Value is null)
@@ -105,7 +109,8 @@ public sealed class BookPerformanceService(
             spyPriceReturn,
             holdingsDelta,
             holdings.Reason,
-            holdings.MissingPriceSymbols is { Count: > 0 } ? holdings.MissingPriceSymbols : null);
+            holdings.MissingPriceSymbols is { Count: > 0 } ? holdings.MissingPriceSymbols : null,
+            BookHeadline(window, since, today));
     }
 
     private static (HoldingsBasedReturnResult Result, CaptureSpan? Span) ComputeHoldingsBasedReturn(
@@ -146,6 +151,20 @@ public sealed class BookPerformanceService(
         return Math.Round((endBar.Close - startBar.Close) / startBar.Close, 4);
     }
 
+    // The book side as M1 over the invested brokerage value. With no measurable window the figure is unavailable
+    // (SHORT_HISTORY); a zero start keeps the dollar change and withholds the percent (ZERO_BASE).
+    private static Headline BookHeadline(
+        (DailyPortfolioValue Start, DailyPortfolioValue End)? window, DateOnly since, DateOnly today)
+    {
+        if (window is not { } w)
+            return HeadlineFactory.Change(null, null, HeadlineScope.InvestedBrokerage, since, today, false, HeadlineSignals.None);
+
+        var signals = (w.Start.Signals ?? HeadlineSignals.None).Merge(w.End.Signals ?? HeadlineSignals.None);
+        return HeadlineFactory.Change(
+            w.Start.BrokerageInvestedUsd, w.End.BrokerageInvestedUsd, HeadlineScope.InvestedBrokerage,
+            w.Start.Date, w.End.Date, false, signals);
+    }
+
     private static decimal? ComputeSpyTwr(IReadOnlyList<Domain.DailyBar> bars, DateOnly since)
     {
         var startBar = bars.FirstOrDefault(b => b.Date >= since);
@@ -164,12 +183,15 @@ public sealed class BookPerformanceService(
         return Math.Round((endBar.AdjClose - startBar.AdjClose) / startBar.AdjClose, 4);
     }
 
-    private static decimal? ComputeBookTwr(IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since, DateOnly today)
+    // The first and last rows of the period, or null when the history does not cover it: a missing end, an edge gap
+    // past the allowance, or a single day.
+    private static (DailyPortfolioValue Start, DailyPortfolioValue End)? BookWindow(
+        IReadOnlyList<DailyPortfolioValue> snapshots, DateOnly since, DateOnly today)
     {
         var startSnapshot = snapshots.FirstOrDefault(s => s.Date >= since);
         var endSnapshot = snapshots.LastOrDefault();
 
-        if (startSnapshot is null || endSnapshot is null || startSnapshot.BrokerageInvestedUsd == 0m)
+        if (startSnapshot is null || endSnapshot is null)
         {
             return null;
         }
@@ -186,9 +208,7 @@ public sealed class BookPerformanceService(
             return null;
         }
 
-        return Math.Round(
-            (endSnapshot.BrokerageInvestedUsd - startSnapshot.BrokerageInvestedUsd) / startSnapshot.BrokerageInvestedUsd,
-            4);
+        return (startSnapshot, endSnapshot);
     }
 
     private readonly record struct CaptureSpan(DateOnly First, DateOnly Last);

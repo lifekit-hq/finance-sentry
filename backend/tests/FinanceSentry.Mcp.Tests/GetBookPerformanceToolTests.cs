@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain;
@@ -54,6 +56,36 @@ public sealed class GetBookPerformanceToolTests
 
         result.Periods.Should().HaveCount(1);
         result.Periods[0].Period.Should().Be(BookPerformancePeriod.OneMonth);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CarriesTheBookHeadline_BesideTheUntypedFields()
+    {
+        var since = Today.AddDays(-7);
+        var book = HeadlineFactory.Change(
+            100_000m, 103_000m, HeadlineScope.InvestedBrokerage, since, Today, false,
+            new HeadlineSignals { StaleSources = ["brokerage"] });
+        _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
+            .ReturnsAsync(new BookPerformanceResult(
+                [new PeriodTwr(BookPerformancePeriod.OneWeek, since, 0.03m, 0.01m, 0.02m, "outperform", Book: book)], Today));
+
+        var result = await CreateSut().ExecuteAsync();
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        var period = json.RootElement.GetProperty("periods")[0];
+
+        period.GetProperty("bookTwr").GetDecimal().Should().Be(0.03m);
+        period.GetProperty("verdict").GetString().Should().Be("outperform");
+        var headline = period.GetProperty("book");
+        headline.GetProperty("amount").GetDecimal().Should().Be(3_000m);
+        headline.GetProperty("percent").GetDecimal().Should().Be(3.00m);
+        headline.GetProperty("method").GetString().Should().Be("VALUE_CHANGE");
+        headline.GetProperty("basis").GetString().Should().Be("START_VALUE");
+        headline.GetProperty("scope").GetString().Should().Be("invested_brokerage");
+        headline.GetProperty("quality").GetString().Should().Be("DEGRADED");
+        headline.GetProperty("basisStatus").GetString().Should().Be("COMPLETE");
+        var reason = headline.GetProperty("reasons")[0];
+        reason.GetProperty("code").GetString().Should().Be("STALE_SOURCE");
+        reason.GetProperty("source").GetString().Should().Be("brokerage");
     }
 
     [Fact]

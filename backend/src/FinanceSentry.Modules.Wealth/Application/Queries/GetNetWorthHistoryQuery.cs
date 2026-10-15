@@ -1,8 +1,10 @@
 namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 public record NetWorthSnapshotDto(
@@ -25,10 +27,16 @@ public record NetWorthSnapshotDto(
 /// </summary>
 public record NetWorthScopeChangeDto(string Source, string Kind, DateOnly At);
 
+/// <summary>
+/// <see cref="ChangeHeadline"/> is the change in total net worth from the first to the last returned snapshot as a
+/// typed <see cref="Headline"/> (M1 value change, USD until the controller applies the base currency): no percent
+/// across a scope change or from a zero start, and the stale, reconstructed and FX flags of both end rows.
+/// </summary>
 public record NetWorthHistoryResponse(
     IReadOnlyList<NetWorthSnapshotDto> Snapshots,
     bool HasHistory,
-    IReadOnlyList<NetWorthScopeChangeDto>? ScopeChanges = null);
+    IReadOnlyList<NetWorthScopeChangeDto>? ScopeChanges = null,
+    Headline? ChangeHeadline = null);
 
 public record GetNetWorthHistoryQuery(Guid UserId, DateOnly? From, DateOnly? To) : IQuery<NetWorthHistoryResponse>;
 
@@ -68,6 +76,21 @@ public class GetNetWorthHistoryQueryHandler(
             }
         }
 
-        return new NetWorthHistoryResponse(dtos, dtos.Count > 0, scopeChanges);
+        return new NetWorthHistoryResponse(dtos, dtos.Count > 0, scopeChanges, ChangeHeadline(snapshots, scopeChanges.Count > 0));
+    }
+
+    // The repository returns the window in date order: the change runs from its first row to its last.
+    private static Headline? ChangeHeadline(IReadOnlyList<NetWorthSnapshot> snapshots, bool scopeChanged)
+    {
+        if (snapshots.Count == 0)
+            return null;
+
+        var first = snapshots[0];
+        var last = snapshots[^1];
+        var signals = HeadlineSignals.FromSnapshot(first.StaleSleeves, first.IsApproximate, first.FxStatus)
+            .Merge(HeadlineSignals.FromSnapshot(last.StaleSleeves, last.IsApproximate, last.FxStatus));
+        return HeadlineFactory.Change(
+            first.TotalNetWorth, last.TotalNetWorth, HeadlineScope.Umbrella,
+            first.SnapshotDate, last.SnapshotDate, scopeChanged, signals);
     }
 }

@@ -18,7 +18,7 @@ public sealed class RadarPortfolioValueSource(IBrokerageValueHistoryReader broke
         // A day with no split is skipped: neither zero nor the cash-inclusive total stands in for it.
         return daily
             .Where(d => d.BrokerageInvestedUsd is not null)
-            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageInvestedUsd!.Value))
+            .Select(d => new DailyPortfolioValue(d.Date, d.BrokerageInvestedUsd!.Value, d.Signals))
             .ToList();
     }
 }

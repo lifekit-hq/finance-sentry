@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync.Application.Services;
 
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.Domain.Repositories;
@@ -12,6 +13,9 @@ using FinanceSentry.Modules.BankSync.Domain.Repositories;
 /// (<see cref="BookFigures.CashUsd"/> / <see cref="BookFigures.InvestedValueUsd"/>) shown as a
 /// sub-line under the net-worth total; they are null when the book could not be read in full,
 /// so the sub-line is hidden rather than showing a partial split. The total is not derived from them.
+/// <see cref="NetWorthHeadline"/>, <see cref="CashHeadline"/> and <see cref="InvestedHeadline"/> describe those
+/// three figures as typed <see cref="Headline"/> records (quality, reasons, as-of); they sit beside the plain
+/// fields so readers that only know those keep working.
 /// </summary>
 public record DashboardData(
     Dictionary<string, decimal> AggregatedBalance,
@@ -24,7 +28,10 @@ public record DashboardData(
     IReadOnlyList<MonthlyFlow>? WindowFlow = null,
     string BaseCurrency = "USD",
     decimal? CashUsd = null,
-    decimal? InvestedUsd = null);
+    decimal? InvestedUsd = null,
+    Headline? NetWorthHeadline = null,
+    Headline? CashHeadline = null,
+    Headline? InvestedHeadline = null);
 
 /// <summary>
 /// Composes all dashboard data in a single call.
@@ -149,10 +156,25 @@ public class DashboardQueryService(
         // A stale source means the split would be partial, so it is withheld.
         var book = _bookFigures is not null ? await _bookFigures.ReadAsync(userId, ct) : null;
         var split = book is { IsStale: false } ? book : null;
+        var totalUsd = bankTotalUsd + cryptoTotalUsd + brokerageTotalUsd;
+
+        // The book's failed reads and conversions, plus any broker whose holdings are older than its cadence.
+        var signals = (book is null ? HeadlineSignals.None : HeadlineSignals.FromBook(book))
+            .Merge(new HeadlineSignals
+            {
+                StaleSources = [.. brokerageHoldings
+                    .GroupBy(h => h.Provider, StringComparer.OrdinalIgnoreCase)
+                    .Where(g => BrokerageFreshness.IsStale(g.Key, g.Max(h => h.SyncedAt), now))
+                    .Select(g => g.Key.ToLowerInvariant())],
+            });
+        var splitSignals = split is null ? signals with { NoSplit = true } : signals;
+        DateTime?[] inputTimes = [.. cryptoHoldings.Select(h => (DateTime?)h.SyncedAt), .. brokerageHoldings.Select(h => (DateTime?)h.SyncedAt), lastSync?.CompletedAt];
+        DateTimeOffset? asOf = inputTimes.Min() is { } oldest ? new DateTimeOffset(DateTime.SpecifyKind(oldest, DateTimeKind.Utc)) : null;
+        var today = DateOnly.FromDateTime(now);
 
         return new DashboardData(
             balance,
-            bankTotalUsd + cryptoTotalUsd + brokerageTotalUsd,
+            totalUsd,
             accountCount,
             byType,
             flow,
@@ -160,7 +182,10 @@ public class DashboardQueryService(
             lastSync?.CompletedAt,
             windowFlow,
             CashUsd: split?.CashUsd,
-            InvestedUsd: split?.InvestedValueUsd);
+            InvestedUsd: split?.InvestedValueUsd,
+            NetWorthHeadline: HeadlineFactory.Value(totalUsd, HeadlineScope.Umbrella, today, signals, asOf),
+            CashHeadline: HeadlineFactory.Value(split?.CashUsd, HeadlineScope.CashSleeve, today, splitSignals, asOf),
+            InvestedHeadline: HeadlineFactory.Value(split?.InvestedValueUsd, HeadlineScope.InvestedSleeve, today, splitSignals, asOf));
     }
 
     // Midnight UTC of the requested day — the dashboard anchors every date in UTC — held

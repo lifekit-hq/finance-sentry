@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Wealth.API.Controllers;
 
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
@@ -65,6 +66,7 @@ public class WealthController(
         {
             TotalNetWorth = Fx(summary.TotalNetWorth),
             BaseCurrency = baseCurrency,
+            Headline = summary.Headline is { } h ? HeadlineFactory.InBaseCurrency(h, baseCurrency, h.Window.To) : null,
             Categories = [.. summary.Categories.Select(c => c with
             {
                 TotalInBaseCurrency = Fx(c.TotalInBaseCurrency),

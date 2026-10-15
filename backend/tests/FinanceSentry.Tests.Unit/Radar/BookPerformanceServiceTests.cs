@@ -1,3 +1,5 @@
+using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Utils;
 using FluentAssertions;
 using Moq;
 using FinanceSentry.Modules.Radar.Application.Services;
@@ -387,6 +389,86 @@ public sealed class BookPerformanceServiceTests
         BookPerformancePeriod.OneYear => today.AddYears(-1),
         _ => throw new ArgumentOutOfRangeException(nameof(period), period, null),
     };
+
+    private void SetupOneWeek(DateOnly since, DateOnly today, params DailyPortfolioValue[] values)
+    {
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync(values);
+    }
+
+    [Fact]
+    public async Task GetAsync_DescribesTheBookSide_AsAValueChangeHeadline()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(since, today, new DailyPortfolioValue(since, 100_000m), new DailyPortfolioValue(today, 103_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        var book = period.Book!;
+        book.Method.Should().Be(HeadlineMethod.ValueChange);
+        book.Basis.Should().Be(HeadlineBasis.StartValue);
+        book.Scope.Should().Be(HeadlineScope.InvestedBrokerage);
+        book.Amount.Should().Be(3_000m);
+        book.Percent.Should().Be(3.00m);
+        book.Quality.Should().Be(HeadlineQuality.Complete);
+        book.Reasons.Should().BeEmpty();
+        book.Window.Should().Be(new HeadlineWindow(since, today));
+        period.BookTwr.Should().Be(0.03m);
+    }
+
+    [Fact]
+    public async Task GetAsync_BookHeadline_CarriesTheEndRowsSignals()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(
+            since, today,
+            new DailyPortfolioValue(since, 100_000m, HeadlineSignals.FromSnapshot(null, true, (FxStatus?)null)),
+            new DailyPortfolioValue(today, 103_000m, HeadlineSignals.FromSnapshot("brokerage", false, FxStatus.Exact)));
+
+        var book = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single().Book!;
+
+        book.Quality.Should().Be(HeadlineQuality.Degraded);
+        book.Reasons.Should().Equal(
+            new HeadlineReason(HeadlineReasonCode.StaleSource, "brokerage"),
+            new HeadlineReason(HeadlineReasonCode.BackfilledEstimate),
+            new HeadlineReason(HeadlineReasonCode.FxTodayRate));
+        book.Amount.Should().Be(3_000m);
+    }
+
+    [Fact]
+    public async Task GetAsync_BookHeadline_IsUnavailableWithShortHistory_WhenTheBookCannotBeMeasured()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(since, today, new DailyPortfolioValue(today, 100_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().BeNull();
+        period.Book!.Amount.Should().BeNull();
+        period.Book.Percent.Should().BeNull();
+        period.Book.Quality.Should().Be(HeadlineQuality.Unavailable);
+        period.Book.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.ShortHistory));
+    }
+
+    [Fact]
+    public async Task GetAsync_BookHeadline_KeepsTheChangeButNoPercent_FromAZeroStart()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+        SetupOneWeek(since, today, new DailyPortfolioValue(since, 0m), new DailyPortfolioValue(today, 5_000m));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().BeNull();
+        period.Book!.Amount.Should().Be(5_000m);
+        period.Book.Percent.Should().BeNull();
+        period.Book.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.ZeroBase));
+    }
 
     private static void AssertBookCompared(PeriodTwr period, bool compared)
     {

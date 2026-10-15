@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.BankSync.API.Controllers;
 
 using FinanceSentry.Core.Auth;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BankSync.API.Responses;
@@ -60,12 +61,17 @@ public class DashboardController(
             FamilySupportOutflowUsd = Fx(f.FamilySupportOutflowUsd),
             InvestedOutflowUsd = Fx(f.InvestedOutflowUsd),
         };
+        // The headlines are point-in-time values dated the service's today: their window end is that day.
+        Headline? Hl(Headline? h) => h is null ? null : HeadlineFactory.InBaseCurrency(h, baseCurrency, h.Window.To);
 
         return data with
         {
             TotalNetWorthUsd = Fx(data.TotalNetWorthUsd),
             CashUsd = data.CashUsd is { } cash ? Fx(cash) : null,
             InvestedUsd = data.InvestedUsd is { } invested ? Fx(invested) : null,
+            NetWorthHeadline = Hl(data.NetWorthHeadline),
+            CashHeadline = Hl(data.CashHeadline),
+            InvestedHeadline = Hl(data.InvestedHeadline),
             MonthlyFlow = [.. data.MonthlyFlow.Select(Flow)],
             WindowFlow = data.WindowFlow?.Select(Flow).ToList(),
             TopCategories = [.. data.TopCategories.Select(c => c with { TotalSpend = Fx(c.TotalSpend) })],
