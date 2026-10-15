@@ -396,8 +396,8 @@ COMPLETE shows nothing, ESTIMATED reads "Estimated", DEGRADED reads "Stale" (a `
 `core/errors/headline-reasons.registry.ts` and resolved through `ErrorMessageService` (an unknown code gets a
 generic line), plus `asOf` and `coverage` when the figure is not complete. The badge and its sheet hold a 44 x 44
 px hit area. The ad-hoc stale alert under the dashboard chart (`netWorthStaleNotice`) is gone: the
-snapshot's `staleSleeves` becomes a `STALE_SOURCE` reason on the net-worth headline when the API's own record has
-none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
+latest history row's stale sources (its `sources` marked `STALE_SOURCE`; `staleSleeves` on an older API build) become
+`STALE_SOURCE` reasons on the net-worth headline when the API's own record has none, and the investments total names a feed that failed to read as `STALE_SOURCE` the same way (a broken
 connection is no longer buried mid-list, finding 5). The dashboard's "Change" line wears the `changeHeadline` badge; its figure still comes from the snapshots (G3 stays open).
 The FIRE tile keeps its own `hasStaleSleeves` flag until the FIRE projection carries a record.
 
@@ -455,7 +455,7 @@ verbatim.
 **Status: partial.** The registry is built (R8 PR 1, §5.6): the banking, brokerage and crypto readers are
 registered as `IWealthSource` (`BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource`) and
 `BookFiguresService` sums whatever is registered; the snapshot job writes one `net_worth_snapshot_sources` row
-per registered source (R8 PR 2). The contract below is still the target: today a source
+per registered source (R8 PR 2), which history, the dashboard, MCP and FIRE read back (R8 PR 3). The contract below is still the target: today a source
 returns `WealthSourceReading` (USD cash, invested positions, worst FX status), not the full
 `SourceSnapshot`, and has no `asOf`, native units, reliability or events.
 
