@@ -5,7 +5,7 @@ export type VerdictWord = 'StrongBuy' | 'Buy' | 'Wait' | 'Avoid' | 'NotScored';
 export type VerdictAxis = 'Structure' | 'Fundamentals' | 'Crowding' | 'Valuation';
 
 export type VerdictOperator =
-  'LessThan' | 'GreaterThan' | 'AtLeast' | 'AtMost' | 'Is' | 'IsNot' | 'IsMissing' | 'IsKnown';
+  'LessThan' | 'GreaterThan' | 'AtLeast' | 'AtMost' | 'Is' | 'IsNot' | 'IsMissing';
 
 /** Which structure value the verdict read: the regime-adjusted one, or raw when there was no regime reading. */
 export type VerdictStructureBasis = 'adjusted' | 'raw';

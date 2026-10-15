@@ -25,8 +25,8 @@ public enum VerdictAxis
 }
 
 /// <summary>
-/// How a condition compares an axis value with its threshold. <see cref="IsMissing"/> and
-/// <see cref="IsKnown"/> make a null axis an explicit rule, never a mid value (spec 726 FR-008).
+/// How a condition compares an axis value with its threshold. <see cref="IsMissing"/> makes a null
+/// axis an explicit rule, never a mid value (spec 726 FR-008).
 /// </summary>
 public enum VerdictOperator
 {
@@ -37,7 +37,6 @@ public enum VerdictOperator
     Is,
     IsNot,
     IsMissing,
-    IsKnown,
 }
 
 /// <summary>

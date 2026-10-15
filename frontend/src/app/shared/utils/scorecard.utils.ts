@@ -29,7 +29,7 @@ const PERCENT = 100;
 const PERCENT_DIGITS = 1;
 const RATIO_DIGITS = 2;
 const PE_DIGITS = 1;
-const UNARY_OPERATORS = new Set(['Is', 'IsNot', 'IsMissing', 'IsKnown']);
+const UNARY_OPERATORS = new Set(['Is', 'IsNot', 'IsMissing']);
 
 type MaybeFact = Nullable<ScorecardFact>;
 

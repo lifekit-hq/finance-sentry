@@ -165,11 +165,6 @@ public sealed class VerdictRulesTests
             return c.Actual is null;
         }
 
-        if (c.Operator == VerdictOperator.IsKnown)
-        {
-            return c.Actual is not null;
-        }
-
         if (c.Actual is null)
         {
             return false;

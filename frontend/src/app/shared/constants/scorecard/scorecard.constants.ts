@@ -55,7 +55,6 @@ export const VERDICT_OPERATOR_LABEL: Readonly<Record<VerdictOperator, string>> =
   Is: 'is',
   IsNot: 'is not',
   IsMissing: 'is missing',
-  IsKnown: 'is known',
 };
 
 export const VERDICT_STRUCTURE_BASIS_NOTE: Readonly<Record<VerdictStructureBasis, string>> = {
