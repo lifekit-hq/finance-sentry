@@ -24,7 +24,8 @@ namespace FinanceSentry.Core.Connections;
 /// <see cref="ConnectionHealthOptions.DormantSyncInterval"/> (<see cref="DormantPausedUntil"/>).</item>
 /// <item>A suspect credential failure, or a Dormant connection, is probed (<see cref="ProbeDue"/>): a cheap authenticated
 /// call per provider, at most one per connection per <see cref="ConnectionHealthOptions.ProbeInterval"/>. A failed probe
-/// that is a credential failure confirms the suspicion (<see cref="RecordProbeFailure"/>); a successful one clears it.</item>
+/// that is a credential failure confirms the suspicion (<see cref="RecordProbeFailure"/>); a successful one clears it
+/// but never heals a Dormant connection (<see cref="RecordProbeSuccess"/>).</item>
 /// </list>
 /// </summary>
 public static class ConnectionHealthPolicy
@@ -188,6 +189,21 @@ public static class ConnectionHealthPolicy
         var confirms = failure.Class == FailureClass.Credential && current.SuspectSince is not null;
         return RecordFailure(
             current, confirms ? failure with { Strength = FailureStrength.Definitive } : failure, at, options, source, connectedAt);
+    }
+
+    /// <summary>
+    /// A successful probe (<see cref="ProbeDue"/>): as any success, except on a Dormant connection. A probe proves the
+    /// credential works, not that the resource whose failure made the connection Dormant is back, so it only clears
+    /// the suspicion there; the state, the failure streak and the last failure that times the slowed cadence stay, and
+    /// only a success of the slowed sync itself (<see cref="RecordSuccess"/>) heals it and resolves the alert.
+    /// </summary>
+    public static ConnectionHealthEvaluation RecordProbeSuccess(ConnectionHealth current, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+
+        return current.State == ConnectionHealthState.Dormant
+            ? new ConnectionHealthEvaluation(current, current with { SuspectSince = null }, ConnectionHealthOutcome.None)
+            : RecordSuccess(current, at);
     }
 
     /// <summary>

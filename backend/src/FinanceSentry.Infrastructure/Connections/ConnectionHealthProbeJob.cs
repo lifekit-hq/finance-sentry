@@ -9,7 +9,8 @@ using Microsoft.Extensions.Options;
 /// The connection-health probe job (report §10 Option B, slice S4): every <see cref="ConnectionHealthOptions.ProbeInterval"/>
 /// it asks each sync module (<see cref="IConnectionHealthProbe"/>) for its suspect and Dormant connections and probes
 /// the ones due (<see cref="ConnectionHealthPolicy.ProbeDue"/>) with the provider's cheap authenticated call: a suspect
-/// credential failure is confirmed (ActionRequired) or cleared, a Dormant connection heals on a success. At most one
+/// credential failure is confirmed (ActionRequired) or cleared; a Dormant connection is probed at its slowed cadence,
+/// which clears a suspicion but never heals it (only the slowed sync's own success does). At most one
 /// probe per connection per window, none for a connection that is neither suspect nor Dormant, and none for a provider
 /// outside <see cref="ConnectionHealthOptions.ActiveProviders"/>: a shadow provider's due probe is only logged.
 /// </summary>

@@ -132,6 +132,38 @@ public class ConnectionHealthProbeTests
         ConnectionHealthPolicy.ProbeDue(evaluation.Health, Now.AddHours(1), _options).Should().BeNull();
     }
 
+    [Fact]
+    public void Dormant_SuccessfulProbe_LeavesItDormantOnItsCadence()
+    {
+        var dormant = DormantSince(Now.AddDays(-1)) with { SuspectSince = Now.AddDays(-1) };
+
+        var evaluation = ConnectionHealthPolicy.RecordProbeSuccess(dormant, Now);
+
+        evaluation.Health.State.Should().Be(ConnectionHealthState.Dormant);
+        evaluation.Health.SuspectSince.Should().BeNull();
+        evaluation.Health.Should().BeEquivalentTo(dormant with { SuspectSince = null });
+        evaluation.Outcome.Should().Be(ConnectionHealthOutcome.None);
+    }
+
+    [Fact]
+    public void Dormant_SuccessfulSlowedSync_HealsAndResolves()
+    {
+        var evaluation = ConnectionHealthPolicy.RecordSuccess(DormantSince(Now.AddDays(-1)), Now);
+
+        evaluation.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        evaluation.Health.ConsecutiveFailures.Should().Be(0);
+        evaluation.Outcome.Should().Be(ConnectionHealthOutcome.Resolve);
+    }
+
+    [Fact]
+    public void NotDormant_SuccessfulProbe_IsAnyOtherSuccess()
+    {
+        var evaluation = ConnectionHealthPolicy.RecordProbeSuccess(SuspectAt(Now), Now.AddMinutes(1));
+
+        evaluation.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        evaluation.Health.SuspectSince.Should().BeNull();
+    }
+
     // ── The recorder ─────────────────────────────────────────────────────────
 
     private ConnectionHealthProbeRecorder CreateRecorder() =>
@@ -177,6 +209,20 @@ public class ConnectionHealthProbeTests
         _stored.State.Should().Be(ConnectionHealthState.Healthy);
         _stored.SuspectSince.Should().BeNull();
         _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(_subject.UserId, Provider, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Recorder_DormantConnection_SuccessfulProbeDoesNotHealOrResolve()
+    {
+        _stored = DormantSince(Now.AddDays(-1));
+        var dormant = _stored;
+        _time.Advance(TimeSpan.FromDays(1));
+
+        await ProbeAsync(_ => Task.CompletedTask, ClassifiesAs(ProviderFailure.Unknown(null)));
+
+        _stored.Should().Be(dormant);
+        _alerts.Verify(a => a.ResolveSyncFailureAlertAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

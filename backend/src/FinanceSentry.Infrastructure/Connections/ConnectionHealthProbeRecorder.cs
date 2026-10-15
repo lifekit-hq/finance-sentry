@@ -6,7 +6,8 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Makes one probe call (<see cref="IConnectionHealthProbe"/>) and records its result for a provider whose alerts the
-/// policy drives: a success as any success, resolving the sync-failure alert when the connection recovers; a failure
+/// policy drives: a success as any success, resolving the sync-failure alert when the connection recovers, except on a Dormant
+/// connection, which only the slowed sync's own success heals (<see cref="ConnectionHealthPolicy.RecordProbeSuccess"/>); a failure
 /// through <see cref="IConnectionHealthShadow.RecordProbeFailureAsync"/>, raising the alert the evaluation earns (the
 /// reconnect ask when the probe confirms a suspect credential failure). Best-effort: never throws for the provider's answer.
 /// </summary>
@@ -53,7 +54,10 @@ public sealed class ConnectionHealthProbeRecorder(
             return failed;
         }
 
-        var succeeded = await connectionHealth.RecordSuccessAsync(subject, current, persist, CancellationToken.None);
+        var succeeded = await connectionHealth.RecordProbeSuccessAsync(subject, current, persist, CancellationToken.None);
+        if (succeeded is { Previous.State: ConnectionHealthState.Dormant })
+            return succeeded;
+
         await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
             alerts, userPreferences, logger, subject.UserId, subject.Provider, succeeded);
         return succeeded;

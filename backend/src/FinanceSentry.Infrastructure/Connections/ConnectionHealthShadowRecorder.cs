@@ -22,6 +22,14 @@ public sealed class ConnectionHealthShadowRecorder(
         CancellationToken ct = default) =>
         RecordAsync(subject, null, () => ConnectionHealthPolicy.RecordSuccess(current, time.GetUtcNow()), persist, ct);
 
+    public Task<ConnectionHealthEvaluation?> RecordProbeSuccessAsync(
+        ConnectionHealthSubject subject,
+        ConnectionHealth current,
+        Func<ConnectionHealth, CancellationToken, Task> persist,
+        CancellationToken ct = default) =>
+        RecordAsync(
+            subject, null, () => ConnectionHealthPolicy.RecordProbeSuccess(current, time.GetUtcNow()), persist, ct, "probe success");
+
     public Task<ConnectionHealthEvaluation?> RecordFailureAsync(
         ConnectionHealthSubject subject,
         ConnectionHealth current,
