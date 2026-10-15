@@ -117,6 +117,14 @@ export const APP_ROUTES: Routes = [
         } satisfies PageChromeData,
       },
       {
+        path: AppRoute.Watchlist.slice(1),
+        loadComponent: () =>
+          import('./modules/research/pages/watchlist/watchlist.component').then(
+            m => m.WatchlistComponent
+          ),
+        ...RouteTitleUtils.of('Watchlist'),
+      },
+      {
         path: AppRoute.Alerts.slice(1),
         loadComponent: () =>
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),
