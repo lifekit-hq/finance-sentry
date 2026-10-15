@@ -33,6 +33,17 @@ public interface IHistoricalExchangeRateService
     Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default);
 
     /// <summary>
+    /// The USD-per-unit rates a feed actually published inside the inclusive range, with the window
+    /// widened backward by <see cref="CachingHistoricalExchangeRateService.PublishedLookbackDays"/> so
+    /// the first day can borrow the closest earlier published rate. One lookup (and one upstream
+    /// request) covers the whole range; resolve each date with <see cref="PublishedRateLookup.Resolve"/>.
+    /// Days a feed skips are absent and today's live rate is never substituted. Empty when no feed
+    /// published one (an unreachable or unsupported feed), and that outcome is not cached.
+    /// </summary>
+    Task<IReadOnlyDictionary<DateOnly, decimal>> GetPublishedSeriesAsync(
+        string currency, DateOnly from, DateOnly to, CancellationToken ct = default);
+
+    /// <summary>
     /// Converts <paramref name="amount"/> to USD at <paramref name="date"/>'s rate and reports how the
     /// rate was obtained: <see cref="FxStatus.Exact"/> when a feed published that very date,
     /// <see cref="FxStatus.NearestPublished"/> when it borrowed the closest earlier published day, and
@@ -43,6 +54,29 @@ public interface IHistoricalExchangeRateService
     /// </summary>
     Task<ConvertResult> ConvertToUsdAsync(
         decimal amount, string currency, DateOnly date, CancellationToken ct = default);
+}
+
+/// <summary>Resolves one date against a published series without ever reaching for today's rate.</summary>
+public static class PublishedRateLookup
+{
+    /// <summary>
+    /// The rate published for <paramref name="date"/> (<see cref="FxStatus.Exact"/>), else the closest
+    /// earlier published rate within <see cref="CachingHistoricalExchangeRateService.PublishedLookbackDays"/>
+    /// (<see cref="FxStatus.NearestPublished"/>), else null.
+    /// </summary>
+    public static (decimal Rate, FxStatus Status)? Resolve(IReadOnlyDictionary<DateOnly, decimal> published, DateOnly date)
+    {
+        if (published.TryGetValue(date, out var exact))
+            return (exact, FxStatus.Exact);
+
+        for (var back = 1; back <= CachingHistoricalExchangeRateService.PublishedLookbackDays; back++)
+        {
+            if (published.TryGetValue(date.AddDays(-back), out var nearest))
+                return (nearest, FxStatus.NearestPublished);
+        }
+
+        return null;
+    }
 }
 
 public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRateService
@@ -97,6 +131,27 @@ public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRa
         return onOrBefore.Count > 0 ? onOrBefore[0].Value : null;
     }
 
+    public async Task<IReadOnlyDictionary<DateOnly, decimal>> GetPublishedSeriesAsync(
+        string currency, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(currency) || to < from)
+            return new Dictionary<DateOnly, decimal>();
+
+        var normalized = currency.Trim().ToUpperInvariant();
+        var cacheKey = $"fx-published:{normalized}:{from:yyyyMMdd}:{to:yyyyMMdd}";
+
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyDictionary<DateOnly, decimal>? cached) && cached is not null)
+            return cached;
+
+        var published = await FetchPublishedAsync(normalized, from.AddDays(-PublishedLookbackDays), to, ct);
+
+        // An empty answer is an outage or an unsupported currency, not a fact about the dates: do not pin it.
+        if (published.Count > 0)
+            _cache.Set(cacheKey, published, CacheLifetime);
+
+        return published;
+    }
+
     public async Task<ConvertResult> ConvertToUsdAsync(
         decimal amount, string currency, DateOnly date, CancellationToken ct = default)
     {
@@ -108,12 +163,8 @@ public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRa
 
             var published = await FetchPublishedAsync(normalized, date.AddDays(-PublishedLookbackDays), date, ct);
 
-            if (published.TryGetValue(date, out var exact))
-                return new ConvertResult(amount * exact, FxStatus.Exact);
-
-            var nearest = published.Where(kv => kv.Key < date).OrderByDescending(kv => kv.Key).Select(kv => (decimal?)kv.Value).FirstOrDefault();
-            if (nearest is { } rate)
-                return new ConvertResult(amount * rate, FxStatus.NearestPublished);
+            if (PublishedRateLookup.Resolve(published, date) is { } resolved)
+                return new ConvertResult(amount * resolved.Rate, resolved.Status);
         }
 
         var today = CurrencyConverter.Convert(amount, currency);

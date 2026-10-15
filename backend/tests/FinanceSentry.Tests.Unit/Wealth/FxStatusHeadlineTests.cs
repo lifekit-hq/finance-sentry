@@ -344,7 +344,7 @@ public sealed class FxStatusHeadlineTests
             .ReturnsAsync(new NetWorthHistoryResponse([dto], true));
         var currencies = new Mock<IUserBaseCurrencyReader>();
         currencies.Setup(c => c.GetAsync(UserId, It.IsAny<CancellationToken>())).ReturnsAsync(baseCurrency);
-        var controller = new NetWorthHistoryController(handler.Object, currencies.Object)
+        var controller = new NetWorthHistoryController(handler.Object, currencies.Object, new StubPublishedRates())
         {
             ControllerContext = new ControllerContext
             {

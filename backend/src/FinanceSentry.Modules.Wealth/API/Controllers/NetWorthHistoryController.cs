@@ -5,6 +5,7 @@ using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Infrastructure.Fx;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,8 +15,10 @@ using Microsoft.AspNetCore.Mvc;
 [Route("net-worth")]
 public class NetWorthHistoryController(
     IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> handler,
-    IUserBaseCurrencyReader baseCurrencyReader) : ControllerBase
+    IUserBaseCurrencyReader baseCurrencyReader,
+    IHistoricalExchangeRateService rates) : ControllerBase
 {
+    private readonly IHistoricalExchangeRateService _rates = rates ?? throw new ArgumentNullException(nameof(rates));
     private readonly IUserBaseCurrencyReader _baseCurrencyReader = baseCurrencyReader ?? throw new ArgumentNullException(nameof(baseCurrencyReader));
     private readonly IQueryHandler<GetNetWorthHistoryQuery, NetWorthHistoryResponse> _handler
         = handler ?? throw new ArgumentNullException(nameof(handler));
@@ -32,41 +35,64 @@ public class NetWorthHistoryController(
         if (baseCurrency == "USD")
             return Ok(result);
 
-        // Snapshots are stored in USD; the profile's base currency is applied at the boundary at today's rate.
-        // A base currency with no live rate shows its figures through a stand-in, so every row says so, and a
-        // row dated before today is converted at a rate that is not its own day's, so it says so too.
+        // Snapshots are stored in USD; the profile's base currency is applied at the boundary at the rate
+        // published for each row's own date (C4), looked up once for the whole window. A row no feed
+        // published a rate for within the lookback falls back to today's rate and says so; a row dated today
+        // is shown at today's live rate, as the dashboard hero is.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var todayStatus = CurrencyConverter.ConvertFromUsd(1m, baseCurrency).Status;
-        string? DisplayReason(DateOnly snapshotDate) =>
-            (snapshotDate < today ? todayStatus.Worst(FxStatus.TodayRate) : todayStatus).ToReason();
-        IReadOnlyList<string>? Reasons(NetWorthSnapshotDto s)
-        {
-            var added = DisplayReason(s.SnapshotDate);
-            if (added is null)
-                return s.FxReasons;
+        var pastDates = result.Snapshots.Where(s => s.SnapshotDate < today).Select(s => s.SnapshotDate).ToList();
+        var published = pastDates.Count == 0
+            ? new Dictionary<DateOnly, decimal>()
+            : await _rates.GetPublishedSeriesAsync(baseCurrency, pastDates.Min(), pastDates.Max(), ct);
 
-            var carried = s.FxReasons ?? [];
-            return carried.Contains(FxReasons.Unknown1To1) || added == FxReasons.Unknown1To1
-                ? [FxReasons.Unknown1To1]
-                : [added];
-        }
-        decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
-        decimal? FxOrNull(decimal? usd) => usd is null ? null : Fx(usd.Value);
-        return Ok(result with
+        NetWorthSnapshotDto Convert(NetWorthSnapshotDto s)
         {
-            Snapshots = [.. result.Snapshots.Select(s => s with
+            Func<decimal, decimal> fx;
+            string? added;
+            if (s.SnapshotDate < today && PublishedRateLookup.Resolve(published, s.SnapshotDate) is { } dated)
             {
-                BankingTotal = Fx(s.BankingTotal),
-                BrokerageTotal = Fx(s.BrokerageTotal),
-                CryptoTotal = Fx(s.CryptoTotal),
-                TotalNetWorth = Fx(s.TotalNetWorth),
+                // The stored rate is USD per unit of the base currency, so USD / rate is the base amount.
+                fx = usd => usd / dated.Rate;
+                added = dated.Status == FxStatus.NearestPublished ? FxReasons.NearestPublished : null;
+            }
+            else
+            {
+                fx = usd => CurrencyConverter.FromUsd(usd, baseCurrency);
+                added = (s.SnapshotDate < today ? todayStatus.Worst(FxStatus.TodayRate) : todayStatus).ToReason();
+            }
+
+            decimal? FxOrNull(decimal? usd) => usd is null ? null : fx(usd.Value);
+            return s with
+            {
+                BankingTotal = fx(s.BankingTotal),
+                BrokerageTotal = fx(s.BrokerageTotal),
+                CryptoTotal = fx(s.CryptoTotal),
+                TotalNetWorth = fx(s.TotalNetWorth),
                 CashTotal = FxOrNull(s.CashTotal),
                 BrokerageInvested = FxOrNull(s.BrokerageInvested),
                 CryptoInvested = FxOrNull(s.CryptoInvested),
                 Currency = baseCurrency,
-                FxReasons = Reasons(s),
-            })],
+                FxReasons = Reasons(s.FxReasons, added),
+            };
+        }
+
+        return Ok(result with
+        {
+            Snapshots = [.. result.Snapshots.Select(Convert)],
             ChangeHeadline = result.ChangeHeadline is { } h ? HeadlineFactory.InBaseCurrency(h, baseCurrency, today) : null,
         });
+    }
+
+    /// <summary>The row's stored reasons plus the one its display conversion added: the single worst reason.</summary>
+    private static IReadOnlyList<string>? Reasons(IReadOnlyList<string>? carried, string? added)
+    {
+        if (added is null)
+            return carried;
+
+        var worst = added;
+        foreach (var reason in carried ?? [])
+            worst = FxReasonOrder.Worse(worst, reason);
+        return [worst!];
     }
 }
