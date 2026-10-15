@@ -1,7 +1,13 @@
 import {DatePipe} from '@angular/common';
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {RouterLink} from '@angular/router';
-import {AsyncStateComponent, PageContainerComponent, TagComponent} from '@lifekit-hq/ui';
+import {
+  AsyncStateComponent,
+  CardComponent,
+  PageContainerComponent,
+  SkeletonComponent,
+  TagComponent,
+} from '@lifekit-hq/ui';
 
 import {
   GAIN_TEXT_CLASS,
@@ -10,8 +16,12 @@ import {
 import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {RecommendationCardComponent} from '../../components/recommendation-card/recommendation-card.component';
 import {
-  DECISION_SKELETON_HEIGHT,
-  DECISION_SKELETON_ROWS,
+  DECISION_SKELETON_CARDS,
+  DECISION_SKELETON_DECIDED_ROWS,
+  DECISION_SKELETON_EVIDENCE_LINES,
+  DECISION_SKELETON_FACTS,
+  DECISION_SKELETON_OUTCOME_LINES,
+  DECISION_SKELETON_TEXT_LINES,
   DECISIONS_EMPTY_COPY,
   RECOMMENDATION_ACTION_LABEL,
   RECOMMENDATION_ACTION_VARIANT,
@@ -31,6 +41,7 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
   selector: 'fns-decisions',
   imports: [
     AsyncStateComponent,
+    CardComponent,
     DatePipe,
     PageContainerComponent,
     RecommendationCardComponent,
@@ -38,6 +49,7 @@ import {type OutcomeTone} from '../../utils/recommendation.utils';
     RecommendationExcessTonePipe,
     RecommendationOutcomePipe,
     RouterLink,
+    SkeletonComponent,
     TagComponent,
   ],
   providers: [DecisionsStore],
@@ -50,8 +62,12 @@ export class DecisionsComponent {
 
   public readonly dossierRoute = AppRoute.AssetDossier;
   public readonly emptyCopy = DECISIONS_EMPTY_COPY;
-  public readonly skeletonRows = DECISION_SKELETON_ROWS;
-  public readonly skeletonHeight = DECISION_SKELETON_HEIGHT;
+  public readonly skeletonCards = Array.from({length: DECISION_SKELETON_CARDS});
+  public readonly skeletonDecidedRows = Array.from({length: DECISION_SKELETON_DECIDED_ROWS});
+  public readonly skeletonFacts = Array.from({length: DECISION_SKELETON_FACTS});
+  public readonly skeletonTextLines = DECISION_SKELETON_TEXT_LINES;
+  public readonly skeletonEvidenceLines = DECISION_SKELETON_EVIDENCE_LINES;
+  public readonly skeletonOutcomeLines = DECISION_SKELETON_OUTCOME_LINES;
   public readonly actionLabel = RECOMMENDATION_ACTION_LABEL;
   public readonly actionVariant = RECOMMENDATION_ACTION_VARIANT;
   public readonly statusLabel = RECOMMENDATION_STATUS_LABEL;

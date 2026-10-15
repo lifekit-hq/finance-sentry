@@ -68,7 +68,7 @@ export class PeopleComponent {
     });
   });
   public readonly statusVariant = PERSON_STATUS_TAG_VARIANT;
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
+  public readonly skeletonRowCount = SKELETON_ROWS;
   public readonly inviteForm = inject(FormBuilder).group({
     email: ['', [Validators.required, Validators.email]],
   });

@@ -66,12 +66,7 @@
         retryable
       >
         <cmn-card skeleton padding="none">
-          @for (row of skeletonRows; track row) {
-            <div class="p-cmn-4 space-y-cmn-2">
-              <cmn-skeleton width="40%" height="14px" />
-              <cmn-skeleton width="20%" height="12px" />
-            </div>
-          }
+          <cmn-skeleton [count]="skeletonRowCount" shape="row" />
         </cmn-card>
 
         <cmn-card padding="none">

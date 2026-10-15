@@ -49,7 +49,7 @@
       [errorMessage]="store.upcomingErrorMessage()"
       [skeletonRows]="skeletonRows.length"
       class="mt-cmn-5 flex min-h-0 flex-1 flex-col"
-      skeletonHeight="2.5rem"
+      skeletonShape="section"
     >
       @if (store.isUpcomingEmpty()) {
         <div class="flex min-h-0 flex-1 items-center justify-center">
@@ -144,9 +144,33 @@
       errorPlacement="above"
       retryable
     >
-      <div skeleton class="space-y-cmn-2" data-testid="fired-loading">
+      <!-- Shaped like the fired cards: kind, subject and time, then title and outcome, with a
+           reader verdict under every other card. -->
+      <div skeleton class="space-y-cmn-2 pr-cmn-1" data-testid="fired-loading">
         @for (row of skeletonRows; track row) {
-          <cmn-skeleton height="4rem" width="100%" />
+          <div
+            class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
+          >
+            <div class="flex h-[1.3125rem] items-center gap-cmn-2">
+              <cmn-skeleton height="0.875rem" width="5.5rem" />
+              <cmn-skeleton height="0.75rem" width="2.5rem" />
+              <cmn-skeleton class="ml-auto" height="0.625rem" width="5.5rem" />
+            </div>
+            <div class="mt-cmn-1 flex h-[1.3125rem] items-center gap-cmn-2">
+              <div class="min-w-0 flex-1">
+                <cmn-skeleton class="block w-3/5" height="0.75rem" width="100%" />
+              </div>
+              <cmn-skeleton height="0.875rem" width="6rem" />
+            </div>
+            @if ($even) {
+              <div
+                class="mt-cmn-2 h-[2.25rem] space-y-cmn-2 border-l-2 border-border-default pl-cmn-3 pt-cmn-1"
+              >
+                <cmn-skeleton class="block" height="0.75rem" width="85%" />
+                <cmn-skeleton class="block" height="0.625rem" width="7rem" />
+              </div>
+            }
+          </div>
         }
       </div>
       <div empty class="flex min-h-0 flex-1 items-center justify-center">

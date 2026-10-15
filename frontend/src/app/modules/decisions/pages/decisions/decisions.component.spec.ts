@@ -14,7 +14,10 @@ import {
   type RecommendationsResult,
 } from '../../../../shared/models/recommendation/recommendation.model';
 import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
-import {DECISIONS_EMPTY_COPY} from '../../constants/recommendation/recommendation.constants';
+import {
+  DECISION_SKELETON_CARDS,
+  DECISIONS_EMPTY_COPY,
+} from '../../constants/recommendation/recommendation.constants';
 import {DecisionSheetService} from '../../services/decision-sheet.service';
 import {RecommendationService} from '../../services/recommendation.service';
 import {ScorecardService} from '../../services/scorecard.service';
@@ -109,6 +112,26 @@ describe('DecisionsComponent', () => {
     const {host} = render({pending: [], decided: []});
 
     expect(host.textContent).toContain('Finance Sentry never trades');
+  });
+
+  it('holds the place of the pending cards and the decided list while the queue loads', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {provide: RecommendationService, useValue: {list}},
+        {provide: DecisionSheetService, useValue: {open}},
+        {provide: ScorecardService, useValue: {read}},
+        {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
+      ],
+    });
+    const fixture = TestBed.createComponent(DecisionsComponent);
+    fixture.detectChanges();
+    const skeleton = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="decisions-skeleton"]'
+    );
+
+    expect(skeleton?.querySelectorAll('cmn-card').length).toBe(DECISION_SKELETON_CARDS);
+    expect(skeleton?.textContent).not.toContain(DECISIONS_EMPTY_COPY.message);
   });
 
   it('stays silent with nothing proposed', () => {
