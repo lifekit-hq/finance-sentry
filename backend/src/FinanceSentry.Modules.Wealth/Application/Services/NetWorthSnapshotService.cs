@@ -20,6 +20,13 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var previous = await _repository.GetLatestBeforeUnscopedAsync(userId, data.SnapshotDate, ct);
         var stale = new List<string>();
 
+        // A sleeve whose source failed to read has nothing to record and, with no earlier snapshot, nothing to
+        // carry forward: fail the run (the job retries) instead of persisting it as $0 over a correct figure.
+        if (previous is null
+            && data.Sources?.FirstOrDefault(s => s.Reading is null && s.SourceId is "banking" or "brokerage" or "crypto") is { } failed)
+            throw new InvalidOperationException(
+                $"Wealth source '{failed.SourceId}' could not be read and there is no earlier snapshot to carry its sleeve forward from.");
+
         var banking = ResolveSleeve("banking", data.BankingTotal, data.BankingFresh, previous?.BankingTotal, stale);
         var brokerage = ResolveSleeve("brokerage", data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, stale);
         var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);

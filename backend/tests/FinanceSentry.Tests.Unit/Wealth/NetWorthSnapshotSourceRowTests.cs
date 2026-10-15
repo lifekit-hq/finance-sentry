@@ -184,7 +184,7 @@ public class NetWorthSnapshotSourceRowTests
     [Fact]
     public async Task Service_WritesAFailedSourceAsUnavailable_WithNullFiguresAndAStaleReason()
     {
-        var (repo, rows) = Repo();
+        var (repo, rows) = Repo(new NetWorthSnapshot { BankingTotal = 100m, CryptoTotal = 45m });
 
         await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, Data(
             new("banking", EconomyKind.Bank, Reading(cash: 100m)),
@@ -309,5 +309,36 @@ public class NetWorthSnapshotSourceRowTests
         crypto.Total.Should().BeNull();
         foreach (var row in rows.Where(r => r.Health is SourceHealth.Complete or SourceHealth.Estimated))
             row.Total.Should().Be(ColumnOf(snapshot, row.SourceId));
+    }
+
+    [Theory]
+    [InlineData("banking")]
+    [InlineData("brokerage")]
+    [InlineData("crypto")]
+    public async Task EndToEnd_AFailedSleeveSourceOnTheFirstDay_FailsTheRunAndPersistsNothing(string failing)
+    {
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetLatestBeforeUnscopedAsync(UserId, Day, It.IsAny<CancellationToken>())).ReturnsAsync((NetWorthSnapshot?)null);
+        var sources = ThreeSources().Select(s => s.SourceId == failing
+            ? new FakeSource(s.SourceId, s.Kind, reading: null)
+            : s).ToArray();
+
+        var run = () => JobOver(new NetWorthSnapshotService(repo.Object), sources).CaptureForUserAsync(UserId, Day);
+
+        await run.Should().ThrowAsync<InvalidOperationException>().WithMessage($"*{failing}*");
+        repo.Verify(r => r.UpsertAsync(It.IsAny<NetWorthSnapshot>(), It.IsAny<CancellationToken>()), Times.Never);
+        repo.Verify(r => r.UpsertWithSourcesAsync(
+            It.IsAny<NetWorthSnapshot>(), It.IsAny<IReadOnlyList<NetWorthSnapshotSource>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task EndToEnd_AFailedNonSleeveSourceOnTheFirstDay_StillWritesTheSnapshot()
+    {
+        var (snapshot, rows) = await CaptureThroughServiceAsync(
+            DateTime.UtcNow, previous: null,
+            [.. ThreeSources(), new FakeSource("fund", EconomyKind.Fund, reading: null)]);
+
+        snapshot.TotalNetWorth.Should().Be(350m);
+        rows.Single(r => r.SourceId == "fund").Health.Should().Be(SourceHealth.Unavailable);
     }
 }

@@ -615,7 +615,7 @@ Today a fourth economy would need a new column on `net_worth_snapshots`, a new c
    `banking`, `brokerage` and `crypto` readings' totals, `StaleSleeves` and `fx_status` are written as before;
    the holdings and sync-time reads that remain only decide freshness, since a reading carries no sync
    timestamp. A source that failed to read is not fresh, so its sleeve is carried forward instead of recorded as
-   zero.
+   zero; with no earlier snapshot to carry it from, nothing is written and the run fails, so the job retries.
    - **Health** is the framework's quality vocabulary (§3.6) stored by name: `Complete`; `Estimated` (a
      today's-rate or seed-table conversion, reason `FX_TODAY_RATE`); `Degraded` (a 1:1 conversion,
      `FX_UNKNOWN_1TO1`, or a sleeve this snapshot carried forward, `STALE_SOURCE`); `Unavailable` (the read
