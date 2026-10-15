@@ -322,4 +322,38 @@ describe('holdingsComputed provider filter', () => {
     expect(c.isFilteredEmpty()).toBe(true);
     expect(c.isEmpty()).toBe(false);
   });
+
+  const staleFeed = (source: string): Headline => ({
+    amount: 300,
+    percent: null,
+    method: 'VALUE',
+    scope: 'umbrella',
+    window: {to: '2026-10-15'},
+    quality: 'DEGRADED',
+    reasons: [{code: 'STALE_SOURCE', source}],
+    currency: 'USD',
+  });
+
+  it('flags the filtered provider when its feed failed, never an empty provider', () => {
+    const c = build([ibkr], {}, 'success', staleFeed('crypto'), 'binance');
+
+    expect(c.isProviderFeedFailed()).toBe(true);
+    expect(c.isFilteredEmpty()).toBe(false);
+    expect(c.isTotalUnavailable()).toBe(true);
+  });
+
+  it('maps a broker provider to the brokerage feed', () => {
+    const c = build([binance], {}, 'success', staleFeed('brokerage'), 'ibkr');
+
+    expect(c.isProviderFeedFailed()).toBe(true);
+    expect(c.isFilteredEmpty()).toBe(false);
+  });
+
+  it('keeps the filtered figure when only the other feed failed', () => {
+    const c = build([ibkr], {}, 'success', staleFeed('crypto'), 'ibkr');
+
+    expect(c.isProviderFeedFailed()).toBe(false);
+    expect(c.isTotalUnavailable()).toBe(false);
+    expect(c.totalPositionsValue()).toBe(300);
+  });
 });

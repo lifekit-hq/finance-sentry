@@ -8,6 +8,8 @@ import {
   CRYPTO_COLOUR,
   EQUITY_COLOUR,
 } from '../../../shared/constants/chart-colour/chart-colour.constants';
+import {STALE_SOURCE_CODE} from '../../../shared/constants/headline/headline.constants';
+import {PROVIDER_CATALOG} from '../../../shared/constants/providers/providers.constants';
 import {type ChartColour} from '../../../shared/models/chart-colour/chart-colour.model';
 import {type Headline} from '../../../shared/models/headline/headline.model';
 import {ChartColorUtils} from '../../../shared/utils/chart-color.utils';
@@ -25,6 +27,10 @@ interface StateSignals {
 }
 
 const WEIGHT_TO_PERCENT = 100;
+
+// The headline names a failed read by feed ('brokerage' | 'crypto'), not by provider.
+const CRYPTO_FEED = 'crypto';
+const BROKERAGE_FEED = 'brokerage';
 
 export type AssetClass = PositionAssetClass;
 
@@ -99,6 +105,17 @@ export function holdingsComputed(store: StateSignals) {
     const provider = store.provider();
     return provider ? store.positions().filter(p => p.provider === provider) : store.positions();
   });
+  const isProviderFeedFailed = computed(() => {
+    const provider = store.provider();
+    const institutionType = PROVIDER_CATALOG.find(p => p.slug === provider)?.institutionType;
+    if (!institutionType) {
+      return false;
+    }
+    const feed = institutionType === 'crypto' ? CRYPTO_FEED : BROKERAGE_FEED;
+    return (store.headline()?.reasons ?? []).some(
+      r => r.code === STALE_SOURCE_CODE && r.source === feed
+    );
+  });
   const totalPositionsValue = computed(() =>
     visiblePositions().reduce((sum, p) => sum + p.currentValue, 0)
   );
@@ -156,13 +173,20 @@ export function holdingsComputed(store: StateSignals) {
     // A filter with no matching rows is its own state, never the "connect an account" empty page.
     isFilteredEmpty: computed(
       () =>
-        store.provider() !== null && visiblePositions().length === 0 && store.positions().length > 0
+        store.provider() !== null &&
+        visiblePositions().length === 0 &&
+        store.positions().length > 0 &&
+        !isProviderFeedFailed()
     ),
+    // The filtered provider's feed failed to load: its empty list is not an empty provider.
+    isProviderFeedFailed,
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
     // The total's record: its badge, and N/A (never 0) when every feed failed.
     totalHeadline: computed((): Nullable<Headline> => store.headline()),
-    isTotalUnavailable: computed(() => HeadlineUtils.isUnavailable(store.headline())),
+    isTotalUnavailable: computed(
+      () => isProviderFeedFailed() || HeadlineUtils.isUnavailable(store.headline())
+    ),
     // A failed feed is never read as an empty book: the total card keeps its N/A and badge.
     isEmpty: computed(
       () => store.positions().length === 0 && HeadlineUtils.badge(store.headline()) === null

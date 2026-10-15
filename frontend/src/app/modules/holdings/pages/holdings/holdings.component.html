@@ -115,6 +115,15 @@
         </p>
       }
 
+      @if (store.isProviderFeedFailed()) {
+        <p
+          class="mt-cmn-6 border-t border-border-default pt-cmn-5 text-center text-cmn-sm text-text-secondary"
+          data-testid="holdings-filter-feed-failed"
+        >
+          {{ store.providerFilterLabel() }} positions could not be loaded.
+        </p>
+      }
+
       @for (group of store.positionsByAssetClass(); track group.assetClass) {
         <section
           class="mt-cmn-6 grid gap-cmn-3 border-t border-border-default pt-cmn-5"

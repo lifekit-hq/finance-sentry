@@ -70,6 +70,7 @@ describe('InvestmentsComponent — positions view', () => {
     providerFilter: ReturnType<typeof signal<Nullable<string>>>;
     providerFilterLabel: ReturnType<typeof signal<Nullable<string>>>;
     isFilteredEmpty: ReturnType<typeof signal<boolean>>;
+    isProviderFeedFailed: ReturnType<typeof signal<boolean>>;
   };
 
   let mockConnectStore: {importPending: ReturnType<typeof signal<boolean>>};
@@ -113,6 +114,7 @@ describe('InvestmentsComponent — positions view', () => {
       providerFilter: signal<Nullable<string>>(null),
       providerFilterLabel: signal<Nullable<string>>(null),
       isFilteredEmpty: signal(false),
+      isProviderFeedFailed: signal(false),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
         {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},
@@ -298,6 +300,26 @@ describe('InvestmentsComponent — positions view', () => {
       'No positions with Binance'
     );
     expect(root.textContent).not.toContain('No positions yet');
+  });
+
+  it('says the provider could not be loaded when its feed failed, not that it has no positions', () => {
+    mockStore.providerFilter.set('binance');
+    mockStore.providerFilterLabel.set('Binance');
+    mockStore.positionsByAssetClass.set([]);
+    mockStore.isTotalUnavailable.set(true);
+    mockStore.isProviderFeedFailed.set(true);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(
+      root.querySelector('[data-testid="holdings-filter-feed-failed"]')?.textContent
+    ).toContain('Binance positions could not be loaded');
+    expect(root.querySelector('[data-testid="holdings-total-value"]')?.textContent).toContain(
+      'N/A'
+    );
+    expect(root.querySelector('[data-testid="holdings-filter-empty"]')).toBeNull();
   });
 
   it('opens the asset page when a holding row is clicked', () => {
