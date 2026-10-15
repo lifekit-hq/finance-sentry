@@ -216,7 +216,7 @@ public sealed class ReadPortCompositionTests
                 new HoldingSnapshot { UserId = User, Symbol = "BBB", Sleeve = RiskSleeve.Brokerage, Quantity = 5m, UsdValue = 0m, CapturedAt = first },
             ]);
 
-        var captures = await new RadarHoldingsHistorySource(snapshots.Object)
+        var captures = await new RadarHoldingsHistorySource(new BrokerageHoldingsHistoryReader(snapshots.Object))
             .GetBrokerageCapturesAsync(User, DateOnly.FromDateTime(first.Date));
 
         captures.Select(c => c.CapturedAt).Should().Equal(first, second);

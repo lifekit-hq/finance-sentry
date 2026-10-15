@@ -53,6 +53,8 @@ public static class RiskModule
         services.AddScoped<IPolicyViolationAckRepository, PolicyViolationAckRepository>();
         services.AddScoped<IHoldingSnapshotRepository, HoldingSnapshotRepository>();
         services.AddScoped<IInvestedHistoryReader, HoldingSnapshotInvestedHistoryReader>();
+        // R1(b): published read port - Radar's holdings-based return reaches the brokerage captures only through it.
+        services.AddScoped<IBrokerageHoldingsHistoryReader, BrokerageHoldingsHistoryReader>();
 
         services.AddScoped<IBookSnapshotReader, BookSnapshotReader>();
         services.AddScoped<IRiskEvaluationService, RiskEvaluationService>();
