@@ -90,6 +90,7 @@ public static class RetentionPolicyRegistry
 
         Keep(Budgets, "budgets", "User budgets."),
         Keep(Public, "detected_subscriptions", "Derived but small + user-facing; keep by decision."),
+        Keep(Public, "net_worth_snapshot_sources", "Per-source rows; cascade with their net_worth_snapshots row, including its weekly downsample."),
 
         Keep(Companion, "companion_capture_state", "Capture watermark; tiny."),
         Keep(Companion, "companion_notification_settings", "User settings."),
