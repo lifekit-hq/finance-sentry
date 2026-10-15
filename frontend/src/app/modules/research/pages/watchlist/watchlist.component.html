@@ -42,7 +42,7 @@
           />
         </cmn-form-field>
         <cmn-button
-          [disabled]="store.isAddLoading()"
+          [disabled]="store.isAddLoading() || store.isLoadLoading()"
           type="submit"
           variant="primary"
           data-testid="watchlist-add"
@@ -109,7 +109,7 @@
               }
             </div>
             <cmn-button
-              [disabled]="isPending(row)"
+              [disabled]="isPending(row) || store.isLoadLoading()"
               (clicked)="confirmRemove(row)"
               variant="secondary"
               size="sm"

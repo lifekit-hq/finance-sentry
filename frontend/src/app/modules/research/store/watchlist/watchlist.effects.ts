@@ -1,7 +1,7 @@
 import {inject} from '@angular/core';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, mergeMap, pipe, switchMap, tap} from 'rxjs';
+import {catchError, EMPTY, filter, mergeMap, pipe, switchMap, tap} from 'rxjs';
 
 import {
   PENDING_ID_PREFIX,
@@ -18,6 +18,7 @@ export interface AddWatchlistCommand {
 
 interface EffectsStore {
   items: () => WatchlistItem[];
+  isLoadLoading: () => boolean;
   setLoadedItems: (items: WatchlistItem[]) => void;
   setLastAction: (action: WatchlistAction) => void;
   appendItem: (item: WatchlistItem) => void;
@@ -60,6 +61,7 @@ export function watchlistEffects(store: EffectsStore) {
     // add takes it back out.
     add: rxMethod<AddWatchlistCommand>(
       pipe(
+        filter(() => !store.isLoadLoading()),
         mergeMap(({payload, onAdded}) => {
           const pendingId = `${PENDING_ID_PREFIX}${crypto.randomUUID()}`;
           store.setLastAction('add');
@@ -83,6 +85,7 @@ export function watchlistEffects(store: EffectsStore) {
     // Optimistic: the row leaves at once and comes back, where it was, if the delete fails (unless the server no longer has it).
     remove: rxMethod<string>(
       pipe(
+        filter(() => !store.isLoadLoading()),
         mergeMap(id => {
           const index = store.items().findIndex(i => i.id === id);
           const removed = index === -1 ? null : store.items()[index];

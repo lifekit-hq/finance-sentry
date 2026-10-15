@@ -101,15 +101,35 @@ describe('WatchlistStore', () => {
     expect(store.items()).toEqual([PLTR]);
   });
 
-  it('keeps a pending add when the initial load answers after it', () => {
+  it('ignores an add and a remove while the load is in flight', () => {
+    const service = {
+      getItems: vi.fn().mockReturnValue(new Subject<WatchlistItem[]>()),
+      add: vi.fn(),
+      remove: vi.fn(),
+    };
+    const store = setup(service);
+
+    store.add({payload: {ticker: 'MRNA', exchange: null, note: null}, onAdded: vi.fn()});
+    store.remove('w1');
+
+    expect(service.add).not.toHaveBeenCalled();
+    expect(service.remove).not.toHaveBeenCalled();
+    expect(store.items()).toEqual([]);
+  });
+
+  it('keeps a pending add when a retried load answers before it', () => {
     const load = new Subject<WatchlistItem[]>();
     const reply = new Subject<WatchlistItem>();
     const store = setup({
-      getItems: vi.fn().mockReturnValue(load),
+      getItems: vi
+        .fn()
+        .mockReturnValueOnce(throwError(() => new HttpErrorResponse({status: 500})))
+        .mockReturnValue(load),
       add: vi.fn().mockReturnValue(reply),
     });
 
     store.add({payload: {ticker: 'MRNA', exchange: null, note: null}, onAdded: vi.fn()});
+    store.load();
     load.next([PLTR]);
     load.complete();
     reply.next(MRNA);

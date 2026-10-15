@@ -99,7 +99,7 @@ export class WatchlistComponent {
       this.form.markAllAsTouched();
       return;
     }
-    if (this.store.isAddLoading()) {
+    if (this.store.isAddLoading() || this.store.isLoadLoading()) {
       return;
     }
     this.store.add({
