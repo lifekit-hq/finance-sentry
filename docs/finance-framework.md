@@ -322,15 +322,15 @@ for a window reaching before today (today's rate, not the dated one) and the bas
 in percentage points, shares the amount's numerator (D1), is never annualised (D6) and is null with a reason
 when the basis does not support one (D4, D5). `HeadlineSignals` gathers a figure's signals and
 `HeadlineQualityMapper` is the single place that turns them into quality, basis status and reasons; the
-quality is the worst its reasons imply and a figure with no amount is UNAVAILABLE, always with at least one reason (`NOT_MEASURABLE` when nothing else explains it). It is an additive field
-beside the existing ones:
+quality is the worst its reasons imply and a figure with no amount is UNAVAILABLE, always with at least one
+reason (`NOT_MEASURABLE` when nothing else explains it). It is an additive field beside the existing ones:
 
 | Surface | Field | What it describes |
 |---|---|---|
 | Dashboard (`GET /dashboard/aggregated`) | `netWorthHeadline`, `cashHeadline`, `investedHeadline` | the hero (`umbrella`) and the C5 split lines (`sleeve:cash`, `sleeve:invested`; `NO_SPLIT` when withheld) |
 | Wealth summary | `headline` | the accounts header total; `source:<provider>` / `sleeve:<category>` when filtered |
 | Crypto and brokerage holdings | `headline` | the investments headers' sleeve totals |
-| Net-worth history | `changeHeadline` | first to last point of the window, M1 (`SCOPE_CHANGED` from R3 withholds the percent) |
+| Net-worth history | `changeHeadline` | first to last point of the window, M1 (`SCOPE_CHANGED` from R3 withholds the percent; a window with one point is UNAVAILABLE with `SHORT_HISTORY`, not a zero change) |
 | `get_portfolio_snapshot` | `headlines` (`totalValue`, `investedValue`, `cash`, `unrealizedPnl`) | the book totals; `unrealizedPnl` is `GAIN_VS_COST` with `basisStatus` and `coverage` |
 | `get_net_worth_history` | `headline` per point | each day's total |
 | `get_book_performance` | `book` per period | the book side, M1 over `invested_brokerage` (`SHORT_HISTORY` or `ZERO_BASE` when there is no percent) |

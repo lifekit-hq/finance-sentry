@@ -820,8 +820,8 @@ are closed periods.
   withheld split makes the cash and invested records UNAVAILABLE with `NO_SPLIT` (amount null, not 0); the
   worst FX status behind the total becomes `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1`. The wealth summary, the
   crypto and brokerage holdings and net-worth history (`changeHeadline`, first to last point, percent
-  withheld with `SCOPE_CHANGED` when an account was linked or removed inside the window) carry the same
-  record. The untyped fields are unchanged.
+  withheld with `SCOPE_CHANGED` when an account was linked or removed inside the window; a window with a
+  single point is UNAVAILABLE with `SHORT_HISTORY`, never a zero change) carry the same record. The untyped fields are unchanged.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point
