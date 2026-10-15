@@ -515,6 +515,16 @@ describe('DashboardComponent async states', () => {
       expect(el.querySelector(CHART)).not.toBeNull();
     });
 
+    it('shows the skeleton, not the previous range chart, while this range loads', () => {
+      const {el} = render('1y', undefined, null, {
+        historyHasHistory: signal(true),
+        isHistoryFirstLoad: signal(true),
+      });
+
+      expect(el.querySelector(SKELETON)).not.toBeNull();
+      expect(el.querySelector(CHART)).toBeNull();
+    });
+
     it('mounts the chart once history has loaded', () => {
       const {el} = render();
 
@@ -614,5 +624,50 @@ describe('DashboardComponent async states', () => {
       );
       expect(el.querySelector('[data-testid="net-worth-link"]')).not.toBeNull();
     });
+  });
+});
+
+describe('DashboardComponent range-scoped widgets', () => {
+  const BAR_CHART = 'cmn-bar-chart';
+  const DONUT = 'cmn-donut-chart';
+  const TABLE = 'cmn-data-table';
+  const SKELETONS = [
+    '[data-testid="cash-flow-chart-skeleton"]',
+    '[data-testid="category-donut-skeleton"]',
+    '[data-testid="category-table-skeleton"]',
+  ];
+  const data = {
+    accountCount: 1,
+    topCategories: [{category: 'GROCERIES', totalSpend: 3100, percentOfTotal: 100}],
+  };
+
+  it('shows skeletons, not the previous range figures, while this range loads', () => {
+    const {el} = render('1y', data, null, {
+      hasCashFlow: signal(true),
+      isFirstLoad: signal(true),
+    });
+
+    for (const selector of SKELETONS) {
+      expect(el.querySelector(selector)).not.toBeNull();
+    }
+    for (const selector of [BAR_CHART, DONUT, TABLE]) {
+      expect(el.querySelector(selector)).toBeNull();
+    }
+    expect(el.textContent).not.toContain('€3,100.00');
+  });
+
+  it('keeps the figures while the same range refreshes', () => {
+    const {el} = render('1y', data, null, {
+      hasCashFlow: signal(true),
+      isLoading: signal(true),
+    });
+
+    for (const selector of SKELETONS) {
+      expect(el.querySelector(selector)).toBeNull();
+    }
+    for (const selector of [BAR_CHART, DONUT, TABLE]) {
+      expect(el.querySelector(selector)).not.toBeNull();
+    }
+    expect(el.textContent).toContain('€3,100.00');
   });
 });

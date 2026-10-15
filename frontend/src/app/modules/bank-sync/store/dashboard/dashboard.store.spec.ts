@@ -22,6 +22,13 @@ class HostComponent {
   public readonly store = inject(DashboardStore);
 }
 
+@Component({
+  selector: 'fns-dashboard-elsewhere',
+  template: '',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ElsewhereComponent {}
+
 const service = {
   getDashboardData: vi.fn(() => NEVER),
   getNetWorthHistory: vi.fn(() => NEVER),
@@ -33,7 +40,10 @@ async function open(url: string) {
       provideHttpClient(),
       provideHttpClientTesting(),
       provideApiBaseUrl('http://localhost/api/v1'),
-      provideRouter([{path: 'dashboard', component: HostComponent}]),
+      provideRouter([
+        {path: 'dashboard', component: HostComponent},
+        {path: 'elsewhere', component: ElsewhereComponent},
+      ]),
       {provide: BankSyncService, useValue: service},
     ],
   });
@@ -118,5 +128,28 @@ describe('DashboardStore loaded range', () => {
 
     expect(store.dataRange()).toBe('1y');
     expect(store.isFirstLoad()).toBe(true);
+  });
+
+  it('repaints a revisit once data and history were both loaded for the range', async () => {
+    service.getDashboardData.mockReturnValueOnce(of(data) as never);
+    service.getNetWorthHistory.mockReturnValueOnce(of(history) as never);
+    const {harness} = await open('/dashboard?range=1y');
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+
+    const host = await harness.navigateByUrl('/dashboard?range=1y', HostComponent);
+
+    expect(host.store.data()).toEqual(data);
+    expect(host.store.isFirstLoad()).toBe(false);
+  });
+
+  it('refuses a snapshot whose history was not loaded for the range', async () => {
+    service.getDashboardData.mockReturnValueOnce(of(data) as never);
+    service.getNetWorthHistory.mockReturnValueOnce(NEVER as never);
+    const {harness} = await open('/dashboard?range=1y');
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+
+    const host = await harness.navigateByUrl('/dashboard?range=1y', HostComponent);
+
+    expect(host.store.data()).toBeNull();
   });
 });

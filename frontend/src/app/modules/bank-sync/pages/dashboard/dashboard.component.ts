@@ -287,7 +287,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
               } @else if (
-                !store.historyHasHistory() && (store.isFirstLoad() || store.isHistoryFirstLoad())
+                store.isHistoryFirstLoad() || (!store.historyHasHistory() && store.isFirstLoad())
               ) {
                 <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
               } @else if (!store.historyHasHistory()) {
@@ -366,7 +366,9 @@ const HISTORY_RANGES: ChipRowOption[] = [
             </cmn-card>
           </div>
 
-          @if (store.hasCashFlow()) {
+          @if (store.isFirstLoad()) {
+            <cmn-skeleton height="12rem" data-testid="cash-flow-chart-skeleton" />
+          } @else if (store.hasCashFlow()) {
             <div>
               <cmn-bar-chart
                 [series]="store.incomeVsSpendingBars()"
@@ -378,36 +380,45 @@ const HISTORY_RANGES: ChipRowOption[] = [
           }
 
           <div class="grid grid-cols-1 gap-cmn-4 lg:grid-cols-3">
-            <div>
-              <cmn-donut-chart
-                [segments]="store.categoryChartData()"
-                [label]="topCategoriesLabel()"
-                [currency]="store.baseCurrency()"
-                (segmentClick)="onCategorySegmentClick($event)"
+            @if (store.isFirstLoad()) {
+              <cmn-skeleton height="12rem" data-testid="category-donut-skeleton" />
+              <cmn-skeleton
+                class="lg:col-span-2"
+                height="12rem"
+                data-testid="category-table-skeleton"
               />
-            </div>
-            <div class="lg:col-span-2">
-              <cmn-data-table
-                [rows]="store.data()?.topCategories ?? []"
-                (rowClick)="onCategoryClick($event)"
-                class="grid gap-4"
-                emptyMessage="No spending data available"
-              >
-                <cmn-column key="category" header="Category">
-                  <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
-                </cmn-column>
-                <cmn-column key="spend" header="Total Spend" align="right">
-                  <ng-template let-row cmnCell>{{
-                    row.totalSpend | money: store.baseCurrency()
-                  }}</ng-template>
-                </cmn-column>
-                <cmn-column key="pct" header="% of Total" align="right">
-                  <ng-template let-row cmnCell
-                    >{{ row.percentOfTotal | appDecimal: '1.1-1' }}%</ng-template
-                  >
-                </cmn-column>
-              </cmn-data-table>
-            </div>
+            } @else {
+              <div>
+                <cmn-donut-chart
+                  [segments]="store.categoryChartData()"
+                  [label]="topCategoriesLabel()"
+                  [currency]="store.baseCurrency()"
+                  (segmentClick)="onCategorySegmentClick($event)"
+                />
+              </div>
+              <div class="lg:col-span-2">
+                <cmn-data-table
+                  [rows]="store.data()?.topCategories ?? []"
+                  (rowClick)="onCategoryClick($event)"
+                  class="grid gap-4"
+                  emptyMessage="No spending data available"
+                >
+                  <cmn-column key="category" header="Category">
+                    <ng-template let-row cmnCell>{{ row.category | merchantCategory }}</ng-template>
+                  </cmn-column>
+                  <cmn-column key="spend" header="Total Spend" align="right">
+                    <ng-template let-row cmnCell>{{
+                      row.totalSpend | money: store.baseCurrency()
+                    }}</ng-template>
+                  </cmn-column>
+                  <cmn-column key="pct" header="% of Total" align="right">
+                    <ng-template let-row cmnCell
+                      >{{ row.percentOfTotal | appDecimal: '1.1-1' }}%</ng-template
+                    >
+                  </cmn-column>
+                </cmn-data-table>
+              </div>
+            }
           </div>
         </cmn-async-state>
       </div>
