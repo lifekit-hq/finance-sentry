@@ -593,6 +593,46 @@ public class IbkrFlexJobsTests
     }
 
     [Fact]
+    public async Task FailureThatReachesFailing_SchedulesNoRecheck()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Degraded,
+            ConsecutiveFailures = 2,
+            FirstFailureAt = Start.AddDays(-2),
+            LastFailureAt = Start.AddDays(-1),
+            LastFailureClass = FailureClass.Transient,
+        });
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Failing);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FailureWhileAlreadyFailing_SchedulesNoRecheck()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(new ConnectionHealth
+        {
+            State = ConnectionHealthState.Failing,
+            ConsecutiveFailures = 4,
+            FirstFailureAt = Start.AddDays(-4),
+            LastFailureAt = Start.AddDays(-1),
+            LastFailureClass = FailureClass.Transient,
+        });
+        harness.GivenSyncFails(new IbkrFlexException("1009", "Server busy."));
+
+        await harness.RunAsync();
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Failing);
+        harness.Scheduled.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Failure_WithNoEarlyRecheckSetting_SchedulesNothing()
     {
         var harness = new PolicyHarness().Active();

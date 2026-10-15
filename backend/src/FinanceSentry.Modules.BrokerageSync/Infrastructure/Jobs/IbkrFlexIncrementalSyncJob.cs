@@ -166,7 +166,8 @@ public sealed class IbkrFlexIncrementalSyncJob(
 
     // After a failure that counted and may be over by the time we look again: ask again at the source's next early
     // re-check interval, never sooner than the provider's NotBefore. `recheck` is null on a run that must not start
-    // a chain (the not-ready retries have their own); the list's length is the bound, so the chain cannot loop.
+    // a chain (the not-ready retries have their own); the list's length is the bound, so the chain cannot loop. Once the
+    // connection is Failing the alert is out and the next daily run picks up a recovery, so nothing more is scheduled.
     // Inzhur is not on the policy yet: when it joins, it takes the same hook from its sync job.
     private void ScheduleEarlyRecheck(Guid userId, ProviderFailure failure, ConnectionHealthEvaluation? evaluation, int? recheck)
     {
@@ -176,7 +177,7 @@ public sealed class IbkrFlexIncrementalSyncJob(
             || evaluation is null
             || !IsRecheckable(failure)
             || evaluation.Health.ConsecutiveFailures <= evaluation.Previous.ConsecutiveFailures
-            || evaluation.Health.State is ConnectionHealthState.ActionRequired or ConnectionHealthState.Dormant
+            || evaluation.Health.State is ConnectionHealthState.Failing or ConnectionHealthState.ActionRequired or ConnectionHealthState.Dormant
             || intervals[done] <= TimeSpan.Zero)
             return;
 
