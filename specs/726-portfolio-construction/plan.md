@@ -133,7 +133,7 @@ The dossier header adoption of the strip is #824's own slice.
 
 **Built ahead of this shape (2026-10-15, owner's call "3. a")**: the verdict-only slice. `VerdictRules`
 (table v1, thresholds in `VerdictOptions`) and a read-time `ScorecardReader` over the unchanged scorers, served by
-`GET research/scorecards/{symbol}` and the dossier payload (no MCP tool in this slice), and rendered by the shared
+`GET research/scorecards/{symbol}` and the dossier payload (no MCP read in this slice; `get_scorecard` is a follow-up), and rendered by the shared
 `fns-scorecard-verdict` drill-down on the dossier and the recommendation card. Step 1 calibrated on a synthetic
 fixture (`VerdictRulesTests`); calibrating against stored `CandidateScore` rows stays open, as do steps 2-6. See the
 spec's [Build status](./spec.md#build-status-verdict-only-slice).
