@@ -26,6 +26,13 @@ class HostComponent {
   public readonly store = inject(TransactionLedgerStore);
 }
 
+@Component({
+  selector: 'fns-ledger-elsewhere',
+  template: '',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ElsewhereComponent {}
+
 const service = {
   getAllTransactions: vi.fn(() => NEVER),
   getDashboardData: vi.fn(() => NEVER),
@@ -256,5 +263,76 @@ describe('TransactionLedgerStore async status', () => {
 
     expect(store.status()).toBe('loading');
     expect(store.transactions()).toHaveLength(1);
+  });
+});
+
+describe('TransactionLedgerStore revisit', () => {
+  const PAGE = {
+    items: [{transactionId: 'tx-1'}],
+    totalCount: 1,
+    offset: 0,
+    limit: 50,
+    hasMore: false,
+  };
+
+  async function visitAndLeave(url: string) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideApiBaseUrl('http://localhost/api/v1'),
+        provideRouter([
+          {path: 'transactions', component: HostComponent},
+          {path: 'elsewhere', component: ElsewhereComponent},
+        ]),
+        {provide: BankSyncService, useValue: service},
+        {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
+      ],
+    });
+    service.getAllTransactions.mockReturnValueOnce(of(PAGE) as never);
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url, HostComponent);
+    await harness.fixture.whenStable();
+    await harness.navigateByUrl('/elsewhere', ElsewhereComponent);
+    return harness;
+  }
+
+  async function revisit(harness: RouterTestingHarness, url: string) {
+    const host = await harness.navigateByUrl(url, HostComponent);
+    await harness.fixture.whenStable();
+    return host.store;
+  }
+
+  it('repaints rows loaded for the same filter and revalidates them', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.transactions()).toHaveLength(1);
+    expect(store.revalidating()).toBe(true);
+    expect(store.status()).toBe('loading');
+  });
+
+  it('keeps the restored rows when their revalidation fails', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({status: 500})) as never
+    );
+
+    const store = await revisit(harness, '/transactions?account=acc-1');
+
+    expect(store.status()).toBe('error');
+    expect(store.transactions()).toHaveLength(1);
+  });
+
+  it('does not restore rows loaded for another filter', async () => {
+    const harness = await visitAndLeave('/transactions?account=acc-1');
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+
+    const store = await revisit(harness, '/transactions?account=acc-2');
+
+    expect(store.transactions()).toEqual([]);
+    expect(store.revalidating()).toBe(false);
   });
 });
