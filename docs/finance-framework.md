@@ -121,12 +121,28 @@ Two things already right and kept:
   per row, zero-quantity holdings left out as the wealth sources do), history maps it (a carried-forward
   sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
   `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
-  `IsApproximate` reading `FX_TODAY_RATE`; a
-  base currency shown on the seed table adds it, and a row dated before today shown in a non-USD base adds it
-  too (the display boundary converts at today's rate, not the row's own day's: dated-rate display conversion,
-  C4's "dated rates", is a separate queued follow-up). R8's per-source rows will take over this field. A brokerage
+  `IsApproximate` reading `FX_TODAY_RATE`. R8's per-source rows will take over this field. A brokerage
   or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
   in force when it is read. Display wording is R7.
+- **Dated display conversion of history (C4, done).** A non-USD base shows each net-worth history row at the
+  rate published for *that row's date* (`GetPublishedSeriesAsync`: one cached lookup, one upstream request, for
+  the whole window; `PublishedRateLookup.Resolve` per row), never at one rate for the whole series. A date the
+  feed skipped (weekend, holiday) borrows the closest earlier published rate within
+  `PublishedLookbackDays` (7: longer than any normal non-publishing run, short enough that a feed outage
+  does not pass for a weekend) and carries `FX_NEAREST_PUBLISHED`; a date with nothing published inside
+  that bound is shown at today's rate and carries `FX_TODAY_RATE`; an exact date carries no reason. A row dated
+  today is shown at today's live rate, as the dashboard hero is. The reason a row finally carries is the worst of its stored
+  reasons and the one its display conversion added (`FX_UNKNOWN_1TO1` > `FX_TODAY_RATE` > `FX_NEAREST_PUBLISHED`),
+  so a base currency shown on the seed table still adds `FX_TODAY_RATE`. USD output is untouched and does no
+  rate lookup. The window's `ChangeHeadline` (a `VALUE_CHANGE` figure, not a return) is read off the same
+  converted rows: last visible row minus first, with the percent over the first row's base amount, so it
+  always equals what the rows show (a flat USD net worth against a moving rate is a non-zero base change).
+  Its FX reasons are the worse of the two end rows' conversions (no blanket `FX_TODAY_RATE`; a headline has
+  no `FX_NEAREST_PUBLISHED` code, so a nearest-published end adds none to it); a percent
+  withheld in USD (zero or negative start, scope change) stays withheld. Display only: stored rows keep their
+  USD values, and MCP `get_net_worth_history` stays USD.
+  Latency (measured 2026-10-15, cold, 2023-01-01..2026-10-14): one request, 0.6 s for Frankfurter EUR and 0.4 s for
+  NBU UAH; repeats within the 12-hour cache add none. A feed that is down costs one failed request (not cached) and the rows fall back to today's rate.
 
 ---
 

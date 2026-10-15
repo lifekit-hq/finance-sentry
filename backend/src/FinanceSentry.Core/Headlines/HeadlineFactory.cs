@@ -92,7 +92,8 @@ public static class HeadlineFactory
     /// <summary>
     /// <paramref name="headline"/> shown in <paramref name="baseCurrency"/> at today's rate. A window reaching
     /// before <paramref name="today"/> is converted at a rate that is not its own day's, so it gains
-    /// <see cref="HeadlineReasonCode.FxTodayRate"/> (dated-rate conversion is not built yet); a base with no live
+    /// <see cref="HeadlineReasonCode.FxTodayRate"/> (a headline figure is not dated-rate converted; the net-worth
+    /// history's own change figure is, see <see cref="ChangeInBaseCurrency"/>); a base with no live
     /// rate gains its own FX reason. The percent is a ratio and does not change.
     /// </summary>
     public static Headline InBaseCurrency(Headline headline, string baseCurrency, DateOnly today)
@@ -107,6 +108,26 @@ public static class HeadlineFactory
         var converted = headline with
         {
             Amount = headline.Amount is { } usd ? CurrencyConverter.FromUsd(usd, baseCurrency) : null,
+            Currency = baseCurrency,
+        };
+        return HeadlineQualityMapper.WithFx(converted, status);
+    }
+
+    /// <summary>
+    /// A <see cref="HeadlineMethod.ValueChange"/> headline re-stated from base-currency end values: the change is
+    /// <paramref name="endAmount"/> minus <paramref name="startAmount"/> and the percent is that change over the
+    /// start, so the figure equals what the converted rows show. A percent the USD figure withheld (zero or
+    /// negative start, scope change) stays withheld. <paramref name="status"/> is the worse of the two end rows'
+    /// conversions.
+    /// </summary>
+    public static Headline ChangeInBaseCurrency(
+        Headline headline, decimal startAmount, decimal endAmount, string baseCurrency, FxStatus status)
+    {
+        var change = endAmount - startAmount;
+        var converted = headline with
+        {
+            Amount = headline.Amount is null ? null : change,
+            Percent = headline.Percent is null || startAmount <= 0m ? null : ToPercent(change / startAmount),
             Currency = baseCurrency,
         };
         return HeadlineQualityMapper.WithFx(converted, status);

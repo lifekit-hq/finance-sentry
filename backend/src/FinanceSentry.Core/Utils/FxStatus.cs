@@ -29,7 +29,27 @@ public readonly record struct ConvertResult(decimal Amount, FxStatus Status);
 public static class FxReasons
 {
     public const string TodayRate = "FX_TODAY_RATE";
+
+    /// <summary>
+    /// A past date was shown at the closest earlier rate its feed published (weekend, holiday) rather than
+    /// its own day's. Carried only by dated display conversion (net-worth history), not by a headline figure.
+    /// </summary>
+    public const string NearestPublished = "FX_NEAREST_PUBLISHED";
     public const string Unknown1To1 = "FX_UNKNOWN_1TO1";
+}
+
+public static class FxReasonOrder
+{
+    /// <summary>The worse of two reason codes (a null is no reason), in the order of <see cref="FxStatus"/>.</summary>
+    public static string? Worse(string? a, string? b) => Rank(a) >= Rank(b) ? a : b;
+
+    private static int Rank(string? reason) => reason switch
+    {
+        FxReasons.Unknown1To1 => 3,
+        FxReasons.TodayRate => 2,
+        FxReasons.NearestPublished => 1,
+        _ => 0,
+    };
 }
 
 public static class FxStatusExtensions

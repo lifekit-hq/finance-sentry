@@ -12,6 +12,10 @@ public class EurReportingConverterTests
             string currency, DateOnly from, DateOnly to, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyDictionary<DateOnly, decimal>> GetPublishedSeriesAsync(
+            string currency, DateOnly from, DateOnly to, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default) =>
             Task.FromResult<decimal?>(published.TryGetValue((currency, date), out var r) ? r : null);
 

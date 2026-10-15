@@ -34,6 +34,10 @@ public class GetInstallmentFxImpactQueryHandlerTests
             return Task.FromResult<IReadOnlyDictionary<DateOnly, decimal>>(series);
         }
 
+        public Task<IReadOnlyDictionary<DateOnly, decimal>> GetPublishedSeriesAsync(
+            string currency, DateOnly from, DateOnly to, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default) =>
             Task.FromResult<decimal?>(null);
         public Task<FinanceSentry.Core.Utils.ConvertResult> ConvertToUsdAsync(
