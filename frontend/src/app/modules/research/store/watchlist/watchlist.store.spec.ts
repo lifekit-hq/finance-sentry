@@ -1,8 +1,10 @@
 import {HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
+import {ERROR_MESSAGES} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {type WatchlistItem} from '../../models/watchlist/watchlist.model';
 import {WatchlistService} from '../../services/watchlist.service';
 import {WatchlistStore} from './watchlist.store';
@@ -24,7 +26,11 @@ const MRNA: WatchlistItem = {
 
 function setup(service: Partial<Record<keyof WatchlistService, unknown>>) {
   TestBed.configureTestingModule({
-    providers: [WatchlistStore, {provide: WatchlistService, useValue: service}],
+    providers: [
+      WatchlistStore,
+      {provide: WatchlistService, useValue: service},
+      {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
+    ],
   });
   return TestBed.inject(WatchlistStore);
 }
