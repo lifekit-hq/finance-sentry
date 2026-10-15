@@ -103,4 +103,30 @@ public sealed class GetBookPerformanceToolTests
         period.Delta.Should().BeNull();
         period.Verdict.Should().BeNull();
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ReturnsHoldingsBasedFieldsAlongsideTheValueChange()
+    {
+        var expected = new BookPerformanceResult(
+            [new PeriodTwr(
+                BookPerformancePeriod.OneWeek, Today.AddDays(-7), 0.5m, 0.05m, 0.45m, "outperform",
+                HoldingsBasedReturn: 0m, SpyPriceReturn: 0.025m, HoldingsBasedDelta: -0.025m),
+            new PeriodTwr(
+                BookPerformancePeriod.OneMonth, Today.AddMonths(-1), 0.5m, 0.05m, 0.45m, "outperform",
+                HoldingsBasedUnavailableReason: HoldingsReturnUnavailableReason.MissingPrice,
+                HoldingsBasedMissingPriceSymbols: ["BBB"])],
+            Today);
+
+        _performance.Setup(s => s.GetAsync(UserId, It.IsAny<IReadOnlyList<BookPerformancePeriod>>(), default))
+            .ReturnsAsync(expected);
+
+        var result = await CreateSut().ExecuteAsync();
+
+        var json = System.Text.Json.JsonSerializer.Serialize(result, System.Text.Json.JsonSerializerOptions.Web);
+        json.Should().Contain("\"holdingsBasedReturn\":0");
+        json.Should().Contain("\"spyPriceReturn\":0.025");
+        json.Should().Contain("\"holdingsBasedUnavailableReason\":\"MissingPrice\"");
+        json.Should().Contain("\"holdingsBasedMissingPriceSymbols\":[\"BBB\"]");
+        json.Should().Contain("\"bookTwr\":0.5");
+    }
 }

@@ -9,7 +9,7 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15.
+Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added 2026-10-15.
 
 ---
 
@@ -1054,6 +1054,31 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   deposit makes it 21,000, and it ends at 19,800; this figure reads +98%, while the time-weighted return is
   +3.7%. A true TWR needs dated external flows (not ingested yet) and the cash-inclusive scope; see
   [finance-framework.md](finance-framework.md), measure M3 and gap G1.
+
+- **Holdings-based return (the flow-neutral companion, R1(b)).** Each period also carries
+  `holdingsBasedReturn` / `spyPriceReturn` / `holdingsBasedDelta`, labelled "holdings-based return" vs
+  "S&P 500 price return". It reuses the `BookDrawdownCalculator` method (`HoldingsBasedReturnCalculator`):
+  each step between two consecutive brokerage holdings captures (Risk's `holding_snapshots`, written by
+  the daily risk check) revalues the quantities held at the **earlier** capture at the **later** capture's
+  prices (price = USD value ÷ quantity), the ratio to the earlier value is the step's return, and the steps
+  chain. A position that was not held at the earlier capture adds nothing to that step, so a deposit or a
+  purchase from idle cash reads 0%, not a gain. Fictional example, the one above with no price change:
+  1,000 + a 500 deposit that buys 5 more shares at an unchanged 100 reads +50% as a value change and 0% here.
+  - **Price return, not total return.** Dividends paid to cash are outside the index, so the comparator is
+    SPY's change in **close** (`DailyBar.Close`), over the same window (first bar on or after the period's
+    start to the latest bar), not the adjusted close the value-change comparison uses.
+  - **Window.** The captures at or after the period's start, with the same edge tolerance as the book
+    value-change figure (`clamp(round(periodDays × 0.1), 1, 7)` days at both ends).
+  - **A reason, never 0.** `holdingsBasedUnavailableReason` is `InsufficientCaptures` (fewer than two
+    captures in the window), `WindowNotCovered` (an end beyond the tolerance), `MissingPrice` (a position
+    held at two consecutive captures has no value at one of them; `holdingsBasedMissingPriceSymbols` names
+    it, and one such step withholds the whole window) or `NoInvestedBase` (no priced position to revalue).
+  - **Splits and sales.** A position whose quantity moved more than 10% while its value moved less than 2%
+    is a reorganisation and is carried flat for that step. A position sold between two captures is carried
+    at its earlier value for that step (its exit price is not in a capture) and contributes nothing after:
+    the sale step understates that position's move. True TWR (dated external flows) is still R1(c).
+  - **Scope.** The brokerage sleeve of the holdings captures, which is invested positions only (broker
+    cash is not a position). The cash-inclusive brokerage headline (C3) arrives with the measure engine.
 
 ## 11. FIRE projection (#433)
 

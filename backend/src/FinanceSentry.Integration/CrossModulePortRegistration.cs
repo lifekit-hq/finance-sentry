@@ -34,6 +34,9 @@ public static class CrossModulePortRegistration
         // 412: portfolio value source for book-vs-benchmark change in invested value; bridges Wealth snapshots → Radar.
         services.AddScoped<IPortfolioValueSource, RadarPortfolioValueSource>();
 
+        // R1(b): holdings captures (quantity and value per position) bridge Risk's snapshots → Radar's holdings-based return.
+        services.AddScoped<IHoldingsHistorySource, RadarHoldingsHistorySource>();
+
         // 413: portfolio scan data — bridges Research IPS + Risk rules → Radar portfolio scanner.
         services.AddScoped<IPortfolioScanDataReader, PortfolioScanDataReader>();
 
