@@ -35,10 +35,19 @@
     </cmn-card>
 
     <cmn-card class="block">
+      @if (store.providerFilterLabel(); as providerLabel) {
+        <div class="mb-cmn-4 flex flex-wrap items-center gap-cmn-2" data-testid="holdings-filter">
+          <lk-dismissible-chip
+            [attr.label]="providerLabel"
+            (lk-dismissible-chip-remove)="clearProvider()"
+            data-testid="holdings-filter-chip"
+          />
+        </div>
+      }
       <div class="flex flex-col gap-cmn-6 md:flex-row md:items-center">
         <div class="min-w-0 flex-1">
           <p class="text-cmn-xs uppercase tracking-wide text-text-secondary">
-            Total position value
+            {{ store.providerFilterLabel() ?? 'Total' }} position value
           </p>
           <div class="mt-cmn-1 flex items-center gap-cmn-2">
             <p
@@ -52,7 +61,7 @@
               }
             </p>
             <fns-headline-badge
-              [headline]="store.totalHeadline()"
+              [headline]="store.providerFilter() ? null : store.totalHeadline()"
               label="Total position value"
               data-testid="holdings-total-quality"
             />
@@ -96,6 +105,24 @@
           </div>
         }
       </div>
+
+      @if (store.isFilteredEmpty()) {
+        <p
+          class="mt-cmn-6 border-t border-border-default pt-cmn-5 text-center text-cmn-sm text-text-secondary"
+          data-testid="holdings-filter-empty"
+        >
+          No positions with {{ store.providerFilterLabel() }}.
+        </p>
+      }
+
+      @if (store.isProviderFeedFailed()) {
+        <p
+          class="mt-cmn-6 border-t border-border-default pt-cmn-5 text-center text-cmn-sm text-text-secondary"
+          data-testid="holdings-filter-feed-failed"
+        >
+          {{ store.providerFilterLabel() }} positions could not be loaded.
+        </p>
+      }
 
       @for (group of store.positionsByAssetClass(); track group.assetClass) {
         <section

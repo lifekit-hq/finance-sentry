@@ -12,6 +12,9 @@ export function holdingsMethods(store: WritableStateSource<HoldingsState>) {
     setHeadline(headline: Nullable<Headline>): void {
       patchState(store, {headline});
     },
+    setProvider(provider: Nullable<string>): void {
+      patchState(store, {provider});
+    },
     setDayChangePct(dayChangePctByTicker: Record<string, number>): void {
       patchState(store, {dayChangePctByTicker});
     },

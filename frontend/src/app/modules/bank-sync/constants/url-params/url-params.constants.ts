@@ -31,12 +31,6 @@ export const MONTHS_PARAM_CODEC: UrlParamCodec<number> = {
   },
 };
 
-/** Free-form id params (`account`, `category`): an empty value reads as absent. */
-export const NULLABLE_STRING_PARAM_CODEC: UrlParamCodec<Nullable<string>> = {
-  encode: value => value ?? '',
-  decode: raw => (raw === '' ? null : raw),
-};
-
 /** The ledger `type` param: only `credit` and `debit` are filters, anything else reads as All. */
 export const TRANSACTION_TYPE_PARAM_CODEC: UrlParamCodec<Nullable<TransactionType>> = {
   encode: value => value ?? '',
