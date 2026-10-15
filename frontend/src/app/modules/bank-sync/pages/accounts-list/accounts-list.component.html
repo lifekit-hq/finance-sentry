@@ -54,19 +54,30 @@
     [isEmpty]="store.isEmpty()"
     errorPlacement="above"
   >
-    <cmn-card skeleton>
-      <div class="p-cmn-4 space-y-cmn-3">
-        @for (_ of skeletonRows; track $index) {
-          <div class="flex gap-cmn-4">
-            <cmn-skeleton height="1rem" width="5%" />
-            <cmn-skeleton height="1rem" width="25%" />
-            <cmn-skeleton height="1rem" width="20%" />
-            <cmn-skeleton height="1rem" width="30%" />
-            <cmn-skeleton height="1rem" width="20%" />
+    <div skeleton data-testid="accounts-skeleton">
+      @for (_ of skeletonSections; track $index) {
+        <div class="mb-cmn-8">
+          <div class="mb-cmn-3 flex items-center justify-between">
+            <cmn-skeleton height="0.75rem" width="30%" />
+            <cmn-skeleton height="0.75rem" width="20%" />
           </div>
-        }
-      </div>
-    </cmn-card>
+          <cmn-card padding="none">
+            @for (__ of skeletonRows; track $index) {
+              <div
+                class="flex items-center gap-cmn-3 border-t border-border-default p-cmn-4 first:border-t-0"
+              >
+                <cmn-skeleton className="rounded-full" height="2rem" width="2rem" />
+                <div class="min-w-0 flex-1 space-y-cmn-2">
+                  <cmn-skeleton height="0.875rem" width="55%" />
+                  <cmn-skeleton height="0.75rem" width="35%" />
+                </div>
+                <cmn-skeleton height="1rem" width="4.5rem" />
+              </div>
+            }
+          </cmn-card>
+        </div>
+      }
+    </div>
 
     <cmn-empty-state empty message="No accounts connected yet.">
       <cmn-button (clicked)="connectAccount()" cta variant="primary"
@@ -78,15 +89,35 @@
       >Retry</cmn-button
     >
 
+    @for (inst of attentionInstitutions(); track inst.institutionId + inst.provider) {
+      <div
+        class="mb-cmn-4 flex items-center gap-cmn-3 rounded-cmn-md border border-status-error p-cmn-3 sm:hidden"
+        data-testid="attention-row"
+        role="alert"
+      >
+        <span class="h-2 w-2 shrink-0 rounded-full bg-status-error"></span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-cmn-sm font-medium text-text-primary">
+            {{ attentionTitle(inst) }}
+          </p>
+          <p class="text-cmn-xs text-text-secondary">{{ attentionDetail(inst) }}</p>
+        </div>
+        @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+          <cmn-button (clicked)="reconnect(inst)" variant="primary" size="sm">Reconnect</cmn-button>
+        }
+      </div>
+    }
+
     @for (section of store.categorySections(); track section.category) {
       <div class="mb-cmn-8">
         <div class="flex items-center justify-between mb-cmn-3">
           <h2 class="text-cmn-xs font-semibold text-text-secondary uppercase tracking-wider">
             {{ section.title }}
           </h2>
-          <span class="text-cmn-xs text-text-secondary"
-            >{{ section.summary.institutionCount }} {{ section.institutionNoun
-            }}{{ section.summary.institutionCount !== 1 ? 's' : '' }}</span
+          <span
+            class="text-cmn-xs font-medium tabular-nums text-text-secondary"
+            data-testid="section-subtotal"
+            >{{ section.summary.totalInBaseCurrency | netBalance: store.baseCurrency() }}</span
           >
         </div>
         <cmn-card padding="none">
@@ -228,13 +259,22 @@
                               "
                               size="sm"
                             />
-                            <span class="truncate">{{
-                              account.symbol ?? account.accountNumberLast4
-                            }}</span>
+                            <span class="min-w-0">
+                              <span class="block truncate" data-testid="position-ticker">{{
+                                account.symbol ?? account.accountNumberLast4
+                              }}</span>
+                              <span
+                                class="block truncate text-cmn-xs text-text-secondary"
+                                data-testid="position-quantity"
+                                >{{ account | positionQuantity }}</span
+                              >
+                            </span>
                           </span>
-                          <ng-container
-                            *ngTemplateOutlet="amountCell; context: {$implicit: account}"
-                          />
+                          <span
+                            class="shrink-0 text-cmn-sm tabular-nums font-medium text-text-primary"
+                            data-testid="position-value"
+                            >{{ account | positionValue: store.baseCurrency() }}</span
+                          >
                         </button>
                       </li>
                     }

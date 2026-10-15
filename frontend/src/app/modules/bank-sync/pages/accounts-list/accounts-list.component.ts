@@ -44,6 +44,8 @@ import {ConnectModalComponent} from '../../components/connect-modal/connect-moda
 import {DisconnectDialogComponent} from '../../components/disconnect-dialog/disconnect-dialog.component';
 import {type BankAccount} from '../../models/bank-account/bank-account.model';
 import {AccountBalancePipe} from '../../pipes/account-balance.pipe';
+import {PositionQuantityPipe} from '../../pipes/position-quantity.pipe';
+import {PositionValuePipe} from '../../pipes/position-value.pipe';
 import {AccountsStore} from '../../store/accounts/accounts.store';
 import {ConnectStore} from '../../store/connect/connect.store';
 import {
@@ -56,7 +58,8 @@ import {
   SYNC_DOT_CLASS,
 } from './accounts-list.constants';
 
-const SKELETON_ROWS = 5;
+const SKELETON_ROWS = 3;
+const SKELETON_SECTIONS = 2;
 
 @Component({
   selector: 'fns-accounts-list',
@@ -78,6 +81,8 @@ const SKELETON_ROWS = 5;
     MoneyPipe,
     NetBalancePipe,
     NgTemplateOutlet,
+    PositionQuantityPipe,
+    PositionValuePipe,
     RelativeTimePipe,
     SkeletonComponent,
     SyncStatusLabelPipe,
@@ -103,6 +108,13 @@ export class AccountsListComponent implements OnInit {
 
   public readonly store = inject(AccountsStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
+  public readonly attentionInstitutions = computed(() =>
+    this.store
+      .categorySections()
+      .flatMap(section => section.summary.institutions)
+      .filter(institution => this.needsAttention(institution))
+  );
   public readonly view = computed(() =>
     AsyncViewUtils.resolve({
       isLoading: this.store.isLoading(),
@@ -208,11 +220,28 @@ export class AccountsListComponent implements OnInit {
     if (!institution.lastSyncTimestamp) {
       return 'Not synced yet';
     }
-    return `synced ${formatRelativeTime(institution.lastSyncTimestamp)}`;
+    return formatRelativeTime(institution.lastSyncTimestamp);
   }
 
   public needsAttention(institution: Institution): boolean {
     return institution.syncStatus === 'failed' || institution.syncStatus === 'reauth_required';
+  }
+
+  public attentionTitle(institution: Institution): string {
+    return institution.syncStatus === 'reauth_required'
+      ? `${institution.name} needs reconnecting`
+      : `${institution.name} sync failed`;
+  }
+
+  public attentionDetail(institution: Institution): string {
+    const last = institution.lastSuccessfulSyncTimestamp;
+    if (!last) {
+      return 'No successful sync yet';
+    }
+    const since = formatRelativeTime(last);
+    return institution.syncStatus === 'reauth_required'
+      ? `Balances frozen since ${since}`
+      : `Last synced ${since}`;
   }
 
   public canReconnect(institution: Institution): boolean {

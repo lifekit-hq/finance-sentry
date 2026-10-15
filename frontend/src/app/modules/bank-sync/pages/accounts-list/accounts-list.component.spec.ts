@@ -116,13 +116,13 @@ describe('AccountsListComponent sync status text', () => {
     expect(text).not.toContain('synced never');
   });
 
-  it('shows "synced <time>" for a synced institution with a timestamp', () => {
+  it('shows the bare time for a synced institution with a timestamp', () => {
     const element = setup(true, {
       syncStatus: 'synced',
       lastSyncTimestamp: new Date().toISOString(),
     });
     const text = element.textContent ?? '';
-    expect(text).toContain('0 accounts · synced just now');
+    expect(text).toContain('0 accounts · just now');
   });
 
   it('keeps the plain count subtitle off phone', () => {
@@ -250,6 +250,83 @@ describe('AccountsListComponent cash rows', () => {
 
     expect(element.querySelector('[data-testid="cash-row"] button')).toBeNull();
     expect(element.textContent).toContain('AAPL');
+  });
+});
+
+describe('AccountsListComponent attention row and subtotals', () => {
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+  it('shows a reconnect row at the top for an institution that needs reauth', () => {
+    const frozenSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
+    const element = setup(true, {
+      name: 'AIB',
+      syncStatus: 'reauth_required',
+      lastSuccessfulSyncTimestamp: frozenSince,
+    });
+
+    const row = element.querySelector('[data-testid="attention-row"]');
+    expect(row?.textContent).toContain('AIB needs reconnecting');
+    expect(row?.textContent).toContain('Balances frozen since 3d ago');
+    expect(row?.querySelector('cmn-button')?.textContent).toContain('Reconnect');
+    expect(row?.className).toContain('sm:hidden');
+  });
+
+  it('shows no reconnect button on the attention row of a failed sync', () => {
+    const element = setup(true, {name: 'Monzo', syncStatus: 'failed'});
+
+    const row = element.querySelector('[data-testid="attention-row"]');
+    expect(row?.textContent).toContain('Monzo sync failed');
+    expect(row?.querySelector('cmn-button')).toBeNull();
+  });
+
+  it('shows no attention row for a healthy institution', () => {
+    const element = setup(true, {syncStatus: 'synced'});
+
+    expect(element.querySelector('[data-testid="attention-row"]')).toBeNull();
+  });
+
+  it('shows the section subtotal instead of an institution count', () => {
+    const element = setup(false, {syncStatus: 'synced'});
+
+    expect(element.querySelector('[data-testid="section-subtotal"]')?.textContent).toContain(
+      '$100.00'
+    );
+    expect(element.textContent).not.toContain('1 bank');
+  });
+});
+
+describe('AccountsListComponent position rows', () => {
+  it('leads with the value and sizes the position in units, not money', () => {
+    const fixture = setupFixture(false, {
+      provider: 'ibkr',
+      category: 'brokerage',
+      syncStatus: 'synced',
+      accounts: [
+        {
+          accountId: 'p1',
+          bankName: 'Interactive Brokers',
+          accountType: 'brokerage',
+          accountNumberLast4: 'AAPL',
+          currency: 'AAPL',
+          symbol: 'AAPL',
+          provider: 'ibkr',
+          category: 'brokerage',
+          currentBalance: 40,
+          balanceInBaseCurrency: 7000,
+          syncStatus: 'synced',
+          lastSyncTimestamp: null,
+        },
+      ],
+    });
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('[data-testid="position-value"]')?.textContent).toContain(
+      '$7,000.00'
+    );
+    expect(element.querySelector('[data-testid="position-quantity"]')?.textContent).toContain(
+      '40 shares'
+    );
+    expect(element.querySelector('[data-testid="position-ticker"]')?.textContent).toContain('AAPL');
   });
 });
 
