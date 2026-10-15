@@ -11,32 +11,33 @@ function unreadWeight(alert: Alert | undefined): number {
 export function alertsMethods(store: WritableStateSource<AlertsState>) {
   return {
     setData(alerts: Alert[], totalCount: number, unreadCount: number): void {
-      patchState(store, {alerts, totalCount, unreadCount, currentPage: 1});
+      patchState(store, {alerts, totalCount, unreadCount, exhausted: false});
     },
     /** Appends the next page; a row that moved into it since the last page is not shown twice. */
     appendData(alerts: Alert[], totalCount: number, unreadCount: number): void {
       patchState(store, (s: AlertsState) => {
         const loaded = new Set(s.alerts.map(a => a.id));
+        const fresh = alerts.filter(a => !loaded.has(a.id));
         return {
-          alerts: [...s.alerts, ...alerts.filter(a => !loaded.has(a.id))],
+          alerts: [...s.alerts, ...fresh],
           totalCount,
           unreadCount,
-          currentPage: s.currentPage + 1,
+          exhausted: fresh.length === 0,
         };
       });
     },
     /** A reload whose query failed: its rows no longer match the filter on screen. */
     clearData(): void {
-      patchState(store, {alerts: [], totalCount: 0, currentPage: 1});
+      patchState(store, {alerts: [], totalCount: 0, exhausted: false});
     },
     setUnreadCount(unreadCount: number): void {
       patchState(store, {unreadCount});
     },
     setFilter(filter: AlertFilter): void {
-      patchState(store, {filter, currentPage: 1});
+      patchState(store, {filter, exhausted: false});
     },
     setSearch(search: string): void {
-      patchState(store, {search, currentPage: 1});
+      patchState(store, {search, exhausted: false});
     },
     markReadLocal(id: string): void {
       patchState(store, (s: AlertsState) => {
@@ -56,7 +57,7 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
     markAllReadLocal(): void {
       patchState(store, (s: AlertsState) =>
         s.filter === 'unread'
-          ? {alerts: [], totalCount: 0, unreadCount: 0, currentPage: 1}
+          ? {alerts: [], totalCount: 0, unreadCount: 0, exhausted: false}
           : {alerts: s.alerts.map(a => ({...a, isRead: true})), unreadCount: 0}
       );
     },

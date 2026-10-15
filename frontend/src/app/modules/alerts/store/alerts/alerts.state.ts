@@ -9,8 +9,8 @@ export interface AlertsState {
   search: string;
   totalCount: number;
   unreadCount: number;
-  /** Pages loaded so far: the next page appends `currentPage + 1`. */
-  currentPage: number;
+  /** The last page asked for added no row: the server holds nothing more to show. */
+  exhausted: boolean;
 }
 
 export const initialAlertsState: AlertsState = {
@@ -19,5 +19,5 @@ export const initialAlertsState: AlertsState = {
   search: '',
   totalCount: 0,
   unreadCount: 0,
-  currentPage: 1,
+  exhausted: false,
 };

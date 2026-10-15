@@ -25,7 +25,7 @@ interface EffectsStore {
   search: Signal<string>;
   filter: Signal<AlertFilter>;
   status: Signal<AsyncStatus>;
-  currentPage: Signal<number>;
+  alerts: Signal<Alert[]>;
   setSearch: (search: string) => void;
   setData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
   appendData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
@@ -72,7 +72,10 @@ export function alertsEffects(store: EffectsStore) {
         )
       )
     ),
-    /** Appends the next page (the infinite list's paging contract): asked near the end and on retry. */
+    /**
+     * Appends the next page (the infinite list's paging contract): asked near the end and on retry.
+     * The page follows the rows on screen, so a row removed locally is refilled, not skipped.
+     */
     loadMore: rxMethod<void>(
       pipe(
         filter(() => store.status() !== 'loading'),
@@ -81,7 +84,7 @@ export function alertsEffects(store: EffectsStore) {
           api
             .getAlerts(
               store.filter(),
-              store.currentPage() + 1,
+              Math.floor(store.alerts().length / ALERTS_PAGE_SIZE) + 1,
               ALERTS_PAGE_SIZE,
               store.search().trim()
             )

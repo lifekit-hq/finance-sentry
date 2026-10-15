@@ -4,7 +4,7 @@ import {type AsyncStatus} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {type AlertFilter} from '../../models/alert/alert.model';
+import {type Alert, type AlertFilter} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
 import {ALERT_SEARCH_DEBOUNCE_MS, alertsEffects, alertsHooks} from './alerts.effects';
@@ -17,7 +17,7 @@ function build() {
     search: signal(''),
     filter: signal<AlertFilter>('all'),
     status: signal<AsyncStatus>('idle'),
-    currentPage: signal(1),
+    alerts: signal<Alert[]>([]),
     setSearch: vi.fn(),
     setData: vi.fn(),
     appendData: vi.fn(),
@@ -93,7 +93,7 @@ describe('alertsEffects', () => {
   it('loadMore appends the page after the loaded ones under its own status', () => {
     const store = build();
     store.filter.set('error');
-    store.currentPage.set(2);
+    store.alerts.set(Array.from({length: 2 * ALERTS_PAGE_SIZE}, (_, i) => ({id: `a${i}`}) as Alert));
     TestBed.runInInjectionContext(() => alertsEffects(store).loadMore());
 
     expect(api.getAlerts).toHaveBeenCalledWith('error', 3, ALERTS_PAGE_SIZE, '');
