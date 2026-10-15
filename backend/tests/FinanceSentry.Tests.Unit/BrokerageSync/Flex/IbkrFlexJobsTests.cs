@@ -40,7 +40,7 @@ public class IbkrFlexJobsTests
         await job.ExecuteAsync();
 
         syncService.Verify(
-            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -56,11 +56,11 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[failing, ok]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("An error occurred while saving the entity changes.",
                 new InvalidOperationException("persist blew up")));
         syncService
-            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
@@ -76,7 +76,7 @@ public class IbkrFlexJobsTests
         credentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(failing, It.IsAny<CancellationToken>()), Times.Once);
         credentialRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         syncService.Verify(
-            s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -91,10 +91,10 @@ public class IbkrFlexJobsTests
         var windows = IbkrFlexBackfillJob.BuildYearlyWindows();
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
         syncService
-            .Setup(s => s.SyncAsync(userId, windows[0], It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(userId, windows[0], It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("window blew up"));
 
         var job = new IbkrFlexBackfillJob(
@@ -105,7 +105,7 @@ public class IbkrFlexJobsTests
         credential.LastError.Should().Be("window blew up");
         credentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(credential, It.IsAny<CancellationToken>()), Times.Once);
         syncService.Verify(
-            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(windows.Count));
     }
 
@@ -123,12 +123,12 @@ public class IbkrFlexJobsTests
         await job.ExecuteAsync();
 
         syncService.Verify(
-            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task IncrementalSyncJob_ActiveCredential_SyncsOnce_WithShortLookbackWindow()
+    public async Task IncrementalSyncJob_ActiveCredential_SyncsOnce_WithAWeekEndingYesterday()
     {
         var userId = Guid.NewGuid();
         var credential = new IBKRFlexCredential(userId, "999999", [1], [2], [3], 1);
@@ -137,19 +137,23 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[credential]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>(MockBehavior.Strict);
         syncService
-            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
         var job = new IbkrFlexIncrementalSyncJob(
             credentialRepo.Object, syncService.Object, Mock.Of<IAlertGeneratorService>(), Mock.Of<IUserAlertPreferencesReader>(),
             Mock.Of<IConnectionHealthShadow>(), new IbkrFlexFailureClassifier(),
-            HealthOptions.Monitor(new ConnectionHealthOptions()), TimeProvider.System,
+            HealthOptions.Monitor(new ConnectionHealthOptions()), new FakeTimeProvider(Start),
             NullLogger<IbkrFlexIncrementalSyncJob>.Instance);
 
         await job.ExecuteAsync();
 
+        // IBKR answers a window ending on a day it has not closed yet with 1003, so today is never asked for.
         syncService.Verify(
-            s => s.SyncAsync(userId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), true),
+            s => s.SyncAsync(
+                userId,
+                new FlexStatementWindow(new DateOnly(2026, 9, 24), new DateOnly(2026, 9, 30)),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -166,7 +170,15 @@ public class IbkrFlexJobsTests
         windows[3].FromDate.Should().Be(new DateOnly(2025, 1, 1));
         windows[3].ToDate.Should().Be(new DateOnly(2025, 12, 31));
         windows[^1].FromDate.Should().Be(new DateOnly(2026, 1, 1));
-        windows[^1].ToDate.Should().Be(asOf, "the final window must stop at today, not run past it into 12-31");
+        windows[^1].ToDate.Should().Be(new DateOnly(2026, 3, 14), "the final window stops at yesterday: IBKR has no statement for today");
+    }
+
+    [Fact]
+    public void BuildYearlyWindows_OnNewYearsDay_EndsWithLastYearsFullWindow()
+    {
+        var windows = IbkrFlexBackfillJob.BuildYearlyWindows(new DateOnly(2027, 1, 1));
+
+        windows[^1].Should().Be(new FlexStatementWindow(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31)));
     }
 
     [Fact]
@@ -189,10 +201,10 @@ public class IbkrFlexJobsTests
             .ReturnsAsync((IReadOnlyList<IBKRFlexCredential>)[failing, ok]);
         var syncService = new Mock<IIbkrFlexTradeSyncService>();
         syncService
-            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(failingUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IbkrFlexException("1015", "Token is invalid."));
         syncService
-            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(s => s.SyncAsync(okUser, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
         var shadow = new Mock<IConnectionHealthShadow>();
 
@@ -253,7 +265,7 @@ public class IbkrFlexJobsTests
 
         public void GivenSyncFails(Exception ex) =>
             SyncService
-                .Setup(s => s.SyncAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .Setup(s => s.SyncAsync(UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(ex);
 
         public Task RunAsync() =>
@@ -329,7 +341,7 @@ public class IbkrFlexJobsTests
     {
         var harness = new PolicyHarness().Active();
         harness.SyncService
-            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IbkrFlexException("1012", "Token has expired."))
             .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
 
@@ -339,22 +351,54 @@ public class IbkrFlexJobsTests
         harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task StatementNotAvailable_IsNoFailure_NoErrorNoCountNoAlert(bool active)
+    [Fact]
+    public async Task StatementNotAvailableThroughYesterday_AsksOnceMoreThroughTheDayBefore_AndRecordsASuccess()
     {
-        // The ~06:00 run routinely meets IBKR's "Statement is not available." answer.
         var harness = new PolicyHarness();
-        if (active) harness.Active();
+        var throughYesterday = new FlexStatementWindow(new DateOnly(2026, 9, 24), new DateOnly(2026, 9, 30));
+        var throughDayBefore = new FlexStatementWindow(new DateOnly(2026, 9, 24), new DateOnly(2026, 9, 29));
+        harness.SyncService
+            .Setup(s => s.SyncAsync(harness.UserId, throughYesterday, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IbkrFlexException("1003", "Statement is not available."));
+        harness.SyncService
+            .Setup(s => s.SyncAsync(harness.UserId, throughDayBefore, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(s => s.SyncAsync(harness.UserId, throughDayBefore, It.IsAny<CancellationToken>()), Times.Once);
+        harness.Credential.LastError.Should().BeNull();
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(0);
+        harness.Credential.Health.LastSuccessAt.Should().Be(Start);
+    }
+
+    [Fact]
+    public async Task OtherFlexErrors_AreNotRetriedWithAnEarlierWindow()
+    {
+        var harness = new PolicyHarness();
+        harness.GivenSyncFails(new IbkrFlexException("1015", "Token is invalid."));
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task StatementNotAvailable_PastTheStepBack_IsRecordedAsAFailure_WithoutAnAlertInShadow()
+    {
+        // While the window ended today this answer met every weekday run and was recorded nowhere.
+        var harness = new PolicyHarness();
         harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
 
-        await harness.RunDailyAsync(10);
+        await harness.RunDailyAsync(3);
 
-        harness.Credential.LastError.Should().BeNull();
-        harness.Credential.Health.Should().Be(new ConnectionHealth(), "it is neither a failure nor a success of the connection");
-        harness.CredentialRepo.Verify(r => r.SaveLastErrorUnscopedAsync(It.IsAny<IBKRFlexCredential>(), It.IsAny<CancellationToken>()), Times.Never);
-        harness.CredentialRepo.Verify(r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()), Times.Exactly(6));
+        harness.Credential.LastError.Should().Be("Statement is not available.");
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(3);
+        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.Unknown);
+        harness.Credential.Health.LastFailureCode.Should().Be("1003");
         harness.VerifyNoAlertCalls();
     }
 

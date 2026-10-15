@@ -1,6 +1,6 @@
 namespace FinanceSentry.Modules.Radar.Domain;
 
-/// <summary>Lookback window for TWR computation.</summary>
+/// <summary>Lookback window for the book-vs-SPY value-change computation.</summary>
 public enum BookPerformancePeriod
 {
     OneWeek,
@@ -10,8 +10,11 @@ public enum BookPerformancePeriod
 }
 
 /// <summary>
-/// Single-period TWR result for both the book (IBKR brokerage portfolio) and the SPY benchmark.
-/// Null fields indicate insufficient price history for the period.
+/// Single-period change in invested value (includes deposits) for the book (IBKR brokerage portfolio,
+/// idle cash excluded) next to SPY's adjusted-close change. Despite the <c>Twr</c> names, none of these
+/// fields is a time-weighted return: <c>BookTwr</c> is last / first - 1 over invested value with no
+/// contribution adjustment. The names are kept for contract stability (MCP tool output).
+/// Null fields indicate insufficient price or invested-value history for the period.
 /// </summary>
 public sealed record PeriodTwr(
     BookPerformancePeriod Period,
@@ -22,7 +25,7 @@ public sealed record PeriodTwr(
     string? Verdict);
 
 /// <summary>
-/// TWR scoreboard across the four standard lookback windows.
+/// Book-vs-SPY change-in-invested-value scoreboard across the four standard lookback windows.
 /// </summary>
 public sealed record BookPerformanceResult(
     IReadOnlyList<PeriodTwr> Periods,

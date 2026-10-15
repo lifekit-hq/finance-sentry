@@ -19,8 +19,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
 /// failure.</item>
 /// <item>Anything else is unknown, and counts like any other non-credential failure.</item>
 /// </list>
-/// IBKR's "statement is not available" answer (<see cref="IbkrFlexException.IsStatementNotAvailable"/>) is no
-/// failure on the scheduled run, which never hands it here; any other caller that does gets it as unknown.
+/// IBKR's "statement is not available" answer (<see cref="IbkrFlexException.IsStatementNotAvailable"/>) reaches
+/// here only once the client's retries and the scheduled run's one-day step-back are spent, and reads as unknown.
 /// </summary>
 public sealed class IbkrFlexFailureClassifier : IProviderFailureClassifier
 {

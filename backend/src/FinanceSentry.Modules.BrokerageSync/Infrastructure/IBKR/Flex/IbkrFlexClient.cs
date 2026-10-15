@@ -19,7 +19,9 @@ public interface IIbkrFlexClient
 /// saved Activity Flex Query, then <c>GetStatement</c> is polled with the returned reference
 /// code until the statement is ready. Every call — the initial request and every poll — goes
 /// through <see cref="IbkrFlexRateLimiter"/>, since the 1 req/s + 10 req/min limit is per token,
-/// not per endpoint.
+/// not per endpoint. <c>SendRequest</c> answered with "statement is not available" (1003) or "generation in
+/// progress" (1019) is retried with a bounded backoff (<see cref="IbkrFlexOptions.SendRequestMaxAttempts"/>);
+/// every refusal is logged with IBKR's error code.
 /// </summary>
 public sealed class IbkrFlexClient(
     HttpClient http,
@@ -28,6 +30,9 @@ public sealed class IbkrFlexClient(
     ILogger<IbkrFlexClient> logger) : IIbkrFlexClient
 {
     private const string FlexNotYetGeneratedErrorCode = "1019";
+
+    private static readonly HashSet<string> RetryableSendRequestCodes =
+        [IbkrFlexException.StatementNotAvailableCode, FlexNotYetGeneratedErrorCode];
 
     // Same edge quirk as the OAuth client: no User-Agent or HTTP/2 gets a silent 403.
     private static readonly ProductInfoHeaderValue UserAgent = new("finance-sentry", "1.0");
@@ -68,13 +73,31 @@ public sealed class IbkrFlexClient(
         if (window is not null)
             url += $"&fd={window.FromDateWire}&td={window.ToDateWire}";
 
-        var body = await SendAsync(url, ct);
-        var ack = DeserializeError(body);
+        var maxAttempts = Math.Max(1, options.Value.SendRequestMaxAttempts);
+        var delay = options.Value.SendRequestRetryDelay;
+        for (var attempt = 1; ; attempt++)
+        {
+            var body = await SendAsync(url, ct);
+            var ack = DeserializeError(body);
 
-        if (!string.Equals(ack.Status, "Success", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(ack.ReferenceCode))
-            throw new IbkrFlexException(ack.ErrorCode, ack.ErrorMessage ?? "IBKR Flex SendRequest failed.");
+            if (string.Equals(ack.Status, "Success", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(ack.ReferenceCode))
+                return ack.ReferenceCode;
 
-        return ack.ReferenceCode;
+            var retryable = ack.ErrorCode is not null && RetryableSendRequestCodes.Contains(ack.ErrorCode);
+            if (!retryable || attempt >= maxAttempts)
+            {
+                logger.LogWarning(
+                    "IBKR Flex SendRequest refused (code {FlexErrorCode}: {FlexMessage}) for window {FromDate}-{ToDate} after {Attempt} attempt(s)",
+                    ack.ErrorCode, ack.ErrorMessage, window?.FromDateWire, window?.ToDateWire, attempt);
+                throw new IbkrFlexException(ack.ErrorCode, ack.ErrorMessage ?? "IBKR Flex SendRequest failed.");
+            }
+
+            logger.LogInformation(
+                "IBKR Flex SendRequest answered code {FlexErrorCode} ({FlexMessage}) for window {FromDate}-{ToDate}; retrying in {Delay} (attempt {Attempt}/{MaxAttempts})",
+                ack.ErrorCode, ack.ErrorMessage, window?.FromDateWire, window?.ToDateWire, delay, attempt, maxAttempts);
+            await Task.Delay(delay, ct);
+            delay *= 2;
+        }
     }
 
     private async Task<FlexQueryResponseXml?> TryGetStatementAsync(

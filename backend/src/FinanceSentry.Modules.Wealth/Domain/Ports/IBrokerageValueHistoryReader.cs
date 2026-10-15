@@ -2,7 +2,7 @@ namespace FinanceSentry.Modules.Wealth.Domain.Ports;
 
 /// <summary>
 /// Published read port (#673): a user's daily brokerage-sleeve totals and invested values from the net-worth snapshot
-/// table, for cross-module readers such as Radar's book-vs-benchmark TWR. Implemented inside
+/// table, for cross-module readers such as Radar's book-vs-benchmark change in invested value. Implemented inside
 /// Wealth; the FinanceSentry.Integration adapter reaches Wealth only through this interface.
 /// </summary>
 public interface IBrokerageValueHistoryReader
