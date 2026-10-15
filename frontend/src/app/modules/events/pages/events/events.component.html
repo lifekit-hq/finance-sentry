@@ -157,7 +157,17 @@
           iconClass="text-text-secondary"
         />
       </div>
-      <div class="space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto">
+      <lk-infinite-list
+        [hasMore]="store.hasMoreFired()"
+        [loading]="store.isFiredAppendLoading()"
+        [failed]="store.hasFiredAppendError()"
+        (lk-infinite-list-load-more)="store.loadMoreFired()"
+        (lk-infinite-list-retry)="store.loadMoreFired()"
+        class="block space-y-cmn-2 pr-cmn-1 md:min-h-0 md:flex-1 md:overflow-auto"
+        end-label="No more events"
+        error-label="Couldn't load more events."
+        data-testid="fired-list"
+      >
         @for (event of store.fired(); track event.alertId) {
           <article
             class="rounded-cmn-md border border-border-default bg-surface-raised px-cmn-4 py-cmn-3"
@@ -223,20 +233,7 @@
             }
           </article>
         }
-        @if (store.isFiredLoading()) {
-          <div class="space-y-cmn-2" data-testid="fired-loading-more">
-            @for (row of skeletonRows; track row) {
-              <cmn-skeleton height="4rem" width="100%" />
-            }
-          </div>
-        } @else if (store.hasMoreFired()) {
-          <div class="flex justify-center p-cmn-4">
-            <cmn-button (clicked)="store.loadMoreFired()" variant="secondary" size="sm"
-              >Load more</cmn-button
-            >
-          </div>
-        }
-      </div>
+      </lk-infinite-list>
     </cmn-async-state>
   }
 </cmn-page-container>

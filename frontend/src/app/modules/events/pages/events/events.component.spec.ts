@@ -96,6 +96,8 @@ describe('EventsComponent', () => {
     firedErrorMessage: ReturnType<typeof signal<string>>;
     isFiredEmpty: ReturnType<typeof signal<boolean>>;
     isFiredLoading: ReturnType<typeof signal<boolean>>;
+    isFiredAppendLoading: ReturnType<typeof signal<boolean>>;
+    hasFiredAppendError: ReturnType<typeof signal<boolean>>;
     hasMoreFired: ReturnType<typeof signal<boolean>>;
     hasFiredRows: ReturnType<typeof signal<boolean>>;
     fired: ReturnType<typeof signal<FiredEvent[]>>;
@@ -132,6 +134,8 @@ describe('EventsComponent', () => {
       firedErrorMessage: signal(''),
       isFiredEmpty: signal(false),
       isFiredLoading: signal(false),
+      isFiredAppendLoading: signal(false),
+      hasFiredAppendError: signal(false),
       hasMoreFired: signal(false),
       hasFiredRows: signal(true),
       fired: signal<FiredEvent[]>([
@@ -344,7 +348,7 @@ describe('EventsComponent', () => {
     expect(render().text).toContain('Nothing has fired');
   });
 
-  it('keeps the loaded rows under the error and retries the next page', () => {
+  it('keeps the loaded rows under a refresh error and Retry reloads the first page', () => {
     mockStore.view.set('fired');
     mockStore.hasMoreFired.set(true);
     mockStore.firedErrorMessage.set('Failed to load fired events.');
@@ -353,13 +357,27 @@ describe('EventsComponent', () => {
 
     expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(3);
     expect(text).toContain('Failed to load fired events.');
-    expect(text).toContain('Load more');
 
     retryButton(host)?.click();
     fixture.detectChanges();
 
+    expect(mockStore.loadFired).toHaveBeenCalledTimes(1);
+    expect(mockStore.loadMoreFired).not.toHaveBeenCalled();
+  });
+
+  it('pages the fired list through lk-infinite-list', () => {
+    mockStore.view.set('fired');
+    mockStore.hasMoreFired.set(true);
+
+    const {host} = render();
+    const list = host.querySelector('[data-testid="fired-list"]') as HTMLElement & {
+      hasMore: boolean;
+    };
+
+    expect(list.hasMore).toBe(true);
+    list.dispatchEvent(new CustomEvent('lk-infinite-list-load-more', {bubbles: true}));
+
     expect(mockStore.loadMoreFired).toHaveBeenCalledTimes(1);
-    expect(mockStore.loadFired).not.toHaveBeenCalled();
   });
 
   it('shows only the error when the first page fails, and Retry reloads the first page', () => {
@@ -393,24 +411,19 @@ describe('EventsComponent', () => {
     expect(text).not.toContain('Nothing has fired');
   });
 
-  it('keeps the rows and adds a skeleton below them while the next page loads', () => {
+  it('keeps the rows and hands the next-page state to the infinite list', () => {
     mockStore.view.set('fired');
     mockStore.hasMoreFired.set(true);
-    mockStore.isFiredLoading.set(true);
+    mockStore.isFiredAppendLoading.set(true);
 
-    const {host, text} = render();
+    const {host} = render();
+    const list = host.querySelector('[data-testid="fired-list"]') as HTMLElement & {
+      loading: boolean;
+      hasMore: boolean;
+    };
 
     expect(host.querySelectorAll('[data-testid="fired-event"]').length).toBe(3);
-    expect(host.querySelector('[data-testid="fired-loading-more"]')).not.toBeNull();
-    expect(text).not.toContain('Load more');
-  });
-
-  it('offers load more only while the feed has more rows', () => {
-    mockStore.view.set('fired');
-
-    expect(render().text).not.toContain('Load more');
-
-    mockStore.hasMoreFired.set(true);
-    expect(render().text).toContain('Load more');
+    expect(list.loading).toBe(true);
+    expect(list.hasMore).toBe(true);
   });
 });

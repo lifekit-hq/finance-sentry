@@ -1,4 +1,4 @@
-import {withAsyncStatus, withUrlSync} from '@lifekit-hq/core';
+import {withAsyncStatus, withNamedAsyncStatus, withUrlSync} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
 import {NULLABLE_STRING_PARAM_CODEC} from '../../../../shared/constants/url-params/url-params.constants';
@@ -34,6 +34,9 @@ export const TransactionLedgerStore = signalStore(
     search: {param: 'q', default: initialTransactionLedgerState.search},
   }),
   withAsyncStatus({defaultErrorMessage: 'Failed to load transactions. Please try again.'}),
+  // The next page appends under the rows already on screen; `lk-infinite-list` shows its own
+  // skeleton rows and inline retry from this status, so it never touches the first-load state.
+  withNamedAsyncStatus('append', {defaultErrorMessage: "Couldn't load more transactions."}),
   withMethods(transactionLedgerMethods),
   withComputed(transactionLedgerComputed),
   withMethods(transactionLedgerEffects),

@@ -11,6 +11,7 @@ import {
   BUDGETS_ADD_ACTION,
   SUBSCRIPTIONS_ADD_ACTION,
 } from './shared/constants/page-actions/page-actions.constants';
+import {TAB_PRELOAD_DATA} from './shared/constants/tab-preload/tab-preload.constants';
 import {AppRoute, ASSET_DOSSIER_SYMBOL_PARAM} from './shared/enums/app-route/app-route.enum';
 import {Permission} from './shared/enums/permission/permission.enum';
 
@@ -67,6 +68,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/pages/dashboard/dashboard.component').then(
             m => m.DashboardComponent
           ),
+        data: TAB_PRELOAD_DATA,
         ...RouteTitleUtils.of('Dashboard'),
       },
       {
@@ -75,6 +77,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/bank-sync.routes').then(
             ({BANK_SYNC_ROUTES}) => BANK_SYNC_ROUTES
           ),
+        data: TAB_PRELOAD_DATA,
       },
       {
         path: AppRoute.Transactions.slice(1),
@@ -82,6 +85,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/bank-sync/pages/transaction-ledger/transaction-ledger.component').then(
             m => m.TransactionLedgerComponent
           ),
+        data: TAB_PRELOAD_DATA,
         ...RouteTitleUtils.of('Transactions'),
       },
       {
@@ -130,6 +134,7 @@ export const APP_ROUTES: Routes = [
           import('./modules/alerts/pages/alerts/alerts.component').then(m => m.AlertsComponent),
         ...RouteTitleUtils.of('Alerts'),
         data: {
+          ...TAB_PRELOAD_DATA,
           actions: [{id: ALERTS_MARK_ALL_READ_ACTION, label: 'Mark all read', icon: 'CheckCheck'}],
         } satisfies PageChromeData,
       },

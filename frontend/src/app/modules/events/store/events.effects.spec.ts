@@ -46,6 +46,9 @@ function buildStore(horizonDays = 30) {
     setFired: vi.fn(),
     appendFired: vi.fn(),
     setFiredError: vi.fn(),
+    setFiredAppendLoading: vi.fn(),
+    setFiredAppendSuccess: vi.fn(),
+    setFiredAppendError: vi.fn(),
   };
 }
 
@@ -157,7 +160,9 @@ describe('eventsEffects', () => {
     expect(api.getFired).toHaveBeenNthCalledWith(2, 3, 20);
     expect(store.setFired).toHaveBeenCalledWith(FIRED);
     expect(store.appendFired).toHaveBeenCalledWith(FIRED);
-    expect(store.setFiredSuccess).toHaveBeenCalledTimes(2);
+    expect(store.setFiredSuccess).toHaveBeenCalledTimes(1);
+    expect(store.setFiredAppendLoading).toHaveBeenCalledTimes(1);
+    expect(store.setFiredAppendSuccess).toHaveBeenCalledTimes(2);
   });
 
   it('loadFired forwards the backend error code', () => {

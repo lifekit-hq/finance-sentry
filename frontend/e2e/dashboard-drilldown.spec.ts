@@ -666,7 +666,7 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
     await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00 out this month');
   });
 
-  test('Monthly Outflow does not change when Load More is clicked', async ({page}) => {
+  test('Monthly Outflow does not change when the next page appends', async ({page}) => {
     // Offset-aware two-page mock (registered last, so it wins over the
     // beforeEach route): page 1 repeats LEDGER_TRANSACTIONS with hasMore,
     // page 2 appends another posted debit ($700) that a client-side sum
@@ -710,11 +710,11 @@ test.describe('Transaction ledger — Monthly Outflow stat', () => {
     await expect(page.getByRole('heading', {name: 'Transactions', exact: true})).toBeVisible();
     await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
 
-    await page.getByRole('button', {name: /load more/i}).click();
+    // The infinite list asks for page 2 as its end comes into reach.
+    await page.getByTestId('ledger-row').last().scrollIntoViewIfNeeded();
     // The page-2 row rendered ⇒ the append happened…
     await expect(page.getByText('Electronics store')).toBeVisible();
-    // …the button is gone (hasMore now false) and the stat did not move.
-    await expect(page.getByRole('button', {name: /load more/i})).not.toBeVisible();
+    // …the stat did not move.
     await expect(page.getByTestId('ledger-summary')).toContainText('$2,900.00');
   });
 });

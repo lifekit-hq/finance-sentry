@@ -104,34 +104,17 @@ test.describe('Alerts page', () => {
     listRequests = await mockApis(page);
   });
 
-  test('pages through the server-side list', async ({page}) => {
+  test('loads the next page as the end of the list comes into reach', async ({page}) => {
     await page.goto('/alerts');
-    await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 1 of 3');
-    await expect(page.getByTestId('alerts-prev').getByRole('button')).toBeDisabled();
+    await expect(page.getByText('Possible duplicate charge')).toBeVisible();
+    await expect(page.getByTestId('alerts-pager')).toHaveCount(0);
     expect(new URL(listRequests[0].url()).searchParams.get('pageSize')).toBe(String(PAGE_SIZE));
 
-    await page.getByTestId('alerts-next').click();
+    await page.getByTestId('alert-row').last().scrollIntoViewIfNeeded();
 
-    await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 2 of 3');
     await expect(page.getByText('Streaming price hike')).toBeVisible();
-    expect(new URL(listRequests[listRequests.length - 1].url()).searchParams.get('page')).toBe('2');
-
-    await page.getByTestId('alerts-prev').click();
-    await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 1 of 3');
     await expect(page.getByText('Possible duplicate charge')).toBeVisible();
-  });
-
-  test('changing the page size reloads from the first page', async ({page}) => {
-    await page.goto('/alerts');
-    await page.getByTestId('alerts-next').click();
-    await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 2 of 3');
-
-    await page.getByRole('radio', {name: '50 per page'}).click();
-
-    await expect(page.getByTestId('alerts-page-label')).toHaveText('Page 1 of 1');
-    const last = new URL(listRequests[listRequests.length - 1].url());
-    expect(last.searchParams.get('page')).toBe('1');
-    expect(last.searchParams.get('pageSize')).toBe('50');
+    expect(listRequests.some(r => new URL(r.url()).searchParams.get('page') === '2')).toBe(true);
   });
 
   test('shows resolved alerts muted and the repeat count as ×N', async ({page}) => {

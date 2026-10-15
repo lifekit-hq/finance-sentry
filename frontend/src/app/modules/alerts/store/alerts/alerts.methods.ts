@@ -11,7 +11,23 @@ function unreadWeight(alert: Alert | undefined): number {
 export function alertsMethods(store: WritableStateSource<AlertsState>) {
   return {
     setData(alerts: Alert[], totalCount: number, unreadCount: number): void {
-      patchState(store, {alerts, totalCount, unreadCount});
+      patchState(store, {alerts, totalCount, unreadCount, currentPage: 1});
+    },
+    /** Appends the next page; a row that moved into it since the last page is not shown twice. */
+    appendData(alerts: Alert[], totalCount: number, unreadCount: number): void {
+      patchState(store, (s: AlertsState) => {
+        const loaded = new Set(s.alerts.map(a => a.id));
+        return {
+          alerts: [...s.alerts, ...alerts.filter(a => !loaded.has(a.id))],
+          totalCount,
+          unreadCount,
+          currentPage: s.currentPage + 1,
+        };
+      });
+    },
+    /** A reload whose query failed: its rows no longer match the filter on screen. */
+    clearData(): void {
+      patchState(store, {alerts: [], totalCount: 0, currentPage: 1});
     },
     setUnreadCount(unreadCount: number): void {
       patchState(store, {unreadCount});
@@ -21,12 +37,6 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
     },
     setSearch(search: string): void {
       patchState(store, {search, currentPage: 1});
-    },
-    setPage(currentPage: number): void {
-      patchState(store, {currentPage: Math.max(1, currentPage)});
-    },
-    setPageSize(pageSize: number): void {
-      patchState(store, {pageSize, currentPage: 1});
     },
     markReadLocal(id: string): void {
       patchState(store, (s: AlertsState) => {
@@ -38,7 +48,6 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
             alerts,
             unreadCount,
             totalCount: target && !target.isRead ? Math.max(0, s.totalCount - 1) : s.totalCount,
-            currentPage: alerts.length === 0 ? Math.max(1, s.currentPage - 1) : s.currentPage,
           };
         }
         return {alerts: s.alerts.map(a => (a.id === id ? {...a, isRead: true} : a)), unreadCount};
@@ -58,8 +67,6 @@ export function alertsMethods(store: WritableStateSource<AlertsState>) {
           alerts,
           totalCount: Math.max(0, s.totalCount - 1),
           unreadCount: Math.max(0, s.unreadCount - unreadWeight(s.alerts.find(a => a.id === id))),
-          // Dismissing the last row of a later page steps back so the pager never shows an empty page.
-          currentPage: alerts.length === 0 ? Math.max(1, s.currentPage - 1) : s.currentPage,
         };
       });
     },

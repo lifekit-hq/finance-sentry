@@ -226,7 +226,7 @@ describe('TransactionLedgerStore async status', () => {
     expect(store.isEmpty()).toBe(false);
   });
 
-  it('keeps the rows on a failed retry', async () => {
+  it('keeps the rows on a failed next page and through its retry', async () => {
     const {store} = await open('/transactions');
     service.getAllTransactions.mockReturnValueOnce(of(page) as never);
     store.load();
@@ -235,9 +235,22 @@ describe('TransactionLedgerStore async status', () => {
     );
     store.loadMore();
 
-    expect(store.status()).toBe('error');
+    expect(store.status()).toBe('success');
+    expect(store.hasAppendError()).toBe(true);
     expect(store.transactions()).toHaveLength(1);
 
+    service.getAllTransactions.mockReturnValueOnce(NEVER as never);
+    store.loadMore();
+
+    expect(store.isAppendLoading()).toBe(true);
+    expect(store.hasAppendError()).toBe(false);
+    expect(store.transactions()).toHaveLength(1);
+  });
+
+  it('keeps the rows on screen while a reload is in flight', async () => {
+    const {store} = await open('/transactions');
+    service.getAllTransactions.mockReturnValueOnce(of(page) as never);
+    store.load();
     service.getAllTransactions.mockReturnValueOnce(NEVER as never);
     store.retry();
 

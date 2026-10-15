@@ -9,7 +9,7 @@ import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
-    /** A first page drops the rows; a retry or the next page keeps them on screen. */
+    /** A failed first page drops the previous query's rows; a reload keeps them until it lands. */
     clearRows(): void {
       patchState(store, {transactions: [], totalCount: 0, hasMore: false});
     },

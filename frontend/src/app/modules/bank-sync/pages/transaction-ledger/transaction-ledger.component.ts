@@ -10,9 +10,10 @@ import {Router} from '@angular/router';
 import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
+  ASYNC_STATE_MIN_DISPLAY_MS,
+  ASYNC_STATE_SHOW_DELAY_MS,
   AsyncStateComponent,
   ButtonComponent,
-  CardComponent,
   CmnDrawerService,
   EmptyStateComponent,
   FilterBarComponent,
@@ -54,7 +55,8 @@ import {TransactionLedgerStore} from '../../store/transaction-ledger/transaction
 import {LedgerPeriodUtils} from '../../utils/ledger-period.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
-const SKELETON_ROWS = 8;
+const SKELETON_SECTIONS = 2;
+const SKELETON_ROWS_PER_SECTION = 4;
 const DRAWER_WIDTH = '480px';
 
 @Component({
@@ -64,7 +66,6 @@ const DRAWER_WIDTH = '480px';
     AlertComponent,
     AsyncStateComponent,
     ButtonComponent,
-    CardComponent,
     EmptyStateComponent,
     FilterBarComponent,
     FilterBarSheetDirective,
@@ -92,7 +93,10 @@ export class TransactionLedgerComponent {
   private readonly connectivity = inject(ConnectivityService);
 
   public readonly store = inject(TransactionLedgerStore);
-  public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
+  public readonly skeletonSections = Array.from({length: SKELETON_SECTIONS});
+  public readonly skeletonRowsPerSection = SKELETON_ROWS_PER_SECTION;
+  public readonly showDelay = ASYNC_STATE_SHOW_DELAY_MS;
+  public readonly minDisplay = ASYNC_STATE_MIN_DISPLAY_MS;
 
   /**
    * The search box: typing writes it, and it follows the store whenever the store's search changes
@@ -112,6 +116,7 @@ export class TransactionLedgerComponent {
       errorMessage: this.store.errorMessage(),
       offline: this.connectivity.offline(),
       lastSyncedAt: this.store.lastSyncedAt(),
+      keepContent: true,
     })
   );
 

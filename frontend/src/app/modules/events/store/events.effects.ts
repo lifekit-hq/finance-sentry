@@ -1,6 +1,6 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {pipe, switchMap, tap} from 'rxjs';
+import {exhaustMap, pipe, switchMap, tap} from 'rxjs';
 
 import {StoreErrorUtils} from '../../../shared/utils/store-error.utils';
 import {
@@ -27,6 +27,9 @@ interface EffectsStore {
   setFired: (response: FiredEventsPageResponse) => void;
   appendFired: (response: FiredEventsPageResponse) => void;
   setFiredError: (code: Nullable<string>) => void;
+  setFiredAppendLoading: () => void;
+  setFiredAppendSuccess: () => void;
+  setFiredAppendError: (code: Nullable<string>) => void;
 }
 
 export function eventsEffects(store: EffectsStore) {
@@ -69,6 +72,7 @@ export function eventsEffects(store: EffectsStore) {
           api.getFired(1, store.firedPageSize()).pipe(
             tap(response => {
               store.setFired(response);
+              store.setFiredAppendSuccess();
               store.setFiredSuccess();
             }),
             StoreErrorUtils.catchAndSetError({
@@ -78,17 +82,18 @@ export function eventsEffects(store: EffectsStore) {
         )
       )
     ),
+    /** Appends the next fired page (the infinite list's paging contract): near the end and on retry. */
     loadMoreFired: rxMethod<void>(
       pipe(
-        tap(() => store.setFiredLoading()),
-        switchMap(() =>
+        tap(() => store.setFiredAppendLoading()),
+        exhaustMap(() =>
           api.getFired(store.firedPage() + 1, store.firedPageSize()).pipe(
             tap(response => {
               store.appendFired(response);
-              store.setFiredSuccess();
+              store.setFiredAppendSuccess();
             }),
             StoreErrorUtils.catchAndSetError({
-              setError: (code: Nullable<string>) => store.setFiredError(code),
+              setError: (code: Nullable<string>) => store.setFiredAppendError(code),
             })
           )
         )

@@ -113,7 +113,7 @@ describe('EventsStore', () => {
     expect(store.firedErrorMessage()).toBe('Failed to load fired events.');
   });
 
-  it('keeps fired rows under the error when loading the next page fails', () => {
+  it('keeps fired rows and the first-load status when loading the next page fails', () => {
     const store = inject();
     api.getFired.mockReturnValue(
       throwError(() => new HttpErrorResponse({status: 500, error: {errorCode: 'NOPE'}}))
@@ -121,9 +121,10 @@ describe('EventsStore', () => {
 
     store.loadMoreFired();
 
-    expect(store.firedStatus()).toBe('error');
+    expect(store.firedStatus()).toBe('success');
     expect(store.hasFiredRows()).toBe(true);
-    expect(store.firedErrorMessage()).toBe('Failed to load fired events.');
+    expect(store.hasFiredAppendError()).toBe(true);
+    expect(store.firedAppendErrorMessage()).toBe("Couldn't load more events.");
   });
 
   it('appends the next page and returns to success', () => {
@@ -135,5 +136,6 @@ describe('EventsStore', () => {
     expect(store.fired().map(f => f.alertId)).toEqual(['a', 'b']);
     expect(store.firedPage()).toBe(2);
     expect(store.firedStatus()).toBe('success');
+    expect(store.isFiredAppendLoading()).toBe(false);
   });
 });

@@ -12,7 +12,6 @@ import {
   AlertComponent,
   AsyncStateComponent,
   type AsyncStateStatus,
-  ButtonComponent,
   CmnTab,
   EmptyStateComponent,
   PageContainerComponent,
@@ -52,7 +51,6 @@ const SKELETON_ROWS = 4;
     PageContainerComponent,
     AlertComponent,
     AsyncStateComponent,
-    ButtonComponent,
     DatePipe,
     EmptyStateComponent,
     EventDayLabelPipe,
@@ -90,7 +88,7 @@ export class EventsComponent {
   });
 
   // Rows already on screen stay under the error banner; only a first page with nothing yet swaps
-  // for the skeleton. Appending a page shows its skeleton inside the list instead.
+  // for the skeleton. Appending a page is the infinite list's state (skeleton rows, inline retry).
   public readonly firedStatus = computed<AsyncStateStatus>(() => {
     if (this.store.firedErrorMessage()) {
       return 'error';
@@ -117,11 +115,7 @@ export class EventsComponent {
   }
 
   public retryFired(): void {
-    if (this.store.hasFiredRows()) {
-      this.store.loadMoreFired();
-    } else {
-      this.store.loadFired();
-    }
+    this.store.loadFired();
   }
 
   public kindMeta(kind: EventKind): EventKindMeta {

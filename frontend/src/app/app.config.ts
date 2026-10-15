@@ -1,7 +1,7 @@
 import {provideHttpClient, withInterceptors, withXhr} from '@angular/common/http';
 import {type ApplicationConfig} from '@angular/core';
-import {provideRouter} from '@angular/router';
-import {provideApiBaseUrl} from '@lifekit-hq/core';
+import {provideRouter, withPreloading} from '@angular/router';
+import {provideApiBaseUrl, TabPreloadStrategy} from '@lifekit-hq/core';
 
 import {environment} from '../environments/environment';
 import {APP_ROUTES} from './app.routes';
@@ -18,7 +18,9 @@ import {authInterceptor} from './modules/auth/interceptors/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(APP_ROUTES),
+    // Bottom tabs preload on idle (skipped under Save-Data or metered). No withViewTransitions():
+    // its crossfade also runs on query-param navigations and swallows pointer input on the charts.
+    provideRouter(APP_ROUTES, withPreloading(TabPreloadStrategy)),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     provideApiBaseUrl(environment.apiBaseUrl),
     provideErrorHandler(),

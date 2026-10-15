@@ -4,11 +4,14 @@ import {
   catchError,
   debounceTime,
   distinctUntilChanged,
+  exhaustMap,
   filter,
   forkJoin,
   of,
   pipe,
+  Subject,
   switchMap,
+  takeUntil,
   tap,
 } from 'rxjs';
 
@@ -59,6 +62,10 @@ interface EffectsStore {
   ) => void;
   nextPage: () => void;
   setError: (errorCode: Nullable<string>) => void;
+  setAppendLoading: () => void;
+  setAppendSuccess: () => void;
+  setAppendError: (errorCode: Nullable<string>) => void;
+  setAppendIdle: () => void;
   setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
 }
 
@@ -89,44 +96,68 @@ function pageParams(store: EffectsStore, offset: number): GetAllTransactionsPara
 export function transactionLedgerEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
-  const fetchPage = rxMethod<'first' | 'next'>(
+  /**
+   * The first page replaces the rows when it lands; until then the previous rows stay on screen
+   * (the page keeps them, dimmed) so a filter change or refresh never blanks the list.
+   */
+  // A first page (a filter change, a refresh) drops any next page still in flight: it belongs to
+  // the rows being replaced.
+  const firstPageStarted$ = new Subject<void>();
+
+  const fetchFirstPage = rxMethod<void>(
     pipe(
-      tap(page => {
-        if (page === 'first') {
-          store.clearRows();
-        }
+      tap(() => {
+        firstPageStarted$.next();
+        store.setAppendIdle();
         store.setLoading();
       }),
-      switchMap(page => {
-        const offset = page === 'first' ? 0 : store.offset() + PAGE_SIZE;
-        return bankSyncService.getAllTransactions(pageParams(store, offset)).pipe(
+      switchMap(() =>
+        bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
           tap(res => {
-            if (page === 'next') {
-              store.nextPage();
-              store.appendTransactions(res.items, res.totalCount, res.hasMore);
-            } else {
-              store.setTransactions(res.items, res.totalCount, res.hasMore);
-            }
+            store.setTransactions(res.items, res.totalCount, res.hasMore);
+            store.setAppendSuccess();
             store.setSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
-            setError: (code: Nullable<string>) => store.setError(code),
+            setError: (code: Nullable<string>) => {
+              // The kept rows belong to the previous query: a failed load drops them.
+              store.clearRows();
+              store.setError(code);
+            },
           })
-        );
-      })
+        )
+      )
+    )
+  );
+
+  /** Appends the next page under the rows on screen (the infinite list's paging contract). */
+  const fetchNextPage = rxMethod<void>(
+    pipe(
+      tap(() => store.setAppendLoading()),
+      exhaustMap(() =>
+        bankSyncService.getAllTransactions(pageParams(store, store.offset() + PAGE_SIZE)).pipe(
+          tap(res => {
+            store.nextPage();
+            store.appendTransactions(res.items, res.totalCount, res.hasMore);
+            store.setAppendSuccess();
+          }),
+          StoreErrorUtils.catchAndSetError({
+            setError: (code: Nullable<string>) => store.setAppendError(code),
+          }),
+          takeUntil(firstPageStarted$)
+        )
+      )
     )
   );
 
   const load = (): void => {
-    fetchPage('first');
+    fetchFirstPage();
   };
 
   return {
     load,
-    /** Re-issues the failed request with the rows already on screen kept in place. */
-    retry: (): void => {
-      fetchPage(store.transactions().length > 0 ? 'next' : 'first');
-    },
+    /** Re-issues the failed first page. */
+    retry: load,
     loadSummary: rxMethod<void>(
       pipe(
         switchMap(() =>
@@ -145,8 +176,9 @@ export function transactionLedgerEffects(store: EffectsStore) {
         )
       )
     ),
+    /** Asked by the infinite list when its end is in reach, and by its Try again. */
     loadMore: (): void => {
-      fetchPage('next');
+      fetchNextPage();
     },
     /** Follows the search box: debounced, then written to the `q` query param by `withUrlSync`. */
     applySearch: rxMethod<string>(

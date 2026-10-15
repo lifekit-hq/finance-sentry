@@ -83,8 +83,10 @@ async function mockApis(page: Page): Promise<void> {
   });
   await page.route(`${API}/agent/conversations`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts/transactions**`, route => {
+    // Two pages: the infinite list appends the second as its end nears, then shows its end marker.
+    const offset = Number(new URL(route.request().url()).searchParams.get('offset') ?? 0);
     const items = Array.from({length: ROW_COUNT}, (_, i) => ({
-      transactionId: `tx-${i}`,
+      transactionId: `tx-${offset + i}`,
       accountId: 'acc-1',
       bankName: 'AIB',
       currency: 'EUR',
@@ -92,14 +94,14 @@ async function mockApis(page: Page): Promise<void> {
       amountUsd: 11,
       date: '2026-10-05',
       postedDate: '2026-10-05',
-      description: `Synthetic row ${i}`,
+      description: `Synthetic row ${offset + i}`,
       transactionType: 'debit',
       merchantCategory: null,
       isPending: false,
       createdAt: TIMESTAMP,
       updatedAt: TIMESTAMP,
     }));
-    return route.fulfill(json({items, totalCount: ROW_COUNT * 2, hasMore: true}));
+    return route.fulfill(json({items, totalCount: ROW_COUNT * 2, hasMore: offset === 0}));
   });
 }
 
@@ -134,25 +136,24 @@ test.describe('last content clears the tab bar (390 wide, iPhone insets)', () =>
     await mockApis(page);
   });
 
-  test('Transactions: Load More sits above the tab bar', async ({page}) => {
+  test('Transactions: the end of the continuous list sits above the tab bar', async ({page}) => {
     await page.goto('/transactions');
     await simulateInsets(page);
     await page.reload();
     await expect(page.getByTestId('ledger-row')).toHaveCount(ROW_COUNT);
 
-    await expectLastContentClearsTabBar(
-      page,
-      'fns-transaction-ledger cmn-button:has-text("Load More")'
-    );
+    await page.locator('main').evaluate(main => main.scrollTo({top: main.scrollHeight}));
+    await expect(page.getByTestId('ledger-row')).toHaveCount(ROW_COUNT * 2);
+    await expectLastContentClearsTabBar(page, '[data-testid="ledger-list"]');
   });
 
-  test('Alerts: the pager sits above the tab bar', async ({page}) => {
+  test('Alerts: the end of the continuous list sits above the tab bar', async ({page}) => {
     await page.goto('/alerts');
     await simulateInsets(page);
     await page.reload();
     await expect(page.getByTestId('alert-row')).toHaveCount(ALERT_PAGE_SIZE);
 
-    await expectLastContentClearsTabBar(page, '[data-testid="alerts-pager"]');
+    await expectLastContentClearsTabBar(page, '[data-testid="alerts-list"]');
   });
 
   test('Events: the last day of the calendar sits above the tab bar', async ({page}) => {
