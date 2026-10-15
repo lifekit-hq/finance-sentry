@@ -1045,7 +1045,7 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   split day is earlier than that before today, the book side is unavailable rather than compared over a
   shorter window. With fewer than two split days, a zero opening value, or a first or last split day
   outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
-  SPY is missing too), as it already is with too little history. The brief shows it as `Book value change (incl. deposits) N/A`.
+  SPY and the holdings-based figure below are missing too), as it already is with too little history. The brief shows it as `Book value change (incl. deposits) N/A`.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
   contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
   loss. A purchase made from idle broker cash (which the series excludes) reads as a gain too, with no deposit
@@ -1081,6 +1081,8 @@ return percentages, not money, but they sit next to cost basis, so their rules a
     the sale step understates that position's move. True TWR (dated external flows) is still R1(c).
   - **Scope.** The brokerage sleeve of the holdings captures, which is invested positions only (broker
     cash is not a position). The cash-inclusive brokerage headline (C3) arrives with the measure engine.
+  - **In the brief.** The same bullet carries `Holdings-based return X vs S&P 500 price return Y`, or
+    `Holdings-based return N/A (<reason>)` when there is no number.
 
 ## 11. FIRE projection (#433)
 
