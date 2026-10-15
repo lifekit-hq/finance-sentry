@@ -144,7 +144,17 @@ public class DashboardQueryService(
             byType["brokerage"] = brokerageConnections;
         }
 
-        var nonBankUsd = cryptoTotalUsd + brokerageTotalUsd;
+        // Cash vs invested comes straight from the canonical book figures (no new math here).
+        // A stale source means the split would be partial, so it is withheld.
+        var book = _bookFigures is not null ? await _bookFigures.ReadAsync(userId, ct) : null;
+        var split = book is { IsStale: false } ? book : null;
+
+        // A source registered after the three original ones has no reader of its own here: it counts as the book read it.
+        var otherSourcesUsd = book?.Sources
+            .Where(s => !WealthSourceIds.Sleeves.Contains(s.SourceId))
+            .Sum(s => s.Reading?.TotalValueUsd ?? 0m) ?? 0m;
+
+        var nonBankUsd = cryptoTotalUsd + brokerageTotalUsd + otherSourcesUsd;
         if (nonBankUsd > 0)
         {
             balance["USD"] = balance.TryGetValue("USD", out var existingUsd) ? existingUsd + nonBankUsd : nonBankUsd;
@@ -152,11 +162,7 @@ public class DashboardQueryService(
 
         var accountCount = byType.Values.Sum();
 
-        // Cash vs invested comes straight from the canonical book figures (no new math here).
-        // A stale source means the split would be partial, so it is withheld.
-        var book = _bookFigures is not null ? await _bookFigures.ReadAsync(userId, ct) : null;
-        var split = book is { IsStale: false } ? book : null;
-        var totalUsd = bankTotalUsd + cryptoTotalUsd + brokerageTotalUsd;
+        var totalUsd = bankTotalUsd + cryptoTotalUsd + brokerageTotalUsd + otherSourcesUsd;
 
         // The book's failed reads and conversions, plus any broker whose holdings are older than its cadence.
         var signals = (book is null ? HeadlineSignals.None : HeadlineSignals.FromBook(book))

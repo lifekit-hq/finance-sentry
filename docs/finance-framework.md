@@ -679,7 +679,8 @@ the `StaleSleeves` string, and a change in every consumer; now it needs one `IWe
      column, the first-day throw), and each other source counts as it read this run or, when its read failed, as
      its own previous per-source row counted it (the row is then `Degraded` + `STALE_SOURCE` and holds the carried
      figure; a source with no earlier figure counts nothing and stays `Unavailable`). History rows, its change
-     headline and FIRE read that total, so a fourth source is in all of them. `NetWorthSnapshotTotalTests` pins
+     headline and FIRE read that total, so a fourth source is in all of them; the live dashboard total adds
+     each such source's book reading (`DashboardQueryService`), so it agrees with the next snapshot. `NetWorthSnapshotTotalTests` pins
      the three-source total unchanged and a fourth source counted, carried and in the history headline.
 
 ### Adding a new economy

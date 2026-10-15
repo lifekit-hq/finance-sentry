@@ -33,7 +33,7 @@ public sealed record SnapshotSourceFigure(
 public sealed class SnapshotSources
 {
     /// <summary>The sources the snapshot's three sleeve columns hold, in column order.</summary>
-    public static IReadOnlyList<string> SleeveIds { get; } = ["banking", "brokerage", "crypto"];
+    public static IReadOnlyList<string> SleeveIds { get; } = WealthSourceIds.Sleeves;
 
     private SnapshotSources(IReadOnlyList<SnapshotSourceFigure> sources) => Sources = sources;
 
