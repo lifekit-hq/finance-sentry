@@ -72,4 +72,38 @@ describe('NetWorthSplitUtils', () => {
       expect(NetWorthSplitUtils.of(snapshot(split))).toBeNull();
     });
   });
+
+  describe('otherSourcesTotal', () => {
+    const source = (sourceId: string, total: number | null) => ({
+      sourceId,
+      kind: 'Bank',
+      total,
+      health: 'COMPLETE' as const,
+      reasons: [],
+    });
+
+    it('sums the sources outside the three sleeves', () => {
+      expect(
+        NetWorthSplitUtils.otherSourcesTotal(
+          snapshot({
+            sources: [
+              source('banking', 100),
+              source('brokerage', 200),
+              source('fund', 700),
+              source('property', 50),
+            ],
+          })
+        )
+      ).toBe(750);
+    });
+
+    it('is zero for a row with only the sleeves, with no sources, and for an unread source', () => {
+      expect(
+        NetWorthSplitUtils.otherSourcesTotal(
+          snapshot({sources: [source('banking', 100), source('fund', null)]})
+        )
+      ).toBe(0);
+      expect(NetWorthSplitUtils.otherSourcesTotal(snapshot())).toBe(0);
+    });
+  });
 });

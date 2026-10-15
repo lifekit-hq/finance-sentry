@@ -1,3 +1,4 @@
+import {SLEEVE_SOURCE_IDS} from '../constants/dashboard/dashboard.constants';
 import {type NetWorthSnapshotDto, type NetWorthSplit} from '../models/dashboard/dashboard.model';
 
 export class NetWorthSplitUtils {
@@ -15,5 +16,12 @@ export class NetWorthSplitUtils {
       otherInvested,
       invested: brokerageInvested + cryptoInvested + otherInvested,
     };
+  }
+
+  /** The counted total of every source outside the three sleeves; zero for a row without sources. */
+  public static otherSourcesTotal(snapshot: NetWorthSnapshotDto): number {
+    return (snapshot.sources ?? [])
+      .filter(source => !SLEEVE_SOURCE_IDS.includes(source.sourceId))
+      .reduce((sum, source) => sum + (source.total ?? 0), 0);
   }
 }
