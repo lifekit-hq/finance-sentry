@@ -142,7 +142,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                   Net worth →
                 </a>
               </div>
-              @if (store.isLoading()) {
+              @if (store.isFirstLoad()) {
                 <cmn-skeleton class="block" height="1.875rem" width="50%" />
               } @else {
                 <div class="flex items-center gap-cmn-2">
@@ -161,7 +161,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               }
               <!-- Live cash / invested split of the book; empty while scrubbing or when unknown. -->
               <div class="h-4 leading-4" data-testid="net-worth-split-slot">
-                @if (store.isLoading()) {
+                @if (store.isFirstLoad()) {
                   <cmn-skeleton height="0.875rem" width="45%" />
                 } @else if (store.bookSplitFormatted() || store.bookSplitUnavailable()) {
                   <div class="flex items-center gap-cmn-2">
@@ -185,7 +185,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 not apply (or has no number yet) leaves its slot empty instead of collapsing it.
               -->
               <div class="h-5 leading-5" data-testid="net-worth-change-slot">
-                @if (store.isLoading() || store.isHistoryLoading()) {
+                @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
                   <cmn-skeleton height="1rem" width="40%" />
                 } @else if (store.netWorthChangeFormatted()) {
                   <div class="flex items-center gap-cmn-2">
@@ -239,7 +239,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 below two split days, so a range reaching before the backfill shows nothing here.
               -->
               <div class="h-4 leading-4" data-testid="net-worth-invested-change-slot">
-                @if (!store.isLoading() && !store.isHistoryLoading()) {
+                @if (!store.isFirstLoad() && !store.isHistoryFirstLoad()) {
                   @if (store.investedChangeFormatted()) {
                     <p
                       [class]="investedChangeClass()"
@@ -269,7 +269,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                 it a savings forecast. Empty below three complete months (hasProjection()).
               -->
               <div class="h-4 leading-4" data-testid="net-worth-projection-slot">
-                @if (store.isLoading() || store.isHistoryLoading()) {
+                @if (store.isFirstLoad() || store.isHistoryFirstLoad()) {
                   <cmn-skeleton height="0.875rem" width="55%" />
                 } @else if (store.hasProjection()) {
                   <p
@@ -287,7 +287,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
               @if (store.historyErrorMessage()) {
                 <cmn-alert variant="error">{{ store.historyErrorMessage() }}</cmn-alert>
               } @else if (
-                !store.historyHasHistory() && (store.isLoading() || store.isHistoryLoading())
+                !store.historyHasHistory() && (store.isFirstLoad() || store.isHistoryFirstLoad())
               ) {
                 <cmn-skeleton height="12rem" data-testid="net-worth-chart-skeleton" />
               } @else if (!store.historyHasHistory()) {
@@ -350,7 +350,7 @@ const HISTORY_RANGES: ChipRowOption[] = [
                       class="block truncate font-label text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
                       >{{ tile.label }}</span
                     >
-                    @if (store.isLoading()) {
+                    @if (store.isFirstLoad()) {
                       <span class="block h-6 sm:h-[1.5625rem]">
                         <cmn-skeleton height="100%" width="70%" />
                       </span>

@@ -11,7 +11,7 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
   return {
     /** A failed first page drops the previous query's rows; a reload keeps them until it lands. */
     clearRows(): void {
-      patchState(store, {transactions: [], totalCount: 0, hasMore: false});
+      patchState(store, {transactions: [], totalCount: 0, hasMore: false, revalidating: false});
     },
     setTransactions(
       transactions: GlobalTransactionDto[],
@@ -24,6 +24,7 @@ export function transactionLedgerMethods(store: WritableStateSource<TransactionL
         hasMore,
         offset: 0,
         lastSyncedAt: Date.now(),
+        revalidating: false,
       });
     },
     setOffset(offset: number): void {

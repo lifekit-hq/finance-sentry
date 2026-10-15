@@ -264,6 +264,22 @@ describe('AlertsComponent async states', () => {
     expect(el.querySelector('[data-testid="alerts-skeleton"]')).toBeNull();
   });
 
+  it('paints the rows a revisit finds at once, without replaying the fade-in', () => {
+    const {el} = render('all', 1, [ALERT]);
+
+    expect(el.querySelector('[data-testid="alert-row"]')).not.toBeNull();
+    expect(el.querySelector('.animate-cmn-fade-in')).toBeNull();
+  });
+
+  it('fades the first rows in where they replace the skeleton', () => {
+    const {el, store, fixture} = render('all', 0, [], {isLoading: true});
+    store.alerts.set([ALERT]);
+    store.isLoading.set(false);
+    fixture.detectChanges();
+
+    expect(el.querySelector('.animate-cmn-fade-in [data-testid="alert-row"]')).not.toBeNull();
+  });
+
   it('groups the rows under a labelled day section', () => {
     const older = {...ALERT, id: 'a0', createdAt: '2026-09-20T10:00:00Z'} as unknown as Alert;
     const {el} = render('all', 1, [ALERT, older]);

@@ -38,6 +38,8 @@ function fakeStore(
     baseCurrency: signal('EUR'),
     isLoading: signal(false),
     isHistoryLoading: signal(false),
+    isFirstLoad: signal(false),
+    isHistoryFirstLoad: signal(false),
     hasCashFlow: signal(false),
     hasProjection: signal(false),
     historyHasHistory: signal(true),
@@ -479,18 +481,21 @@ describe('DashboardComponent async states', () => {
     const SKELETON = '[data-testid="net-worth-chart-skeleton"]';
 
     it.each([
-      ['the page', {isLoading: signal(true)}],
-      ['the history', {isHistoryLoading: signal(true)}],
-    ])('shows the skeleton, not the chart or its empty state, while %s loads', (_, loading) => {
-      const {el} = render('3m', undefined, null, {historyHasHistory: signal(false), ...loading});
+      ['the page', {isLoading: signal(true), isFirstLoad: signal(true)}],
+      ['the history', {isHistoryLoading: signal(true), isHistoryFirstLoad: signal(true)}],
+    ])(
+      'shows the skeleton, not the chart or its empty state, while %s first loads',
+      (_, loading) => {
+        const {el} = render('3m', undefined, null, {historyHasHistory: signal(false), ...loading});
 
-      expect(el.querySelector(SKELETON)).not.toBeNull();
-      expect(el.querySelector(CHART)).toBeNull();
-      // Scoped to the hero card: the category donut below has its own empty copy.
-      const hero = el.querySelector('cmn-card')?.textContent;
-      expect(hero).not.toContain('No data yet');
-      expect(hero).not.toContain('starts after tonight');
-    });
+        expect(el.querySelector(SKELETON)).not.toBeNull();
+        expect(el.querySelector(CHART)).toBeNull();
+        // Scoped to the hero card: the category donut below has its own empty copy.
+        const hero = el.querySelector('cmn-card')?.textContent;
+        expect(hero).not.toContain('No data yet');
+        expect(hero).not.toContain('starts after tonight');
+      }
+    );
 
     it('says history starts tonight only once loaded with no history', () => {
       const {el} = render('3m', undefined, null, {historyHasHistory: signal(false)});

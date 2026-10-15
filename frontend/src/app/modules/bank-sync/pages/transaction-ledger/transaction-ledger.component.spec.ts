@@ -27,7 +27,11 @@ const ROW = {
   isPending: false,
 };
 
-function setup(type: string | null, extra: Record<string, string | string[]> = {}) {
+function setup(
+  type: string | null,
+  extra: Record<string, string | string[]> = {},
+  rows: unknown[] = []
+) {
   const drawerOpen = vi.fn(() => ({beforeClose$: new Subject<void>(), close: vi.fn()}));
   const store = {
     accounts: signal([]),
@@ -38,6 +42,7 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
     load: vi.fn(),
     retry: vi.fn(),
     lastSyncedAt: signal<number | null>(null),
+    revalidating: signal(false),
     isLoading: signal(false),
     isEmpty: signal(true),
     hasActiveFilter: signal(false),
@@ -45,7 +50,7 @@ function setup(type: string | null, extra: Record<string, string | string[]> = {
     isAppendLoading: signal(false),
     hasAppendError: signal(false),
     loadMore: vi.fn(),
-    transactions: signal([]),
+    transactions: signal(rows as never[]),
     accountId: signal<string | null>((extra['account'] as string | undefined) ?? null),
     transactionType: signal<string | null>(type),
     categories: signal<string[]>([extra['category'] ?? []].flat()),
@@ -393,6 +398,27 @@ describe('TransactionLedgerComponent async states', () => {
     fixture.detectChanges();
 
     expect(root.textContent).not.toContain('No transactions found');
+  });
+
+  it('paints the rows a revisit restored at once while they revalidate', () => {
+    const {store, fixture, root} = setup(null, {}, [ROW]);
+    store.isEmpty.set(false);
+    store.revalidating.set(true);
+    store.isLoading.set(true);
+    fixture.detectChanges();
+
+    expect(root.querySelector('cmn-skeleton')).toBeNull();
+    expect(root.querySelectorAll('[data-testid="ledger-row"]')).toHaveLength(1);
+    expect(root.querySelector('.animate-cmn-fade-in')).toBeNull();
+  });
+
+  it('fades the first rows in where they replace the skeleton', () => {
+    const {store, fixture, root} = setup(null);
+    store.transactions.set([ROW] as never);
+    store.isEmpty.set(false);
+    fixture.detectChanges();
+
+    expect(root.querySelector('.animate-cmn-fade-in [data-testid="ledger-row"]')).not.toBeNull();
   });
 
   it('keeps the loaded rows on screen through a reload', async () => {

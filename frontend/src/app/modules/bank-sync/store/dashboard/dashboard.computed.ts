@@ -37,6 +37,7 @@ import {MonthKeyUtils} from '../../utils/month-key.utils';
 import {NetWorthSplitUtils} from '../../utils/net-worth-split.utils';
 
 interface StateSignals {
+  isLoading: Signal<boolean>;
   data: Signal<Nullable<DashboardData>>;
   historyRange: Signal<HistoryRange>;
   netWorthHistory: Signal<NetWorthSnapshotDto[]>;
@@ -663,6 +664,12 @@ export function dashboardComputed(store: StateSignals) {
     incomeVsSpendingMonthKeys: computed((): string[] => completeMonths().map(([key]) => key)),
 
     isHistoryLoading: computed(() => store.historyLoading()),
+    // Keep content: a widget swaps for its skeleton only while it has nothing to show yet. A range
+    // change, the periodic refresh or a revisit keeps the numbers on screen until the new ones land.
+    isFirstLoad: computed(() => store.isLoading() && store.data() === null),
+    isHistoryFirstLoad: computed(
+      () => store.historyLoading() && store.netWorthHistory().length === 0
+    ),
     historyErrorMessage: computed(() => store.historyError()),
   };
 }

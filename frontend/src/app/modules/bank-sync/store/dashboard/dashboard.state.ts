@@ -36,3 +36,14 @@ export const initialDashboardState: DashboardState = {
   historyError: null,
   scrubIndex: null,
 };
+
+/** What a revisit restores: the last visit's numbers and history, for the range they were loaded for. */
+export const DASHBOARD_SESSION_FIELDS = [
+  'data',
+  'lastSyncedAt',
+  'netWorthHistory',
+  'historyRange',
+  'historyHasHistory',
+  'historyScopeChanges',
+  'historyChangeHeadline',
+] as const satisfies readonly (keyof DashboardState)[];

@@ -27,11 +27,11 @@
     [isEmpty]="store.alerts().length === 0"
     [showDelay]="showDelay"
     [minDisplay]="minDisplay"
+    [crossfade]="crossfade"
     (retry)="store.load(store.query())"
     class="mt-cmn-3 flex min-h-0 flex-1 flex-col"
     retryable
     keepContent
-    crossfade
   >
     <div skeleton class="space-y-cmn-4" data-testid="alerts-skeleton">
       @for (_ of skeletonSections; track $index) {

@@ -69,6 +69,7 @@ export function build(
     data: signal<Nullable<DashboardData>>(data),
     historyRange: signal<HistoryRange>(historyRange),
     netWorthHistory: signal<NetWorthSnapshotDto[]>(netWorthHistory),
+    isLoading: signal(false),
     historyLoading: signal(false),
     historyError: signal<string | null>(null),
     scrubIndex: signal<number | null>(scrubIndex),

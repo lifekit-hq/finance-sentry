@@ -26,6 +26,8 @@ export interface TransactionLedgerState {
   /** Server-side free-text filter (description / merchant). */
   search: string;
   accounts: TransactionAccountOption[];
+  /** The rows were restored from the session cache and their first reload has not landed yet. */
+  revalidating: boolean;
 }
 
 export const PAGE_SIZE = 50;
@@ -45,4 +47,23 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   to: null,
   search: '',
   accounts: [],
+  revalidating: false,
 };
+
+/** What a revisit restores: the rows and summary of the last visit, with the filter they match. */
+export const LEDGER_SESSION_FIELDS = [
+  'transactions',
+  'totalCount',
+  'hasMore',
+  'offset',
+  'lastSyncedAt',
+  'monthlyOutflowUsd',
+  'monthlyOutflowCurrency',
+  'accounts',
+  'accountId',
+  'transactionType',
+  'categories',
+  'from',
+  'to',
+  'search',
+] as const satisfies readonly (keyof TransactionLedgerState)[];

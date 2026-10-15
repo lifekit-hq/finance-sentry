@@ -62,10 +62,10 @@
     [isEmpty]="store.transactions().length === 0"
     [showDelay]="showDelay"
     [minDisplay]="minDisplay"
+    [crossfade]="crossfade"
     class="flex min-h-0 flex-1 flex-col"
     errorPlacement="above"
     keepContent
-    crossfade
   >
     <cmn-button (clicked)="store.retry()" error-action variant="secondary" size="sm"
       >Retry</cmn-button
