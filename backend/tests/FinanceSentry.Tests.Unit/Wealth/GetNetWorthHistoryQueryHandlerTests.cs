@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
 using System.Text.Json;
+using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
@@ -38,7 +39,7 @@ public class GetNetWorthHistoryQueryHandlerTests
         repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([withoutSplit, withSplit]);
 
-        var response = await new GetNetWorthHistoryQueryHandler(repo.Object)
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
             .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
 
         response.Snapshots[0].CashTotal.Should().BeNull("a day before the split existed has no split, not zero");
@@ -63,5 +64,37 @@ public class GetNetWorthHistoryQueryHandlerTests
             "currency", "staleSleeves", "isApproximate",
             "cashTotal", "brokerageInvested", "cryptoInvested"]);
         json.RootElement.GetProperty("cashTotal").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Handle_NamesTheScopeChangesFromTheWindowStart()
+    {
+        var first = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 9, 1), TotalNetWorth = 1_000m };
+        var last = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_400m };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([first, last]);
+        var reader = new Mock<IAccountScopeChangeReader>();
+        var windowStart = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        reader.Setup(r => r.GetChangesSinceAsync(UserId, windowStart, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("monobank", AccountScopeChangeKinds.Linked, new DateTime(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc))]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [reader.Object])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        response.ScopeChanges.Should().ContainSingle()
+            .Which.Should().Be(new NetWorthScopeChangeDto("monobank", "linked", new DateOnly(2026, 9, 20)));
+    }
+
+    [Fact]
+    public async Task Handle_ReportsNoScopeChangesWhenThereIsNoHistory()
+    {
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var reader = new Mock<IAccountScopeChangeReader>(MockBehavior.Strict);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [reader.Object])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        response.ScopeChanges.Should().BeEmpty();
     }
 }

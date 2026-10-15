@@ -65,6 +65,8 @@ public sealed class IBKRFlexCredential : IUserOwned
         byte[] tokenAuthTag,
         int keyVersion)
     {
+        if (!IsActive)
+            CreatedAt = DateTime.UtcNow;
         IsActive = true;
         LastUsedAt = null;
         LastError = null;

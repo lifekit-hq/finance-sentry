@@ -2,6 +2,7 @@ import {DEFAULT_HISTORY_RANGE} from '../../constants/dashboard/dashboard.constan
 import {
   type DashboardData,
   type HistoryRange,
+  type NetWorthScopeChangeDto,
   type NetWorthSnapshotDto,
 } from '../../models/dashboard/dashboard.model';
 
@@ -12,6 +13,8 @@ export interface DashboardState {
   netWorthHistory: NetWorthSnapshotDto[];
   historyRange: HistoryRange;
   historyHasHistory: boolean;
+  /** Accounts linked or removed inside the loaded window; hides the change percentage. */
+  historyScopeChanges: NetWorthScopeChangeDto[];
   historyLoading: boolean;
   historyError: string | null;
   /** Index into the drawn history while a pointer scrubs the hero chart; null at rest. */
@@ -24,6 +27,7 @@ export const initialDashboardState: DashboardState = {
   netWorthHistory: [],
   historyRange: DEFAULT_HISTORY_RANGE,
   historyHasHistory: false,
+  historyScopeChanges: [],
   historyLoading: false,
   historyError: null,
   scrubIndex: null,
