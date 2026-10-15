@@ -182,10 +182,10 @@ const HISTORY_RANGES: {label: string; value: HistoryRange}[] = [
                       ({{ store.netWorthChangePercentFormatted() }})
                     } @else if (store.netWorthScopeNote()) {
                       <span
-                        class="font-normal text-text-secondary"
-                        data-testid="net-worth-scope-note"
                         [attr.title]="store.netWorthScopeNote()"
                         [attr.aria-label]="store.netWorthScopeNote()"
+                        class="font-normal text-text-secondary"
+                        data-testid="net-worth-scope-note"
                         >· {{ store.netWorthScopeNote() }}</span
                       >
                     }
