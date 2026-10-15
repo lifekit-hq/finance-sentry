@@ -117,7 +117,7 @@ Two things already right and kept:
   and crypto readers stamp each row, `BookFiguresService` carries the worst on `BookFigures.FxStatus`
   (`FxReasonCodes`), the snapshot job passes it in `NetWorthSnapshotData`, and net-worth history returns
   `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
-  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it (a carried-forward
+  per row, zero-quantity holdings left out as the wealth sources do), history maps it (a carried-forward
   sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
   `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
   `IsApproximate` reading `FX_TODAY_RATE`; a
@@ -388,7 +388,7 @@ A source declares which facets it can supply; the engine computes only the measu
 |---|---|---|---|---|
 | Identity | source id, economy kind, native unit(s) | yes | — | provider name strings |
 | Holdings | asset, quantity, native unit, exit price, price time, price source | yes | value, M1, M7 | `BankingAccountSummary`, `BrokerageHoldingSummary`, `CryptoHoldingSummary` |
-| Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BookFiguresService` |
+| Cash and liabilities | cash balances; debts, signed as in money-semantics §1 | when the economy has them | liquid net worth, the cash/invested split | the cash split in `BankingWealthSource`, `BrokerageWealthSource`, `CryptoWealthSource` |
 | Flows | dated movements with a counterparty reference and transaction id | no | M2, M3, M4, M5 | a landing table for IBKR and Inzhur with no reader; none for crypto (G6) |
 | Income and costs | dividends, interest, rewards, fees, taxes | no | bridge lines, M6 | dividend and withholding rows read by `PositionReturnCalculator` |
 | History | past snapshots, or a way to rebuild them | no | windows longer than the link's age | daily snapshots; the banking backfill (#584) |

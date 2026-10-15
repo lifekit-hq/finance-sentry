@@ -51,7 +51,7 @@ deletes only its own (`SyncExchangeHoldingsCommandHandler`). `FreeQuantity + Loc
 is the position; the `UsdValue` readers hand out is already USD — for crypto converted by the
 adapter (the last place the quote currency is in scope), for venue fiat at the reader (below) —
 so sums over holdings are USD sums (§3). Crypto holdings reach the book as
-`AssetClassNormalizer.Crypto` positions (`BookFiguresService`), never as banking cash.
+`AssetClassNormalizer.Crypto` positions (`CryptoWealthSource`), never as banking cash.
 
 - **Binance** (`BinanceHoldingsAggregator`): spot + funding + Simple Earn (flexible = free,
   locked = locked); valued via the `{asset}USDT` pair, or `{asset}BTC × BTCUSDT`; USD
