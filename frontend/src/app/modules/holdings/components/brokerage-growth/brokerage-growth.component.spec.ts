@@ -83,7 +83,18 @@ describe('BrokerageGrowthComponent', () => {
   it('says the view starts where the value history starts', () => {
     const el = render();
 
-    expect(text(el, 'brokerage-growth-since')).toContain('since 30 Jun 2026');
+    expect(text(el, 'brokerage-growth-since')).toContain(
+      'since 30 Jun 2026 - the day value history starts'
+    );
+  });
+
+  it('names the window the figures cover once it has moved past the value history start', () => {
+    store.growth.set({...GROWTH, from: '2026-07-02'});
+    const el = render();
+
+    const since = text(el, 'brokerage-growth-since');
+    expect(since).toContain('since 2 Jul 2026');
+    expect(since).not.toContain('value history starts');
   });
 
   it('splits the change into contributions, newly linked value and growth with its return', () => {
