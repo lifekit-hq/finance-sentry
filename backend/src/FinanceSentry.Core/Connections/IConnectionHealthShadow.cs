@@ -30,4 +30,6 @@ public interface IConnectionHealthShadow
 /// <param name="Kind">The row that carries the health (<c>BankAccount</c>, <c>IBKRCredential</c>, …).</param>
 /// <param name="Id">That row's id.</param>
 /// <param name="UserId">Its owner.</param>
-public sealed record ConnectionHealthSubject(string Provider, string Kind, Guid Id, Guid UserId);
+/// <param name="ConnectedAt">When the connection was made, where the row records it; null where it does not.</param>
+public sealed record ConnectionHealthSubject(
+    string Provider, string Kind, Guid Id, Guid UserId, DateTimeOffset? ConnectedAt = null);

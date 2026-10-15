@@ -21,8 +21,12 @@ public class ConnectionHealthRetryClassesTests
     };
 
     private static ConnectionHealthEvaluation Fail(
-        ConnectionHealth current, ProviderFailure failure, DateTimeOffset at, ConnectionHealthSourceOptions? source = null) =>
-        ConnectionHealthPolicy.RecordFailure(current, failure, at, Options, source);
+        ConnectionHealth current,
+        ProviderFailure failure,
+        DateTimeOffset at,
+        ConnectionHealthSourceOptions? source = null,
+        DateTimeOffset? connectedAt = null) =>
+        ConnectionHealthPolicy.RecordFailure(current, failure, at, Options, source, connectedAt);
 
     private static ConnectionHealth SucceededAt(DateTimeOffset at) =>
         ConnectionHealthPolicy.RecordSuccess(new ConnectionHealth(), at).Health;
@@ -261,6 +265,36 @@ public class ConnectionHealthRetryClassesTests
     }
 
     [Fact]
+    public void NotReady_OnAConnectionThatNeverSucceeded_IsNotCountedWithinTheDeadlineOfItsStart()
+    {
+        var evaluation = Fail(
+            new ConnectionHealth(), ProviderFailure.NotReady("1003"), T0.AddHours(30), Flex, connectedAt: T0);
+
+        evaluation.Health.Should().Be(new ConnectionHealth());
+        evaluation.Outcome.Should().Be(ConnectionHealthOutcome.None);
+    }
+
+    [Fact]
+    public void NotReady_OnAConnectionThatNeverSucceeded_CountsOnceTheDeadlineOfItsStartHasPassed()
+    {
+        var evaluation = Fail(
+            new ConnectionHealth(), ProviderFailure.NotReady("1003"), T0.AddHours(48), Flex, connectedAt: T0);
+
+        evaluation.Health.ConsecutiveFailures.Should().Be(1);
+        evaluation.Health.State.Should().Be(ConnectionHealthState.Degraded);
+    }
+
+    [Fact]
+    public void NotReady_TheLastSuccessOutranksTheStartOfTheConnection()
+    {
+        var health = SucceededAt(T0.AddDays(10));
+
+        var evaluation = Fail(health, ProviderFailure.NotReady("1003"), T0.AddDays(10).AddHours(30), Flex, connectedAt: T0);
+
+        evaluation.Health.Should().Be(health);
+    }
+
+    [Fact]
     public void NotReady_ForASourceWithNoDeadline_CountsAtOnce()
     {
         var health = SucceededAt(T0);
@@ -326,11 +360,12 @@ public class ConnectionHealthRetryClassesTests
     }
 
     [Theory]
-    [InlineData(60, 60)]
-    [InlineData(90000, 86400)]
-    public void RetryAfterHint_CapsTheWait(int seconds, int expectedSeconds)
+    [InlineData(60)]
+    [InlineData(90000)]
+    [InlineData(864000)]
+    public void RetryAfterHint_NamesTheTimeAsGiven(int seconds)
     {
-        RetryAfterHint.NotBefore(T0, TimeSpan.FromSeconds(seconds)).Should().Be(T0.AddSeconds(expectedSeconds));
+        RetryAfterHint.NotBefore(T0, TimeSpan.FromSeconds(seconds)).Should().Be(T0.AddSeconds(seconds));
     }
 
     [Fact]

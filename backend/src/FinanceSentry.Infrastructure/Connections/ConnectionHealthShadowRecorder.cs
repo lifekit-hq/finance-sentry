@@ -32,7 +32,12 @@ public sealed class ConnectionHealthShadowRecorder(
             subject,
             failure,
             () => ConnectionHealthPolicy.RecordFailure(
-                current, failure, time.GetUtcNow(), options.CurrentValue, sourceOptions.Get(subject.Provider)),
+                current,
+                failure,
+                time.GetUtcNow(),
+                options.CurrentValue,
+                sourceOptions.Get(subject.Provider),
+                subject.ConnectedAt),
             persist,
             ct);
 

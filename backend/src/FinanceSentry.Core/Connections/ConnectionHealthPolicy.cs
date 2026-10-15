@@ -14,7 +14,8 @@ namespace FinanceSentry.Core.Connections;
 /// <item>A rate-limited answer counts like a transient one, is never a credential signal, and may carry the time
 /// before which no scheduled run calls the provider (<see cref="ConnectionHealth.NotBefore"/>).</item>
 /// <item>A not-ready answer is not counted while the last success is younger than the source's
-/// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/>; past it, it counts like a transient failure.</item>
+/// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/> (a connection that never succeeded is aged from when it was
+/// connected); past it, it counts like a transient failure.</item>
 /// <item>An internal failure is ours, not the provider's: it leaves the health as it was.</item>
 /// <item>A scheduled run skips an ActionRequired connection (<see cref="ScheduledRunPausedUntil"/>), except for one
 /// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.</item>
@@ -53,12 +54,16 @@ public static class ConnectionHealthPolicy
     /// <param name="source">
     /// The failing source's own values; null reads as the defaults (a not-ready answer has no grace).
     /// </param>
+    /// <param name="connectedAt">
+    /// When the connection was made; ages a not-ready answer on a connection that has not succeeded yet.
+    /// </param>
     public static ConnectionHealthEvaluation RecordFailure(
         ConnectionHealth current,
         ProviderFailure failure,
         DateTimeOffset at,
         ConnectionHealthOptions options,
-        ConnectionHealthSourceOptions? source = null)
+        ConnectionHealthSourceOptions? source = null,
+        DateTimeOffset? connectedAt = null)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(failure);
@@ -80,7 +85,7 @@ public static class ConnectionHealthPolicy
         if (current.State == ConnectionHealthState.ActionRequired)
             return new ConnectionHealthEvaluation(current, counted, ConnectionHealthOutcome.None);
 
-        if (failure.Class == FailureClass.NotReady && IsWithinNotReadyGrace(current, at, source))
+        if (failure.Class == FailureClass.NotReady && IsWithinNotReadyGrace(current, at, source, connectedAt))
             return new ConnectionHealthEvaluation(current, current, ConnectionHealthOutcome.None);
 
         if (failure.Class == FailureClass.Credential)
@@ -147,14 +152,15 @@ public static class ConnectionHealthPolicy
 
     /// <summary>
     /// A not-ready answer is the provider still preparing what we asked for. It is not counted while the last
-    /// success is younger than the source's deadline; a source with no deadline has no grace, and a connection
-    /// that never succeeded has no age to excuse it, so both count.
+    /// success (or, before the first one, the connection) is younger than the source's deadline; a source with no
+    /// deadline has no grace, and a connection with neither a success nor a start time has no age to excuse it,
+    /// so both count.
     /// </summary>
     private static bool IsWithinNotReadyGrace(
-        ConnectionHealth current, DateTimeOffset at, ConnectionHealthSourceOptions? source) =>
+        ConnectionHealth current, DateTimeOffset at, ConnectionHealthSourceOptions? source, DateTimeOffset? connectedAt) =>
         source?.NotReadyDeadline is { } deadline
-        && current.LastSuccessAt is { } lastSuccessAt
-        && at - lastSuccessAt < deadline;
+        && (current.LastSuccessAt ?? connectedAt) is { } since
+        && at - since < deadline;
 
     private static DateTimeOffset? LaterOf(DateTimeOffset? a, DateTimeOffset? b) =>
         a is null ? b : b is null ? a : a >= b ? a : b;

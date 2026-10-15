@@ -446,9 +446,30 @@ public class IbkrFlexJobsTests
     }
 
     [Fact]
+    public async Task StatementNotAvailable_OnAFreshCredentialThatNeverSucceeded_IsNotCountedUntilTheDeadlineAfterConnecting()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Time.SetUtcNow(DateTimeOffset.UtcNow);
+        harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
+
+        await harness.RunDailyAsync(2);
+
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(0);
+        harness.VerifyNoAlertCalls();
+
+        harness.Time.Advance(TimeSpan.FromDays(1));
+        await harness.RunAsync();
+
+        harness.Credential.Health.ConsecutiveFailures.Should().Be(1);
+        harness.Credential.Health.LastFailureClass.Should().Be(FailureClass.NotReady);
+        harness.VerifyNoAlertCalls();
+    }
+
+    [Fact]
     public async Task StatementNotAvailable_InShadow_RecordsNotReadyAndRaisesNoAlert()
     {
         var harness = new PolicyHarness();
+        harness.Credential.ApplyHealth(new ConnectionHealth { LastSuccessAt = Start.AddHours(-49) });
         harness.GivenSyncFails(new IbkrFlexException("1003", "Statement is not available."));
 
         await harness.RunDailyAsync(3);

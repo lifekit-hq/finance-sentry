@@ -31,7 +31,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// sync-failure alert (a rejected or expired token at once, anything else once it has persisted: by default
 /// 3 failures and 2 h without a success, three daily runs); otherwise (shadow mode) this job raises none,
 /// as before the policy existed. A "statement is not available" answer that survives the step-back is
-/// recorded as not ready: the policy does not count it while the last success is younger than the source's
+/// recorded as not ready: the policy does not count it while the last success (the credential's creation, before
+/// the first one) is younger than the source's
 /// <see cref="ConnectionHealthSourceOptions.NotReadyDeadline"/> (48 h by default), and the job asks again sooner
 /// than the next daily run (<see cref="ConnectionHealthSourceOptions.NotReadyRetryAfter"/>, 2 h by default),
 /// through <see cref="RetryUserAsync"/>, until the next daily run is due.
@@ -200,7 +201,12 @@ public sealed class IbkrFlexIncrementalSyncJob(
     }
 
     private static ConnectionHealthSubject HealthSubject(IBKRFlexCredential credential) =>
-        new(Provider, nameof(IBKRFlexCredential), credential.Id, credential.UserId);
+        new(
+            Provider,
+            nameof(IBKRFlexCredential),
+            credential.Id,
+            credential.UserId,
+            new DateTimeOffset(DateTime.SpecifyKind(credential.CreatedAt, DateTimeKind.Utc)));
 
     private Task SaveHealthAsync(IBKRFlexCredential credential, ConnectionHealth health, CancellationToken ct)
     {
