@@ -1,6 +1,7 @@
 import {expect, type Page, test} from '@playwright/test';
 
 import {API, mockApis} from './support/dossier-mocks';
+import {seedUnreadWhatsNew} from './support/whats-new-mocks';
 
 const PHONES = {
   'iPhone 390x844': {width: 390, height: 844},
@@ -8,29 +9,10 @@ const PHONES = {
 } as const;
 const DESKTOP = {width: 1440, height: 900};
 const SIGNED_IN_EMAIL = 'test@gmail.com';
-const SEEN_KEY = 'fns.whatsNew.lastSeen';
-const WHATS_NEW = {
-  versions: [
-    {
-      version: '1.14.0',
-      date: '2026-10-05',
-      notes: [
-        {text: 'You can show only money in or only money out.', owner: false},
-        {text: 'You can invite people from Settings.', owner: true},
-      ],
-      changes: ['Group transactions by day'],
-    },
-    {version: '1.13.0', date: '2026-09-28', notes: [], changes: ['Older change']},
-  ],
-};
-
-async function openWithStaleSeen(page: Page, path: string): Promise<void> {
-  await page.addInitScript(key => localStorage.setItem(key, '1.13.0'), SEEN_KEY);
-  await page.route('**/whats-new.json*', route =>
-    route.fulfill({contentType: 'application/json', body: JSON.stringify(WHATS_NEW)})
-  );
-  await openPage(page, path);
-}
+const WHATS_NEW_NOTES = [
+  {text: 'You can show only money in or only money out.', owner: false},
+  {text: 'You can invite people from Settings.', owner: true},
+];
 
 async function openPage(page: Page, path: string): Promise<void> {
   await mockApis(page);
@@ -38,6 +20,11 @@ async function openPage(page: Page, path: string): Promise<void> {
     route.fulfill({contentType: 'application/json', body: JSON.stringify({count: 0})})
   );
   await page.goto(path);
+}
+
+async function openWithStaleSeen(page: Page, path: string): Promise<void> {
+  await seedUnreadWhatsNew(page, WHATS_NEW_NOTES);
+  await openPage(page, path);
 }
 
 async function expectNoHorizontalScroll(page: Page): Promise<void> {
