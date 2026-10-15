@@ -315,8 +315,18 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   handlers directly and stay USD.
 - Rate table: process-wide, refreshed daily at midnight UTC by the FX job
   (`Program.cs`), seeded with hardcoded fallbacks until the first refresh.
-- **Unknown currency falls back 1:1.** Use `CurrencyConverter.IsKnown` to flag a total as
-  approximate rather than trusting the silent fallback.
+- **Unknown currency falls back 1:1, and says so.** `CurrencyConverter.Convert(amount, currency)`
+  returns a `ConvertResult(Amount, FxStatus)`; `ToUsd` is its amount-only adapter. Status, best to
+  worst: `EXACT` (a rate from the last live refresh, or USD), `NEAREST_PUBLISHED` (historical: the
+  closest earlier published day), `TODAY_RATE` (historical: no feed published, today's rate used),
+  `SEED_TABLE` (the hard-coded seed, not a live rate) and `UNKNOWN_1TO1` (no rate; the amount passed
+  through unchanged — never thrown on). A figure carries the **worst** status of what it summed
+  (`BookFigures.FxStatus`, `NetWorthSnapshotData.FxStatus`), mapped to the reason codes `FX_TODAY_RATE`
+  (today's-rate and seed-table) and `FX_UNKNOWN_1TO1`. Net-worth history reports `FxReasons` per
+  point: a backfilled (`IsApproximate`) row is valued at today's rate (`FX_TODAY_RATE`), and a base
+  currency without a live rate adds it too. A stored snapshot row does not persist the status, and a
+  brokerage or crypto row's USD value is converted at sync time, so its status is re-derived from the
+  rate table in force at read. `CurrencyConverter.IsKnown` remains for callers outside these paths.
 - **Dated EUR boundary (reporting, e.g. tax schedules).** `IEurReportingConverter.ToEurAsync(
   amount, currency, onDate)` values an amount in EUR at the rate for the *transaction date*, never
   today's rate. EUR in is EUR out unchanged. It routes through

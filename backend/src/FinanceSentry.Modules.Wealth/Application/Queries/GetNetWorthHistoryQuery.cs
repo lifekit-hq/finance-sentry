@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 public record NetWorthSnapshotDto(
@@ -15,7 +16,8 @@ public record NetWorthSnapshotDto(
     bool IsApproximate,
     decimal? CashTotal = null,
     decimal? BrokerageInvested = null,
-    decimal? CryptoInvested = null);
+    decimal? CryptoInvested = null,
+    IReadOnlyList<string>? FxReasons = null);
 
 /// <summary>
 /// An account or connection that entered or left the book inside the returned window: <c>Kind</c> is
@@ -45,7 +47,10 @@ public class GetNetWorthHistoryQueryHandler(
             .Select(s => new NetWorthSnapshotDto(
                 s.SnapshotDate, s.BankingTotal, s.BrokerageTotal,
                 s.CryptoTotal, s.TotalNetWorth, s.Currency, s.StaleSleeves, s.IsApproximate,
-                s.CashTotal, s.BrokerageInvested, s.CryptoInvested))
+                s.CashTotal, s.BrokerageInvested, s.CryptoInvested,
+                // A reconstructed row is valued at today's rate rather than the rate of its own day. The
+                // snapshot row stores no per-row conversion status yet, so no other reason is recoverable.
+                (s.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact).ToReasons()))
             .ToList();
 
         // A change across the window includes accounts that joined or left it; the dashboard reads this to

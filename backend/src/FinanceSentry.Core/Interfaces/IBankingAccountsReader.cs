@@ -1,5 +1,7 @@
 namespace FinanceSentry.Core.Interfaces;
 
+using FinanceSentry.Core.Utils;
+
 public interface IBankingAccountsReader
 {
     Task<IReadOnlyList<BankingAccountSummary>> GetAccountSummariesAsync(Guid userId, CancellationToken ct = default);
@@ -42,4 +44,5 @@ public record BankingAccountSummary(
     DateTime? LastSuccessfulSyncTimestamp = null,
     Guid? MonobankCredentialId = null,
     Guid? TrueLayerConnectionId = null,
-    string? ProductType = null);
+    string? ProductType = null,
+    FxStatus FxStatus = FxStatus.Exact);

@@ -32,6 +32,8 @@ public class NetWorthHistoryController(
             return Ok(result);
 
         // Snapshots are stored in USD; the profile's base currency is applied at the boundary.
+        // A base currency with no live rate shows its figures through a stand-in, so every row says so.
+        var displayReason = CurrencyConverter.ConvertFromUsd(1m, baseCurrency).Status.ToReason();
         decimal Fx(decimal usd) => CurrencyConverter.FromUsd(usd, baseCurrency);
         decimal? FxOrNull(decimal? usd) => usd is null ? null : Fx(usd.Value);
         return Ok(result with
@@ -46,6 +48,9 @@ public class NetWorthHistoryController(
                 BrokerageInvested = FxOrNull(s.BrokerageInvested),
                 CryptoInvested = FxOrNull(s.CryptoInvested),
                 Currency = baseCurrency,
+                FxReasons = displayReason is null || (s.FxReasons?.Contains(displayReason) ?? false)
+                    ? s.FxReasons
+                    : [.. s.FxReasons ?? [], displayReason],
             })],
         });
     }

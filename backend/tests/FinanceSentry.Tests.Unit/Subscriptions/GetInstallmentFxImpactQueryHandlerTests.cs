@@ -36,6 +36,9 @@ public class GetInstallmentFxImpactQueryHandlerTests
 
         public Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default) =>
             Task.FromResult<decimal?>(null);
+        public Task<FinanceSentry.Core.Utils.ConvertResult> ConvertToUsdAsync(
+            decimal amount, string currency, DateOnly date, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private static DetectedSubscription Installment(

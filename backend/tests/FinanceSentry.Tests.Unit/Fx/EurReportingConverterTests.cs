@@ -14,6 +14,10 @@ public class EurReportingConverterTests
 
         public Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default) =>
             Task.FromResult<decimal?>(published.TryGetValue((currency, date), out var r) ? r : null);
+
+        public Task<FinanceSentry.Core.Utils.ConvertResult> ConvertToUsdAsync(
+            decimal amount, string currency, DateOnly date, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private static readonly DateOnly Day = new(2024, 3, 15);

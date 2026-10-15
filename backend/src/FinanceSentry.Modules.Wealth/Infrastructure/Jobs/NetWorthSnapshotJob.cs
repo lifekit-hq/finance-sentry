@@ -2,15 +2,19 @@ namespace FinanceSentry.Modules.Wealth.Infrastructure.Jobs;
 
 using FinanceSentry.Core.Domain;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using Hangfire;
+using Microsoft.Extensions.Logging;
 
 public class NetWorthSnapshotJob(
     IBankingTotalsReader bankingTotals,
     ICryptoHoldingsReader cryptoReader,
     IBrokerageHoldingsReader brokerageReader,
     INetWorthSnapshotService snapshotService,
-    IBookFiguresService bookFigures)
+    IBookFiguresService bookFigures,
+    ILogger<NetWorthSnapshotJob>? logger = null)
 {
+    private readonly ILogger<NetWorthSnapshotJob>? _logger = logger;
     private readonly IBankingTotalsReader _bankingTotals = bankingTotals ?? throw new ArgumentNullException(nameof(bankingTotals));
     private readonly ICryptoHoldingsReader _cryptoReader = cryptoReader ?? throw new ArgumentNullException(nameof(cryptoReader));
     private readonly IBrokerageHoldingsReader _brokerageReader = brokerageReader ?? throw new ArgumentNullException(nameof(brokerageReader));
@@ -73,9 +77,23 @@ public class NetWorthSnapshotJob(
             ? book.Positions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
             : null;
 
+        // The worst conversion status of what this snapshot was summed from: the book figures cover the
+        // bank accounts, the two holdings reads this run's own sleeve totals.
+        var fxStatus = book.FxStatus;
+        foreach (var h in cryptoHoldings)
+            fxStatus = fxStatus.Worst(h.FxStatus);
+        foreach (var h in brokerageHoldings)
+            fxStatus = fxStatus.Worst(h.FxStatus);
+
+        if (fxStatus.ToReason() is { } fxReason)
+            _logger?.LogWarning(
+                "Net worth snapshot for user {UserId} on {SnapshotDate} used a substituted FX rate ({FxStatus}, {Reason})",
+                userId, snapshotDate, fxStatus, fxReason);
+
         await _snapshotService.PersistSnapshotAsync(userId, new NetWorthSnapshotData(
             snapshotDate, bankingTotal, brokerageTotal, cryptoTotal,
             BankingFresh: bankingFresh, BrokerageFresh: brokerageFresh, CryptoFresh: cryptoFresh,
-            BrokerageInvested: brokerageInvested, CryptoInvested: cryptoInvested), ct);
+            BrokerageInvested: brokerageInvested, CryptoInvested: cryptoInvested,
+            FxStatus: fxStatus), ct);
     }
 }

@@ -10,8 +10,18 @@ namespace FinanceSentry.Modules.CryptoSync.Application.Services;
 /// </summary>
 public static class CryptoHoldingValuation
 {
-    public static decimal UsdValue(CryptoHolding holding) =>
-        holding.IsFiat
-            ? Math.Round(CurrencyConverter.ToUsd(holding.FreeQuantity + holding.LockedQuantity, holding.Asset), 4)
-            : holding.UsdValue;
+    public static decimal UsdValue(CryptoHolding holding) => Convert(holding).Amount;
+
+    /// <summary>
+    /// <see cref="UsdValue"/> with how it was converted: a crypto position is valued in USD at sync time
+    /// (<see cref="FxStatus.Exact"/>), venue fiat carries the status of its own conversion.
+    /// </summary>
+    public static ConvertResult Convert(CryptoHolding holding)
+    {
+        if (!holding.IsFiat)
+            return new ConvertResult(holding.UsdValue, FxStatus.Exact);
+
+        var converted = CurrencyConverter.Convert(holding.FreeQuantity + holding.LockedQuantity, holding.Asset);
+        return converted with { Amount = Math.Round(converted.Amount, 4) };
+    }
 }

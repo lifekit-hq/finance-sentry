@@ -31,6 +31,18 @@ public interface IHistoricalExchangeRateService
     /// today's live rate, so a caller that must not guess can tell a real rate from a fallback.
     /// </summary>
     Task<decimal?> GetPublishedRateAsync(string currency, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>
+    /// Converts <paramref name="amount"/> to USD at <paramref name="date"/>'s rate and reports how the
+    /// rate was obtained: <see cref="FxStatus.Exact"/> when a feed published that very date,
+    /// <see cref="FxStatus.NearestPublished"/> when it borrowed the closest earlier published day, and
+    /// otherwise today's rate from <see cref="CurrencyConverter"/> - at least
+    /// <see cref="FxStatus.TodayRate"/>, worse when that rate is itself the seed
+    /// (<see cref="FxStatus.SeedTable"/>) or absent (<see cref="FxStatus.Unknown1To1"/>). Never throws
+    /// on an unknown currency.
+    /// </summary>
+    Task<ConvertResult> ConvertToUsdAsync(
+        decimal amount, string currency, DateOnly date, CancellationToken ct = default);
 }
 
 public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRateService
@@ -83,6 +95,29 @@ public sealed class CachingHistoricalExchangeRateService : IHistoricalExchangeRa
 
         var onOrBefore = published.Where(kv => kv.Key <= date).OrderByDescending(kv => kv.Key).ToList();
         return onOrBefore.Count > 0 ? onOrBefore[0].Value : null;
+    }
+
+    public async Task<ConvertResult> ConvertToUsdAsync(
+        decimal amount, string currency, DateOnly date, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(currency))
+        {
+            var normalized = currency.Trim().ToUpperInvariant();
+            if (normalized == "USD")
+                return new ConvertResult(amount, FxStatus.Exact);
+
+            var published = await FetchPublishedAsync(normalized, date.AddDays(-PublishedLookbackDays), date, ct);
+
+            if (published.TryGetValue(date, out var exact))
+                return new ConvertResult(amount * exact, FxStatus.Exact);
+
+            var nearest = published.Where(kv => kv.Key < date).OrderByDescending(kv => kv.Key).Select(kv => (decimal?)kv.Value).FirstOrDefault();
+            if (nearest is { } rate)
+                return new ConvertResult(amount * rate, FxStatus.NearestPublished);
+        }
+
+        var today = CurrencyConverter.Convert(amount, currency);
+        return today with { Status = today.Status.Worst(FxStatus.TodayRate) };
     }
 
     private async Task<IReadOnlyDictionary<DateOnly, decimal>> FetchPublishedAsync(
