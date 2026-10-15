@@ -91,7 +91,7 @@ Three rules keep the layers apart:
 
 | # | Figure | Where | Method today | Quality signal today | Measure | Gap |
 |---|---|---|---|---|---|---|
-| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a backfilled or older row) | valuation, M7 | G2 (live total closed), G4, G5 |
+| 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | none on the figure | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
 | 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain** | null when history misses the edge tolerance | M1 (not M3), M9 | **G1** |
@@ -116,8 +116,10 @@ Two things already right and kept:
   and crypto readers stamp each row, `BookFiguresService` carries the worst on `BookFigures.FxStatus`
   (`FxReasonCodes`), the snapshot job passes it in `NetWorthSnapshotData`, and net-worth history returns
   `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
-  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it, and a row with none
-  recorded (backfilled or from before the column) falls back to `IsApproximate` reading `FX_TODAY_RATE`; a
+  per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it (a carried-forward
+  sleeve folds in the previous row's status, a backfilled row stores the worst of its accounts' with
+  `TODAY_RATE` as the floor), and a row with none recorded (from before the column) falls back to
+  `IsApproximate` reading `FX_TODAY_RATE`; a
   base currency shown on the seed table adds it, and a row dated before today shown in a non-USD base adds it
   too (the display boundary converts at today's rate, not the row's own day's: dated-rate display conversion,
   C4's "dated rates", is a separate queued follow-up). R8's per-source rows will take over this field. A brokerage

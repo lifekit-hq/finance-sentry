@@ -324,8 +324,10 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   (`BookFigures.FxStatus`, `NetWorthSnapshotData.FxStatus`), mapped to the reason codes `FX_TODAY_RATE`
   (today's-rate and seed-table) and `FX_UNKNOWN_1TO1`. Net-worth history reports `FxReasons` per
   point: the snapshot row stores the worst status of what the job summed (`net_worth_snapshots.fx_status`,
-  nullable, additive; zero-quantity holdings are left out), a row with none recorded falls back to
-  `IsApproximate` reading `FX_TODAY_RATE` (a backfilled row is valued at today's rate), and a base
+  nullable, additive; zero-quantity holdings are left out; a sleeve carried forward from the previous row
+  folds that row's status in), a backfilled row stores the worst of its accounts' statuses with
+  `TODAY_RATE` as the floor (it is valued at today's rate), a row with none recorded falls back to
+  `IsApproximate` reading `FX_TODAY_RATE`, and a base
   currency without a live rate adds it too, as does a row dated before today shown in a non-USD base
   (displayed at today's rate; dated-rate display conversion is a queued follow-up). R8's per-source rows will take over the stored field. A
   brokerage or crypto row's USD value is converted at sync time, so its status is re-derived from the

@@ -224,6 +224,53 @@ public sealed class FxStatusHeadlineTests
         captured!.FxStatus.Should().Be(FxStatus.Exact);
     }
 
+    private static async Task<NetWorthSnapshot> PersistAsync(
+        NetWorthSnapshot? previous, NetWorthSnapshotData data)
+    {
+        NetWorthSnapshot? stored = null;
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetLatestBeforeUnscopedAsync(UserId, data.SnapshotDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(previous);
+        repo.Setup(r => r.UpsertAsync(It.IsAny<NetWorthSnapshot>(), It.IsAny<CancellationToken>()))
+            .Callback<NetWorthSnapshot, CancellationToken>((s, _) => stored = s)
+            .Returns(Task.CompletedTask);
+
+        await new NetWorthSnapshotService(repo.Object).PersistSnapshotAsync(UserId, data, CancellationToken.None);
+        return stored!;
+    }
+
+    [Theory]
+    [InlineData(FxStatus.Unknown1To1, false, FxStatus.Exact, FxStatus.Unknown1To1)]
+    [InlineData(null, true, FxStatus.Exact, FxStatus.TodayRate)]
+    [InlineData(null, false, FxStatus.Exact, FxStatus.Exact)]
+    [InlineData(FxStatus.TodayRate, false, FxStatus.SeedTable, FxStatus.SeedTable)]
+    public async Task SnapshotService_FoldsThePreviousRowsStatus_WhenASleeveIsCarriedForward(
+        FxStatus? previousStatus, bool previousApproximate, FxStatus live, FxStatus expected)
+    {
+        var previous = new NetWorthSnapshot
+        {
+            BankingTotal = 100m, CryptoTotal = 500m, FxStatus = previousStatus, IsApproximate = previousApproximate,
+        };
+
+        var stored = await PersistAsync(previous, new NetWorthSnapshotData(
+            new DateOnly(2026, 10, 2), 100m, 0m, 0m, CryptoFresh: false, FxStatus: live));
+
+        stored.StaleSleeves.Should().Contain("crypto");
+        stored.FxStatus.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task SnapshotService_KeepsTheLiveStatus_WhenNoSleeveIsCarriedForward()
+    {
+        var previous = new NetWorthSnapshot { BankingTotal = 100m, FxStatus = FxStatus.Unknown1To1 };
+
+        var stored = await PersistAsync(previous, new NetWorthSnapshotData(
+            new DateOnly(2026, 10, 2), 100m, 0m, 0m, FxStatus: FxStatus.Exact));
+
+        stored.StaleSleeves.Should().BeNull();
+        stored.FxStatus.Should().Be(FxStatus.Exact);
+    }
+
     [Fact]
     public async Task SnapshotService_StoresTheWorstStatusOnTheSnapshotRow()
     {
@@ -378,8 +425,12 @@ public sealed class FxStatusHeadlineTests
 
     // ---- Backfill ----
 
-    [Fact]
-    public async Task Backfill_RecordsNoStoredStatus_SoHistoryReadsItFromIsApproximate()
+    [Theory]
+    [InlineData("USD", FxStatus.TodayRate)] // reconstructed days are valued at today's rate, whatever the currency
+    [InlineData("EUR", FxStatus.TodayRate)]
+    [InlineData("UAH", FxStatus.SeedTable)]
+    [InlineData("XYZ", FxStatus.Unknown1To1)]
+    public async Task Backfill_StoresTheWorstStatusOfTheAccountsAFloorOfTodayRate(string currency, FxStatus expected)
     {
         using var _ = FxTableScope.Live(LiveEur);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -395,18 +446,31 @@ public sealed class FxStatusHeadlineTests
         var accountId = Guid.NewGuid();
         var accounts = new Mock<IBankingAccountsReader>();
         accounts.Setup(a => a.GetActiveAccountSnapshotsAsync(UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new AccountBalanceSnapshot(accountId, "Bank", "checking", "1234", "EUR", 1_000m)]);
+            .ReturnsAsync([new AccountBalanceSnapshot(accountId, "Bank", "checking", "1234", currency, 1_000m)]);
         var transactions = new Mock<IBankingTransactionReader>();
         transactions.Setup(t => t.GetTransactionsAsync(
                 UserId, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new BankingTransactionSummary(
-                accountId, "monobank", "debit", 10m, "EUR", 10m,
+                accountId, "monobank", "debit", 10m, currency, 10m,
                 anchorDate.AddDays(-3).ToDateTime(TimeOnly.MinValue), IsPending: false)]);
 
         var result = await new BackfillNetWorthHistoryCommandHandler(repo.Object, accounts.Object, transactions.Object)
             .Handle(new BackfillNetWorthHistoryCommand(UserId), CancellationToken.None);
 
         result.InsertedCount.Should().BeGreaterThan(0);
-        inserted.Should().OnlyContain(r => r.IsApproximate && r.FxStatus == null);
+        inserted.Should().OnlyContain(r => r.IsApproximate && r.FxStatus == expected);
+    }
+
+    [Fact]
+    public async Task History_ReadsAnUnknownOneToOne_FromABackfilledRowThatStoredIt()
+    {
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([Row(approximate: true, fxStatus: FxStatus.Unknown1To1)]);
+
+        var result = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        result.Snapshots[0].FxReasons.Should().Equal("FX_UNKNOWN_1TO1");
     }
 }

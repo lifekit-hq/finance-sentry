@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Application.Services;
 
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
@@ -28,6 +29,10 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
         var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
 
+        var fxStatus = data.FxStatus;
+        if (stale.Count > 0 && previous is not null)
+            fxStatus = fxStatus.Worst(previous.FxStatus ?? (previous.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact));
+
         var snapshot = new NetWorthSnapshot
         {
             Id = Guid.NewGuid(),
@@ -46,7 +51,7 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             CashTotal = hasSplit ? total - brokerageInvested!.Value - cryptoInvested!.Value : null,
             BrokerageInvested = hasSplit ? brokerageInvested : null,
             CryptoInvested = hasSplit ? cryptoInvested : null,
-            FxStatus = data.FxStatus,
+            FxStatus = fxStatus,
         };
 
         // Upsert: the day's row is refreshed on every successful sync rather than frozen
