@@ -46,24 +46,25 @@ public class NetWorthHistoryController(
             ? new Dictionary<DateOnly, decimal>()
             : await _rates.GetPublishedSeriesAsync(baseCurrency, pastDates.Min(), pastDates.Max(), ct);
 
-        NetWorthSnapshotDto Convert(NetWorthSnapshotDto s)
+        (NetWorthSnapshotDto Row, FxStatus Status) Convert(NetWorthSnapshotDto s)
         {
             Func<decimal, decimal> fx;
-            string? added;
+            FxStatus status;
             if (s.SnapshotDate < today && PublishedRateLookup.Resolve(published, s.SnapshotDate) is { } dated)
             {
                 // The stored rate is USD per unit of the base currency, so USD / rate is the base amount.
                 fx = usd => usd / dated.Rate;
-                added = dated.Status == FxStatus.NearestPublished ? FxReasons.NearestPublished : null;
+                status = dated.Status;
             }
             else
             {
                 fx = usd => CurrencyConverter.FromUsd(usd, baseCurrency);
-                added = (s.SnapshotDate < today ? todayStatus.Worst(FxStatus.TodayRate) : todayStatus).ToReason();
+                status = s.SnapshotDate < today ? todayStatus.Worst(FxStatus.TodayRate) : todayStatus;
             }
 
+            var added = status == FxStatus.NearestPublished ? FxReasons.NearestPublished : status.ToReason();
             decimal? FxOrNull(decimal? usd) => usd is null ? null : fx(usd.Value);
-            return s with
+            return (s with
             {
                 BankingTotal = fx(s.BankingTotal),
                 BrokerageTotal = fx(s.BrokerageTotal),
@@ -74,14 +75,26 @@ public class NetWorthHistoryController(
                 CryptoInvested = FxOrNull(s.CryptoInvested),
                 Currency = baseCurrency,
                 FxReasons = Reasons(s.FxReasons, added),
-            };
+            }, status);
         }
 
-        return Ok(result with
+        var converted = result.Snapshots.Select(Convert).ToList();
+
+        // The change is read off the converted end rows, so it always equals what the rows show.
+        Headline? change = null;
+        if (result.ChangeHeadline is { } h)
         {
-            Snapshots = [.. result.Snapshots.Select(Convert)],
-            ChangeHeadline = result.ChangeHeadline is { } h ? HeadlineFactory.InBaseCurrency(h, baseCurrency, today) : null,
-        });
+            change = converted.Count == 0
+                ? h
+                : HeadlineFactory.ChangeInBaseCurrency(
+                    h,
+                    converted[0].Row.TotalNetWorth,
+                    converted[^1].Row.TotalNetWorth,
+                    baseCurrency,
+                    converted[0].Status.Worst(converted[^1].Status));
+        }
+
+        return Ok(result with { Snapshots = [.. converted.Select(c => c.Row)], ChangeHeadline = change });
     }
 
     /// <summary>The row's stored reasons plus the one its display conversion added: the single worst reason.</summary>

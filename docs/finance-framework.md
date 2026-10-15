@@ -134,7 +134,12 @@ Two things already right and kept:
   today is shown at today's live rate, as the dashboard hero is. The reason a row finally carries is the worst of its stored
   reasons and the one its display conversion added (`FX_UNKNOWN_1TO1` > `FX_TODAY_RATE` > `FX_NEAREST_PUBLISHED`),
   so a base currency shown on the seed table still adds `FX_TODAY_RATE`. USD output is untouched and does no
-  rate lookup. Display only: stored rows keep their USD values, and MCP `get_net_worth_history` stays USD.
+  rate lookup. The window's `ChangeHeadline` (a `VALUE_CHANGE` figure, not a return) is read off the same
+  converted rows: last visible row minus first, with the percent over the first row's base amount, so it
+  always equals what the rows show (a flat USD net worth against a moving rate is a non-zero base change).
+  Its FX reasons are the worse of the two end rows' conversions (no blanket `FX_TODAY_RATE`); a percent
+  withheld in USD (zero or negative start, scope change) stays withheld. Display only: stored rows keep their
+  USD values, and MCP `get_net_worth_history` stays USD.
   Latency (measured 2026-10-15, cold, 2023-01-01..2026-10-14): one request, 0.6 s for Frankfurter EUR and 0.4 s for
   NBU UAH; repeats within the 12-hour cache add none. A feed that is down costs one failed request (not cached) and the rows fall back to today's rate.
 

@@ -112,6 +112,26 @@ public static class HeadlineFactory
         return HeadlineQualityMapper.WithFx(converted, status);
     }
 
+    /// <summary>
+    /// A <see cref="HeadlineMethod.ValueChange"/> headline re-stated from base-currency end values: the change is
+    /// <paramref name="endAmount"/> minus <paramref name="startAmount"/> and the percent is that change over the
+    /// start, so the figure equals what the converted rows show. A percent the USD figure withheld (zero or
+    /// negative start, scope change) stays withheld. <paramref name="status"/> is the worse of the two end rows'
+    /// conversions.
+    /// </summary>
+    public static Headline ChangeInBaseCurrency(
+        Headline headline, decimal startAmount, decimal endAmount, string baseCurrency, FxStatus status)
+    {
+        var change = endAmount - startAmount;
+        var converted = headline with
+        {
+            Amount = headline.Amount is null ? null : change,
+            Percent = headline.Percent is null || startAmount <= 0m ? null : ToPercent(change / startAmount),
+            Currency = baseCurrency,
+        };
+        return HeadlineQualityMapper.WithFx(converted, status);
+    }
+
     private static decimal? ToPercent(decimal? rate) =>
         rate is { } r ? Math.Round(r * PercentScale, PercentDecimals) : null;
 }

@@ -337,7 +337,11 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   on a date the feed published uses that rate (no reason); a weekend or holiday uses the closest earlier
   published rate within 7 days (`NEAREST_PUBLISHED`, reason `FX_NEAREST_PUBLISHED`); nothing published inside
   that bound falls back to today's rate (`TODAY_RATE`, reason `FX_TODAY_RATE`); a row dated today is shown at
-  today's live rate. The row carries the worst of this and its stored reason. USD base and MCP stay USD.
+  today's live rate. The row carries the worst of this and its stored reason. The window's change headline
+  (`VALUE_CHANGE`) is the last visible converted row minus the first, its percent taken over the first row's
+  base amount (still withheld across a scope change or from a non-positive start), and its FX reason is the
+  worse of the two end rows' - so with a flat USD net worth and a moving rate the base change is non-zero and
+  equals what the rows show. USD base and MCP stay USD.
 - **Dated EUR boundary (reporting, e.g. tax schedules).** `IEurReportingConverter.ToEurAsync(
   amount, currency, onDate)` values an amount in EUR at the rate for the *transaction date*, never
   today's rate. EUR in is EUR out unchanged. It routes through
