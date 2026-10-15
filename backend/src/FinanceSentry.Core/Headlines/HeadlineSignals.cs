@@ -23,6 +23,9 @@ public sealed record HeadlineSignals
     /// <summary>The figure is a cash or invested split that was not measured (a snapshot's <c>CashTotal</c> is null, or the split was withheld).</summary>
     public bool NoSplit { get; init; }
 
+    /// <summary>No position the figure was summed from has a known cost basis, so the gain against cost is unavailable.</summary>
+    public bool NoCostBasis { get; init; }
+
     /// <summary>Both figures' signals: the start and the end of a window.</summary>
     public HeadlineSignals Merge(HeadlineSignals other) => new()
     {
@@ -30,6 +33,7 @@ public sealed record HeadlineSignals
         BackfilledEstimate = BackfilledEstimate || other.BackfilledEstimate,
         Fx = Fx.Worst(other.Fx),
         NoSplit = NoSplit || other.NoSplit,
+        NoCostBasis = NoCostBasis || other.NoCostBasis,
     };
 
     /// <summary>

@@ -74,7 +74,7 @@ support one; never annualised), `method` (`VALUE`, `VALUE_CHANGE`, `GAIN_VS_COST
 `basisStatus` (`COMPLETE` / `PARTIAL` / `MISSING`), `coverage` (0..1, the share of the scope measured),
 `reasons` (typed `code` plus the `source` a per-source reason is about: `STALE_SOURCE`,
 `BACKFILLED_ESTIMATE`, `FX_TODAY_RATE`, `FX_UNKNOWN_1TO1`, `NO_SPLIT`, `SCOPE_CHANGED`, `SHORT_HISTORY`,
-`ZERO_BASE`, `NEGATIVE_BASE`, `NOT_MEASURABLE`), `asOf` and `currency` (USD on MCP). Read `quality` and
+`ZERO_BASE`, `NEGATIVE_BASE`, `NO_COST_BASIS`, `NOT_MEASURABLE`), `asOf` and `currency` (USD on MCP). Read `quality` and
 `reasons` before quoting a figure as measured. Contract and mapping: `docs/finance-framework.md` §3.6.
 
 ## Research Retrieval Guidance

@@ -242,6 +242,26 @@ public class HeadlineQualityMapperTests
         headline.BasisStatus.Should().Be(BasisStatus.Missing);
         headline.Coverage.Should().Be(0m);
         headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.NoCostBasis));
+    }
+
+    [Fact]
+    public void AFigureWithNoAmount_AndNoSignals_IsUnavailable_WithNotMeasurable()
+    {
+        var headline = HeadlineFactory.Value(null, HeadlineScope.Umbrella, Today, HeadlineSignals.None);
+
+        headline.Amount.Should().BeNull();
+        headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.NotMeasurable));
+    }
+
+    [Fact]
+    public void AFigureWithNoAmount_KeepsItsOwnReason_InsteadOfNotMeasurable()
+    {
+        var headline = HeadlineFactory.Value(1000m, HeadlineScope.CashSleeve, Today, new HeadlineSignals { NoSplit = true });
+
+        headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.NoSplit));
     }
 
     [Theory]

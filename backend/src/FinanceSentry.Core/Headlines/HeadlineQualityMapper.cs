@@ -9,7 +9,8 @@ public sealed record HeadlineAssessment(HeadlineQuality Quality, IReadOnlyList<H
 /// <summary>
 /// The single place today's signals become a <see cref="Headline"/>'s quality, basis status and reasons
 /// (finance-framework §3.6 mapping table). The quality is the worst any reason implies; a figure with no amount
-/// is <see cref="HeadlineQuality.Unavailable"/> whatever its reasons.
+/// is <see cref="HeadlineQuality.Unavailable"/> whatever its reasons, and never carries an empty reason list
+/// (<see cref="HeadlineReasonCode.NotMeasurable"/> stands in when nothing else explains it).
 /// </summary>
 public static class HeadlineQualityMapper
 {
@@ -38,6 +39,9 @@ public static class HeadlineQualityMapper
 
         if (signals.NoSplit)
             reasons.Add(new HeadlineReason(HeadlineReasonCode.NoSplit));
+
+        if (signals.NoCostBasis)
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.NoCostBasis));
 
         if (percentFailure is { } failure)
             reasons.Add(new HeadlineReason(ReasonFor(failure)));
@@ -111,6 +115,7 @@ public static class HeadlineQualityMapper
         HeadlineReasonCode.FxTodayRate => HeadlineQuality.Estimated,
         HeadlineReasonCode.FxUnknown1To1 => HeadlineQuality.Degraded,
         HeadlineReasonCode.NoSplit => HeadlineQuality.Unavailable,
+        HeadlineReasonCode.NoCostBasis => HeadlineQuality.Unavailable,
         HeadlineReasonCode.UnknownFlow => HeadlineQuality.Estimated,
         HeadlineReasonCode.UnmatchedTransfer => HeadlineQuality.Estimated,
         HeadlineReasonCode.PriceCarriedForward => HeadlineQuality.Estimated,
@@ -121,6 +126,9 @@ public static class HeadlineQualityMapper
 
     private static HeadlineAssessment Build(List<HeadlineReason> reasons, bool amountAvailable)
     {
+        if (!amountAvailable && reasons.Count == 0)
+            reasons.Add(new HeadlineReason(HeadlineReasonCode.NotMeasurable));
+
         var ordered = reasons
             .Distinct()
             .OrderBy(r => r.Code)

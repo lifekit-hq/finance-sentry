@@ -322,7 +322,7 @@ for a window reaching before today (today's rate, not the dated one) and the bas
 in percentage points, shares the amount's numerator (D1), is never annualised (D6) and is null with a reason
 when the basis does not support one (D4, D5). `HeadlineSignals` gathers a figure's signals and
 `HeadlineQualityMapper` is the single place that turns them into quality, basis status and reasons; the
-quality is the worst its reasons imply and a figure with no amount is UNAVAILABLE. It is an additive field
+quality is the worst its reasons imply and a figure with no amount is UNAVAILABLE, always with at least one reason (`NOT_MEASURABLE` when nothing else explains it). It is an additive field
 beside the existing ones:
 
 | Surface | Field | What it describes |
@@ -346,6 +346,7 @@ them:
 | `IsApproximate` (bool; backfill from #584) | ESTIMATED + `BACKFILLED_ESTIMATE` + `FX_TODAY_RATE` |
 | `CashTotal` null | `NO_SPLIT`: cash and invested splits are UNAVAILABLE |
 | `PositionReturns.Coverage` | basisStatus COMPLETE / PARTIAL / MISSING |
+| No known cost basis on any position | UNAVAILABLE + `NO_COST_BASIS` (amount and percent null, basisStatus MISSING) |
 | Unknown currency converted 1:1 (`CurrencyConverter.Convert` → `UNKNOWN_1TO1`) | DEGRADED + `FX_UNKNOWN_1TO1` (reason code live, R4) |
 | Historical FX replaced by today's rate (`TODAY_RATE`) or a seed-table rate (`SEED_TABLE`) | ESTIMATED + `FX_TODAY_RATE` (reason code live, R4) |
 | `HasStaleSleeves` on FIRE | DEGRADED + `STALE_SOURCE` |

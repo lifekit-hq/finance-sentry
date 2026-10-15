@@ -200,4 +200,8 @@ public enum HeadlineReasonCode
     /// <summary>The net-worth bridge leaves a residual above its tolerance.</summary>
     [JsonStringEnumMemberName("RESIDUAL_ABOVE_TOLERANCE")]
     ResidualAboveTolerance,
+
+    /// <summary>No position in the scope has a known cost basis, so a gain against cost cannot be measured.</summary>
+    [JsonStringEnumMemberName("NO_COST_BASIS")]
+    NoCostBasis,
 }

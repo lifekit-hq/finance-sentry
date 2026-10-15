@@ -80,7 +80,8 @@ public static class HeadlineFactory
         var rate = cost > 0m ? MeasuredRate.Of((measuredValue - cost) / cost) : MeasuredRate.Fails(MeasureFailure.MissingValue);
         decimal? coverage = totalValue > 0m ? Math.Round(measuredValue / totalValue, CoverageDecimals) : null;
 
-        var assessment = HeadlineQualityMapper.Assess(signals, amount is not null);
+        var assessment = HeadlineQualityMapper.Assess(
+            amount is null ? signals with { NoCostBasis = true } : signals, amount is not null);
         return new Headline(
             amount, amount is null ? null : ToPercent(rate.Value), HeadlineMethod.GainVsCost, HeadlineBasis.Cost, scope,
             new HeadlineWindow(null, date), assessment.Quality,

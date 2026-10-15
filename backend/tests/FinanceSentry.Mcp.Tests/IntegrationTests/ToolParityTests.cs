@@ -540,6 +540,7 @@ public sealed class ToolParityTests
         headlines.UnrealizedPnl.Percent.Should().BeNull();
         headlines.UnrealizedPnl.BasisStatus.Should().Be(BasisStatus.Missing);
         headlines.UnrealizedPnl.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headlines.UnrealizedPnl.Reasons.Select(r => r.Code).Should().Equal(HeadlineReasonCode.NoCostBasis);
     }
 
     /// <summary>
