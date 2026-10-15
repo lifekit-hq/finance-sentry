@@ -25,11 +25,11 @@
         </div>
         <p class="mt-cmn-1 text-cmn-xs text-text-secondary" data-testid="brokerage-growth-since">
           Interactive Brokers and Inzhur, cash included, since
-          {{ (growth.from ?? growth.seriesStart) | date: 'd MMM y' }}@if (
-            !growth.from || growth.from === growth.seriesStart
-          ) {
+          {{ growth.from ?? growth.seriesStart | date: 'd MMM y' }}
+          @if (!growth.from || growth.from === growth.seriesStart) {
             - the day value history starts
-          }.
+          }
+          .
         </p>
 
         @switch (store.view()) {
