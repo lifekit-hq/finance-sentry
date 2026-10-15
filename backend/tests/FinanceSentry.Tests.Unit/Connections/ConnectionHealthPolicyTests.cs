@@ -371,4 +371,109 @@ public class ConnectionHealthPolicyTests
         evaluation.Outcome.Should().Be(ConnectionHealthOutcome.None);
         evaluation.Health.Should().BeSameAs(degraded);
     }
+
+    // ── The scheduled-run pause of an ActionRequired connection ─────────────
+
+    private static ConnectionHealth ActionRequiredSince(DateTimeOffset lastFailureAt) =>
+        new()
+        {
+            State = ConnectionHealthState.ActionRequired,
+            ConsecutiveFailures = 1,
+            FirstFailureAt = lastFailureAt,
+            LastFailureAt = lastFailureAt,
+            LastFailureClass = FailureClass.Credential,
+        };
+
+    [Fact]
+    public void Options_ProbeAnActionRequiredConnectionOnceADay()
+    {
+        Options.ActionRequiredProbeInterval.Should().Be(TimeSpan.FromDays(1));
+    }
+
+    [Theory]
+    [InlineData(ConnectionHealthState.Healthy)]
+    [InlineData(ConnectionHealthState.Degraded)]
+    [InlineData(ConnectionHealthState.Failing)]
+    [InlineData(ConnectionHealthState.Dormant)]
+    public void ScheduledRun_OfAnyStateButActionRequired_IsNeverPaused(ConnectionHealthState state)
+    {
+        var health = new ConnectionHealth { State = state, LastFailureAt = T0 };
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddMinutes(15), Options).Should().BeNull();
+    }
+
+    [Fact]
+    public void ScheduledRun_OfAnActionRequiredConnection_IsPausedUntilADayAfterTheLastFailure()
+    {
+        var health = ActionRequiredSince(T0);
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddMinutes(15), Options)
+            .Should().Be(T0.AddDays(1));
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddHours(23), Options)
+            .Should().Be(T0.AddDays(1));
+    }
+
+    [Fact]
+    public void ScheduledRun_OnceADayHasPassed_IsTheProbe()
+    {
+        var health = ActionRequiredSince(T0);
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddDays(1), Options).Should().BeNull();
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddDays(3), Options).Should().BeNull();
+    }
+
+    [Fact]
+    public void ScheduledRun_AFewSecondsBeforeTheDayEnds_IsStillTheProbe_SoADailyCronIsNotSkippedEveryOtherDay()
+    {
+        var health = ActionRequiredSince(T0.AddSeconds(20));
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddDays(1), Options).Should().BeNull();
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddDays(1).AddHours(-1), Options)
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ScheduledRun_WithNoFailureOnRecord_IsProbedAtOnce()
+    {
+        var health = new ConnectionHealth { State = ConnectionHealthState.ActionRequired };
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0, Options).Should().BeNull();
+    }
+
+    [Fact]
+    public void ScheduledRun_FollowsTheConfiguredProbeInterval()
+    {
+        var options = new ConnectionHealthOptions { ActionRequiredProbeInterval = TimeSpan.FromHours(6) };
+        var health = ActionRequiredSince(T0);
+
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddHours(5), options).Should().Be(T0.AddHours(6));
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(health, T0.AddHours(6), options).Should().BeNull();
+    }
+
+    [Fact]
+    public void FailedProbe_RenewsThePauseFromItsOwnTime_AndTellsNobodyAgain()
+    {
+        var health = ActionRequiredSince(T0);
+        var probeAt = T0.AddDays(1);
+
+        var evaluation = Fail(health, probeAt, ProviderFailure.CredentialSuspect("HTTP_401"));
+
+        evaluation.Outcome.Should().Be(ConnectionHealthOutcome.None);
+        evaluation.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(evaluation.Health, probeAt.AddHours(1), Options)
+            .Should().Be(probeAt.AddDays(1));
+    }
+
+    [Fact]
+    public void SuccessfulProbe_ClearsActionRequired_AndResolvesWhatTheUserWasTold()
+    {
+        var health = ActionRequiredSince(T0);
+
+        var evaluation = ConnectionHealthPolicy.RecordSuccess(health, T0.AddDays(1));
+
+        evaluation.Outcome.Should().Be(ConnectionHealthOutcome.Resolve);
+        evaluation.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        ConnectionHealthPolicy.ScheduledRunPausedUntil(evaluation.Health, T0.AddDays(1).AddMinutes(15), Options)
+            .Should().BeNull();
+    }
 }

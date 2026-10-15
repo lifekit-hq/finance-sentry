@@ -33,6 +33,9 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 /// at once for a confirmed credential loss, otherwise once the failure has persisted (by default 3 failures
 /// and 2 h without a success). The run itself then succeeds even when every user failed.
 ///
+/// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
+/// mode, except for one probe a day.
+///
 /// One subclass per venue, because Hangfire names a job by its type: each venue gets its own
 /// schedule, metrics and failure streak.
 /// </summary>
@@ -60,9 +63,15 @@ public abstract class CryptoExchangeSyncJob(
         var policyDrivesAlerts = healthOptions.CurrentValue.IsActive(Provider);
         var activeCredentials = await credentialRepository.GetAllActiveUnscopedAsync(Provider);
         var failures = new List<Exception>();
+        var attempted = 0;
 
         foreach (var credential in activeCredentials)
         {
+            if (ConnectionHealthScheduledRunGate.ShouldSkip(
+                    logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
+                continue;
+
+            attempted++;
             try
             {
                 await syncHandler.Handle(
@@ -109,7 +118,8 @@ public abstract class CryptoExchangeSyncJob(
             }
         }
 
-        if (failures.Count > 0 && failures.Count == activeCredentials.Count)
+        // A credential the gate skipped made no attempt, so it neither fails nor excuses the run.
+        if (failures.Count > 0 && failures.Count == attempted)
         {
             throw new AggregateException(
                 $"{CryptoExchangeProvider.DisplayName(Provider)} holdings sync failed for all "

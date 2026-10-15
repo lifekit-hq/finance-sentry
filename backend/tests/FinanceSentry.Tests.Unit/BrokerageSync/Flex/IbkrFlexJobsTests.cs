@@ -401,4 +401,110 @@ public class IbkrFlexJobsTests
         harness.Credential.Health.LastFailureCode.Should().Be("1003");
         harness.VerifyNoAlertCalls();
     }
+
+    // ── A confirmed-lost credential is not re-hit every run ──────────────────
+
+    private static ConnectionHealth ActionRequiredSince(DateTimeOffset lastFailureAt) =>
+        new()
+        {
+            State = ConnectionHealthState.ActionRequired,
+            ConsecutiveFailures = 1,
+            FirstFailureAt = lastFailureAt,
+            LastFailureAt = lastFailureAt,
+            LastFailureClass = FailureClass.Credential,
+            LastFailureCode = "FLEX_1015",
+        };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IncrementalSyncJob_ActionRequired_SkipsTheCredentialInsideTheDay(bool active)
+    {
+        var harness = new PolicyHarness();
+        if (active) harness.Active();
+        harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
+        harness.GivenSyncFails(new IbkrFlexException("1015", "Token is invalid."));
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(It.IsAny<Guid>(), It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.VerifyNoAlertCalls();
+        harness.CredentialRepo.Verify(r => r.SaveHealthUnscopedAsync(It.IsAny<Guid>(), It.IsAny<ConnectionHealth>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_ProbesOnEveryDailyRun_NotOnlyEveryOtherDay()
+    {
+        // Each run stamps its failure a few seconds after its cron time, so a strict "24 h since the last
+        // failure" would let the next daily run start just short of it and skip.
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1015", "Token is invalid."));
+        await harness.RunAsync();
+        harness.Time.Advance(TimeSpan.FromSeconds(20));
+        harness.Credential.ApplyHealth(harness.Credential.Health with { LastFailureAt = harness.Time.GetUtcNow() });
+
+        harness.Time.Advance(TimeSpan.FromDays(1) - TimeSpan.FromSeconds(20) - TimeSpan.FromSeconds(8));
+        await harness.RunAsync();
+        harness.Time.Advance(TimeSpan.FromDays(1));
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+        harness.VerifyEscalated(Times.Once());
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_ASixHourReRunDoesNotProbeAgain()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.GivenSyncFails(new IbkrFlexException("1013", "Invalid IP address."));
+        await harness.RunAsync();
+
+        harness.Time.Advance(TimeSpan.FromHours(6));
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_SuccessfulProbeRecoversWithoutAReconnect()
+    {
+        // A definitive loss fixed on IBKR's side (an IP restriction lifted) heals on the daily probe.
+        var harness = new PolicyHarness().Active();
+        harness.SyncService
+            .SetupSequence(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IbkrFlexException("1013", "Invalid IP address."))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+
+        await harness.RunDailyAsync(2);
+
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        harness.Alerts.Verify(a => a.ResolveSyncFailureAlertAsync(harness.UserId, "ibkr-flex", null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IncrementalSyncJob_ActionRequired_AfterReplace_TheNextRunSyncs()
+    {
+        var harness = new PolicyHarness().Active();
+        harness.Credential.ApplyHealth(ActionRequiredSince(Start.AddHours(-2)));
+        harness.Credential.Replace("888888", [4], [5], [6], 1);
+        harness.SyncService
+            .Setup(s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IbkrFlexTradeSyncResult(0, 0));
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.ActionRequired);
+
+        await harness.RunAsync();
+
+        harness.SyncService.Verify(
+            s => s.SyncAsync(harness.UserId, It.IsAny<FlexStatementWindow?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.Credential.Health.State.Should().Be(ConnectionHealthState.Healthy);
+        harness.Credential.Health.LastSuccessAt.Should().Be(Start);
+        harness.Alerts.Verify(a => a.ResolveSyncFailureAlertAsync(harness.UserId, "ibkr-flex", null, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

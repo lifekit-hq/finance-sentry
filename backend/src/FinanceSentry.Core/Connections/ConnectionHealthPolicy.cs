@@ -12,10 +12,18 @@ namespace FinanceSentry.Core.Connections;
 /// <see cref="ConnectionHealthOptions.FailingMinTimeWithoutSuccess"/> without a success; Dormant once the streak
 /// has lasted <see cref="ConnectionHealthOptions.DormantAfter"/>.</item>
 /// <item>An internal failure is ours, not the provider's: it leaves the health as it was.</item>
+/// <item>A scheduled run skips an ActionRequired connection (<see cref="ScheduledRunPausedUntil"/>), except for one
+/// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.</item>
 /// </list>
 /// </summary>
 public static class ConnectionHealthPolicy
 {
+    /// <summary>
+    /// How early a probe may start. A daily cron run starts about when the previous one did, a few seconds before
+    /// that run's failure was stamped; without the slack a once-a-day source would skip its probe every other day.
+    /// </summary>
+    private static readonly TimeSpan ProbeSlack = TimeSpan.FromMinutes(5);
+
     public static ConnectionHealthEvaluation RecordSuccess(ConnectionHealth current, DateTimeOffset at)
     {
         ArgumentNullException.ThrowIfNull(current);
@@ -76,6 +84,26 @@ public static class ConnectionHealthPolicy
         }
 
         return Progress(current, counted, at, options);
+    }
+
+    /// <summary>
+    /// When a scheduled run of an ActionRequired connection may next call the provider, or null when it may go
+    /// ahead now: the connection is not ActionRequired, or its probe is due. The probe is timed from
+    /// <see cref="ConnectionHealth.LastFailureAt"/>, which a failed probe renews, so no field is added; a
+    /// connection with no failure on record has nothing to time from and is probed at once. A probe may start
+    /// <see cref="ProbeSlack"/> early. A run the person triggers does not ask: it always goes ahead.
+    /// </summary>
+    public static DateTimeOffset? ScheduledRunPausedUntil(
+        ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(health);
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (health.State != ConnectionHealthState.ActionRequired || health.LastFailureAt is not { } lastFailureAt)
+            return null;
+
+        var nextProbeAt = lastFailureAt + options.ActionRequiredProbeInterval;
+        return now < nextProbeAt - ProbeSlack ? nextProbeAt : null;
     }
 
     private static ConnectionHealthEvaluation Progress(

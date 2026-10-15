@@ -68,6 +68,7 @@ public sealed class IBKRFlexCredential : IUserOwned
         IsActive = true;
         LastUsedAt = null;
         LastError = null;
+        Health = Health with { LastFailureAt = null };
         QueryId = queryId;
         EncryptedToken = encryptedToken;
         TokenIv = tokenIv;
