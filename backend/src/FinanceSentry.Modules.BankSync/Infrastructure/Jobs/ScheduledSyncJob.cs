@@ -19,4 +19,13 @@ public class ScheduledSyncJob(ITransactionSyncCoordinator coordinator)
     [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteSyncAsync(Guid accountId)
           => await _coordinator.TriggerScheduledSyncAsync(accountId);
+
+    /// <summary>
+    /// Entry-point for a sync a person asked for (<c>POST /accounts/{id}/sync</c>). It goes through the
+    /// coordinator's manual path, so a provider-named wait (<c>NotBefore</c>) that pauses the scheduled run
+    /// does not silently drop it.
+    /// </summary>
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ExecuteManualSyncAsync(Guid accountId)
+          => await _coordinator.TriggerManualSyncAsync(accountId);
 }
