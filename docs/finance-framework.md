@@ -77,7 +77,7 @@ This is the target shape. Today the top (three sources registered as `IWealthSou
 per-source row written beside every snapshot, R8 PR 2, and read back by history, the dashboard, MCP and FIRE,
 R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the
 headline record (3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The stored
-totals are still the three sleeve columns until R8 PR 4 freezes them.
+totals are still the three sleeve columns, frozen by R8 PR 4: kept for history, never extended (5.6).
 
 Three rules keep the layers apart:
 
@@ -603,9 +603,8 @@ and the list of what is not yet verified are in report §5.5 and §12.4; none of
 
 ### 5.6 From three sleeves to a registry (four PRs)
 
-Today a fourth economy gets its per-source row with no schema change, but would need a new column on
-`net_worth_snapshots` to count in the stored totals, a new name inside the `StaleSleeves` string, and a change
-in every consumer.
+Before this work a fourth economy would have needed a new column on `net_worth_snapshots`, a new name inside
+the `StaleSleeves` string, and a change in every consumer; now it needs one `IWealthSource` registration.
 
 1. **Wrap. Done.** The three readers (`IBankingAccountsReader`, `IBrokerageHoldingsReader`,
    `ICryptoHoldingsReader`) are three `IWealthSource` registrations (`AddBookFigures`, which registers them in
@@ -639,7 +638,7 @@ in every consumer.
      source); whenever every source is, the rows add up to the sleeve columns, up to a cent: each figure rounds
      to cents on its own.
    - **Totals do not read the rows yet.** `TotalNetWorth` stays `banking + brokerage + crypto`; a fourth
-     source's row is recorded but not part of that total until PRs 3 and 4.
+     source's row is recorded and read back per source (PR 3); the frozen columns (PR 4) do not extend to it.
    - **Not backfilled.** Past snapshots are untouched and have no rows (PR 3 treats "no rows" as "legacy").
      The startup catch-up (`NetWorthSnapshotBackfillService`) fills gap days through the same job, so those rows
      carry the figures read at that moment, like their snapshot columns. The history reconstruction command
@@ -665,8 +664,32 @@ in every consumer.
      snapshot gives the same stale state and signals as its columns, and the history handler test that a mixed
      window (pre-PR-2 day and a day with rows, a carried-forward source) returns the same figures and change
      headline as the column formula. The legacy columns are still written; nothing is migrated or backfilled.
-4. **Freeze the old columns. Remaining.** Keep `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` for
-   history, and stop extending them. The first new economy comes after this step.
+4. **Freeze the old columns. Done.** `BankingTotal`, `BrokerageTotal`, `CryptoTotal` and `StaleSleeves` stay, and are
+   still written exactly as before (older history and the PR 3 fallback depend on them), but they are never
+   extended. No migration, no stored data changed.
+   - **Marked in code.** Each carries `[FrozenLegacyColumn]` (Wealth `Domain`) naming the per-source row that
+     replaces it. Not `[Obsolete]`: the writer and the fallback use them by design, so that would only add
+     suppressions.
+   - **Enforced.** `FrozenLegacyColumnGuardTests` (`Tests.Unit/Architecture`) fails when `NetWorthSnapshot` gains a
+     property (a fourth sleeve) and when a file outside the allow-list reads a frozen column. The allow-list is the
+     snapshot writer (`NetWorthSnapshotService`, the repository, `WealthDbContext`), the PR 3 fallback adapter
+     (`SnapshotSources`) and the three readers that predate the freeze (`GetNetWorthHistoryQuery`,
+     `BrokerageValueHistoryReader`, `NetWorthSplitBackfillService`); it is not to be extended.
+   - **The totals.** `TotalNetWorth` is still `banking + brokerage + crypto` from the columns' sources; a new
+     economy's contribution is read from its per-source row (see "Adding a new economy").
+
+### Adding a new economy
+
+Register an `IWealthSource`; nothing else changes.
+
+1. Complete the new-source checklist (§7) before writing the adapter: §5.4 row, facets (§5.1), reliability and
+   convertibility (§5.3), failure classes (§5.7).
+2. Implement `IWealthSource` and register it in `AddBookFigures` (its id is the `source_id`, its `EconomyKind`
+   the row's `kind`). `BookFiguresService` sums it into the live book.
+3. The snapshot job writes its `net_worth_snapshot_sources` row from `BookFigures.Sources`; history, the dashboard,
+   MCP and FIRE read it back through `SnapshotSources`.
+4. Do not add a column to `net_worth_snapshots`, a name to `StaleSleeves`, or a read of the frozen columns; the
+   guard test fails the build.
 
 Rejected: a column per new economy (each economy then costs a migration and a change to every consumer) and
 one JSON column (loses typed queries and per-source quality fields).
@@ -789,12 +812,12 @@ outside the headline paths are unchanged. money-semantics §9 accepts the approx
 about that (M1), but linking an existing account is not a change in wealth, yet shows as one, with a
 percentage (rule 3 of §3.2; reason `SCOPE_CHANGED`).
 
-**G4. The sleeves are hard-coded.** *Partly closed (R8 PRs 1-3): the live book sums registered sources, every
-snapshot written since has a per-source row, and the snapshot readers take sources and staleness from those rows
-(§5.6 step 3); the stored totals are still the three sleeve columns.*
+**G4. The sleeves are hard-coded.** *Closed (R8 PRs 1-4): the live book sums registered sources, every
+snapshot written since has a per-source row, the snapshot readers take sources and staleness from those rows
+(§5.6 step 3), and the three sleeve columns are frozen and guarded (step 4).*
 Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names, still
-written. A new economy is recorded and reported per source, but counts in the stored totals only once the old
-columns are frozen (§5.6, PR 4).
+written. The columns are frozen (R8 PR 4, §5.6): a new economy is an `IWealthSource` recorded and reported per
+source, never a column.
 
 **G5. Quality signals are scattered and untyped.** *Closed for the headline figures, the MCP
 totals and the UI badges (R6, first PR and P9); the FIRE tile still reads its own untyped `hasStaleSleeves`.*
@@ -841,4 +864,5 @@ in shadow mode: their `NotBefore` is recorded there, and it pauses scheduled ban
   is part of the new-source checklist: its signals mapped to each failure class, whether its requests are
   signed or safe to retry, whether failed sign-ins lock the account, its cadence, and its per-source settings
   (`EarlyRechecks` if it runs once a day, `NotReadyDeadline` and `NotReadyRetryAfter` if it can be not ready).
+  Then follow the steps in [Adding a new economy](#adding-a-new-economy) (§5.6): register an `IWealthSource`.
 - No real balance, amount, token or account identifier belongs in this document.

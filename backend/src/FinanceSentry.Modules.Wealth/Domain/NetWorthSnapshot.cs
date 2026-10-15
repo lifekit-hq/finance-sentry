@@ -2,13 +2,21 @@ namespace FinanceSentry.Modules.Wealth.Domain;
 
 using FinanceSentry.Core.Auth;
 
+/// <remarks>
+/// <see cref="BankingTotal"/>, <see cref="BrokerageTotal"/>, <see cref="CryptoTotal"/> and
+/// <see cref="StaleSleeves"/> are frozen (<see cref="FrozenLegacyColumnAttribute"/>): a new economy registers an
+/// <c>IWealthSource</c> and is recorded per source, not as a column here.
+/// </remarks>
 public sealed class NetWorthSnapshot : IUserOwned
 {
     public Guid Id { get; init; }
     public Guid UserId { get; init; }
     public DateOnly SnapshotDate { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'banking')")]
     public decimal BankingTotal { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'brokerage')")]
     public decimal BrokerageTotal { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'crypto')")]
     public decimal CryptoTotal { get; init; }
     public decimal TotalNetWorth { get; init; }
     public string Currency { get; init; } = "USD";
@@ -21,6 +29,7 @@ public sealed class NetWorthSnapshot : IUserOwned
     /// distinguish a measured net worth from a partially estimated one instead of
     /// treating carried-forward or $0 sync-failure days as real movement.
     /// </summary>
+    [FrozenLegacyColumn("net_worth_snapshot_sources.health / reasons (STALE_SOURCE)")]
     public string? StaleSleeves { get; init; }
 
     /// <summary>
