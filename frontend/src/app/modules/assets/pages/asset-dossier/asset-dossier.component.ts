@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {RouterLink} from '@angular/router';
+import {type ChipRowChangeDetail} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   AreaChartComponent,
@@ -199,8 +200,8 @@ export class AssetDossierComponent {
   }
 
   public onChartRangeChange(event: Event): void {
-    const {value} = (event as CustomEvent<{value: ChartRangeId}>).detail;
-    this.store.selectChartRange(value);
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.selectChartRange(value as ChartRangeId);
   }
 
   public generateLedgerRead(symbol: string, force: boolean): void {

@@ -445,9 +445,9 @@ test.describe('Dashboard range presets (IBKR set)', () => {
 
   test('offers 1W MTD 1M 3M YTD 1Y ALL, in that order, and no 6M', async ({page}) => {
     await page.goto('/dashboard');
-    const bar = page.getByRole('radiogroup', {name: 'History range'});
-    await expect(bar.getByRole('radio')).toHaveText(['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL']);
-    await expect(bar.getByRole('radio', {name: '6M', exact: true})).toHaveCount(0);
+    const bar = page.getByRole('group', {name: 'History range'});
+    await expect(bar.getByRole('button')).toHaveText(['1W', 'MTD', '1M', '3M', 'YTD', '1Y', 'ALL']);
+    await expect(bar.getByRole('button', {name: '6M', exact: true})).toHaveCount(0);
   });
 
   test('the range control sits under the chart in the hero card and stays on one row on a phone', async ({
@@ -456,12 +456,12 @@ test.describe('Dashboard range presets (IBKR set)', () => {
     await page.setViewportSize({width: 390, height: 844});
     await mockHistory(page);
     await page.goto('/dashboard');
-    const bar = page.getByRole('radiogroup', {name: 'History range'});
+    const bar = page.getByRole('group', {name: 'History range'});
     const chart = page.locator('cmn-area-chart');
     await expect(bar).toBeVisible();
     await expect(chart).toBeVisible();
 
-    const boxes = await bar.getByRole('radio').evaluateAll(cells =>
+    const boxes = await bar.getByRole('button').evaluateAll(cells =>
       cells.map(c => {
         const {top, height} = c.getBoundingClientRect();
         return {top, height};
@@ -500,10 +500,10 @@ test.describe('Dashboard range presets (IBKR set)', () => {
 
   test('choosing a range updates the selected cell', async ({page}) => {
     await page.goto('/dashboard');
-    const bar = page.getByRole('radiogroup', {name: 'History range'});
-    await bar.getByRole('radio', {name: '1Y'}).click();
-    await expect(bar.getByRole('radio', {name: '1Y'})).toBeChecked();
-    await expect(bar.getByRole('radio', {name: '3M'})).not.toBeChecked();
+    const bar = page.getByRole('group', {name: 'History range'});
+    await bar.getByRole('button', {name: '1Y'}).click();
+    await expect(bar.getByRole('button', {name: '1Y'})).toHaveAttribute('aria-pressed', 'true');
+    await expect(bar.getByRole('button', {name: '3M'})).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('1W asks the API for a day window and the tiles drill into the same seven days', async ({
@@ -516,8 +516,8 @@ test.describe('Dashboard range presets (IBKR set)', () => {
       r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
     );
     await page
-      .getByRole('radiogroup', {name: 'History range'})
-      .getByRole('radio', {name: '1W'})
+      .getByRole('group', {name: 'History range'})
+      .getByRole('button', {name: '1W'})
       .click();
     await aggregated;
     await expect(page.getByText('Last 7 days')).toBeVisible();
@@ -536,8 +536,8 @@ test.describe('Dashboard range presets (IBKR set)', () => {
       r => r.url().includes('/dashboard/aggregated') && r.url().includes(`windowFrom=${from}`)
     );
     await page
-      .getByRole('radiogroup', {name: 'History range'})
-      .getByRole('radio', {name: 'MTD'})
+      .getByRole('group', {name: 'History range'})
+      .getByRole('button', {name: 'MTD'})
       .click();
     await aggregated;
     await expect(page.getByText('Month to date')).toBeVisible();
@@ -811,10 +811,7 @@ test.describe('Top spendings → Ledger category drill-down', () => {
 
       await expect(page).toHaveURL(new RegExp(`/transactions\\?.*category=${key}`));
       expect(new URL(page.url()).searchParams.get('type')).toBe('debit');
-      await expect(page.getByTestId(`chip-category-${key}`)).toHaveAttribute(
-        'label',
-        `Category: ${label}`
-      );
+      await expect(page.getByRole('button', {name: `Remove Category: ${label}`})).toBeVisible();
       await expect.poll(() => ledgerQueries.at(-1)?.getAll('category')).toEqual([key]);
       const query = ledgerQueries.at(-1);
       expect(query?.get('transactionType')).toBe('debit');

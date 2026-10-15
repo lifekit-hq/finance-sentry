@@ -1,6 +1,7 @@
 import {signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
+import {type ChipRowOption} from '@lifekit-hq/elements';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {OUTCOME_META_REGISTRY} from '../../constants/event/event.constants';
@@ -79,11 +80,13 @@ function retryButton(host: HTMLElement): Nullable<HTMLButtonElement> {
   );
 }
 
+type ChipRowElement = HTMLElement & {options: ChipRowOption[]; selected: string[]};
+
 describe('EventsComponent', () => {
   let mockStore: {
     view: ReturnType<typeof signal<EventsView>>;
     horizonDays: ReturnType<typeof signal<number>>;
-    isKindSelected: ReturnType<typeof signal<(kind: EventKind) => boolean>>;
+    kinds: ReturnType<typeof signal<EventKind[]>>;
     unavailableSourceLabels: ReturnType<typeof signal<string[]>>;
     upcomingErrorMessage: ReturnType<typeof signal<string>>;
     isUpcomingLoading: ReturnType<typeof signal<boolean>>;
@@ -119,7 +122,7 @@ describe('EventsComponent', () => {
     mockStore = {
       view: signal<EventsView>('calendar'),
       horizonDays: signal(30),
-      isKindSelected: signal(() => false),
+      kinds: signal<EventKind[]>([]),
       unavailableSourceLabels: signal<string[]>([]),
       upcomingErrorMessage: signal(''),
       isUpcomingLoading: signal(false),
@@ -238,14 +241,33 @@ describe('EventsComponent', () => {
     expect(mockStore.setView).toHaveBeenCalledWith('fired');
   });
 
-  it('dispatches horizon changes to the store', () => {
+  it('offers the horizons as a single-choice chip row and dispatches a change as days', () => {
     const {host} = render();
-    const chips = host.querySelectorAll('[data-testid="horizon-chip"]');
+    const row = host.querySelector('[data-testid="horizon-chips"]') as ChipRowElement;
 
-    expect(chips.length).toBe(3);
-    (chips[2] as HTMLElement).querySelector('button')?.click();
+    expect(row.options.map(o => o.label)).toEqual(['7 days', '30 days', '90 days']);
+    expect(row.selected).toEqual(['30']);
+    row.dispatchEvent(
+      new CustomEvent('lk-chip-row-change', {detail: {selected: ['90'], value: '90'}})
+    );
 
     expect(mockStore.selectHorizon).toHaveBeenCalledWith(90);
+  });
+
+  it('offers the kinds as a multi-choice chip row that toggles the pressed kind', () => {
+    mockStore.kinds.set(['macro']);
+    const {host} = render();
+    const row = host.querySelector('[data-testid="kind-chips"]') as ChipRowElement;
+
+    expect(row.getAttribute('mode')).toBe('multi');
+    expect(row.selected).toEqual(['macro']);
+    row.dispatchEvent(
+      new CustomEvent('lk-chip-row-change', {
+        detail: {selected: ['earnings', 'macro'], value: 'earnings'},
+      })
+    );
+
+    expect(mockStore.toggleKind).toHaveBeenCalledWith('earnings');
   });
 
   it('renders the fired feed with an outcome label per event and the verdict text', () => {

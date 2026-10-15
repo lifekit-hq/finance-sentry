@@ -43,6 +43,13 @@ describe('alertsMethods', () => {
     expect(state.currentPage()).toBe(1);
   });
 
+  it('setSearch returns to the first page', () => {
+    const {state, methods} = setup([], 0, {currentPage: 3});
+    methods.setSearch('rent');
+    expect(state.search()).toBe('rent');
+    expect(state.currentPage()).toBe(1);
+  });
+
   it('setPage moves to the page and never below the first', () => {
     const {state, methods} = setup([], 0);
     methods.setPage(4);

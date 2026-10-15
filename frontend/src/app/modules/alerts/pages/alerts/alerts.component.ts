@@ -4,6 +4,7 @@ import {
   computed,
   CUSTOM_ELEMENTS_SCHEMA,
   inject,
+  linkedSignal,
 } from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Router} from '@angular/router';
@@ -11,11 +12,13 @@ import {
   AlertItemComponent,
   type AlertItemSeverity,
   AsyncStateComponent,
-  BadgeComponent,
   ButtonComponent,
-  CmnDrawerService,
   CmnPageActionsService,
   EmptyStateComponent,
+  type FilterBarChip,
+  FilterBarComponent,
+  FilterBarSheetDirective,
+  ListSectionComponent,
   type LucideIconName,
   PageContainerComponent,
   SkeletonComponent,
@@ -27,21 +30,17 @@ import {ConnectivityService} from '../../../../shared/services/connectivity.serv
 import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {AlertFilterSheetComponent} from '../../components/alert-filter-sheet/alert-filter-sheet.component';
 import {ALERT_FILTER_LABELS} from '../../constants/alert/alert-filter.constants';
-import {
-  type Alert,
-  type AlertFilter,
-  type AlertSeverity,
-  type AlertType,
-} from '../../models/alert/alert.model';
+import {type Alert, type AlertSeverity, type AlertType} from '../../models/alert/alert.model';
 import {AlertCaptionPipe} from '../../pipes/alert-caption.pipe';
 import {AlertMessagePipe} from '../../pipes/alert-message.pipe';
 import {AlertsStore} from '../../store/alerts/alerts.store';
+import {AlertDayUtils} from '../../utils/alert-day.utils';
 import {AlertDestinationUtils} from '../../utils/alert-destination.utils';
 import {AlertTypeUtils} from '../../utils/alert-type.utils';
 import {ALERT_PAGE_SIZE_OPTIONS, RESOLVED_ALERT_ROW_CLASS} from './alerts.constants';
 
 const SKELETON_ROWS = 5;
-const FILTER_SHEET_WIDTH = '420px';
+const ALERT_FILTER_CHIP_ID = 'filter';
 
 function severityFor(severity: AlertSeverity): AlertItemSeverity {
   switch (severity) {
@@ -61,22 +60,25 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
     AlertCaptionPipe,
     AlertItemComponent,
     AlertMessagePipe,
+    AlertFilterSheetComponent,
     AsyncStateComponent,
-    BadgeComponent,
     ButtonComponent,
     EmptyStateComponent,
+    FilterBarComponent,
+    FilterBarSheetDirective,
+    ListSectionComponent,
     SkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block min-h-full md:h-full'},
+  host: {class: 'block h-full'},
   templateUrl: './alerts.component.html',
 })
 export class AlertsComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
-  private readonly drawer = inject(CmnDrawerService);
   private readonly connectivity = inject(ConnectivityService);
+  private readonly searching = computed(() => this.store.search().trim() !== '');
 
   public readonly store = inject(AlertsStore);
   public readonly resolvedRowClass = RESOLVED_ALERT_ROW_CLASS;
@@ -102,16 +104,33 @@ export class AlertsComponent {
     return 'All caught up';
   });
 
-  public readonly emptyTitle = computed(() =>
-    this.store.filter() === 'all' ? 'No alerts' : `No ${this.store.filter()} alerts`
-  );
+  /** The search box's text; the store debounces it into the query. */
+  public readonly query = linkedSignal(() => this.store.search());
 
-  public readonly emptySubtext = computed(() =>
-    this.store.filter() === 'all' ? 'All your accounts are healthy.' : 'Try a different filter.'
-  );
+  public readonly dayGroups = computed(() => AlertDayUtils.groupByDay(this.store.alerts()));
+
+  public readonly emptyTitle = computed(() => {
+    if (this.searching()) {
+      return 'No matching alerts';
+    }
+    return this.store.filter() === 'all' ? 'No alerts' : `No ${this.store.filter()} alerts`;
+  });
+
+  public readonly emptySubtext = computed(() => {
+    if (this.searching()) {
+      return 'Try a different search or filter.';
+    }
+    return this.store.filter() === 'all'
+      ? 'All your accounts are healthy.'
+      : 'Try a different filter.';
+  });
 
   public readonly activeFilterCount = computed(() => (this.store.filter() === 'all' ? 0 : 1));
-  public readonly filterLabel = computed(() => ALERT_FILTER_LABELS[this.store.filter()]);
+  public readonly appliedFilters = computed<FilterBarChip[]>(() =>
+    this.store.filter() === 'all'
+      ? []
+      : [{id: ALERT_FILTER_CHIP_ID, label: ALERT_FILTER_LABELS[this.store.filter()]}]
+  );
 
   // lk-segmented reads `value` as a string, so the page sizes carry strings; the handler converts
   // back.
@@ -130,22 +149,7 @@ export class AlertsComponent {
       .on(ALERTS_MARK_ALL_READ_ACTION)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.markAllRead());
-  }
-
-  public openFilters(): void {
-    this.drawer
-      .open<AlertFilter, AlertFilter, AlertFilterSheetComponent>(AlertFilterSheetComponent, {
-        title: 'Filters',
-        data: this.store.filter(),
-        mode: 'responsive',
-        width: FILTER_SHEET_WIDTH,
-      })
-      .afterClosed()
-      .subscribe(filter => {
-        if (filter) {
-          this.store.setFilter(filter);
-        }
-      });
+    this.store.applySearch(this.query);
   }
 
   public clearFilter(): void {

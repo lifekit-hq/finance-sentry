@@ -88,5 +88,36 @@ public sealed class AlertRepositoryByTypesTests : IDisposable
         unreadCount.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GetPagedAsync_search_matches_title_message_or_reference_label_ignoring_case()
+    {
+        var byTitle = Add(AlertType.LowBalance, 10);
+        byTitle.Title = "Rent account is low";
+        var byMessage = Add(AlertType.SyncFailure, 5);
+        byMessage.Message = "Monthly RENT payment failed";
+        var byLabel = Add(AlertType.BudgetBreach, 3);
+        byLabel.ReferenceLabel = "Rent budget";
+        Add(AlertType.NewsCluster, 1);
+        await _db.SaveChangesAsync();
+
+        var (items, total, unread) = await _repo.GetPagedAsync(User, filter: "all", page: 1, pageSize: 10, search: "  rent ");
+
+        total.Should().Be(3);
+        items.Select(a => a.Id).Should().Equal(byLabel.Id, byMessage.Id, byTitle.Id);
+        unread.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_blank_search_keeps_every_alert()
+    {
+        Add(AlertType.LowBalance, 10);
+        Add(AlertType.SyncFailure, 5);
+        await _db.SaveChangesAsync();
+
+        var (_, total, _) = await _repo.GetPagedAsync(User, filter: "all", page: 1, pageSize: 10, search: "   ");
+
+        total.Should().Be(2);
+    }
+
     public void Dispose() => _db.Dispose();
 }

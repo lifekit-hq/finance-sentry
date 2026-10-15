@@ -1,12 +1,18 @@
 import {DatePipe} from '@angular/common';
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {RouterLink} from '@angular/router';
+import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   AsyncStateComponent,
   type AsyncStateStatus,
   ButtonComponent,
-  ChipComponent,
   CmnTab,
   EmptyStateComponent,
   PageContainerComponent,
@@ -47,7 +53,6 @@ const SKELETON_ROWS = 4;
     AlertComponent,
     AsyncStateComponent,
     ButtonComponent,
-    ChipComponent,
     DatePipe,
     EmptyStateComponent,
     EventDayLabelPipe,
@@ -59,14 +64,23 @@ const SKELETON_ROWS = 4;
   ],
   providers: [EventsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {class: 'block min-h-full md:h-full'},
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  host: {class: 'block h-full'},
   templateUrl: './events.component.html',
 })
 export class EventsComponent {
   public readonly store = inject(EventsStore);
   public readonly viewTabs: CmnTab[] = [...EVENTS_VIEW_OPTIONS];
-  public readonly horizons = EVENT_HORIZON_DAYS;
-  public readonly kinds = EVENT_KIND_ORDER;
+  // lk-chip-row carries string values; the handlers convert back.
+  public readonly horizonOptions: ChipRowOption[] = EVENT_HORIZON_DAYS.map(days => ({
+    value: String(days),
+    label: `${days} days`,
+  }));
+  public readonly kindOptions: ChipRowOption[] = EVENT_KIND_ORDER.map(kind => ({
+    value: kind,
+    label: EVENT_KIND_META_REGISTRY[kind].label,
+  }));
+  public readonly selectedHorizon = computed(() => [String(this.store.horizonDays())]);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS}, (_, i) => i);
   public readonly upcomingStatus = computed<AsyncStateStatus>(() => {
     if (this.store.upcomingErrorMessage()) {
@@ -89,6 +103,17 @@ export class EventsComponent {
     if (option) {
       this.store.setView(option.id);
     }
+  }
+
+  public onHorizonChange(event: Event): void {
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.selectHorizon(Number(value));
+  }
+
+  // An empty selection means every kind, so the chips light up only for an explicit pick.
+  public onKindChange(event: Event): void {
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.store.toggleKind(value as EventKind);
   }
 
   public retryFired(): void {

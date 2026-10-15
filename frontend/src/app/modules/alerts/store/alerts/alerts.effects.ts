@@ -1,12 +1,16 @@
 import {inject, type Signal} from '@angular/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, exhaustMap, pipe, switchMap, tap} from 'rxjs';
+import {catchError, debounceTime, EMPTY, exhaustMap, filter, pipe, switchMap, tap} from 'rxjs';
 
 import {type Alert} from '../../models/alert/alert.model';
 import {type AlertsQuery} from '../../models/alert/alerts-query.model';
 import {AlertsService} from '../../services/alerts.service';
 
+export const ALERT_SEARCH_DEBOUNCE_MS = 300;
+
 interface EffectsStore {
+  search: Signal<string>;
+  setSearch: (search: string) => void;
   setData: (alerts: Alert[], totalCount: number, unreadCount: number) => void;
   setUnreadCount: (n: number) => void;
   setLoading: () => void;
@@ -24,8 +28,8 @@ export function alertsEffects(store: EffectsStore) {
     load: rxMethod<AlertsQuery>(
       pipe(
         tap(() => store.setLoading()),
-        switchMap(({filter, page, pageSize}) =>
-          api.getAlerts(filter, page, pageSize).pipe(
+        switchMap(({filter: kind, page, pageSize, search}) =>
+          api.getAlerts(kind, page, pageSize, search).pipe(
             tap(res => {
               store.setData(res.items, res.totalCount, res.unreadCount);
               store.setSuccess();
@@ -36,6 +40,14 @@ export function alertsEffects(store: EffectsStore) {
             })
           )
         )
+      )
+    ),
+    /** Follows the search box: debounced, then written to the state the list query reads. */
+    applySearch: rxMethod<string>(
+      pipe(
+        debounceTime(ALERT_SEARCH_DEBOUNCE_MS),
+        filter(search => search.trim() !== store.search().trim()),
+        tap(search => store.setSearch(search))
       )
     ),
     loadUnreadCount: rxMethod<void>(

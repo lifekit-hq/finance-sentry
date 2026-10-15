@@ -26,10 +26,11 @@ public class AlertsController(
         [FromQuery] string filter = "all",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
         var result = await getAlerts.Handle(
-            new GetAlertsQuery(User.RequireUserId(), filter, page, pageSize), ct);
+            new GetAlertsQuery(User.RequireUserId(), filter, page, pageSize, search), ct);
         return Ok(result);
     }
 

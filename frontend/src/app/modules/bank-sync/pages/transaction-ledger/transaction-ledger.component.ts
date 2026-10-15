@@ -4,22 +4,22 @@ import {
   computed,
   CUSTOM_ELEMENTS_SCHEMA,
   inject,
+  linkedSignal,
 } from '@angular/core';
-import {takeUntilDestroyed, toObservable} from '@angular/core/rxjs-interop';
-import {FormControl, ReactiveFormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
+import {type ChipRowChangeDetail, type ChipRowOption} from '@lifekit-hq/elements';
 import {
   AlertComponent,
   AsyncStateComponent,
-  BadgeComponent,
   ButtonComponent,
   CardComponent,
-  ChipComponent,
   CmnDrawerService,
   EmptyStateComponent,
-  InputComponent,
+  FilterBarComponent,
+  FilterBarSheetDirective,
   InstitutionAvatarComponent,
   ListItemRowComponent,
+  ListSectionComponent,
   PageContainerComponent,
   SkeletonComponent,
 } from '@lifekit-hq/ui';
@@ -33,6 +33,10 @@ import {AsyncViewUtils} from '../../../../shared/utils/async-view.utils';
 import {MerchantCategoryUtils} from '../../../../shared/utils/merchant-category.utils';
 import {TransactionDrawerComponent} from '../../components/transaction-drawer/transaction-drawer.component';
 import {TransactionFilterSheetComponent} from '../../components/transaction-filter-sheet/transaction-filter-sheet.component';
+import {
+  ALL_ACCOUNTS_LABEL,
+  ALL_ACCOUNTS_VALUE,
+} from '../../constants/account-filter/account-filter.constants';
 import {LEDGER_PERIODS} from '../../constants/ledger-period/ledger-period.constants';
 import {type LedgerPeriod} from '../../models/ledger-period/ledger-period.model';
 import {
@@ -52,7 +56,6 @@ import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 
 const SKELETON_ROWS = 8;
 const DRAWER_WIDTH = '480px';
-const FILTER_SHEET_WIDTH = '420px';
 
 @Component({
   selector: 'fns-transaction-ledger',
@@ -60,26 +63,26 @@ const FILTER_SHEET_WIDTH = '420px';
     PageContainerComponent,
     AlertComponent,
     AsyncStateComponent,
-    BadgeComponent,
     ButtonComponent,
     CardComponent,
-    ChipComponent,
     EmptyStateComponent,
-    InputComponent,
+    FilterBarComponent,
+    FilterBarSheetDirective,
     InstitutionAvatarComponent,
     InstitutionLogoPipe,
     ListItemRowComponent,
+    ListSectionComponent,
     MerchantCategoryPipe,
     MoneyPipe,
-    ReactiveFormsModule,
     SkeletonComponent,
     TransactionAmountClassPipe,
     TransactionAmountPipe,
+    TransactionFilterSheetComponent,
   ],
   templateUrl: './transaction-ledger.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block min-h-full md:h-full'},
+  host: {class: 'block h-full'},
   providers: [TransactionLedgerStore],
 })
 export class TransactionLedgerComponent {
@@ -91,9 +94,16 @@ export class TransactionLedgerComponent {
   public readonly store = inject(TransactionLedgerStore);
   public readonly skeletonRows = Array.from({length: SKELETON_ROWS});
 
-  public readonly searchControl = new FormControl(this.store.search(), {nonNullable: true});
+  /**
+   * The search box: typing writes it, and it follows the store whenever the store's search changes
+   * (a debounced write, or back/forward to a different `q`).
+   */
+  public readonly query = linkedSignal(() => this.store.search());
 
-  public readonly periods = LEDGER_PERIODS;
+  public readonly periodOptions: ChipRowOption[] = LEDGER_PERIODS.map(p => ({
+    value: p.id,
+    label: p.label,
+  }));
 
   public readonly view = computed(() =>
     AsyncViewUtils.resolve({
@@ -109,6 +119,18 @@ export class TransactionLedgerComponent {
   public readonly activePeriod = computed(() =>
     LedgerPeriodUtils.match(this.store.from(), this.store.to())
   );
+
+  public readonly selectedPeriod = computed(() => {
+    const period = this.activePeriod();
+    return period ? [period] : [];
+  });
+
+  public readonly accountOptions = computed<ChipRowOption[]>(() => [
+    {value: ALL_ACCOUNTS_VALUE, label: ALL_ACCOUNTS_LABEL},
+    ...this.store.accounts().map(a => ({value: a.accountId, label: a.label})),
+  ]);
+
+  public readonly selectedAccount = computed(() => [this.store.accountId() ?? ALL_ACCOUNTS_VALUE]);
 
   public readonly activeDateRangeLabel = computed(() => {
     const from = this.store.from();
@@ -165,19 +187,7 @@ export class TransactionLedgerComponent {
   );
 
   constructor() {
-    this.store.applySearch(this.searchControl.valueChanges);
-    this.followSearch();
-  }
-
-  /** State → box: back/forward (or a new deep link) rewrites the box when it differs. */
-  private followSearch(): void {
-    toObservable(this.store.search)
-      .pipe(takeUntilDestroyed())
-      .subscribe(search => {
-        if (search !== this.searchControl.value) {
-          this.searchControl.setValue(search);
-        }
-      });
+    this.store.applySearch(this.query);
   }
 
   public openDrawer(tx: GlobalTransactionDto): void {
@@ -195,24 +205,21 @@ export class TransactionLedgerComponent {
     });
   }
 
-  public openFilters(): void {
-    this.drawer
-      .open<
-        TransactionFilterSelection,
-        TransactionFilterSelection,
-        TransactionFilterSheetComponent
-      >(TransactionFilterSheetComponent, {
-        title: 'Filters',
-        data: this.activeSelection(),
-        mode: 'responsive',
-        width: FILTER_SHEET_WIDTH,
-      })
-      .afterClosed()
-      .subscribe(selection => {
-        if (selection) {
-          this.applySelection(selection);
-        }
-      });
+  public onAccountChange(event: Event): void {
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.selectAccount(value === ALL_ACCOUNTS_VALUE ? null : value);
+  }
+
+  public onPeriodChange(event: Event): void {
+    const {value} = (event as CustomEvent<ChipRowChangeDetail>).detail;
+    this.selectPeriod(value as LedgerPeriod);
+  }
+
+  /** An applied-filter chip was dismissed: drop that one filter. */
+  public removeFilter(id: string): void {
+    this.appliedFilters()
+      .find(f => f.id === id)
+      ?.remove();
   }
 
   public clearFilters(): void {
@@ -242,7 +249,7 @@ export class TransactionLedgerComponent {
   }
 
   /** Writes the sheet filters to the URL; the account and search params are left as they are. */
-  private applySelection(selection: TransactionFilterSelection): void {
+  public applySelection(selection: TransactionFilterSelection): void {
     void this.router.navigate([], {
       queryParams: {
         from: selection.from,

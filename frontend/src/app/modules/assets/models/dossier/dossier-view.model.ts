@@ -6,7 +6,7 @@ import {
   type DossierCheckAxisKey,
 } from './dossier.model';
 
-/** A timeframe tab; lk-segmented reads `{label, value}`. */
+/** A timeframe chip; lk-chip-row reads `{label, value}`. */
 export interface ChartRangeOption {
   label: string;
   value: ChartRangeId;

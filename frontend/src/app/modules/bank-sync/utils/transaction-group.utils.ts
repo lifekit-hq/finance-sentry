@@ -1,4 +1,3 @@
-import {MS_PER_DAY} from '../../../shared/constants/date/date.constants';
 import {DateUtils} from '../../../shared/utils/date.utils';
 import {
   type GlobalTransactionDto,
@@ -48,19 +47,7 @@ export class TransactionGroupUtils {
 
   /** "Today", "Yesterday", otherwise "Mon 10 Aug" (the year is added outside the current one). */
   public static dayLabel(dayKey: string, now: Date = new Date()): string {
-    const today = DateUtils.isoDateLocal(now);
-    if (dayKey === today) {
-      return 'Today';
-    }
-    if (dayKey === DateUtils.isoDateLocal(new Date(now.getTime() - MS_PER_DAY))) {
-      return 'Yesterday';
-    }
-    const date = new Date(`${dayKey}T00:00:00`);
-    if (Number.isNaN(date.getTime())) {
-      return dayKey;
-    }
-    const sameYear = date.getFullYear() === now.getFullYear();
-    return DateUtils.dayLabel(dayKey, !sameYear);
+    return DateUtils.recentDayLabel(dayKey, now);
   }
 
   public static accountLabel(account: {bankName: string; accountNumberLast4: string}): string {

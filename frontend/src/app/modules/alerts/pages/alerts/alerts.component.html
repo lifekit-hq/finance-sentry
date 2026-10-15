@@ -1,38 +1,25 @@
 <cmn-page-container spacing="none" fill>
-  <div class="flex items-center justify-between gap-cmn-3">
-    <p class="min-w-0 text-cmn-sm text-text-secondary">{{ alertsSubtitle() }}</p>
-    <cmn-badge [count]="activeFilterCount()" status="default" class="shrink-0">
-      <cmn-button
-        (clicked)="openFilters()"
-        variant="secondary"
-        icon="SlidersHorizontal"
-        data-testid="alerts-filter-button"
-      >
-        <span class="sr-only">Filters</span>
-      </cmn-button>
-    </cmn-badge>
-  </div>
+  <p class="mb-cmn-3 text-cmn-sm text-text-secondary" data-testid="alerts-subtitle">
+    {{ alertsSubtitle() }}
+  </p>
 
-  @if (store.filter() !== 'all') {
-    <div
-      class="mt-cmn-3 flex flex-wrap items-center gap-x-cmn-2 gap-y-3"
-      data-testid="alerts-applied-filters"
-    >
-      <lk-dismissible-chip
-        [attr.label]="filterLabel()"
-        (lk-dismissible-chip-remove)="clearFilter()"
-        data-testid="alerts-chip-filter"
+  <cmn-filter-bar
+    [activeCount]="activeFilterCount()"
+    [applied]="appliedFilters()"
+    [(query)]="query"
+    (remove)="clearFilter()"
+    (clear)="clearFilter()"
+    placeholder="Search alerts"
+    searchLabel="Search alerts"
+    data-testid="alerts-filter-bar"
+  >
+    <ng-template let-close="close" cmnFilterBarSheet>
+      <fns-alert-filter-sheet
+        [initial]="store.filter()"
+        (applied)="store.setFilter($event); close()"
       />
-      <cmn-button
-        (clicked)="clearFilter()"
-        variant="secondary"
-        size="sm"
-        data-testid="alerts-filter-clear"
-      >
-        Clear
-      </cmn-button>
-    </div>
-  }
+    </ng-template>
+  </cmn-filter-bar>
 
   <cmn-async-state
     [status]="view().status"
@@ -55,36 +42,40 @@
         iconClass="text-status-success"
       />
     </div>
-    <div class="md:min-h-0 md:flex-1 md:overflow-auto">
-      @for (alert of store.alerts(); track alert.id) {
-        <div
-          [class]="alert.isResolved ? resolvedRowClass : ''"
-          [attr.data-resolved]="alert.isResolved"
-          class="relative rounded-cmn-md"
-          data-testid="alert-row"
-        >
-          <cmn-alert-item
-            [title]="alert.title"
-            [message]="alert.message | alertMessage"
-            [severity]="severityFor(alert.severity)"
-            [icon]="iconFor(alert.type)"
-            [badgeLabel]="typeLabel(alert.type)"
-            [referenceLabel]="alert.referenceLabel"
-            [timestamp]="alert.createdAt"
-            [isRead]="alert.isRead || alert.isResolved"
-            [description]="alert | alertCaption"
-            (dismissed)="dismiss(alert.id)"
-            class="[&_button]:relative [&_button]:z-10"
-            density="flat"
-          />
-          <button
-            [attr.aria-label]="alert.title"
-            (click)="openAlert(alert)"
-            class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-            type="button"
-            data-testid="alert-row-open"
-          ></button>
-        </div>
+    <div class="space-y-cmn-4 md:min-h-0 md:flex-1 md:overflow-auto">
+      @for (group of dayGroups(); track group.dayKey) {
+        <cmn-list-section [heading]="group.label" data-testid="alerts-day">
+          @for (alert of group.items; track alert.id) {
+            <div
+              [class]="alert.isResolved ? resolvedRowClass : ''"
+              [attr.data-resolved]="alert.isResolved"
+              class="relative rounded-cmn-md"
+              data-testid="alert-row"
+            >
+              <cmn-alert-item
+                [title]="alert.title"
+                [message]="alert.message | alertMessage"
+                [severity]="severityFor(alert.severity)"
+                [icon]="iconFor(alert.type)"
+                [badgeLabel]="typeLabel(alert.type)"
+                [referenceLabel]="alert.referenceLabel"
+                [timestamp]="alert.createdAt"
+                [isRead]="alert.isRead || alert.isResolved"
+                [description]="alert | alertCaption"
+                (dismissed)="dismiss(alert.id)"
+                class="[&_button]:relative [&_button]:z-10"
+                density="flat"
+              />
+              <button
+                [attr.aria-label]="alert.title"
+                (click)="openAlert(alert)"
+                class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                type="button"
+                data-testid="alert-row-open"
+              ></button>
+            </div>
+          }
+        </cmn-list-section>
       }
     </div>
   </cmn-async-state>

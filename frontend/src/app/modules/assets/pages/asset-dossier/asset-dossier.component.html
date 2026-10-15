@@ -561,10 +561,10 @@
                   }
                 </div>
 
-                <lk-segmented
+                <lk-chip-row
                   [options]="chartRanges"
-                  [value]="store.chartRange()"
-                  (lk-segmented-change)="onChartRangeChange($event)"
+                  [selected]="[store.chartRange()]"
+                  (lk-chip-row-change)="onChartRangeChange($event)"
                   class="mt-cmn-3 block"
                   data-testid="chart-ranges"
                   label="Chart range"

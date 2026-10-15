@@ -46,6 +46,42 @@ async function mockApis(page: Page): Promise<void> {
       })
     );
   });
+  await page.route(`${API}/events/upcoming**`, route => {
+    const today = new Date().toISOString().slice(0, 10);
+    const items = Array.from({length: ROW_COUNT}, (_, i) => ({
+      kind: 'macro',
+      date: today,
+      time: null,
+      subject: 'US',
+      title: `Synthetic event ${i}`,
+      detail: null,
+      isEstimate: false,
+      source: 'https://www.federalreserve.gov',
+      referenceId: null,
+    }));
+    return route.fulfill(json({items, from: today, to: today, sources: []}));
+  });
+  await page.route(`${API}/dashboard/flow-breakdown**`, route => {
+    const items = Array.from({length: ROW_COUNT}, (_, i) => ({
+      transactionId: `flow-${i}`,
+      accountId: 'acc-1',
+      bankName: 'AIB',
+      accountLast4: '4821',
+      currency: 'USD',
+      amount: -10,
+      amountUsd: -10,
+      date: '2026-09-14T06:00:00Z',
+      description: `Synthetic spend ${i}`,
+      merchantName: `Synthetic spend ${i}`,
+      category: null,
+      direction: 'out',
+      bucket: 'spending',
+      counterpartyName: null,
+      flowRole: null,
+    }));
+    return route.fulfill(json({month: '2026-09', items}));
+  });
+  await page.route(`${API}/agent/conversations`, route => route.fulfill(json([])));
   await page.route(`${API}/accounts/transactions**`, route => {
     const items = Array.from({length: ROW_COUNT}, (_, i) => ({
       transactionId: `tx-${i}`,
@@ -81,7 +117,7 @@ async function expectLastContentClearsTabBar(page: Page, selector: string): Prom
   await page.locator('cmn-app-layout main').evaluate(el => {
     el.scrollTop = el.scrollHeight;
   });
-  const last = page.locator(selector);
+  const last = page.locator(selector).last();
   await last.scrollIntoViewIfNeeded();
   const tabBar = await page.locator('cmn-bottom-tab-bar nav').boundingBox();
   const content = await last.boundingBox();
@@ -117,5 +153,36 @@ test.describe('last content clears the tab bar (390 wide, iPhone insets)', () =>
     await expect(page.getByTestId('alert-row')).toHaveCount(ALERT_PAGE_SIZE);
 
     await expectLastContentClearsTabBar(page, '[data-testid="alerts-pager"]');
+  });
+
+  test('Events: the last day of the calendar sits above the tab bar', async ({page}) => {
+    await page.goto('/events');
+    await simulateInsets(page);
+    await page.reload();
+    await expect(page.getByText(`Synthetic event ${ROW_COUNT - 1}`)).toBeVisible();
+
+    await expectLastContentClearsTabBar(page, 'fns-events section[data-testid^="day-"]');
+  });
+
+  test('Flow breakdown: the last row sits above the tab bar', async ({page}) => {
+    await page.goto('/dashboard/breakdown?month=2026-09');
+    await simulateInsets(page);
+    await page.reload();
+    const rows = page.locator('[data-testid="breakdown-rows"] [data-testid="breakdown-row"]');
+    await expect(rows).toHaveCount(ROW_COUNT);
+
+    await expectLastContentClearsTabBar(
+      page,
+      '[data-testid="breakdown-rows"] [data-testid="breakdown-row"]'
+    );
+  });
+
+  test('Ledger chat: the composer sits above the tab bar', async ({page}) => {
+    await page.goto('/ledger');
+    await simulateInsets(page);
+    await page.reload();
+    await expect(page.getByRole('textbox', {name: 'Ask Ledger…'})).toBeVisible();
+
+    await expectLastContentClearsTabBar(page, 'role=textbox[name="Ask Ledger…"]');
   });
 });

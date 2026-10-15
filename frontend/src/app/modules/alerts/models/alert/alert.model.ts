@@ -62,3 +62,10 @@ export interface AlertsPageResponse {
 export interface UnreadCountResponse {
   count: number;
 }
+
+/** One calendar day of a newest-first alerts page: the sticky heading and its rows. */
+export interface AlertDayGroup {
+  dayKey: string;
+  label: string;
+  items: Alert[];
+}

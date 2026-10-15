@@ -1,100 +1,52 @@
 <cmn-page-container spacing="none" fill>
-  <div class="mb-cmn-4 flex flex-wrap items-end justify-between gap-cmn-4">
-    <div class="min-w-0">
-      <p class="text-cmn-sm text-text-secondary" data-testid="ledger-summary">
-        @if (store.monthlyOutflow() !== null) {
-          <span
-            >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this
-            month</span
-          >
-          <span aria-hidden="true"> · </span>
-        }
-        @if (store.topCategory(); as top) {
-          <span>Top category: {{ top }}</span>
-        }
-      </p>
-    </div>
-    <div class="flex w-full items-center gap-cmn-2 md:w-auto">
-      <div class="min-w-0 flex-1 md:w-72 md:flex-none [&_cmn-input]:block [&_cmn-input]:w-full">
-        <cmn-input
-          [formControl]="searchControl"
-          type="search"
-          placeholder="Search transactions"
-          autocomplete="off"
-        />
-      </div>
-      <cmn-badge [count]="activeFilterCount()" status="default" class="shrink-0">
-        <cmn-button
-          (clicked)="openFilters()"
-          variant="secondary"
-          icon="SlidersHorizontal"
-          data-testid="filter-button"
-        >
-          <span class="sr-only">Filters</span>
-        </cmn-button>
-      </cmn-badge>
-    </div>
-  </div>
-
-  <div
-    class="mb-cmn-4 flex gap-cmn-2 overflow-x-auto pb-cmn-1 md:flex-wrap"
-    role="group"
-    aria-label="Period filter"
-  >
-    @for (period of periods; track period.id) {
-      <cmn-chip
-        [selected]="activePeriod() === period.id"
-        [attr.data-testid]="'period-' + period.id"
-        (clicked)="selectPeriod(period.id)"
-        class="shrink-0"
+  <p class="mb-cmn-4 text-cmn-sm text-text-secondary" data-testid="ledger-summary">
+    @if (store.monthlyOutflow() !== null) {
+      <span
+        >{{ store.monthlyOutflow() | money: store.monthlyOutflowCurrency() }} out this month</span
       >
-        {{ period.label }}
-      </cmn-chip>
+      <span aria-hidden="true"> · </span>
     }
-  </div>
+    @if (store.topCategory(); as top) {
+      <span>Top category: {{ top }}</span>
+    }
+  </p>
 
-  @if (appliedFilters().length > 0) {
-    <div
-      class="mb-cmn-4 flex flex-wrap items-center gap-x-cmn-2 gap-y-3"
-      data-testid="applied-filters"
-    >
-      @for (filter of appliedFilters(); track filter.id) {
-        <lk-dismissible-chip
-          [attr.label]="filter.label"
-          [attr.data-testid]="'chip-' + filter.id"
-          (lk-dismissible-chip-remove)="filter.remove()"
-        />
-      }
-      <cmn-button
-        (clicked)="clearFilters()"
-        variant="secondary"
-        size="sm"
-        data-testid="filter-clear"
-      >
-        Clear
-      </cmn-button>
-    </div>
-  }
+  <cmn-filter-bar
+    [activeCount]="activeFilterCount()"
+    [applied]="appliedFilters()"
+    [(query)]="query"
+    (remove)="removeFilter($event)"
+    (clear)="clearFilters()"
+    class="mb-cmn-4"
+    placeholder="Search transactions"
+    searchLabel="Search transactions"
+    data-testid="ledger-filter-bar"
+  >
+    <lk-chip-row
+      [options]="periodOptions"
+      [selected]="selectedPeriod()"
+      (lk-chip-row-change)="onPeriodChange($event)"
+      cmnFilterBarQuick
+      label="Period filter"
+      data-testid="period-chips"
+    />
+    <ng-template let-close="close" cmnFilterBarSheet>
+      <fns-transaction-filter-sheet
+        [initial]="activeSelection()"
+        (applied)="applySelection($event); close()"
+      />
+    </ng-template>
+  </cmn-filter-bar>
 
   @if (store.accounts().length > 1) {
-    <div
-      class="mb-cmn-4 -mx-cmn-4 flex gap-cmn-2 overflow-x-auto px-cmn-4 pb-cmn-1 md:mx-0 md:flex-wrap md:px-0"
-      role="group"
-      aria-label="Account filter"
-    >
-      <cmn-chip [selected]="!store.accountId()" (clicked)="selectAccount(null)" class="shrink-0">
-        All accounts
-      </cmn-chip>
-      @for (account of store.accounts(); track account.accountId) {
-        <cmn-chip
-          [selected]="store.accountId() === account.accountId"
-          (clicked)="selectAccount(account.accountId)"
-          class="shrink-0"
-        >
-          {{ account.label }}
-        </cmn-chip>
-      }
-    </div>
+    <lk-chip-row
+      [options]="accountOptions()"
+      [selected]="selectedAccount()"
+      (lk-chip-row-change)="onAccountChange($event)"
+      class="mb-cmn-4"
+      label="Account filter"
+      data-testid="account-chips"
+    />
   }
 
   @if (view().offlineNotice; as notice) {
@@ -142,49 +94,42 @@
     </div>
     <div class="md:min-h-0 md:flex-1 md:overflow-auto">
       @for (group of dayGroups(); track group.dayKey) {
-        <section [attr.aria-label]="group.label" class="mb-cmn-4">
-          <h2
-            class="px-cmn-1 pb-cmn-2 text-cmn-xs font-semibold uppercase tracking-wide text-text-secondary"
-          >
-            {{ group.label }}
-          </h2>
-          <cmn-card padding="none">
-            @for (t of group.items; track t.transactionId) {
-              <div class="relative" data-testid="ledger-row">
-                <cmn-list-item-row
-                  [label]="t.description"
-                  [sublabel]="
-                    t.bankName +
-                    (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
-                    (t.isPending ? ' · Pending' : '')
-                  "
-                  [dimmed]="t.isPending"
+        <cmn-list-section [heading]="group.label" class="mb-cmn-4">
+          @for (t of group.items; track t.transactionId) {
+            <div class="relative" data-testid="ledger-row">
+              <cmn-list-item-row
+                [label]="t.description"
+                [sublabel]="
+                  t.bankName +
+                  (t.merchantCategory ? ' · ' + (t.merchantCategory | merchantCategory) : '') +
+                  (t.isPending ? ' · Pending' : '')
+                "
+                [dimmed]="t.isPending"
+              >
+                <cmn-institution-avatar
+                  [name]="t.bankName"
+                  [logoUrl]="t.bankName | institutionLogo"
+                  size="sm"
+                  avatar
+                />
+                <span
+                  [class]="t | transactionAmountClass"
+                  class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
+                  amount
                 >
-                  <cmn-institution-avatar
-                    [name]="t.bankName"
-                    [logoUrl]="t.bankName | institutionLogo"
-                    size="sm"
-                    avatar
-                  />
-                  <span
-                    [class]="t | transactionAmountClass"
-                    class="shrink-0 whitespace-nowrap text-cmn-sm font-medium tabular-nums"
-                    amount
-                  >
-                    {{ t | transactionAmount }}
-                  </span>
-                </cmn-list-item-row>
-                <button
-                  [attr.aria-label]="t.description"
-                  (click)="openDrawer(t)"
-                  class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
-                  type="button"
-                  data-testid="ledger-row-open"
-                ></button>
-              </div>
-            }
-          </cmn-card>
-        </section>
+                  {{ t | transactionAmount }}
+                </span>
+              </cmn-list-item-row>
+              <button
+                [attr.aria-label]="t.description"
+                (click)="openDrawer(t)"
+                class="absolute inset-0 cursor-pointer rounded-cmn-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                type="button"
+                data-testid="ledger-row-open"
+              ></button>
+            </div>
+          }
+        </cmn-list-section>
       }
 
       @if (store.hasMore()) {

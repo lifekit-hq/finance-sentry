@@ -37,12 +37,20 @@ const GROUP = {
 };
 
 const drawer = {open: vi.fn()};
+const setAccountFilter = vi.fn();
+
+type ChipRowElement = HTMLElement & {options: {value: string; label: string}[]; selected: string[]};
 
 function render(
   group: Omit<typeof GROUP, 'items'> & {items: object[]} = GROUP,
   range: Nullable<{from: Nullable<string>; to: string; months: number}> = null,
   accountFilter: Nullable<string> = null,
-  state: {isLoading?: boolean; isEmpty?: boolean; errorMessage?: string} = {}
+  state: {
+    isLoading?: boolean;
+    isEmpty?: boolean;
+    errorMessage?: string;
+    accountChips?: {accountId: string; label: string}[];
+  } = {}
 ) {
   const store = {
     month: signal('2026-09'),
@@ -50,7 +58,8 @@ function render(
     isLoading: signal(state.isLoading ?? false),
     isEmpty: signal(state.isEmpty ?? false),
     errorMessage: signal(state.errorMessage ?? null),
-    accountChips: signal([]),
+    accountChips: signal(state.accountChips ?? []),
+    setAccountFilter,
     accountFilter: signal(accountFilter),
     groups: signal([group]),
     incomeFormatted: signal('$0'),
@@ -282,5 +291,48 @@ describe('FlowBreakdownComponent async states', () => {
 
     expect(el.querySelector('cmn-alert')).toBeNull();
     expect(el.querySelector('[data-testid="breakdown-row"]')).not.toBeNull();
+  });
+});
+
+describe('FlowBreakdownComponent account chips', () => {
+  const CHIPS = [
+    {accountId: 'a1', label: 'Monobank · 1234'},
+    {accountId: 'a2', label: 'Revolut · 9876'},
+  ];
+  const row = (el: HTMLElement) =>
+    el.querySelector('[data-testid="breakdown-account-chips"]') as Nullable<ChipRowElement>;
+
+  beforeEach(() => setAccountFilter.mockReset());
+
+  it('hides the row for a single account', () => {
+    expect(row(render(GROUP, null, null, {accountChips: [CHIPS[0]]}))).toBeNull();
+  });
+
+  it('offers All accounts first and lights the filtered account', () => {
+    const chips = row(render(GROUP, null, 'a2', {accountChips: CHIPS}));
+
+    expect(chips?.options.map(o => o.label)).toEqual([
+      'All accounts',
+      'Monobank · 1234',
+      'Revolut · 9876',
+    ]);
+    expect(chips?.selected).toEqual(['a2']);
+  });
+
+  it('lights All accounts when no account is filtered', () => {
+    expect(row(render(GROUP, null, null, {accountChips: CHIPS}))?.selected).toEqual(['all']);
+  });
+
+  it('filters by the pressed account and clears the filter from All accounts', () => {
+    const chips = row(render(GROUP, null, 'a1', {accountChips: CHIPS}));
+    const press = (value: string) =>
+      chips?.dispatchEvent(
+        new CustomEvent('lk-chip-row-change', {detail: {selected: [value], value}})
+      );
+
+    press('a2');
+    press('all');
+
+    expect(setAccountFilter.mock.calls).toEqual([['a2'], [null]]);
   });
 });
