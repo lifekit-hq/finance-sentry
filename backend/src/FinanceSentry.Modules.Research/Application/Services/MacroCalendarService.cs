@@ -19,57 +19,34 @@ public class MacroCalendarService(
         CancellationToken ct = default)
         => repo.QueryAsync(from, to, regions, minImportance, ct);
 
-    public async Task<int> SeedIfEmptyAsync(CancellationToken ct = default)
+    public async Task<MacroCalendarSyncResult> SyncAsync(DateTimeOffset now, CancellationToken ct = default)
     {
-        var any = await db.MacroEvents.AnyAsync(ct);
-        if (any)
+        // The calendar used to be seeded only into an empty table, so a corrected date never reached a database that
+        // already held the first, wrong seed (#1091). Every pass now reconciles against the schedule instead.
+        var stored = await db.MacroEvents.ToListAsync(ct);
+        var plan = MacroCalendarReconciler.Plan(stored, MacroCalendarSchedule.Events(), now);
+
+        foreach (var flag in plan.Flags)
         {
-            return 0;
+            logger.LogWarning(
+                "Macro event {Key} ({EventId}) was stored as upcoming at {StoredAt:o} but was released at {ReleasedAt:o}; correcting it",
+                flag.Key, flag.EventId, flag.StoredAt, flag.ReleasedAt);
         }
 
-        var inserted = await repo.UpsertAsync(BuildSeed(), ct);
-        logger.LogInformation("MacroCalendarService seeded {Count} 2026 events", inserted);
-        return inserted;
-    }
+        foreach (var correction in plan.Corrections)
+        {
+            logger.LogInformation(
+                "Macro event {Key} corrected from {StoredDate} {StoredTime} to {ExpectedDate} {ExpectedTime}",
+                MacroEventTiming.Key(correction.Expected),
+                correction.Stored.EventDate, correction.Stored.EventTime,
+                correction.Expected.EventDate, correction.Expected.EventTime);
+            correction.Apply();
+        }
 
-    private static List<MacroEvent> BuildSeed()
-    {
-        static MacroEvent Ev(int y, int m, int d, string ev, string region, string importance, string src, int? hour = null, int? minute = null)
-            => new()
-            {
-                EventDate = new DateOnly(y, m, d),
-                EventTime = hour is int h && minute is int mm ? new TimeOnly(h, mm) : null,
-                Event = ev,
-                Region = region,
-                Importance = importance,
-                Source = src,
-            };
+        db.MacroEvents.RemoveRange(plan.Deletes);
+        await db.SaveChangesAsync(ct);
 
-        return
-        [
-            Ev(2026, 7, 30, "FOMC rate decision", "US", MacroImportance.High, "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", 14, 0),
-            Ev(2026, 9, 17, "FOMC rate decision + SEP", "US", MacroImportance.High, "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", 14, 0),
-            Ev(2026, 10, 29, "FOMC rate decision", "US", MacroImportance.High, "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", 14, 0),
-            Ev(2026, 12, 10, "FOMC rate decision + SEP", "US", MacroImportance.High, "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", 14, 0),
-
-            Ev(2026, 7, 15, "CPI (Jun)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-            Ev(2026, 8, 12, "CPI (Jul)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-            Ev(2026, 9, 11, "CPI (Aug)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-            Ev(2026, 10, 15, "CPI (Sep)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-            Ev(2026, 11, 13, "CPI (Oct)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-            Ev(2026, 12, 10, "CPI (Nov)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/cpi.htm", 8, 30),
-
-            Ev(2026, 7, 2, "Nonfarm payrolls (Jun)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-            Ev(2026, 8, 6, "Nonfarm payrolls (Jul)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-            Ev(2026, 9, 3, "Nonfarm payrolls (Aug)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-            Ev(2026, 10, 1, "Nonfarm payrolls (Sep)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-            Ev(2026, 11, 5, "Nonfarm payrolls (Oct)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-            Ev(2026, 12, 3, "Nonfarm payrolls (Nov)", "US", MacroImportance.High, "https://www.bls.gov/schedule/news_release/empsit.htm", 8, 30),
-
-            Ev(2026, 7, 23, "ECB rate decision", "EU", MacroImportance.High, "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html", 13, 15),
-            Ev(2026, 9, 10, "ECB rate decision + projections", "EU", MacroImportance.High, "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html", 13, 15),
-            Ev(2026, 10, 29, "ECB rate decision", "EU", MacroImportance.High, "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html", 13, 15),
-            Ev(2026, 12, 17, "ECB rate decision + projections", "EU", MacroImportance.High, "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html", 13, 15),
-        ];
+        var inserted = plan.Inserts.Count > 0 ? await repo.UpsertAsync(plan.Inserts, ct) : 0;
+        return new MacroCalendarSyncResult(inserted, plan.Corrections.Count, plan.Deletes.Count, plan.Flags);
     }
 }

@@ -48,7 +48,9 @@ public class EventsContractTests(EventsApiFactory factory) : IClassFixture<Event
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         _factory.MacroMock
             .Setup(m => m.QueryAsync(It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new MacroCalendarEntry(Guid.NewGuid(), today.AddDays(3), new TimeOnly(14, 0), "FOMC rate decision", "US", "high", "fed")]);
+            .ReturnsAsync([new MacroCalendarEntry(
+                Guid.NewGuid(), today.AddDays(3), new TimeOnly(14, 0), "FOMC rate decision", "US", "high", "fed",
+                new DateTimeOffset(today.AddDays(3).ToDateTime(new TimeOnly(18, 0)), TimeSpan.Zero), "scheduled")]);
 
         var response = await _client.GetAsync("/api/v1/events/upcoming");
 

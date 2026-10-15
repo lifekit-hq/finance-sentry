@@ -18,6 +18,8 @@ export type AlertType =
   | 'CashSweepProposal'
   | 'EarningsAhead'
   | 'FilingLanded'
+  | 'MacroEventAhead'
+  | 'MacroEventReleased'
   | 'AnalystRatingChange'
   | 'NewsCluster'
   | 'BudgetBreach'

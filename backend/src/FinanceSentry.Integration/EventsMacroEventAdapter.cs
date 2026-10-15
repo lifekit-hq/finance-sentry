@@ -10,7 +10,8 @@ public sealed class EventsMacroEventAdapter(IMacroCalendarReader macro) : IMacro
     {
         var rows = await macro.QueryAsync(from, to, ct);
         return rows
-            .Select(m => new MacroCalendarEntry(m.Id, m.EventDate, m.EventTime, m.Event, m.Region, m.Importance, m.Source))
+            .Select(m => new MacroCalendarEntry(
+                m.Id, m.EventDate, m.EventTime, m.Event, m.Region, m.Importance, m.Source, m.EventAt, m.Status))
             .ToList();
     }
 }

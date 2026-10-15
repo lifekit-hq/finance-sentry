@@ -295,6 +295,9 @@ internal sealed class FakeOpportunityAlertGenerator : IAlertGeneratorService
     public Task ResolveRebalanceProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveCashSweepProposalAlertAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
     public Task ResolveEarningsAheadAlertAsync(Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateMacroEventAheadAlertAsync(Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt, CancellationToken ct = default) => Task.CompletedTask;
+    public Task ResolveMacroEventAheadAlertAsync(Guid userId, string eventKey, CancellationToken ct = default) => Task.CompletedTask;
+    public Task GenerateMacroEventReleasedAlertAsync(Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt, CancellationToken ct = default) => Task.CompletedTask;
 }
 
 internal sealed class FakeRiskPolicyGate(RiskGateVerdict verdict) : IRiskPolicyGate

@@ -368,6 +368,37 @@ public interface IAlertGeneratorService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Raises an Info alert that a high-importance macro release (<paramref name="eventKey"/>, e.g.
+    /// <c>macro:CPI:2026-10</c>) is coming up at <paramref name="eventAt"/> (#1091). Once per release, ever: a
+    /// re-run, a dismiss or a corrected date inside the same month never announces the same release ahead twice.
+    /// </summary>
+    Task GenerateMacroEventAheadAlertAsync(
+        Guid userId,
+        string eventKey,
+        string eventName,
+        string region,
+        DateTimeOffset eventAt,
+        CancellationToken ct = default);
+
+    /// <summary>Resolves the macro-ahead Alert for <paramref name="eventKey"/> once the release is out.</summary>
+    Task ResolveMacroEventAheadAlertAsync(
+        Guid userId,
+        string eventKey,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises an Info alert that a high-importance macro release (<paramref name="eventKey"/>) is out (#1091) — the
+    /// one post-event reaction per release. Once per release, ever.
+    /// </summary>
+    Task GenerateMacroEventReleasedAlertAsync(
+        Guid userId,
+        string eventKey,
+        string eventName,
+        string region,
+        DateTimeOffset eventAt,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Raises an Info alert that a 10-K, 10-Q or 8-K (or a foreign private issuer's 6-K, 20-F or 40-F)
     /// has landed on a holding, thesis or thesis-proxy ticker.
     /// Deduped per (ticker, EDGAR accession number) — that pair is unique forever, so the same filing

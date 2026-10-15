@@ -107,6 +107,16 @@ export const ALERT_TYPE_META_REGISTRY = {
     label: 'filing',
     destination: 'dossier',
   },
+  ['MacroEventAhead']: {
+    icon: 'CalendarRange',
+    label: 'macro ahead',
+    destination: AppRoute.Events,
+  },
+  ['MacroEventReleased']: {
+    icon: 'Landmark',
+    label: 'macro released',
+    destination: AppRoute.Events,
+  },
   ['AnalystRatingChange']: {
     icon: 'TrendingUp',
     label: 'analyst rating',

@@ -52,10 +52,18 @@ public static class ResearchModule
                 job => job.ExecuteAsync(CancellationToken.None),
                 "20 */6 * * *");
 
+            // Daily reconcile of the macro calendar against the publishers' schedule (#1091).
             mgr.AddOrUpdate<MacroCalendarSeedJob>(
                 "research-macro-seed",
                 job => job.ExecuteAsync(CancellationToken.None),
                 Cron.Daily(3));
+
+            // Fire-once macro lookahead and release alerts (#1091), hourly at :05 so a release on the half hour
+            // (08:30 ET) reacts within the hour.
+            mgr.AddOrUpdate<MacroEventAlertJob>(
+                MacroEventAlertJob.RecurringJobId,
+                job => job.ExecuteAsync(CancellationToken.None),
+                "5 * * * *");
 
             // Seed market-wide default feeds + TrendForce→DRAM page source (feature 030). Idempotent.
             mgr.AddOrUpdate<NewsSourceSeedJob>(
@@ -463,6 +471,7 @@ public static class ResearchModule
         services.AddScoped<NewsSourceSeedJob>();
         services.AddScoped<AnalystActionsIngestionJob>();
         services.AddScoped<MacroCalendarSeedJob>();
+        services.AddScoped<MacroEventAlertJob>();
         services.AddScoped<ThesisMonitorJob>();
         services.AddScoped<ThesisTrackRecordSnapshotJob>();
         services.AddScoped<CandidateExpiryJob>();

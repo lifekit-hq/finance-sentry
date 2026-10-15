@@ -43,6 +43,8 @@ public sealed class MaterialityPolicy : IMaterialityPolicy
         "PolicyReview" => CompanionEventKind.PolicyReview,
         "PolicyReviewMissed" => CompanionEventKind.PolicyReviewMissed,
         "RelativeUnderperformance" => CompanionEventKind.RelativeUnderperformance,
+        "MacroEventAhead" => CompanionEventKind.MacroEventAhead,
+        "MacroEventReleased" => CompanionEventKind.MacroEventReleased,
         _ => null,
     };
 

@@ -24,6 +24,7 @@ public static partial class AlertAppPath
     public const string Dashboard = "/dashboard";
     public const string Transactions = "/transactions";
     public const string Subscriptions = "/subscriptions";
+    public const string Events = "/events";
 
     /// <summary>The element id of the dossier's Analyst Coverage card, which the dossier scrolls to when the URL carries it.</summary>
     public const string AnalystCoverageFragment = "analyst-coverage";
@@ -81,6 +82,9 @@ public static partial class AlertAppPath
 
             "PriceHike" => Subscriptions,
             "FireBrief" => Dashboard,
+
+            // A macro release is a calendar event; the Events calendar lists what is still to come (#1091).
+            "MacroEventAhead" or "MacroEventReleased" => Events,
 
             _ => null,
         };

@@ -34,4 +34,6 @@ public enum CompanionEventKind
     PolicyReview,
     PolicyReviewMissed,
     RelativeUnderperformance,
+    MacroEventAhead,
+    MacroEventReleased,
 }
