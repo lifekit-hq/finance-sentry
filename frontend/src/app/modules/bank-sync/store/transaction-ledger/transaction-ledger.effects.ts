@@ -25,6 +25,7 @@ import {
   type TransactionType,
 } from '../../models/transaction/transaction.model';
 import {BankSyncService} from '../../services/bank-sync.service';
+import {LedgerFilterUtils} from '../../utils/ledger-filter.utils';
 import {MonthKeyUtils} from '../../utils/month-key.utils';
 import {TransactionGroupUtils} from '../../utils/transaction-group.utils';
 import {type LedgerFilter} from './transaction-ledger.computed';
@@ -41,6 +42,8 @@ interface EffectsStore {
   transactions: Signal<GlobalTransactionDto[]>;
   offset: Signal<number>;
   status: Signal<AsyncStatus>;
+  filter: Signal<LedgerFilter>;
+  rowsFilter: Signal<Nullable<LedgerFilter>>;
   accountId: Signal<Nullable<string>>;
   transactionType: Signal<Nullable<TransactionType>>;
   categories: Signal<string[]>;
@@ -55,8 +58,10 @@ interface EffectsStore {
   setTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
-    hasMore: boolean
+    hasMore: boolean,
+    rowsFilter: LedgerFilter
   ) => void;
+  setRevalidating: (revalidating: boolean) => void;
   appendTransactions: (
     transactions: GlobalTransactionDto[],
     totalCount: number,
@@ -69,17 +74,6 @@ interface EffectsStore {
   setAppendError: (errorCode: Nullable<string>) => void;
   setAppendIdle: () => void;
   setMonthlyOutflowUsd: (value: number | null, currency?: string) => void;
-}
-
-function sameFilter(a: LedgerFilter, b: LedgerFilter): boolean {
-  return (
-    a.accountId === b.accountId &&
-    a.transactionType === b.transactionType &&
-    a.categories.join() === b.categories.join() &&
-    a.from === b.from &&
-    a.to === b.to &&
-    a.search === b.search
-  );
 }
 
 function pageParams(store: EffectsStore, offset: number): GetAllTransactionsParams {
@@ -106,36 +100,44 @@ export function transactionLedgerEffects(store: EffectsStore) {
   // the rows being replaced.
   const firstPageStarted$ = new Subject<void>();
 
+  const rowsMatchFilter = (): boolean =>
+    LedgerFilterUtils.same(store.rowsFilter(), store.filter());
+
   const fetchFirstPage = rxMethod<void>(
     pipe(
       tap(() => {
         firstPageStarted$.next();
         store.setAppendIdle();
+        if (!rowsMatchFilter()) {
+          store.setRevalidating(false);
+        }
         store.setLoading();
       }),
-      switchMap(() =>
-        bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
+      switchMap(() => {
+        const requested = store.filter();
+        return bankSyncService.getAllTransactions(pageParams(store, 0)).pipe(
           tap(res => {
-            store.setTransactions(res.items, res.totalCount, res.hasMore);
+            store.setTransactions(res.items, res.totalCount, res.hasMore, requested);
             store.setAppendSuccess();
             store.setSuccess();
           }),
           StoreErrorUtils.catchAndSetError({
             setError: (code: Nullable<string>) => {
-              // The kept rows belong to the previous query: a failed load drops them.
-              store.clearRows();
+              if (!rowsMatchFilter()) {
+                store.clearRows();
+              }
               store.setError(code);
             },
           })
-        )
-      )
+        );
+      })
     )
   );
 
   /** Appends the next page under the rows on screen (the infinite list's paging contract). */
   const fetchNextPage = rxMethod<void>(
     pipe(
-      filter(() => store.status() !== 'loading'),
+      filter(() => store.status() !== 'loading' && rowsMatchFilter()),
       tap(() => store.setAppendLoading()),
       exhaustMap(() =>
         bankSyncService.getAllTransactions(pageParams(store, store.offset() + PAGE_SIZE)).pipe(
@@ -197,7 +199,7 @@ export function transactionLedgerEffects(store: EffectsStore) {
      */
     watchFilter: rxMethod<LedgerFilter>(
       pipe(
-        distinctUntilChanged(sameFilter),
+        distinctUntilChanged((a, b) => LedgerFilterUtils.same(a, b)),
         tap(() => load())
       )
     ),

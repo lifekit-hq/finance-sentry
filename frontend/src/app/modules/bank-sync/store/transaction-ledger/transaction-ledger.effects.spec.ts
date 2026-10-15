@@ -1,4 +1,4 @@
-import {signal} from '@angular/core';
+import {computed, signal} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {type AsyncStatus} from '@lifekit-hq/core';
 import {of, Subject, throwError} from 'rxjs';
@@ -122,16 +122,32 @@ const ACCOUNTS: AccountsResponse = {
 // Signals are real so the EffectsStore type constraint is satisfied.
 // Pass initialOffset to simulate the offset of the last page already on screen.
 function buildStore(initialOffset = 0, transactions: GlobalTransactionDto[] = []) {
+  const accountId = signal<string | null>(null);
+  const transactionType = signal<TransactionType | null>(null);
+  const categories = signal<string[]>([]);
+  const from = signal<string | null>(null);
+  const to = signal<string | null>(null);
+  const search = signal('');
   return {
     transactions: signal(transactions),
     offset: signal(initialOffset),
     status: signal<AsyncStatus>('idle'),
-    accountId: signal<string | null>(null),
-    transactionType: signal<TransactionType | null>(null),
-    categories: signal<string[]>([]),
-    from: signal<string | null>(null),
-    to: signal<string | null>(null),
-    search: signal(''),
+    accountId,
+    transactionType,
+    categories,
+    from,
+    to,
+    search,
+    filter: computed<LedgerFilter>(() => ({
+      accountId: accountId(),
+      transactionType: transactionType(),
+      categories: categories(),
+      from: from(),
+      to: to(),
+      search: search().trim(),
+    })),
+    rowsFilter: signal<LedgerFilter | null>(NO_FILTER),
+    setRevalidating: vi.fn(),
     clearRows: vi.fn(),
     setLoading: vi.fn(),
     setSuccess: vi.fn(),
@@ -181,7 +197,7 @@ describe('transactionLedgerEffects', () => {
       expect(store.clearRows).not.toHaveBeenCalled();
       expect(store.setLoading).toHaveBeenCalled();
       expect(service.getAllTransactions).toHaveBeenCalledWith({offset: 0, limit: PAGE_SIZE});
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
       expect(store.setSuccess).toHaveBeenCalled();
     });
 
@@ -235,8 +251,23 @@ describe('transactionLedgerEffects', () => {
       });
     });
 
-    it('surfaces a transactions error', () => {
+    it('records the filter the landed rows were requested for', () => {
       const store = buildStore();
+      store.accountId.set('acc-1');
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(of(TX_RESPONSE));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, {
+        ...NO_FILTER,
+        accountId: 'acc-1',
+      });
+    });
+
+    it('keeps the rows on screen when revalidating them fails', () => {
+      const store = buildStore(0, [TX_ITEM]);
       const service = buildService();
       service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
       configure(service);
@@ -244,9 +275,38 @@ describe('transactionLedgerEffects', () => {
       TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
 
       expect(store.setError).toHaveBeenCalled();
-      expect(store.clearRows).toHaveBeenCalled();
+      expect(store.clearRows).not.toHaveBeenCalled();
+      expect(store.setRevalidating).not.toHaveBeenCalled();
       expect(store.setTransactions).not.toHaveBeenCalled();
       expect(store.setSuccess).not.toHaveBeenCalled();
+    });
+
+    it('drops the previous query rows when the load for a new filter fails', () => {
+      const store = buildStore(0, [TX_ITEM]);
+      store.accountId.set('acc-2');
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.setRevalidating).toHaveBeenCalledWith(false);
+      expect(store.clearRows).toHaveBeenCalled();
+      expect(store.setError).toHaveBeenCalled();
+      expect(store.setTransactions).not.toHaveBeenCalled();
+    });
+
+    it('drops the rows when none have landed yet and the first page fails', () => {
+      const store = buildStore();
+      store.rowsFilter.set(null);
+      const service = buildService();
+      service.getAllTransactions.mockReturnValue(throwError(() => new Error('boom')));
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).load());
+
+      expect(store.clearRows).toHaveBeenCalled();
+      expect(store.setError).toHaveBeenCalled();
     });
   });
 
@@ -331,6 +391,29 @@ describe('transactionLedgerEffects', () => {
 
       expect(service.getAllTransactions).not.toHaveBeenCalled();
       expect(store.setAppendLoading).not.toHaveBeenCalled();
+    });
+
+    it('refuses while the filter changed and its first page has not started', () => {
+      const store = buildStore(PAGE_SIZE, [TX_ITEM]);
+      store.accountId.set('acc-2');
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
+      expect(store.setAppendLoading).not.toHaveBeenCalled();
+    });
+
+    it('refuses while no rows have landed', () => {
+      const store = buildStore(PAGE_SIZE);
+      store.rowsFilter.set(null);
+      const service = buildService();
+      configure(service);
+
+      TestBed.runInInjectionContext(() => transactionLedgerEffects(store).loadMore());
+
+      expect(service.getAllTransactions).not.toHaveBeenCalled();
     });
 
     it('fetches the page after the loaded one, then advances the offset and appends', () => {
@@ -431,7 +514,7 @@ describe('transactionLedgerEffects', () => {
       });
 
       expect(service.getAllTransactions).toHaveBeenLastCalledWith({offset: 0, limit: PAGE_SIZE});
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
       expect(store.appendTransactions).not.toHaveBeenCalled();
     });
   });

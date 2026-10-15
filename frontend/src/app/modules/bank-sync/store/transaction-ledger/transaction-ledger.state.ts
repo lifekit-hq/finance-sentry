@@ -4,6 +4,7 @@ import {
   type TransactionAccountOption,
   type TransactionType,
 } from '../../models/transaction/transaction.model';
+import {type LedgerFilter} from './transaction-ledger.computed';
 
 export interface TransactionLedgerState {
   transactions: GlobalTransactionDto[];
@@ -26,6 +27,8 @@ export interface TransactionLedgerState {
   /** Server-side free-text filter (description / merchant). */
   search: string;
   accounts: TransactionAccountOption[];
+  /** The filter the rows on screen were loaded for; null until a first page has landed. */
+  rowsFilter: Nullable<LedgerFilter>;
   /** The rows were restored from the session cache and their first reload has not landed yet. */
   revalidating: boolean;
 }
@@ -47,6 +50,7 @@ export const initialTransactionLedgerState: TransactionLedgerState = {
   to: null,
   search: '',
   accounts: [],
+  rowsFilter: null,
   revalidating: false,
 };
 
@@ -60,6 +64,7 @@ export const LEDGER_SESSION_FIELDS = [
   'monthlyOutflowUsd',
   'monthlyOutflowCurrency',
   'accounts',
+  'rowsFilter',
   'accountId',
   'transactionType',
   'categories',

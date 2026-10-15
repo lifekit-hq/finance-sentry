@@ -7,6 +7,7 @@ import {
   ISO_DATE_PARAM_CODEC,
   TRANSACTION_TYPE_PARAM_CODEC,
 } from '../../constants/url-params/url-params.constants';
+import {LedgerFilterUtils} from '../../utils/ledger-filter.utils';
 import {transactionLedgerComputed} from './transaction-ledger.computed';
 import {transactionLedgerEffects, transactionLedgerHooks} from './transaction-ledger.effects';
 import {transactionLedgerMethods} from './transaction-ledger.methods';
@@ -19,12 +20,14 @@ import {
 /** The kept rows fit only the filter they were loaded for; the URL decides the filter. */
 function sameLedgerFilter(kept: Partial<TransactionLedgerState>, current: TransactionLedgerState) {
   return (
-    kept.accountId === current.accountId &&
-    kept.transactionType === current.transactionType &&
-    (kept.categories ?? []).join() === current.categories.join() &&
-    kept.from === current.from &&
-    kept.to === current.to &&
-    kept.search === current.search
+    LedgerFilterUtils.same(kept.rowsFilter, {
+      accountId: current.accountId,
+      transactionType: current.transactionType,
+      categories: current.categories,
+      from: current.from,
+      to: current.to,
+      search: current.search.trim(),
+    })
   );
 }
 

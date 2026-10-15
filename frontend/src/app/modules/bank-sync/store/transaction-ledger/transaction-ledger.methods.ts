@@ -5,27 +5,39 @@ import {
   type GlobalTransactionDto,
   type TransactionAccountOption,
 } from '../../models/transaction/transaction.model';
+import {type LedgerFilter} from './transaction-ledger.computed';
 import {PAGE_SIZE, type TransactionLedgerState} from './transaction-ledger.state';
 
 export function transactionLedgerMethods(store: WritableStateSource<TransactionLedgerState>) {
   return {
     /** A failed first page drops the previous query's rows; a reload keeps them until it lands. */
     clearRows(): void {
-      patchState(store, {transactions: [], totalCount: 0, hasMore: false, revalidating: false});
+      patchState(store, {
+        transactions: [],
+        totalCount: 0,
+        hasMore: false,
+        rowsFilter: null,
+        revalidating: false,
+      });
     },
     setTransactions(
       transactions: GlobalTransactionDto[],
       totalCount: number,
-      hasMore: boolean
+      hasMore: boolean,
+      rowsFilter: LedgerFilter
     ): void {
       patchState(store, {
         transactions,
         totalCount,
         hasMore,
+        rowsFilter,
         offset: 0,
         lastSyncedAt: Date.now(),
         revalidating: false,
       });
+    },
+    setRevalidating(revalidating: boolean): void {
+      patchState(store, {revalidating});
     },
     setOffset(offset: number): void {
       patchState(store, {offset});
