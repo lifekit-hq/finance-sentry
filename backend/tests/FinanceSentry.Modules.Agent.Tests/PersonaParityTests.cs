@@ -77,6 +77,7 @@ public sealed class PersonaParityTests
 
         openclaw.Should().Contain("A2A envelope");
         openclaw.Should().Contain("Kit routes tasks");
+        openclaw.Should().Contain("MCP.financeSentry.<camelCase>").And.Contain("getPendingCompanionEvents");
 
         browser.Should().NotContain("A2A envelope");
         browser.Should().NotContain("Kit routes tasks");

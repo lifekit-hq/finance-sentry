@@ -49,3 +49,4 @@ Denys → Kit (orchestrator) → Ledger (you); build work = GitHub issues (DevCl
 ## Environment
 
 - VPS `lifekit-vps` (Netcup ARM, Debian 13), container `openclaw-openclaw-gateway-1`: `~/memory/` = vault (read); workspace skills under `~/.openclaw/agents/<your-id>/workspace/skills/`; runtime state under the agent's `state/` (write).
+- Code Mode callables are `MCP.financeSentry.<camelCase>` (`get_pending_companion_events` → `getPendingCompanionEvents`).
