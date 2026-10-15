@@ -10,7 +10,9 @@ using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Application.Services.Fundamentals;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
+using FinanceSentry.Modules.Research.Domain.Scoring;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -34,6 +36,8 @@ public class GetAssetDossierValuationTests
 
         dossier.Valuation.Should().BeNull();
         dossier.Analysts.Should().BeNull();
+        dossier.Scorecard!.Verdict.Word.Should().Be(nameof(VerdictWord.NotScored));
+        dossier.Scorecard.Verdict.FiredRuleId.Should().Be(VerdictRules.OutsideUniverse);
         analystHandler.Verify(
             h => h.Handle(It.IsAny<GetAnalystActionsQuery>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -51,6 +55,7 @@ public class GetAssetDossierValuationTests
         dossier.Valuation.Should().NotBeNull();
         dossier.Valuation!.NotApplicable.Should().BeTrue();
         dossier.Analysts.Should().BeNull();
+        dossier.Scorecard!.Verdict.FiredRuleId.Should().Be(VerdictRules.OutsideUniverse);
     }
 
     [Fact]
@@ -154,7 +159,13 @@ public class GetAssetDossierValuationTests
             Mock.Of<IFundamentalsService>(),
             Mock.Of<IAssetPriceTargetRepository>(),
             Mock.Of<IRecommendationRepository>(),
-            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
+            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
+            new ScorecardReader(
+                Mock.Of<IMarketStructureReader>(),
+                Mock.Of<IFundamentalsService>(),
+                Mock.Of<IMarketRegimeSource>(),
+                Options.Create(new OpportunityOptions()),
+                Options.Create(new VerdictOptions())));
 
         return handler.Handle(new GetAssetDossierQuery(Guid.NewGuid(), Symbol), CancellationToken.None);
     }

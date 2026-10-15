@@ -299,6 +299,17 @@
         </cmn-alert>
       }
 
+      <!-- Research verdict (spec 726 US2): four axes and a published rule table, never a combined score. -->
+      @if (dossier.scorecard; as scorecard) {
+        <cmn-card class="block" data-testid="dossier-verdict">
+          <h2 class="font-headline text-cmn-md font-semibold text-text-primary">Verdict</h2>
+          <p class="mt-cmn-1 text-cmn-xs text-text-secondary">
+            A research read on structure, fundamentals, crowding and valuation. It places no trade.
+          </p>
+          <fns-scorecard-verdict [scorecard]="scorecard" class="mt-cmn-3" />
+        </cmn-card>
+      }
+
       @if (!store.hasDossierSections()) {
         <cmn-card class="block" data-testid="dossier-no-data">
           <cmn-empty-state

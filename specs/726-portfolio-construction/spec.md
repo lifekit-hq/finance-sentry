@@ -5,7 +5,8 @@
 **Created**: 2026-10-07
 
 **Status**: Draft; open questions OQ-1..OQ-10 closed by the owner on 2026-10-07 (see [Decisions](#decisions-formerly-open-questions)).
-Spec only: no product surface ships during the October consolidation phase. The build is planned for November.
+The verdict-only slice of US2 was built on 2026-10-15 by the owner's call (see
+[Build status](#build-status-verdict-only-slice)); the rest is planned for November.
 
 **GitHub Issue**: #726
 
@@ -14,6 +15,57 @@ Spec only: no product surface ships during the October consolidation phase. The 
 
 **Also owns**: the 4-axis scorecard visual (fs-825 ruling C3a, 2026-10-05: per-axis strip, designed in this
 spec, built after it; #824 hosts it in the dossier header)
+
+## Build status: verdict-only slice
+
+The owner's call on 2026-10-15 ("3. a") built only the verdict part of US2: a deterministic one-word verdict
+from the four axes, with its full drill-down, on the asset dossier page and on the recommendation card. No new
+module, no universe screen, no construction and no gap mode. The scorecard is computed at read time by the
+unchanged 019 scorers (`ScorecardComposer`, shared with candidate scoring) plus the valuation snapshot; nothing
+new is stored and there is no migration.
+
+| Requirement | Status in this slice | Where |
+|---|---|---|
+| FR-002 | Covered for the single-symbol read: one `ScorecardComposer` feeds both candidate scoring and the scorecard. | `Domain/Scoring/ScorecardComposer.cs` |
+| FR-004 | Covered: valuation is raw facts (trailing P/E, own average, premium, forward P/E, price, target). | `ScorecardValuationAxis` |
+| FR-005 | Covered: one word per scorecard from an ordered rule table; deterministic. | `Domain/Scoring/VerdictRules.cs`, `VerdictRulesTests` |
+| FR-006 | Covered: the whole table, the rules version and the fired rule travel in every payload and are tabled below. | `VerdictDto`, [Verdict rule table v1](#verdict-rule-table-v1) |
+| FR-007 / 019 FR-007 amendment | Covered: the word is categorical; no composite, weighted or rank field exists (contract test). | `ScorecardReaderTests.Scorecard_CarriesNoCompositeNumber` |
+| FR-008 | Covered: every null axis has an explicit rule; a comparison against a missing axis is never met. | rules `no_axis_data`, `structure_missing`, `buy_fundamentals_missing` |
+| FR-009 | Partial: four per-axis rows, each expandable to its evidence, no radar or single shape. Not yet the lifekit chip strip. | `fns-scorecard-verdict` |
+| FR-010 | Partial: one shared component used on both surfaces; composed from `cmn-tag` and native disclosure, no new primitive. Lifting it into lifekit-common is a follow-up. | `shared/components/scorecard-verdict/` |
+| FR-011 | Covered: raw beside adjusted, the verdict reads adjusted, and the drill-down names which value the rules read (raw when there is no regime reading). | `ScorecardStructureAxis`, `VerdictDto.StructureBasis` |
+| FR-021 | Partial: the single scorecard read is `GET /api/v1/research/scorecards/{symbol}`; the dossier payload carries it too. No MCP read of the scorecard or verdict exists in this slice; adding `get_scorecard` is a follow-up. The universe, construction and gap reads are not built. | `ScorecardsController` |
+| FR-023 | Not applied: the owner's call ships the verdict on two existing surfaces, so it is not behind a flag. | - |
+| OQ-3 | Covered: `STRONG BUY / BUY / WAIT / AVOID` plus `NOT SCORED`. | `VerdictWord` |
+| OQ-4 | Covered: ordered decision list, first match wins, thresholds in configuration (`Verdict` section). | `VerdictOptions` |
+| OQ-8 | Covered: structure thresholds apply to the regime-adjusted score. | `ScorecardReader` |
+| SC-002 | Covered on a synthetic calibration fixture: every row re-derives its word from the published conditions, and every rule fires for at least one row. | `VerdictRulesTests` |
+| SC-003 | Covered for the scorecard payload. | `ScorecardReaderTests` |
+
+Not built here (follow-ups, each still under #726): US1 (ranked universe screen and universe scorecards,
+FR-001/FR-003), US3 (archetype constructor, a new module, FR-012..FR-018), US4 (gap mode, FR-019/FR-020), FR-022,
+suggested weights, the lifekit-common axis strip (FR-009/FR-010, SC-006 baselines), calibration of the v1
+thresholds against stored `CandidateScore` rows (they carry no valuation premium, so the slice calibrates on a
+synthetic fixture), and the FR-023 flag. Nothing in the slice places a trade.
+
+### Verdict rule table v1
+
+Thresholds are configuration (`Verdict` section, `VerdictOptions`); any change bumps the rules version.
+Structure is the regime-adjusted score (raw when there is no regime reading). Premium is the trailing P/E's
+distance from its own five-year average, in percent. A comparison against a missing axis is never met.
+
+| # | Rule id | Word | Fires when |
+|---|---|---|---|
+| 1 | `outside_universe` | NOT SCORED | valuation does not apply (not a single equity) |
+| 2 | `no_axis_data` | NOT SCORED | structure, fundamentals, crowding and valuation are all missing |
+| 3 | `weak_structure` | AVOID | structure < 30 |
+| 4 | `extended_and_rich` | AVOID | crowding is `Extended` and premium > 0% |
+| 5 | `structure_missing` | WAIT | structure is missing |
+| 6 | `strong_buy` | STRONG BUY | structure ≥ 70, fundamentals ≥ 70, crowding known and not `Extended`, premium ≤ 10% |
+| 7 | `buy` | BUY | structure ≥ 50 and fundamentals ≥ 50 |
+| 8 | `buy_fundamentals_missing` | BUY | structure ≥ 50 and fundamentals missing (capped at BUY, FR-008) |
+| 9 | `otherwise` | WAIT | no earlier rule matched |
 
 ## Context
 

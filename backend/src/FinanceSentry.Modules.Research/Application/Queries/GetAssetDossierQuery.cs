@@ -32,7 +32,8 @@ public sealed class GetAssetDossierQueryHandler(
     IFundamentalsService fundamentals,
     IAssetPriceTargetRepository priceTargets,
     IRecommendationRepository recommendations,
-    PositionReturnsReader returnsReader)
+    PositionReturnsReader returnsReader,
+    ScorecardReader scorecards)
     : IQueryHandler<GetAssetDossierQuery, AssetDossierResult>
 {
     private const int NewsLimit = 10;
@@ -90,6 +91,12 @@ public sealed class GetAssetDossierQueryHandler(
             ? null
             : (await Safe(() => fundamentals.GetFundamentalsAsync(symbol, FundamentalFactsPerConcept, ct)))?.Facts;
 
+        // The verdict reads the valuation and fundamentals already fetched above (spec 726 US2).
+        var scorecardValuation = isCrypto
+            ? ScorecardValuationAxis.NotApplicableAxis
+            : ScorecardValuationAxis.From(valuationResult);
+        var scorecard = await Safe(() => scorecards.ReadAsync(symbol, scorecardValuation, facts, ct));
+
         var capPercent = capFraction is decimal cap ? Math.Round(cap * PercentScale, 2) : (decimal?)null;
 
         // Position section: find symbol in the book, then fetch tax lots and the return decomposition.
@@ -132,7 +139,8 @@ public sealed class GetAssetDossierQueryHandler(
             UserTarget: userTarget is null
                 ? null
                 : new DossierUserTarget(userTarget.TargetPrice, userTarget.Currency, userTarget.UpdatedAt),
-            PendingRecommendation: pending is null ? null : RecommendationDto.From(pending));
+            PendingRecommendation: pending is null ? null : RecommendationDto.From(pending),
+            Scorecard: scorecard);
     }
 
     private async Task<DossierPositionSection?> BuildPositionSectionAsync(

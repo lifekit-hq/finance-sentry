@@ -7,11 +7,13 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {ERROR_MESSAGES_REGISTRY} from '../../../../core/errors/error-messages.registry';
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
 import {OFFLINE_ERROR_MESSAGE} from '../../../../shared/utils/async-view.utils';
 import {DECISIONS_LOAD_FAILED_MESSAGE} from '../../constants/recommendation/recommendation.constants';
 import {DecisionSheetService} from '../../services/decision-sheet.service';
 import {RecommendationService} from '../../services/recommendation.service';
+import {ScorecardService} from '../../services/scorecard.service';
 import {DecisionsStore} from './decisions.store';
 
 function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
@@ -53,6 +55,7 @@ describe('DecisionsStore', () => {
   const offline = signal(false);
   let service: {list: ReturnType<typeof vi.fn>};
   let sheet: {open: ReturnType<typeof vi.fn>};
+  let scorecards: {read: ReturnType<typeof vi.fn>};
 
   function inject(): InstanceType<typeof DecisionsStore> {
     TestBed.configureTestingModule({
@@ -60,6 +63,7 @@ describe('DecisionsStore', () => {
         DecisionsStore,
         {provide: RecommendationService, useValue: service},
         {provide: DecisionSheetService, useValue: sheet},
+        {provide: ScorecardService, useValue: scorecards},
         {provide: ConnectivityService, useValue: {offline}},
         {provide: ERROR_MESSAGES, useValue: ERROR_MESSAGES_REGISTRY},
       ],
@@ -72,6 +76,54 @@ describe('DecisionsStore', () => {
     offline.set(false);
     service = {list: vi.fn().mockReturnValue(of({pending: [], decided: []}))};
     sheet = {open: vi.fn().mockReturnValue(of(undefined))};
+    scorecards = {
+      read: vi.fn((symbol: string) => of(ScorecardFixtures.scorecard({symbol}))),
+    };
+  });
+
+  it('reads one scorecard per pending ticker and keys it by symbol', () => {
+    service.list.mockReturnValue(
+      of({
+        pending: [
+          mkRecommendation({id: 'a', ticker: 'GRAB'}),
+          mkRecommendation({id: 'b', ticker: 'DRAM'}),
+          mkRecommendation({id: 'c', ticker: 'GRAB'}),
+        ],
+        decided: [mkRecommendation({id: 'd', ticker: 'NVDA', status: 'Rejected'})],
+      })
+    );
+    const store = inject();
+
+    expect(scorecards.read.mock.calls.map(([symbol]) => symbol)).toEqual(['GRAB', 'DRAM']);
+    expect(Object.keys(store.scorecards()).sort()).toEqual(['DRAM', 'GRAB']);
+    expect(store.scorecards()['GRAB'].verdict.word).toBe('Avoid');
+  });
+
+  it('leaves a card without a verdict when its scorecard read fails', () => {
+    service.list.mockReturnValue(
+      of({
+        pending: [
+          mkRecommendation({id: 'a', ticker: 'GRAB'}),
+          mkRecommendation({id: 'b', ticker: 'DRAM'}),
+        ],
+        decided: [],
+      })
+    );
+    scorecards.read.mockImplementation((symbol: string) =>
+      symbol === 'GRAB'
+        ? throwError(() => new HttpErrorResponse({status: 500}))
+        : of(ScorecardFixtures.scorecard({symbol}))
+    );
+    const store = inject();
+
+    expect(Object.keys(store.scorecards())).toEqual(['DRAM']);
+    expect(store.view().status).toBe('success');
+  });
+
+  it('reads no scorecard for an empty queue', () => {
+    inject();
+
+    expect(scorecards.read).not.toHaveBeenCalled();
   });
 
   it('loads on open and is loading until the queue arrives', () => {

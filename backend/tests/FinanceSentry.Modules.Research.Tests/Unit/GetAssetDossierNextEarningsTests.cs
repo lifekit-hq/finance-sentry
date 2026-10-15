@@ -11,6 +11,7 @@ using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Ports;
 using FinanceSentry.Modules.Research.Domain.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -66,7 +67,13 @@ public class GetAssetDossierNextEarningsTests
             Mock.Of<IFundamentalsService>(),
             Mock.Of<IAssetPriceTargetRepository>(),
             Mock.Of<IRecommendationRepository>(),
-            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()));
+            new PositionReturnsReader(Mock.Of<IPositionLedgerSource>(), Mock.Of<IHistoricalExchangeRateService>()),
+            new ScorecardReader(
+                Mock.Of<IMarketStructureReader>(),
+                Mock.Of<IFundamentalsService>(),
+                Mock.Of<IMarketRegimeSource>(),
+                Options.Create(new OpportunityOptions()),
+                Options.Create(new VerdictOptions())));
 
         return handler.Handle(new GetAssetDossierQuery(Guid.NewGuid(), Symbol), CancellationToken.None);
     }

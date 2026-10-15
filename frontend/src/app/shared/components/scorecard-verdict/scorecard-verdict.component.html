@@ -1,0 +1,113 @@
+@let verdict = scorecard().verdict;
+<div class="flex flex-col gap-cmn-2" data-testid="scorecard-verdict">
+  <div class="flex flex-wrap items-center gap-cmn-2">
+    <cmn-tag [variant]="wordVariant[verdict.word]" data-testid="verdict-word">
+      {{ wordLabel[verdict.word] }}
+    </cmn-tag>
+    <span class="text-cmn-xs text-text-secondary">Rules v{{ verdict.rulesVersion }}</span>
+  </div>
+  @if (firedRule(); as fired) {
+    <p class="text-cmn-sm text-text-primary" data-testid="verdict-fired-rule">{{ fired }}</p>
+  }
+
+  <details class="group" data-testid="verdict-why">
+    <summary
+      class="cursor-pointer list-none text-cmn-sm font-medium text-text-primary marker:hidden"
+    >
+      Why {{ wordLabel[verdict.word] }}
+      <span class="text-text-secondary group-open:hidden">· show</span>
+      <span class="hidden text-text-secondary group-open:inline">· hide</span>
+    </summary>
+
+    <div class="mt-cmn-3 flex flex-col gap-cmn-4">
+      <section class="flex flex-col gap-cmn-1">
+        <h4 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          The four axes
+        </h4>
+        <p class="text-cmn-xs text-text-secondary">
+          Read separately, never added up. Open one to see the facts behind it.
+        </p>
+        <div class="divide-y divide-border-default">
+          @for (axis of axes(); track axis.axis) {
+            <details [attr.data-testid]="'verdict-axis-' + axis.axis" class="py-cmn-2">
+              <summary
+                class="flex cursor-pointer list-none items-center justify-between gap-cmn-3 marker:hidden"
+              >
+                <span class="text-cmn-sm font-medium text-text-primary">{{ axis.label }}</span>
+                <span class="text-right text-cmn-sm tabular-nums text-text-secondary">
+                  {{ axis.summary }}
+                </span>
+              </summary>
+              @if (axis.facts.length > 0) {
+                <dl class="mt-cmn-2 grid grid-cols-[1fr_auto] gap-x-cmn-3 gap-y-cmn-1 text-cmn-xs">
+                  @for (fact of axis.facts; track fact.label) {
+                    <dt class="text-text-secondary">{{ fact.label }}</dt>
+                    <dd class="text-right tabular-nums text-text-primary">{{ fact.value }}</dd>
+                  }
+                </dl>
+              }
+              @if (axis.notes.length > 0) {
+                <ul class="mt-cmn-2 space-y-cmn-1 text-cmn-xs text-text-secondary">
+                  @for (note of axis.notes; track $index) {
+                    <li>{{ note }}</li>
+                  }
+                </ul>
+              }
+              @if (axis.facts.length === 0 && axis.notes.length === 0) {
+                <p class="mt-cmn-2 text-cmn-xs text-text-secondary">No facts on this axis.</p>
+              }
+            </details>
+          }
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-cmn-2">
+        <h4 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          Rule table v{{ verdict.rulesVersion }}: the first match fires
+        </h4>
+        <p class="text-cmn-xs text-text-secondary" data-testid="verdict-structure-basis">
+          {{ basisNote[verdict.structureBasis] }}
+        </p>
+        <ol class="flex flex-col gap-cmn-2">
+          @for (rule of rules(); track rule.id) {
+            <li
+              [attr.data-testid]="'verdict-rule-' + rule.id"
+              [attr.data-fired]="rule.fired"
+              [class]="rule.fired ? 'border-accent-default' : 'border-border-default'"
+              class="rounded-cmn-md border px-cmn-3 py-cmn-2"
+            >
+              <div class="flex flex-wrap items-center gap-cmn-2">
+                <cmn-tag [variant]="rule.fired ? wordVariant[rule.word] : 'neutral'">
+                  {{ wordLabel[rule.word] }}
+                </cmn-tag>
+                @if (rule.fired) {
+                  <span class="text-cmn-xs font-semibold text-text-primary">Fired</span>
+                } @else if (rule.matched) {
+                  <span class="text-cmn-xs text-text-secondary">Also matched</span>
+                }
+              </div>
+              <p class="mt-cmn-1 text-cmn-sm text-text-primary">{{ rule.description }}</p>
+              @if (rule.conditions.length > 0) {
+                <ul class="mt-cmn-1 space-y-cmn-1 text-cmn-xs">
+                  @for (condition of rule.conditions; track $index) {
+                    <li class="flex items-start gap-cmn-2">
+                      <span
+                        [class]="condition.met ? metClass : unmetClass"
+                        class="mt-1 h-2 w-2 shrink-0 rounded-full"
+                      ></span>
+                      <span class="min-w-0 text-text-primary">
+                        {{ condition.text }}
+                        <span class="text-text-secondary">· read {{ condition.actual }}</span>
+                        <span class="sr-only">: {{ condition.met ? 'met' : 'not met' }}</span>
+                      </span>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ol>
+      </section>
+    </div>
+  </details>
+</div>

@@ -35,6 +35,14 @@
       <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">Why</h3>
       <p class="whitespace-pre-line text-cmn-sm text-text-primary">{{ rec.rationale }}</p>
     </section>
+    @if (scorecard(); as card) {
+      <section class="flex flex-col gap-cmn-1" data-testid="recommendation-verdict">
+        <h3 class="text-cmn-xs font-semibold uppercase tracking-widest text-text-secondary">
+          Research verdict
+        </h3>
+        <fns-scorecard-verdict [scorecard]="card" />
+      </section>
+    }
 
     <dl class="grid gap-cmn-3 text-cmn-sm sm:grid-cols-2">
       <div class="flex flex-col gap-cmn-1">

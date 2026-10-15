@@ -7,6 +7,7 @@ import {TagComponent} from '@lifekit-hq/ui';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {AuthStore} from '../../../auth/store/auth.store';
 import {
   type AssetChartDto,
@@ -397,6 +398,32 @@ describe('AssetDossierComponent', () => {
       verdict: 'reject',
     });
     expect(byTestId('dossier-decision-recorded')).toBeNull();
+  });
+
+  it('shows no verdict card without a scorecard', () => {
+    fixture.detectChanges();
+
+    expect(byTestId('dossier-verdict')).toBeNull();
+  });
+
+  it('shows the research verdict below the proposal, opening into its axes and rules', () => {
+    mockStore.dossier.set({
+      ...DOSSIER,
+      pendingRecommendation: mkRecommendation(),
+      scorecard: ScorecardFixtures.scorecard({symbol: DOSSIER.symbol}),
+    });
+    fixture.detectChanges();
+
+    const verdict = byTestId('dossier-verdict');
+    expect(byTestId('dossier-hero')?.nextElementSibling?.tagName.toLowerCase()).toBe(
+      'fns-recommendation-card'
+    );
+    expect(verdict?.querySelector('[data-testid="verdict-word"]')?.textContent?.trim()).toBe(
+      'AVOID'
+    );
+    expect(verdict?.querySelector('[data-testid="verdict-axis-Valuation"]')).not.toBeNull();
+    expect(verdict?.querySelector('[data-testid="verdict-rule-extended_and_rich"]')).not.toBeNull();
+    expect(verdict?.textContent).toContain('It places no trade.');
   });
 
   it('says what was recorded once the proposal is decided', () => {

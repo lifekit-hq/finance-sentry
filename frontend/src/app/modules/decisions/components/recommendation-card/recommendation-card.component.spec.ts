@@ -6,6 +6,7 @@ import {
   type RecommendationDto,
   type RecommendationVerdict,
 } from '../../../../shared/models/recommendation/recommendation.model';
+import {ScorecardFixtures} from '../../../../shared/models/scorecard/scorecard.fixtures';
 import {RecommendationCardComponent} from './recommendation-card.component';
 
 function mkRecommendation(overrides: Partial<RecommendationDto> = {}): RecommendationDto {
@@ -119,5 +120,27 @@ describe('RecommendationCardComponent', () => {
     host.querySelector<HTMLElement>('[data-testid="recommendation-confirm"] button')?.click();
 
     expect(verdicts).toEqual(['reject', 'confirm']);
+  });
+
+  it('shows no research verdict without a scorecard', () => {
+    const {host} = render(mkRecommendation());
+
+    expect(host.querySelector('[data-testid="recommendation-verdict"]')).toBeNull();
+  });
+
+  it('opens a research verdict with its drill-down when a scorecard is given', () => {
+    TestBed.configureTestingModule({providers: [provideRouter([])]});
+    const fixture = TestBed.createComponent(RecommendationCardComponent);
+    fixture.componentRef.setInput('recommendation', mkRecommendation());
+    fixture.componentRef.setInput('scorecard', ScorecardFixtures.scorecard({symbol: 'GRAB'}));
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const verdict = host.querySelector('[data-testid="recommendation-verdict"]');
+
+    expect(verdict?.textContent).toContain('Research verdict');
+    expect(verdict?.querySelector('[data-testid="verdict-word"]')?.textContent?.trim()).toBe(
+      'AVOID'
+    );
+    expect(verdict?.querySelector('[data-testid="verdict-why"]')).not.toBeNull();
   });
 });

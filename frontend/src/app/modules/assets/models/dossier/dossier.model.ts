@@ -1,4 +1,5 @@
 import {type RecommendationDto} from '../../../../shared/models/recommendation/recommendation.model';
+import {type ScorecardDto} from '../../../../shared/models/scorecard/scorecard.model';
 
 export interface DossierTaxLotEntry {
   quantity: number;
@@ -288,6 +289,11 @@ export interface AssetDossierDto {
   userTarget?: Nullable<DossierUserTargetDto>;
   /** Ledger's pending proposal on this ticker (#1069), awaiting the owner's Confirm or Reject. */
   pendingRecommendation?: Nullable<RecommendationDto>;
+  /**
+   * The four-axis scorecard and its verdict word (spec 726 US2); null when it could not be read, absent
+   * from older API builds. A non-equity reads NotScored.
+   */
+  scorecard?: Nullable<ScorecardDto>;
 }
 
 /**

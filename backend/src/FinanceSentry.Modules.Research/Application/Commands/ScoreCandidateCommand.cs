@@ -72,36 +72,11 @@ public sealed class ScoreCandidateCommandHandler(
         var maxPositionCap = await positionCapSource.GetMaxPositionWeightAsync(command.UserId, ct);
         var holdings = await holdingsReader.GetHoldingsAsync(command.UserId, ct);
 
-        var (structureScore, structureReasons) = StructureScorer.Score(structureSnapshot);
-        var (fundamentalsScore, revenueYoy, grossMarginLatest, grossMarginTrend, epsYoy, fundamentalsReasons, fundamentalsBasis) =
-            FundamentalsScorer.Evaluate(fundamentalFacts);
-        var crowding = CrowdingClassifier.Classify(
-            structureSnapshot?.ExtensionFromMa50, structureSnapshot?.VolumeRatio, _options);
-
         var ipsFit = BuildIpsFit(ticker, ips, maxPositionCap, holdings);
 
-        // 021: regime is CONTEXT only — haircut the presented/ranked structure score for speculative
-        // candidates in risk-off macro conditions. Raw structureScore is preserved (and persisted);
-        // regime never actions (no cash/sell/promotion change). Null regime ⇒ raw == adjusted.
         var regimeSnapshot = await marketRegimeSource.GetLatestAsync(ct);
-        var regime = RegimeScoreAdjuster.Adjust(structureScore, crowding, regimeSnapshot, _options);
-
-        var evidence = new ScoreEvidence(
-            structureSnapshot?.RsByWindow ?? new Dictionary<int, decimal?>(),
-            structureSnapshot?.ReturnByWindow ?? new Dictionary<int, decimal?>(),
-            structureSnapshot?.ExtensionFromMa50,
-            structureSnapshot?.TodayZScore,
-            structureSnapshot?.VolumeRatio,
-            structureReasons,
-            revenueYoy,
-            grossMarginLatest,
-            grossMarginTrend,
-            epsYoy,
-            fundamentalsReasons,
-            SectorRank: structureSnapshot?.SectorRank,
-            SectorRankDelta: structureSnapshot?.SectorRankDelta,
-            DistanceFrom63dHigh: structureSnapshot?.DistanceFrom63dHigh,
-            FundamentalsBasis: fundamentalsBasis);
+        var (structureScore, fundamentalsScore, crowding, evidence, regime) =
+            ScorecardComposer.Compose(structureSnapshot, fundamentalFacts, regimeSnapshot, _options);
 
         var scorecard = new CandidateScorecard(
             structureScore, fundamentalsScore, crowding, ipsFit, evidence, _options.FormulaVersion, regime);

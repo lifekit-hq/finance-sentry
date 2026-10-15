@@ -31,6 +31,7 @@ import {
   type TagVariant,
 } from '@lifekit-hq/ui';
 
+import {ScorecardVerdictComponent} from '../../../../shared/components/scorecard-verdict/scorecard-verdict.component';
 import {
   GAIN_TEXT_CLASS,
   LOSS_TEXT_CLASS,
@@ -101,6 +102,7 @@ const TREND_LABEL_FORMAT = 'mediumDate';
     ProviderLabelPipe,
     RelativeTimePipe,
     RouterLink,
+    ScorecardVerdictComponent,
     SignalTypeLabelPipe,
     SkeletonComponent,
     EmptyStateComponent,
