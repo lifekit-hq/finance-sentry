@@ -31,6 +31,8 @@ public static class PerformanceBriefComposer
 
     /// <summary>The book figure is last / first - 1 over invested value: deposits count, so it is not a TWR.</summary>
     private const string BookLabel = "Book value change (incl. deposits)";
+    private const string HoldingsLabel = "Holdings-based return";
+    private const string BenchmarkPriceLabel = "S&P 500 price return";
     private const decimal PercentDivisor = 100m;
     private const decimal ThousandThreshold = 1_000m;
     private const decimal MillionThreshold = 1_000_000m;
@@ -95,6 +97,32 @@ public static class PerformanceBriefComposer
             : $"Weekly brief: {CapitalizeFirst(verdict)}";
     }
 
+    /// <summary>
+    /// The flow-neutral companion to the value change, kept on the same bullet so the brief stays inside its
+    /// line budget. A missing figure names why rather than reading as 0%.
+    /// </summary>
+    private static string HoldingsClause(PeriodTwr p)
+    {
+        if (p.HoldingsBasedReturn is not { } holdings)
+        {
+            return p.HoldingsBasedUnavailableReason is { } reason
+                ? $" · {HoldingsLabel} N/A ({UnavailableText(reason)})"
+                : string.Empty;
+        }
+
+        var spy = p.SpyPriceReturn.HasValue ? $"{p.SpyPriceReturn.Value:+0.##%;-0.##%;0%}" : "N/A";
+        return $" · {HoldingsLabel} {holdings:+0.##%;-0.##%;0%} vs {BenchmarkPriceLabel} {spy}";
+    }
+
+    private static string UnavailableText(HoldingsReturnUnavailableReason reason) => reason switch
+    {
+        HoldingsReturnUnavailableReason.InsufficientCaptures => "too few holdings captures",
+        HoldingsReturnUnavailableReason.WindowNotCovered => "history does not cover the window",
+        HoldingsReturnUnavailableReason.MissingPrice => "a held position has no price",
+        HoldingsReturnUnavailableReason.NoInvestedBase => "no priced positions",
+        _ => "unavailable",
+    };
+
     private static List<string> BuildScoreboard(BookPerformanceResult result, string? appBaseUrl)
     {
         var lines = new List<string>(result.Periods.Count);
@@ -115,7 +143,9 @@ public static class PerformanceBriefComposer
             var diff = p.Delta.HasValue ? $" (Δ {p.Delta.Value:+0.##%;-0.##%;0%})" : string.Empty;
 
             lines.Add(AppUrl.Bullet(
-                $"{label}: {BookLabel} {book} | {Benchmark} {spy}{diff}", appBaseUrl, AlertAppPath.AccountsInvestments));
+                $"{label}: {BookLabel} {book} | {Benchmark} {spy}{diff}{HoldingsClause(p)}",
+                appBaseUrl,
+                AlertAppPath.AccountsInvestments));
         }
 
         return lines;

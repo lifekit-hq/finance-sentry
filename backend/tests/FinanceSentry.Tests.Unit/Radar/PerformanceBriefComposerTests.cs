@@ -403,4 +403,34 @@ public sealed class PerformanceBriefComposerTests
         linked.Body.Split('\n').Select(l => l.Split(" → ")[0]).Should().Equal(unlinked.Body.Split('\n'));
         linked.Body.Should().Contain(" → " + longHost, "the links that still fit stay");
     }
+
+    [Fact]
+    public void Compose_ShowsHoldingsBasedReturnAgainstSpyPriceReturn_OnTheScoreboardLine()
+    {
+        var result = new BookPerformanceResult(
+            [new PeriodTwr(
+                BookPerformancePeriod.OneWeek, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+                0.5m, 0.05m, 0.45m, "outperform",
+                HoldingsBasedReturn: 0m, SpyPriceReturn: 0.025m, HoldingsBasedDelta: -0.025m)],
+            DateOnly.FromDateTime(DateTime.UtcNow));
+
+        var brief = PerformanceBriefComposer.Compose(result, [], null);
+
+        brief.Body.Should().Contain("Holdings-based return 0% vs S&P 500 price return +2.5%");
+    }
+
+    [Fact]
+    public void Compose_NamesTheReason_WhenHoldingsBasedReturnIsUnavailable()
+    {
+        var result = new BookPerformanceResult(
+            [new PeriodTwr(
+                BookPerformancePeriod.OneWeek, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+                0.03m, 0.01m, 0.02m, "outperform",
+                HoldingsBasedUnavailableReason: HoldingsReturnUnavailableReason.MissingPrice)],
+            DateOnly.FromDateTime(DateTime.UtcNow));
+
+        var brief = PerformanceBriefComposer.Compose(result, [], null);
+
+        brief.Body.Should().Contain("Holdings-based return N/A (a held position has no price)");
+    }
 }

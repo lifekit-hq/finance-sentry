@@ -14,8 +14,17 @@ public sealed class BookPerformanceServiceTests
 
     private readonly Mock<IDailyBarRepository> _bars = new();
     private readonly Mock<IPortfolioValueSource> _portfolio = new();
+    private readonly Mock<IHoldingsHistorySource> _holdings = new();
 
-    private BookPerformanceService CreateSut() => new(_bars.Object, _portfolio.Object);
+    public BookPerformanceServiceTests()
+    {
+        _portfolio.Setup(p => p.GetAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([]);
+        _holdings.Setup(h => h.GetBrokerageCapturesAsync(It.IsAny<Guid>(), It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([]);
+    }
+
+    private BookPerformanceService CreateSut() => new(_bars.Object, _portfolio.Object, _holdings.Object);
 
     private static DailyBar Bar(string ticker, DateOnly date, decimal adjClose) => new()
     {
@@ -393,5 +402,166 @@ public sealed class BookPerformanceServiceTests
             period.Delta.Should().BeNull();
             period.Verdict.Should().BeNull();
         }
+    }
+
+    private static DailyBar BarWithClose(string ticker, DateOnly date, decimal close, decimal adjClose) => new()
+    {
+        Id = Guid.NewGuid(),
+        Ticker = ticker,
+        Date = date,
+        Open = close,
+        High = close,
+        Low = close,
+        Close = close,
+        AdjClose = adjClose,
+        Volume = 1_000_000,
+    };
+
+    private static HoldingsCapture Capture(DateOnly day, params CapturedHolding[] holdings) =>
+        new(new DateTimeOffset(day.ToDateTime(new TimeOnly(6, 0)), TimeSpan.Zero), holdings);
+
+    private void GivenCaptures(params HoldingsCapture[] captures) =>
+        _holdings.Setup(h => h.GetBrokerageCapturesAsync(UserId, It.IsAny<DateOnly>(), default))
+            .ReturnsAsync(captures);
+
+    // Golden: 1W window, a deposit of 500 buys 5 more shares at an unchanged price of 100.
+    //   Invested value 1,000 -> 1,500: the value change reads +50% (deposit counted as a gain).
+    //   Holdings-based: revalue the earlier 10 shares at the later price 100 = 1,000; 1,000 / 1,000 - 1 = 0%.
+    //   SPY: close 400 -> 410 = +2.5% price return; adjusted close 400 -> 420 would read +5% (dividends).
+    //   Delta vs SPY price return = 0% - 2.5% = -2.5%.
+    [Fact]
+    public async Task GetAsync_HoldingsBasedReturnIsZero_AndSpyIsPriceReturn_ForADepositWithNoPriceChange()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                BarWithClose("SPY", since, 400m, 400m),
+                BarWithClose("SPY", today, 410m, 420m),
+            ]);
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([
+                new DailyPortfolioValue(since, 1_000m),
+                new DailyPortfolioValue(today, 1_500m),
+            ]);
+        GivenCaptures(
+            Capture(since, new CapturedHolding("AAA", 10m, 1_000m)),
+            Capture(today, new CapturedHolding("AAA", 15m, 1_500m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().Be(0.5m);
+        period.HoldingsBasedReturn.Should().Be(0m);
+        period.SpyPriceReturn.Should().Be(0.025m);
+        period.SpyTwr.Should().Be(0.05m);
+        period.HoldingsBasedDelta.Should().Be(-0.025m);
+        period.HoldingsBasedUnavailableReason.Should().BeNull();
+    }
+
+    // Golden: 1M window, captures sit 2 days inside each edge (tolerance is 3 days), so the index covers
+    // since+2 .. today-2. SPY close is measured between those dates: 410 -> 440 = +7.32%, not the nominal
+    // since .. today span (400 -> 500 = +25%). Holdings: 10 shares 1,000 -> 1,100 = +10%; delta = +2.68%.
+    [Fact]
+    public async Task GetAsync_MeasuresSpyPriceReturnOverTheCaptureSpan_WhenCapturesSitInsideTheEdgeTolerance()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddMonths(-1);
+        var firstCapture = since.AddDays(2);
+        var lastCapture = today.AddDays(-2);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([
+                BarWithClose("SPY", since, 400m, 400m),
+                BarWithClose("SPY", firstCapture, 410m, 410m),
+                BarWithClose("SPY", lastCapture, 440m, 440m),
+                BarWithClose("SPY", today, 500m, 500m),
+            ]);
+        GivenCaptures(
+            Capture(firstCapture, new CapturedHolding("AAA", 10m, 1_000m)),
+            Capture(lastCapture, new CapturedHolding("AAA", 10m, 1_100m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneMonth])).Periods.Single();
+
+        period.HoldingsBasedReturn.Should().Be(0.1m);
+        period.SpyPriceReturn.Should().Be(0.0732m);
+        period.HoldingsBasedDelta.Should().Be(0.0268m);
+    }
+
+    // Golden: no captures at all -> a reason, never 0, while the value-change figure is untouched.
+    [Fact]
+    public async Task GetAsync_ReturnsInsufficientCapturesReason_WhenNoHoldingsWereCaptured()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        _portfolio.Setup(r => r.GetAsync(UserId, It.IsAny<DateOnly>(), today, default))
+            .ReturnsAsync([new DailyPortfolioValue(since, 100m), new DailyPortfolioValue(today, 103m)]);
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.BookTwr.Should().Be(0.03m);
+        period.HoldingsBasedReturn.Should().BeNull();
+        period.HoldingsBasedUnavailableReason.Should().Be(HoldingsReturnUnavailableReason.InsufficientCaptures);
+    }
+
+    // Golden: one capture inside the 1W window (the other is 20 days old) -> fewer than two captures.
+    [Fact]
+    public async Task GetAsync_IgnoresCapturesBeforeTheWindow()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        GivenCaptures(
+            Capture(today.AddDays(-20), new CapturedHolding("AAA", 10m, 1_000m)),
+            Capture(today, new CapturedHolding("AAA", 10m, 1_100m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.HoldingsBasedReturn.Should().BeNull();
+        period.HoldingsBasedUnavailableReason.Should().Be(HoldingsReturnUnavailableReason.InsufficientCaptures);
+    }
+
+    // Golden: two captures, but the first sits 4 days after the window opens; the 1W edge tolerance is 1 day.
+    [Fact]
+    public async Task GetAsync_ReturnsWindowNotCoveredReason_WhenFirstCaptureIsPastTheEdgeTolerance()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        GivenCaptures(
+            Capture(since.AddDays(4), new CapturedHolding("AAA", 10m, 1_000m)),
+            Capture(today, new CapturedHolding("AAA", 10m, 1_100m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.HoldingsBasedReturn.Should().BeNull();
+        period.HoldingsBasedUnavailableReason.Should().Be(HoldingsReturnUnavailableReason.WindowNotCovered);
+    }
+
+    // Golden: a held position (BBB, 5 shares) has no value at the later capture -> MissingPrice naming BBB.
+    [Fact]
+    public async Task GetAsync_ReturnsMissingPriceReasonAndSymbols_WhenAHeldPositionHasNoPrice()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var since = today.AddDays(-7);
+
+        _bars.Setup(r => r.GetSinceAsync("SPY", It.IsAny<DateOnly>(), default))
+            .ReturnsAsync([Bar("SPY", since, 400m), Bar("SPY", today, 404m)]);
+        GivenCaptures(
+            Capture(since, new CapturedHolding("AAA", 10m, 1_000m), new CapturedHolding("BBB", 5m, 500m)),
+            Capture(today, new CapturedHolding("AAA", 10m, 1_100m), new CapturedHolding("BBB", 5m, 0m)));
+
+        var period = (await CreateSut().GetAsync(UserId, [BookPerformancePeriod.OneWeek])).Periods.Single();
+
+        period.HoldingsBasedReturn.Should().BeNull();
+        period.HoldingsBasedUnavailableReason.Should().Be(HoldingsReturnUnavailableReason.MissingPrice);
+        period.HoldingsBasedMissingPriceSymbols.Should().BeEquivalentTo(["BBB"]);
     }
 }

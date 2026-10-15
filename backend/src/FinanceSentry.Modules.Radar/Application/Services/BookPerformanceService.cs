@@ -11,10 +11,14 @@ namespace FinanceSentry.Modules.Radar.Application.Services;
 /// return: deposits and withdrawals are not adjusted for, so a contribution reads as a gain, and a purchase
 /// made from idle broker cash reads as a gain too. The <c>PeriodTwr</c> / <c>BookTwr</c> / <c>SpyTwr</c> names
 /// are kept for contract stability and are misleading; see docs/finance-framework.md (known gaps).
+/// Beside it each period carries the holdings-based return (R1(b)): the brokerage book's flow-neutral price
+/// return from <see cref="HoldingsBasedReturnCalculator"/>, against SPY's price return (close, not adjusted
+/// close) measured between the first and last capture the index covers, or the reason there is no number.
 /// </summary>
 public sealed class BookPerformanceService(
     IDailyBarRepository bars,
-    IPortfolioValueSource portfolioValues) : IBookPerformanceService
+    IPortfolioValueSource portfolioValues,
+    IHoldingsHistorySource holdingsHistory) : IBookPerformanceService
 {
     private const string BenchmarkTicker = "SPY";
 
@@ -26,6 +30,8 @@ public sealed class BookPerformanceService(
 
     private const int MaxEdgeGapDays = 7;
 
+    private const int SpyLookbackDays = MaxEdgeGapDays;
+
     public async Task<BookPerformanceResult> GetAsync(
         Guid userId,
         IReadOnlyList<BookPerformancePeriod> periods,
@@ -34,14 +40,15 @@ public sealed class BookPerformanceService(
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var earliest = periods.Select(p => StartDate(today, p)).Min();
 
-        var spyBars = await bars.GetSinceAsync(BenchmarkTicker, earliest, ct);
+        var spyBars = await bars.GetSinceAsync(BenchmarkTicker, earliest.AddDays(-SpyLookbackDays), ct);
         var portfolioSnapshots = await portfolioValues.GetAsync(userId, earliest, today, ct);
+        var captures = await holdingsHistory.GetBrokerageCapturesAsync(userId, earliest, ct);
 
         var results = new List<PeriodTwr>(periods.Count);
         foreach (var period in periods)
         {
             var since = StartDate(today, period);
-            var periodTwr = ComputePeriod(period, since, today, spyBars, portfolioSnapshots);
+            var periodTwr = ComputePeriod(period, since, today, spyBars, portfolioSnapshots, captures);
             if (periodTwr is not null)
             {
                 results.Add(periodTwr);
@@ -56,15 +63,24 @@ public sealed class BookPerformanceService(
         DateOnly since,
         DateOnly today,
         IReadOnlyList<Domain.DailyBar> spyBars,
-        IReadOnlyList<DailyPortfolioValue> portfolioSnapshots)
+        IReadOnlyList<DailyPortfolioValue> portfolioSnapshots,
+        IReadOnlyList<HoldingsCapture> captures)
     {
         var spyTwr = ComputeSpyTwr(spyBars, since);
         var bookTwr = ComputeBookTwr(portfolioSnapshots, since, today);
+        var (holdings, span) = ComputeHoldingsBasedReturn(captures, since, today);
 
-        if (spyTwr is null && bookTwr is null)
+        if (spyTwr is null && bookTwr is null && holdings.Value is null)
         {
             return null;
         }
+
+        var spyPriceReturn = span is { } covered
+            ? ComputeSpyPriceReturn(spyBars, covered.First, covered.Last)
+            : null;
+        decimal? holdingsDelta = holdings.Value is not null && spyPriceReturn is not null
+            ? Math.Round(holdings.Value.Value - spyPriceReturn.Value, 4)
+            : null;
 
         decimal? delta = bookTwr is not null && spyTwr is not null
             ? Math.Round(bookTwr.Value - spyTwr.Value, 4)
@@ -78,7 +94,56 @@ public sealed class BookPerformanceService(
             _ => null,
         };
 
-        return new PeriodTwr(period, since, bookTwr, spyTwr, delta, verdict);
+        return new PeriodTwr(
+            period,
+            since,
+            bookTwr,
+            spyTwr,
+            delta,
+            verdict,
+            holdings.Value,
+            spyPriceReturn,
+            holdingsDelta,
+            holdings.Reason,
+            holdings.MissingPriceSymbols is { Count: > 0 } ? holdings.MissingPriceSymbols : null);
+    }
+
+    private static (HoldingsBasedReturnResult Result, CaptureSpan? Span) ComputeHoldingsBasedReturn(
+        IReadOnlyList<HoldingsCapture> captures, DateOnly since, DateOnly today)
+    {
+        var inWindow = captures
+            .Where(c => DateOnly.FromDateTime(c.CapturedAt.UtcDateTime) >= since)
+            .OrderBy(c => c.CapturedAt)
+            .ToList();
+
+        if (inWindow.Count < 2)
+        {
+            return (HoldingsBasedReturnResult.Unavailable(HoldingsReturnUnavailableReason.InsufficientCaptures), null);
+        }
+
+        // The same edge tolerance the invested-value figure is held to, so both cover the same span as SPY.
+        var allowedGapDays = AllowedEdgeGapDays(today.DayNumber - since.DayNumber);
+        var first = DateOnly.FromDateTime(inWindow[0].CapturedAt.UtcDateTime);
+        var last = DateOnly.FromDateTime(inWindow[^1].CapturedAt.UtcDateTime);
+        if (first > since.AddDays(allowedGapDays) || last < today.AddDays(-allowedGapDays))
+        {
+            return (HoldingsBasedReturnResult.Unavailable(HoldingsReturnUnavailableReason.WindowNotCovered), null);
+        }
+
+        return (HoldingsBasedReturnCalculator.Measure(inWindow), new CaptureSpan(first, last));
+    }
+
+    private static decimal? ComputeSpyPriceReturn(IReadOnlyList<Domain.DailyBar> bars, DateOnly from, DateOnly to)
+    {
+        var startBar = bars.LastOrDefault(b => b.Date <= from);
+        var endBar = bars.LastOrDefault(b => b.Date <= to);
+
+        if (startBar is null || endBar is null || startBar.Close == 0m || startBar.Date == endBar.Date)
+        {
+            return null;
+        }
+
+        return Math.Round((endBar.Close - startBar.Close) / startBar.Close, 4);
     }
 
     private static decimal? ComputeSpyTwr(IReadOnlyList<Domain.DailyBar> bars, DateOnly since)
@@ -125,6 +190,8 @@ public sealed class BookPerformanceService(
             (endSnapshot.BrokerageInvestedUsd - startSnapshot.BrokerageInvestedUsd) / startSnapshot.BrokerageInvestedUsd,
             4);
     }
+
+    private readonly record struct CaptureSpan(DateOnly First, DateOnly Last);
 
     private static int AllowedEdgeGapDays(int periodDays) =>
         Math.Clamp(

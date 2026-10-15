@@ -95,7 +95,7 @@ Three rules keep the layers apart:
 | 1 | Net worth total | `NetWorthSnapshot` (three sleeve columns plus total); live total from `BookFiguresService` (three hard-coded readers) | Sum of sleeves in USD through `CurrencyConverter.ToUsd` at today's rates | `StaleSleeves`, `IsApproximate`, a null `CashTotal`; `FxStatus` (R4): `BookFigures.FxStatus` on the live total, `fx_status` on a stored row (null on a row from before the column) | valuation, M7 | G2 (live total closed), G4, G5 |
 | 2 | Dashboard "Change" and its % | `dashboard.computed.ts`; label in `dashboard.component.ts` | (end − start) / start over snapshots: deposits, savings and newly linked accounts all count | none on the figure | M1, later M5 | G3 |
 | 3 | Dashboard "Invested change" | `dashboard.computed.ts` | Change in invested value, deposits included; the code comment says it is "not a return" | the comment only | M1 | none: correctly labelled |
-| 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain** | null when history misses the edge tolerance | M1 (not M3), M9 | **G1** |
+| 4 | Book vs SPY (weekly brief, MCP `get_book_performance`) | `BookPerformanceService` | last ÷ first − 1 on invested brokerage value; SPY from adjusted close. **Labelled "change in invested value (includes deposits)"; the `Twr` field names remain.** Beside it, since R1(b), the flow-neutral **holdings-based return** (`holdingsBasedReturn`) against SPY's price return (`spyPriceReturn`, close) | null when history misses the edge tolerance; the holdings-based figure carries a typed reason instead of a number | M1 (not M3), M9 | **G1** |
 | 5 | Book drawdown | `BookDrawdownCalculator` | Flow-neutral chained index from holdings snapshots, with split detection | null under two captures | M8 | none: the pattern to reuse |
 | 6 | Position returns | `PositionReturnCalculator` | Average-cost walk: unrealized, realized, dividends net of withholding, currency effect | `Coverage` = complete / partial / unavailable | M6 | the vocabulary is local (G5) |
 | 7 | 12-month projection tile | `dashboard.computed.ts` | Median monthly savings × 12, no market return | hidden under three complete months | M10 | G7 |
@@ -610,8 +610,16 @@ return. The `outperform` / `underperform` verdict inherits all of this.
 *Done:* the descriptions and the brief label now say "change in invested value (includes deposits)".
 *Not done, deliberately:* the type and field names `PeriodTwr`, `BookTwr`, `SpyTwr`, and the tool name
 `get_book_performance`, keep their `Twr` names. They are misleading, and renaming them is a contract change
-against the MCP tool surface and its tests. Later steps: a holdings-based price index on the cash-inclusive
-scope (C3), then a true TWR once dated external flows land (G6).
+against the MCP tool surface and its tests.
+*R1(b) done:* the same tool and brief now also carry a holdings-based price return (`HoldingsBasedReturnCalculator`,
+the `BookDrawdownCalculator` method: revalue the earlier capture's quantities at the later capture's prices,
+then chain), so a deposit or a purchase from idle cash reads 0%. It excludes dividends, so it is compared with
+SPY's *price* return (close, not adjusted close) between the first and last capture the index covers, and it is labelled "holdings-based
+return" vs "S&P 500 price return". It is on the invested brokerage positions (the holdings captures hold no
+cash); the cash-inclusive scope (C3) and the position ledger's dividends are not in it. A missing price,
+too few captures or an uncovered window yield a typed reason, never 0. A position sold inside the window is
+carried at its earlier value for the step that sold it, so that step understates the position's move. Semantics:
+money-semantics §10. Later step: a true TWR once dated external flows land (G6, R1(c)).
 
 **G2. Currency fallbacks are silent at the headline.** *Closed for the live total and stored snapshot rows (R4); per-source status waits for R8.*
 `CurrencyConverter.ToUsd` still returns an unknown currency's amount unchanged, but the headline readers now
