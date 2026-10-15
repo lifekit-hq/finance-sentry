@@ -41,7 +41,12 @@
             data-testid="watchlist-note"
           />
         </cmn-form-field>
-        <cmn-button type="submit" variant="primary" data-testid="watchlist-add">
+        <cmn-button
+          [disabled]="store.isAddLoading()"
+          type="submit"
+          variant="primary"
+          data-testid="watchlist-add"
+        >
           Add to watchlist
         </cmn-button>
       </form>

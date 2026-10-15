@@ -34,9 +34,9 @@ import {WatchlistStore} from '../../store/watchlist/watchlist.store';
 
 const SKELETON_ROWS = 3;
 const NOTE_ROWS = 3;
-const MAX_TICKER_LENGTH = 32;
-const MAX_EXCHANGE_LENGTH = 32;
-const MAX_NOTE_LENGTH = 4000;
+const MAX_TICKER_LENGTH = 20;
+const MAX_EXCHANGE_LENGTH = 20;
+const MAX_NOTE_LENGTH = 500;
 
 @Component({
   selector: 'fns-watchlist',
@@ -102,12 +102,17 @@ export class WatchlistComponent {
       this.form.markAllAsTouched();
       return;
     }
+    if (this.store.isAddLoading()) {
+      return;
+    }
     this.store.add({
-      ticker: ticker.trim().toUpperCase(),
-      exchange: exchange.trim() || null,
-      note: note.trim() || null,
+      payload: {
+        ticker: ticker.trim().toUpperCase(),
+        exchange: exchange.trim() || null,
+        note: note.trim() || null,
+      },
+      onAdded: () => this.form.reset(),
     });
-    this.form.reset();
   }
 
   public confirmRemove(row: Pick<WatchlistRow, 'id' | 'ticker'>): void {

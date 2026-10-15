@@ -52,6 +52,7 @@ describe('WatchlistStore', () => {
   });
 
   it('shows an added row before the server answers, then swaps in the saved one', () => {
+    const onAdded = vi.fn();
     const reply = new Subject<WatchlistItem>();
     const service = {
       getItems: vi.fn().mockReturnValue(of([PLTR])),
@@ -59,24 +60,62 @@ describe('WatchlistStore', () => {
     };
     const store = setup(service);
 
-    store.add({ticker: 'MRNA', exchange: 'NASDAQ', note: null});
+    store.add({payload: {ticker: 'MRNA', exchange: 'NASDAQ', note: null}, onAdded});
 
     expect(store.rows().map(r => r.ticker)).toContain('MRNA');
+    expect(onAdded).not.toHaveBeenCalled();
     reply.next(MRNA);
     reply.complete();
+    expect(onAdded).toHaveBeenCalledTimes(1);
     expect(store.items().map(i => i.id)).toEqual(['w1', 'w2']);
   });
 
   it('takes an added row back out when the add fails', () => {
+    const onAdded = vi.fn();
     const store = setup({
       getItems: vi.fn().mockReturnValue(of([PLTR])),
       add: vi.fn().mockReturnValue(throwError(() => new HttpErrorResponse({status: 400}))),
     });
 
-    store.add({ticker: 'MRNA', exchange: null, note: null});
+    store.add({payload: {ticker: 'MRNA', exchange: null, note: null}, onAdded});
 
     expect(store.items()).toEqual([PLTR]);
     expect(store.addErrorMessage()).not.toBe('');
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  it('leaves a row removed by another call gone when a later delete fails', () => {
+    const first = new Subject<void>();
+    const second = new Subject<void>();
+    const store = setup({
+      getItems: vi.fn().mockReturnValue(of([PLTR, MRNA])),
+      remove: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
+    });
+
+    store.remove('w1');
+    store.remove('w2');
+    second.next();
+    second.complete();
+    first.error(new HttpErrorResponse({status: 500}));
+
+    expect(store.items()).toEqual([PLTR]);
+  });
+
+  it('keeps a pending add when the initial load answers after it', () => {
+    const load = new Subject<WatchlistItem[]>();
+    const reply = new Subject<WatchlistItem>();
+    const store = setup({
+      getItems: vi.fn().mockReturnValue(load),
+      add: vi.fn().mockReturnValue(reply),
+    });
+
+    store.add({payload: {ticker: 'MRNA', exchange: null, note: null}, onAdded: vi.fn()});
+    load.next([PLTR]);
+    load.complete();
+    reply.next(MRNA);
+    reply.complete();
+
+    expect(store.items().map(i => i.id)).toEqual(['w1', 'w2']);
   });
 
   it('removes a row at once and deletes it on the server', () => {

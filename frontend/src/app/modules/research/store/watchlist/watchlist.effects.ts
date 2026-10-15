@@ -7,11 +7,17 @@ import {PENDING_ID_PREFIX} from '../../constants/watchlist/watchlist.constants';
 import {type AddWatchlistRequest, type WatchlistItem} from '../../models/watchlist/watchlist.model';
 import {WatchlistService} from '../../services/watchlist.service';
 
+export interface AddWatchlistCommand {
+  payload: AddWatchlistRequest;
+  onAdded: () => void;
+}
+
 interface EffectsStore {
   items: () => WatchlistItem[];
-  setItems: (items: WatchlistItem[]) => void;
+  setLoadedItems: (items: WatchlistItem[]) => void;
   appendItem: (item: WatchlistItem) => void;
   replaceItem: (id: string, item: WatchlistItem) => void;
+  insertItem: (index: number, item: WatchlistItem) => void;
   removeItem: (id: string) => void;
   setLoadLoading: () => void;
   setLoadSuccess: () => void;
@@ -34,7 +40,7 @@ export function watchlistEffects(store: EffectsStore) {
         switchMap(() =>
           service.getItems().pipe(
             tap(items => {
-              store.setItems(items);
+              store.setLoadedItems(items);
               store.setLoadSuccess();
             }),
             catchError((err: unknown) => {
@@ -47,9 +53,9 @@ export function watchlistEffects(store: EffectsStore) {
     ),
     // Optimistic: the row shows at once under a client id, then takes the server's row; a failed
     // add takes it back out.
-    add: rxMethod<AddWatchlistRequest>(
+    add: rxMethod<AddWatchlistCommand>(
       pipe(
-        mergeMap(payload => {
+        mergeMap(({payload, onAdded}) => {
           const pendingId = `${PENDING_ID_PREFIX}${crypto.randomUUID()}`;
           store.setAddLoading();
           store.appendItem({id: pendingId, ...payload, addedAt: new Date().toISOString()});
@@ -57,6 +63,7 @@ export function watchlistEffects(store: EffectsStore) {
             tap(created => {
               store.replaceItem(pendingId, created);
               store.setAddSuccess();
+              onAdded();
             }),
             catchError((err: unknown) => {
               store.removeItem(pendingId);
@@ -71,13 +78,16 @@ export function watchlistEffects(store: EffectsStore) {
     remove: rxMethod<string>(
       pipe(
         mergeMap(id => {
-          const before = store.items();
+          const index = store.items().findIndex(i => i.id === id);
+          const removed = index === -1 ? null : store.items()[index];
           store.setRemoveLoading();
           store.removeItem(id);
           return service.remove(id).pipe(
             tap(() => store.setRemoveSuccess()),
             catchError((err: unknown) => {
-              store.setItems(before);
+              if (removed) {
+                store.insertItem(index, removed);
+              }
               store.setRemoveError(extractErrorCode(err));
               return EMPTY;
             })
