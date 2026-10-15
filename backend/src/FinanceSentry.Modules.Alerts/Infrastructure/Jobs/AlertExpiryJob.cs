@@ -51,6 +51,8 @@ public sealed class AlertExpiryJob(
         [AlertType.PriceHike] = TimeSpan.FromDays(60),
         [AlertType.PerformanceBrief] = TimeSpan.FromDays(14),
         [AlertType.EarningsAhead] = TimeSpan.FromDays(2), // floor; the exact event date already resolves it (§3.1)
+        [AlertType.MacroEventAhead] = TimeSpan.FromDays(3), // only meaningful up to the release
+        [AlertType.MacroEventReleased] = TimeSpan.FromDays(2),
     };
 
     /// <summary>

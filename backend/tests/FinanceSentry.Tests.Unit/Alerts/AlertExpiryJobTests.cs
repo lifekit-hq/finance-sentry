@@ -52,6 +52,8 @@ public class AlertExpiryJobTests
     [InlineData(AlertType.PriceHike, 60)]
     [InlineData(AlertType.PerformanceBrief, 14)]
     [InlineData(AlertType.EarningsAhead, 2)]
+    [InlineData(AlertType.MacroEventAhead, 3)]
+    [InlineData(AlertType.MacroEventReleased, 2)]
     public async Task JustInsideTtl_LeavesAlertOpen(string type, int ttlDays)
     {
         var alert = MakeAlert(type, DateTimeOffset.UtcNow.AddDays(-ttlDays).AddMinutes(1));
@@ -71,6 +73,8 @@ public class AlertExpiryJobTests
     [InlineData(AlertType.PriceHike, 60)]
     [InlineData(AlertType.PerformanceBrief, 14)]
     [InlineData(AlertType.EarningsAhead, 2)]
+    [InlineData(AlertType.MacroEventAhead, 3)]
+    [InlineData(AlertType.MacroEventReleased, 2)]
     public async Task JustPastTtl_ResolvesAlert(string type, int ttlDays)
     {
         var alert = MakeAlert(type, DateTimeOffset.UtcNow.AddDays(-ttlDays).AddMinutes(-1));
