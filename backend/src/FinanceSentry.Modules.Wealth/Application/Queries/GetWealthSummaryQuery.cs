@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Modules.Wealth.Domain.Services;
 
 public record AppliedFiltersDto(string? Category, string? Provider);
@@ -66,7 +67,8 @@ public record WealthSummaryResponse(
     decimal TotalNetWorth,
     string BaseCurrency,
     IReadOnlyList<CategorySummaryDto> Categories,
-    AppliedFiltersDto AppliedFilters);
+    AppliedFiltersDto AppliedFilters,
+    Headline? Headline = null);
 
 public record GetWealthSummaryQuery(
     Guid UserId,

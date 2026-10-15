@@ -1,4 +1,6 @@
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.CryptoSync.Application.Services;
 using FinanceSentry.Modules.CryptoSync.Domain.Repositories;
 
@@ -11,12 +13,17 @@ public sealed record GetCryptoHoldingsQuery(Guid UserId) : IQuery<CryptoHoldings
 /// when they span several (each <see cref="CryptoHoldingDto"/> names its own venue), or
 /// <see cref="CryptoHoldingsResponse.NoProvider"/> when there are none.
 /// </param>
+/// <param name="Headline">
+/// <see cref="TotalUsdValue"/> as a typed <see cref="Core.Headlines.Headline"/> (USD): degraded while the
+/// holdings are older than an hour, with the worst conversion of a fiat balance behind it.
+/// </param>
 public sealed record CryptoHoldingsResponse(
     string Provider,
     DateTime? SyncedAt,
     bool IsStale,
     IReadOnlyList<CryptoHoldingDto> Holdings,
-    decimal TotalUsdValue)
+    decimal TotalUsdValue,
+    Headline? Headline = null)
 {
     public const string MultipleProviders = "multiple";
     public const string NoProvider = "none";
@@ -71,8 +78,9 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
                 TotalUsdValue: 0m);
         }
 
+        var now = DateTime.UtcNow;
         var lastSyncedAt = holdings.Max(h => h.SyncedAt);
-        var isStale = DateTime.UtcNow - lastSyncedAt > StaleThreshold;
+        var isStale = now - lastSyncedAt > StaleThreshold;
 
         var dtos = holdings
             .Select(h => new CryptoHoldingDto(
@@ -86,11 +94,27 @@ public sealed class GetCryptoHoldingsQueryHandler : IQueryHandler<GetCryptoHoldi
                 h.IsFiat))
             .ToList();
 
+        var provider = CryptoHoldingsResponse.ProviderOf(holdings.Select(h => h.Provider));
+        var totalUsd = dtos.Sum(h => h.UsdValue);
+        var signals = new HeadlineSignals
+        {
+            StaleSources = [.. holdings
+                .GroupBy(h => h.Provider, StringComparer.OrdinalIgnoreCase)
+                .Where(g => now - g.Max(h => h.SyncedAt) > StaleThreshold)
+                .Select(g => g.Key.ToLowerInvariant())],
+            Fx = holdings.Aggregate(FxStatus.Exact, (worst, h) => worst.Worst(CryptoHoldingValuation.Convert(h).Status)),
+        };
+        var scope = provider == CryptoHoldingsResponse.MultipleProviders
+            ? HeadlineScope.Sleeve("crypto")
+            : HeadlineScope.Source(provider);
+        var asOf = new DateTimeOffset(DateTime.SpecifyKind(holdings.Min(h => h.SyncedAt), DateTimeKind.Utc));
+
         return new CryptoHoldingsResponse(
-            Provider: CryptoHoldingsResponse.ProviderOf(holdings.Select(h => h.Provider)),
+            Provider: provider,
             SyncedAt: lastSyncedAt,
             IsStale: isStale,
             Holdings: dtos,
-            TotalUsdValue: dtos.Sum(h => h.UsdValue));
+            TotalUsdValue: totalUsd,
+            Headline: HeadlineFactory.Value(totalUsd, scope, DateOnly.FromDateTime(now), signals, asOf));
     }
 }

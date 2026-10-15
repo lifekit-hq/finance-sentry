@@ -1,6 +1,7 @@
 namespace FinanceSentry.Tests.Unit.Wealth;
 
 using System.Text.Json;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain;
@@ -96,5 +97,78 @@ public class GetNetWorthHistoryQueryHandlerTests
             .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
 
         response.ScopeChanges.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_TypesTheWindowChange_AsAValueChangeHeadline()
+    {
+        var first = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 9, 1), TotalNetWorth = 1_000m };
+        var last = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_400m };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([first, last]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        var headline = response.ChangeHeadline!;
+        headline.Method.Should().Be(HeadlineMethod.ValueChange);
+        headline.Basis.Should().Be(HeadlineBasis.StartValue);
+        headline.Amount.Should().Be(400m);
+        headline.Percent.Should().Be(40m);
+        headline.Window.Should().Be(new HeadlineWindow(new DateOnly(2026, 9, 1), new DateOnly(2026, 10, 1)));
+        headline.Quality.Should().Be(HeadlineQuality.Complete);
+    }
+
+    [Fact]
+    public async Task Handle_WithholdsTheChangePercent_AcrossAScopeChange_AndCarriesTheEndRowsFlags()
+    {
+        var first = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 9, 1), TotalNetWorth = 1_000m, IsApproximate = true };
+        var last = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_400m, StaleSleeves = "brokerage" };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([first, last]);
+        var reader = new Mock<IAccountScopeChangeReader>();
+        reader.Setup(r => r.GetChangesSinceAsync(UserId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new AccountScopeChange("monobank", AccountScopeChangeKinds.Linked, new DateTime(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc))]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [reader.Object])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        var headline = response.ChangeHeadline!;
+        headline.Amount.Should().Be(400m, "the amount stays; only the percent is withheld");
+        headline.Percent.Should().BeNull();
+        headline.Quality.Should().Be(HeadlineQuality.Degraded);
+        headline.Reasons.Select(r => r.Code).Should().Contain([
+            HeadlineReasonCode.ScopeChanged, HeadlineReasonCode.BackfilledEstimate,
+            HeadlineReasonCode.FxTodayRate, HeadlineReasonCode.StaleSource]);
+    }
+
+    [Fact]
+    public async Task Handle_TypesASingleSnapshotWindow_AsUnavailableWithShortHistory()
+    {
+        var only = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_400m };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([only]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        var headline = response.ChangeHeadline!;
+        headline.Amount.Should().BeNull();
+        headline.Percent.Should().BeNull();
+        headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Reasons.Select(r => r.Code).Should().Equal(HeadlineReasonCode.ShortHistory);
+        headline.Window.Should().Be(new HeadlineWindow(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 1)));
+    }
+
+    [Fact]
+    public async Task Handle_HasNoChangeHeadline_WithoutHistory()
+    {
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        response.ChangeHeadline.Should().BeNull();
     }
 }

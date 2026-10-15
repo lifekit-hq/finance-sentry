@@ -2,6 +2,7 @@ namespace FinanceSentry.Modules.Research.Application.Queries;
 
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Modules.Research.API.Responses;
 using FinanceSentry.Modules.Research.Domain.Repositories;
@@ -44,6 +45,8 @@ public class GetAllocationDriftQueryHandler(
             logger.LogWarning("Book figures are stale for user {UserId}; stale sources: {Sources}.", query.UserId, string.Join(", ", book.StaleSources));
 
         var total = book.TotalValueUsd;
+        var totalHeadline = HeadlineFactory.Value(
+            total, HeadlineScope.Umbrella, DateOnly.FromDateTime(DateTime.UtcNow), HeadlineSignals.FromBook(book));
 
         if (ips is null)
         {
@@ -53,7 +56,7 @@ public class GetAllocationDriftQueryHandler(
                     Percent(kv.Value, total), kv.Value, Percent(kv.Value, total), StatusUnplanned))
                 .OrderByDescending(s => s.ActualValueUsd)
                 .ToList();
-            return new AllocationDriftDto(false, total, book.CashUsd, book.InvestedValueUsd, false, currentOnly, "n/a", book.IsStale);
+            return new AllocationDriftDto(false, total, book.CashUsd, book.InvestedValueUsd, false, currentOnly, "n/a", book.IsStale, totalHeadline);
         }
 
         var rule = ips.RebalancingRule;
@@ -93,7 +96,8 @@ public class GetAllocationDriftQueryHandler(
             true, total, book.CashUsd, book.InvestedValueUsd, needsRebalance,
             sleeves.OrderByDescending(s => s.ActualValueUsd).ToList(),
             ips.ReviewCadence,
-            book.IsStale);
+            book.IsStale,
+            totalHeadline);
     }
 
     private static decimal Percent(decimal value, decimal total)

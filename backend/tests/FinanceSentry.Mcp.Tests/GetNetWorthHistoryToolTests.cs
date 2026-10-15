@@ -1,4 +1,6 @@
+using System.Text.Json;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FluentAssertions;
@@ -87,6 +89,58 @@ public sealed class GetNetWorthHistoryToolTests
         result[1].CashTotal.Should().Be(1150m);
         result[1].BrokerageInvested.Should().Be(400m);
         result[1].CryptoInvested.Should().Be(200m);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TypesEachDaysTotal_AsAHeadline()
+    {
+        var measured = new NetWorthSnapshotDto(new DateOnly(2026, 10, 2), 1000m, 500m, 250m, 1750m, "USD", null, false, FxReasons: []);
+        var reconstructed = new NetWorthSnapshotDto(
+            new DateOnly(2026, 10, 3), 1000m, 500m, 250m, 1750m, "USD", "crypto", true, FxReasons: ["FX_TODAY_RATE"]);
+        var unknownFx = new NetWorthSnapshotDto(
+            new DateOnly(2026, 10, 4), 1000m, 500m, 250m, 1750m, "USD", null, false, FxReasons: ["FX_UNKNOWN_1TO1"]);
+
+        _handler
+            .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new NetWorthHistoryResponse([measured, reconstructed, unknownFx], true));
+
+        var result = await CreateSut().ExecuteAsync();
+
+        result[0].Headline!.Quality.Should().Be(HeadlineQuality.Complete);
+        result[0].Headline!.Amount.Should().Be(1750m);
+        result[0].Headline!.Window.To.Should().Be(new DateOnly(2026, 10, 2));
+        result[1].Headline!.Quality.Should().Be(HeadlineQuality.Degraded);
+        result[1].Headline!.Reasons.Should().Equal(
+            new HeadlineReason(HeadlineReasonCode.StaleSource, "crypto"),
+            new HeadlineReason(HeadlineReasonCode.BackfilledEstimate),
+            new HeadlineReason(HeadlineReasonCode.FxTodayRate));
+        result[2].Headline!.Quality.Should().Be(HeadlineQuality.Degraded);
+        result[2].Headline!.Reasons.Should().Equal(new HeadlineReason(HeadlineReasonCode.FxUnknown1To1));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HeadlineContract_IsAdditiveAndTyped()
+    {
+        var row = new NetWorthSnapshotDto(new DateOnly(2026, 10, 3), 1000m, 500m, 250m, 1750m, "USD", "crypto", true);
+        _handler
+            .Setup(h => h.Handle(It.IsAny<GetNetWorthHistoryQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new NetWorthHistoryResponse([row], true));
+
+        var result = await CreateSut().ExecuteAsync();
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        var entry = json.RootElement[0];
+
+        // The existing fields stay where they were; the headline sits beside them.
+        entry.GetProperty("totalNetWorth").GetDecimal().Should().Be(1750m);
+        entry.GetProperty("staleSleeves").GetString().Should().Be("crypto");
+        entry.GetProperty("isApproximate").GetBoolean().Should().BeTrue();
+        var headline = entry.GetProperty("headline");
+        headline.GetProperty("method").GetString().Should().Be("VALUE");
+        headline.GetProperty("scope").GetString().Should().Be("umbrella");
+        headline.GetProperty("quality").GetString().Should().Be("DEGRADED");
+        headline.GetProperty("currency").GetString().Should().Be("USD");
+        headline.GetProperty("reasons").EnumerateArray().Select(r => r.GetProperty("code").GetString())
+            .Should().Equal("STALE_SOURCE", "BACKFILLED_ESTIMATE", "FX_TODAY_RATE");
     }
 
     [Fact]

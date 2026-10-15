@@ -1,5 +1,6 @@
 using FinanceSentry.Core.Auth;
 using FinanceSentry.Core.Cqrs;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Mcp.Tools;
 using FinanceSentry.Modules.Alerts.Application.Services;
@@ -508,6 +509,38 @@ public sealed class ToolParityTests
         result.CashUsd.Should().Be(result.BankingCashUsd + result.BrokerageCashUsd);
         result.InvestedValueUsd.Should().Be(1_900m);
         result.TotalValueUsd.Should().Be(result.InvestedValueUsd + result.CashUsd);
+    }
+
+    [Fact]
+    public async Task GetPortfolioSnapshot_TypesItsTotals_AsHeadlinesThatAgreeWithTheUntypedFields()
+    {
+        var userId = Guid.NewGuid();
+        await using var sp = BuildProvider(Guid.NewGuid().ToString("N"), actingUserId: userId);
+        await using var scope = sp.CreateAsyncScope();
+        var svc = scope.ServiceProvider;
+
+        var brokerageDb = svc.GetRequiredService<BrokerageSyncDbContext>();
+        brokerageDb.BrokerageHoldings.Add(new BrokerageHolding(userId, "AAPL", "STK", 10m, 1_900m, "ibkr"));
+        brokerageDb.BrokerageHoldings.Add(new BrokerageHolding(userId, "EUR", "CASH", 800m, 923m, "ibkr"));
+        await brokerageDb.SaveChangesAsync();
+
+        var result = await svc.GetRequiredService<GetPortfolioSnapshotTool>().ExecuteAsync();
+
+        var headlines = result.Headlines!;
+        headlines.TotalValue.Amount.Should().Be(result.TotalValueUsd);
+        headlines.TotalValue.Scope.Should().Be(HeadlineScope.Umbrella);
+        headlines.InvestedValue.Amount.Should().Be(result.InvestedValueUsd);
+        headlines.Cash.Amount.Should().Be(result.CashUsd);
+        headlines.TotalValue.Method.Should().Be(HeadlineMethod.Value);
+        headlines.TotalValue.Currency.Should().Be("USD");
+
+        // No cost basis was synced: the gain is unavailable with a missing basis, never 0%.
+        headlines.UnrealizedPnl.Method.Should().Be(HeadlineMethod.GainVsCost);
+        headlines.UnrealizedPnl.Amount.Should().BeNull();
+        headlines.UnrealizedPnl.Percent.Should().BeNull();
+        headlines.UnrealizedPnl.BasisStatus.Should().Be(BasisStatus.Missing);
+        headlines.UnrealizedPnl.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headlines.UnrealizedPnl.Reasons.Select(r => r.Code).Should().Equal(HeadlineReasonCode.NoCostBasis);
     }
 
     /// <summary>

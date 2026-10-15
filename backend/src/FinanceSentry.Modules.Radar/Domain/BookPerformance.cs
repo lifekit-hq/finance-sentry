@@ -1,5 +1,7 @@
 namespace FinanceSentry.Modules.Radar.Domain;
 
+using FinanceSentry.Core.Headlines;
+
 /// <summary>Lookback window for the book-vs-SPY value-change computation.</summary>
 public enum BookPerformancePeriod
 {
@@ -23,6 +25,12 @@ public enum BookPerformancePeriod
 /// no number, <c>HoldingsBasedUnavailableReason</c> says why (never a 0) and, for a missing price,
 /// <c>HoldingsBasedMissingPriceSymbols</c> names the positions.
 /// </para>
+/// <para>
+/// <c>Book</c> names the book side as a typed <see cref="Headline"/> (VALUE_CHANGE over START_VALUE on
+/// <c>invested_brokerage</c>, USD): its amount is the dollar change, its percent the same change in percentage
+/// points, and its quality and reasons carry the end rows' stale, reconstructed and FX flags, or say why there is
+/// no figure (SHORT_HISTORY, ZERO_BASE).
+/// </para>
 /// </summary>
 public sealed record PeriodTwr(
     BookPerformancePeriod Period,
@@ -35,7 +43,8 @@ public sealed record PeriodTwr(
     decimal? SpyPriceReturn = null,
     decimal? HoldingsBasedDelta = null,
     HoldingsReturnUnavailableReason? HoldingsBasedUnavailableReason = null,
-    IReadOnlyList<string>? HoldingsBasedMissingPriceSymbols = null);
+    IReadOnlyList<string>? HoldingsBasedMissingPriceSymbols = null,
+    Headline? Book = null);
 
 /// <summary>
 /// Book-vs-SPY change-in-invested-value scoreboard across the four standard lookback windows.

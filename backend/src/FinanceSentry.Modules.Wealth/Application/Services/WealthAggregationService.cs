@@ -1,6 +1,7 @@
 namespace FinanceSentry.Modules.Wealth.Application.Services;
 
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
@@ -32,6 +33,9 @@ public class WealthAggregationService(
             ["active"] = 5,
         };
 
+    private static readonly HashSet<string> NotCurrentStatuses =
+        new(StringComparer.OrdinalIgnoreCase) { "stale", "failed", "reauth_required" };
+
     private readonly IBankingAccountsReader _bankingAccounts = bankingAccounts ?? throw new ArgumentNullException(nameof(bankingAccounts));
     private readonly IBankingTransactionReader _bankingTransactions = bankingTransactions ?? throw new ArgumentNullException(nameof(bankingTransactions));
     private readonly ICryptoHoldingsReader? _cryptoReader = cryptoReader;
@@ -51,6 +55,9 @@ public class WealthAggregationService(
             filtered = filtered.Where(a => string.Equals(a.Provider, provider, StringComparison.OrdinalIgnoreCase));
         else if (category is not null)
             filtered = filtered.Where(a => ProviderCategoryMapper.GetCategory(a.Provider) == category);
+
+        // The worst conversion behind any figure the total is summed from.
+        var fx = filtered.Aggregate(FxStatus.Exact, (worst, a) => worst.Worst(a.FxStatus));
 
         var grouped = filtered
             .GroupBy(a => ProviderCategoryMapper.GetCategory(a.Provider))
@@ -74,6 +81,7 @@ public class WealthAggregationService(
                 .ToList();
             if (holdings.Count > 0)
             {
+                fx = holdings.Aggregate(fx, (worst, h) => worst.Worst(h.FxStatus));
                 var accounts = holdings.Select(h => new AccountBalanceDto(
                     Guid.Empty, DisplayNameFor(h.Provider), h.IsVenueFiat ? "cash" : "crypto", h.Asset, h.Provider.ToLowerInvariant(), "crypto",
                     h.Asset, h.FreeQuantity + h.LockedQuantity, h.UsdValue, "synced", h.SyncedAt,
@@ -106,6 +114,7 @@ public class WealthAggregationService(
             if (holdings.Count > 0)
             {
                 var now = DateTime.UtcNow;
+                fx = holdings.Aggregate(fx, (worst, h) => worst.Worst(h.FxStatus));
                 var connectionStatuses = brokerageConnections is null
                     ? new Dictionary<string, string>()
                     : await brokerageConnections.GetStatusesAsync(userId, ct);
@@ -138,9 +147,35 @@ public class WealthAggregationService(
             }
         }
 
+        var total = grouped.Sum(c => c.TotalInBaseCurrency);
         return new WealthSummaryResponse(
-            grouped.Sum(c => c.TotalInBaseCurrency), "USD", grouped,
-            new AppliedFiltersDto(category, provider));
+            total, "USD", grouped,
+            new AppliedFiltersDto(category, provider),
+            BuildHeadline(total, grouped, fx, category, provider));
+    }
+
+    // Institutions that are not current (stale, failed, needing re-auth) make the total degraded, each named
+    // as its own source; the oldest successful sync behind the total is its as-of.
+    private static Headline BuildHeadline(
+        decimal totalUsd, IReadOnlyList<CategorySummaryDto> categories, FxStatus fx, string? category, string? provider)
+    {
+        var institutions = categories.SelectMany(c => c.Institutions).ToList();
+        var signals = new HeadlineSignals
+        {
+            StaleSources = [.. institutions
+                .Where(i => NotCurrentStatuses.Contains(i.SyncStatus))
+                .Select(i => i.Provider)
+                .Distinct(StringComparer.OrdinalIgnoreCase)],
+            Fx = fx,
+        };
+        DateTimeOffset? asOf = institutions.Min(i => i.LastSuccessfulSyncTimestamp) is { } oldest
+            ? new DateTimeOffset(DateTime.SpecifyKind(oldest, DateTimeKind.Utc))
+            : null;
+        var scope = provider is not null ? HeadlineScope.Source(provider)
+            : category is not null ? HeadlineScope.Sleeve(category)
+            : HeadlineScope.Umbrella;
+
+        return HeadlineFactory.Value(totalUsd, scope, DateOnly.FromDateTime(DateTime.UtcNow), signals, asOf);
     }
 
     private static IReadOnlyList<InstitutionDto> BuildBankingInstitutions(IReadOnlyList<BankingAccountSummary> summaries)

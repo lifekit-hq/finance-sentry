@@ -1,5 +1,6 @@
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Domain;
+using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
@@ -30,14 +31,19 @@ public sealed record BrokeragePositionDto(
     string Currency = "USD",
     decimal? NativeValue = null);
 
-/// <summary><see cref="Provider"/> is the one provider all positions come from, or <c>mixed</c>.</summary>
+/// <summary>
+/// <see cref="Provider"/> is the one provider all positions come from, or <c>mixed</c>. <see cref="Headline"/> is
+/// <see cref="TotalUsdValue"/> as a typed <see cref="Core.Headlines.Headline"/> (USD): each provider past its own
+/// cadence is a stale source, and a position in a currency with no rate passes through 1:1.
+/// </summary>
 public sealed record BrokerageHoldingsResponse(
     string Provider,
     DateTime? SyncedAt,
     bool IsStale,
     DateOnly? FlexAsOfDate,
     IReadOnlyList<BrokeragePositionDto> Positions,
-    decimal TotalUsdValue);
+    decimal TotalUsdValue,
+    Headline? Headline = null);
 
 public sealed class GetBrokerageHoldingsQueryHandler(
     IBrokerageHoldingRepository holdingRepository,
@@ -77,11 +83,14 @@ public sealed class GetBrokerageHoldingsQueryHandler(
         var now = DateTime.UtcNow;
         // Each provider is judged on its own cadence: Flex-sourced holdings are daily by nature (statement date,
         // calendar days), IBKR's live sync is intraday, Inzhur is read once a day.
-        var isStale = holdings
+        var staleProviders = holdings
             .GroupBy(h => h.Provider, StringComparer.OrdinalIgnoreCase)
-            .Any(g => g.Max(h => h.FlexAsOfDate) is { } asOf
+            .Where(g => g.Max(h => h.FlexAsOfDate) is { } asOf
                 ? asOf < DateOnly.FromDateTime(now).AddDays(-FlexStaleAfterDays)
-                : BrokerageFreshness.IsStale(g.Key, g.Max(h => h.SyncedAt), now));
+                : BrokerageFreshness.IsStale(g.Key, g.Max(h => h.SyncedAt), now))
+            .Select(g => g.Key.ToLowerInvariant())
+            .ToList();
+        var isStale = staleProviders.Count > 0;
         var providers = holdings.Select(h => h.Provider).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var totalUsd = holdings.Sum(h => h.UsdValue);
 
@@ -106,12 +115,21 @@ public sealed class GetBrokerageHoldingsQueryHandler(
             })
             .ToList();
 
+        var signals = new HeadlineSignals
+        {
+            StaleSources = staleProviders,
+            Fx = holdings.Aggregate(FxStatus.Exact, (worst, h) => worst.Worst(CurrencyConverter.Convert(1m, h.Currency).Status)),
+        };
+        var scope = providers.Count == 1 ? HeadlineScope.Source(providers[0]) : HeadlineScope.Sleeve("brokerage");
+        var asOf = new DateTimeOffset(DateTime.SpecifyKind(holdings.Min(h => h.SyncedAt), DateTimeKind.Utc));
+
         return new BrokerageHoldingsResponse(
             Provider: providers.Count == 1 ? providers[0] : MixedProviders,
             SyncedAt: latestSyncedAt,
             IsStale: isStale,
             FlexAsOfDate: flexAsOf,
             Positions: positions,
-            TotalUsdValue: totalUsd);
+            TotalUsdValue: totalUsd,
+            Headline: HeadlineFactory.Value(totalUsd, scope, DateOnly.FromDateTime(now), signals, asOf));
     }
 }

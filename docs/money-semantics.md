@@ -9,7 +9,8 @@ contract, the valuation rule for a new economy) live in [finance-framework.md](f
 This document records what each existing number means today; a PR that changes money math updates
 both, or says in its description why the framework doc is untouched.
 
-Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added 2026-10-15.
+Last verified: 2026-10-06 (§11 FIRE projection); §10 Book vs SPY relabelled 2026-10-15, holdings-based return added
+2026-10-15; headline records (§8, §10) added 2026-10-15.
 
 ---
 
@@ -812,6 +813,15 @@ are closed periods.
   was stale (`BookFigures.IsStale`) both are null and the sub-line is hidden rather than
   showing a partial split; it is also hidden while the chart is being scrubbed, as the split
   is live only.
+- **Headline records** (finance-framework §3.6): the dashboard payload carries the total, cash and invested
+  figures a second time as typed records (`netWorthHeadline`, `cashHeadline`, `investedHeadline`), computed
+  in USD and converted to the base currency at the controller with the same rate. A stale book source makes
+  them DEGRADED with `STALE_SOURCE` per source (a brokerage provider past its freshness window counts too); a
+  withheld split makes the cash and invested records UNAVAILABLE with `NO_SPLIT` (amount null, not 0); the
+  worst FX status behind the total becomes `FX_TODAY_RATE` / `FX_UNKNOWN_1TO1`. The wealth summary, the
+  crypto and brokerage holdings and net-worth history (`changeHeadline`, first to last point, percent
+  withheld with `SCOPE_CHANGED` when an account was linked or removed inside the window; a window with a
+  single point is UNAVAILABLE with `SHORT_HISTORY`, never a zero change) carry the same record. The untyped fields are unchanged.
 - **History chart**: daily `net_worth_snapshots` rows, one per (user, UTC date),
   **upserted** — refreshed by every successful account sync (`FirstSyncSnapshotTrigger`)
   and by the 01:00 UTC Hangfire backstop job (`NetWorthSnapshotJob`). The newest point
@@ -1061,6 +1071,16 @@ return percentages, not money, but they sit next to cost basis, so their rules a
   shorter window. With fewer than two split days, a zero opening value, or a first or last split day
   outside the tolerance, `bookTwr` is null (and so are `delta` and `verdict`; the period is dropped when
   SPY and the holdings-based figure below are missing too), as it already is with too little history. The brief shows it as `Book value change (incl. deposits) N/A`.
+- **Headline record.** Each period also carries `Book`, the same book side as a typed headline record
+  (finance-framework §3.6): `VALUE_CHANGE` over `START_VALUE` on scope `invested_brokerage`, from the window's
+  first to last split day. Its `amount` is the dollar change and its `percent` is `bookTwr` in percentage
+  points. Where `bookTwr` is null it says why: no measurable window (fewer than two split days, an edge outside
+  the tolerance) is UNAVAILABLE with `NO_SPLIT` when the period has snapshot days whose cash/invested split was
+  not measured (the portfolio value port keeps those days, marked by a null invested value, and the calculation
+  still ignores them) and with `SHORT_HISTORY` otherwise; a zero opening value keeps the dollar change and
+  withholds the percent with `ZERO_BASE`. The two end rows' `StaleSleeves` (brokerage only), `IsApproximate`
+  and `fx_status` become its quality and reasons. No scope change is detected on this series, so the record
+  never carries `SCOPE_CHANGED`. The holdings-based return below carries no headline record yet.
 - **Deposits still distort it (not fixed).** The figure is last / first - 1 over the invested value, with no
   contribution adjustment: money moved into the brokerage and invested reads as a gain, a withdrawal as a
   loss. A purchase made from idle broker cash (which the series excludes) reads as a gain too, with no deposit
