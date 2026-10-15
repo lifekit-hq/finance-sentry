@@ -18,6 +18,12 @@ public sealed class NetWorthSnapshot : IUserOwned
     public decimal BrokerageTotal { get; init; }
     [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'crypto')")]
     public decimal CryptoTotal { get; init; }
+
+    /// <summary>
+    /// The sum of every registered source's resolved figure: the three sleeve columns above plus each other
+    /// source's <c>net_worth_snapshot_sources.total</c> (carried forward from its own previous row when its read
+    /// failed). Equal to the three sleeves while no other source is registered.
+    /// </summary>
     public decimal TotalNetWorth { get; init; }
     public string Currency { get; init; } = "USD";
     public DateTimeOffset TakenAt { get; init; }

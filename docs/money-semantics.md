@@ -851,9 +851,11 @@ are closed periods.
   `STALE_SOURCE`). A carried-forward or unread sleeve's counted figure is its column (the carried
   value), never the row's own reading, so the sleeves' figures always add up to `totalNetWorth`.
   Figures are USD like the snapshot's totals; a non-USD base converts them at the row's own rate
-  (C4). Only the three sleeves count in `totalNetWorth` until the columns are frozen (R8 PR 4); a
-  source beyond them is listed (null figure when its read failed) but not summed. `staleSleeves`
-  is still returned, derived from the sources (sleeves only). Stale state everywhere (history and
+  (C4). `totalNetWorth` is the sum of every registered source's figure (R8 PR 4): the three
+  sleeves as above, and any other source as it read that day - or, when its read failed, carried
+  forward from its own previous row (DEGRADED, `STALE_SOURCE`; null figure and not summed only
+  when it has no earlier figure). `staleSleeves` is still returned, derived from the sources
+  (sleeves only). Stale state everywhere (history and
   hero badges, FIRE, the brokerage history reader, the split backfill) is `STALE_SOURCE` per source.
 - **Cash / invested split per snapshot** (`net_worth_snapshots.cash_total`, `brokerage_invested`,
   `crypto_invested`; exposed as `cashTotal` / `brokerageInvested` / `cryptoInvested` on

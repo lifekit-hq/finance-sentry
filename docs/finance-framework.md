@@ -77,7 +77,8 @@ This is the target shape. Today the top (three sources registered as `IWealthSou
 per-source row written beside every snapshot, R8 PR 2, and read back by history, the dashboard, MCP and FIRE,
 R8 PR 3) and bottom (dashboard, MCP, briefs) are wired. The measure engine is built for M1-M6 and M9 (3.4); the
 headline record (3.6) is built in the backend and MCP and calls M1 for the figures that are changes. The stored
-totals are still the three sleeve columns, frozen by R8 PR 4: kept for history, never extended (5.6).
+stored total is the sum of every registered source's resolved figure; the three sleeve columns are frozen by
+R8 PR 4: kept for history, never extended (5.6).
 
 Three rules keep the layers apart:
 
@@ -632,13 +633,14 @@ the `StaleSleeves` string, and a change in every consumer; now it needs one `IWe
      `FX_UNKNOWN_1TO1`, or a sleeve this snapshot carried forward, `STALE_SOURCE`); `Unavailable` (the read
      threw: null figures, `STALE_SOURCE`, the same way `BookFigures` reports a failed source stale).
    - **A row is what the source read this run.** When the snapshot carried a sleeve forward, the snapshot's own
-     column holds the carried figure and the row says so through its health. A sleeve that was read,
+     column holds the carried figure and the row says so through its health (a source beyond the sleeves that
+     failed to read is carried in its own row instead, PR 4). A sleeve that was read,
      is fresh and was not carried forward is `Complete` or `Estimated`, and its row total is its column
      (`NetWorthSnapshotSourceRowTests` pins this through the job and the service, with a stale and a failed
      source); whenever every source is, the rows add up to the sleeve columns, up to a cent: each figure rounds
      to cents on its own.
-   - **Totals do not read the rows yet.** `TotalNetWorth` stays `banking + brokerage + crypto`; a fourth
-     source's row is recorded and read back per source (PR 3); the frozen columns (PR 4) do not extend to it.
+   - **Totals.** A source beyond the three sleeves is recorded and read back per source (PR 3) and, since PR 4,
+     counted in `TotalNetWorth` (see step 4).
    - **Not backfilled.** Past snapshots are untouched and have no rows (PR 3 treats "no rows" as "legacy").
      The startup catch-up (`NetWorthSnapshotBackfillService`) fills gap days through the same job, so those rows
      carry the figures read at that moment, like their snapshot columns. The history reconstruction command
@@ -671,12 +673,14 @@ the `StaleSleeves` string, and a change in every consumer; now it needs one `IWe
      replaces it. Not `[Obsolete]`: the writer and the fallback use them by design, so that would only add
      suppressions.
    - **Enforced.** `FrozenLegacyColumnGuardTests` (`Tests.Unit/Architecture`) fails when `NetWorthSnapshot` gains a
-     property (a fourth sleeve) and when a file outside the allow-list reads a frozen column. The allow-list is the
-     snapshot writer (`NetWorthSnapshotService`, the repository, `WealthDbContext`), the PR 3 fallback adapter
-     (`SnapshotSources`) and the three readers that predate the freeze (`GetNetWorthHistoryQuery`,
-     `BrokerageValueHistoryReader`, `NetWorthSplitBackfillService`); it is not to be extended.
-   - **The totals.** `TotalNetWorth` is still `banking + brokerage + crypto` from the columns' sources; a new
-     economy's contribution is read from its per-source row (see "Adding a new economy").
+     property (a fourth sleeve) or when the set of properties carrying `[FrozenLegacyColumn]` changes.
+   - **The totals.** `TotalNetWorth` is the sum of every registered source's resolved figure
+     (`NetWorthSnapshotService`): the three sleeves resolve exactly as before (fresh figure, else the previous
+     column, the first-day throw), and each other source counts as it read this run or, when its read failed, as
+     its own previous per-source row counted it (the row is then `Degraded` + `STALE_SOURCE` and holds the carried
+     figure; a source with no earlier figure counts nothing and stays `Unavailable`). History rows, its change
+     headline and FIRE read that total, so a fourth source is in all of them. `NetWorthSnapshotTotalTests` pins
+     the three-source total unchanged and a fourth source counted, carried and in the history headline.
 
 ### Adding a new economy
 
@@ -817,7 +821,7 @@ snapshot written since has a per-source row, the snapshot readers take sources a
 (§5.6 step 3), and the three sleeve columns are frozen and guarded (step 4).*
 Three total columns on `net_worth_snapshots` and staleness as a comma-separated string of sleeve names, still
 written. The columns are frozen (R8 PR 4, §5.6): a new economy is an `IWealthSource` recorded and reported per
-source, never a column.
+source, counted in the stored total, never a column.
 
 **G5. Quality signals are scattered and untyped.** *Closed for the headline figures, the MCP
 totals and the UI badges (R6, first PR and P9); the FIRE tile still reads its own untyped `hasStaleSleeves`.*
