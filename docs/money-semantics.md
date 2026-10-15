@@ -878,6 +878,19 @@ are closed periods.
   later. While scrubbing, it runs from the
   first split day to the scrubbed day, and is hidden when the scrubbed day has no split. The
   "At this pace" projection is untouched (built from savings, not from this line).
+- **Scope changes hide the change percentage**: `/net-worth/history` also returns `scopeChanges`
+  (`source`, `kind` = `linked` | `removed`, `at` date, UTC) - the accounts or connections that
+  entered or left the book on or after the first returned snapshot, collected from one
+  `IAccountScopeChangeReader` per module (bank accounts, IBKR / IBKR Flex / Inzhur credentials,
+  exchange credentials). The MCP `get_net_worth_history` tool does not return it. When any change
+  falls between the window's first snapshot and the figure shown (the scrubbed day while
+  scrubbing), the **Change** line keeps its amount, drops the percentage and shows "Includes newly
+  linked accounts" (or "…removed accounts") instead: linking an existing account grows the book
+  without any money moving, so a percentage over it misleads. Removal is detected for bank
+  accounts only - their last update stands in for the deactivation time, so a later write to an
+  already-deactivated account reads as a removal - because credentials record no deactivation time;
+  per-source rows (R8) resolve it. A relinked IBKR / Flex credential counts as linked (its
+  `CreatedAt` is re-stamped). The **Invested change** line is unaffected.
 - **Chart gaps and scrubbing** (frontend, `dashboard.computed.ts`): the dashboard's stacked
   chart additionally carries a sleeve's last drawn value forward over a snapshot where it reads
   exactly 0 (negative banking values are drawn as they are). While a pointer scrubs the chart,
