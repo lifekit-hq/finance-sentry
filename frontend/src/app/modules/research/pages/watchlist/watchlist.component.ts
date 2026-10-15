@@ -95,7 +95,7 @@ export class WatchlistComponent {
 
   public submit(): void {
     const {ticker, exchange, note} = this.form.getRawValue();
-    if (ticker.trim() === '') {
+    if (ticker.trim() === '' || this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }

@@ -123,4 +123,28 @@ test.describe('Watchlist', () => {
     await expect(page.getByTestId('watchlist-row')).toHaveCount(1);
     expect(server.removed).toHaveLength(1);
   });
+
+  test('does not send a ticker or exchange over the backend column limits', async ({page}) => {
+    const requests: string[] = [];
+    page.on('request', r => {
+      if (r.method() === 'POST' && r.url().includes('/research/watchlist')) {
+        requests.push(r.url());
+      }
+    });
+    await mockWatchlist(page, []);
+    await page.goto('/watchlist');
+    await page.getByTestId('watchlist-ticker').locator('input').fill('A'.repeat(21));
+    await page.getByTestId('watchlist-add').click();
+    await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
+    await page.getByTestId('watchlist-ticker').locator('input').fill('PLTR');
+    await page.getByTestId('watchlist-exchange').locator('input').fill('B'.repeat(21));
+    await page.getByTestId('watchlist-add').click();
+    await expect(page.getByTestId('watchlist-row')).toHaveCount(0);
+    expect(requests).toHaveLength(0);
+
+    await page.getByTestId('watchlist-exchange').locator('input').fill('NASDAQ');
+    await page.getByTestId('watchlist-add').click();
+    await expect(page.getByTestId('watchlist-row')).toHaveCount(1);
+    expect(requests).toHaveLength(1);
+  });
 });
