@@ -17,12 +17,16 @@ public sealed class GetUpcomingEventsQueryTests
     private static readonly DateOnly From = new(2026, 9, 22);
     private static readonly DateOnly To = new(2026, 10, 22);
 
+    /// <summary>US Eastern daylight time, which every release in the window falls under.</summary>
+    private static readonly TimeSpan Edt = TimeSpan.FromHours(-4);
+
     private readonly Mock<IBrokerageHoldingsReader> _brokerage = new();
     private readonly Mock<IWatchlistReader> _watchlist = new();
     private readonly Mock<IUpcomingCorporateEventReader> _corporate = new();
     private readonly Mock<IMacroEventReader> _macro = new();
     private readonly Mock<IThesisCatalystReader> _theses = new();
     private readonly Mock<IPeriodicFilingReader> _filings = new();
+    private DateTimeOffset _now = new(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
 
     public GetUpcomingEventsQueryTests()
     {
@@ -39,7 +43,7 @@ public sealed class GetUpcomingEventsQueryTests
                 new CorporateCalendarEntry("PLTR", "dividend", new DateOnly(2026, 10, 15), false, "yahoo"),
             ]);
         _macro.Setup(m => m.QueryAsync(From, To, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new MacroCalendarEntry(Guid.NewGuid(), new DateOnly(2026, 10, 15), new TimeOnly(8, 30), "CPI (Sep)", "US", "high", "bls")]);
+            .ReturnsAsync([Macro(new DateOnly(2026, 10, 15), new TimeOnly(8, 30), "CPI (Sep)", "bls")]);
         _theses.Setup(t => t.ListActiveAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new ThesisCatalystEntry(Guid.NewGuid(), "MU", new DateOnly(2026, 10, 5), "HBM4 ramp update"),
@@ -55,7 +59,20 @@ public sealed class GetUpcomingEventsQueryTests
 
     private GetUpcomingEventsQueryHandler Handler() => new(
         _brokerage.Object, _watchlist.Object, _corporate.Object, _macro.Object, _theses.Object, _filings.Object,
-        NullLogger<GetUpcomingEventsQueryHandler>.Instance);
+        new FixedClock(_now), NullLogger<GetUpcomingEventsQueryHandler>.Instance);
+
+    /// <summary>A US release as the Research reader reports it: status derived from <see cref="_now"/>.</summary>
+    private MacroCalendarEntry Macro(DateOnly date, TimeOnly time, string name, string source)
+    {
+        var at = new DateTimeOffset(date.ToDateTime(time), Edt).ToUniversalTime();
+        return new MacroCalendarEntry(
+            Guid.NewGuid(), date, time, name, "US", "high", source, at, at <= _now ? "released" : "scheduled");
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 
     [Fact]
     public async Task Unions_every_source_sorted_by_date_and_reports_them_ok()
@@ -227,14 +244,47 @@ public sealed class GetUpcomingEventsQueryTests
         result.Items.Should().ContainSingle();
     }
 
+    /// <summary>
+    /// #1091 reproduction: the evening after BLS released the September CPI (14 Oct 08:30 ET) the calendar must not
+    /// list it as upcoming - that row is what read as "Tomorrow: CPI" to the reader. The FOMC two weeks out still lists.
+    /// </summary>
+    [Fact]
+    public async Task A_released_macro_event_is_never_listed_as_upcoming()
+    {
+        _now = new DateTimeOffset(2026, 10, 14, 20, 0, 0, TimeSpan.Zero);
+        _macro.Setup(m => m.QueryAsync(From, To, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                Macro(new DateOnly(2026, 10, 14), new TimeOnly(8, 30), "CPI (Sep)", "bls"),
+                Macro(new DateOnly(2026, 10, 28), new TimeOnly(14, 0), "FOMC rate decision", "fed"),
+            ]);
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["macro"]), CancellationToken.None);
+
+        result.Items.Select(i => i.Title).Should().Equal("FOMC rate decision");
+    }
+
+    [Fact]
+    public async Task A_macro_row_still_marked_scheduled_but_past_its_release_instant_is_not_listed()
+    {
+        _now = new DateTimeOffset(2026, 10, 14, 12, 30, 0, TimeSpan.Zero);
+        var released = new MacroCalendarEntry(
+            Guid.NewGuid(), new DateOnly(2026, 10, 14), new TimeOnly(8, 30), "CPI (Sep)", "US", "high", "bls",
+            _now, "scheduled");
+        _macro.Setup(m => m.QueryAsync(From, To, It.IsAny<CancellationToken>())).ReturnsAsync([released]);
+
+        var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["macro"]), CancellationToken.None);
+
+        result.Items.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Two_macro_rows_on_one_date_both_survive()
     {
         var day = new DateOnly(2026, 10, 15);
         _macro.Setup(m => m.QueryAsync(From, To, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
-                new MacroCalendarEntry(Guid.NewGuid(), day, new TimeOnly(14, 0), "FOMC rate decision + SEP", "US", "high", "fed"),
-                new MacroCalendarEntry(Guid.NewGuid(), day, new TimeOnly(8, 30), "CPI (Sep)", "US", "high", "bls"),
+                Macro(day, new TimeOnly(14, 0), "FOMC rate decision + SEP", "fed"),
+                Macro(day, new TimeOnly(8, 30), "CPI (Sep)", "bls"),
             ]);
 
         var result = await Handler().Handle(new GetUpcomingEventsQuery(UserId, From, To, ["macro"]), CancellationToken.None);

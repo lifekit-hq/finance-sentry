@@ -111,6 +111,8 @@ describe('AlertDestinationUtils.resolve', () => {
     ['PolicyReviewMissed', AppRoute.AccountsInvestments],
     ['PerformanceBrief', AppRoute.AccountsInvestments],
     ['RelativeUnderperformance', AppRoute.AccountsInvestments],
+    ['MacroEventAhead', AppRoute.Events],
+    ['MacroEventReleased', AppRoute.Events],
   ])('routes %s to its page', (type, route) => {
     expect(AlertDestinationUtils.resolve(makeAlert({type}))).toEqual({
       kind: 'route',

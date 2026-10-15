@@ -7,6 +7,7 @@ using FinanceSentry.Modules.Alerts.Application.Queries;
 using FinanceSentry.Modules.Alerts.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Application.Queries;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
+using FinanceSentry.Modules.Events.Domain.Ports;
 using FinanceSentry.Modules.Radar.Application.Queries;
 using FinanceSentry.Modules.Radar.Application.Services;
 using FinanceSentry.Modules.Radar.Domain.MarketStructure;
@@ -110,7 +111,9 @@ public sealed class ReadPortCompositionTests
         var macro = new Mock<IMacroCalendarService>();
         macro.Setup(m => m.QueryAsync(from, to, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([cpi]);
 
-        var rows = await new EventsMacroEventAdapter(new MacroCalendarReader(macro.Object)).QueryAsync(from, to);
+        // 12:30 Eastern is 16:30Z; the read runs an hour before it, so the row is still scheduled.
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 14, 15, 30, 0, TimeSpan.Zero));
+        var rows = await new EventsMacroEventAdapter(new MacroCalendarReader(macro.Object, clock)).QueryAsync(from, to);
 
         var row = rows.Should().ContainSingle().Subject;
         row.Id.Should().Be(cpi.Id);
@@ -120,6 +123,8 @@ public sealed class ReadPortCompositionTests
         row.Region.Should().Be("US");
         row.Importance.Should().Be(MacroImportance.High);
         row.Source.Should().Be("seed");
+        row.At.Should().Be(new DateTimeOffset(2026, 10, 14, 16, 30, 0, TimeSpan.Zero));
+        row.Status.Should().Be(MacroCalendarEntry.Scheduled);
     }
 
     [Fact]
@@ -271,5 +276,10 @@ public sealed class ReadPortCompositionTests
         handler.Setup(h => h.Handle(new GetTaxLotsQuery(User), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TaxLotsResponse("IBKR", null, lots, 0m, 0m));
         return handler.Object;
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

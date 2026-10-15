@@ -608,5 +608,16 @@ public class RunThesisMonitorHandlerTests
         public Task ResolveEarningsAheadAlertAsync(
             Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task GenerateMacroEventAheadAlertAsync(
+            Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ResolveMacroEventAheadAlertAsync(Guid userId, string eventKey, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task GenerateMacroEventReleasedAlertAsync(
+            Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

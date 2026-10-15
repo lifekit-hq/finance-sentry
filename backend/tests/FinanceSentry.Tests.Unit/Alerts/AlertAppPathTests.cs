@@ -70,6 +70,10 @@ public class AlertAppPathTests
         { AlertType.PerformanceBrief, null, null, "/accounts/investments" },
         { AlertType.FireBrief, null, null, "/dashboard" },
 
+        // A macro release opens the Events calendar.
+        { AlertType.MacroEventAhead, Guid.NewGuid(), "macro:CPI:2026-10", "/events" },
+        { AlertType.MacroEventReleased, Guid.NewGuid(), "macro:CPI:2026-10", "/events" },
+
         // N-8: a job has no page in the app.
         { AlertType.JobFailure, null, "SyncJob", null },
         { "SomethingNew", Guid.NewGuid(), "x", null },

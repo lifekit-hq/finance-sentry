@@ -26,6 +26,8 @@ public sealed class MaterialityPolicyTests
     [InlineData("PolicyReview", CompanionEventKind.PolicyReview)]
     [InlineData("PolicyReviewMissed", CompanionEventKind.PolicyReviewMissed)]
     [InlineData("RelativeUnderperformance", CompanionEventKind.RelativeUnderperformance)]
+    [InlineData("MacroEventAhead", CompanionEventKind.MacroEventAhead)]
+    [InlineData("MacroEventReleased", CompanionEventKind.MacroEventReleased)]
     public void Known_alert_types_map_to_kinds(string alertType, CompanionEventKind expected)
         => _policy.ClassifyAlert(alertType).Should().Be(expected);
 

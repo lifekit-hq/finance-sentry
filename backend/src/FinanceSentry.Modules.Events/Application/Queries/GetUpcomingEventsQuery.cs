@@ -41,6 +41,7 @@ public sealed class GetUpcomingEventsQueryHandler(
     IMacroEventReader macro,
     IThesisCatalystReader theses,
     IPeriodicFilingReader filings,
+    TimeProvider clock,
     ILogger<GetUpcomingEventsQueryHandler> logger)
     : IQueryHandler<GetUpcomingEventsQuery, UpcomingEventsResult>
 {
@@ -103,8 +104,16 @@ public sealed class GetUpcomingEventsQueryHandler(
         {
             await RunSourceAsync(EventSource.Macro, sources, ct, async token =>
             {
+                // #1091: a macro row in the window whose release is already out is history, not an upcoming event -
+                // listing it here is what let a released CPI print read as "tomorrow".
+                var now = clock.GetUtcNow();
                 foreach (var m in await macro.QueryAsync(from, to, token))
                 {
+                    if (!m.IsUpcomingAt(now))
+                    {
+                        continue;
+                    }
+
                     items.Add(new UpcomingEvent(
                         EventKind.Macro, m.Date, m.Time, m.Region, m.Event, $"{m.Region} · {m.Importance} importance",
                         false, m.Source, m.Id));

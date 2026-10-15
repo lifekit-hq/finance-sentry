@@ -449,6 +449,31 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         Guid userId, string ticker, string eventType, DateOnly eventDate, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.EarningsAhead, EarningsAheadReferenceId(ticker, eventType, eventDate), ct);
 
+    public Task GenerateMacroEventAheadAlertAsync(
+        Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt,
+        CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.MacroEventAhead, AlertSeverity.Info,
+            MacroEventReferenceId(AlertType.MacroEventAhead, eventKey), eventKey,
+            $"Macro ahead: {eventName}",
+            $"{eventName} ({region}) is scheduled for {FormatUtc(eventAt)}.")
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
+    public Task ResolveMacroEventAheadAlertAsync(Guid userId, string eventKey, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.MacroEventAhead, MacroEventReferenceId(AlertType.MacroEventAhead, eventKey), ct);
+
+    public Task GenerateMacroEventReleasedAlertAsync(
+        Guid userId, string eventKey, string eventName, string region, DateTimeOffset eventAt,
+        CancellationToken ct = default)
+        => EmitAsync(userId, new AlertDraft(
+            AlertType.MacroEventReleased, AlertSeverity.Info,
+            MacroEventReferenceId(AlertType.MacroEventReleased, eventKey), eventKey,
+            $"Macro released: {eventName}",
+            $"{eventName} ({region}) was released at {FormatUtc(eventAt)}; it is no longer upcoming.")
+        { Dedup = AlertDedup.OncePerReference },
+            ct);
+
     public Task GenerateFilingLandedAlertAsync(
         Guid userId, string ticker, string form, DateOnly filingDate, string accessionNumber, string documentUrl,
         CancellationToken ct = default)
@@ -654,6 +679,16 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     /// <summary>Stable per-(ticker, event type, event date) synthetic GUID — never emit twice for the same event.</summary>
     private static Guid EarningsAheadReferenceId(string ticker, string eventType, DateOnly eventDate)
         => DerivedReferenceId($"earnings-ahead:{ticker.ToUpperInvariant()}:{eventType}:{eventDate:yyyy-MM-dd}");
+
+    /// <summary>
+    /// Stable per-(alert type, release key) synthetic GUID (#1091): the key names the release, not the calendar row,
+    /// so the ahead and released alerts each fire once per release whatever the job's cadence.
+    /// </summary>
+    private static Guid MacroEventReferenceId(string alertType, string eventKey)
+        => DerivedReferenceId($"{alertType}:{eventKey}");
+
+    private static string FormatUtc(DateTimeOffset at)
+        => at.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
     /// <summary>Stable per-(ticker, accession number) synthetic GUID — never emit twice for the same filing.</summary>
     private static Guid FilingLandedReferenceId(string ticker, string accessionNumber)

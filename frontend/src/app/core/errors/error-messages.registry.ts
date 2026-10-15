@@ -72,6 +72,7 @@ export const ERROR_MESSAGES_REGISTRY: ErrorMessagesMap = {
   ALERT_LOAD_FAILED: 'Failed to load alerts.',
   EVENTS_WINDOW_INVALID: 'The events window is invalid. Pick a range of at most a year.',
   EVENTS_KINDS_INVALID: 'One of the requested event kinds is not recognised.',
+  MACRO_STATUS_INVALID: 'Unknown macro event status. Use scheduled or released.',
   BUDGET_NOT_FOUND: 'Budget not found.',
   BUDGET_DUPLICATE_CATEGORY: 'A budget for this category already exists.',
   BUDGET_INVALID_CATEGORY: 'Invalid budget category.',

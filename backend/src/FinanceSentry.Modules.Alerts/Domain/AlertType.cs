@@ -38,4 +38,8 @@ public static class AlertType
     public const string PolicyReviewMissed = "PolicyReviewMissed";
     public const string RelativeUnderperformance = "RelativeUnderperformance";
     public const string AnalystRatingChange = "AnalystRatingChange";
+    /// <summary>A high-importance macro release is coming up (#1091); raised once per release, ever.</summary>
+    public const string MacroEventAhead = "MacroEventAhead";
+    /// <summary>A high-importance macro release is out (#1091); raised once per release, ever.</summary>
+    public const string MacroEventReleased = "MacroEventReleased";
 }

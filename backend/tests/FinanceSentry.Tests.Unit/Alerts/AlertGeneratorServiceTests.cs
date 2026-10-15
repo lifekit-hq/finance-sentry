@@ -1292,7 +1292,7 @@ public class AlertGeneratorServiceTests
         // them any more — they need no window.
         var retired = new[] { AlertType.UnusualSpend };
         // Deduped once per reference, ever — no silence window applies.
-        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange };
+        var oncePerReference = new[] { AlertType.BudgetBreach, AlertType.PolicyReview, AlertType.PolicyReviewMissed, AlertType.AnalystRatingChange, AlertType.MacroEventAhead, AlertType.MacroEventReleased };
         // The silent-detector alert is the only generator left on JobFailure and sets its own window per draft.
         var windowPerDraft = new[] { AlertType.JobFailure };
 
@@ -1365,6 +1365,56 @@ public class AlertGeneratorServiceTests
         ledger.Should().OnlyContain(a => a.Type == AlertType.PolicyReviewMissed && a.Severity == AlertSeverity.Warning);
         ledger[0].Message.Should().Contain("2026-07-01").And.Contain("5 day(s) overdue");
         Assert.NotEqual(ledger[0].ReferenceId, ledger[1].ReferenceId);
+    }
+
+    [Fact]
+    public async Task MacroEventAhead_FiresOncePerReleaseKey_HoweverOftenItRuns()
+    {
+        // #1091: the hourly job re-offers the same release every run; one release is announced ahead once, ever.
+        var ledger = TrackAlerts();
+        var at = new DateTimeOffset(2026, 10, 14, 12, 30, 0, TimeSpan.Zero);
+
+        await _service.GenerateMacroEventAheadAlertAsync(_userId, "macro:CPI:2026-10", "CPI (Sep)", "US", at);
+        await _service.GenerateMacroEventAheadAlertAsync(_userId, "macro:CPI:2026-10", "CPI (Sep)", "US", at);
+
+        var alert = Assert.Single(ledger);
+        alert.Type.Should().Be(AlertType.MacroEventAhead);
+        alert.Severity.Should().Be(AlertSeverity.Info);
+        alert.ReferenceLabel.Should().Be("macro:CPI:2026-10");
+        alert.Title.Should().Be("Macro ahead: CPI (Sep)");
+        alert.Message.Should().Contain("2026-10-14 12:30 UTC");
+    }
+
+    [Fact]
+    public async Task MacroEventReleased_FiresOncePerReleaseKey_AndIsKeyedApartFromTheAheadAlert()
+    {
+        var ledger = TrackAlerts();
+        var at = new DateTimeOffset(2026, 10, 14, 12, 30, 0, TimeSpan.Zero);
+
+        await _service.GenerateMacroEventAheadAlertAsync(_userId, "macro:CPI:2026-10", "CPI (Sep)", "US", at);
+        await _service.GenerateMacroEventReleasedAlertAsync(_userId, "macro:CPI:2026-10", "CPI (Sep)", "US", at);
+        await _service.GenerateMacroEventReleasedAlertAsync(_userId, "macro:CPI:2026-10", "CPI (Sep)", "US", at);
+        await _service.GenerateMacroEventReleasedAlertAsync(_userId, "macro:CPI:2026-11", "CPI (Oct)", "US", at.AddMonths(1));
+
+        ledger.Select(a => a.Type).Should().Equal(
+            AlertType.MacroEventAhead, AlertType.MacroEventReleased, AlertType.MacroEventReleased);
+        Assert.NotEqual(ledger[0].ReferenceId, ledger[1].ReferenceId);
+        ledger[2].ReferenceLabel.Should().Be("macro:CPI:2026-11");
+    }
+
+    [Fact]
+    public async Task ResolveMacroEventAhead_ResolvesTheAheadAlertOfThatRelease()
+    {
+        var ledger = TrackAlerts();
+        await _service.GenerateMacroEventAheadAlertAsync(
+            _userId, "macro:FOMC:2026-10", "FOMC rate decision", "US", DateTimeOffset.UnixEpoch);
+        var ahead = Assert.Single(ledger);
+        _repo.Setup(r => r.FindActiveAsync(_userId, AlertType.MacroEventAhead, ahead.ReferenceId, default))
+            .ReturnsAsync(ahead);
+
+        await _service.ResolveMacroEventAheadAlertAsync(_userId, "macro:FOMC:2026-10");
+
+        _repo.Verify(r => r.ResolveAsync(ahead.Id, default), Times.Once);
     }
 
     private void AllowAlert(string type)

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Tests.Integration.Research;
 
+using FinanceSentry.Modules.Research.Application.Services;
 using FinanceSentry.Modules.Research.Domain;
 using FinanceSentry.Modules.Research.Domain.Opportunity;
 using FinanceSentry.Modules.Research.Infrastructure.Persistence;
@@ -7,6 +8,7 @@ using FinanceSentry.Modules.Research.Infrastructure.Persistence.Repositories;
 using FinanceSentry.Tests.Integration.Shared;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Xunit;
 
@@ -72,6 +74,62 @@ public sealed class ResearchUpsertTests : IAsyncLifetime
         cpi.Importance.Should().Be("high");
         cpi.Source.Should().Be("b");
         cpi.EventTime.Should().Be(new TimeOnly(13, 30));
+    }
+
+    [DockerRequiredFact]
+    public async Task Macro_sync_corrects_the_misdated_first_seed_and_leaves_unknown_rows_alone()
+    {
+        // #1091: a database seeded by the first (wrong) schedule — CPI (Sep) on 15 Oct, the FOMC a day late — was
+        // never corrected because the seed only ran into an empty table.
+        await using (var ctx = CreateContext())
+        {
+            ctx.MacroEvents.AddRange(
+                new MacroEvent
+                {
+                    EventDate = new DateOnly(2026, 10, 15), EventTime = new TimeOnly(8, 30), Event = "CPI (Sep)",
+                    Region = "US", Importance = MacroImportance.High,
+                    Source = "https://www.bls.gov/schedule/news_release/cpi.htm",
+                },
+                new MacroEvent
+                {
+                    EventDate = new DateOnly(2026, 10, 29), EventTime = new TimeOnly(14, 0), Event = "FOMC rate decision",
+                    Region = "US", Importance = MacroImportance.High,
+                    Source = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+                },
+                new MacroEvent
+                {
+                    EventDate = new DateOnly(2026, 10, 22), Event = "PMI (Oct)", Region = "US",
+                    Importance = MacroImportance.Medium, Source = "manual",
+                });
+            await ctx.SaveChangesAsync();
+        }
+
+        var now = new DateTimeOffset(2026, 10, 14, 20, 0, 0, TimeSpan.Zero);
+        MacroCalendarSyncResult result;
+        await using (var ctx = CreateContext())
+        {
+            result = await new MacroCalendarService(
+                new MacroCalendarRepository(ctx), ctx, NullLogger<MacroCalendarService>.Instance).SyncAsync(now);
+        }
+
+        result.PastButUpcoming.Should().ContainSingle().Which.Key.Should().Be("macro:CPI:2026-10");
+        result.Corrected.Should().Be(2);
+        result.Removed.Should().Be(0);
+        result.Inserted.Should().Be(MacroCalendarSchedule.Events().Count - 2);
+
+        await using var read = CreateContext();
+        var rows = await read.MacroEvents.AsNoTracking().ToListAsync();
+        rows.Should().ContainSingle(r => r.Event == "CPI (Sep)").Which.EventDate.Should().Be(new DateOnly(2026, 10, 14));
+        rows.Should().ContainSingle(r => r.Event == "FOMC rate decision" && r.EventDate.Month == 10)
+            .Which.EventDate.Should().Be(new DateOnly(2026, 10, 28));
+        rows.Should().ContainSingle(r => r.Event == "PMI (Oct)");
+
+        await using (var ctx = CreateContext())
+        {
+            var again = await new MacroCalendarService(
+                new MacroCalendarRepository(ctx), ctx, NullLogger<MacroCalendarService>.Instance).SyncAsync(now);
+            again.Should().BeEquivalentTo(new MacroCalendarSyncResult(0, 0, 0, []));
+        }
     }
 
     [DockerRequiredFact]

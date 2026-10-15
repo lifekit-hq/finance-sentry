@@ -6,5 +6,16 @@ public interface IMacroEventReader
     Task<IReadOnlyList<MacroCalendarEntry>> QueryAsync(DateOnly from, DateOnly to, CancellationToken ct = default);
 }
 
+/// <summary>
+/// One macro release. <paramref name="Date"/>/<paramref name="Time"/> are the publisher's local clock,
+/// <paramref name="At"/> the UTC release instant, <paramref name="Status"/> <c>scheduled</c> or <c>released</c> (#1091).
+/// </summary>
 public sealed record MacroCalendarEntry(
-    Guid Id, DateOnly Date, TimeOnly? Time, string Event, string Region, string Importance, string Source);
+    Guid Id, DateOnly Date, TimeOnly? Time, string Event, string Region, string Importance, string Source,
+    DateTimeOffset At, string Status)
+{
+    public const string Scheduled = "scheduled";
+
+    /// <summary>Still to come at <paramref name="now"/>: scheduled, and its release instant not yet reached.</summary>
+    public bool IsUpcomingAt(DateTimeOffset now) => Status == Scheduled && At > now;
+}

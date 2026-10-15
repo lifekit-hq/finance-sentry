@@ -18,6 +18,7 @@ public class MacroCalendarController(
         [FromQuery] DateOnly? to,
         [FromQuery] string? regions,
         [FromQuery] string? minImportance,
+        [FromQuery] string? status,
         CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -28,7 +29,7 @@ public class MacroCalendarController(
             ? null
             : regions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        var result = await handler.Handle(new GetMacroCalendarQuery(fromEff, toEff, regionList, minImportance), ct);
+        var result = await handler.Handle(new GetMacroCalendarQuery(fromEff, toEff, regionList, minImportance, status), ct);
         return Ok(result);
     }
 }

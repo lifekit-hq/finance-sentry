@@ -34,7 +34,9 @@ WORKDIR /app
 # krb5-libs: without it Npgsql writes two raw "Cannot load library libgssapi_krb5.so.2" lines to
 # stderr at first connect — plain text in a stdout stream that must be JSON (platform contract,
 # spec 048). The api image installs it for the same reason.
-RUN apk add --no-cache krb5-libs
+# tzdata: get_macro_calendar resolves each release in its publisher's zone (America/New_York,
+# Europe/Berlin) to derive eventAt/status (#1091); alpine ships no zone database without it.
+RUN apk add --no-cache krb5-libs tzdata
 
 COPY --from=build /app/publish .
 
