@@ -12,6 +12,7 @@ const PHONES = {
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 const FROZEN_SINCE = new Date(Date.now() - THREE_DAYS_MS).toISOString();
 const SYNCED_AT = new Date().toISOString();
+const MAX_SCREENS = 2;
 
 function position(
   id: string,
@@ -122,10 +123,54 @@ const SUMMARY = {
   ],
 };
 
-async function openAccounts(page: Page): Promise<void> {
+const MANY_IBKR = 14;
+const MANY_BINANCE = 9;
+
+// The shape that made the page long: a broker and an exchange with a full portfolio each.
+function heavySummary(): typeof SUMMARY {
+  const positions = (count: number, prefix: string, category: 'brokerage' | 'crypto', p: string) =>
+    Array.from({length: count}, (_, i) =>
+      position(`${prefix}-${i}`, `${prefix}${i}`.toUpperCase(), 1, 100, category, p)
+    );
+  const [banking, brokerage, crypto] = SUMMARY.categories;
+  return {
+    ...SUMMARY,
+    categories: [
+      banking,
+      {
+        ...brokerage,
+        institutions: [
+          institution(
+            'ibkr-1',
+            'ibkr',
+            'Interactive Brokers',
+            'brokerage',
+            MANY_IBKR * 100,
+            positions(MANY_IBKR, 'sym', 'brokerage', 'ibkr')
+          ),
+        ],
+      },
+      {
+        ...crypto,
+        institutions: [
+          institution(
+            'binance-1',
+            'binance',
+            'Binance',
+            'crypto',
+            MANY_BINANCE * 100,
+            positions(MANY_BINANCE, 'coin', 'crypto', 'binance')
+          ),
+        ],
+      },
+    ],
+  };
+}
+
+async function openAccounts(page: Page, summary: unknown = SUMMARY): Promise<void> {
   await mockApis(page);
   await mockAccounts(page);
-  await mockGet(page, 'wealth/summary', SUMMARY);
+  await mockGet(page, 'wealth/summary', summary);
   await page.route(`${API}/alerts/unread-count`, route =>
     route.fulfill({contentType: 'application/json', body: JSON.stringify({count: 0})})
   );
@@ -146,21 +191,48 @@ for (const [name, viewport] of Object.entries(PHONES)) {
       await expect(row.getByRole('button', {name: 'Reconnect'})).toBeVisible();
     });
 
-    test('shows subtotals, full tickers and quantities in units, with no sideways scroll', async ({
+    test('shows subtotals and one nav row per brokerage and exchange, with no sideways scroll', async ({
       page,
     }) => {
       await openAccounts(page);
 
       await expect(page.getByTestId('section-subtotal').first()).toBeVisible();
-      await expect(page.getByTestId('position-ticker').first()).toHaveText('GOOGL');
-      await expect(page.getByTestId('position-quantity').first()).toHaveText('40 shares');
-      await expect(page.getByTestId('position-quantity').nth(1)).toHaveText('0.0812 BTC');
-      await expect(page.getByTestId('position-value').first()).toHaveText('$6,800.00');
+      await expect(page.getByTestId('position-ticker')).toHaveCount(0);
+      const rows = page.getByTestId('institution-nav-row');
+      await expect(rows).toHaveCount(2);
+      await expect(rows.first()).toContainText('Interactive Brokers');
+      await expect(rows.first().getByTestId('institution-nav-sublabel')).toHaveText('1 position');
+      await expect(rows.first().getByTestId('institution-nav-total')).toHaveText('$6,800.00');
+      await expect(rows.nth(1).getByTestId('institution-nav-sublabel')).toHaveText('1 asset');
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
       );
       expect(overflow).toBeLessThanOrEqual(0);
+    });
+
+    test('opens Investments filtered to the provider and keeps the menu reachable', async ({
+      page,
+    }) => {
+      await openAccounts(page);
+
+      const row = page.getByTestId('institution-nav-row').first();
+      await expect(
+        row.getByRole('button', {name: 'Actions for Interactive Brokers'})
+      ).toBeVisible();
+      await row.getByTestId('institution-nav-link').click();
+
+      await expect(page).toHaveURL(/\/accounts\/investments\?provider=ibkr/);
+    });
+
+    test('keeps a 23-position portfolio within two screens', async ({page}) => {
+      await openAccounts(page, heavySummary());
+      await expect(page.getByTestId('institution-nav-row').first()).toBeVisible();
+
+      const screens = await page.evaluate(
+        () => document.documentElement.scrollHeight / window.innerHeight
+      );
+      expect(screens).toBeLessThanOrEqual(MAX_SCREENS);
     });
   });
 }

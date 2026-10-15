@@ -58,7 +58,7 @@ function setupFixture(
         category: institution.category,
         title: 'Banks',
         institutionNoun: 'bank',
-        rowNoun: 'account',
+        rowNoun: institution.category === 'banking' ? 'account' : 'position',
         summary: {
           category: institution.category,
           totalInBaseCurrency: 100,
@@ -204,12 +204,8 @@ describe('AccountsListComponent account row', () => {
   });
 });
 
-describe('AccountsListComponent cash rows', () => {
-  function brokerageRow(
-    accountId: string,
-    symbol: string,
-    accountType: string
-  ): AccountBalanceItem {
+describe('AccountsListComponent investment nav rows', () => {
+  function holding(accountId: string, symbol: string, accountType: string): AccountBalanceItem {
     return {
       accountId,
       bankName: 'Interactive Brokers',
@@ -219,37 +215,64 @@ describe('AccountsListComponent cash rows', () => {
       symbol: accountType === 'cash' ? null : symbol,
       provider: 'ibkr',
       category: 'brokerage',
-      currentBalance: 400,
+      currentBalance: 40,
       balanceInBaseCurrency: 400,
       syncStatus: 'synced',
       lastSyncTimestamp: null,
     };
   }
 
-  function brokerageElement(): HTMLElement {
+  function brokerage(overrides: Partial<Institution> = {}): HTMLElement {
     const fixture = setupFixture(false, {
       provider: 'ibkr',
+      name: 'Interactive Brokers',
       category: 'brokerage',
       syncStatus: 'synced',
-      accounts: [brokerageRow('a1', 'AAPL', 'brokerage'), brokerageRow('a2', 'USD Cash', 'cash')],
+      totalInBaseCurrency: 800,
+      accounts: [
+        holding('a1', 'GOOGL', 'brokerage'),
+        holding('a2', 'BRK.B', 'brokerage'),
+        holding('a3', 'USD Cash', 'cash'),
+      ],
+      ...overrides,
     });
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('tags a cash row with a Cash label and leaves positions untagged', () => {
-    const element = brokerageElement();
+  it('renders one row per brokerage with its positions, cash and total, and no position rows', () => {
+    const element = brokerage();
 
-    const labels = element.querySelectorAll('[data-testid="cash-label"]');
-    expect(labels).toHaveLength(1);
-    expect(labels[0].textContent?.trim()).toBe('Cash');
-    expect(element.querySelector('[data-testid="cash-row"]')?.textContent).toContain('USD Cash');
+    expect(element.querySelectorAll('[data-testid="institution-nav-row"]')).toHaveLength(1);
+    expect(
+      element.querySelector('[data-testid="institution-nav-sublabel"]')?.textContent?.trim()
+    ).toBe('2 positions · $400.00 cash');
+    expect(element.querySelector('[data-testid="institution-nav-total"]')?.textContent).toContain(
+      '$800.00'
+    );
+    expect(element.textContent).not.toContain('GOOGL');
+    expect(element.querySelector('cmn-disclosure-row')).toBeNull();
   });
 
-  it('does not link a cash row to an asset dossier', () => {
-    const element = brokerageElement();
+  it('opens Investments filtered to the provider', () => {
+    const element = brokerage();
 
-    expect(element.querySelector('[data-testid="cash-row"] button')).toBeNull();
-    expect(element.textContent).toContain('AAPL');
+    const link = element.querySelector<HTMLAnchorElement>('[data-testid="institution-nav-link"]');
+    expect(link?.getAttribute('href')).toBe('/accounts/investments?provider=ibkr');
+  });
+
+  it('keeps the actions menu outside the link, so both stay reachable', () => {
+    const element = brokerage();
+
+    const row = element.querySelector('[data-testid="institution-nav-row"]');
+    expect(row?.querySelector('cmn-menu')).not.toBeNull();
+    expect(row?.querySelector('a cmn-menu')).toBeNull();
+  });
+
+  it('leaves banking as an expanded disclosure row', () => {
+    const element = setup(false, {syncStatus: 'synced'});
+
+    expect(element.querySelector('cmn-disclosure-row')).not.toBeNull();
+    expect(element.querySelector('[data-testid="institution-nav-row"]')).toBeNull();
   });
 });
 
@@ -292,75 +315,6 @@ describe('AccountsListComponent attention row and subtotals', () => {
       '$100.00'
     );
     expect(element.textContent).not.toContain('1 bank');
-  });
-});
-
-describe('AccountsListComponent position rows', () => {
-  it('leads with the value and sizes the position in units, not money', () => {
-    const fixture = setupFixture(false, {
-      provider: 'ibkr',
-      category: 'brokerage',
-      syncStatus: 'synced',
-      accounts: [
-        {
-          accountId: 'p1',
-          bankName: 'Interactive Brokers',
-          accountType: 'brokerage',
-          accountNumberLast4: 'AAPL',
-          currency: 'AAPL',
-          symbol: 'AAPL',
-          provider: 'ibkr',
-          category: 'brokerage',
-          currentBalance: 40,
-          balanceInBaseCurrency: 7000,
-          syncStatus: 'synced',
-          lastSyncTimestamp: null,
-        },
-      ],
-    });
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(element.querySelector('[data-testid="position-value"]')?.textContent).toContain(
-      '$7,000.00'
-    );
-    expect(element.querySelector('[data-testid="position-quantity"]')?.textContent).toContain(
-      '40 shares'
-    );
-    expect(element.querySelector('[data-testid="position-ticker"]')?.textContent).toContain('AAPL');
-  });
-});
-
-describe('AccountsListComponent position symbols', () => {
-  it.each(['GOOGL', 'BRK.B'])('shows %s in full and opens its dossier', symbol => {
-    const fixture = setupFixture(false, {
-      provider: 'ibkr',
-      category: 'brokerage',
-      syncStatus: 'synced',
-      accounts: [
-        {
-          accountId: 'p1',
-          bankName: 'Interactive Brokers',
-          accountType: 'brokerage',
-          accountNumberLast4: symbol.slice(0, 4),
-          currency: symbol,
-          symbol,
-          provider: 'ibkr',
-          category: 'brokerage',
-          currentBalance: 10,
-          balanceInBaseCurrency: 10,
-          syncStatus: 'synced',
-          lastSyncTimestamp: null,
-        },
-      ],
-    });
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    const element = fixture.nativeElement as HTMLElement;
-
-    const row = element.querySelector<HTMLButtonElement>('li button');
-    expect(row?.textContent).toContain(symbol);
-    row?.click();
-
-    expect(navigate).toHaveBeenCalledWith(['/assets', symbol]);
   });
 });
 
