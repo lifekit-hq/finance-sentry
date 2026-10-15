@@ -143,6 +143,24 @@ public class GetNetWorthHistoryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TypesASingleSnapshotWindow_AsUnavailableWithShortHistory()
+    {
+        var only = new NetWorthSnapshot { UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1), TotalNetWorth = 1_400m };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([only]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        var headline = response.ChangeHeadline!;
+        headline.Amount.Should().BeNull();
+        headline.Percent.Should().BeNull();
+        headline.Quality.Should().Be(HeadlineQuality.Unavailable);
+        headline.Reasons.Select(r => r.Code).Should().Equal(HeadlineReasonCode.ShortHistory);
+        headline.Window.Should().Be(new HeadlineWindow(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 1)));
+    }
+
+    [Fact]
     public async Task Handle_HasNoChangeHeadline_WithoutHistory()
     {
         var repo = new Mock<INetWorthSnapshotRepository>();

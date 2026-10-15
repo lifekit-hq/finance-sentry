@@ -87,6 +87,12 @@ public class GetNetWorthHistoryQueryHandler(
 
         var first = snapshots[0];
         var last = snapshots[^1];
+        if (snapshots.Count == 1)
+        {
+            return HeadlineFactory.Change(
+                null, null, HeadlineScope.Umbrella, first.SnapshotDate, first.SnapshotDate, false, HeadlineSignals.None);
+        }
+
         var signals = HeadlineSignals.FromSnapshot(first.StaleSleeves, first.IsApproximate, first.FxStatus)
             .Merge(HeadlineSignals.FromSnapshot(last.StaleSleeves, last.IsApproximate, last.FxStatus));
         return HeadlineFactory.Change(
