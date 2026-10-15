@@ -120,4 +120,31 @@ public class DashboardBookSplitTests
         data.CashHeadline.Reasons.Select(r => r.Code).Should().Contain(HeadlineReasonCode.NoSplit);
         data.InvestedHeadline!.Quality.Should().Be(HeadlineQuality.Unavailable);
     }
+
+    [Fact]
+    public async Task Total_CountsASourceRegisteredAfterTheOriginalThree_AndStaysAtBankSumWithout()
+    {
+        var fund = new BookSourceReading(
+            "fund", EconomyKind.Fund,
+            new WealthSourceReading(0m, [new BookFigurePosition("FUND", "fund", 1m, null, 700m, "fund")]));
+        var withFund = new BookFigures(
+            CashUsd: 700m, BankingCashUsd: 700m, BrokerageCashUsd: 0m, InvestedValueUsd: 700m,
+            TotalValueUsd: 1_400m, Positions: [], IsStale: false, StaleSources: [])
+        {
+            Sources =
+            [
+                new("banking", EconomyKind.Bank, new WealthSourceReading(700m, [])),
+                fund,
+            ],
+        };
+        var withoutFund = withFund with { Sources = [withFund.Sources[0]] };
+
+        var counted = await Build(BookOf(withFund), bankTotalUsd: 1_000m).GetDashboardDataAsync(UserId);
+        var original = await Build(BookOf(withoutFund), bankTotalUsd: 1_000m).GetDashboardDataAsync(UserId);
+
+        original.TotalNetWorthUsd.Should().Be(1_000m, "the three original sources total exactly as before");
+        counted.TotalNetWorthUsd.Should().Be(1_700m);
+        counted.NetWorthHeadline!.Amount.Should().Be(1_700m);
+        counted.AggregatedBalance["USD"].Should().Be(700m);
+    }
 }

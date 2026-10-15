@@ -36,6 +36,19 @@ public sealed record WealthSourceReading(
 }
 
 /// <summary>
+/// The ids of the three original sources, which the snapshot's sleeve columns hold and the live dashboard totals
+/// from its own readers. A source registered after them is counted from its <see cref="BookSourceReading"/>.
+/// </summary>
+public static class WealthSourceIds
+{
+    public const string Banking = "banking";
+    public const string Brokerage = "brokerage";
+    public const string Crypto = "crypto";
+
+    public static IReadOnlyList<string> Sleeves { get; } = [Banking, Brokerage, Crypto];
+}
+
+/// <summary>
 /// A place the person holds wealth: a bank, a broker, a crypto venue. Each economy registers its sources as
 /// <see cref="IWealthSource"/> services and <see cref="IBookFiguresService"/> sums every registered one, so a new
 /// economy is a new registration, not a new column or a new constructor parameter.

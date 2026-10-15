@@ -13,6 +13,9 @@ export const HISTORY_RANGES: readonly HistoryRange[] = [
   'all',
 ];
 
+/** Source ids of the three legacy sleeve columns on a history row. */
+export const SLEEVE_SOURCE_IDS: readonly string[] = ['banking', 'brokerage', 'crypto'];
+
 export const DEFAULT_HISTORY_RANGE: HistoryRange = '3m';
 
 /** The `range` query param: an unknown value reads as the default range. */

@@ -31,13 +31,19 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         var brokerage = ResolveSleeve("brokerage", data.BrokerageTotal, data.BrokerageFresh, previous?.BrokerageTotal, stale);
         var crypto = ResolveSleeve("crypto", data.CryptoTotal, data.CryptoFresh, previous?.CryptoTotal, stale);
 
-        var total = banking + brokerage + crypto;
+        // The total is every registered source's resolved figure: the three sleeves above, plus each other source
+        // as it read this run - or, when its read failed, as its own previous per-source row counted it.
+        var carriedSources = await CarryForwardUnreadSourcesAsync(userId, previous, data.Sources, ct);
+        var otherSources = (data.Sources ?? []).Where(s => !SnapshotSources.SleeveIds.Contains(s.SourceId)).ToList();
+        var otherTotal = otherSources.Sum(s => s.Reading?.TotalValueUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Total ?? 0m);
+        var otherCash = otherSources.Sum(s => s.Reading?.CashUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Cash ?? 0m);
+        var total = banking + brokerage + crypto + otherTotal;
         var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, stale.Contains("brokerage"));
         var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
         var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
 
         var fxStatus = data.FxStatus;
-        if (stale.Count > 0 && previous is not null)
+        if ((stale.Count > 0 || carriedSources.Count > 0) && previous is not null)
             fxStatus = fxStatus.Worst(previous.FxStatus ?? (previous.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact));
 
         var snapshot = new NetWorthSnapshot
@@ -52,10 +58,11 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             Currency = data.Currency,
             TakenAt = DateTimeOffset.UtcNow,
             StaleSleeves = stale.Count > 0 ? string.Join(',', stale) : null,
-            // Cash is the remainder, so cash + invested always equals the stored total - including when a
-            // sleeve was carried forward (its invested part is carried with it; a carried banking balance
-            // stays in cash). One unknown invested part leaves the whole split null rather than half-filled.
-            CashTotal = hasSplit ? total - brokerageInvested!.Value - cryptoInvested!.Value : null,
+            // Cash is every source's cash: the banking balance, each of the two sleeves without its invested part
+            // (carried with the sleeve when it was carried forward), and the cash of each other source as it read
+            // or was carried. Another source's invested value stays on its own per-source row. One unknown
+            // invested part leaves the whole split null rather than half-filled.
+            CashTotal = hasSplit ? banking + (brokerage - brokerageInvested!.Value) + (crypto - cryptoInvested!.Value) + otherCash : null,
             BrokerageInvested = hasSplit ? brokerageInvested : null,
             CryptoInvested = hasSplit ? cryptoInvested : null,
             FxStatus = fxStatus,
@@ -67,7 +74,45 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         if (data.Sources is null)
             await _repository.UpsertAsync(snapshot, ct);
         else
-            await _repository.UpsertWithSourcesAsync(snapshot, data.Sources.Select(f => ToRow(f, stale)).ToList(), ct);
+            await _repository.UpsertWithSourcesAsync(snapshot, data.Sources.Select(f => carriedSources.GetValueOrDefault(f.SourceId) ?? ToRow(f, stale)).ToList(), ct);
+    }
+
+    /// <summary>
+    /// The rows for the sources outside the three sleeve columns whose read failed this run and which have a
+    /// figure on the previous snapshot: that figure is carried forward (DEGRADED + STALE_SOURCE), so the total
+    /// does not drop by the source's whole value on a bad day. A sleeve is carried by its column instead; a source
+    /// with no earlier figure contributes nothing and stays UNAVAILABLE.
+    /// </summary>
+    private async Task<Dictionary<string, NetWorthSnapshotSource>> CarryForwardUnreadSourcesAsync(
+        Guid userId, NetWorthSnapshot? previous, IReadOnlyList<BookSourceReading>? figures, CancellationToken ct)
+    {
+        var unread = (figures ?? [])
+            .Where(f => f.Reading is null && !SnapshotSources.SleeveIds.Contains(f.SourceId))
+            .ToList();
+        var carried = new Dictionary<string, NetWorthSnapshotSource>(StringComparer.Ordinal);
+        if (unread.Count == 0 || previous is null)
+            return carried;
+
+        var earlier = (await _repository.GetSourcesUnscopedAsync(userId, [previous.Id], ct))
+            .ToDictionary(r => r.SourceId, StringComparer.Ordinal);
+        foreach (var figure in unread)
+        {
+            if (!earlier.TryGetValue(figure.SourceId, out var row) || row.Total is null)
+                continue;
+
+            carried[figure.SourceId] = new NetWorthSnapshotSource
+            {
+                SourceId = figure.SourceId,
+                Kind = figure.Kind,
+                Total = row.Total,
+                Cash = row.Cash,
+                Invested = row.Invested,
+                Health = SourceHealth.Degraded > row.Health ? SourceHealth.Degraded : row.Health,
+                Reasons = [.. row.Reasons.Append(SourceReasons.StaleSource).Distinct()],
+            };
+        }
+
+        return carried;
     }
 
     /// <summary>

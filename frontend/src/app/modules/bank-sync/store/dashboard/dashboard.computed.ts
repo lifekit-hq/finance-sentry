@@ -75,11 +75,13 @@ export const SLEEVE_COLOUR = {
   crypto: CRYPTO_COLOUR,
 } as const;
 // The split chart's three bands keep the asset-class colours; days with no split are drawn as one
-// neutral band so they read as "total only", not as a share of any class.
+// neutral band so they read as "total only", not as a share of any class. Other sources take a
+// series step of their own so they never read as that neutral band.
 export const SPLIT_COLOUR = {
   cash: CASH_COLOUR,
   brokerageInvested: EQUITY_COLOUR,
   cryptoInvested: CRYPTO_COLOUR,
+  other: {step: CATEGORICAL_STEPS[3]},
   unsplit: NEUTRAL_COLOUR,
 } as const;
 export const NET_WORTH_BY_SLEEVE_LABEL = 'Net worth by sleeve';
@@ -88,6 +90,7 @@ const INCOME_COLOUR = FLOW_IN_COLOUR;
 const SPENDING_COLOUR = FLOW_OUT_COLOUR;
 const PERCENT = 100;
 const OTHER_CATEGORIES_LABEL = 'Other categories';
+const OTHER_SOURCES_LABEL = 'Other sources';
 
 // A savings rate over a single month is only meaningful once the month's income has actually
 // landed. Salary posts once, often on the last day, so before then the month holds a full run
@@ -270,8 +273,8 @@ export function dashboardComputed(store: StateSignals) {
   // the sleeve stack, so ranges reaching before the backfill lose nothing they show today.
   const hasSplit = computed(() => splitHistory().some(split => split !== null));
 
-  // Stacked net-worth composition over time. A split day's three bands add up to its stored
-  // total. A day with no split is drawn as a single "No split" band (its sleeves summed), never
+  // Stacked net-worth composition over time. A split day's bands (cash, the two invested sleeves,
+  // and other sources' invested value when any) add up to its stored total. A day with no split is drawn as a single "No split" band (its sleeves summed), never
   // as zeros in the three bands and never dropped, so the stack top is the total on every day.
   const netWorthAreaSeries = computed((): AreaSeries[] => {
     const history = validHistory();
@@ -297,6 +300,8 @@ export function dashboardComputed(store: StateSignals) {
     const banking = carryForward(s => s.bankingTotal);
     const brokerage = carryForward(s => s.brokerageTotal);
     const crypto = carryForward(s => s.cryptoTotal);
+    const other = history.map(NetWorthSplitUtils.otherSourcesTotal);
+    const hasOther = other.some(value => value !== 0);
     const splits = splitHistory();
     if (!hasSplit()) {
       return [
@@ -315,6 +320,15 @@ export function dashboardComputed(store: StateSignals) {
           color: ChartColorUtils.canvas(SLEEVE_COLOUR.crypto),
           points: toPoints(crypto),
         },
+        ...(hasOther
+          ? [
+              {
+                label: OTHER_SOURCES_LABEL,
+                color: ChartColorUtils.canvas(SPLIT_COLOUR.other),
+                points: toPoints(other),
+              },
+            ]
+          : []),
       ];
     }
     const bands: AreaSeries[] = [
@@ -334,6 +348,13 @@ export function dashboardComputed(store: StateSignals) {
         points: toPoints(splits.map(split => split?.cryptoInvested ?? 0)),
       },
     ];
+    if (splits.some(split => (split?.otherInvested ?? 0) !== 0)) {
+      bands.push({
+        label: OTHER_SOURCES_LABEL,
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.other),
+        points: toPoints(splits.map(split => split?.otherInvested ?? 0)),
+      });
+    }
     if (splits.every(split => split !== null)) {
       return bands;
     }
@@ -343,7 +364,9 @@ export function dashboardComputed(store: StateSignals) {
         label: 'No split',
         color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
         points: toPoints(
-          splits.map((split, i) => (split === null ? banking[i] + brokerage[i] + crypto[i] : 0))
+          splits.map((split, i) =>
+            split === null ? banking[i] + brokerage[i] + crypto[i] + other[i] : 0
+          )
         ),
       },
     ];
@@ -404,7 +427,7 @@ export function dashboardComputed(store: StateSignals) {
     return removed ? 'Includes removed accounts' : '';
   });
 
-  // Change in the invested book (brokerage + crypto positions, cash excluded), over the days that
+  // Change in the invested book (every source's positions, cash excluded), over the days that
   // have a split only: from the first split day to the last, or to the scrubbed day. It is a
   // change in invested value, deposits included, not a return. Null until two split days exist
   // (and while scrubbing a day with no split, or one before the first split day).

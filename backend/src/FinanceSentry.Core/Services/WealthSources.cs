@@ -10,7 +10,7 @@ using FinanceSentry.Core.Utils;
 /// </summary>
 public sealed class BankingWealthSource(IBankingAccountsReader reader) : IWealthSource
 {
-    public string SourceId => "banking";
+    public string SourceId => WealthSourceIds.Banking;
 
     public EconomyKind Kind => EconomyKind.Bank;
 
@@ -32,7 +32,7 @@ public sealed class BankingWealthSource(IBankingAccountsReader reader) : IWealth
 /// </summary>
 public sealed class BrokerageWealthSource(IBrokerageHoldingsReader reader) : IWealthSource
 {
-    public string SourceId => "brokerage";
+    public string SourceId => WealthSourceIds.Brokerage;
 
     public EconomyKind Kind => EconomyKind.Brokerage;
 
@@ -63,7 +63,7 @@ public sealed class BrokerageWealthSource(IBrokerageHoldingsReader reader) : IWe
 /// </summary>
 public sealed class CryptoWealthSource(ICryptoHoldingsReader reader) : IWealthSource
 {
-    public string SourceId => "crypto";
+    public string SourceId => WealthSourceIds.Crypto;
 
     public EconomyKind Kind => EconomyKind.CryptoVenue;
 

@@ -2,14 +2,28 @@ namespace FinanceSentry.Modules.Wealth.Domain;
 
 using FinanceSentry.Core.Auth;
 
+/// <remarks>
+/// <see cref="BankingTotal"/>, <see cref="BrokerageTotal"/>, <see cref="CryptoTotal"/> and
+/// <see cref="StaleSleeves"/> are frozen (<see cref="FrozenLegacyColumnAttribute"/>): a new economy registers an
+/// <c>IWealthSource</c> and is recorded per source, not as a column here.
+/// </remarks>
 public sealed class NetWorthSnapshot : IUserOwned
 {
     public Guid Id { get; init; }
     public Guid UserId { get; init; }
     public DateOnly SnapshotDate { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'banking')")]
     public decimal BankingTotal { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'brokerage')")]
     public decimal BrokerageTotal { get; init; }
+    [FrozenLegacyColumn("net_worth_snapshot_sources.total (source_id 'crypto')")]
     public decimal CryptoTotal { get; init; }
+
+    /// <summary>
+    /// The sum of every registered source's resolved figure: the three sleeve columns above plus each other
+    /// source's <c>net_worth_snapshot_sources.total</c> (carried forward from its own previous row when its read
+    /// failed). Equal to the three sleeves while no other source is registered.
+    /// </summary>
     public decimal TotalNetWorth { get; init; }
     public string Currency { get; init; } = "USD";
     public DateTimeOffset TakenAt { get; init; }
@@ -21,6 +35,7 @@ public sealed class NetWorthSnapshot : IUserOwned
     /// distinguish a measured net worth from a partially estimated one instead of
     /// treating carried-forward or $0 sync-failure days as real movement.
     /// </summary>
+    [FrozenLegacyColumn("net_worth_snapshot_sources.health / reasons (STALE_SOURCE)")]
     public string? StaleSleeves { get; init; }
 
     /// <summary>
@@ -35,7 +50,9 @@ public sealed class NetWorthSnapshot : IUserOwned
     /// <summary>
     /// Cash apart from invested assets, USD: bank balances (signed, card debt netted in), idle broker cash and
     /// fiat on crypto venues - the <see cref="FinanceSentry.Core.Interfaces.BookFigures.CashUsd"/> definition.
-    /// Always <see cref="TotalNetWorth"/> - <see cref="BrokerageInvested"/> - <see cref="CryptoInvested"/>.
+    /// The sum of every source's cash: <see cref="TotalNetWorth"/> - <see cref="BrokerageInvested"/> -
+    /// <see cref="CryptoInvested"/> - the invested value of any source outside the three sleeve columns, which
+    /// its per-source row holds (<see cref="SnapshotSources.OtherInvested"/>).
     /// Null = no split for this day (a row from before the split existed, or one the split cannot be
     /// measured for) - never zero.
     /// </summary>

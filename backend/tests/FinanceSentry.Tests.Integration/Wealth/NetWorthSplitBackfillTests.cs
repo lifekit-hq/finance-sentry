@@ -32,7 +32,7 @@ public sealed class NetWorthSplitBackfillTests : IDisposable
     private WealthDbContext NewContext() => new(
         new DbContextOptionsBuilder<WealthDbContext>().UseInMemoryDatabase(_dbName).Options, new FixedCurrentUser(null));
 
-    private static NetWorthSnapshot Row(DateOnly date, decimal banking, decimal brokerage, decimal crypto, string? stale = null, bool approximate = false) => new()
+    private static NetWorthSnapshot Row(DateOnly date, decimal banking, decimal brokerage, decimal crypto, string? stale = null, bool approximate = false, decimal fourthSource = 0m) => new()
     {
         Id = Guid.NewGuid(),
         UserId = UserId,
@@ -40,7 +40,7 @@ public sealed class NetWorthSplitBackfillTests : IDisposable
         BankingTotal = banking,
         BrokerageTotal = brokerage,
         CryptoTotal = crypto,
-        TotalNetWorth = banking + brokerage + crypto,
+        TotalNetWorth = banking + brokerage + crypto + fourthSource,
         Currency = "USD",
         TakenAt = DateTimeOffset.UtcNow,
         StaleSleeves = stale,
@@ -182,6 +182,34 @@ public sealed class NetWorthSplitBackfillTests : IDisposable
         rows[1].CashTotal.Should().BeNull("the crypto source was missing");
         rows[2].CashTotal.Should().Be(2_050m);
         rows[2].BrokerageInvested.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Backfill_LeavesTheSplitNull_WhenASourceOutsideTheThreeSleevesIsInTheTotal()
+    {
+        var withFund = Row(FirstCapturedDay, 2_000m, 800m, 350m, fourthSource: 700m);
+        await SeedAsync(withFund, Row(FirstCapturedDay.AddDays(1), 2_000m, 800m, 350m));
+        _db.NetWorthSnapshotSources.Add(new NetWorthSnapshotSource
+        {
+            SnapshotId = withFund.Id,
+            SourceId = "fund",
+            Kind = EconomyKind.Fund,
+            Total = 700m,
+            Cash = 0m,
+            Invested = 700m,
+            Health = SourceHealth.Complete,
+            Reasons = [],
+        });
+        await _db.SaveChangesAsync();
+
+        var filled = await Backfill(
+            new DailyInvestedBySleeve(FirstCapturedDay, 750m, 300m),
+            new DailyInvestedBySleeve(FirstCapturedDay.AddDays(1), 750m, 300m)).BackfillAsync();
+
+        filled.Should().Be(1);
+        var rows = await StoredAsync();
+        rows[0].CashTotal.Should().BeNull("the fund's invested value is not in holding_snapshots, so it would land in cash");
+        rows[1].CashTotal.Should().Be(2_100m);
     }
 
     [Fact]

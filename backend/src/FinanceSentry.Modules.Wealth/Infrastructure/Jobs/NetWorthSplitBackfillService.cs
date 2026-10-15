@@ -9,8 +9,9 @@ using FinanceSentry.Modules.Wealth.Domain.Repositories;
 /// invested positions <c>holding_snapshots</c> recorded: cash = the row's own total - that day's invested value.
 /// The two are captured at different moments, so intraday moves can shift a little between cash and invested. It
 /// only fills null columns (never overwrites), so it is idempotent. Days the history does not cover - and days
-/// where a sleeve's stored total has no invested positions behind it (a source that was missing when Risk ran) -
-/// keep a null split: "no split", not zero.
+/// where a sleeve's stored total has no invested positions behind it (a source that was missing when Risk ran), or
+/// that counted a source outside the three sleeves (its invested part is on its own per-source row, not in the
+/// history) - keep a null split: "no split", not zero.
 /// </summary>
 /// <remarks>
 /// Bounded: one history read and one snapshot read per user, over at most <see cref="HistoryWindowDays"/> days
@@ -45,7 +46,7 @@ public sealed class NetWorthSplitBackfillService(
             snapshots, await snapshotRepository.GetSourcesUnscopedAsync(userId, [.. snapshots.Select(s => s.Id)], ct));
 
         var splits = withSources
-            .Where(x => !CarriesInvestedSleeve(x.Snapshot, x.Sources))
+            .Where(x => x.Sources.OtherTotal == 0m && !CarriesInvestedSleeve(x.Snapshot, x.Sources))
             .Select(x => x.Snapshot)
             .Where(s => !s.IsApproximate
                 && (s.CashTotal is null || s.BrokerageInvested is null || s.CryptoInvested is null)
