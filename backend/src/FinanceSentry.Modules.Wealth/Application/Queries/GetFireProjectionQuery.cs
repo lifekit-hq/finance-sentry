@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using FinanceSentry.Core.Cqrs;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
+using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
 
 /// <summary>
@@ -77,7 +78,10 @@ public class GetFireProjectionQueryHandler(
 
         var currentMonthKey = _clock.GetUtcNow().ToString("yyyy-MM");
         var completeMonths = flows.Where(f => f.Month != currentMonthKey).ToList();
-        var hasStaleSleeves = !string.IsNullOrEmpty(snapshot?.StaleSleeves);
+        // Stale when any of the snapshot's sources failed to read or was carried forward (per-source reasons).
+        var hasStaleSleeves = snapshot is not null && SnapshotSources
+            .Of(snapshot, await _snapshots.GetSourcesUnscopedAsync(query.UserId, [snapshot.Id], cancellationToken))
+            .StaleSources.Count > 0;
 
         if (snapshot is null || completeMonths.Count < MinCompleteMonths)
         {

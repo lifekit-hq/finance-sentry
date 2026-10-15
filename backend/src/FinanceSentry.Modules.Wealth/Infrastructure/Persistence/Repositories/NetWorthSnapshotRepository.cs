@@ -110,6 +110,17 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
     public Task<IReadOnlyList<NetWorthSnapshot>> GetByUserIdUnscopedAsync(Guid userId, DateOnly? from, DateOnly? to, CancellationToken ct = default)
         => ByUserId(_db.NetWorthSnapshots.IgnoreQueryFilters([OwnerQueryFilter.Name]), userId, from, to, ct);
 
+    public Task<IReadOnlyList<NetWorthSnapshotSource>> GetSourcesAsync(
+        Guid userId, IReadOnlyCollection<Guid> snapshotIds, CancellationToken ct = default)
+        => SourcesOf(_db.NetWorthSnapshotSources, _db.NetWorthSnapshots, userId, snapshotIds, ct);
+
+    public Task<IReadOnlyList<NetWorthSnapshotSource>> GetSourcesUnscopedAsync(
+        Guid userId, IReadOnlyCollection<Guid> snapshotIds, CancellationToken ct = default)
+        => SourcesOf(
+            _db.NetWorthSnapshotSources.IgnoreQueryFilters([OwnerQueryFilter.Name]),
+            _db.NetWorthSnapshots.IgnoreQueryFilters([OwnerQueryFilter.Name]),
+            userId, snapshotIds, ct);
+
     public Task<NetWorthSnapshot?> GetEarliestByUserIdAsync(Guid userId, CancellationToken ct = default)
         => _db.NetWorthSnapshots
             .Where(s => s.UserId == userId)
@@ -196,6 +207,20 @@ public class NetWorthSnapshotRepository(WealthDbContext db) : INetWorthSnapshotR
             .OrderByDescending(s => s.SnapshotDate)
             .ThenByDescending(s => s.TakenAt)
             .FirstOrDefaultAsync(ct);
+
+    // The rows belong to whoever owns their snapshot, so the user predicate goes through the parent.
+    private static async Task<IReadOnlyList<NetWorthSnapshotSource>> SourcesOf(
+        IQueryable<NetWorthSnapshotSource> sources, IQueryable<NetWorthSnapshot> snapshots,
+        Guid userId, IReadOnlyCollection<Guid> snapshotIds, CancellationToken ct)
+    {
+        if (snapshotIds.Count == 0)
+            return [];
+
+        var ids = snapshotIds.ToList();
+        return await sources
+            .Where(x => ids.Contains(x.SnapshotId) && snapshots.Any(s => s.Id == x.SnapshotId && s.UserId == userId))
+            .ToListAsync(ct);
+    }
 
     private static async Task<IReadOnlyList<NetWorthSnapshot>> ByUserId(
         IQueryable<NetWorthSnapshot> snapshots, Guid userId, DateOnly? from, DateOnly? to, CancellationToken ct)

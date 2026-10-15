@@ -3,6 +3,7 @@ namespace FinanceSentry.Tests.Unit.Wealth;
 using System.Text.Json;
 using FinanceSentry.Core.Headlines;
 using FinanceSentry.Core.Interfaces;
+using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Wealth.Application.Queries;
 using FinanceSentry.Modules.Wealth.Domain;
 using FinanceSentry.Modules.Wealth.Domain.Repositories;
@@ -170,5 +171,66 @@ public class GetNetWorthHistoryQueryHandlerTests
             .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
 
         response.ChangeHeadline.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_OverAMixedWindow_ReadsTheRowsWhereTheyExist_AndKeepsEveryLegacyFigureAndTheChangeHeadline()
+    {
+        // The window starts before per-source rows were written (stale banking via the column only) and ends on a
+        // day with rows whose crypto was carried forward: the row holds this run's 0, the column the carried 400.
+        var old = new NetWorthSnapshot
+        {
+            Id = Guid.NewGuid(), UserId = UserId, SnapshotDate = new DateOnly(2026, 9, 1),
+            BankingTotal = 900m, BrokerageTotal = 300m, CryptoTotal = 100m, TotalNetWorth = 1_300m,
+            StaleSleeves = "banking", IsApproximate = true,
+        };
+        var current = new NetWorthSnapshot
+        {
+            Id = Guid.NewGuid(), UserId = UserId, SnapshotDate = new DateOnly(2026, 10, 1),
+            BankingTotal = 1_000m, BrokerageTotal = 500m, CryptoTotal = 400m, TotalNetWorth = 1_900m,
+            StaleSleeves = "crypto", FxStatus = FxStatus.Exact,
+        };
+        var repo = new Mock<INetWorthSnapshotRepository>();
+        repo.Setup(r => r.GetByUserIdAsync(UserId, null, null, It.IsAny<CancellationToken>())).ReturnsAsync([old, current]);
+        repo.Setup(r => r.GetSourcesAsync(UserId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new NetWorthSnapshotSource { SnapshotId = current.Id, SourceId = "banking", Kind = EconomyKind.Bank, Total = 1_000m, Health = SourceHealth.Complete },
+                new NetWorthSnapshotSource { SnapshotId = current.Id, SourceId = "brokerage", Kind = EconomyKind.Brokerage, Total = 500m, Health = SourceHealth.Complete },
+                new NetWorthSnapshotSource { SnapshotId = current.Id, SourceId = "crypto", Kind = EconomyKind.CryptoVenue, Total = 0m, Health = SourceHealth.Degraded, Reasons = [SourceReasons.StaleSource] },
+            ]);
+
+        var response = await new GetNetWorthHistoryQueryHandler(repo.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+
+        response.Snapshots.Select(s => (s.BankingTotal, s.BrokerageTotal, s.CryptoTotal, s.TotalNetWorth, s.StaleSleeves, s.IsApproximate))
+            .Should().Equal((900m, 300m, 100m, 1_300m, "banking", true), (1_000m, 500m, 400m, 1_900m, "crypto", false));
+        response.Snapshots[0].Sources!.Select(s => (s.SourceId, s.Total, s.Health)).Should().Equal(
+            ("banking", 900m, HeadlineQuality.Degraded), ("brokerage", 300m, HeadlineQuality.Complete), ("crypto", 100m, HeadlineQuality.Complete));
+        var crypto = response.Snapshots[1].Sources!.Single(s => s.SourceId == "crypto");
+        (crypto.Total, crypto.Health, crypto.Kind).Should().Be((400m, HeadlineQuality.Degraded, "CryptoVenue"));
+        crypto.Reasons.Should().Equal("STALE_SOURCE");
+
+        var legacy = HeadlineFactory.Change(
+            1_300m, 1_900m, HeadlineScope.Umbrella, old.SnapshotDate, current.SnapshotDate, false,
+            HeadlineSignals.FromSnapshot(old.StaleSleeves, old.IsApproximate, old.FxStatus)
+                .Merge(HeadlineSignals.FromSnapshot(current.StaleSleeves, current.IsApproximate, current.FxStatus)));
+        response.ChangeHeadline.Should().BeEquivalentTo(legacy);
+    }
+
+    [Fact]
+    public void ResponseJson_AddsThePerSourceBreakdownBesideTheLegacyFields()
+    {
+        var dto = new NetWorthSnapshotDto(
+            new DateOnly(2026, 10, 1), 900m, 0m, 0m, 900m, "USD", "banking", false,
+            Sources: [new NetWorthSourceDto("banking", "Bank", 900m, HeadlineQuality.Degraded, ["STALE_SOURCE"])]);
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(dto, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+        json.RootElement.GetProperty("staleSleeves").GetString().Should().Be("banking");
+        var source = json.RootElement.GetProperty("sources")[0];
+        source.GetProperty("sourceId").GetString().Should().Be("banking");
+        source.GetProperty("kind").GetString().Should().Be("Bank");
+        source.GetProperty("total").GetDecimal().Should().Be(900m);
+        source.GetProperty("reasons")[0].GetString().Should().Be("STALE_SOURCE");
     }
 }

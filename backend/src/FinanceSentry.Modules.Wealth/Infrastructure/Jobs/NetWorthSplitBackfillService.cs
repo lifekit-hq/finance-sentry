@@ -41,10 +41,13 @@ public sealed class NetWorthSplitBackfillService(
 
         var byDate = days.ToDictionary(d => d.Date);
         var snapshots = await snapshotRepository.GetByUserIdUnscopedAsync(userId, days.Min(d => d.Date), days.Max(d => d.Date), ct);
+        var withSources = SnapshotSources.OfEach(
+            snapshots, await snapshotRepository.GetSourcesUnscopedAsync(userId, [.. snapshots.Select(s => s.Id)], ct));
 
-        var splits = snapshots
+        var splits = withSources
+            .Where(x => !CarriesInvestedSleeve(x.Snapshot, x.Sources))
+            .Select(x => x.Snapshot)
             .Where(s => !s.IsApproximate
-                && !CarriesInvestedSleeve(s)
                 && (s.CashTotal is null || s.BrokerageInvested is null || s.CryptoInvested is null)
                 && byDate.TryGetValue(s.SnapshotDate, out var day)
                 && !MissingSource(s, day))
@@ -65,12 +68,9 @@ public sealed class NetWorthSplitBackfillService(
     // A brokerage/crypto sleeve carried forward from an earlier day holds a value the day's captured positions
     // do not describe, so its remainder would not be cash. A carried banking balance is cash and is fine, and so
     // is an empty carried sleeve (nothing there to mis-describe).
-    private static bool CarriesInvestedSleeve(NetWorthSnapshot snapshot)
-    {
-        var stale = snapshot.StaleSleeves?.Split(',') ?? [];
-        return (stale.Contains("brokerage") && snapshot.BrokerageTotal != 0m)
-            || (stale.Contains("crypto") && snapshot.CryptoTotal != 0m);
-    }
+    private static bool CarriesInvestedSleeve(NetWorthSnapshot snapshot, SnapshotSources sources)
+        => (sources.IsStale("brokerage") && snapshot.BrokerageTotal != 0m)
+            || (sources.IsStale("crypto") && snapshot.CryptoTotal != 0m);
 
     // Risk stores holding_snapshots even when a book source failed, leaving that sleeve with no positions and no
     // marker. A sleeve with value on the row but nothing invested behind it would land whole in cash, so the day

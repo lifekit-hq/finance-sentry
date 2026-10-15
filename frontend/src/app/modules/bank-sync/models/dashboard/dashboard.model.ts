@@ -1,4 +1,7 @@
-import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
+import {
+  type HeadlineQuality,
+  type MaybeHeadline,
+} from '../../../../shared/models/headline/headline.model';
 
 export type HistoryRange = '1w' | 'mtd' | '1m' | '3m' | 'ytd' | '1y' | 'all';
 
@@ -18,6 +21,19 @@ export interface NetWorthSnapshotDto {
   cashTotal?: Nullable<number>;
   brokerageInvested?: Nullable<number>;
   cryptoInvested?: Nullable<number>;
+  /** The day's sources: the three sleeves, then any other source. A source the snapshot carried
+   * forward or could not read carries `STALE_SOURCE` in `reasons`. Absent on an older API build. */
+  sources?: Nullable<NetWorthSourceDto[]>;
+}
+
+/** One source's part of a history row: the figure counted for it, its health and typed reasons. */
+export interface NetWorthSourceDto {
+  sourceId: string;
+  kind: string;
+  /** In the row's currency; null only for a source outside the three sleeves whose read failed. */
+  total: Nullable<number>;
+  health: HeadlineQuality;
+  reasons: string[];
 }
 
 /** A snapshot's cash / invested split, once all three parts are known. */

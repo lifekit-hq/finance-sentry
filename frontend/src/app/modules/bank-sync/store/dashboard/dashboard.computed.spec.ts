@@ -986,6 +986,45 @@ describe('dashboardComputed headline quality', () => {
     });
   });
 
+  it('takes the stale sources from the latest snapshot per-source rows, one per source', () => {
+    const c = compute({
+      monthlyFlow: [],
+      totalNetWorthUsd: 1000,
+      netWorthHeadline: headline(),
+      netWorthHistory: [
+        {
+          ...snapshot(900, 0, 100),
+          staleSleeves: 'crypto',
+          sources: [
+            {sourceId: 'banking', kind: 'Bank', total: 900, health: 'COMPLETE', reasons: []},
+            {
+              sourceId: 'crypto',
+              kind: 'CryptoVenue',
+              total: 100,
+              health: 'DEGRADED',
+              reasons: ['STALE_SOURCE'],
+            },
+            {
+              sourceId: 'inzhur',
+              kind: 'Fund',
+              total: null,
+              health: 'UNAVAILABLE',
+              reasons: ['STALE_SOURCE'],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(c.netWorthHeadline()).toMatchObject({
+      quality: 'DEGRADED',
+      reasons: [
+        {code: 'STALE_SOURCE', source: 'crypto'},
+        {code: 'STALE_SOURCE', source: 'inzhur'},
+      ],
+    });
+  });
+
   it('builds a degraded record around the amount on an older API build', () => {
     const c = compute({
       monthlyFlow: [],

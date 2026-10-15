@@ -34,6 +34,16 @@ public interface INetWorthSnapshotRepository
     /// Opts out of the Owner query filter.</summary>
     Task<IReadOnlyList<NetWorthSnapshot>> GetByUserIdUnscopedAsync(Guid userId, DateOnly? from, DateOnly? to, CancellationToken ct = default);
 
+    /// <summary>
+    /// The per-source rows of the user's given snapshots, all in one read; a snapshot taken before the rows were
+    /// written has none. Read them through <see cref="SnapshotSources"/>, never on their own.
+    /// </summary>
+    Task<IReadOnlyList<NetWorthSnapshotSource>> GetSourcesAsync(Guid userId, IReadOnlyCollection<Guid> snapshotIds, CancellationToken ct = default);
+
+    /// <summary><see cref="GetSourcesAsync"/> for the readers that run with no person in scope (the brokerage history
+    /// reader, the FIRE brief job, the split backfill). Opts out of the Owner query filter.</summary>
+    Task<IReadOnlyList<NetWorthSnapshotSource>> GetSourcesUnscopedAsync(Guid userId, IReadOnlyCollection<Guid> snapshotIds, CancellationToken ct = default);
+
     /// <summary>Earliest snapshot for the user — the boundary a history backfill reconstructs up to.</summary>
     Task<NetWorthSnapshot?> GetEarliestByUserIdAsync(Guid userId, CancellationToken ct = default);
 

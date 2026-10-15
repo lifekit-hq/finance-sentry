@@ -418,20 +418,24 @@ export function dashboardComputed(store: StateSignals) {
     return start && end && endIndex > first ? changeOf(start.invested, end.invested) : null;
   });
 
-  // The live net worth as a typed record, with the latest snapshot's stale sleeves added when the
+  // The live net worth as a typed record, with the latest snapshot's stale sources added when the
   // API's own record does not already name them (and one built around the amount on an older
-  // build). Null while scrubbing: a historical point is not the live figure, so it carries no
-  // badge and never reads N/A.
+  // build). The stale sources are the ones its per-source rows mark STALE_SOURCE, or its stale
+  // sleeves on an older API build. Null while scrubbing: a historical point is not the live
+  // figure, so it carries no badge and never reads N/A.
   const netWorthHeadline = computed((): Nullable<Headline> => {
     const data = store.data();
     if (scrubbedTotal() !== null || !data) {
       return null;
     }
     const history = store.netWorthHistory();
-    const sleeves = (history[history.length - 1]?.staleSleeves ?? '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
+    const latest = history[history.length - 1];
+    const sleeves = latest?.sources
+      ? latest.sources.filter(s => s.reasons.includes(STALE_SOURCE_CODE)).map(s => s.sourceId)
+      : (latest?.staleSleeves ?? '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
     const named = data.netWorthHeadline?.reasons.some(r => r.code === STALE_SOURCE_CODE) ?? false;
     return HeadlineUtils.withStaleSources(
       data.netWorthHeadline,

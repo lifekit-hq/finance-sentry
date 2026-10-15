@@ -73,6 +73,7 @@ public class NetWorthHistoryController(
                 CashTotal = FxOrNull(s.CashTotal),
                 BrokerageInvested = FxOrNull(s.BrokerageInvested),
                 CryptoInvested = FxOrNull(s.CryptoInvested),
+                Sources = s.Sources?.Select(src => src with { Total = FxOrNull(src.Total) }).ToList(),
                 Currency = baseCurrency,
                 FxReasons = Reasons(s.FxReasons, added),
             }, status);
