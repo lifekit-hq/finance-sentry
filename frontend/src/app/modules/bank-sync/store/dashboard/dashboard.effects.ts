@@ -2,7 +2,7 @@ import {inject, type Signal, untracked} from '@angular/core';
 import {toObservable} from '@angular/core/rxjs-interop';
 import {extractErrorCode} from '@lifekit-hq/core';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
-import {catchError, EMPTY, pipe, switchMap, tap, timer} from 'rxjs';
+import {catchError, EMPTY, filter, pipe, switchMap, tap, timer} from 'rxjs';
 
 import {type MaybeHeadline} from '../../../../shared/models/headline/headline.model';
 import {
@@ -33,6 +33,10 @@ const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;
 const REFRESH_INTERVAL_MS = MINUTES_PER_REFRESH * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
+function isCurrentRange(store: EffectsStore, range: HistoryRange): boolean {
+  return untracked(store.historyRange) === range;
+}
+
 export function dashboardEffects(store: EffectsStore) {
   const bankSyncService = inject(BankSyncService);
 
@@ -50,12 +54,15 @@ export function dashboardEffects(store: EffectsStore) {
               DashboardRangeUtils.windowFrom(range)
             )
             .pipe(
+              filter(() => isCurrentRange(store, range)),
               tap(data => {
                 store.setData(data, range);
                 store.setSuccess();
               }),
               catchError((err: unknown) => {
-                store.setError(extractErrorCode(err));
+                if (isCurrentRange(store, range)) {
+                  store.setError(extractErrorCode(err));
+                }
                 return EMPTY;
               })
             )
@@ -68,6 +75,7 @@ export function dashboardEffects(store: EffectsStore) {
         tap(() => store.setHistoryLoading(true)),
         switchMap(range =>
           bankSyncService.getNetWorthHistory(range).pipe(
+            filter(() => isCurrentRange(store, range)),
             tap(response => {
               store.setNetWorthHistory(response.snapshots, range);
               store.setHistoryHasHistory(response.hasHistory);
@@ -77,8 +85,10 @@ export function dashboardEffects(store: EffectsStore) {
               store.setHistoryError(null);
             }),
             catchError((err: unknown) => {
-              store.setHistoryError(extractErrorCode(err) ?? 'Failed to load net worth history.');
-              store.setHistoryLoading(false);
+              if (isCurrentRange(store, range)) {
+                store.setHistoryError(extractErrorCode(err) ?? 'Failed to load net worth history.');
+                store.setHistoryLoading(false);
+              }
               return EMPTY;
             })
           )
@@ -111,20 +121,21 @@ export function dashboardHooks(store: HookStore): void {
     )
     .subscribe();
 
-  rxMethod<void>(
+  // A range change restarts the timer and cancels a refresh still in flight for the old range.
+  rxMethod<HistoryRange>(
     pipe(
-      switchMap(() =>
+      switchMap(range =>
         timer(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS).pipe(
           // The catch sits inside the inner stream: one failed refresh must not end the timer.
-          switchMap(() => {
-            const range = untracked(store.historyRange);
-            return bankSyncService
+          switchMap(() =>
+            bankSyncService
               .getDashboardData(
                 DashboardRangeUtils.months(range),
                 DashboardRangeUtils.windowMonths(range),
                 DashboardRangeUtils.windowFrom(range)
               )
               .pipe(
+                filter(() => isCurrentRange(store, range)),
                 tap(data =>
                   untracked(() => {
                     store.setData(data, range);
@@ -132,13 +143,15 @@ export function dashboardHooks(store: HookStore): void {
                   })
                 ),
                 catchError((err: unknown) => {
-                  untracked(() => store.setError(extractErrorCode(err)));
+                  if (isCurrentRange(store, range)) {
+                    untracked(() => store.setError(extractErrorCode(err)));
+                  }
                   return EMPTY;
                 })
-              );
-          })
+              )
+          )
         )
       )
     )
-  )();
+  )(store.historyRange);
 }
