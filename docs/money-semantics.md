@@ -326,7 +326,8 @@ convention above is unchanged — only the label differs. Net worth totals stay 
   point: the snapshot row stores the worst status of what the job summed (`net_worth_snapshots.fx_status`,
   nullable, additive; zero-quantity holdings are left out), a row with none recorded falls back to
   `IsApproximate` reading `FX_TODAY_RATE` (a backfilled row is valued at today's rate), and a base
-  currency without a live rate adds it too. R8's per-source rows will take over the stored field. A
+  currency without a live rate adds it too, as does a row dated before today shown in a non-USD base
+  (displayed at today's rate; dated-rate display conversion is a queued follow-up). R8's per-source rows will take over the stored field. A
   brokerage or crypto row's USD value is converted at sync time, so its status is re-derived from the
   rate table in force at read. `CurrencyConverter.IsKnown` remains for callers outside these paths.
 - **Dated EUR boundary (reporting, e.g. tax schedules).** `IEurReportingConverter.ToEurAsync(

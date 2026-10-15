@@ -118,7 +118,9 @@ Two things already right and kept:
   `FxReasons` per point: the job persists the worst status on the snapshot row (`fx_status`, nullable, one
   per row, zero-quantity holdings left out as `BookFiguresService` does), history maps it, and a row with none
   recorded (backfilled or from before the column) falls back to `IsApproximate` reading `FX_TODAY_RATE`; a
-  base currency shown on the seed table adds it. R8's per-source rows will take over this field. A brokerage
+  base currency shown on the seed table adds it, and a row dated before today shown in a non-USD base adds it
+  too (the display boundary converts at today's rate, not the row's own day's: dated-rate display conversion,
+  C4's "dated rates", is a separate queued follow-up). R8's per-source rows will take over this field. A brokerage
   or crypto row stores its USD value converted at sync time, so its status is re-derived from the rate table
   in force when it is read. Display wording is R7.
 

@@ -308,12 +308,54 @@ public sealed class FxStatusHeadlineTests
         return result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<NetWorthHistoryResponse>().Subject;
     }
 
+    private static NetWorthSnapshotDto HistoryDto(DateOnly date, params string[] reasons) =>
+        new(date, 100m, 0m, 0m, 100m, "USD", null, false, FxReasons: reasons);
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    [Fact]
+    public async Task HistoryController_AddsFxTodayRate_ToAPastRowShownInANonUsdBase()
+    {
+        using var _ = FxTableScope.Live(LiveEur);
+
+        var eur = await ControllerHistoryAsync("EUR", HistoryDto(Today.AddDays(-30)));
+
+        eur.Snapshots[0].FxReasons.Should().Equal("FX_TODAY_RATE");
+        eur.Snapshots[0].TotalNetWorth.Should().Be(CurrencyConverter.FromUsd(100m, "EUR"));
+    }
+
+    [Fact]
+    public async Task HistoryController_AddsNothing_ToAPastRowInUsd_OrATodayRowOnALiveRate()
+    {
+        using var _ = FxTableScope.Live(LiveEur);
+
+        var usd = await ControllerHistoryAsync("USD", HistoryDto(Today.AddDays(-30)));
+        var eurToday = await ControllerHistoryAsync("EUR", HistoryDto(Today));
+
+        usd.Snapshots[0].FxReasons.Should().BeEmpty();
+        eurToday.Snapshots[0].FxReasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HistoryController_KeepsTheWorseReason_WithoutDuplicates()
+    {
+        using var _ = FxTableScope.Live(LiveEur);
+
+        var unknown = await ControllerHistoryAsync("EUR", HistoryDto(Today.AddDays(-30), "FX_UNKNOWN_1TO1"));
+        var uahUnknown = await ControllerHistoryAsync("UAH", HistoryDto(Today, "FX_UNKNOWN_1TO1"));
+        var uahTodayRate = await ControllerHistoryAsync("UAH", HistoryDto(Today.AddDays(-30), "FX_TODAY_RATE"));
+
+        unknown.Snapshots[0].FxReasons.Should().Equal("FX_UNKNOWN_1TO1");
+        uahUnknown.Snapshots[0].FxReasons.Should().Equal("FX_UNKNOWN_1TO1");
+        uahTodayRate.Snapshots[0].FxReasons.Should().Equal("FX_TODAY_RATE");
+    }
+
     [Fact]
     public async Task HistoryController_AddsFxTodayRate_WhenTheBaseCurrencyIsShownOnTheSeedTable()
     {
         using var _ = FxTableScope.Live(LiveEur); // UAH is not in the live feed
         var dto = new NetWorthSnapshotDto(
-            new DateOnly(2026, 10, 1), 100m, 0m, 0m, 100m, "USD", null, false, FxReasons: []);
+            Today, 100m, 0m, 0m, 100m, "USD", null, false, FxReasons: []);
 
         var uah = await ControllerHistoryAsync("UAH", dto);
         var eur = await ControllerHistoryAsync("EUR", dto);
@@ -327,7 +369,7 @@ public sealed class FxStatusHeadlineTests
     {
         using var _ = FxTableScope.Live(LiveEur);
         var dto = new NetWorthSnapshotDto(
-            new DateOnly(2026, 10, 1), 100m, 0m, 0m, 100m, "USD", null, true, FxReasons: ["FX_TODAY_RATE"]);
+            Today, 100m, 0m, 0m, 100m, "USD", null, true, FxReasons: ["FX_TODAY_RATE"]);
 
         var uah = await ControllerHistoryAsync("UAH", dto);
 
