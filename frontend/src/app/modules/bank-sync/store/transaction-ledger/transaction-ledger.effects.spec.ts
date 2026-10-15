@@ -531,7 +531,7 @@ describe('transactionLedgerEffects', () => {
       TestBed.tick();
 
       expect(service.getAllTransactions).toHaveBeenCalledTimes(1);
-      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false);
+      expect(store.setTransactions).toHaveBeenCalledWith([TX_ITEM], 1, false, NO_FILTER);
     });
 
     it.each<[string, Partial<LedgerFilter>]>([

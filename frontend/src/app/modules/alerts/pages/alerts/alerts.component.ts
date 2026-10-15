@@ -72,7 +72,7 @@ function severityFor(severity: AlertSeverity): AlertItemSeverity {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block h-full'},
+  host: {class: 'block md:h-full'},
   templateUrl: './alerts.component.html',
 })
 export class AlertsComponent {

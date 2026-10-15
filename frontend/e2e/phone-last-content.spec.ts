@@ -22,6 +22,7 @@ async function mockApis(page: Page): Promise<void> {
   await page.route(`${API}/alerts/unread-count`, route => route.fulfill(json({count: 0})));
   await page.route(`${API}/categories`, route => route.fulfill(json([])));
   await page.route(`${API}/alerts?**`, route => {
+    // One full page that is also the last: the list ends at once, on its end label.
     const items = Array.from({length: ALERT_PAGE_SIZE}, (_, i) => ({
       id: `alert-${i}`,
       type: 'Opportunity',
@@ -38,11 +39,11 @@ async function mockApis(page: Page): Promise<void> {
     return route.fulfill(
       json({
         items,
-        totalCount: ROW_COUNT,
+        totalCount: ALERT_PAGE_SIZE,
         unreadCount: 0,
         page: 1,
         pageSize: ALERT_PAGE_SIZE,
-        totalPages: 2,
+        totalPages: 1,
       })
     );
   });
@@ -153,6 +154,7 @@ test.describe('last content clears the tab bar (390 wide, iPhone insets)', () =>
     await page.reload();
     await expect(page.getByTestId('alert-row')).toHaveCount(ALERT_PAGE_SIZE);
 
+    await expect(page.getByText('No more alerts')).toBeVisible();
     await expectLastContentClearsTabBar(page, '[data-testid="alerts-list"]');
   });
 

@@ -1,5 +1,8 @@
+import {provideHttpClient, withXhr} from '@angular/common/http';
+import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {TestBed} from '@angular/core/testing';
-import {describe, expect, it} from 'vitest';
+import {provideApiBaseUrl} from '@lifekit-hq/core';
+import {beforeEach, describe, expect, it} from 'vitest';
 
 import {dashboardComputed} from './dashboard.computed';
 import {build, snapshot} from './dashboard.computed.fixtures';
@@ -11,6 +14,16 @@ function projection(history = [snapshot(1, 0, 0)]) {
 }
 
 describe('dashboardComputed first-load skeletons', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withXhr()),
+        provideHttpClientTesting(),
+        provideApiBaseUrl('http://localhost/api/v1'),
+      ],
+    });
+  });
+
   it('keeps the numbers while the same range refreshes', () => {
     const {signals, computed} = projection();
 

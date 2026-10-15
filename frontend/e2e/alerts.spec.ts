@@ -69,6 +69,12 @@ const FIRST_PAGE_ITEMS = [
   alertItem({id: 'job-1', type: 'JobFailure', title: 'A background job failed'}),
 ];
 
+// A full first page: the list asks for the next page by the rows it holds, as the server fills a
+// page before it starts the next one.
+const FILLER_ITEMS = Array.from({length: PAGE_SIZE - FIRST_PAGE_ITEMS.length}, (_, i) =>
+  alertItem({id: `filler-${i}`, title: `Older alert ${i}`})
+);
+
 const SECOND_PAGE_ITEMS = [
   alertItem({id: 'p2-1', type: 'PriceHike', title: 'Streaming price hike'}),
 ];
@@ -86,7 +92,7 @@ async function mockApis(page: Page): Promise<Request[]> {
     const url = new URL(request.url());
     const pageNumber = Number(url.searchParams.get('page'));
     const pageSize = Number(url.searchParams.get('pageSize'));
-    const items = pageNumber === 1 ? FIRST_PAGE_ITEMS : SECOND_PAGE_ITEMS;
+    const items = pageNumber === 1 ? [...FIRST_PAGE_ITEMS, ...FILLER_ITEMS] : SECOND_PAGE_ITEMS;
     return route.fulfill(json(pageOf(pageNumber, pageSize, items)));
   });
   await page.route(`${API}/accounts**`, route => route.fulfill(json([])));

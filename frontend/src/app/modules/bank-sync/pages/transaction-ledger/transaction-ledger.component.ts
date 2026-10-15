@@ -83,7 +83,7 @@ const DRAWER_WIDTH = '480px';
   templateUrl: './transaction-ledger.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {class: 'block h-full'},
+  host: {class: 'block md:h-full'},
   providers: [TransactionLedgerStore],
 })
 export class TransactionLedgerComponent {
