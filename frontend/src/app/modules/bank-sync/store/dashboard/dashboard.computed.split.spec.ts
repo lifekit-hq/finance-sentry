@@ -4,7 +4,9 @@ import {TestBed} from '@angular/core/testing';
 import {provideApiBaseUrl} from '@lifekit-hq/core';
 import {beforeEach, describe, expect, it} from 'vitest';
 
+import {ChartColorUtils} from '../../../../shared/utils/chart-color.utils';
 import {type NetWorthSnapshotDto} from '../../models/dashboard/dashboard.model';
+import {SPLIT_COLOUR} from './dashboard.computed';
 import {projectionFor, snapshot} from './dashboard.computed.fixtures';
 
 describe('dashboardComputed cash / invested split', () => {
@@ -138,6 +140,24 @@ describe('dashboardComputed cash / invested split', () => {
       });
 
       expect(values(c.netWorthAreaSeries()[3])).toEqual([9_200, 0]);
+    });
+
+    it('draws "Other sources" in its own colour, never the "No split" band colour', () => {
+      const unsplit = {
+        ...withSources(noSplitDay('2026-07-01', 3_000, 5_000, 500), 700),
+        totalNetWorth: 9_200,
+      };
+      const c = projectionFor({
+        monthlyFlow: [],
+        netWorthHistory: [unsplit, splitDayWithFund('2026-08-01', 4_000, 700)],
+      });
+      const series = c.netWorthAreaSeries();
+      const colour = (label: string) => series.find(s => s.label === label)?.color;
+
+      expect(colour('Other sources')).toBe(ChartColorUtils.canvas(SPLIT_COLOUR.other));
+      expect(colour('No split')).toBe(ChartColorUtils.canvas(SPLIT_COLOUR.unsplit));
+      expect(colour('Other sources')).not.toBe(colour('No split'));
+      expect(new Set(series.map(s => s.color)).size).toBe(series.length);
     });
 
     it('stacks cash, brokerage invested and crypto invested when every day has a split', () => {

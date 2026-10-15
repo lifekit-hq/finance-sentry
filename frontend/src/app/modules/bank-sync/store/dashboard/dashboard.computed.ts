@@ -75,11 +75,13 @@ export const SLEEVE_COLOUR = {
   crypto: CRYPTO_COLOUR,
 } as const;
 // The split chart's three bands keep the asset-class colours; days with no split are drawn as one
-// neutral band so they read as "total only", not as a share of any class.
+// neutral band so they read as "total only", not as a share of any class. Other sources take a
+// series step of their own so they never read as that neutral band.
 export const SPLIT_COLOUR = {
   cash: CASH_COLOUR,
   brokerageInvested: EQUITY_COLOUR,
   cryptoInvested: CRYPTO_COLOUR,
+  other: {step: CATEGORICAL_STEPS[3]},
   unsplit: NEUTRAL_COLOUR,
 } as const;
 export const NET_WORTH_BY_SLEEVE_LABEL = 'Net worth by sleeve';
@@ -322,7 +324,7 @@ export function dashboardComputed(store: StateSignals) {
           ? [
               {
                 label: OTHER_SOURCES_LABEL,
-                color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
+                color: ChartColorUtils.canvas(SPLIT_COLOUR.other),
                 points: toPoints(other),
               },
             ]
@@ -349,7 +351,7 @@ export function dashboardComputed(store: StateSignals) {
     if (splits.some(split => (split?.otherInvested ?? 0) !== 0)) {
       bands.push({
         label: OTHER_SOURCES_LABEL,
-        color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.other),
         points: toPoints(splits.map(split => split?.otherInvested ?? 0)),
       });
     }
