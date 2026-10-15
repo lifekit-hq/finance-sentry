@@ -23,7 +23,7 @@ public sealed record BackfillNetWorthHistoryResult(
 /// docs/money-semantics.md). Only banking is reconstructable this way — brokerage and
 /// crypto positions leave no transaction ledger to walk here — so every inserted row
 /// carries BrokerageTotal = CryptoTotal = 0 and IsApproximate = true. Currency conversion
-/// uses <see cref="CurrencyConverter.ToUsd"/>'s current rate table, not the historical
+/// uses <see cref="CurrencyConverter.Convert"/>'s current rate table, not the historical
 /// rate on the reconstructed date; that, plus the banking-only scope, is why the segment
 /// is approximate rather than measured: each row stores the worst conversion status of its
 /// accounts, never better than <see cref="FxStatus.TodayRate"/>. Each account's reconstructable range is bounded

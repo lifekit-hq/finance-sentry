@@ -49,8 +49,9 @@ public sealed class NetWorthSnapshot : IUserOwned
 
     /// <summary>
     /// The worst currency-conversion status among the figures the snapshot job summed this row from (see
-    /// <see cref="FinanceSentry.Core.Utils.FxStatus"/>). Null = not recorded (a backfilled row, or one from
-    /// before the status was kept); history then falls back to <see cref="IsApproximate"/>.
+    /// <see cref="FinanceSentry.Core.Utils.FxStatus"/>); a carried-forward sleeve folds in the previous row's
+    /// status and a backfilled row stores the worst of its accounts'. Null = not recorded (a row from before the
+    /// status was kept); history then falls back to <see cref="IsApproximate"/>.
     /// </summary>
     public FinanceSentry.Core.Utils.FxStatus? FxStatus { get; init; }
 }
