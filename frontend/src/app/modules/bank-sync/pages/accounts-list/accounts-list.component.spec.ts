@@ -38,6 +38,8 @@ function setupFixture(
     load?: () => void;
     totalNetWorth?: number;
     headline?: Headline;
+    collapsed?: string[];
+    setInstitutionOpen?: (key: string, isOpen: boolean) => void;
   } = {}
 ) {
   const institution: Institution = {...baseInstitution, ...overrides};
@@ -48,6 +50,8 @@ function setupFixture(
     summary: signal(state.hasData ? {} : null),
     lastSyncedAt: signal<number | null>(state.hasData ? Date.now() : null),
     load: state.load ?? vi.fn(),
+    collapsedInstitutions: signal(state.collapsed ?? []),
+    setInstitutionOpen: state.setInstitutionOpen ?? vi.fn(),
     totalNetWorth: signal(state.totalNetWorth ?? 0),
     netWorthHeadline: signal(state.headline ?? null),
     isNetWorthUnavailable: signal(state.headline?.quality === 'UNAVAILABLE'),
@@ -273,6 +277,45 @@ describe('AccountsListComponent investment nav rows', () => {
 
     expect(element.querySelector('cmn-disclosure-row')).not.toBeNull();
     expect(element.querySelector('[data-testid="institution-nav-row"]')).toBeNull();
+  });
+});
+
+describe('AccountsListComponent sticky sections and remembered disclosure', () => {
+  const KEY = 'truelayer:inst-1';
+
+  function details(element: HTMLElement): HTMLDetailsElement {
+    return element.querySelector('cmn-disclosure-row details') as HTMLDetailsElement;
+  }
+
+  it('renders each category as a list section with its subtotal in the header', () => {
+    const element = setup(true, {syncStatus: 'synced'});
+
+    const heading = element.querySelector('cmn-list-section h2');
+    expect(heading?.textContent).toContain('Banks');
+    expect(heading?.querySelector('[data-testid="section-subtotal"]')).not.toBeNull();
+  });
+
+  it('opens a banking group by default', () => {
+    expect(details(setup(true, {syncStatus: 'synced'})).open).toBe(true);
+  });
+
+  it('opens a collapsed group closed, with its total still in the summary', () => {
+    const fixture = setupFixture(true, {syncStatus: 'synced'}, [], {collapsed: [KEY]});
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(details(element).open).toBe(false);
+    expect(details(element).querySelector('summary')?.textContent).toContain('$100.00');
+  });
+
+  it('records the open state when the user toggles the group', () => {
+    const setInstitutionOpen = vi.fn();
+    const fixture = setupFixture(true, {syncStatus: 'synced'}, [], {setInstitutionOpen});
+    const group = details(fixture.nativeElement as HTMLElement);
+
+    group.open = false;
+    group.dispatchEvent(new Event('toggle'));
+
+    expect(setInstitutionOpen).toHaveBeenCalledWith(KEY, false);
   });
 });
 

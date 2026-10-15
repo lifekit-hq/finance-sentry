@@ -178,8 +178,10 @@ export function accountsEffects(store: EffectsStore) {
 
 interface HookStore {
   load: () => void;
+  restoreCollapsed: () => void;
 }
 
 export function accountsHooks(store: HookStore): void {
+  store.restoreCollapsed();
   store.load();
 }
