@@ -42,6 +42,14 @@ public interface IBankConnectionHealth
     /// <summary>Records a successful sync of <paramref name="account"/> on the account and its connection, and resolves their alerts.</summary>
     Task RecordSyncSuccessAsync(BankAccount account, CancellationToken ct = default);
 
+    /// <summary>
+    /// When a scheduled sync of <paramref name="account"/> may next call the provider, or null when it may go ahead: the
+    /// provider asked for a wait (a rate limit's <c>Retry-After</c>, <see cref="ConnectionHealth.NotBefore"/>) that has
+    /// not passed, on the account or on its connection, whose token the limit is charged to. A sync the person
+    /// triggers never asks. Reads only; a connection that cannot be read pauses nothing.
+    /// </summary>
+    Task<DateTimeOffset?> ScheduledSyncPausedUntilAsync(BankAccount account, CancellationToken ct = default);
+
     /// <summary>Records a failed sync of <paramref name="account"/>, raises the alert the policy decides, and returns the verdict.</summary>
     /// <param name="cancelledByCaller">The sync was cancelled from our side (shutdown), which says nothing about the provider.</param>
     /// <param name="ct">Bookkeeping token; a failure path passes <see cref="CancellationToken.None"/> so a cancelled sync is still recorded.</param>
@@ -120,6 +128,23 @@ public sealed class BankConnectionHealth(
             return;
 
         await RecordConnectionSuccessAsync(connection, ct);
+    }
+
+    public async Task<DateTimeOffset?> ScheduledSyncPausedUntilAsync(BankAccount account, CancellationToken ct = default)
+    {
+        var now = time.GetUtcNow();
+        var accountPause = ConnectionHealthPolicy.NotBeforePausedUntil(account.Health, now);
+        if (ConnectionOf(account) is not { } connection)
+            return accountPause;
+
+        var stored = await ReadAsync(connection, ct);
+        var connectionPause = stored is null ? null : ConnectionHealthPolicy.NotBeforePausedUntil(stored.Health, now);
+        return (accountPause, connectionPause) switch
+        {
+            (null, var other) => other,
+            (var own, null) => own,
+            var (own, other) => own >= other ? own : other,
+        };
     }
 
     public async Task<BankHealthVerdict> RecordSyncFailureAsync(
@@ -248,7 +273,7 @@ public sealed class BankConnectionHealth(
     }
 
     private static SyncFailureClass FailingClass(ProviderFailure failure) =>
-        failure.Class == FailureClass.Transient ? SyncFailureClass.Outage : SyncFailureClass.Unknown;
+        failure.Class.IsTransientLike() ? SyncFailureClass.Outage : SyncFailureClass.Unknown;
 
     private ProviderFailure Classify(string provider, Exception exception, DateTimeOffset at, StoredConnectionHealth? stored)
     {

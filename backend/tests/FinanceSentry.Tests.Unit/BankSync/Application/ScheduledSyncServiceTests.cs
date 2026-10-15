@@ -1208,7 +1208,7 @@ public class ScheduledSyncServiceTests
 
         var coordinator = new TransactionSyncCoordinator(
             accountRepo.Object, syncService.Object,
-            new Mock<IBackgroundJobClient>().Object);
+            new Mock<IBackgroundJobClient>().Object, Mock.Of<IBankConnectionHealth>());
 
         var result = await coordinator.TriggerScheduledSyncAsync(AccountId);
 
@@ -1216,6 +1216,51 @@ public class ScheduledSyncServiceTests
         syncService.Verify(
             s => s.PerformFullSyncAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()),
             Times.Never);
+    }
+
+    // The provider asked for a wait (a rate limit's Retry-After): the scheduled run leaves the account alone until
+    // then without calling the provider, and goes ahead once the wait is over.
+    [Fact]
+    public async Task TriggerScheduledSyncAsync_ProviderAskedForAWait_SkipsWithoutSyncing()
+    {
+        var account = new BankAccount { Provider = "monobank" };
+        var accountRepo = new Mock<IBankAccountRepository>();
+        accountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        var syncService = new Mock<IScheduledSyncService>();
+        var health = new Mock<IBankConnectionHealth>();
+        health
+            .Setup(h => h.ScheduledSyncPausedUntilAsync(account, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DateTimeOffset(2026, 10, 15, 9, 0, 0, TimeSpan.Zero));
+        var coordinator = new TransactionSyncCoordinator(
+            accountRepo.Object, syncService.Object, Mock.Of<IBackgroundJobClient>(), health.Object);
+
+        var result = await coordinator.TriggerScheduledSyncAsync(AccountId);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("SYNC_RATE_LIMITED");
+        syncService.Verify(
+            s => s.PerformFullSyncAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task TriggerScheduledSyncAsync_NoWaitAsked_Syncs()
+    {
+        var account = new BankAccount { Provider = "monobank" };
+        var accountRepo = new Mock<IBankAccountRepository>();
+        accountRepo.Setup(r => r.GetByIdUnscopedAsync(AccountId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        var syncService = new Mock<IScheduledSyncService>();
+        syncService
+            .Setup(s => s.PerformFullSyncAsync(AccountId, It.IsAny<CancellationToken>(), It.IsAny<string?>()))
+            .ReturnsAsync(new SyncResult(true, 0, 0, null, null));
+        var coordinator = new TransactionSyncCoordinator(
+            accountRepo.Object, syncService.Object, Mock.Of<IBackgroundJobClient>(), Mock.Of<IBankConnectionHealth>());
+
+        var result = await coordinator.TriggerScheduledSyncAsync(AccountId);
+
+        result.Success.Should().BeTrue();
+        syncService.Verify(
+            s => s.PerformFullSyncAsync(AccountId, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
     }
 
     // ScheduledSyncService now delegates the refresh-token exchange to ITrueLayerTokenRefreshService

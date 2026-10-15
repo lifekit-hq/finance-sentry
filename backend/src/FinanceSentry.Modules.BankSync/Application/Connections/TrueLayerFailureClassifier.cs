@@ -56,7 +56,9 @@ public sealed class TrueLayerFailureClassifier : IProviderFailureClassifier
 
         return tl.StatusCode switch
         {
-            >= ServerErrorStatus or TooManyRequestsStatus => ProviderFailure.Transient(tl.ErrorCode),
+            TooManyRequestsStatus => ProviderFailure.RateLimited(
+                tl.ErrorCode, RetryAfterHint.NotBefore(context.At, tl.RetryAfter)),
+            >= ServerErrorStatus => ProviderFailure.Transient(tl.ErrorCode),
             UnauthorizedStatus or ForbiddenStatus when consentExpiresAt is { } expiresAt && context.At >= expiresAt =>
                 ProviderFailure.CredentialDefinitive(tl.ErrorCode),
             UnauthorizedStatus or ForbiddenStatus => ProviderFailure.CredentialSuspect(tl.ErrorCode),

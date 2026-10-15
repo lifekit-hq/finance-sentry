@@ -167,16 +167,18 @@ public sealed class SyncClaimConcurrencyTests : IAsyncLifetime
         var trueLayerConnections = Mock.Of<ITrueLayerConnectionRepository>();
         var alerts = Mock.Of<IAlertGeneratorService>();
         var userPreferences = Mock.Of<IUserAlertPreferencesReader>();
+        var connectionHealth = BankConnectionHealthFactory.Create(
+            accounts, monobankCredentials, trueLayerConnections, alerts, userPreferences);
         var syncService = new ScheduledSyncService(
             accounts, transactions.Object, syncJobs, encryption.Object, dedup.Object,
             Mock.Of<IBankSyncLogger>(), providerFactory.Object, monobankCredentials,
             trueLayerConnections, Mock.Of<ITrueLayerClient>(),
             new MonobankBalanceCache(TimeProvider.System), alerts, userPreferences,
             Mock.Of<IEventBus>(), Mock.Of<ITrueLayerTokenRefreshService>(),
-            BankConnectionHealthFactory.Create(accounts, monobankCredentials, trueLayerConnections, alerts, userPreferences));
+            connectionHealth);
 
         var coordinator = new TransactionSyncCoordinator(
-            accounts, syncService, Mock.Of<IBackgroundJobClient>());
+            accounts, syncService, Mock.Of<IBackgroundJobClient>(), connectionHealth);
 
         return await coordinator.TriggerManualSyncAsync(_account.Id);
     }

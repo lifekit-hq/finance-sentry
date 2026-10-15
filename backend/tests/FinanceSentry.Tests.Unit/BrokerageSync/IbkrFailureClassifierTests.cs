@@ -22,7 +22,7 @@ public class IbkrFailureClassifierTests
         // During an outage IBKR answers the token request with 401 and "backend down".
         { new BrokerAuthException("IBKR live-session-token request failed (401): {\"error\":\"backend down\",\"statusCode\":401}", "IBKR", HttpStatusCode.Unauthorized), FailureClass.Transient, FailureStrength.Definitive, "HTTP_401" },
         { new BrokerAuthException("IBKR live-session-token request failed (503): Error 500 - Server Error", "IBKR", HttpStatusCode.ServiceUnavailable), FailureClass.Transient, FailureStrength.Definitive, "HTTP_503" },
-        { new BrokerAuthException("IBKR live-session-token request failed (429): slow down", "IBKR", HttpStatusCode.TooManyRequests), FailureClass.Transient, FailureStrength.Definitive, "HTTP_429" },
+        { new BrokerAuthException("IBKR live-session-token request failed (429): slow down", "IBKR", HttpStatusCode.TooManyRequests), FailureClass.RateLimited, FailureStrength.Definitive, "HTTP_429" },
         { new HttpRequestException("Bad Gateway", null, HttpStatusCode.BadGateway), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
         { new HttpRequestException("Connection refused", new SocketException()), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
         { new TaskCanceledException("The request timed out."), FailureClass.Transient, FailureStrength.Definitive, nameof(TaskCanceledException) },

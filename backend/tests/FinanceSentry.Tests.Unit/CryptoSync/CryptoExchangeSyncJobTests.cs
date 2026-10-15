@@ -367,7 +367,7 @@ public class CryptoExchangeSyncJobTests
         { new BinanceException("Invalid API-key", binanceErrorCode: -2015, venueStatusCode: 401), FailureClass.Credential, FailureStrength.Definitive },
         { new BinanceException("Unauthorized", venueStatusCode: 401), FailureClass.Credential, FailureStrength.Suspect },
         { new BinanceException("Binance API error: HTTP 500", venueStatusCode: 500), FailureClass.Transient, FailureStrength.Definitive },
-        { new CryptoTradeHistoryException(CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)), FailureClass.Transient, FailureStrength.Definitive },
+        { new CryptoTradeHistoryException(CryptoExchangeProvider.Binance, ["BTC"], new BinanceException("HTTP 429", venueStatusCode: 429)), FailureClass.RateLimited, FailureStrength.Definitive },
         { new BinanceException("Binance refused the call.", binanceErrorCode: -1021, venueStatusCode: 400), FailureClass.Unknown, FailureStrength.Definitive },
         { new ExchangeCredentialUnreadableException(CryptoExchangeProvider.Binance, new System.Security.Cryptography.CryptographicException("tag")), FailureClass.Credential, FailureStrength.Definitive },
         { new InvalidOperationException("boom"), FailureClass.Unknown, FailureStrength.Definitive },

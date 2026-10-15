@@ -14,7 +14,8 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Binance;
 /// <list type="bullet">
 /// <item>Binance's invalid-key codes say plainly the key is not honoured: a definitive credential failure.</item>
 /// <item>A bare 401/403 is only suspect.</item>
-/// <item>Throttling, 5xx, timeouts and network failures are transient.</item>
+/// <item>A 429 is rate limited: it counts like a transient failure and is never a credential signal.</item>
+/// <item>5xx, timeouts and network failures are transient.</item>
 /// <item>A stored key we cannot decrypt can only be fixed by entering it again: a definitive credential failure.</item>
 /// <item>Anything else is unknown, and counts like any other non-credential failure.</item>
 /// </list>
@@ -38,6 +39,11 @@ public sealed class BinanceFailureClassifier : IProviderFailureClassifier
             BinanceException { VenueStatusCode: { } status } => $"HTTP_{status}",
             _ => cause.GetType().Name,
         };
+
+        // Throttling is its own class: it counts like a transient failure but is never read as a credential signal.
+        if (cause is BinanceException { VenueStatusCode: (int)HttpStatusCode.TooManyRequests }
+            or HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests })
+            return ProviderFailure.RateLimited(code);
 
         if (JobFailureTransientClassifier.IsTransient(cause)
             || cause is BinanceException { VenueStatusCode: { } transientStatus }

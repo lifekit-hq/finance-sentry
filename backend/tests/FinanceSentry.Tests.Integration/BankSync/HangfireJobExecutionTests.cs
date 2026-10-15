@@ -45,6 +45,27 @@ public class HangfireJobExecutionTests
     }
 
     /// <summary>
+    /// A person-triggered sync goes through the coordinator's manual path, not the scheduled one
+    /// that honours a provider-named NotBefore.
+    /// </summary>
+    [Fact]
+    public async Task ScheduledSyncJob_ExecuteManualSyncAsync_UsesManualPath()
+    {
+        var accountId   = Guid.NewGuid();
+        var coordinator = new Mock<ITransactionSyncCoordinator>();
+        coordinator
+            .Setup(c => c.TriggerManualSyncAsync(accountId, default))
+            .ReturnsAsync(new SyncResult(true, 10, 8, null, null));
+
+        var job = new ScheduledSyncJob(coordinator.Object);
+
+        await job.ExecuteManualSyncAsync(accountId);
+
+        coordinator.Verify(c => c.TriggerManualSyncAsync(accountId, default), Times.Once);
+        coordinator.Verify(c => c.TriggerScheduledSyncAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
     /// Verifies that the coordinator reports a sync-in-progress result without calling the service.
     /// Simulates the concurrency guard that prevents duplicate runs.
     /// </summary>

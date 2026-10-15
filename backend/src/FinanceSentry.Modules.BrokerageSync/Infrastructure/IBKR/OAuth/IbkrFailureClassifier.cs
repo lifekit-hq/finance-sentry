@@ -10,7 +10,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
 /// <summary>
 /// Reads an IBKR Web API (OAuth) sync failure for the connection-health policy (report §5).
 /// <list type="bullet">
-/// <item>Throttling, 5xx, timeouts and network failures are transient, and so is a 401 whose body says
+/// <item>A 429 is rate limited: it counts like a transient failure and is never a credential signal.</item>
+/// <item>5xx, timeouts and network failures are transient, and so is a 401 whose body says
 /// "backend down": IBKR answers the token request that way during an outage.</item>
 /// <item>Any other 401/403 is a suspect credential failure: IBKR sends it for reasons other than a dead
 /// credential too, so the policy waits for a confirmation before asking the user to reconnect.</item>
@@ -34,6 +35,11 @@ public sealed class IbkrFailureClassifier : IProviderFailureClassifier
         var code = exception is BrokerAuthException { UpstreamStatusCode: { } status }
             ? $"HTTP_{(int)status}"
             : exception.GetType().Name;
+
+        // Throttling is its own class: it counts like a transient failure but is never read as a credential signal.
+        if (exception is BrokerAuthException { UpstreamStatusCode: HttpStatusCode.TooManyRequests }
+            or HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests })
+            return ProviderFailure.RateLimited(code);
 
         if (IsTransient(exception))
             return ProviderFailure.Transient(code);

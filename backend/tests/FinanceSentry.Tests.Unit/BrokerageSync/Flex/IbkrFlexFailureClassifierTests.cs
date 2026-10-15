@@ -25,15 +25,22 @@ public class IbkrFlexFailureClassifierTests
         // Ambiguous refusals: suspect until seen again.
         { new IbkrFlexException("1020", "Invalid request or unable to validate request."), FailureClass.Credential, FailureStrength.Suspect, "1020" },
         { new IbkrFlexException(null, "IBKR Flex rejected the request (403).", HttpStatusCode.Forbidden), FailureClass.Credential, FailureStrength.Suspect, "HTTP_403" },
-        // Not ready yet, under load or throttled.
+        // Not ready yet or under load.
         { new IbkrFlexException("1001", "Statement could not be generated at this time. Please try again shortly."), FailureClass.Transient, FailureStrength.Definitive, "1001" },
         { new IbkrFlexException("1009", "The server is under heavy load."), FailureClass.Transient, FailureStrength.Definitive, "1009" },
-        { new IbkrFlexException("1018", "Too many requests have been made from this token."), FailureClass.Transient, FailureStrength.Definitive, "1018" },
+        { new IbkrFlexException("1004", "Statement is incomplete at this time."), FailureClass.Transient, FailureStrength.Definitive, "1004" },
+        { new IbkrFlexException("1005", "Settlement data is not ready at this time."), FailureClass.Transient, FailureStrength.Definitive, "1005" },
+        { new IbkrFlexException("1006", "FIFO P/L data is not ready at this time."), FailureClass.Transient, FailureStrength.Definitive, "1006" },
+        { new IbkrFlexException("1007", "MTM P/L data is not ready at this time."), FailureClass.Transient, FailureStrength.Definitive, "1007" },
+        { new IbkrFlexException("1008", "MTM and FIFO P/L data is not ready at this time."), FailureClass.Transient, FailureStrength.Definitive, "1008" },
+        // Throttled: a rate limit of its own class (IBKR names no wait, so no time is invented).
+        { new IbkrFlexException("1018", "Too many requests have been made from this token."), FailureClass.RateLimited, FailureStrength.Definitive, "1018" },
         { new IbkrFlexException("1019", "Statement for reference 123 was not ready after 5 polls."), FailureClass.Transient, FailureStrength.Definitive, "1019" },
         { new HttpRequestException("Service Unavailable", null, HttpStatusCode.ServiceUnavailable), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
         { new HttpRequestException("Connection refused", new SocketException()), FailureClass.Transient, FailureStrength.Definitive, nameof(HttpRequestException) },
-        // "Statement is not available", once the client's retries and the job's step-back are spent: unknown.
-        { new IbkrFlexException("1003", "Statement is not available."), FailureClass.Unknown, FailureStrength.Definitive, "1003" },
+        // "Statement is not available", once the client's retries and the job's step-back are spent: IBKR has not
+        // produced the day yet. Its own class, not counted until the source's deadline.
+        { new IbkrFlexException("1003", "Statement is not available."), FailureClass.NotReady, FailureStrength.Definitive, "1003" },
         // A stored token we cannot read: only entering it again fixes it.
         { new BrokerCredentialUnreadableException("IBKR Flex", new CryptographicException("tag mismatch")), FailureClass.Credential, FailureStrength.Definitive, nameof(BrokerCredentialUnreadableException) },
         // IBKR answered with something we cannot place, or anything else unexpected: unknown.

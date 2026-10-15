@@ -252,6 +252,9 @@ namespace FinanceSentry.Modules.CryptoSync.Migrations
                             b1.Property<DateTimeOffset?>("LastSuccessAt")
                                 .HasColumnType("timestamp with time zone");
 
+                            b1.Property<DateTimeOffset?>("NotBefore")
+                                .HasColumnType("timestamp with time zone");
+
                             b1.Property<string>("State")
                                 .IsRequired()
                                 .HasMaxLength(20)

@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.BankSync.Infrastructure.Monobank;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FinanceSentry.Infrastructure.Http;
 
 public class MonobankHttpClient(HttpClient http)
 {
@@ -114,7 +115,10 @@ public class MonobankHttpClient(HttpClient http)
         {
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 throw new MonobankException("MONOBANK_RATE_LIMITED",
-                    "Monobank API rate limit exceeded. Please try again in 60 seconds.", 429);
+                    "Monobank API rate limit exceeded. Please try again in 60 seconds.", 429)
+                {
+                    RetryAfter = RetryAfterHeader.WaitFrom(response, DateTimeOffset.UtcNow),
+                };
 
             // Monobank returns 403 (not 401) for a bad/unknown X-Token; treat both as invalid token.
             if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)

@@ -213,7 +213,7 @@ public class BankSyncController(
             return Conflict(new ApiErrorBody("A sync is already in progress for this account.", "SYNC_IN_PROGRESS"));
 
         var hangfireJobId = _backgroundJobs.Enqueue<Infrastructure.Jobs.ScheduledSyncJob>(
-            job => job.ExecuteSyncAsync(accountId));
+            job => job.ExecuteManualSyncAsync(accountId));
 
         return Accepted(new SyncEnqueuedResponse(
             hangfireJobId,
