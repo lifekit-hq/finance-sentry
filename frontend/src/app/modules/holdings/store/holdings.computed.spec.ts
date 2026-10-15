@@ -27,7 +27,8 @@ function build(
   positions: Position[],
   dayChangePctByTicker: Record<string, number> = {},
   status: AsyncStatus = 'idle',
-  headline: Nullable<Headline> = null
+  headline: Nullable<Headline> = null,
+  provider: Nullable<string> = null
 ) {
   return TestBed.runInInjectionContext(() =>
     holdingsComputed({
@@ -35,6 +36,7 @@ function build(
       headline: signal(headline),
       status: signal<AsyncStatus>(status),
       dayChangePctByTicker: signal(dayChangePctByTicker),
+      provider: signal(provider),
     })
   );
 }
@@ -282,5 +284,42 @@ describe('holdingsComputed', () => {
     expect(bySymbol('AAPL')).toEqual(
       expect.objectContaining({nativeCurrency: null, nativeValue: null, nativePrice: null})
     );
+  });
+});
+
+describe('holdingsComputed provider filter', () => {
+  const ibkr = position({
+    symbol: 'AAPL',
+    provider: 'ibkr',
+    assetClass: 'equity',
+    currentValue: 300,
+  });
+  const binance = position({symbol: 'ETH', provider: 'binance', currentValue: 100});
+
+  it('keeps every position when no provider is selected', () => {
+    const c = build([ibkr, binance]);
+
+    expect(c.positions()).toHaveLength(2);
+    expect(c.providerFilterLabel()).toBeNull();
+    expect(c.totalPositionsValue()).toBe(400);
+  });
+
+  it('narrows positions, total, groups and weights to the selected provider', () => {
+    const c = build([ibkr, binance], {}, 'success', null, 'ibkr');
+
+    expect(c.positions().map(p => p.symbol)).toEqual(['AAPL']);
+    expect(c.totalPositionsValue()).toBe(300);
+    expect(c.positionsByAssetClass().map(g => g.assetClass)).toEqual(['equity']);
+    expect(c.positionsByAssetClass()[0].rows[0].weightPercent).toBe(100);
+    expect(c.providerFilterLabel()).toBe('Interactive Brokers');
+    expect(c.isFilteredEmpty()).toBe(false);
+  });
+
+  it('reports a filter that matches nothing without reading as an empty book', () => {
+    const c = build([ibkr], {}, 'success', null, 'binance');
+
+    expect(c.positions()).toHaveLength(0);
+    expect(c.isFilteredEmpty()).toBe(true);
+    expect(c.isEmpty()).toBe(false);
   });
 });

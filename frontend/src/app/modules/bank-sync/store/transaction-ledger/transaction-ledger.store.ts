@@ -1,9 +1,9 @@
 import {withAsyncStatus, withUrlSync} from '@lifekit-hq/core';
 import {signalStore, withComputed, withHooks, withMethods, withState} from '@ngrx/signals';
 
+import {NULLABLE_STRING_PARAM_CODEC} from '../../../../shared/constants/url-params/url-params.constants';
 import {
   ISO_DATE_PARAM_CODEC,
-  NULLABLE_STRING_PARAM_CODEC,
   TRANSACTION_TYPE_PARAM_CODEC,
 } from '../../constants/url-params/url-params.constants';
 import {transactionLedgerComputed} from './transaction-ledger.computed';

@@ -1,5 +1,11 @@
 import {DecimalPipe, NgTemplateOutlet} from '@angular/common';
-import {ChangeDetectionStrategy, Component, computed, inject} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import {Router, RouterLink} from '@angular/router';
 import {type DonutSegmentClick} from '@lifekit-hq/charts-core';
 import {
@@ -48,6 +54,7 @@ const SKELETON_ROWS = 4;
   ],
   templateUrl: './holdings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [HoldingsStore],
 })
 export class InvestmentsComponent {
@@ -64,6 +71,11 @@ export class InvestmentsComponent {
   });
   public readonly pnlPositiveClass = GAIN_TEXT_CLASS;
   public readonly pnlNegativeClass = LOSS_TEXT_CLASS;
+
+  /** Removes the provider filter, which drops `?provider=` from the URL. */
+  public clearProvider(): void {
+    void this.router.navigate([], {queryParams: {provider: null}, queryParamsHandling: 'merge'});
+  }
 
   /** Cash rows are currency balances, not holdings - they have no dossier to open. */
   public openDossier(assetClass: AssetClass, symbol: string): void {

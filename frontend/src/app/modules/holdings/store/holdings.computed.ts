@@ -21,6 +21,7 @@ interface StateSignals {
   headline: Signal<Nullable<Headline>>;
   status: Signal<AsyncStatus>;
   dayChangePctByTicker: Signal<Record<string, number>>;
+  provider: Signal<Nullable<string>>;
 }
 
 const WEIGHT_TO_PERCENT = 100;
@@ -51,6 +52,11 @@ export interface PositionAssetGroup {
   label: string;
   rows: PositionRow[];
   totalValue: number;
+}
+
+export interface ProviderOption {
+  slug: string;
+  label: string;
 }
 
 export interface AllocationBreakdownRow {
@@ -88,12 +94,17 @@ export const ASSET_CLASS_COLOUR: Record<AssetClass, ChartColour> = {
 };
 
 export function holdingsComputed(store: StateSignals) {
+  // The provider filter narrows everything the page shows - total, weights, groups and donut.
+  const visiblePositions = computed((): Position[] => {
+    const provider = store.provider();
+    return provider ? store.positions().filter(p => p.provider === provider) : store.positions();
+  });
   const totalPositionsValue = computed(() =>
-    store.positions().reduce((sum, p) => sum + p.currentValue, 0)
+    visiblePositions().reduce((sum, p) => sum + p.currentValue, 0)
   );
 
   const positionsByAssetClass = computed((): PositionAssetGroup[] => {
-    const positions = store.positions();
+    const positions = visiblePositions();
     const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0);
     const dayChanges = store.dayChangePctByTicker();
     const groups = new Map<AssetClass, PositionRow[]>();
@@ -136,7 +147,17 @@ export function holdingsComputed(store: StateSignals) {
   });
 
   return {
-    positions: computed((): Position[] => store.positions()),
+    positions: visiblePositions,
+    providerFilter: computed(() => store.provider()),
+    providerFilterLabel: computed(() => {
+      const provider = store.provider();
+      return provider ? ProviderUtils.label(provider) : null;
+    }),
+    // A filter with no matching rows is its own state, never the "connect an account" empty page.
+    isFilteredEmpty: computed(
+      () =>
+        store.provider() !== null && visiblePositions().length === 0 && store.positions().length > 0
+    ),
     positionsLoaded: computed(() => store.status() !== 'idle' || store.positions().length > 0),
     totalPositionsValue,
     // The total's record: its badge, and N/A (never 0) when every feed failed.

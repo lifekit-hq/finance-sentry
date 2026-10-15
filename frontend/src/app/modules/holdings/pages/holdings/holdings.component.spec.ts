@@ -67,6 +67,9 @@ describe('InvestmentsComponent — positions view', () => {
     isEmpty: ReturnType<typeof signal<boolean>>;
     allocationSegments: ReturnType<typeof signal<never[]>>;
     allocationBreakdown: ReturnType<typeof signal<AllocationBreakdownRow[]>>;
+    providerFilter: ReturnType<typeof signal<Nullable<string>>>;
+    providerFilterLabel: ReturnType<typeof signal<Nullable<string>>>;
+    isFilteredEmpty: ReturnType<typeof signal<boolean>>;
   };
 
   let mockConnectStore: {importPending: ReturnType<typeof signal<boolean>>};
@@ -107,6 +110,9 @@ describe('InvestmentsComponent — positions view', () => {
       totalHeadline: signal<Nullable<Headline>>(null),
       isTotalUnavailable: signal(false),
       isEmpty: signal(false),
+      providerFilter: signal<Nullable<string>>(null),
+      providerFilterLabel: signal<Nullable<string>>(null),
+      isFilteredEmpty: signal(false),
       allocationSegments: signal([]),
       allocationBreakdown: signal<AllocationBreakdownRow[]>([
         {label: 'Equities', color: 'var(--color-asset-equity)', value: 100, percent: 67},
@@ -245,6 +251,52 @@ describe('InvestmentsComponent — positions view', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-testid="holdings-importing"]')).not.toBeNull();
+    expect(root.textContent).not.toContain('No positions yet');
+  });
+
+  it('shows no filter chip while the list is unfiltered', () => {
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="holdings-filter-chip"]')
+    ).toBeNull();
+  });
+
+  it('shows a removable chip for the provider filter and clears it from the URL', () => {
+    mockStore.providerFilter.set('ibkr');
+    mockStore.providerFilterLabel.set('Interactive Brokers');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const chip = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="holdings-filter-chip"]'
+    );
+    expect(chip?.getAttribute('label')).toBe('Interactive Brokers');
+
+    chip?.dispatchEvent(new CustomEvent('lk-dismissible-chip-remove'));
+
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: {provider: null},
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('says so when the provider filter matches no positions', () => {
+    mockStore.providerFilter.set('binance');
+    mockStore.providerFilterLabel.set('Binance');
+    mockStore.positionsByAssetClass.set([]);
+    mockStore.isFilteredEmpty.set(true);
+
+    const fixture = TestBed.createComponent(InvestmentsComponent);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="holdings-filter-empty"]')?.textContent).toContain(
+      'No positions with Binance'
+    );
     expect(root.textContent).not.toContain('No positions yet');
   });
 
