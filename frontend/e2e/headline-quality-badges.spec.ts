@@ -1,6 +1,6 @@
 import {expect, type Page, test} from '@playwright/test';
 
-import {API, AUTH_RESPONSE} from './support/dossier-mocks';
+import {API, AUTH_RESPONSE, mockApis as mockHoldingsApis} from './support/dossier-mocks';
 
 // A headline figure that is not COMPLETE carries a badge; one tap opens the reason sheet.
 // The badge and its reason need a 44 x 44 px hit area (mobile standard section 3).
@@ -103,5 +103,34 @@ test.describe('Headline quality badge, 390px phone', () => {
     await page.goto('/dashboard');
     await expect(page.getByTestId('net-worth-value')).toContainText('N/A');
     await expect(page.getByTestId('net-worth-value')).not.toContainText('$0');
+  });
+
+  test('a failed brokerage feed with no crypto keeps the holdings total card, not the empty book', async ({
+    page,
+  }) => {
+    await mockHoldingsApis(page);
+    await page.route(`${API}/brokerage/holdings`, route =>
+      route.fulfill({status: 500, contentType: 'application/json', body: '{}'})
+    );
+    await page.route(`${API}/crypto/holdings`, route =>
+      route.fulfill(json({provider: 'binance', holdings: [], totalUsdValue: 0}))
+    );
+    await page.goto('/accounts/investments');
+    await expect(page.getByTestId('holdings-total-value')).toBeVisible();
+    await expect(page.getByTestId('holdings-total-quality')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('No positions yet');
+  });
+
+  test('both holdings feeds failing renders N/A with a badge, never $0', async ({page}) => {
+    await mockHoldingsApis(page);
+    await page.route(`${API}/brokerage/holdings`, route =>
+      route.fulfill({status: 500, contentType: 'application/json', body: '{}'})
+    );
+    await page.route(`${API}/crypto/holdings`, route =>
+      route.fulfill({status: 500, contentType: 'application/json', body: '{}'})
+    );
+    await page.goto('/accounts/investments');
+    await expect(page.getByTestId('holdings-total-value')).toContainText('N/A');
+    await expect(page.getByTestId('holdings-total-value')).not.toContainText('$0');
   });
 });

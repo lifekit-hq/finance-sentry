@@ -226,6 +226,7 @@ describe('InvestmentsComponent — positions view', () => {
 
   it('shows an empty state when there are no positions', () => {
     mockStore.positionsByAssetClass.set([]);
+    mockStore.isEmpty.set(true);
 
     const fixture = TestBed.createComponent(InvestmentsComponent);
     fixture.detectChanges();
@@ -236,6 +237,7 @@ describe('InvestmentsComponent — positions view', () => {
 
   it('says the import is pending instead of the connect prompt while IBKR positions import', () => {
     mockStore.positionsByAssetClass.set([]);
+    mockStore.isEmpty.set(true);
     mockConnectStore.importPending.set(true);
 
     const fixture = TestBed.createComponent(InvestmentsComponent);
