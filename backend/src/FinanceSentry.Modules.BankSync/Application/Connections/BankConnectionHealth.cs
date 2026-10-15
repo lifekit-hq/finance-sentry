@@ -62,26 +62,6 @@ public interface IBankConnectionHealth
     /// <summary>The same slowed cadence for a scheduled connection-level call (the discovery pass's listing).</summary>
     DateTimeOffset? DormantPausedUntil(BankConnectionRef connection, ConnectionHealth health);
 
-    /// <summary>The health of <paramref name="account"/>'s connection, or null when it has none or it cannot be read.</summary>
-    Task<ConnectionHealth?> ReadConnectionHealthAsync(BankAccount account, CancellationToken ct = default);
-
-    /// <summary>
-    /// After a scheduled sync of <paramref name="account"/> failed: schedules the next look at its connection's suspect
-    /// credential failure through <paramref name="schedule"/> when one is due and the provider is active
-    /// (<see cref="ConnectionHealthSuspectRecheck"/>); Monobank's never inside its one-call-a-minute limit.
-    /// </summary>
-    /// <param name="before">The connection's health before the sync; <paramref name="after"/>, after it.</param>
-    /// <param name="recheck">How many looks have run, the sync just made included when it was one.</param>
-    void ScheduleSuspectRecheckIfDue(
-        BankAccount account, ConnectionHealth before, ConnectionHealth after, int recheck, Action<TimeSpan, DateTimeOffset> schedule);
-
-    /// <summary>
-    /// Whether a look at <paramref name="account"/>'s connection scheduled at <paramref name="scheduledAt"/> still has
-    /// work (<see cref="ConnectionHealthSuspectRecheck.IsDue"/>): of a token's cards that each scheduled one, only the
-    /// last makes a call.
-    /// </summary>
-    bool IsSuspectRecheckDue(BankAccount account, ConnectionHealth connectionHealth, DateTimeOffset scheduledAt);
-
     /// <summary>Records a failed sync of <paramref name="account"/>, raises the alert the policy decides, and returns the verdict.</summary>
     /// <param name="cancelledByCaller">The sync was cancelled from our side (shutdown), which says nothing about the provider.</param>
     /// <param name="ct">Bookkeeping token; a failure path passes <see cref="CancellationToken.None"/> so a cancelled sync is still recorded.</param>
@@ -93,6 +73,14 @@ public interface IBankConnectionHealth
 
     /// <summary>Records a failed connection-level call, raises the alert the policy decides, and returns the verdict.</summary>
     Task<BankHealthVerdict> RecordConnectionFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records a failed probe of the connection (<see cref="BankConnectionHealthProbe"/>): as a failed connection-level
+    /// call, except that a credential failure on a connection already suspect confirms it
+    /// (<see cref="ConnectionHealthPolicy.RecordProbeFailure"/>), so the reconnect ask goes out at once.
+    /// </summary>
+    Task<BankHealthVerdict> RecordConnectionProbeFailureAsync(
         BankConnectionRef connection, Exception exception, CancellationToken ct = default);
 
     /// <summary>
@@ -142,9 +130,6 @@ public sealed class BankConnectionHealth(
 
     /// <summary>The error code an attempt we cancelled ourselves is recorded with.</summary>
     public const string CancelledCode = "SYNC_CANCELLED";
-
-    /// <summary>Monobank's personal API answers one call a minute per token; a look at a suspect token never comes sooner.</summary>
-    public static readonly TimeSpan MonobankMinCallSpacing = TimeSpan.FromSeconds(60);
 
     public bool IsActive(string provider) =>
         options.CurrentValue.ActiveProviders.Contains(provider, StringComparer.OrdinalIgnoreCase);
@@ -197,30 +182,6 @@ public sealed class BankConnectionHealth(
     public DateTimeOffset? DormantPausedUntil(BankConnectionRef connection, ConnectionHealth health) =>
         ConnectionHealthScheduledRunGate.DormantPausedUntil(
             logger, ConnectionSubject(connection), health, time.GetUtcNow(), options.CurrentValue);
-
-    public async Task<ConnectionHealth?> ReadConnectionHealthAsync(BankAccount account, CancellationToken ct = default) =>
-        ConnectionOf(account) is { } connection ? (await ReadAsync(connection, ct))?.Health : null;
-
-    public void ScheduleSuspectRecheckIfDue(
-        BankAccount account, ConnectionHealth before, ConnectionHealth after, int recheck, Action<TimeSpan, DateTimeOffset> schedule)
-    {
-        if (ConnectionOf(account) is not { } connection)
-            return;
-
-        ConnectionHealthSuspectRecheck.ScheduleIfDue(
-            logger,
-            ConnectionSubject(connection),
-            before,
-            after,
-            recheck,
-            time.GetUtcNow(),
-            options.CurrentValue,
-            schedule,
-            connection.Provider == MonobankFailureClassifier.ProviderName ? MonobankMinCallSpacing : TimeSpan.Zero);
-    }
-
-    public bool IsSuspectRecheckDue(BankAccount account, ConnectionHealth connectionHealth, DateTimeOffset scheduledAt) =>
-        ConnectionHealthSuspectRecheck.IsDue(account.Provider, connectionHealth, options.CurrentValue, scheduledAt);
 
     public async Task<BankHealthVerdict> RecordSyncFailureAsync(
         BankAccount account, Exception exception, bool cancelledByCaller, CancellationToken ct = default)
@@ -288,8 +249,16 @@ public sealed class BankConnectionHealth(
             await ResolveAsync(connection.UserId, connection.Provider, connection.Id, ct);
     }
 
-    public async Task<BankHealthVerdict> RecordConnectionFailureAsync(
-        BankConnectionRef connection, Exception exception, CancellationToken ct = default)
+    public Task<BankHealthVerdict> RecordConnectionFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default) =>
+        RecordConnectionFailureCoreAsync(connection, exception, probe: false, ct);
+
+    public Task<BankHealthVerdict> RecordConnectionProbeFailureAsync(
+        BankConnectionRef connection, Exception exception, CancellationToken ct = default) =>
+        RecordConnectionFailureCoreAsync(connection, exception, probe: true, ct);
+
+    private async Task<BankHealthVerdict> RecordConnectionFailureCoreAsync(
+        BankConnectionRef connection, Exception exception, bool probe, CancellationToken ct)
     {
         var at = time.GetUtcNow();
         var stored = await ReadAsync(connection, ct);
@@ -297,7 +266,7 @@ public sealed class BankConnectionHealth(
 
         return stored is null
             ? new BankHealthVerdict(failure, null)
-            : await ChargeConnectionAsync(connection, stored, failure, at, ct);
+            : await ChargeConnectionAsync(connection, stored, failure, at, ct, probe);
     }
 
     public async Task ResolveReplacedConnectionAlertsAsync(
@@ -311,7 +280,12 @@ public sealed class BankConnectionHealth(
     }
 
     private async Task<BankHealthVerdict> ChargeConnectionAsync(
-        BankConnectionRef connection, StoredConnectionHealth stored, ProviderFailure failure, DateTimeOffset at, CancellationToken ct)
+        BankConnectionRef connection,
+        StoredConnectionHealth stored,
+        ProviderFailure failure,
+        DateTimeOffset at,
+        CancellationToken ct,
+        bool probe = false)
     {
         if (failure is { Class: FailureClass.Credential, Strength: FailureStrength.Suspect }
             && await IsProviderWideOutageAsync(connection, at, ct))
@@ -319,12 +293,11 @@ public sealed class BankConnectionHealth(
             failure = ProviderFailure.Transient(failure.Code);
         }
 
-        var evaluation = await recorder.RecordFailureAsync(
-            ConnectionSubject(connection),
-            stored.Health,
-            failure,
-            (health, c) => StoreOf(connection).SaveHealthUnscopedAsync(connection.Id, health, c),
-            ct);
+        Func<ConnectionHealth, CancellationToken, Task> persist =
+            (health, c) => StoreOf(connection).SaveHealthUnscopedAsync(connection.Id, health, c);
+        var evaluation = probe
+            ? await recorder.RecordProbeFailureAsync(ConnectionSubject(connection), stored.Health, failure, persist, ct)
+            : await recorder.RecordFailureAsync(ConnectionSubject(connection), stored.Health, failure, persist, ct);
 
         switch (evaluation?.Outcome)
         {

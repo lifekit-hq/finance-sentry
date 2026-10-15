@@ -5,8 +5,9 @@ namespace FinanceSentry.Core.Connections;
 /// and returns the next health and the outcome, which fires only on the transition that earns it.
 /// <list type="bullet">
 /// <item>One success makes any state Healthy; it resolves only a state the user was told about.</item>
-/// <item>A definitive credential failure, or a suspect one seen again after
-/// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/>, makes any state ActionRequired, which holds until a success.</item>
+/// <item>A definitive credential failure, a suspect one seen again after
+/// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/>, or a suspect one followed by a probe that fails on
+/// the credential too, makes any state ActionRequired, which holds until a success.</item>
 /// <item>Any other counted failure makes Healthy Degraded (silent); Failing once there are
 /// <see cref="ConnectionHealthOptions.FailingMinConsecutiveFailures"/> failures and
 /// <see cref="ConnectionHealthOptions.FailingMinTimeWithoutSuccess"/> without a success; Dormant once the streak
@@ -21,8 +22,9 @@ namespace FinanceSentry.Core.Connections;
 /// probe per <see cref="ConnectionHealthOptions.ActionRequiredProbeInterval"/>; a success clears the state as usual.
 /// An active provider's Dormant connection is slowed the same way, to one run per
 /// <see cref="ConnectionHealthOptions.DormantSyncInterval"/> (<see cref="DormantPausedUntil"/>).</item>
-/// <item>A suspect credential failure is looked at again twice and no more (<see cref="SuspectRecheckAfter"/>): soon, so a
-/// blip clears in minutes, and once the confirmation window has passed, so a real loss is confirmed on time.</item>
+/// <item>A suspect credential failure, or a Dormant connection, is probed (<see cref="ProbeDue"/>): a cheap authenticated
+/// call per provider, at most one per connection per <see cref="ConnectionHealthOptions.ProbeInterval"/>. A failed probe
+/// that is a credential failure confirms the suspicion (<see cref="RecordProbeFailure"/>); a successful one clears it.</item>
 /// </list>
 /// </summary>
 public static class ConnectionHealthPolicy
@@ -32,6 +34,12 @@ public static class ConnectionHealthPolicy
     /// that run's failure was stamped; without the slack a once-a-day source would skip its probe every other day.
     /// </summary>
     private static readonly TimeSpan ProbeSlack = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// The least time between a failed attempt and the probe that follows it: Monobank's personal API answers one call a
+    /// minute per token, and no provider is helped by a second call within the minute.
+    /// </summary>
+    public static readonly TimeSpan ProbeMinSpacing = TimeSpan.FromMinutes(1);
 
     public static ConnectionHealthEvaluation RecordSuccess(ConnectionHealth current, DateTimeOffset at)
     {
@@ -160,48 +168,67 @@ public static class ConnectionHealthPolicy
     }
 
     /// <summary>
-    /// How long until the next look at a suspect credential failure, or null for none. <paramref name="recheck"/> is how
-    /// many looks have run (0 after the scheduled run's own attempt); <paramref name="before"/> and
-    /// <paramref name="after"/> are the health around the attempt just made.
-    /// <list type="bullet">
-    /// <item>The attempt that raised the suspicion earns a quick look after
-    /// <see cref="ConnectionHealthOptions.SuspectQuickRetryDelay"/>: a success clears it at once.</item>
-    /// <item>A quick look that leaves it standing earns the confirming look, once
-    /// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/> has passed since it was raised.</item>
-    /// </list>
-    /// Never more: a sign-in is not repeated beyond that, since failed ones are what lock accounts. Nothing once the
-    /// failure is confirmed (ActionRequired), cleared, or the connection is Dormant, and never sooner than
-    /// <see cref="ConnectionHealth.NotBefore"/>. Whether a look is made is the caller's: only for a provider in
-    /// <see cref="ConnectionHealthOptions.ActiveProviders"/>.
+    /// A failed probe (<see cref="ProbeDue"/>): recorded as any failed attempt, except that a credential failure on a
+    /// connection already suspect confirms it at once - the report's "once plus a failed probe" - whatever its own
+    /// strength, so the connection becomes ActionRequired without waiting out
+    /// <see cref="ConnectionHealthOptions.SuspectConfirmationWindow"/>. Any other failure (an outage, a rate limit) confirms
+    /// nothing and is counted as usual.
     /// </summary>
-    public static TimeSpan? SuspectRecheckAfter(
-        ConnectionHealth before, ConnectionHealth after, int recheck, DateTimeOffset now, ConnectionHealthOptions options)
+    public static ConnectionHealthEvaluation RecordProbeFailure(
+        ConnectionHealth current,
+        ProviderFailure failure,
+        DateTimeOffset at,
+        ConnectionHealthOptions options,
+        ConnectionHealthSourceOptions? source = null,
+        DateTimeOffset? connectedAt = null)
     {
-        ArgumentNullException.ThrowIfNull(before);
-        ArgumentNullException.ThrowIfNull(after);
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(failure);
+
+        var confirms = failure.Class == FailureClass.Credential && current.SuspectSince is not null;
+        return RecordFailure(
+            current, confirms ? failure with { Strength = FailureStrength.Definitive } : failure, at, options, source, connectedAt);
+    }
+
+    /// <summary>
+    /// Why the probe job should probe this connection now, or null when it should leave it alone. At most one probe per
+    /// connection per <see cref="ConnectionHealthOptions.ProbeInterval"/>, and none for a connection that is neither
+    /// suspect nor Dormant:
+    /// <list type="bullet">
+    /// <item><see cref="ConnectionHealthProbeReason.Suspect"/>: a suspect credential failure stands unconfirmed. The first
+    /// probe may follow the failure that raised it after <see cref="ProbeMinSpacing"/>; once another failed attempt came
+    /// after it (a probe that failed for some other reason, or a scheduled run), not before a probe window has passed since
+    /// that attempt.</item>
+    /// <item><see cref="ConnectionHealthProbeReason.Dormant"/>: the connection is Dormant and its slowed cadence is due
+    /// (<see cref="DormantPausedUntil"/>), timed from the last failure as the slowed sync is, so whichever of the two
+    /// calls first renews the pause for the other.</item>
+    /// </list>
+    /// Never while the provider's <see cref="ConnectionHealth.NotBefore"/> has not come, and never for an ActionRequired
+    /// connection, whose scheduled run already probes it daily (<see cref="ScheduledRunPausedUntil"/>). Whether the probe
+    /// is made is the caller's: only for a provider in <see cref="ConnectionHealthOptions.ActiveProviders"/>.
+    /// </summary>
+    public static ConnectionHealthProbeReason? ProbeDue(ConnectionHealth health, DateTimeOffset now, ConnectionHealthOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(health);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (after.SuspectSince is not { } since
-            || after.State is ConnectionHealthState.ActionRequired or ConnectionHealthState.Dormant
-            || options.SuspectQuickRetryDelay <= TimeSpan.Zero)
+        if (NotBeforePausedUntil(health, now) is not null)
             return null;
 
-        TimeSpan delay;
-        switch (recheck)
+        switch (health.State)
         {
-            case 0 when before.SuspectSince is null:
-                delay = options.SuspectQuickRetryDelay;
-                break;
-            case 1:
-                delay = since + options.SuspectConfirmationWindow - now;
-                if (delay <= TimeSpan.Zero)
-                    return null;
-                break;
-            default:
+            case ConnectionHealthState.ActionRequired:
                 return null;
+            case ConnectionHealthState.Dormant:
+                return DormantPausedUntil(health, now, options) is null ? ConnectionHealthProbeReason.Dormant : null;
         }
 
-        return after.NotBefore is { } notBefore && notBefore - now > delay ? notBefore - now : delay;
+        if (health.SuspectSince is not { } since)
+            return null;
+
+        var lastAttempt = health.LastFailureAt ?? since;
+        var wait = lastAttempt <= since ? ProbeMinSpacing : options.ProbeInterval - ProbeSlack;
+        return now - lastAttempt >= wait ? ConnectionHealthProbeReason.Suspect : null;
     }
 
     /// <summary>

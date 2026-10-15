@@ -35,8 +35,8 @@ namespace FinanceSentry.Modules.CryptoSync.Infrastructure.Jobs;
 ///
 /// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
 /// mode, except for one probe a day. With the venue active, a Dormant credential is tried once a day
-/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>), and a suspect credential failure is looked at again a
-/// minute later and once more when it can be confirmed (<see cref="RecheckSuspectAsync"/>).
+/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>); a suspect credential failure is confirmed or cleared by
+/// the probe job (<see cref="IConnectionHealthProbe"/>), not by this sync.
 ///
 /// One subclass per venue, because Hangfire names a job by its type: each venue gets its own
 /// schedule, metrics and failure streak.
@@ -50,7 +50,6 @@ public abstract class CryptoExchangeSyncJob(
     IConnectionHealthShadow connectionHealth,
     IProviderFailureClassifier failureClassifier,
     IOptionsMonitor<ConnectionHealthOptions> healthOptions,
-    IBackgroundJobClient backgroundJobs,
     TimeProvider time,
     ILogger logger)
 {
@@ -75,8 +74,50 @@ public abstract class CryptoExchangeSyncJob(
                 continue;
 
             attempted++;
-            if (await SyncCredentialAsync(credential, policyDrivesAlerts, recheck: 0) is { } failure)
-                failures.Add(failure);
+            try
+            {
+                await syncHandler.Handle(
+                    new SyncExchangeHoldingsCommand(credential.UserId, Provider), CancellationToken.None);
+                var evaluation = await connectionHealth.RecordSuccessAsync(
+                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
+                }
+                else
+                {
+                    failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
+                    await TryResolveSyncFailureAsync(credential.UserId);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "Failed to sync {Provider} holdings for user {UserId}",
+                    Provider,
+                    credential.UserId);
+
+                var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
+                var evaluation = await connectionHealth.RecordFailureAsync(
+                    HealthSubject(credential),
+                    credential.Health,
+                    failure,
+                    (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
+                }
+                else
+                {
+                    failures.Add(ex);
+                    await HandleFailureAsync(credential.UserId, ex);
+                }
+            }
         }
 
         // A credential the gate skipped made no attempt, so it neither fails nor excuses the run.
@@ -86,96 +127,6 @@ public abstract class CryptoExchangeSyncJob(
                 $"{CryptoExchangeProvider.DisplayName(Provider)} holdings sync failed for all "
                 + $"{failures.Count} connected user(s).",
                 failures);
-        }
-    }
-
-    /// <summary>
-    /// One look at a suspect credential failure, scheduled after the attempt before it
-    /// (<see cref="ConnectionHealthSuspectRecheck"/>). <paramref name="recheck"/> is how many looks have run, this one
-    /// included; <paramref name="scheduledAt"/>, when it was scheduled. Goes through the same gate and recording as the
-    /// scheduled run; does nothing once the suspicion is confirmed or cleared, the credential was tried since, or the
-    /// venue has left <see cref="ConnectionHealthOptions.ActiveProviders"/>.
-    /// </summary>
-    [AutomaticRetry(Attempts = 0)]
-    public async Task RecheckSuspectAsync(Guid userId, int recheck, DateTimeOffset scheduledAt)
-    {
-        var credential = await credentialRepository.GetUnscopedAsync(userId, Provider);
-        if (credential is not { IsActive: true }
-            || !ConnectionHealthSuspectRecheck.IsDue(Provider, credential.Health, healthOptions.CurrentValue, scheduledAt))
-            return;
-
-        if (ConnectionHealthScheduledRunGate.ShouldSkip(
-                logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
-            return;
-
-        await SyncCredentialAsync(credential, policyDrivesAlerts: true, recheck);
-    }
-
-    /// <summary>Schedules look <paramref name="recheck"/> of this venue's sync for one user, by this venue's job type.</summary>
-    protected abstract void ScheduleSuspectRecheck(
-        IBackgroundJobClient jobs, Guid userId, int recheck, TimeSpan delay, DateTimeOffset scheduledAt);
-
-    /// <returns>The failure, in shadow mode, for the run's all-failed check; null on a success or when the policy drives alerts.</returns>
-    private async Task<Exception?> SyncCredentialAsync(ExchangeCredential credential, bool policyDrivesAlerts, int recheck)
-    {
-        var before = credential.Health;
-        try
-        {
-            await syncHandler.Handle(
-                new SyncExchangeHoldingsCommand(credential.UserId, Provider), CancellationToken.None);
-            var evaluation = await connectionHealth.RecordSuccessAsync(
-                HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
-
-            if (policyDrivesAlerts)
-            {
-                await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
-                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
-            }
-            else
-            {
-                failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
-                await TryResolveSyncFailureAsync(credential.UserId);
-            }
-
-            return null;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Failed to sync {Provider} holdings for user {UserId}",
-                Provider,
-                credential.UserId);
-
-            var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
-            var evaluation = await connectionHealth.RecordFailureAsync(
-                HealthSubject(credential),
-                credential.Health,
-                failure,
-                (health, ct) => SaveHealthAsync(credential, health, ct));
-
-            if (evaluation is not null)
-            {
-                ConnectionHealthSuspectRecheck.ScheduleIfDue(
-                    logger,
-                    HealthSubject(credential),
-                    before,
-                    evaluation.Health,
-                    recheck,
-                    time.GetUtcNow(),
-                    healthOptions.CurrentValue,
-                    (delay, at) => ScheduleSuspectRecheck(backgroundJobs, credential.UserId, recheck + 1, delay, at));
-            }
-
-            if (policyDrivesAlerts)
-            {
-                await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
-                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
-                return null;
-            }
-
-            await HandleFailureAsync(credential.UserId, ex);
-            return ex;
         }
     }
 
@@ -271,18 +222,13 @@ public sealed class BinanceSyncJob(
     IConnectionHealthShadow connectionHealth,
     BinanceFailureClassifier failureClassifier,
     IOptionsMonitor<ConnectionHealthOptions> healthOptions,
-    IBackgroundJobClient backgroundJobs,
     TimeProvider time,
     ILogger<BinanceSyncJob> logger)
     : CryptoExchangeSyncJob(
         credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, connectionHealth,
-        failureClassifier, healthOptions, backgroundJobs, time, logger)
+        failureClassifier, healthOptions, time, logger)
 {
     protected override string Provider => CryptoExchangeProvider.Binance;
-
-    protected override void ScheduleSuspectRecheck(
-        IBackgroundJobClient jobs, Guid userId, int recheck, TimeSpan delay, DateTimeOffset scheduledAt) =>
-        jobs.Schedule<BinanceSyncJob>(job => job.RecheckSuspectAsync(userId, recheck, scheduledAt), delay);
 }
 
 public sealed class RevolutXSyncJob(
@@ -294,16 +240,11 @@ public sealed class RevolutXSyncJob(
     IConnectionHealthShadow connectionHealth,
     RevolutXFailureClassifier failureClassifier,
     IOptionsMonitor<ConnectionHealthOptions> healthOptions,
-    IBackgroundJobClient backgroundJobs,
     TimeProvider time,
     ILogger<RevolutXSyncJob> logger)
     : CryptoExchangeSyncJob(
         credentialRepository, syncHandler, alerts, userPreferences, failureStreaks, connectionHealth,
-        failureClassifier, healthOptions, backgroundJobs, time, logger)
+        failureClassifier, healthOptions, time, logger)
 {
     protected override string Provider => CryptoExchangeProvider.RevolutX;
-
-    protected override void ScheduleSuspectRecheck(
-        IBackgroundJobClient jobs, Guid userId, int recheck, TimeSpan delay, DateTimeOffset scheduledAt) =>
-        jobs.Schedule<RevolutXSyncJob>(job => job.RecheckSuspectAsync(userId, recheck, scheduledAt), delay);
 }

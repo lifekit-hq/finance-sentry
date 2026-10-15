@@ -41,12 +41,33 @@ public sealed class ConnectionHealthShadowRecorder(
             persist,
             ct);
 
+    public Task<ConnectionHealthEvaluation?> RecordProbeFailureAsync(
+        ConnectionHealthSubject subject,
+        ConnectionHealth current,
+        ProviderFailure failure,
+        Func<ConnectionHealth, CancellationToken, Task> persist,
+        CancellationToken ct = default) =>
+        RecordAsync(
+            subject,
+            failure,
+            () => ConnectionHealthPolicy.RecordProbeFailure(
+                current,
+                failure,
+                time.GetUtcNow(),
+                options.CurrentValue,
+                sourceOptions.Get(subject.Provider),
+                subject.ConnectedAt),
+            persist,
+            ct,
+            "probe failure");
+
     private async Task<ConnectionHealthEvaluation?> RecordAsync(
         ConnectionHealthSubject subject,
         ProviderFailure? failure,
         Func<ConnectionHealthEvaluation> evaluate,
         Func<ConnectionHealth, CancellationToken, Task> persist,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? attempt = null)
     {
         try
         {
@@ -64,7 +85,7 @@ public sealed class ConnectionHealthShadowRecorder(
                 evaluation.Previous.State,
                 evaluation.Health.State,
                 evaluation.Outcome,
-                failure is null ? "success" : "failure",
+                attempt ?? (failure is null ? "success" : "failure"),
                 failure?.Class,
                 failure?.Strength,
                 failure?.Code,

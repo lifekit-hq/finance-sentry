@@ -8,6 +8,7 @@ using FinanceSentry.Infrastructure.Observability.Hangfire;
 using FinanceSentry.Modules.BrokerageSync.Application.Connect;
 using FinanceSentry.Modules.BrokerageSync.Application.Services;
 using FinanceSentry.Modules.BrokerageSync.Domain.Interfaces;
+using FinanceSentry.Modules.BrokerageSync.Infrastructure.Connections;
 using FinanceSentry.Modules.BrokerageSync.Domain.Ports;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.Flex;
@@ -152,6 +153,7 @@ public static class BrokerageSyncModule
         services.AddSingleton<IbkrFailureClassifier>();
         services.AddSingleton<IbkrFlexFailureClassifier>();
         services.AddScoped<IBKRSyncJob>();
+        services.AddConnectionHealthProbe<IbkrConnectionHealthProbe>();
         services.AddScoped<IbkrFlexIncrementalSyncJob>();
         services.AddScoped<IbkrFlexBackfillJob>();
 

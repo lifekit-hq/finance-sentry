@@ -10,7 +10,6 @@ using FinanceSentry.Modules.BrokerageSync.Domain;
 using FinanceSentry.Modules.BrokerageSync.Domain.Exceptions;
 using FinanceSentry.Modules.BrokerageSync.Domain.Repositories;
 using FinanceSentry.Modules.BrokerageSync.Infrastructure.IBKR.OAuth;
-using Hangfire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -28,9 +27,8 @@ namespace FinanceSentry.Modules.BrokerageSync.Infrastructure.Jobs;
 /// </list>
 /// A credential whose health is ActionRequired is skipped (<see cref="ConnectionHealthScheduledRunGate"/>), in either
 /// mode, except for one probe a day. With <c>ibkr</c> active, a Dormant credential is tried once a day
-/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>), and a suspect credential failure is looked at again a
-/// minute later and once more when it can be confirmed (<see cref="RecheckSuspectAsync"/>); each look signs in afresh,
-/// since the failure dropped the cached session token.
+/// (<see cref="ConnectionHealthOptions.DormantSyncInterval"/>); a suspect credential failure is confirmed or cleared by
+/// the probe job (<see cref="IConnectionHealthProbe"/>), not by this sync.
 /// </summary>
 public sealed class IBKRSyncJob(
     IIBKRCredentialRepository credentialRepository,
@@ -41,7 +39,6 @@ public sealed class IBKRSyncJob(
     IConnectionHealthShadow connectionHealth,
     IbkrFailureClassifier failureClassifier,
     IOptionsMonitor<ConnectionHealthOptions> healthOptions,
-    IBackgroundJobClient backgroundJobs,
     TimeProvider time,
     ILogger<IBKRSyncJob> logger)
 {
@@ -68,88 +65,46 @@ public sealed class IBKRSyncJob(
                     logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
                 continue;
 
-            await SyncCredentialAsync(credential, policyDrivesAlerts, recheck: 0);
-        }
-    }
-
-    /// <summary>
-    /// One look at a suspect credential failure, scheduled after the attempt before it
-    /// (<see cref="ConnectionHealthSuspectRecheck"/>). <paramref name="recheck"/> is how many looks have run, this one
-    /// included; <paramref name="scheduledAt"/>, when it was scheduled. Goes through the same gate and recording as the
-    /// scheduled run; does nothing once the suspicion is confirmed or cleared, the credential was tried since, or
-    /// <c>ibkr</c> has left <see cref="ConnectionHealthOptions.ActiveProviders"/>.
-    /// </summary>
-    [AutomaticRetry(Attempts = 0)]
-    public async Task RecheckSuspectAsync(Guid userId, int recheck, DateTimeOffset scheduledAt)
-    {
-        var credential = await credentialRepository.GetByUserIdUnscopedAsync(userId);
-        if (credential is not { IsActive: true }
-            || !ConnectionHealthSuspectRecheck.IsDue(Provider, credential.Health, healthOptions.CurrentValue, scheduledAt))
-            return;
-
-        if (ConnectionHealthScheduledRunGate.ShouldSkip(
-                logger, Provider, credential.UserId, credential.Health, time.GetUtcNow(), healthOptions.CurrentValue))
-            return;
-
-        await SyncCredentialAsync(credential, policyDrivesAlerts: true, recheck);
-    }
-
-    private async Task SyncCredentialAsync(IBKRCredential credential, bool policyDrivesAlerts, int recheck)
-    {
-        var before = credential.Health;
-        try
-        {
-            await syncHandler.Handle(new SyncIBKRHoldingsCommand(credential.UserId), CancellationToken.None);
-            var evaluation = await connectionHealth.RecordSuccessAsync(
-                HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
-
-            if (policyDrivesAlerts)
+            try
             {
-                await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
-                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
+                await syncHandler.Handle(new SyncIBKRHoldingsCommand(credential.UserId), CancellationToken.None);
+                var evaluation = await connectionHealth.RecordSuccessAsync(
+                    HealthSubject(credential), credential.Health, (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.ResolveIfRecoveredAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation);
+                }
+                else
+                {
+                    failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
+                    await TryResolveSyncFailureAsync(credential.UserId);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                failureStreaks.Set(StreakKey(credential.UserId), JobFailureStreak.Empty);
-                await TryResolveSyncFailureAsync(credential.UserId);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Failed to sync IBKR holdings for user {UserId}",
-                credential.UserId);
+                logger.LogError(
+                    ex,
+                    "Failed to sync IBKR holdings for user {UserId}",
+                    credential.UserId);
 
-            var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
-            var evaluation = await connectionHealth.RecordFailureAsync(
-                HealthSubject(credential),
-                credential.Health,
-                failure,
-                (health, ct) => SaveHealthAsync(credential, health, ct));
-
-            if (policyDrivesAlerts)
-            {
-                await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
-                    alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
-            }
-            else
-            {
-                await HandleFailureAsync(credential.UserId, ex);
-            }
-
-            if (evaluation is not null)
-            {
-                ConnectionHealthSuspectRecheck.ScheduleIfDue(
-                    logger,
+                var failure = failureClassifier.Classify(ex, new ProviderFailureContext(time.GetUtcNow(), credential.Health));
+                var evaluation = await connectionHealth.RecordFailureAsync(
                     HealthSubject(credential),
-                    before,
-                    evaluation.Health,
-                    recheck,
-                    time.GetUtcNow(),
-                    healthOptions.CurrentValue,
-                    (delay, at) => backgroundJobs.Schedule<IBKRSyncJob>(
-                        job => job.RecheckSuspectAsync(credential.UserId, recheck + 1, at), delay));
+                    credential.Health,
+                    failure,
+                    (health, ct) => SaveHealthAsync(credential, health, ct));
+
+                if (policyDrivesAlerts)
+                {
+                    await ConnectionHealthSyncFailureAlerts.RaiseIfDueAsync(
+                        alerts, userPreferences, logger, credential.UserId, Provider, evaluation, ex.GetType().Name);
+                }
+                else
+                {
+                    await HandleFailureAsync(credential.UserId, ex);
+                }
             }
         }
     }

@@ -18,7 +18,10 @@ public sealed class ConnectionHealthOptions
     /// <summary>Continuous failure after which a connection becomes Dormant.</summary>
     public TimeSpan DormantAfter { get; set; } = TimeSpan.FromDays(7);
 
-    /// <summary>A suspect credential failure is confirmed when seen again at least this long after the first.</summary>
+    /// <summary>
+    /// A suspect credential failure is confirmed when seen again at least this long after the first, or at once by a failed
+    /// probe (<see cref="ConnectionHealthPolicy.RecordProbeFailure"/>).
+    /// </summary>
     public TimeSpan SuspectConfirmationWindow { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
@@ -35,15 +38,13 @@ public sealed class ConnectionHealthOptions
     public TimeSpan DormantSyncInterval { get; set; } = TimeSpan.FromHours(24);
 
     /// <summary>
-    /// How long after the failure that raised a suspect credential signal an active provider looks again once, so a
-    /// blip clears within minutes; the look after <see cref="SuspectConfirmationWindow"/> still decides a loss
-    /// (<see cref="ConnectionHealthPolicy.SuspectRecheckAfter"/>). The captain's "try again after a minute". Zero turns the
-    /// re-checks off.
+    /// The probe window: a suspect connection is probed at most once in it (<see cref="ConnectionHealthPolicy.ProbeDue"/>).
+    /// The probe job itself runs on a fixed schedule every 30 minutes, so a shorter window probes no more often.
     /// </summary>
-    public TimeSpan SuspectQuickRetryDelay { get; set; } = TimeSpan.FromMinutes(1);
+    public TimeSpan ProbeInterval { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// The providers whose alerts, Dormant cadence and suspect re-checks the policy drives, by the keys the shadow log uses
+    /// The providers whose alerts, Dormant cadence and probes the policy drives, by the keys the shadow log uses
     /// (<c>monobank</c>, <c>truelayer</c>, <c>ibkr</c>, <c>ibkr-flex</c>, <c>binance</c>, <c>revolut_x</c>, …). Every other
     /// provider stays in shadow mode: its evaluation is recorded and logged, and its own alerting, account status and sync
     /// schedule stay exactly as they were (the pause on ActionRequired and on <see cref="ConnectionHealth.NotBefore"/>

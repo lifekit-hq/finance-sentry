@@ -769,7 +769,7 @@ makes its own:
 | Probe while ActionRequired | once a day, timed from `LastFailureAt` | shared (`ActionRequiredProbeInterval`) |
 | Failing after / Dormant after / Suspect confirmed after | 3 failures and 2 h / 7 days / 30 min (shared) | none |
 | Scheduled runs while Dormant | once a day, timed from `LastFailureAt`; active providers only | shared (`DormantSyncInterval`) |
-| Quick look at a suspect credential failure | 1 min after it, then the confirming look at 30 min; active providers only | shared (`SuspectQuickRetryDelay`; 0 turns the looks off); Monobank never under 60 s |
+| Probe of a suspect or Dormant connection | at most one per connection per 30-min window (job at :07 and :37), the first ≥ 1 min after the suspect failure; Dormant at its daily cadence; active providers only | shared (`ProbeInterval`); Monobank skipped while its client-info is cached (one call a minute per token) |
 
 **Early re-checks** (`ConnectionHealthSourceOptions.EarlyRechecks`, R12 PR 3). A source that runs once a day
 would otherwise reach Failing (3 failures and 2 h) on its third day. After a counted failure of a transient kind
@@ -782,22 +782,32 @@ which is not duplicated), a definitive credential failure (the pause), or a fail
 Failing or Dormant (the alert is out, and the next daily run picks up a recovery). An interval
 set in `ConnectionHealth:Sources:<provider>:EarlyRechecks` replaces the code default.
 
-**Dormant cadence and suspect re-checks** (connection-health slice S4), both only for a provider in
+**Dormant cadence and the probe job** (connection-health slice S4), both only for a provider in
 `ConnectionHealth:ActiveProviders`; a shadow provider's schedule is untouched, and one `Connection health (shadow)`
 line says what either would have done. A Dormant connection is paused by the same gate as ActionRequired
 (`ConnectionHealthPolicy.ScheduledRunPausedUntil`, `DormantPausedUntil`): one scheduled run a day, timed from the
 last failure, so a failed run renews the pause, a success goes Healthy and resolves the alert through the usual path,
 and a reconnect (which clears the last failure) lets the next run through. The bank scheduler and the discovery pass
-apply it to Dormant accounts and connections the same way. A scheduled run whose failure raises a suspect credential
-signal schedules one look `SuspectQuickRetryDelay` (1 min) later; if that look fails too, it confirms nothing and
-schedules the confirming look for when the confirmation window ends (`ConnectionHealthPolicy.SuspectRecheckAfter`).
-Each look is the source's own sync for that one connection, scheduled with `BackgroundJob.Schedule`
-(`IBKRSyncJob.RecheckSuspectAsync`, the venue jobs' `RecheckSuspectAsync`, `ScheduledSyncJob.ExecuteSuspectRecheckAsync`
-for a bank account) and gated like the scheduled run; it does nothing once the suspicion is confirmed, cleared or
-Dormant, the connection was tried after the look was scheduled (so of a Monobank token's cards that each schedule one,
-only the last calls), or the provider has left `ActiveProviders`. That is one sign-in more than the schedule would make per
-suspicion, and no more. IBKR Flex keeps its own early re-checks for a suspect 1020 (its first look, 1 h on, already
-confirms).
+apply it to Dormant accounts and connections the same way.
+
+A suspect credential signal is confirmed (ActionRequired, the reconnect ask) when it is seen twice at least the
+confirmation window (`SuspectConfirmationWindow`, 30 min) apart, or once plus a failed probe. The probe is the
+recurring Hangfire job `connection-health-probe` (`ConnectionHealthProbeJob`, every `ProbeInterval` = 30 min, at :07
+and :37, off the sync jobs' quarter-hours). Each sync module lists its suspect and Dormant connections
+(`IConnectionHealthProbe`) and the job probes those due (`ConnectionHealthPolicy.ProbeDue`) with the provider's cheap
+authenticated call, never a full sync: Monobank's client-info, IBKR's session token (`EnsureSessionAsync`),
+Binance's account endpoint, Revolut X's balances (its smallest existing read, as it has no account-only call), and
+TrueLayer's token refresh. A probe's credential failure on a suspect connection confirms it at once
+(`ConnectionHealthPolicy.RecordProbeFailure`); a success clears the suspicion and resolves the alert; any other failure
+(an outage, a rate limit) confirms nothing and is counted like a failed run. A Dormant connection heals on a successful
+probe, which the job makes at its daily cadence. Probes never hammer a sign-in: at most one per connection per window
+(the first may follow the suspect failure after 1 min; after any later failed attempt, the next waits for the next
+window), none for a connection that is neither suspect nor Dormant, none while the provider's `NotBefore` holds, none
+while ActionRequired (its daily scheduled run already probes it), and a Monobank token whose client-info is still
+cached is left for the next window. The bank probes run for suspect connections only, and TrueLayer's refresh (which
+rotates the refresh token) is never made otherwise: a Dormant bank connection is already looked at once a day by the
+discovery pass, with these same calls. IBKR Flex and Inzhur have no probe: Flex's only call generates a statement,
+so its daily run and its own early re-checks (1 h, then 4 h; a suspect 1020's first look already confirms) are its looks.
 
 **Failures and retries, per source** (each new source fills in this table, and a new source's job declares its
 settings the way Flex does in `BrokerageSyncModule`):
