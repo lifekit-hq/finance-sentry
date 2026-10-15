@@ -92,7 +92,7 @@ Served over both transports (`resources/list`, `resources/read`; OpenClaw Code M
 ## Runtime Model
 
 - The server is assembled in `Program.cs` using `AddMcpServer()`.
-- Tools are discovered by assembly scan via `WithToolsFromAssembly(...)`.
+- Tools and resources are discovered by assembly scan; both transports register them through `WithFinanceSentryTools(...)` (`WithToolsFromAssembly` + `WithResourcesFromAssembly`, plus tool-error surfacing).
 - Tool identity comes from the MCP SDK attributes (`[McpServerToolType]` and `[McpServerTool]`), not from a separate local tool interface.
 - Each tool is a thin MCP adapter around the existing CQRS handlers in the module projects.
 - Development usually runs over `stdio`; production compose runs the same server over HTTP with request-based JWT auth.
