@@ -37,20 +37,27 @@ public class NetWorthSnapshotJobTests
         return mock;
     }
 
-    private static BookSourceReading Source(string id, EconomyKind kind, decimal cash)
-        => new(id, kind, new WealthSourceReading(cash, []));
+    private static BookSourceReading Source(
+        string id, EconomyKind kind, decimal cash, IReadOnlyList<BookFigurePosition>? positions = null)
+        => new(id, kind, new WealthSourceReading(cash, positions ?? []));
 
     private static IBookFiguresService BookStub(
         IReadOnlyList<BookFigurePosition>? positions = null, bool isStale = false,
-        decimal banking = 2000m, decimal crypto = 500m, decimal brokerage = 1000m)
+        decimal banking = 2000m, decimal crypto = 500m, decimal brokerage = 1000m,
+        IReadOnlyList<BookSourceReading>? otherSources = null)
     {
-        var book = new BookFigures(0m, 0m, 0m, 0m, 0m, positions ?? [], isStale, isStale ? ["crypto"] : [])
+        var all = positions ?? [];
+        var sleevePositions = all.Where(p => !otherSources?.Any(o => o.Reading!.Positions.Contains(p)) ?? true).ToList();
+        var book = new BookFigures(0m, 0m, 0m, 0m, 0m, all, isStale, isStale ? ["crypto"] : [])
         {
             Sources =
             [
                 Source("banking", EconomyKind.Bank, banking),
-                Source("brokerage", EconomyKind.Brokerage, brokerage),
-                Source("crypto", EconomyKind.CryptoVenue, crypto),
+                Source("brokerage", EconomyKind.Brokerage, brokerage,
+                    [.. sleevePositions.Where(p => p.AssetClass != AssetClassNormalizer.Crypto)]),
+                Source("crypto", EconomyKind.CryptoVenue, crypto,
+                    [.. sleevePositions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto)]),
+                .. otherSources ?? [],
             ],
         };
         var mock = new Mock<IBookFiguresService>();
@@ -162,7 +169,7 @@ public class NetWorthSnapshotJobTests
             CryptoMock(usdValue: 500m).Object,
             BrokerageMock(usdValue: 1000m).Object,
             snapshotServiceMock.Object,
-            BookStub(positions));
+            BookStub(positions, brokerage: 200m, crypto: 100m));
 
         await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
 
@@ -170,6 +177,35 @@ public class NetWorthSnapshotJobTests
         captured.CryptoInvested.Should().Be(400m, "venue fiat is not a position");
         captured.BrokerageTotal.Should().Be(1000m, "the sleeve totals stay byte-identical");
         captured.CryptoTotal.Should().Be(500m);
+    }
+
+    [Fact]
+    public async Task CaptureForUserAsync_LeavesAnotherSourcesPositionsOutOfTheSleeveInvestedParts()
+    {
+        NetWorthSnapshotData? captured = null;
+        var fund = new BookFigurePosition("FUND", AssetClassNormalizer.Equities, 1m, null, 700m, "fund-x");
+        var cryptoLike = new BookFigurePosition("TKN", AssetClassNormalizer.Crypto, 1m, null, 50m, "fund-x");
+        var positions = new BookFigurePosition[]
+        {
+            new("AAPL", AssetClassNormalizer.Equities, 10m, null, 800m, "ibkr"),
+            new("BTC", AssetClassNormalizer.Crypto, 1m, null, 400m, "binance"),
+            fund,
+            cryptoLike,
+        };
+        var other = Source("fund-x", EconomyKind.Fund, 10m, [fund, cryptoLike]);
+
+        var sut = new NetWorthSnapshotJob(
+            BankingMock(total: 2000m).Object,
+            CryptoMock(usdValue: 500m).Object,
+            BrokerageMock(usdValue: 1000m).Object,
+            CapturingService(d => captured = d).Object,
+            BookStub(positions, otherSources: [other]));
+
+        await sut.CaptureForUserAsync(UserId, new DateOnly(2026, 10, 1));
+
+        captured!.BrokerageInvested.Should().Be(800m);
+        captured.CryptoInvested.Should().Be(400m);
+        captured.Sources.Should().Contain(s => s.SourceId == "fund-x");
     }
 
     [Fact]

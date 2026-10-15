@@ -652,6 +652,19 @@ describe('dashboardComputed', () => {
       };
     }
 
+    // A split day with a fourth source: its invested value is `otherInvested`, outside the sleeve columns.
+    function splitDayWithFund(
+      date: string,
+      cash: number,
+      fundInvested: number
+    ): NetWorthSnapshotDto {
+      return {
+        ...splitDay(date, cash, 5_000, 1_000),
+        totalNetWorth: cash + 5_000 + 1_000 + fundInvested,
+        otherInvested: fundInvested,
+      };
+    }
+
     function noSplitDay(date: string, banking: number, brokerage: number, crypto: number) {
       return {...snapshot(banking, brokerage, crypto), snapshotDate: date};
     }
@@ -689,6 +702,26 @@ describe('dashboardComputed', () => {
           'Other sources',
         ]);
         expect(values(series[3])).toEqual([700, 700]);
+        history.forEach((day, i) => {
+          expect(series.reduce((sum, s) => sum + s.points[i].value, 0)).toBe(day.totalNetWorth);
+        });
+      });
+
+      it("stacks a fourth source's invested value as its own band on a split day", () => {
+        const history = [
+          splitDayWithFund('2026-08-01', 4_000, 700),
+          splitDayWithFund('2026-08-02', 4_100, 800),
+        ];
+        const c = projectionFor({monthlyFlow: [], netWorthHistory: history});
+        const series = c.netWorthAreaSeries();
+
+        expect(series.map(s => s.label)).toEqual([
+          'Cash',
+          'Brokerage invested',
+          'Crypto invested',
+          'Other sources',
+        ]);
+        expect(values(series[3])).toEqual([700, 800]);
         history.forEach((day, i) => {
           expect(series.reduce((sum, s) => sum + s.points[i].value, 0)).toBe(day.totalNetWorth);
         });
@@ -799,6 +832,18 @@ describe('dashboardComputed', () => {
         expect(c.investedChangeFormatted()).toBe('+$500');
         expect(c.investedChangePercentFormatted()).toBe('+8.3%');
         expect(c.investedChangeDirection()).toBe(1);
+      });
+
+      it("includes a fourth source's invested value in the invested change", () => {
+        const c = projectionFor({
+          monthlyFlow: [],
+          netWorthHistory: [
+            splitDayWithFund('2026-08-01', 4_000, 700),
+            splitDayWithFund('2026-08-02', 4_000, 1_200),
+          ],
+        });
+
+        expect(c.investedChangeFormatted()).toBe('+$500');
       });
 
       it('signs a decline', () => {

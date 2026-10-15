@@ -20,13 +20,44 @@ describe('NetWorthSplitUtils', () => {
         NetWorthSplitUtils.of(
           snapshot({cashTotal: 4_000, brokerageInvested: 5_000, cryptoInvested: 1_000})
         )
-      ).toEqual({cash: 4_000, brokerageInvested: 5_000, cryptoInvested: 1_000, invested: 6_000});
+      ).toEqual({
+        cash: 4_000,
+        brokerageInvested: 5_000,
+        cryptoInvested: 1_000,
+        otherInvested: 0,
+        invested: 6_000,
+      });
+    });
+
+    it('counts the invested value of a source outside the three sleeves', () => {
+      expect(
+        NetWorthSplitUtils.of(
+          snapshot({
+            cashTotal: 4_000,
+            brokerageInvested: 5_000,
+            cryptoInvested: 1_000,
+            otherInvested: 700,
+          })
+        )
+      ).toEqual({
+        cash: 4_000,
+        brokerageInvested: 5_000,
+        cryptoInvested: 1_000,
+        otherInvested: 700,
+        invested: 6_700,
+      });
     });
 
     it('keeps a zero or negative part: zero invested and net card debt are real values', () => {
       expect(
         NetWorthSplitUtils.of(snapshot({cashTotal: -200, brokerageInvested: 0, cryptoInvested: 0}))
-      ).toEqual({cash: -200, brokerageInvested: 0, cryptoInvested: 0, invested: 0});
+      ).toEqual({
+        cash: -200,
+        brokerageInvested: 0,
+        cryptoInvested: 0,
+        otherInvested: 0,
+        invested: 0,
+      });
     });
 
     it('is null when the fields are absent', () => {

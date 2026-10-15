@@ -20,7 +20,8 @@ public record NetWorthSnapshotDto(
     decimal? BrokerageInvested = null,
     decimal? CryptoInvested = null,
     IReadOnlyList<string>? FxReasons = null,
-    IReadOnlyList<NetWorthSourceDto>? Sources = null);
+    IReadOnlyList<NetWorthSourceDto>? Sources = null,
+    decimal? OtherInvested = null);
 
 /// <summary>
 /// One source's part of a history row (framework §5.6): <c>Total</c> is the figure the row counted for it (a
@@ -77,7 +78,8 @@ public class GetNetWorthHistoryQueryHandler(
                 // A measured row carries the status its snapshot recorded; a reconstructed row (none recorded)
                 // is valued at today's rate rather than the rate of its own day.
                 (x.Snapshot.FxStatus ?? (x.Snapshot.IsApproximate ? FxStatus.TodayRate : FxStatus.Exact)).ToReasons(),
-                [.. x.Sources.Sources.Select(ToDto)]))
+                [.. x.Sources.Sources.Select(ToDto)],
+                x.Snapshot.CashTotal is null ? null : x.Sources.OtherInvested))
             .ToList();
 
         // A change across the window includes accounts that joined or left it; the dashboard reads this to

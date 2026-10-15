@@ -15,12 +15,15 @@ export interface NetWorthSnapshotDto {
   /** Comma-separated sleeves ('banking','brokerage','crypto') carried forward because their
    * feed was stale that day — the value is estimated, not measured. Null when all fresh. */
   staleSleeves?: string | null;
-  /** Cash / invested split of `totalNetWorth` (cash is the remainder, so the three add up to it).
-   * All three are null together on a day with no split — before the backfill window, or a
-   * source that was stale at capture. Null means "no split", never zero. */
+  /** Cash / invested split of `totalNetWorth`: cash is every source's own cash, so cash, the two
+   * sleeves' invested values and `otherInvested` add up to it. The three are null together on a
+   * day with no split — before the backfill window, or a source that was stale at capture. Null
+   * means "no split", never zero. */
   cashTotal?: Nullable<number>;
   brokerageInvested?: Nullable<number>;
   cryptoInvested?: Nullable<number>;
+  /** Invested value of every source outside the three sleeves; null on a day with no split. */
+  otherInvested?: Nullable<number>;
   /** The day's sources: the three sleeves, then any other source. A source the snapshot carried
    * forward or could not read carries `STALE_SOURCE` in `reasons`. Absent on an older API build. */
   sources?: Nullable<NetWorthSourceDto[]>;
@@ -41,7 +44,9 @@ export interface NetWorthSplit {
   cash: number;
   brokerageInvested: number;
   cryptoInvested: number;
-  /** `brokerageInvested + cryptoInvested`. */
+  /** Invested value of sources outside the three sleeves; zero on an older API build. */
+  otherInvested: number;
+  /** `brokerageInvested + cryptoInvested + otherInvested`. */
   invested: number;
 }
 

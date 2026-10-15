@@ -7,11 +7,13 @@ export class NetWorthSplitUtils {
     if (cashTotal == null || brokerageInvested == null || cryptoInvested == null) {
       return null;
     }
+    const otherInvested = snapshot.otherInvested ?? 0;
     return {
       cash: cashTotal,
       brokerageInvested,
       cryptoInvested,
-      invested: brokerageInvested + cryptoInvested,
+      otherInvested,
+      invested: brokerageInvested + cryptoInvested + otherInvested,
     };
   }
 }

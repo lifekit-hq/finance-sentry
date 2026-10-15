@@ -35,8 +35,9 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
         // as it read this run - or, when its read failed, as its own previous per-source row counted it.
         var carriedSources = await CarryForwardUnreadSourcesAsync(userId, previous, data.Sources, ct);
         var otherSources = (data.Sources ?? []).Where(s => !SnapshotSources.SleeveIds.Contains(s.SourceId)).ToList();
-        var total = banking + brokerage + crypto
-            + otherSources.Sum(s => s.Reading?.TotalValueUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Total ?? 0m);
+        var otherTotal = otherSources.Sum(s => s.Reading?.TotalValueUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Total ?? 0m);
+        var otherCash = otherSources.Sum(s => s.Reading?.CashUsd ?? carriedSources.GetValueOrDefault(s.SourceId)?.Cash ?? 0m);
+        var total = banking + brokerage + crypto + otherTotal;
         var brokerageInvested = ResolveInvested(data.BrokerageTotal, data.BrokerageInvested, brokerage, previous?.BrokerageInvested, stale.Contains("brokerage"));
         var cryptoInvested = ResolveInvested(data.CryptoTotal, data.CryptoInvested, crypto, previous?.CryptoInvested, stale.Contains("crypto"));
         var hasSplit = brokerageInvested is not null && cryptoInvested is not null;
@@ -57,10 +58,11 @@ public class NetWorthSnapshotService(INetWorthSnapshotRepository repository) : I
             Currency = data.Currency,
             TakenAt = DateTimeOffset.UtcNow,
             StaleSleeves = stale.Count > 0 ? string.Join(',', stale) : null,
-            // Cash is the remainder, so cash + invested always equals the stored total - including when a
-            // sleeve was carried forward (its invested part is carried with it; a carried banking balance
-            // stays in cash). One unknown invested part leaves the whole split null rather than half-filled.
-            CashTotal = hasSplit ? total - brokerageInvested!.Value - cryptoInvested!.Value : null,
+            // Cash is every source's cash: the banking balance, each of the two sleeves without its invested part
+            // (carried with the sleeve when it was carried forward), and the cash of each other source as it read
+            // or was carried. Another source's invested value stays on its own per-source row. One unknown
+            // invested part leaves the whole split null rather than half-filled.
+            CashTotal = hasSplit ? banking + (brokerage - brokerageInvested!.Value) + (crypto - cryptoInvested!.Value) + otherCash : null,
             BrokerageInvested = hasSplit ? brokerageInvested : null,
             CryptoInvested = hasSplit ? cryptoInvested : null,
             FxStatus = fxStatus,

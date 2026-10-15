@@ -50,7 +50,9 @@ public sealed class NetWorthSnapshot : IUserOwned
     /// <summary>
     /// Cash apart from invested assets, USD: bank balances (signed, card debt netted in), idle broker cash and
     /// fiat on crypto venues - the <see cref="FinanceSentry.Core.Interfaces.BookFigures.CashUsd"/> definition.
-    /// Always <see cref="TotalNetWorth"/> - <see cref="BrokerageInvested"/> - <see cref="CryptoInvested"/>.
+    /// The sum of every source's cash: <see cref="TotalNetWorth"/> - <see cref="BrokerageInvested"/> -
+    /// <see cref="CryptoInvested"/> - the invested value of any source outside the three sleeve columns, which
+    /// its per-source row holds (<see cref="SnapshotSources.OtherInvested"/>).
     /// Null = no split for this day (a row from before the split existed, or one the split cannot be
     /// measured for) - never zero.
     /// </summary>

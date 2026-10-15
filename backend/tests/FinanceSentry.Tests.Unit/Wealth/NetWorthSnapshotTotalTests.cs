@@ -31,8 +31,11 @@ public class NetWorthSnapshotTotalTests
         new("crypto", EconomyKind.CryptoVenue, Reading(cash: 0m, invested: 50m)),
     ];
 
-    private static NetWorthSnapshotData Data(DateOnly day, IReadOnlyList<BookSourceReading>? sources, bool bankingFresh = true)
-        => new(day, BankingTotal: 100m, BrokerageTotal: 210m, CryptoTotal: 50m, BankingFresh: bankingFresh, Sources: sources);
+    private static NetWorthSnapshotData Data(
+        DateOnly day, IReadOnlyList<BookSourceReading>? sources, bool bankingFresh = true, bool split = false)
+        => new(
+            day, BankingTotal: 100m, BrokerageTotal: 210m, CryptoTotal: 50m, BankingFresh: bankingFresh,
+            BrokerageInvested: split ? 200m : null, CryptoInvested: split ? 50m : null, Sources: sources);
 
     private sealed class Store
     {
@@ -89,6 +92,9 @@ public class NetWorthSnapshotTotalTests
                 BrokerageTotal = snapshot.BrokerageTotal,
                 CryptoTotal = snapshot.CryptoTotal,
                 TotalNetWorth = snapshot.TotalNetWorth,
+                CashTotal = snapshot.CashTotal,
+                BrokerageInvested = snapshot.BrokerageInvested,
+                CryptoInvested = snapshot.CryptoInvested,
                 StaleSleeves = snapshot.StaleSleeves,
                 FxStatus = snapshot.FxStatus,
             };
@@ -196,5 +202,58 @@ public class NetWorthSnapshotTotalTests
         response.Snapshots.Select(s => s.TotalNetWorth).Should().Equal(1_060m, 1_260m);
         response.Snapshots[1].Sources!.Single(s => s.SourceId == "fund").Total.Should().Be(900m);
         response.ChangeHeadline!.Amount.Should().Be(200m, "the fourth source's growth is part of the headline change");
+    }
+
+    [Fact]
+    public async Task Split_OfTheThreeOriginalSources_IsCashPlusTheTwoInvestedParts_OfTheTotal()
+    {
+        var snapshot = await new Store().PersistAsync(Data(Day, Sleeves(), split: true));
+
+        snapshot.CashTotal.Should().Be(110m);
+        snapshot.BrokerageInvested.Should().Be(200m);
+        snapshot.CryptoInvested.Should().Be(50m);
+        (snapshot.CashTotal + snapshot.BrokerageInvested + snapshot.CryptoInvested).Should().Be(snapshot.TotalNetWorth);
+    }
+
+    [Fact]
+    public async Task Split_WithAFourthSource_CountsItsCashAsCash_AndKeepsItsInvestedValueOutOfCash()
+    {
+        var store = new Store();
+        BookSourceReading fund = new("fund", EconomyKind.Fund, Reading(cash: 30m, invested: 700m));
+
+        var snapshot = await store.PersistAsync(Data(Day, [.. Sleeves(), fund], split: true));
+
+        snapshot.TotalNetWorth.Should().Be(1_090m);
+        snapshot.CashTotal.Should().Be(140m, "banking 100 + brokerage cash 10 + the fund's own cash 30");
+        snapshot.BrokerageInvested.Should().Be(200m);
+        snapshot.CryptoInvested.Should().Be(50m);
+
+        var response = await new GetNetWorthHistoryQueryHandler(store.Repository.Object, [])
+            .Handle(new GetNetWorthHistoryQuery(UserId, null, null), CancellationToken.None);
+        var row = response.Snapshots.Single();
+        row.OtherInvested.Should().Be(700m);
+        (row.CashTotal + row.BrokerageInvested + row.CryptoInvested + row.OtherInvested).Should().Be(row.TotalNetWorth);
+    }
+
+    [Fact]
+    public async Task Split_CarriesAFourthSourcesCashAndInvestedForward_WhenItsReadFails()
+    {
+        var store = new Store();
+        BookSourceReading fund = new("fund", EconomyKind.Fund, Reading(cash: 30m, invested: 700m));
+        await store.PersistAsync(Data(Day.AddDays(-1), [.. Sleeves(), fund], split: true));
+
+        var snapshot = await store.PersistAsync(Data(Day, [.. Sleeves(), Fund(null)], split: true));
+
+        snapshot.TotalNetWorth.Should().Be(1_090m);
+        snapshot.CashTotal.Should().Be(140m);
+    }
+
+    [Fact]
+    public async Task Split_IsNull_WhenTheBookWasStale_EvenWithAFourthSource()
+    {
+        var snapshot = await new Store().PersistAsync(Data(Day, [.. Sleeves(), Fund(700m)]));
+
+        snapshot.CashTotal.Should().BeNull();
+        snapshot.BrokerageInvested.Should().BeNull();
     }
 }

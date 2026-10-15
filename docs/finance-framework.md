@@ -682,6 +682,27 @@ the `StaleSleeves` string, and a change in every consumer; now it needs one `IWe
      headline and FIRE read that total, so a fourth source is in all of them; the live dashboard total adds
      each such source's book reading (`DashboardQueryService`), so it agrees with the next snapshot. `NetWorthSnapshotTotalTests` pins
      the three-source total unchanged and a fourth source counted, carried and in the history headline.
+   - **The cash / invested split.** `CashTotal` is the sum of every source's own cash (the sleeves' cash as before,
+     plus each other source's per-source cash, carried from its previous row when its read failed), and the invested
+     parts are the sleeves' invested positions plus each other source's per-source invested value, so
+     `CashTotal + BrokerageInvested + CryptoInvested + otherInvested = TotalNetWorth` with a fourth source present.
+     The two sleeve invested columns stay the only stored invested columns (frozen); `otherInvested` is read from
+     the per-source rows (`SnapshotSources.OtherInvested`). Stale or unknown-split handling is unchanged: a stale
+     book leaves the split null. For the three original sources the stored values are identical to the former
+     `total - brokerageInvested - cryptoInvested` remainder (`NetWorthSnapshotTotalTests`).
+   - **Every reader routed through per-source figures** (none derives a figure from three sleeves or from
+     total-minus-sleeves any more):
+     - the snapshot writer's cash split (`NetWorthSnapshotService`);
+     - the nightly capture's sleeve invested parts, taken from the `brokerage` / `crypto` sources' readings only,
+       so another source's positions never reach a sleeve (`NetWorthSnapshotJob`);
+     - the split backfill, which leaves a day that counted a source outside the three sleeves with a null split
+       because Risk's `holding_snapshots` holds none of that source's positions (`NetWorthSplitBackfillService`);
+     - net-worth history: `otherInvested` on the REST row and on the MCP `get_net_worth_history` entries
+       (`GetNetWorthHistoryQuery`, `NetWorthHistoryController`, `GetNetWorthHistoryTool`);
+     - the dashboard chart's split bands, which add an "Other sources" band from `otherInvested`, and the invested
+       change headline, which counts it (`NetWorthSplitUtils`, `dashboard.computed.ts`);
+     - the no-split chart (its "Other sources" band is each source's own total beyond the sleeve columns), the live
+       dashboard total (`DashboardQueryService`), and FIRE, which reads `TotalNetWorth`.
 
 ### Adding a new economy
 
@@ -691,8 +712,8 @@ Register an `IWealthSource`; nothing else changes.
    convertibility (§5.3), failure classes (§5.7).
 2. Implement `IWealthSource` and register it in `AddBookFigures` (its id is the `source_id`, its `EconomyKind`
    the row's `kind`). `BookFiguresService` sums it into the live book.
-3. The snapshot job writes its `net_worth_snapshot_sources` row from `BookFigures.Sources`; history, the dashboard,
-   MCP and FIRE read it back through `SnapshotSources`.
+3. The snapshot job writes its `net_worth_snapshot_sources` row (total, cash, invested) from `BookFigures.Sources`;
+   history, the dashboard, the cash / invested split, MCP and FIRE read it back through `SnapshotSources`.
 4. Do not add a column to `net_worth_snapshots`, a name to `StaleSleeves`, or a read of the frozen columns; the
    guard test fails the build.
 

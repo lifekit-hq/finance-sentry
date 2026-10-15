@@ -86,11 +86,15 @@ public class NetWorthSnapshotJob(
         // dashboard's "cash" for the same moment. A stale source would make the split partial, so it is
         // withheld (null), as the dashboard hides its sub-line.
         var measured = !book.IsStale;
+        var sleevePositions = book.Sources
+            .Where(s => WealthSourceIds.Sleeves.Contains(s.SourceId))
+            .SelectMany(s => s.Reading?.Positions ?? [])
+            .ToList();
         decimal? brokerageInvested = measured
-            ? book.Positions.Where(p => p.AssetClass != AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
+            ? sleevePositions.Where(p => p.AssetClass != AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
             : null;
         decimal? cryptoInvested = measured
-            ? book.Positions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
+            ? sleevePositions.Where(p => p.AssetClass == AssetClassNormalizer.Crypto).Sum(p => p.UsdValue)
             : null;
 
         // The worst conversion status of what this snapshot was summed from, which is what the book summed.

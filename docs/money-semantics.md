@@ -858,14 +858,15 @@ are closed periods.
   (sleeves only). Stale state everywhere (history and
   hero badges, FIRE, the brokerage history reader, the split backfill) is `STALE_SOURCE` per source.
 - **Cash / invested split per snapshot** (`net_worth_snapshots.cash_total`, `brokerage_invested`,
-  `crypto_invested`; exposed as `cashTotal` / `brokerageInvested` / `cryptoInvested` on
+  `crypto_invested`; exposed as `cashTotal` / `brokerageInvested` / `cryptoInvested` / `otherInvested` on
   `/net-worth/history` and the MCP `get_net_worth_history` tool): `brokerageInvested` and
-  `cryptoInvested` are the invested positions of each sleeve (`IBookFiguresService` positions, crypto
-  by `AssetClassNormalizer.Crypto`, everything else brokerage; stablecoins stay crypto, §8
-  sub-line), and `cashTotal` is the **remainder** - `totalNetWorth - brokerageInvested -
-  cryptoInvested` - so the three always add up to the stored total, including after a
-  carry-forward. On a fresh capture that remainder is exactly the dashboard's `cashUsd` (bank +
-  broker + venue cash, card debt netted, §2). A carried-forward brokerage or crypto sleeve
+  `cryptoInvested` are the invested positions of each sleeve (the `brokerage` and `crypto` sources'
+  readings, crypto by `AssetClassNormalizer.Crypto`, everything else brokerage; stablecoins stay
+  crypto, §8 sub-line), `otherInvested` is the sum of every other source's per-source invested
+  value, and `cashTotal` is the sum of every source's own cash - so the four always add up to the
+  stored total, including after a carry-forward. For the three original sources that equals
+  `totalNetWorth - brokerageInvested - cryptoInvested`, and on a fresh capture it is exactly the
+  dashboard's `cashUsd` (bank + broker + venue cash, card debt netted, §2). A carried-forward brokerage or crypto sleeve
   carries that sleeve's invested value forward with it; a book source that was stale at capture
   (`BookFigures.IsStale`) leaves the whole split **null**. Null means "no split", never zero:
   the columns are nullable and additive, `totalNetWorth` and the sleeve totals are untouched.
@@ -877,7 +878,8 @@ are closed periods.
   moments, so intraday moves can shift a little between cash and invested. That table keeps 180 days (about 2026-07-08 onward at
   the time of writing), so days before it keep a null split. Rows flagged `IsApproximate` or
   with a stale brokerage or crypto source (per-source rows, or `StaleSleeves` on older rows) are skipped (their stored sleeve value is not
-  what the positions describe), as is a day where a sleeve's stored total is non-zero but
+  what the positions describe), as is a day that counted a source outside the three sleeves (its invested positions are not in
+  `holding_snapshots`, so its value would land whole in cash), as is a day where a sleeve's stored total is non-zero but
   `holding_snapshots` holds no positions for it (a source that failed when Risk ran), so a stale
   book leaves the split null here too. A permanently empty sleeve is not a gap: the nightly capture
   records 0 invested for it even when the previous row has no split. Idempotent and bounded: it fills only null columns, never

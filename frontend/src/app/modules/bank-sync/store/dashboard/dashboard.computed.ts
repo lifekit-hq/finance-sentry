@@ -272,8 +272,8 @@ export function dashboardComputed(store: StateSignals) {
   // the sleeve stack, so ranges reaching before the backfill lose nothing they show today.
   const hasSplit = computed(() => splitHistory().some(split => split !== null));
 
-  // Stacked net-worth composition over time. A split day's three bands add up to its stored
-  // total. A day with no split is drawn as a single "No split" band (its sleeves summed), never
+  // Stacked net-worth composition over time. A split day's bands (cash, the two invested sleeves,
+  // and other sources' invested value when any) add up to its stored total. A day with no split is drawn as a single "No split" band (its sleeves summed), never
   // as zeros in the three bands and never dropped, so the stack top is the total on every day.
   const netWorthAreaSeries = computed((): AreaSeries[] => {
     const history = validHistory();
@@ -349,6 +349,13 @@ export function dashboardComputed(store: StateSignals) {
         points: toPoints(splits.map(split => split?.cryptoInvested ?? 0)),
       },
     ];
+    if (splits.some(split => (split?.otherInvested ?? 0) > OTHER_SOURCES_EPSILON)) {
+      bands.push({
+        label: OTHER_SOURCES_LABEL,
+        color: ChartColorUtils.canvas(SPLIT_COLOUR.unsplit),
+        points: toPoints(splits.map(split => split?.otherInvested ?? 0)),
+      });
+    }
     if (splits.every(split => split !== null)) {
       return bands;
     }
@@ -421,7 +428,7 @@ export function dashboardComputed(store: StateSignals) {
     return removed ? 'Includes removed accounts' : '';
   });
 
-  // Change in the invested book (brokerage + crypto positions, cash excluded), over the days that
+  // Change in the invested book (every source's positions, cash excluded), over the days that
   // have a split only: from the first split day to the last, or to the scrubbed day. It is a
   // change in invested value, deposits included, not a return. Null until two split days exist
   // (and while scrubbing a day with no split, or one before the first split day).

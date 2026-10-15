@@ -15,7 +15,8 @@ public sealed record SnapshotSourceFigure(
     EconomyKind Kind,
     decimal? Total,
     SourceHealth Health,
-    IReadOnlyList<string> Reasons)
+    IReadOnlyList<string> Reasons,
+    decimal? Invested = null)
 {
     /// <summary>The source failed to read, or the snapshot carried it forward from an earlier day.</summary>
     public bool IsStale => Reasons.Contains(SourceReasons.StaleSource);
@@ -55,6 +56,17 @@ public sealed class SnapshotSources
             return stale.Count > 0 ? string.Join(',', stale) : null;
         }
     }
+
+    /// <summary>
+    /// The invested value of the sources outside the three sleeve columns, from their per-source rows: the part of
+    /// the snapshot's total that neither its cash nor its two sleeve invested parts hold.
+    /// </summary>
+    public decimal OtherInvested => OtherSources.Sum(s => s.Invested ?? 0m);
+
+    /// <summary>The total the snapshot counted for the sources outside the three sleeve columns.</summary>
+    public decimal OtherTotal => OtherSources.Sum(s => s.Total ?? 0m);
+
+    private IEnumerable<SnapshotSourceFigure> OtherSources => Sources.Where(s => !SleeveIds.Contains(s.SourceId));
 
     public bool IsStale(string sourceId) => Sources.Any(s => s.SourceId == sourceId && s.IsStale);
 
@@ -119,7 +131,7 @@ public sealed class SnapshotSources
     }
 
     private static SnapshotSourceFigure FromRow(NetWorthSnapshotSource row)
-        => new(row.SourceId, row.Kind, row.Total, row.Health, row.Reasons);
+        => new(row.SourceId, row.Kind, row.Total, row.Health, row.Reasons, row.Invested);
 
     private static decimal SleeveColumn(NetWorthSnapshot snapshot, string sleeve) => sleeve switch
     {
