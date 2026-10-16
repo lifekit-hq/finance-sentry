@@ -59,8 +59,9 @@ public static partial class AlertAppPath
                 ? Ledger(("account", account.ToString()))
                 : AccountsList,
 
-            // Reconnecting happens on the list, and there is no per-account page.
-            "SyncFailure" or "ConsentExpiring" or "FamilyStatement" => AccountsList,
+            // Reconnecting happens on the list, and there is no per-account page. A confirmed credential loss carries its
+            // provider's reconnect link instead (ForReconnect), stored by its emitter.
+            "SyncFailure" or "ConsentExpiring" or "FamilyStatement" or "ConnectionDormant" => AccountsList,
 
             "CategorySpike" => SpendIn(label, MonthStart(day), null),
             "BudgetBreach" => SpendIn(label, MonthStart(day), MonthEnd(day)),
@@ -89,6 +90,13 @@ public static partial class AlertAppPath
             _ => null,
         };
     }
+
+    /// <summary>
+    /// The Accounts list opening <paramref name="provider"/>'s reconnect (<c>?reconnect=</c>): the app opens that provider's
+    /// existing reconnect flow where it has one, and otherwise lands on the list, whose row shows the reconnect ask.
+    /// </summary>
+    public static string ForReconnect(string provider)
+        => $"{AccountsList}?reconnect={Uri.EscapeDataString(provider.Trim().ToLowerInvariant())}";
 
     /// <summary>The ledger narrowed to the transactions whose text contains <paramref name="query"/> (<c>?q=</c>), or null when blank.</summary>
     public static string? ForLedgerSearch(string? query)

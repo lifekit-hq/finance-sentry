@@ -85,6 +85,15 @@ public class BankAccountRepository(BankSyncDbContext context) : IBankAccountRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<StoredAccountHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(ba => ba.UserId == userId)
+            .Select(ba => new StoredAccountHealthRow(
+                ba.Id, ba.Provider, ba.Health, ba.MonobankCredentialId ?? ba.TrueLayerConnectionId))
+            .ToListAsync(cancellationToken);
+
     public async Task<BankAccount> UpdateAsync(BankAccount account, CancellationToken cancellationToken = default)
     {
         account.ValidateInvariants();
@@ -553,6 +562,14 @@ public class MonobankCredentialRepository(BankSyncDbContext context) : IMonobank
     public async Task<IReadOnlyList<MonobankCredential>> GetAllUnscopedAsync(CancellationToken cancellationToken = default)
         => await AllUsers.ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<StoredConnectionHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(c => c.UserId == userId)
+            .Select(c => new StoredConnectionHealthRow(c.Id, c.Health))
+            .ToListAsync(cancellationToken);
+
     public async Task<StoredConnectionHealth?> GetHealthUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
         => await AllUsers
             .AsNoTracking()
@@ -635,6 +652,14 @@ public class TrueLayerConnectionRepository(BankSyncDbContext context) : ITrueLay
         => await AllUsers
             .AsNoTracking()
             .Where(tc => tc.Status == "LINKED")
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<StoredConnectionHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+        => await AllUsers
+            .AsNoTracking()
+            .Where(tc => tc.UserId == userId)
+            .Select(tc => new StoredConnectionHealthRow(tc.Id, tc.Health))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TrueLayerConnection>> GetLinkedExpiringBeforeUnscopedAsync(DateTime threshold, CancellationToken cancellationToken = default)

@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.CryptoSync;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Http;
@@ -78,6 +79,7 @@ public static class CryptoSyncModule
         services.AddScoped<BinanceSyncJob>();
         services.AddScoped<RevolutXSyncJob>();
         services.AddConnectionHealthProbe<CryptoConnectionHealthProbe>();
+        services.AddScoped<IConnectionHealthReader, CryptoConnectionHealthReader>();
 
         services.AddSingleton<IJobRegistrar, JobRegistrar>();
 

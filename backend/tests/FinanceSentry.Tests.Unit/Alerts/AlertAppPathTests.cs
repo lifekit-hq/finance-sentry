@@ -59,6 +59,7 @@ public class AlertAppPathTests
         // Singletons keep the page that already holds them.
         { AlertType.SyncFailure, Account, "Monobank", "/accounts/list" },
         { AlertType.ConsentExpiring, Account, "AIB", "/accounts/list" },
+        { AlertType.ConnectionDormant, Account, "Monobank ···1234", "/accounts/list" },
         { AlertType.FamilyStatement, null, null, "/accounts/list" },
         { AlertType.PriceHike, Guid.NewGuid(), "Netflix", "/subscriptions" },
         { AlertType.DuplicateCharge, Guid.NewGuid(), "starbucks", "/transactions" },

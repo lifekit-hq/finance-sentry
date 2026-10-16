@@ -48,6 +48,14 @@ public interface IBankAccountRepository
     Task<IEnumerable<BankAccount>> GetByUserIdUnscopedAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The health of every active account of <paramref name="userId"/>, projected to the columns the read surfaces need
+    /// (<see cref="IConnectionHealthReader"/>), not the full rows. Opts out of the Owner query filter and keeps the
+    /// explicit user predicate.
+    /// </summary>
+    Task<IReadOnlyList<StoredAccountHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Update existing bank account.
     /// </summary>
     Task<BankAccount> UpdateAsync(BankAccount account, CancellationToken cancellationToken = default);
@@ -380,10 +388,24 @@ public interface IConnectionHealthStore
     /// </summary>
     Task<ProviderHealthSnapshot> GetProviderHealthUnscopedAsync(
         Guid excludingId, DateTimeOffset since, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The health of every one of <paramref name="userId"/>'s rows, for the read surfaces
+    /// (<see cref="IConnectionHealthReader"/>). Opts out of the Owner query filter and keeps
+    /// the explicit user predicate.
+    /// </summary>
+    Task<IReadOnlyList<StoredConnectionHealthRow>> GetHealthByUserUnscopedAsync(
+        Guid userId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>A connection row's health, with its consent expiry where the provider has one.</summary>
 public sealed record StoredConnectionHealth(ConnectionHealth Health, DateTime? ExpiresAt);
+
+/// <summary>One connection row's id and health; see <see cref="IConnectionHealthStore.GetHealthByUserUnscopedAsync"/>.</summary>
+public sealed record StoredConnectionHealthRow(Guid Id, ConnectionHealth Health);
+
+/// <summary>One account's id, provider, own health and the connection it belongs to; see <see cref="IBankAccountRepository.GetHealthByUserUnscopedAsync"/>.</summary>
+public sealed record StoredAccountHealthRow(Guid Id, string Provider, ConnectionHealth Health, Guid? ConnectionId);
 
 /// <summary>How a provider's other connections stand in a recent window; see <see cref="IConnectionHealthStore"/>.</summary>
 public sealed record ProviderHealthSnapshot(int OtherConnectionsFailing, bool AnyOtherConnectionSucceeded);

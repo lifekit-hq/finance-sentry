@@ -469,3 +469,122 @@ describe('AccountsListComponent async states', () => {
     expect(el.textContent).not.toContain('No accounts connected yet.');
   });
 });
+
+describe('AccountsListComponent connection-health labels', () => {
+  const dormantAccount: AccountBalanceItem = {
+    accountId: 'acc-eaid',
+    bankName: 'Monobank',
+    accountType: 'current',
+    accountNumberLast4: '4321',
+    currency: 'UAH',
+    provider: 'monobank',
+    category: 'banking',
+    currentBalance: 0,
+    balanceInBaseCurrency: 0,
+    syncStatus: 'dormant',
+    lastSyncTimestamp: null,
+  };
+
+  it.each([
+    ['retrying', 'Retrying · just now'],
+    ['reconnect_needed', 'Reconnect needed'],
+    ['dormant', 'Dormant'],
+  ] as const)('labels a %s institution "%s" on a phone', (syncStatus, label) => {
+    const text = setup(true, {syncStatus, lastSyncTimestamp: new Date().toISOString()}).textContent;
+    expect(text).toContain(`0 accounts · ${label}`);
+  });
+
+  it.each([
+    ['retrying', 'Retrying'],
+    ['dormant', 'Dormant'],
+  ] as const)('says %s quietly on desktop, never in the error colour', (syncStatus, label) => {
+    const element = setup(false, {syncStatus, lastSyncTimestamp: new Date().toISOString()});
+
+    const note = element.querySelector('[data-testid="institution-health-label"]');
+    expect(note?.textContent?.trim()).toBe(label);
+    expect(element.querySelector('.text-status-error')).toBeNull();
+  });
+
+  it('marks a retrying institution with the warning dot and a dormant one with the neutral dot', () => {
+    expect(
+      setup(false, {syncStatus: 'retrying'}).querySelector('.bg-status-warning')
+    ).not.toBeNull();
+    TestBed.resetTestingModule();
+    expect(
+      setup(false, {syncStatus: 'dormant'}).querySelector('.bg-text-secondary')
+    ).not.toBeNull();
+  });
+
+  it('asks for a reconnect on the attention row and in the row, as for a reauth', () => {
+    const element = setup(true, {name: 'AIB', syncStatus: 'reconnect_needed'});
+
+    const row = element.querySelector('[data-testid="attention-row"]');
+    expect(row?.textContent).toContain('AIB needs reconnecting');
+    expect(row?.querySelector('cmn-button')?.textContent).toContain('Reconnect');
+  });
+
+  it.each(['retrying', 'dormant'] as const)(
+    'raises no attention row for a %s institution',
+    syncStatus => {
+      expect(setup(true, {syncStatus}).querySelector('[data-testid="attention-row"]')).toBeNull();
+    }
+  );
+
+  it('labels a Dormant account quietly in its row', () => {
+    const element = setupFixture(false, {
+      provider: 'monobank',
+      syncStatus: 'synced',
+      accounts: [dormantAccount],
+    }).nativeElement as HTMLElement;
+
+    expect(element.querySelector('[data-testid="account-dormant-label"]')?.textContent).toContain(
+      'Dormant'
+    );
+  });
+});
+
+describe('AccountsListComponent reconnect deep link', () => {
+  function openWithReconnect(provider: string) {
+    const connectStore = {openModal: vi.fn(), selectPickedProvider: vi.fn()};
+    const dialog = {open: vi.fn().mockReturnValue({afterClosed: () => of(true)})};
+    const navigate = vi.fn().mockResolvedValue(true);
+    setupFixture(false, {provider, syncStatus: 'reconnect_needed'}, [
+      {provide: ConnectStore, useValue: connectStore},
+      {provide: CmnDialogService, useValue: dialog},
+      {provide: Router, useValue: {navigate}},
+      {
+        provide: ActivatedRoute,
+        useValue: {snapshot: {queryParamMap: new Map([['reconnect', provider]])}},
+      },
+    ]);
+    return {connectStore, dialog, navigate};
+  }
+
+  it("opens the provider's existing reconnect flow from ?reconnect=", () => {
+    const {connectStore, dialog} = openWithReconnect('truelayer');
+
+    expect(connectStore.selectPickedProvider).toHaveBeenCalledWith('truelayer');
+    expect(dialog.open).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({title: 'Reconnect bank'})
+    );
+  });
+
+  it('lands on the list, with no new sign-in, for a provider that has no reconnect flow', () => {
+    const {dialog} = openWithReconnect('ibkr');
+
+    expect(dialog.open).not.toHaveBeenCalled();
+  });
+
+  it('drops the parameter so a refresh does not reopen the flow', () => {
+    const {navigate} = openWithReconnect('truelayer');
+
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({reconnect: null}),
+        replaceUrl: true,
+      })
+    );
+  });
+});

@@ -12,7 +12,7 @@ public enum ConnectionHealthOutcome
     /// <summary>The connection just became <see cref="ConnectionHealthState.ActionRequired"/>: ask the user to reconnect, even in Quiet mode.</summary>
     NotifyActionRequired,
 
-    /// <summary>The connection just became <see cref="ConnectionHealthState.Dormant"/>: ask the user once whether to hide it.</summary>
+    /// <summary>The connection just became <see cref="ConnectionHealthState.Dormant"/>: tell the user once that it may be closed (hiding it is the owner's own action).</summary>
     GoDormant,
 
     /// <summary>A success after the user was told about a failure: resolve what they were told.</summary>

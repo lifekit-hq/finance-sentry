@@ -52,6 +52,12 @@ export const ALERT_TYPE_META_REGISTRY = {
     label: 'consent expiring',
     destination: AppRoute.AccountsList,
   },
+  // The one notice that a connection or account has failed for days and may be closed.
+  ['ConnectionDormant']: {
+    icon: 'Unplug',
+    label: 'dormant',
+    destination: AppRoute.AccountsList,
+  },
   ['JobFailure']: {
     icon: 'Wrench',
     label: 'job failure',

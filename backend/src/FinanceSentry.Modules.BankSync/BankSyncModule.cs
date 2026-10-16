@@ -1,5 +1,6 @@
 namespace FinanceSentry.Modules.BankSync;
 
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Infrastructure.Connections;
 using FinanceSentry.Infrastructure.Logging;
 using FinanceSentry.Modules.BankSync.Application.Connections;
@@ -201,6 +202,7 @@ public static class BankSyncModule
         services.AddScoped<ITrueLayerTokenRefreshService, TrueLayerTokenRefreshService>();
         services.AddScoped<IAccountDiscoveryService, AccountDiscoveryService>();
         services.AddConnectionHealthProbe<BankConnectionHealthProbe>();
+        services.AddScoped<IConnectionHealthReader, BankConnectionHealthReader>();
 
         services.AddScoped<IAggregationService, AggregationService>();
         services.AddScoped<ICommittedOutflowPolicy, CommittedOutflowPolicy>();

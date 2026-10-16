@@ -3,6 +3,7 @@ namespace FinanceSentry.Modules.Alerts.Application.Services;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using FinanceSentry.Core.Connections;
 using FinanceSentry.Core.Interfaces;
 using FinanceSentry.Core.Utils;
 using FinanceSentry.Modules.Alerts.Domain;
@@ -103,7 +104,13 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
         => EmitAsync(
             userId,
             SyncFailureDraft(provider, accountId, accountName, errorCode, SyncFailureClass.Credential)
-                with { Dedup = AlertDedup.Always, SupersedeOpen = true },
+                with
+                {
+                    Dedup = AlertDedup.Always,
+                    SupersedeOpen = true,
+                    HealthState = nameof(ConnectionHealthState.ActionRequired),
+                    AppPath = AlertAppPath.ForReconnect(provider),
+                },
             ct);
 
     private static AlertDraft SyncFailureDraft(
@@ -127,6 +134,34 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
     public Task ResolveSyncFailureAlertAsync(
         Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
         => ResolveAsync(userId, AlertType.SyncFailure, SyncFailureReferenceId(provider, accountId), ct);
+
+    public Task GenerateConnectionDormantAlertAsync(
+        Guid userId, string provider, Guid? accountId, string? accountName,
+        TimeSpan failingFor, bool othersSyncing, CancellationToken ct = default)
+    {
+        var label = accountName ?? provider;
+        var days = Math.Max(1, (int)failingFor.TotalDays);
+        var period = days == 1 ? "a day" : $"{days} days";
+        var body = othersSyncing
+            ? $"It has been failing for {period} while your other accounts sync fine."
+            : $"It has been failing for {period}.";
+
+        return EmitAsync(
+            userId,
+            new AlertDraft(
+                AlertType.ConnectionDormant, AlertSeverity.Info, SyncFailureReferenceId(provider, accountId), accountName,
+                $"{label} may be closed",
+                body)
+            {
+                Dedup = AlertDedup.OncePerReference,
+                HealthState = nameof(ConnectionHealthState.Dormant),
+            },
+            ct);
+    }
+
+    public Task ResolveConnectionDormantAlertAsync(
+        Guid userId, string provider, Guid? accountId, CancellationToken ct = default)
+        => ResolveAsync(userId, AlertType.ConnectionDormant, SyncFailureReferenceId(provider, accountId), ct);
 
     public Task DeleteAlertsForAccountAsync(Guid accountId, CancellationToken ct = default)
         => _alerts.DeleteByReferenceIdAsync(accountId, ct);
@@ -632,6 +667,7 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
             ReferenceId = draft.ReferenceId,
             ReferenceLabel = draft.ReferenceLabel,
             AppPath = draft.AppPath ?? AlertAppPath.Resolve(draft.Type, draft.ReferenceId, draft.ReferenceLabel, DateTimeOffset.UtcNow),
+            HealthState = draft.HealthState,
         }, ct);
     }
 
@@ -750,5 +786,8 @@ public class AlertGeneratorService(IAlertRepository alerts, IPolicyAckReader pol
 
         /// <summary>Where the alert opens, for an emitter that knows more than type, reference and label say.</summary>
         public string? AppPath { get; init; }
+
+        /// <summary>The connection-health state that raised the alert (<see cref="Alert.HealthState"/>).</summary>
+        public string? HealthState { get; init; }
     }
 }

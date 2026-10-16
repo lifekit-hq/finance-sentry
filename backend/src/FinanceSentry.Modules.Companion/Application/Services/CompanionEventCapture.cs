@@ -75,7 +75,7 @@ public sealed class CompanionEventCapture(
                 ReferenceId = a.ReferenceId ?? a.AlertId,
                 AppPath = a.AppPath,
                 SourceModule = "alerts",
-                Disposition = policy.DispositionFor(mode, kind.Value, staleness),
+                Disposition = policy.DispositionFor(mode, kind.Value, staleness, a.HealthState),
                 OccurredAt = a.CreatedAt,
             };
 

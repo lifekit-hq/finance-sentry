@@ -18,6 +18,12 @@ public class Alert : IHasUpdatedAt, IUserOwned
     /// alerts stored before it existed; <see cref="AlertAppPaths.For"/> resolves those from type, reference and label.
     /// </summary>
     public string? AppPath { get; set; }
+    /// <summary>
+    /// The connection-health state that raised the alert: <c>ActionRequired</c> on the reconnect ask the policy escalates,
+    /// <c>Dormant</c> on its Dormant notice, for a provider it drives; null on every other alert, the policy's Failing
+    /// alert included (it is an ordinary sync failure). Companion reads it to relay a reconnect ask at once.
+    /// </summary>
+    public string? HealthState { get; set; }
     public bool IsRead { get; set; }
     public bool IsResolved { get; set; }
     public bool IsDismissed { get; set; }

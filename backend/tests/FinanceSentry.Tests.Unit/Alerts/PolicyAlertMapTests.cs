@@ -28,6 +28,7 @@ public class PolicyAlertMapTests
         AlertType.PolicyViolation, // the Risk emitter itself; already gated by Risk's ack evaluation
         AlertType.Opportunity,
         AlertType.ConsentExpiring,
+        AlertType.ConnectionDormant,
         AlertType.JobFailure,
         AlertType.PerformanceBrief,
         AlertType.PriceHike,

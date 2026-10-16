@@ -132,6 +132,7 @@ export class AccountsListComponent implements OnInit {
     const params = this.route.snapshot.queryParamMap;
     const connected = params.get('connected');
     const connectError = params.get('connectError');
+    const reconnect = params.get('reconnect');
 
     if (connected === 'truelayer') {
       this.toast.show('Bank connected. Syncing your accounts now.', 'success');
@@ -140,6 +141,11 @@ export class AccountsListComponent implements OnInit {
     } else if (connectError) {
       this.toast.show(`Connection failed: ${connectError}`, 'error');
       this.clearConnectQueryParams();
+    } else if (reconnect) {
+      // A reconnect link (a confirmed credential loss's alert) opens the provider's own reconnect flow where it has
+      // one; any other provider lands here, where its row says "Reconnect needed".
+      this.clearConnectQueryParams();
+      this.reconnect({provider: reconnect});
     }
   }
 
@@ -169,7 +175,7 @@ export class AccountsListComponent implements OnInit {
   private clearConnectQueryParams(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: {connected: null, connectError: null},
+      queryParams: {connected: null, connectError: null, reconnect: null},
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -215,13 +221,13 @@ export class AccountsListComponent implements OnInit {
    */
   public navSublabel(institution: Institution, noun: string): string {
     const base = InstitutionNavUtils.sublabel(institution, noun, this.store.baseCurrency());
-    return this.isPhone() && this.needsAttention(institution)
+    return this.isPhone() && (this.needsAttention(institution) || this.hasQuietNote(institution))
       ? `${base} · ${this.syncSummary(institution)}`
       : base;
   }
 
   public syncSummary(institution: Institution): string {
-    if (institution.syncStatus === 'reauth_required') {
+    if (this.needsReconnect(institution)) {
       return 'Reconnect needed';
     }
     if (institution.syncStatus === 'failed') {
@@ -230,10 +236,14 @@ export class AccountsListComponent implements OnInit {
     if (institution.syncStatus === 'syncing') {
       return 'Syncing…';
     }
+    if (institution.syncStatus === 'dormant') {
+      return 'Dormant';
+    }
     if (!institution.lastSyncTimestamp) {
       return 'Not synced yet';
     }
-    return formatRelativeTime(institution.lastSyncTimestamp);
+    const since = formatRelativeTime(institution.lastSyncTimestamp);
+    return institution.syncStatus === 'retrying' ? `Retrying · ${since}` : since;
   }
 
   public disclosureKey(institution: Institution): string {
@@ -241,11 +251,23 @@ export class AccountsListComponent implements OnInit {
   }
 
   public needsAttention(institution: Institution): boolean {
-    return institution.syncStatus === 'failed' || institution.syncStatus === 'reauth_required';
+    return institution.syncStatus === 'failed' || this.needsReconnect(institution);
+  }
+
+  /** Only the owner can fix it: the provider refused the credential (`reconnect_needed` comes from its health). */
+  public needsReconnect(institution: Pick<Institution, 'syncStatus'>): boolean {
+    return (
+      institution.syncStatus === 'reauth_required' || institution.syncStatus === 'reconnect_needed'
+    );
+  }
+
+  /** A failure that is being handled (retrying) or a connection presumed closed (dormant): said, but quietly. */
+  public hasQuietNote(institution: Institution): boolean {
+    return institution.syncStatus === 'retrying' || institution.syncStatus === 'dormant';
   }
 
   public attentionTitle(institution: Institution): string {
-    return institution.syncStatus === 'reauth_required'
+    return this.needsReconnect(institution)
       ? `${institution.name} needs reconnecting`
       : `${institution.name} sync failed`;
   }
@@ -256,7 +278,7 @@ export class AccountsListComponent implements OnInit {
       return 'No successful sync yet';
     }
     const since = formatRelativeTime(last);
-    return institution.syncStatus === 'reauth_required'
+    return this.needsReconnect(institution)
       ? `Balances frozen since ${since}`
       : `Last synced ${since}`;
   }

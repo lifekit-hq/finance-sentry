@@ -155,6 +155,7 @@ public static class BrokerageSyncModule
         services.AddSingleton<IbkrFlexFailureClassifier>();
         services.AddScoped<IBKRSyncJob>();
         services.AddConnectionHealthProbe<IbkrConnectionHealthProbe>();
+        services.AddScoped<IConnectionHealthReader, BrokerageConnectionHealthReader>();
         services.AddScoped<IbkrFlexIncrementalSyncJob>();
         services.AddScoped<IbkrFlexBackfillJob>();
 

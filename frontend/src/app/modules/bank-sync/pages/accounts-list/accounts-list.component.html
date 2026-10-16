@@ -102,7 +102,7 @@
           </p>
           <p class="text-cmn-xs text-text-secondary">{{ attentionDetail(inst) }}</p>
         </div>
-        @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+        @if (canReconnect(inst) && needsReconnect(inst)) {
           <cmn-button (clicked)="reconnect(inst)" variant="primary" size="sm">Reconnect</cmn-button>
         }
       </div>
@@ -143,6 +143,11 @@
                   @if (needsAttention(inst)) {
                     <span class="text-status-error">{{ inst.syncStatus | syncStatusLabel }}</span>
                     ·
+                  } @else if (hasQuietNote(inst)) {
+                    <span data-testid="institution-health-label">{{
+                      inst.syncStatus | syncStatusLabel
+                    }}</span>
+                    ·
                   }
                   {{ inst.lastSyncTimestamp | cmnRelativeTime: 'Never' }}
                 </span>
@@ -159,7 +164,7 @@
 
               <div class="flex items-center gap-cmn-2" actions>
                 <!-- On a phone the menu carries Reconnect; the row keeps room for the figure. -->
-                @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+                @if (canReconnect(inst) && needsReconnect(inst)) {
                   <cmn-button
                     (clicked)="reconnect(inst); $event.stopPropagation()"
                     class="hidden sm:inline-block"
@@ -258,7 +263,7 @@
                 <cmn-icon class="shrink-0 text-text-secondary" name="ChevronRight" />
               </a>
               <div class="flex shrink-0 items-center gap-cmn-2 pr-cmn-3">
-                @if (canReconnect(inst) && inst.syncStatus === 'reauth_required') {
+                @if (canReconnect(inst) && needsReconnect(inst)) {
                   <cmn-button
                     (clicked)="reconnect(inst)"
                     class="hidden sm:inline-block"
@@ -293,7 +298,14 @@
   >
     <div class="min-w-0">
       <p class="text-cmn-sm text-text-primary">{{ title }}</p>
-      <p class="text-cmn-xs text-text-secondary">•••• {{ account.accountNumberLast4 }}</p>
+      <p class="text-cmn-xs text-text-secondary">
+        •••• {{ account.accountNumberLast4 }}
+        @if (account.syncStatus === 'dormant') {
+          <span data-testid="account-dormant-label"
+            >· {{ account.syncStatus | syncStatusLabel }}</span
+          >
+        }
+      </p>
     </div>
     <ng-container *ngTemplateOutlet="amountCell; context: {$implicit: account}" />
   </button>

@@ -16,7 +16,11 @@ public interface IMaterialAlertReader
     Task<IReadOnlySet<Guid>> GetOpenIdsAsync(IReadOnlyCollection<Guid> alertIds, CancellationToken ct = default);
 }
 
-/// <summary>A lightweight projection of an alert for companion capture. <paramref name="AppPath"/> is where the alert opens in the app.</summary>
+/// <summary>
+/// A lightweight projection of an alert for companion capture. <paramref name="AppPath"/> is where the alert opens in the
+/// app; <paramref name="HealthState"/> is the connection-health state that raised it
+/// (<c>ActionRequired</c>, <c>Dormant</c>) when the connection-health policy did, else null.
+/// </summary>
 public sealed record MaterialAlertRecord(
     Guid AlertId,
     Guid UserId,
@@ -26,4 +30,5 @@ public sealed record MaterialAlertRecord(
     Guid? ReferenceId,
     string? ReferenceLabel,
     DateTimeOffset CreatedAt,
-    string? AppPath = null);
+    string? AppPath = null,
+    string? HealthState = null);

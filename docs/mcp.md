@@ -32,7 +32,7 @@ The current runtime surface contains 72 tools. The canonical list is the `Agreed
 | `get_portfolio_snapshot` | Read | Portfolio | — | Unified brokerage + crypto holdings; cash split into banking / brokerage / crypto-venue fiat. `headlines` types the totals (`totalValue`, `investedValue`, `cash`, `unrealizedPnl`) as headline records (see below) |
 | `list_subscriptions` | Read | Subscriptions | — | Detected recurring charges |
 | `committed_merchants` | Read + Write | Cashflow | `action` (`list`\|`pin`\|`unpin`), `merchant?` | The merchants the user declared committed — rule (d) of the committed-outflow policy |
-| `get_sync_health` | Read | Sync | — | Status across Monobank, TrueLayer, Binance, Revolut X, IBKR |
+| `get_sync_health` | Read | Sync | — | Status across Monobank, TrueLayer, Binance, Revolut X, IBKR; a provider in `ConnectionHealth:ActiveProviders` is read from its stored connection health and adds `health` (`healthy` / `retrying` / `reconnect_needed` / `dormant`), omitted for every other provider |
 | `get_crypto_pnl_detail` | Read | Crypto | — | Per-asset crypto P&L from trade history |
 | `get_tax_lots` | Read | Brokerage | — | Current IBKR tax lots / average cost data (Inzhur holdings are not tax lots) |
 | `get_cashflow_report` | Read | Cashflow | `fromDate?`, `toDate?` | Monthly inflow / outflow / net from the classified money-flow statistics (internal transfers excluded, USD); `TransactionCount` is always 0 — the source query doesn't expose one |

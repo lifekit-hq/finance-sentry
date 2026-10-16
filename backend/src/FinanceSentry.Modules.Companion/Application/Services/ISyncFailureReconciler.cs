@@ -3,7 +3,8 @@ namespace FinanceSentry.Modules.Companion.Application.Services;
 using FinanceSentry.Modules.Companion.Domain;
 
 /// <summary>
-/// Delivery-time check for <see cref="CompanionEventKind.SyncFailure"/> events: a failure whose alert is no longer
+/// Delivery-time check for <see cref="CompanionEventKind.SyncFailure"/> and <see cref="CompanionEventKind.ConnectionDormant"/>
+/// events: a failure whose alert is no longer
 /// open (resolved, dismissed or deleted with its account) must never be relayed, and a still-held failure whose alert
 /// stayed open past <see cref="IMaterialityPolicy.SyncFailureEscalationAge"/> is a real outage that escalates.
 /// </summary>

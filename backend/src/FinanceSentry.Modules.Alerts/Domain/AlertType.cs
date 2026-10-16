@@ -15,6 +15,11 @@ public static class AlertType
     public const string Opportunity = "Opportunity";
     public const string ConsentExpiring = "ConsentExpiring";
     /// <summary>
+    /// A connection, or one account, of a provider the connection-health policy drives has been failing long enough to go
+    /// Dormant: the one notice that it may be closed. Raised once per reference, ever; resolved when it syncs again.
+    /// </summary>
+    public const string ConnectionDormant = "ConnectionDormant";
+    /// <summary>
     /// The operational-alert type. Failing jobs no longer raise it (the Grafana rule on
     /// <c>finance_job_consecutive_failures</c> replaced that, #935); the silent-detector alert still does, and
     /// rows already stored under it keep resolving to a known type.
