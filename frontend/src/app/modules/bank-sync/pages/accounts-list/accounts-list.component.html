@@ -29,11 +29,13 @@
                 class="h-2.5 w-2.5 shrink-0 rounded-full"
               ></span>
               <span class="text-cmn-sm text-text-primary">{{ row.label }}</span>
-              <span class="text-cmn-xs tabular-nums text-text-secondary"
-                >{{ row.percent | number: '1.0-0' }}%</span
-              >
+              @if (row.percent !== null) {
+                <span class="text-cmn-xs tabular-nums text-text-secondary"
+                  >{{ row.percent | number: '1.0-0' }}%</span
+                >
+              }
               <span class="ml-auto text-cmn-sm tabular-nums text-text-primary">
-                {{ row.value | money: store.baseCurrency() }}
+                {{ row.value | netBalance: store.baseCurrency() }}
               </span>
             </div>
           }

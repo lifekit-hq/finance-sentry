@@ -5,7 +5,7 @@ using FinanceSentry.Core.Connections;
 /// <summary>
 /// The connection-health labels of one wealth summary (slice S5): for a provider in
 /// <see cref="ConnectionHealthOptions.ActiveProviders"/>, what <see cref="ConnectionHealthSurface"/> makes of the health
-/// its module stores; for any other provider nothing, so its rows keep the status their sync path gave them. Read once
+/// its module stores; for any other provider nothing - bar an account its module holds Dormant - so its rows keep the status their sync path gave them. Read once
 /// per summary through every module's <see cref="IConnectionHealthReader"/>; with no provider listed nothing is read.
 /// </summary>
 internal sealed class ConnectionHealthLabels
@@ -22,7 +22,11 @@ internal sealed class ConnectionHealthLabels
         _options = options;
         var active = entries.Where(e => options.IsActive(e.Provider)).ToList();
         _connections = active.Where(e => !e.IsAccount).ToDictionary(e => e.Id);
-        _accounts = active.Where(e => e.IsAccount).ToDictionary(e => e.Id);
+        // A shadow provider keeps only an account the policy holds Dormant (closed at the bank): that one is quiet, so it
+        // must not fail its working siblings' institution.
+        _accounts = entries
+            .Where(e => e.IsAccount && (options.IsActive(e.Provider) || e.Health.State == ConnectionHealthState.Dormant))
+            .ToDictionary(e => e.Id);
     }
 
     /// <summary>
@@ -59,6 +63,9 @@ internal sealed class ConnectionHealthLabels
     public string? ForAccount(Guid accountId, string provider, Guid? connectionId)
     {
         var account = _accounts.TryGetValue(accountId, out var own) ? own.Health.State : (ConnectionHealthState?)null;
+        if (!IsActive(provider))
+            return account == ConnectionHealthState.Dormant ? ConnectionHealthSurface.Dormant : null;
+
         var connection = connectionId is { } id && _connections.TryGetValue(id, out var shared)
             ? shared.Health.State
             : (ConnectionHealthState?)null;

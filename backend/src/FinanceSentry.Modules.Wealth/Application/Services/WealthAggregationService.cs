@@ -328,7 +328,7 @@ public class WealthAggregationService(
     }
 
     // The most urgent status; a Dormant member counts only when every member is Dormant.
-    private static string WorstSyncStatus(IEnumerable<string> statuses)
+    public static string WorstSyncStatus(IEnumerable<string> statuses)
     {
         var all = statuses.ToList();
         var awake = all.Where(s => s != ConnectionHealthSurface.Dormant).ToList();
