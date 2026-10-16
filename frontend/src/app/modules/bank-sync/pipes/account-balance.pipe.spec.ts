@@ -88,10 +88,11 @@ describe('AccountBalancePipe', () => {
     expect(pipe.transform(account({balanceInBaseCurrency: null}), 'USD').equivalent).toBeNull();
   });
 
-  it('labels a credit account balance as owed, keeping the stored positive amount', () => {
+  it('shows a credit account balance as a negative amount', () => {
     const result = pipe.transform(account({accountType: 'credit', currentBalance: 120}), 'USD');
 
-    expect(result.native).toBe('Owes €120.00');
+    expect(result.native).toBe('-€120.00');
+    expect(result.equivalent).toBe('~ -$1,300');
     expect(result.owed).toBe(true);
   });
 

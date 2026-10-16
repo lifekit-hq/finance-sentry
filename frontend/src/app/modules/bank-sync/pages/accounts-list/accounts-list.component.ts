@@ -36,7 +36,6 @@ import {AppRoute} from '../../../../shared/enums/app-route/app-route.enum';
 import {type Institution} from '../../../../shared/models/wealth/wealth.model';
 import {InstitutionLogoPipe} from '../../../../shared/pipes/institution-logo.pipe';
 import {MoneyPipe} from '../../../../shared/pipes/money.pipe';
-import {NetBalancePipe} from '../../../../shared/pipes/net-balance.pipe';
 import {SyncStatusLabelPipe} from '../../../../shared/pipes/sync-status-label.pipe';
 import {SyncStatusVariantPipe} from '../../../../shared/pipes/sync-status-variant.pipe';
 import {ConnectivityService} from '../../../../shared/services/connectivity.service';
@@ -81,7 +80,6 @@ const SKELETON_SECTIONS = 2;
     ListSectionComponent,
     MenuComponent,
     MoneyPipe,
-    NetBalancePipe,
     NgTemplateOutlet,
     RelativeTimePipe,
     RouterLink,

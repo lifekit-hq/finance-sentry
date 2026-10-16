@@ -6,7 +6,7 @@ import {MoneyUtils} from '../../../shared/utils/money.utils';
 export interface FormattedBalance {
   native: string;
   equivalent: Nullable<string>;
-  /** A liability: the amount is what the user owes, so the row reads "Owes …" in the error tone. */
+  /** A liability: the stored amount is what the user owes, shown negative in the error tone. */
   owed: boolean;
 }
 
@@ -30,9 +30,7 @@ export class AccountBalancePipe implements PipeTransform {
     const amount = hasNative ? nativeValue : currentBalance;
     const shownCurrency = hasNative ? nativeCurrency : currency;
     const owed = accountType.toLowerCase() === LIABILITY_ACCOUNT_TYPE && amount > 0;
-    const native = owed
-      ? MoneyUtils.formatOwed(amount, shownCurrency)
-      : MoneyUtils.format(amount, shownCurrency);
+    const native = MoneyUtils.format(owed ? -amount : amount, shownCurrency);
 
     if (shownCurrency === baseCurrency || balanceInBaseCurrency === null) {
       return {native, equivalent: null, owed};
@@ -40,7 +38,10 @@ export class AccountBalancePipe implements PipeTransform {
 
     return {
       native,
-      equivalent: MoneyUtils.formatEquivalent(balanceInBaseCurrency, baseCurrency),
+      equivalent: MoneyUtils.formatEquivalent(
+        owed ? -balanceInBaseCurrency : balanceInBaseCurrency,
+        baseCurrency
+      ),
       owed,
     };
   }
