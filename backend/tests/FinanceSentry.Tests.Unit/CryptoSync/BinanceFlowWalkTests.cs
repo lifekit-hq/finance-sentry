@@ -231,6 +231,30 @@ public class BinanceFlowWalkTests
         page.WalkedTo.Should().Be(WindowEnd);
     }
 
+    [Fact]
+    public async Task ALockedRewardWithANumericPositionId_IsReadWithTheSameEventIdAsAStringOne()
+    {
+        _handler
+            .Respond("/api/v3/ticker/price", """[{"symbol":"BNBUSDT","price":"500"}]""")
+            .Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord",
+            $$"""{"rows":[{"positionId":123456789,"asset":"USDT","amount":"1.5","time":{{Apr9}}}],"total":1}""");
+
+        var page = await WalkAsync(PaymentsOut);
+
+        page.Flows.Should().ContainSingle().Which.EventId.Should().Be("123456789:" + Apr9);
+    }
+
+    [Fact]
+    public async Task AMalformedSuccessBody_SurfacesAsABinanceException()
+    {
+        _handler.Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord",
+            $$"""{"rows":[{"positionId":{"nested":1},"asset":"USDT","amount":"1.5","time":{{Apr9}}}],"total":1}""");
+
+        var act = () => WalkAsync(PaymentsOut);
+
+        (await act.Should().ThrowAsync<BinanceException>()).Which.Message.Should().Contain("unreadable");
+    }
+
     [Theory]
     [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""")]
     [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"msg":"Unauthorized"}""")]

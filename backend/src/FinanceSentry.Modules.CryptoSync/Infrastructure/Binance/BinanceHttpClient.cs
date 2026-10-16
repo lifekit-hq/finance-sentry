@@ -225,7 +225,14 @@ public sealed class BinanceHttpClient
                 (int)response.StatusCode);
         }
 
-        return JsonSerializer.Deserialize<T>(body)
-            ?? throw new BinanceException("Binance API returned empty response.");
+        try
+        {
+            return JsonSerializer.Deserialize<T>(body)
+                ?? throw new BinanceException("Binance API returned empty response.");
+        }
+        catch (JsonException ex)
+        {
+            throw new BinanceException("Binance API returned an unreadable response.", ex);
+        }
     }
 }
