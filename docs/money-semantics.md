@@ -1046,10 +1046,12 @@ split guard is a heuristic. The tolerance lives on the IPS, so it is checked whe
 - Revolut X fills quoted in a non-USD fiat are converted at the current FX rate, not the
   fill-date rate (§1 "Crypto venues").
 - Brokerage TWR and contributions vs growth (§8, §10): the market move on a provider's link day is lost
-  into the "newly linked" line (one or two days, bridged as capital). A relinked IBKR / Flex credential
-  re-stamps its link day, so its rows up to the relink are treated as history the linked value held. A
-  credential re-entered inside the window can therefore count deposits made between the first link and the
-  relink as growth, and the headline does not flag this yet. A removed
+  into the "newly linked" line (one or two days, bridged as capital). The link day is the credential's
+  `FirstLinkedAt` (set once; M016 backfilled it from the earliest of both IBKR credentials' `CreatedAt` and the first stored IBKR cash row or trade), which a relink of an IBKR / Flex credential never
+  moves, so deposits between the first link and a relink stay contributions, and a relink no longer moves the link
+  day in the brokerage growth query or the Book headline nor raises `SCOPE_CHANGED` there. Known gap:
+  `BrokerageScopeChangeReader`, used only by the net-worth history query, still reads the re-stamped `CreatedAt`. A credential relinked before M016 with no earlier synced row keeps its
+  relink day (the earlier link is not recoverable). A removed
   provider is not seen (connections record no deactivation time); its value leaving reads as a loss unless a
   withdrawal was recorded. Inzhur's link day is its credential's `CreatedAt` (Inzhur credentials have no
   active flag).
