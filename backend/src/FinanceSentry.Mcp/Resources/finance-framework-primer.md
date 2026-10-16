@@ -63,7 +63,8 @@ CONTRIBUTIONS_VS_GROWTH, TWR, MWR_XIRR, MODIFIED_DIETZ, GAIN_VS_COST, HPR), `bas
   a transfer is internal for the whole umbrella and external for one source. A newly linked account is not
   growth. Unknown flows degrade a figure (`UNKNOWN_FLOW`); they are never guessed.
 - Liabilities (money-semantics §2 Liability sign convention): a credit account's balance is an amount
-  owed, shown positive per account as "Owes" and subtracted in every net total. Never add it as an asset.
+  owed, stored positive per account, shown with a minus sign on Accounts and subtracted in every net total.
+  Never add it as an asset.
 
 ## Valuation and currency
 
