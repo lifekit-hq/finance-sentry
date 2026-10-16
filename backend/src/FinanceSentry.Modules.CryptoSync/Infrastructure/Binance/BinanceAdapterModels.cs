@@ -117,3 +117,41 @@ public sealed record BinanceCoinWithdrawal(
     [property: JsonPropertyName("applyTime")] string? ApplyTime,
     [property: JsonPropertyName("completeTime")] string? CompleteTime,
     [property: JsonPropertyName("transferType")] int TransferType);
+
+// /sapi/v1/simple-earn/flexible/history/rewardsRecord — one payout of a flexible product (type BONUS, REALTIME or REWARDS).
+public sealed record BinanceFlexibleReward(
+    [property: JsonPropertyName("asset")] string? Asset,
+    [property: JsonPropertyName("rewards")] string? Rewards,
+    [property: JsonPropertyName("projectId")] string? ProjectId,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("time")] long TimeMs);
+
+// /sapi/v1/simple-earn/locked/history/rewardsRecord — one payout of a locked position.
+public sealed record BinanceLockedReward(
+    [property: JsonPropertyName("positionId")] string? PositionId,
+    [property: JsonPropertyName("asset")] string? Asset,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("time")] long TimeMs);
+
+// /sapi/v1/asset/assetDividend — a distribution or airdrop; enInfo is free text and there is no documented type list.
+public sealed record BinanceAssetDividendPage(
+    [property: JsonPropertyName("rows")] IReadOnlyList<BinanceAssetDividend>? Rows,
+    [property: JsonPropertyName("total")] int Total);
+
+public sealed record BinanceAssetDividend(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("tranId")] long? TranId,
+    [property: JsonPropertyName("asset")] string? Asset,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("enInfo")] string? Info,
+    [property: JsonPropertyName("divTime")] long TimeMs);
+
+// /sapi/v1/asset/dribblet — dust conversions to BNB: totalTransferedAmount received after totalServiceChargeAmount.
+public sealed record BinanceDribbletResponse(
+    [property: JsonPropertyName("userAssetDribblets")] IReadOnlyList<BinanceDribblet>? Dribblets);
+
+public sealed record BinanceDribblet(
+    [property: JsonPropertyName("transId")] long TransId,
+    [property: JsonPropertyName("operateTime")] long OperateTimeMs,
+    [property: JsonPropertyName("totalTransferedAmount")] string? TransferedAmount,
+    [property: JsonPropertyName("totalServiceChargeAmount")] string? ServiceChargeAmount);

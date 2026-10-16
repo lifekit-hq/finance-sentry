@@ -78,6 +78,35 @@ public class RevolutXFlowWalkTests
         Leg("0.5", "BTC", "revolut_x"), Leg("0.5", "BTC", "external_crypto_wallet"), 1700000200000, 1700000300000);
 
     [Fact]
+    public async Task ARejectedRewardRequest_IsSkipped_AndTheTransfersAreStillRecorded()
+    {
+        _handler.RespondWithStatus(TransactionsPath, request =>
+            HttpUtility.ParseQueryString(request.RequestUri!.Query)["types"] == "reward"
+                ? (System.Net.HttpStatusCode.BadRequest, """{"message":"unknown type"}""")
+                : (System.Net.HttpStatusCode.OK, Page(null, ReceiveFromRevolut, SendToWallet)));
+
+        var page = await WalkAsync();
+
+        page.Flows.Select(f => f.ProviderType).Should().Equal(CryptoFlowTypes.Receive, CryptoFlowTypes.Send);
+        page.WalkedTo.Should().Be(AsOf);
+    }
+
+    [Fact]
+    public async Task AReward_IsReadFromItsDestinationLeg_AsIncomeWithNoCounterparty()
+    {
+        var reward = Row("d4e5f6a7-b8c9-0123-def0-345678901234", "completed", "reward",
+            null, Leg("0.00005", "BTC", "revolut_x"), 1700000400000, 1700000500000);
+        _handler.Respond(TransactionsPath, Page(null, reward));
+
+        var page = await WalkAsync();
+
+        page.Flows.Should().Equal(
+            new CryptoFlow("d4e5f6a7-b8c9-0123-def0-345678901234", CryptoFlowTypes.Reward,
+                DateTimeOffset.FromUnixTimeMilliseconds(1700000500000).UtcDateTime, 0.00005m, "BTC", false, 60000m, null, null,
+                null, "completed"));
+    }
+
+    [Fact]
     public async Task ReceiveAndSend_AreReadFromTheVenuesOwnLeg_WithTheOtherSidesAccountType()
     {
         _handler.Respond(TransactionsPath, Page(null, ReceiveFromRevolut, SendToWallet));
@@ -101,28 +130,35 @@ public class RevolutXFlowWalkTests
 
         await WalkAsync();
 
-        var request = _handler.Requests.Should().ContainSingle().Which;
-        request.Method.Should().Be(HttpMethod.Get);
-        request.Headers.Contains(RevolutXSigner.SignatureHeader).Should().BeTrue();
-        var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
-        query["types"].Should().Be("receive,send");
-        query["limit"].Should().Be("1900");
-        long.Parse(query["end_date"]!).Should().BeLessThan(long.Parse(query["start_date"]!) + 30L * 24 * 60 * 60 * 1000,
-            "a request spans at most 30 days");
+        var requests = _handler.Requests.Where(r => r.RequestUri!.AbsolutePath == TransactionsPath).ToList();
+        requests.Select(r => HttpUtility.ParseQueryString(r.RequestUri!.Query)["types"])
+            .Should().Equal("receive,send", "reward");
+        foreach (var request in requests)
+        {
+            request.Method.Should().Be(HttpMethod.Get);
+            request.Headers.Contains(RevolutXSigner.SignatureHeader).Should().BeTrue();
+            var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
+            query["limit"].Should().Be("1900");
+            long.Parse(query["end_date"]!).Should().BeLessThan(long.Parse(query["start_date"]!) + 30L * 24 * 60 * 60 * 1000,
+                "a request spans at most 30 days");
+        }
     }
 
     [Fact]
     public async Task AWindowLongerThanAPage_FollowsTheCursor()
     {
         _handler.Respond(TransactionsPath, request =>
-            HttpUtility.ParseQueryString(request.RequestUri!.Query)["cursor"] is null
-                ? Page("next-1", ReceiveFromRevolut)
-                : Page(null, SendToWallet));
+        {
+            var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
+            return query["types"] == "reward" ? Page(null)
+                : query["cursor"] is null ? Page("next-1", ReceiveFromRevolut)
+                : Page(null, SendToWallet);
+        });
 
         var page = await WalkAsync();
 
         page.Flows.Select(f => f.ProviderType).Should().Equal(CryptoFlowTypes.Receive, CryptoFlowTypes.Send);
-        _handler.Requests.Where(r => r.RequestUri!.AbsolutePath == TransactionsPath).Should().HaveCount(2);
+        _handler.Requests.Where(r => r.RequestUri!.AbsolutePath == TransactionsPath).Should().HaveCount(3);
     }
 
     [Fact]
@@ -132,7 +168,7 @@ public class RevolutXFlowWalkTests
 
         var page = await WalkAsync(from: AsOf.AddDays(-75));
 
-        _handler.Requests.Where(r => r.RequestUri!.AbsolutePath == TransactionsPath).Should().HaveCount(3);
+        _handler.Requests.Where(r => r.RequestUri!.AbsolutePath == TransactionsPath).Should().HaveCount(6);
         page.WalkedTo.Should().Be(AsOf);
     }
 

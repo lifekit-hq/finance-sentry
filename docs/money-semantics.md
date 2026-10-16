@@ -980,7 +980,7 @@ are closed periods.
   - **Base currency.** Computed in USD; the controller converts every amount at today's rate to the profile's
     base currency like the wealth summary, and the headline names that rate (`FX_TODAY_RATE`) for a non-USD base.
     The rates are untouched.
-- **Crypto contributions vs growth** (S2a, S2b; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
+- **Crypto contributions vs growth** (S2a, S2b, S2c; `GET /api/v1/wealth/crypto/growth`, no UI yet; finance-framework M2
   and M4): the same split, handler and response as the brokerage one, over the crypto sleeve - the venues
   (Binance, Revolut X; no self-custody) at `crypto_total` from the daily snapshots, with only the crypto
   source's own staleness reaching the headline (scope `sleeve:crypto`).
@@ -1000,14 +1000,23 @@ are closed periods.
     (`txId`) and network kept: a deposit once credited (status 1, or 6 credited but locked), a withdrawal once
     completed (6), at its `amount` with the `transactionFee` as its fee; a pending one holds the cursor for up
     to 30 days; a transfer with another Binance account (`transferType` 1) is marked `binance_internal`.
-    Revolut X: completed `receive` and `send` transfers (`/transactions`), with the other side's account type
+    Revolut X: completed `receive` and `send` transfers (`/transactions`) and `reward` (staking income, a separate request per window: a rejected one is skipped with a warning, so that income stays in the market remainder; rewards paid before this release are not fetched for a credential whose flow walk already passed them, and stay in the market remainder until a separate backfill), with the other side's account type
     kept (`revolut` = the owner's own Revolut app, `external_*` = outside); a coin transfer with an
     `external_crypto_wallet` also reads its details (`/transactions/{id}`) for the chain hash and network, and a
     send whose fee is named in the sent coin is stored at what went on chain with that fee apart.
+    S2c adds Binance's earn and
+    dust history, read with the window's last lane (one day, once per window, best-effort: a call the key is not
+    permitted to make (HTTP 401, or a 403 with Binance code -2015; any other failure, including another 403, throws and the window is read again) is skipped with a warning, so its income stays in the market remainder): Simple Earn flexible
+    and locked rewards, `assetDividend` distributions and airdrops (rows whose text names Earn are skipped, as the
+    Earn calls already count them; unverified against a live row), and `asset/dribblet` dust conversions to BNB.
   - **Classification** (`CryptoFlowClassifier`, at read time): fiat in, a card buy and a transfer in are
     external inflows; fiat out, a sell for fiat and a transfer out are external outflows; the fee is a fee
     (return). A buy paid from Binance's own fiat balance (`Cash Balance`) moves nothing across the sleeve's
-    edge, so only its fee counts. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
+    edge, so only its fee counts. An earn reward, a staking reward and an airdrop are income (return, in the
+    asset received), never money put in; a dust conversion moves nothing and counts only its BNB service charge as
+    a fee. Spot trades, Convert, Earn subscribe and redeem and Revolut X `stake` and `un_stake` are internal and
+    record nothing. An income or fee leg the venue could not price drops out of the split without marking the
+    flows unknown. Fixture 19 at EURUSD 1.10: a EUR 500 Revolut X receive from `revolut` and a
     EUR 100 card buy with a EUR 2 fee read +660 contributed and -2.20 fees. The other side's account type is kept raw
     (`CounterpartyRef`); the sleeve reads both `revolut` and `external_*` as external.
   - **Transfers between venues** (`CryptoTransferMatcher`, at read time). A coin one venue sent and another

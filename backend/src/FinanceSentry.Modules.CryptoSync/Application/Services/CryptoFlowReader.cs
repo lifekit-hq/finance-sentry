@@ -122,7 +122,13 @@ public sealed class CryptoFlowReader(CryptoSyncDbContext db, IHistoricalExchange
                     : CryptoToUsd(leg, row, item.Date);
                 if (usd is not { } converted)
                 {
-                    unpriced.Add(row.Provider);
+                    // An income or fee leg with no price is only part of the return's split, so it cannot make the
+                    // flows unknown; a leg that moves money across the edge can.
+                    if (leg.Class is not (FlowClass.Income or FlowClass.Fee))
+                    {
+                        unpriced.Add(row.Provider);
+                    }
+
                     continue;
                 }
 

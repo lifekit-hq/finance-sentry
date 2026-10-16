@@ -138,6 +138,40 @@ public sealed class BinanceHttpClient
             System.Globalization.CultureInfo.InvariantCulture,
             $"startTime={startTimeMs}&endTime={endTimeMs}&offset={offset}&limit={limit}");
 
+    // The earn, distribution and dust history of a day-long window: weighted far below fiat/orders, so the last lane
+    // reads them together.
+    // https://developers.binance.com/docs/simple_earn/history/Get-Flexible-Rewards-History
+    public Task<BinanceEarnPage<BinanceFlexibleReward>> GetFlexibleRewardsAsync(
+        string apiKey, string apiSecret, string type, long beginTimeMs, long endTimeMs, int page, int size, CancellationToken ct = default) =>
+        SendSignedAsync<BinanceEarnPage<BinanceFlexibleReward>>(
+            HttpMethod.Get, "/sapi/v1/simple-earn/flexible/history/rewardsRecord", apiKey, apiSecret,
+            string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"type={type}&startTime={beginTimeMs}&endTime={endTimeMs}&current={page}&size={size}"), ct);
+
+    // https://developers.binance.com/docs/simple_earn/history/Get-Locked-Rewards-History
+    public Task<BinanceEarnPage<BinanceLockedReward>> GetLockedRewardsAsync(
+        string apiKey, string apiSecret, long beginTimeMs, long endTimeMs, int page, int size, CancellationToken ct = default) =>
+        SendSignedAsync<BinanceEarnPage<BinanceLockedReward>>(
+            HttpMethod.Get, "/sapi/v1/simple-earn/locked/history/rewardsRecord", apiKey, apiSecret,
+            string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"startTime={beginTimeMs}&endTime={endTimeMs}&current={page}&size={size}"), ct);
+
+    // https://developers.binance.com/docs/wallet/asset/assets-divided-record
+    public Task<BinanceAssetDividendPage> GetAssetDividendsAsync(
+        string apiKey, string apiSecret, long beginTimeMs, long endTimeMs, int limit, CancellationToken ct = default) =>
+        SendSignedAsync<BinanceAssetDividendPage>(
+            HttpMethod.Get, "/sapi/v1/asset/assetDividend", apiKey, apiSecret,
+            string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"startTime={beginTimeMs}&endTime={endTimeMs}&limit={limit}"), ct);
+
+    // https://developers.binance.com/docs/wallet/asset/dust-log
+    public Task<BinanceDribbletResponse> GetDribbletAsync(
+        string apiKey, string apiSecret, long beginTimeMs, long endTimeMs, CancellationToken ct = default) =>
+        SendSignedAsync<BinanceDribbletResponse>(
+            HttpMethod.Get, "/sapi/v1/asset/dribblet", apiKey, apiSecret,
+            string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"startTime={beginTimeMs}&endTime={endTimeMs}"), ct);
+
     private static string FiatHistoryQuery(int transactionType, long beginTimeMs, long endTimeMs, int page, int rows) =>
         string.Create(
             System.Globalization.CultureInfo.InvariantCulture,

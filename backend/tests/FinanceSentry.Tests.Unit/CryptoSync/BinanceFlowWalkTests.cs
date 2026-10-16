@@ -36,6 +36,12 @@ public class BinanceFlowWalkTests
 
     public BinanceFlowWalkTests()
     {
+        _handler
+            .Respond("/sapi/v1/simple-earn/flexible/history/rewardsRecord", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/asset/assetDividend", """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/asset/dribblet", """{"total":0,"userAssetDribblets":[]}""");
+
         foreach (var path in new[] { OrdersPath, PaymentsPath })
         {
             _handler.Respond(path, request =>
@@ -82,7 +88,8 @@ public class BinanceFlowWalkTests
         {
             _handler.Requests.Clear();
             var page = await WalkAsync(lane);
-            var request = _handler.Requests.Should().ContainSingle("a run spends one weighted fiat call").Subject;
+            var request = _handler.Requests.Where(r => r.RequestUri!.AbsolutePath.StartsWith("/sapi/v1/fiat", StringComparison.Ordinal))
+                .Should().ContainSingle("a run spends one weighted fiat call").Subject;
             var query = HttpUtility.ParseQueryString(request.RequestUri!.Query);
             rows.Add((lane, request.RequestUri.AbsolutePath, query["transactionType"]!, page.Flows.Should().ContainSingle().Subject));
         }
@@ -190,6 +197,71 @@ public class BinanceFlowWalkTests
     public async Task ARefusedHistory_Throws_SoTheCursorAndLaneStay()
     {
         _pages[(PaymentsPath, "1")] = _ => """{"code": "100001", "message": "refused", "data": [], "total": 0, "success": false}""";
+
+        var act = () => WalkAsync(PaymentsOut);
+
+        await act.Should().ThrowAsync<BinanceException>();
+    }
+
+    [Fact]
+    public async Task TheLastLane_AlsoReadsRewardsAirdropsAndDust_PricedAtTheVenueRate()
+    {
+        _handler
+            .Respond("/api/v3/ticker/price", """[{"symbol":"BNBUSDT","price":"500"}]""")
+            .Respond("/sapi/v1/simple-earn/flexible/history/rewardsRecord", request =>
+                HttpUtility.ParseQueryString(request.RequestUri!.Query)["type"] == "REWARDS"
+                    ? $$"""{"rows":[{"asset":"USDT","rewards":"3.00","projectId":"USDT001","type":"REWARDS","time":{{Apr9}}}],"total":1}"""
+                    : """{"rows":[],"total":0}""")
+            .Respond("/sapi/v1/simple-earn/locked/history/rewardsRecord",
+                $$"""{"rows":[{"positionId":"7","asset":"USDT","amount":"1.5","time":{{Apr9}}}],"total":1}""")
+            .Respond("/sapi/v1/asset/assetDividend",
+                $$"""{"rows":[{"id":11,"tranId":901,"asset":"BNB","amount":"0.1","enInfo":"Airdrop distribution","divTime":{{Apr9}}},{"id":12,"tranId":902,"asset":"USDT","amount":"9","enInfo":"Simple Earn payout","divTime":{{Apr9}}}],"total":2}""")
+            .Respond("/sapi/v1/asset/dribblet",
+                $$"""{"total":1,"userAssetDribblets":[{"transId":55,"operateTime":{{Apr9}},"totalTransferedAmount":"0.2","totalServiceChargeAmount":"0.0001"}]}""");
+
+        var page = await WalkAsync(PaymentsOut);
+
+        page.Flows.Select(f => (f.EventId, f.ProviderType, f.Amount, f.Unit, f.UnitPriceUsd, f.Fee)).Should().BeEquivalentTo(
+        [
+            ("USDT001:REWARDS:" + Apr9, CryptoFlowTypes.Reward, 3.00m, "USDT", (decimal?)1m, (decimal?)null),
+            ("7:" + Apr9, CryptoFlowTypes.Reward, 1.5m, "USDT", (decimal?)1m, (decimal?)null),
+            ("901", CryptoFlowTypes.Airdrop, 0.1m, "BNB", (decimal?)500m, (decimal?)null),
+            ("55", CryptoFlowTypes.DustConversion, 0.2m, "BNB", (decimal?)500m, (decimal?)0.0001m),
+        ]);
+        page.WalkedTo.Should().Be(WindowEnd);
+    }
+
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""")]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, """{"msg":"Unauthorized"}""")]
+    [InlineData(System.Net.HttpStatusCode.Forbidden, """{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}""")]
+    public async Task ARejectedEarnSource_IsSkipped_AndTheWindowStillCompletes(System.Net.HttpStatusCode status, string body)
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", body, status);
+
+        var page = await WalkAsync(PaymentsOut);
+
+        page.Flows.Should().BeEmpty();
+        page.WalkedTo.Should().Be(WindowEnd);
+    }
+
+    [Fact]
+    public async Task AForbiddenEarnSourceWithoutTheKeyRejectedCode_Throws_SoTheWindowIsReadAgain()
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", """{"msg":"WAF Limit (Way Too Many Requests)"}""", System.Net.HttpStatusCode.Forbidden);
+
+        var act = () => WalkAsync(PaymentsOut);
+
+        await act.Should().ThrowAsync<BinanceException>();
+    }
+
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.TooManyRequests)]
+    [InlineData((System.Net.HttpStatusCode)418)]
+    [InlineData(System.Net.HttpStatusCode.BadRequest)]
+    public async Task AThrottledOrFailedEarnSource_Throws_SoTheWindowIsReadAgain(System.Net.HttpStatusCode status)
+    {
+        _handler.Respond("/sapi/v1/asset/dribblet", """{"code":-1003,"msg":"Too many requests."}""", status);
 
         var act = () => WalkAsync(PaymentsOut);
 

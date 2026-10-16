@@ -46,6 +46,22 @@ public class CryptoFlowClassifierTests
     [Fact]
     public void AnUnknownType_ContributesNothing()
     {
-        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, "airdrop", 10m, "EUR", null)).Should().BeEmpty();
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, "mystery", 10m, "EUR", null)).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(CryptoFlowTypes.Reward)]
+    [InlineData(CryptoFlowTypes.Airdrop)]
+    public void ARewardOrAirdrop_IsIncome_NeverMoneyPutIn(string type)
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, type, 30m, "USDT", null, isFiat: false))
+            .Should().Equal(new CryptoFlowLeg(FlowClass.Income, 30m, "USDT"));
+    }
+
+    [Fact]
+    public void ADustConversion_MovesNothing_ButItsServiceCharge()
+    {
+        CryptoFlowClassifier.AtSleeve(Flow(CryptoExchangeProvider.Binance, CryptoFlowTypes.DustConversion, 0.2m, "BNB", null, fee: 0.0001m, isFiat: false))
+            .Should().Equal(new CryptoFlowLeg(FlowClass.Fee, 0.0001m, "BNB"));
     }
 }
